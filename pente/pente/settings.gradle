@@ -1,2 +1,2 @@
 rootProject.name = 'pente'
-
+include 'contracts'

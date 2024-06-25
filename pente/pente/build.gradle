@@ -21,28 +21,6 @@ repositories {
     mavenCentral()
 }
 
-tasks.named('compileTestJava') {
-    mustRunAfter(compileSolidity)
-}
-
-tasks.named('jar') {
-    mustRunAfter(compileSolidity)
-}
-
-sourceSets {
-    main {
-        solidity {
-            srcDir {
-                "contracts/solidity"
-            }
-            setEvmVersion('BERLIN')
-            setOptimize(true)
-            setOptimizeRuns(200)
-            setVersion('0.8.26')
-        }
-    }
-}
-
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -50,8 +28,11 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.12+'
 
     testImplementation "org.web3j.solidity:solidity-gradle-plugin:0.5+"
+    testImplementation project(':contracts')
 
     implementation 'org.hyperledger.besu:evm:24.5.4'
+    implementation 'commons-io:commons-io:2.16.1'
+
 }
 
 test {
