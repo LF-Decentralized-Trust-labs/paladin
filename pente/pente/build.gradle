@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id "org.web3j.solidity" version "0.5.0"
+}
+
+group = 'io.kaleido'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    maven {
+        url 'https://hyperledger.jfrog.io/hyperledger/besu-maven'
+        content { includeGroupByRegex('org\\.hyperledger\\..*') }
+    }
+    maven {
+        url 'https://artifacts.consensys.net/public/maven/maven/'
+        content { includeGroupByRegex('tech\\.pegasys(\\..*)?') }
+    }
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
+    mavenCentral()
+}
+
+tasks.named('compileTestJava') {
+    mustRunAfter(compileSolidity)
+}
+
+tasks.named('jar') {
+    mustRunAfter(compileSolidity)
+}
+
+sourceSets {
+    main {
+        solidity {
+            srcDir {
+                "contracts/solidity"
+            }
+            setEvmVersion('BERLIN')
+            setOptimize(true)
+            setOptimizeRuns(200)
+            setVersion('0.8.26')
+        }
+    }
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.9+')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.mockito:mockito-core:5.12+'
+    testImplementation 'org.mockito:mockito-core:5.12+'
+
+    testImplementation "org.web3j.solidity:solidity-gradle-plugin:0.5+"
+
+    implementation 'org.hyperledger.besu:evm:24.5.4'
+}
+
+test {
+    useJUnitPlatform()
+}
