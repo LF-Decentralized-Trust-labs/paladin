@@ -1,0 +1,7 @@
+{
+    "go.formatFlags": ["-s"],
+    "go.lintTool": "golangci-lint",
+    "cSpell.words": [],
+    "go.testTimeout": "10s"
+  }
+  
