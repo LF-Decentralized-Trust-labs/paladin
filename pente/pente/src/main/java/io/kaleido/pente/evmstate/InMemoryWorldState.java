@@ -21,9 +21,13 @@ import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.worldstate.WorldState;
 import org.apache.tuweni.bytes.Bytes32;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public class InMemoryWorldState implements WorldState {
+
+    final Map<Address, Account> accounts = new HashMap<>();
 
     @Override
     public Hash rootHash() {
@@ -42,6 +46,6 @@ public class InMemoryWorldState implements WorldState {
 
     @Override
     public Account get(Address address) {
-        return null;
+        return accounts.get(address);
     }
 }

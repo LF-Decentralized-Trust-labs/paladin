@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc. 
+ * Copyright © 2024 Kaleido, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,11 +27,13 @@ import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.evm.Code;
 import org.hyperledger.besu.evm.EVM;
 import org.hyperledger.besu.evm.MainnetEVMs;
-import org.hyperledger.besu.evm.contractvalidation.MaxCodeSizeRule;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.gascalculator.ShanghaiGasCalculator;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
+import org.hyperledger.besu.evm.precompile.PrecompileContractRegistry;
 import org.hyperledger.besu.evm.processor.ContractCreationProcessor;
+import org.hyperledger.besu.evm.processor.MessageCallProcessor;
+import org.hyperledger.besu.evm.tracing.OperationTracer;
 import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -41,10 +43,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.Random;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -80,13 +79,6 @@ public class PrivateStateTests {
                 evmConfiguration);
         VirtualBlockchain virtualBlockchain = new VirtualBlockchain(0 );
 
-        ContractCreationProcessor processor = new ContractCreationProcessor(
-                gasCalculator,
-                evm,
-                true,
-                Collections.singletonList(MaxCodeSizeRule.of(Integer.MAX_VALUE)),
-                1);
-
         // Process the code
         Bytes codeBytes = Bytes.fromHexString(hexByteCode);
         Code code = evm.getCode(Hash.hash(codeBytes), codeBytes);
@@ -98,7 +90,6 @@ public class PrivateStateTests {
         worldUpdater.getOrCreate(receiver).setCode(codeBytes);
 
         // Construct a contract deployment message
-        Deque<MessageFrame> messageFrameStack = new ArrayDeque<>();
         final MessageFrame frame =
                 MessageFrame.builder()
                         .type(MessageFrame.Type.CONTRACT_CREATION)
@@ -107,7 +98,7 @@ public class PrivateStateTests {
                         .address(receiver)
                         .originator(sender)
                         .sender(sender)
-                        .gasPrice(Wei.of(new BigInteger("10000000000" /* 10 gwei */)))
+                        .gasPrice(Wei.ZERO)
                         .inputData(Bytes.EMPTY)
                         .value(Wei.ZERO)
                         .apparentValue(Wei.ZERO)
@@ -120,8 +111,30 @@ public class PrivateStateTests {
                         .maxStackSize(Integer.MAX_VALUE)
                         .build();
 
-        // Suck it and see
+        final OperationTracer tracer = new DebugEVMTracer();
+        Deque<MessageFrame> messageFrameStack = frame.getMessageFrameStack();
+        final PrecompileContractRegistry precompileContractRegistry = new PrecompileContractRegistry();
+        final MessageCallProcessor mcp = new MessageCallProcessor(evm, precompileContractRegistry);
+        final ContractCreationProcessor ccp =
+                new ContractCreationProcessor(evm.getGasCalculator(), evm, false, List.of(), 0);
+
         logger.debug("Running contract deployment");
-        processor.start(frame, new DebugEVMTracer());
+        while (!messageFrameStack.isEmpty()) {
+            final MessageFrame messageFrame = messageFrameStack.peek();
+            switch (messageFrame.getType()) {
+                case CONTRACT_CREATION -> ccp.process(messageFrame, tracer);
+                case MESSAGE_CALL -> mcp.process(messageFrame, tracer);
+            }
+
+            if (messageFrame.getExceptionalHaltReason().isPresent()) {
+                logger.debug(messageFrame.getExceptionalHaltReason().get().toString());
+            }
+            if (messageFrame.getRevertReason().isPresent()) {
+                logger.debug(
+                        new String(
+                                messageFrame.getRevertReason().get().toArrayUnsafe(), StandardCharsets.UTF_8));
+            }
+        }
+
     }
 }

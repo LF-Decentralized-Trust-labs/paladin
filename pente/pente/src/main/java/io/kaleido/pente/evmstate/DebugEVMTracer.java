@@ -35,12 +35,12 @@ public class DebugEVMTracer implements OperationTracer {
 
     @Override
     public void tracePreExecution(MessageFrame frame) {
-        logger.debug("tracePreExecution: frame={}", frame);
+        logger.debug("tracePreExecution: op={}", frame.getCurrentOperation().getName());
     }
 
     @Override
     public void tracePostExecution(MessageFrame frame, Operation.OperationResult operationResult) {
-        logger.debug("tracePostExecution: frame={} operationResult={}", frame, operationResult);
+        logger.debug("tracePostExecution: op={} cost={}", frame.getCurrentOperation().getName(), operationResult.getGasCost());
     }
 
     @Override
