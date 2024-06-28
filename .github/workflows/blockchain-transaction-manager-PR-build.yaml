@@ -16,6 +16,7 @@ on:
       - main
     paths:
       - 'blockchain-transaction-manager/**'
+      - 'Makefile.common'
       - '.github/workflows/blockchain-transaction-manager-PR-build.yaml'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
