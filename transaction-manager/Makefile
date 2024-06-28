@@ -5,9 +5,8 @@ all: test
 btxmanager:
 	$(eval BTXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-blockchain-transaction-manager/pkg/manager))
 
-USE_TEST_DB := 0
-
 # include the common tasks
+USE_TEST_DB := 0
 include ../Makefile.common
 
 # register mocks
