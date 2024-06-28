@@ -15,6 +15,7 @@ on:
       - main
     paths:
       - 'transaction-manager/**'
+      - 'Makefile.common'
       - '.github/workflows/paladin-transaction-manager-PR-build.yaml'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -22,7 +23,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: golang:1.22-bullseye
-
+    # uncomment database setup as needed
+    # services:
+    #   postgres:
+    #     image: postgres
+    #     env:
+    #       POSTGRES_PASSWORD: my-secret
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,3 +53,8 @@ jobs:
       - name: Build and Test
         working-directory: transaction-manager
         run: make
+        # env:
+        #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
+        #   POSTGRES_HOSTNAME: postgres
+        #   POSTGRES_PASSWORD: my-secret
+        #   POSTGRES_PORT: 5432

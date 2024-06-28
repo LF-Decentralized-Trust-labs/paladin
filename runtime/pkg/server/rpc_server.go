@@ -31,17 +31,10 @@ func NewRPCServer(ctx context.Context) (*rpc.Server, error) {
 	s.RegisterCodec(json2.NewCodec(), "application/json")
 
 	// Create a blockchain transaction manager
-	blockchainTransactionManager, _ := btxManager.NewBlockchainTxManager(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	blockchainTransactionManager := btxManager.NewBlockchainTxManager(ctx)
 
 	// Create a paladin transaction manager service
-	pldTxMgrService, _ := pldManager.NewPaladinService(ctx, blockchainTransactionManager)
-
-	// if err != nil {
-	// 	return nil, err
-	// }
+	pldTxMgrService := pldManager.NewPaladinService(ctx, blockchainTransactionManager)
 
 	// Register the BlockchainService
 	_ = s.RegisterService(pldTxMgrService, "pld" /**subject name of the JSON rpc method, e.g. pld.SubmitTransaction**/)
