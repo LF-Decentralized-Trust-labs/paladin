@@ -56,8 +56,7 @@ func TestPaladinService_SubmitTransaction(t *testing.T) {
 func TestNewPaladinService(t *testing.T) {
 	mockManager := &btxmMocks.BlockchainTransactionManager{}
 
-	service, err := NewPaladinService(context.Background(), mockManager)
+	service := NewPaladinService(context.Background(), mockManager)
 
-	assert.NoError(t, err, "NewPaladinService should not return an error")
 	assert.NotNil(t, service, "NewPaladinService should return a non-nil service instance")
 }

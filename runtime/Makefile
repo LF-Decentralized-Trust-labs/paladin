@@ -7,11 +7,14 @@ MOCK_TARGET_DEFINED := 1
 .PHONY: btxmanager
 btxmanager:
 		$(eval BTXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-blockchain-transaction-manager/pkg/manager))	
+.PHONY: txmanager
+txmanager:
+		$(eval TXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-transaction-manager/pkg/manager))	
 
 .PHONY: mock
-mock: deps btxmanager
+mock: deps btxmanager txmanager
 		${MOCKERY} --case underscore --dir ${BTXM_PATH} --name BlockchainTransactionManager --outpkg btxmMocks --output mocks/btxmMocks
-
+		${MOCKERY} --case underscore --dir ${TXM_PATH} --name PaladinTransactionManager --outpkg txmMocks --output mocks/txmMocks
 
 # include the common tasks
 include ../Makefile.common

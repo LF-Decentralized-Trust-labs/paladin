@@ -25,7 +25,7 @@ import (
 )
 
 func TestBlockchainTxManager_Init(t *testing.T) {
-	manager, _ := NewBlockchainTxManager(context.Background())
+	manager := NewBlockchainTxManager(context.Background())
 
 	err := manager.Init(context.Background())
 
@@ -33,7 +33,7 @@ func TestBlockchainTxManager_Init(t *testing.T) {
 }
 
 func TestBlockchainTxManager_HandleNewTransaction(t *testing.T) {
-	manager, _ := NewBlockchainTxManager(context.Background())
+	manager := NewBlockchainTxManager(context.Background())
 
 	txRequest := &apitypes.TransactionRequest{}
 

@@ -39,6 +39,6 @@ func (b *BlockchainTxManager) HandleNewTransaction(ctx context.Context, txReq *a
 	return nil, false, errors.New("mock failure")
 }
 
-func NewBlockchainTxManager(context.Context) (*BlockchainTxManager, error) {
-	return &BlockchainTxManager{}, nil
+func NewBlockchainTxManager(context.Context) *BlockchainTxManager {
+	return &BlockchainTxManager{}
 }

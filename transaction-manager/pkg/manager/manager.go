@@ -50,8 +50,8 @@ func (b *PaladinService) SubmitTransaction(r *http.Request, args *TransactionArg
 	return err
 }
 
-func NewPaladinService(ctx context.Context, btm btxManager.BlockchainTransactionManager) (*PaladinService, error) {
+func NewPaladinService(ctx context.Context, btm btxManager.BlockchainTransactionManager) *PaladinService {
 	return &PaladinService{
 		blockchainTransactionManager: btm,
-	}, nil
+	}
 }
