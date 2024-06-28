@@ -20,8 +20,11 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/config"
+	"github.com/hyperledger/firefly-common/pkg/dbsql"
+	"github.com/hyperledger/firefly-common/pkg/ffapi"
 	smconfig "github.com/kaleido-io/paladin-state-manager/internal/config"
 	"github.com/kaleido-io/paladin-state-manager/internal/db"
+	"github.com/kaleido-io/paladin-state-manager/pkg/apitypes"
 )
 
 type Config struct {
@@ -29,6 +32,8 @@ type Config struct {
 }
 
 type PaladinStateManager interface {
+	ListStates(ctx context.Context, filter ffapi.Filter) ([]*apitypes.State, *ffapi.FilterResult, error)
+	UpsertState(ctx context.Context, state *apitypes.State) (bool, error)
 }
 
 type stateManagerService struct {
@@ -62,4 +67,12 @@ func initDBConf(ctx context.Context, databaseConfig config.Section) (db.Persiste
 	}
 
 	return db.NewPersistencePSQL(psql), nil
+}
+
+func (sm *stateManagerService) ListStates(ctx context.Context, filter ffapi.Filter) ([]*apitypes.State, *ffapi.FilterResult, error) {
+	return sm.persistence.States().GetMany(ctx, filter)
+}
+
+func (sm *stateManagerService) UpsertState(ctx context.Context, state *apitypes.State) (bool, error) {
+	return sm.persistence.States().Upsert(ctx, state, dbsql.UpsertOptimizationNew)
 }
