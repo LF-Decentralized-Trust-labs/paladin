@@ -18,14 +18,48 @@ package manager
 
 import (
 	"context"
+
+	"github.com/hyperledger/firefly-common/pkg/config"
+	smconfig "github.com/kaleido-io/paladin-state-manager/internal/config"
+	"github.com/kaleido-io/paladin-state-manager/internal/db"
 )
+
+type Config struct {
+	Database config.Section
+}
 
 type PaladinStateManager interface {
 }
 
-type StateManagerService struct {
+type stateManagerService struct {
+	config      Config
+	persistence db.Persistence
 }
 
-func NewStateManagerService(ctx context.Context) (*StateManagerService, error) {
-	return &StateManagerService{}, nil
+func NewStateManagerService(ctx context.Context) (PaladinStateManager, error) {
+	config := Config{
+		Database: smconfig.DatabaseSection,
+	}
+
+	persistence, err := initDBConf(ctx, config.Database)
+	if err != nil {
+		return nil, err
+	}
+	return &stateManagerService{
+		config:      config,
+		persistence: persistence,
+	}, nil
+}
+
+func initDBConf(ctx context.Context, databaseConfig config.Section) (db.Persistence, error) {
+	// Get the postgres config
+	postgresConfig := databaseConfig.SubSection(smconfig.ConfigDatabasePostgres)
+	psql := db.InitConfig(postgresConfig)
+
+	// Init the db connection
+	if err := psql.Init(ctx, postgresConfig); err != nil {
+		return nil, err
+	}
+
+	return db.NewPersistencePSQL(psql), nil
 }

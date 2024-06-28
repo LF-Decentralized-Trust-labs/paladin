@@ -18,13 +18,37 @@ package manager
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	smconfig "github.com/kaleido-io/paladin-state-manager/internal/config"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
+var baseConfig = `
+---
+database:
+  postgres:
+    url: none
+`
+
+func setupConfig(t *testing.T, config string) {
+	smconfig.Reset()
+	viper.SetConfigType("yaml")
+	err := viper.ReadConfig(strings.NewReader(config))
+	assert.NoError(t, err)
+}
+
 func TestNewStateManagerService(t *testing.T) {
+	setupConfig(t, baseConfig)
 	service, err := NewStateManagerService(context.Background())
 	assert.NoError(t, err)
 	assert.NotNil(t, service)
+}
+
+func TestNewStateManagerServiceBadConfig(t *testing.T) {
+	setupConfig(t, "")
+	_, err := NewStateManagerService(context.Background())
+	assert.Regexp(t, "FF00183", err)
 }
