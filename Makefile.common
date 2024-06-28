@@ -6,17 +6,30 @@ VGO=go
 GOBIN := $(shell $(VGO) env GOPATH)/bin
 CGO_ENABLED=0
 GOGC=30
+
 MOCKERY := $(GOBIN)/mockery
+MOCKERY_VERSION := v2.40.2
 
-# Dependency
+# Install mockery if it is missing or at the wrong version
+GET_MOCKERY_VERSION = $(shell $(MOCKERY) --version)
+
+$(MOCKERY):
+	$(VGO) install github.com/vektra/mockery/v2@$(MOCKERY_VERSION)
+
+.PHONY: mockery
+mockery: $(MOCKERY)
+	@if [ $(GET_MOCKERY_VERSION) != "$(MOCKERY_VERSION)" ]; then \
+		echo "Replacing mockery (wrong version found)" ; \
+		$(MAKE) -B mockery; \
+	fi
+
+# Dependencies
 .PHONY: deps
-deps:
-		$(VGO) get $(SRC_DIR)
-		$(VGO) install github.com/vektra/mockery/v2@v2.40.2
-		$(VGO) mod tidy
+deps: mockery
+	$(VGO) get $(SRC_DIR)
+	$(VGO) mod tidy
 
-# None mock setup
-
+# Mock setup
 ifeq ($(MOCK_TARGET_DEFINED),)
 .PHONY: mock
 mock: deps
