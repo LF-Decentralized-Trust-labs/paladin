@@ -5,6 +5,7 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 ADD --chown=1001:0 ./runtime /runtime
 ADD --chown=1001:0 ./blockchain-transaction-manager /blockchain-transaction-manager
 ADD --chown=1001:0 ./transaction-manager /transaction-manager
+ADD --chown=1001:0 ./Makefile.common /Makefile.common
 
 WORKDIR /runtime
 RUN mkdir /.cache \

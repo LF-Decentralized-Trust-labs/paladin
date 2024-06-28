@@ -7,7 +7,7 @@ require (
 	github.com/kaleido-io/paladin-transaction-manager v0.0.0-00010101000000-000000000000
 )
 
-require github.com/hyperledger/firefly-transaction-manager v1.3.15 // indirect
+require github.com/hyperledger/firefly-transaction-manager v1.3.15
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.18.2 // indirect
 	github.com/stretchr/objx v0.5.1 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/stretchr/testify v1.8.4
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
 	gitlab.com/hfuss/mux-prometheus v0.0.5 // indirect
