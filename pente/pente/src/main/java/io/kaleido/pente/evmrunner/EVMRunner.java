@@ -33,6 +33,10 @@ import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.Utils;
+import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
 
@@ -40,6 +44,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class EVMRunner {
 
@@ -83,7 +89,6 @@ public class EVMRunner {
         }
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
         this.worldUpdater.getOrCreate(sender);
-        this.worldUpdater.getOrCreate(smartContractAddress).setCode(codeBytes);
 
         // Build the message frame
         final MessageFrame frame =
@@ -91,15 +96,15 @@ public class EVMRunner {
                         .type(MessageFrame.Type.CONTRACT_CREATION)
                         .worldUpdater(worldUpdater)
                         .initialGas(100000)
-                        .address(smartContractAddress)
                         .originator(sender)
                         .sender(sender)
-                        .gasPrice(Wei.ZERO)
+                        .address(smartContractAddress)
+                        .contract(smartContractAddress)
+                        .code(code)
                         .inputData(Bytes.EMPTY)
+                        .gasPrice(Wei.ZERO)
                         .value(Wei.ZERO)
                         .apparentValue(Wei.ZERO)
-                        .contract(Address.ZERO)
-                        .code(code)
                         .blockValues(virtualBlockchain)
                         .completer(c -> {})
                         .miningBeneficiary(coinbase)
@@ -109,6 +114,70 @@ public class EVMRunner {
         logger.debug("Running contract deployment from {} to contract address {}", sender, smartContractAddress);
         this.runFrame(frame);
         return frame;
+    }
+
+
+    @SuppressWarnings("rawtypes")
+    public String methodSignature(Function function) {
+        StringBuilder result = new StringBuilder();
+        result.append(function.getName());
+        result.append("(");
+        String params = function.getInputParameters().stream().map(Type::getTypeAsString).collect(Collectors.joining(","));
+        result.append(params);
+        result.append(")");
+        return result.toString();
+    }
+
+    @SuppressWarnings("rawtypes")
+    public MessageFrame runContractInvoke(
+            Address sender,
+            Address smartContractAddress,
+            String methodName,
+            Type ...parameters
+    ) {
+
+        // Use web3j to encode the call data
+        Function function = new Function(methodName, List.of(parameters), List.of());
+        String callDataHex = FunctionEncoder.encode(function);
+        this.worldUpdater.getOrCreate(sender);
+
+        // Build the message frame
+        Bytes codeBytes = this.worldUpdater.get(smartContractAddress).getCode();
+        Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
+        final MessageFrame frame =
+                MessageFrame.builder()
+                        .type(MessageFrame.Type.MESSAGE_CALL)
+                        .worldUpdater(worldUpdater)
+                        .initialGas(100000)
+                        .originator(sender)
+                        .sender(sender)
+                        .address(smartContractAddress)
+                        .contract(smartContractAddress)
+                        .code(code)
+                        .inputData(Bytes.fromHexString(callDataHex))
+                        .gasPrice(Wei.ZERO)
+                        .value(Wei.ZERO)
+                        .apparentValue(Wei.ZERO)
+                        .blockValues(virtualBlockchain)
+                        .completer(c -> {})
+                        .miningBeneficiary(coinbase)
+                        .blockHashLookup(virtualBlockchain)
+                        .maxStackSize(Integer.MAX_VALUE)
+                        .completer(__ -> {})
+                        .build();
+        logger.debug("Invoking {} from {} to contract address {}", methodSignature(function), sender, smartContractAddress);
+        this.runFrame(frame);
+        return frame;
+    }
+
+    @SuppressWarnings("rawtypes")
+    public List<Type<?>> decodeReturn( MessageFrame frame, List<TypeReference<?>> returns) {
+        return FunctionReturnDecoder.decode(
+                frame.getOutputData().toHexString(),
+                Utils.convert(returns)).stream().map(r ->
+                (Type<?>)(r)
+        ).collect(Collectors.toList());
+
     }
 
     public void runFrame(MessageFrame initialFrame) {

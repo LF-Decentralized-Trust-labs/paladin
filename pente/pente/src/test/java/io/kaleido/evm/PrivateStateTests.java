@@ -17,37 +17,25 @@ package io.kaleido.evm;
 
 import io.kaleido.pente.evmrunner.EVMRunner;
 import io.kaleido.pente.evmrunner.EVMVersion;
-import io.kaleido.pente.evmstate.DebugEVMTracer;
-import io.kaleido.pente.evmstate.InMemoryWorldState;
-import io.kaleido.pente.evmstate.InMemoryWorldStateUpdater;
-import io.kaleido.pente.evmstate.VirtualBlockchain;
 import org.apache.commons.io.IOUtils;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
-import org.hyperledger.besu.datatypes.Hash;
-import org.hyperledger.besu.datatypes.Wei;
-import org.hyperledger.besu.evm.Code;
-import org.hyperledger.besu.evm.EVM;
-import org.hyperledger.besu.evm.MainnetEVMs;
 import org.hyperledger.besu.evm.frame.MessageFrame;
-import org.hyperledger.besu.evm.gascalculator.ShanghaiGasCalculator;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
-import org.hyperledger.besu.evm.precompile.PrecompileContractRegistry;
-import org.hyperledger.besu.evm.processor.ContractCreationProcessor;
-import org.hyperledger.besu.evm.processor.MessageCallProcessor;
-import org.hyperledger.besu.evm.tracing.OperationTracer;
-import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.Utils;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.util.Deque;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -74,13 +62,29 @@ public class PrivateStateTests {
             assertNotNull(is);
             hexByteCode = IOUtils.toString(is, StandardCharsets.UTF_8);
         }
-        MessageFrame frame = evmRunner.runContractDeployment(
-                EVMRunner.randomAddress(),
-                EVMRunner.randomAddress(),
+        final Address smartContractAddress = EVMRunner.randomAddress();
+        final Address sender = EVMRunner.randomAddress();
+        MessageFrame deployFrame = evmRunner.runContractDeployment(
+                sender,
+                smartContractAddress,
                 Bytes.fromHexString(hexByteCode),
                 new Uint256(12345)
         );
-        assertEquals(MessageFrame.State.COMPLETED_SUCCESS, frame.getState());
-
+        assertEquals(MessageFrame.State.COMPLETED_SUCCESS, deployFrame.getState());
+        MessageFrame setFrame = evmRunner.runContractInvoke(
+                sender,
+                smartContractAddress,
+                "set",
+                new Uint256(23456)
+        );
+        assertEquals(MessageFrame.State.COMPLETED_SUCCESS, setFrame.getState());
+        MessageFrame getFrame = evmRunner.runContractInvoke(
+                sender,
+                smartContractAddress,
+                "get"
+        );
+        assertEquals(MessageFrame.State.COMPLETED_SUCCESS, getFrame.getState());
+        List<Type<?>> returns = evmRunner.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
+        assertEquals(23456, ((Uint256)(returns.getFirst())).getValue().intValue());
     }
 }

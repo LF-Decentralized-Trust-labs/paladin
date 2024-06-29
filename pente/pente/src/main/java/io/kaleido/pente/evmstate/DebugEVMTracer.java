@@ -35,52 +35,52 @@ public class DebugEVMTracer implements OperationTracer {
 
     @Override
     public void tracePreExecution(MessageFrame frame) {
-        logger.debug("tracePreExecution: op={}", frame.getCurrentOperation().getName());
+        logger.trace("tracePreExecution: op={}", frame.getCurrentOperation().getName());
     }
 
     @Override
     public void tracePostExecution(MessageFrame frame, Operation.OperationResult operationResult) {
-        logger.debug("tracePostExecution: op={} cost={}", frame.getCurrentOperation().getName(), operationResult.getGasCost());
+        logger.trace("tracePostExecution: op={} cost={}", frame.getCurrentOperation().getName(), operationResult.getGasCost());
     }
 
     @Override
     public void tracePrecompileCall(MessageFrame frame, long gasRequirement, Bytes output) {
-        logger.debug("tracePrecompileCall: frame={} gasRequirement={} output={}", frame, gasRequirement, output);
+        logger.trace("tracePrecompileCall: frame={} gasRequirement={} output={}", frame, gasRequirement, output);
     }
 
     @Override
     public void traceAccountCreationResult(MessageFrame frame, Optional<ExceptionalHaltReason> haltReason) {
-        logger.debug("traceAccountCreationResult: frame={} haltReason={}", frame, haltReason);
+        logger.trace("traceAccountCreationResult: frame={} haltReason={}", frame, haltReason);
     }
 
     @Override
     public void tracePrepareTransaction(WorldView worldView, Transaction transaction) {
-        logger.debug("tracePrepareTransaction: worldView={} transaction={}", worldView, transaction);
+        logger.trace("tracePrepareTransaction: worldView={} transaction={}", worldView, transaction);
     }
 
     @Override
     public void traceStartTransaction(WorldView worldView, Transaction transaction) {
-        logger.debug("traceStartTransaction: worldView={} transaction={}", worldView, transaction);
+        logger.trace("traceStartTransaction: worldView={} transaction={}", worldView, transaction);
     }
 
     @Override
     public void traceEndTransaction(WorldView worldView, Transaction transaction, boolean status, Bytes output, List<Log> logs, long gasUsed, long timeNs) {
-        logger.debug("traceEndTransaction: worldView={} transaction={} status={} output={} logs={} gasUsed={} timens={}", worldView, transaction, status, output, logs, gasUsed, timeNs);
+        logger.trace("traceEndTransaction: worldView={} transaction={} status={} output={} logs={} gasUsed={} timens={}", worldView, transaction, status, output, logs, gasUsed, timeNs);
     }
 
     @Override
     public void traceContextEnter(MessageFrame frame) {
-        logger.debug("traceContextEnter: frame={}", frame);
+        logger.trace("traceContextEnter: frame={}", frame);
     }
 
     @Override
     public void traceContextReEnter(MessageFrame frame) {
-        logger.debug("traceContextReEnter: frame={}", frame);
+        logger.trace("traceContextReEnter: frame={}", frame);
     }
 
     @Override
     public void traceContextExit(MessageFrame frame) {
-        logger.debug("traceContextExit: frame={}", frame);
+        logger.trace("traceContextExit: frame={}", frame);
     }
 
     @Override
