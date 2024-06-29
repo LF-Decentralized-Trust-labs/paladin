@@ -40,7 +40,8 @@ dependencies {
     implementation 'org.hyperledger.besu:besu-datatypes:24.5.4'
     implementation 'org.hyperledger.besu.internal:trie:24.5.4'
 
-    implementation 'org.web3j:rlp:4.9+'
+    implementation 'org.web3j:rlp:4+'
+    implementation 'org.web3j:core:4+'
 
     implementation 'commons-io:commons-io:2.16.1'
     implementation 'io.tmio:tuweni-bytes:2.4.2'

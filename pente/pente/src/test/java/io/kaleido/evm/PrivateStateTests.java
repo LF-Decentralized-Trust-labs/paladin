@@ -38,13 +38,18 @@ import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.datatypes.generated.Uint256;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Deque;
+import java.util.List;
+import java.util.Random;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class PrivateStateTests {
@@ -79,8 +84,15 @@ public class PrivateStateTests {
                 evmConfiguration);
         VirtualBlockchain virtualBlockchain = new VirtualBlockchain(0 );
 
+        // Use web3j to encode some input data
+        String constructorParamsHex = FunctionEncoder.encodeConstructor(List.of(new Uint256(12345)));
+        Bytes constructorParamsBytes = Bytes.fromHexString(constructorParamsHex);
+
         // Process the code
         Bytes codeBytes = Bytes.fromHexString(hexByteCode);
+
+        // Add constructor params to end of code
+        codeBytes = Bytes.wrap(codeBytes, constructorParamsBytes);
         Code code = evm.getCode(Hash.hash(codeBytes), codeBytes);
 
         // Setup the addresses
@@ -126,6 +138,7 @@ public class PrivateStateTests {
                 case MESSAGE_CALL -> mcp.process(messageFrame, tracer);
             }
 
+            assertEquals(MessageFrame.State.COMPLETED_SUCCESS, messageFrame.getState());
             if (messageFrame.getExceptionalHaltReason().isPresent()) {
                 logger.debug(messageFrame.getExceptionalHaltReason().get().toString());
             }
