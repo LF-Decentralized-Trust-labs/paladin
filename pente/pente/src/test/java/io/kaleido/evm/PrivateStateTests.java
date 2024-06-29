@@ -15,6 +15,8 @@
 
 package io.kaleido.evm;
 
+import io.kaleido.pente.evmrunner.EVMRunner;
+import io.kaleido.pente.evmrunner.EVMVersion;
 import io.kaleido.pente.evmstate.DebugEVMTracer;
 import io.kaleido.pente.evmstate.InMemoryWorldState;
 import io.kaleido.pente.evmstate.InMemoryWorldStateUpdater;
@@ -64,13 +66,7 @@ public class PrivateStateTests {
     void runAnEVM() throws IOException {
 
         // Generate a shiny new EVM
-        EvmConfiguration evmConfiguration = EvmConfiguration.DEFAULT;
-        long chainId = new Random().nextLong();
-        EVM evm = MainnetEVMs.shanghai(
-                BigInteger.valueOf(chainId),
-                evmConfiguration
-        );
-        ShanghaiGasCalculator gasCalculator = new ShanghaiGasCalculator();
+        EVMRunner evmRunner = new EVMRunner(EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT), 0);
 
         // Load some bytecode for our first contract deploy
         String hexByteCode;
@@ -78,76 +74,13 @@ public class PrivateStateTests {
             assertNotNull(is);
             hexByteCode = IOUtils.toString(is, StandardCharsets.UTF_8);
         }
-
-        WorldUpdater worldUpdater = new InMemoryWorldStateUpdater(
-                new InMemoryWorldState(),
-                evmConfiguration);
-        VirtualBlockchain virtualBlockchain = new VirtualBlockchain(0 );
-
-        // Use web3j to encode some input data
-        String constructorParamsHex = FunctionEncoder.encodeConstructor(List.of(new Uint256(12345)));
-        Bytes constructorParamsBytes = Bytes.fromHexString(constructorParamsHex);
-
-        // Process the code
-        Bytes codeBytes = Bytes.fromHexString(hexByteCode);
-
-        // Add constructor params to end of code
-        codeBytes = Bytes.wrap(codeBytes, constructorParamsBytes);
-        Code code = evm.getCode(Hash.hash(codeBytes), codeBytes);
-
-        // Setup the addresses
-        Address sender = randomAddress();
-        Address receiver = randomAddress();
-        worldUpdater.getOrCreate(sender).setBalance(Wei.of(BigInteger.TWO.pow(20)));
-        worldUpdater.getOrCreate(receiver).setCode(codeBytes);
-
-        // Construct a contract deployment message
-        final MessageFrame frame =
-                MessageFrame.builder()
-                        .type(MessageFrame.Type.CONTRACT_CREATION)
-                        .worldUpdater(worldUpdater)
-                        .initialGas(100000)
-                        .address(receiver)
-                        .originator(sender)
-                        .sender(sender)
-                        .gasPrice(Wei.ZERO)
-                        .inputData(Bytes.EMPTY)
-                        .value(Wei.ZERO)
-                        .apparentValue(Wei.ZERO)
-                        .contract(Address.ZERO)
-                        .code(code)
-                        .blockValues(virtualBlockchain)
-                        .completer(c -> {})
-                        .miningBeneficiary(randomAddress())
-                        .blockHashLookup(virtualBlockchain)
-                        .maxStackSize(Integer.MAX_VALUE)
-                        .build();
-
-        final OperationTracer tracer = new DebugEVMTracer();
-        Deque<MessageFrame> messageFrameStack = frame.getMessageFrameStack();
-        final PrecompileContractRegistry precompileContractRegistry = new PrecompileContractRegistry();
-        final MessageCallProcessor mcp = new MessageCallProcessor(evm, precompileContractRegistry);
-        final ContractCreationProcessor ccp =
-                new ContractCreationProcessor(evm.getGasCalculator(), evm, false, List.of(), 0);
-
-        logger.debug("Running contract deployment");
-        while (!messageFrameStack.isEmpty()) {
-            final MessageFrame messageFrame = messageFrameStack.peek();
-            switch (messageFrame.getType()) {
-                case CONTRACT_CREATION -> ccp.process(messageFrame, tracer);
-                case MESSAGE_CALL -> mcp.process(messageFrame, tracer);
-            }
-
-            assertEquals(MessageFrame.State.COMPLETED_SUCCESS, messageFrame.getState());
-            if (messageFrame.getExceptionalHaltReason().isPresent()) {
-                logger.debug(messageFrame.getExceptionalHaltReason().get().toString());
-            }
-            if (messageFrame.getRevertReason().isPresent()) {
-                logger.debug(
-                        new String(
-                                messageFrame.getRevertReason().get().toArrayUnsafe(), StandardCharsets.UTF_8));
-            }
-        }
+        MessageFrame frame = evmRunner.runContractDeployment(
+                EVMRunner.randomAddress(),
+                EVMRunner.randomAddress(),
+                Bytes.fromHexString(hexByteCode),
+                new Uint256(12345)
+        );
+        assertEquals(MessageFrame.State.COMPLETED_SUCCESS, frame.getState());
 
     }
 }
