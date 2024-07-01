@@ -17,9 +17,11 @@ package io.kaleido.evm;
 
 import io.kaleido.pente.evmrunner.EVMRunner;
 import io.kaleido.pente.evmrunner.EVMVersion;
+import io.kaleido.pente.evmstate.AccountLoader;
 import org.apache.commons.io.IOUtils;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
+import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.junit.jupiter.api.Test;
@@ -48,7 +50,12 @@ public class SimpleStorageWrappedGetSet {
 
         // Generate a shiny new EVM
         EVMVersion evmVersion = EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT);
-        EVMRunner evmRunner = new EVMRunner(evmVersion, 0);
+        EVMRunner evmRunner = new EVMRunner(evmVersion, new AccountLoader() {
+            @Override
+            public Optional<Account> load(Address address) throws IOException {
+                return Optional.empty();
+            }
+        }, 0);
 
         // Load some bytecode for our first contract deploy
         String hexByteCode;

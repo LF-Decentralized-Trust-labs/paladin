@@ -15,10 +15,7 @@
 
 package io.kaleido.pente.evmrunner;
 
-import io.kaleido.pente.evmstate.DebugEVMTracer;
-import io.kaleido.pente.evmstate.InMemoryWorldState;
-import io.kaleido.pente.evmstate.InMemoryWorldStateUpdater;
-import io.kaleido.pente.evmstate.VirtualBlockchain;
+import io.kaleido.pente.evmstate.*;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
@@ -38,14 +35,11 @@ import org.web3j.abi.TypeReference;
 import org.web3j.abi.Utils;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
-import org.web3j.abi.datatypes.generated.Uint256;
 
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class EVMRunner {
 
@@ -53,7 +47,7 @@ public class EVMRunner {
 
     private final EVMVersion evmVersion;
 
-    private final WorldUpdater worldUpdater;
+    private final AccountLoader accountLoader;
 
     private final VirtualBlockchain virtualBlockchain;
 
@@ -63,15 +57,13 @@ public class EVMRunner {
         return Address.wrap(Bytes.random(20));
     }
 
-    private final InMemoryWorldState world;
+    private final DynamicLoadWorldState world;
 
-    public EVMRunner(EVMVersion evmVersion, long blockNumber) {
+    public EVMRunner(EVMVersion evmVersion, AccountLoader accountLoader, long blockNumber) {
         this.evmVersion = evmVersion;
         this.coinbase = randomAddress();
-        this.world = new InMemoryWorldState();
-        this.worldUpdater = new InMemoryWorldStateUpdater(
-                this.world,
-                evmVersion.evmConfiguration());
+        this.accountLoader = accountLoader;
+        this.world = new DynamicLoadWorldState(accountLoader, evmVersion.evmConfiguration());
         this.virtualBlockchain = new VirtualBlockchain(blockNumber);
     }
 
@@ -90,13 +82,13 @@ public class EVMRunner {
             codeBytes = Bytes.wrap(codeBytes, constructorParamsBytes);
         }
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
-        this.worldUpdater.getOrCreate(sender);
+        this.world.getUpdater().getOrCreate(sender);
 
         // Build the message frame
         final MessageFrame frame =
                 MessageFrame.builder()
                         .type(MessageFrame.Type.CONTRACT_CREATION)
-                        .worldUpdater(worldUpdater)
+                        .worldUpdater(this.world.getUpdater())
                         .initialGas(Long.MAX_VALUE)
                         .originator(sender)
                         .sender(sender)
@@ -141,15 +133,15 @@ public class EVMRunner {
         // Use web3j to encode the call data
         Function function = new Function(methodName, List.of(parameters), List.of());
         String callDataHex = FunctionEncoder.encode(function);
-        this.worldUpdater.getOrCreate(sender);
+        this.world.getUpdater().getOrCreate(sender);
 
         // Build the message frame
-        Bytes codeBytes = this.worldUpdater.get(smartContractAddress).getCode();
+        Bytes codeBytes = this.world.getUpdater().get(smartContractAddress).getCode();
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
         final MessageFrame frame =
                 MessageFrame.builder()
                         .type(MessageFrame.Type.MESSAGE_CALL)
-                        .worldUpdater(worldUpdater)
+                        .worldUpdater(this.world.getUpdater())
                         .initialGas(Long.MAX_VALUE)
                         .originator(sender)
                         .sender(sender)
@@ -172,7 +164,6 @@ public class EVMRunner {
         return frame;
     }
 
-    @SuppressWarnings("rawtypes")
     public List<Type<?>> decodeReturn( MessageFrame frame, List<TypeReference<?>> returns) {
         return FunctionReturnDecoder.decode(
                 frame.getOutputData().toHexString(),
@@ -202,6 +193,8 @@ public class EVMRunner {
                 case MESSAGE_CALL -> mcp.process(messageFrame, tracer);
             }
 
+            logger.debug("Frame {}/{} completed: {}", messageFrame.getType(),  Integer.toHexString(messageFrame.hashCode()), messageFrame.getState());
+
             if (messageFrame.getExceptionalHaltReason().isPresent()) {
                 logger.debug(messageFrame.getExceptionalHaltReason().get().toString());
             }
@@ -213,7 +206,7 @@ public class EVMRunner {
         }
     }
 
-    public InMemoryWorldState getWorld() {
+    public DynamicLoadWorldState getWorld() {
         return world;
     }
 }
