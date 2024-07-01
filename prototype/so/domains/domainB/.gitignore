@@ -1,0 +1,5 @@
+	LoadDomain.pb.cc
+	LoadDomain.pb.h
+	LoadDomain.pb.o
+	domainB.o
+	libdomainb.so
