@@ -38,12 +38,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
-import static io.kaleido.evm.TestUtils.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static io.kaleido.evm.TestUtils.sortedAddressList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class SimpleStorageWrappedGetSet {
+public class SimpleStorageGetSetTest {
 
-    private final Logger logger = LoggerFactory.getLogger(SimpleStorageWrappedGetSet.class);
+    private final Logger logger = LoggerFactory.getLogger(SimpleStorageGetSetTest.class);
 
     @Test
     void runAnEVM() throws IOException {
@@ -59,7 +60,7 @@ public class SimpleStorageWrappedGetSet {
 
         // Load some bytecode for our first contract deploy
         String hexByteCode;
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("solidity/SimpleStorageWrapped.bin")) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("solidity/SimpleStorage.bin")) {
             assertNotNull(is);
             hexByteCode = IOUtils.toString(is, StandardCharsets.UTF_8);
         }
@@ -88,14 +89,15 @@ public class SimpleStorageWrappedGetSet {
         List<Type<?>> returns = evmRunner.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
         assertEquals(23456, ((Uint256)(returns.getFirst())).getValue().intValue());
 
-        // Now there should be a third account for the secondary deployed contract
-        assertEquals(3, evmRunner.getWorld().getQueriedAccounts().size());
-        listContains(evmRunner.getWorld().getQueriedAccounts(), sender.toString());
-        listContains(evmRunner.getWorld().getQueriedAccounts(), smartContractAddress.toString());
-        Optional<Address> deployedContract = firstNonMatch(evmRunner.getWorld().getQueriedAccounts(), sender, smartContractAddress);
-        assertTrue(deployedContract.isPresent());
+        // Should only have the two accounts involved
+        assertEquals(
+                sortedAddressList(List.of(sender, smartContractAddress)),
+                sortedAddressList(evmRunner.getWorld().getQueriedAccounts())
+        );
 
-        // Get the nonce of the first contract, as that should now be incremented as the deployer of the second
-        assertEquals(1L, evmRunner.getWorld().get(smartContractAddress).getNonce());
+        // The nonce of the first contract should still be zero (contrast from the SimpleStorageWrapped test)
+        assertEquals(0L, evmRunner.getWorld().get(smartContractAddress).getNonce());
+
     }
+
 }
