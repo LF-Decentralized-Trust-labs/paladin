@@ -17,10 +17,13 @@ package io.kaleido.evm;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.DelegatingBytes;
+import org.apache.tuweni.units.bigints.UInt256;
 import org.hyperledger.besu.datatypes.Address;
 
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -34,8 +37,14 @@ public class TestUtils {
         return entries.stream().map(Object::toString).anyMatch(e -> e.equals(stringMatch));
     }
 
+    @SafeVarargs
     static <T> Optional<T> firstNonMatch(Collection<T> entries, T ...excludes) {
         return entries.stream().filter(e -> Stream.of(excludes).noneMatch(e1 -> e1.toString().equals(e.toString()))).findFirst();
+    }
+
+    static UInt256 randomUInt256() {
+        BigInteger randKeyBI = new BigInteger(256, new Random());
+        return UInt256.valueOf(randKeyBI);
     }
 
 }

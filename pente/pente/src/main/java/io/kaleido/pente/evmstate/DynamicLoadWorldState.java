@@ -84,16 +84,16 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
         return updater;
     }
 
-    void setAccount(UpdateTrackingAccount<Account> account) {
+    public Collection<Address> getQueriedAccounts() {
+        return Collections.unmodifiableSet(queriedAccounts);
+    }
+
+    private void setAccount(UpdateTrackingAccount<Account> account) {
         this.accounts.put(account.getAddress(), account);
     }
 
-    void deleteAccount(Address account) {
+    private void deleteAccount(Address account) {
         this.accounts.remove(account);
-    }
-
-    public Collection<Address> getQueriedAccounts() {
-        return Collections.unmodifiableSet(queriedAccounts);
     }
 
     private class Updater extends AbstractWorldUpdater<DynamicLoadWorldState, Account> {
