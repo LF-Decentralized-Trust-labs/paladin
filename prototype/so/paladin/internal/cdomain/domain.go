@@ -25,7 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/kalaeido-io/paladin/pkg/domain"
-	protobuf "github.com/kalaeido-io/paladin/pkg/protobuf/pb"
+	protobuf "github.com/kalaeido-io/paladin/pkg/protobuf/go"
 	"github.com/kalaeido-io/paladin/pkg/transaction"
 )
 
