@@ -25,40 +25,34 @@ import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
-import org.web3j.abi.Utils;
-import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static io.kaleido.evm.TestUtils.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class PrivateStateTests {
+public class SimpleStorageWrappedGetSet {
 
-    private final Logger logger = LoggerFactory.getLogger(PrivateStateTests.class);
-
-    Address randomAddress() {
-        return Address.wrap(Bytes.random(20));
-    }
+    private final Logger logger = LoggerFactory.getLogger(SimpleStorageWrappedGetSet.class);
 
     @Test
     void runAnEVM() throws IOException {
 
         // Generate a shiny new EVM
-        EVMRunner evmRunner = new EVMRunner(EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT), 0);
+        EVMVersion evmVersion = EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT);
+        EVMRunner evmRunner = new EVMRunner(evmVersion, 0);
 
         // Load some bytecode for our first contract deploy
         String hexByteCode;
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("solidity/SimpleStorage.bin")) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("solidity/SimpleStorageWrapped.bin")) {
             assertNotNull(is);
             hexByteCode = IOUtils.toString(is, StandardCharsets.UTF_8);
         }
@@ -86,5 +80,15 @@ public class PrivateStateTests {
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, getFrame.getState());
         List<Type<?>> returns = evmRunner.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
         assertEquals(23456, ((Uint256)(returns.getFirst())).getValue().intValue());
+
+        // Now there should be a third account for the secondary deployed contract
+        assertEquals(3, evmRunner.getWorld().getQueriedAccounts().size());
+        listContains(evmRunner.getWorld().getQueriedAccounts(), sender.toString());
+        listContains(evmRunner.getWorld().getQueriedAccounts(), smartContractAddress.toString());
+        Optional<Address> deployedContract = firstNonMatch(evmRunner.getWorld().getQueriedAccounts(), sender, smartContractAddress);
+        assertTrue(deployedContract.isPresent());
+
+        // Get the nonce of the first contract, as that should now be incremented as the deployer of the second
+        assertEquals(1L, evmRunner.getWorld().get(smartContractAddress).getNonce());
     }
 }

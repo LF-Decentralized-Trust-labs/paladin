@@ -18,6 +18,7 @@ package io.kaleido.pente.evmstate;
 import kotlin.NotImplementedError;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.account.Account;
+import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.evm.worldstate.AbstractWorldUpdater;
@@ -29,7 +30,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public class InMemoryWorldStateUpdater extends AbstractWorldUpdater<InMemoryWorldState,Account> {
+public class InMemoryWorldStateUpdater extends AbstractWorldUpdater<InMemoryWorldState, MutableAccount> {
 
     private final Logger logger = LoggerFactory.getLogger(InMemoryWorldStateUpdater.class);
 
@@ -41,7 +42,7 @@ public class InMemoryWorldStateUpdater extends AbstractWorldUpdater<InMemoryWorl
     }
 
     @Override
-    protected Account getForMutation(Address address) {
+    protected MutableAccount getForMutation(Address address) {
         return world.get(address);
     }
 
@@ -63,9 +64,10 @@ public class InMemoryWorldStateUpdater extends AbstractWorldUpdater<InMemoryWorl
 
     @Override
     public void commit() {
-        // TODO: lots to consider here... but for the moment we pretend we did a thing
+        // TODO: lots to consider here... but for the moment we just flush all the accounts down to the world
         for (Account account : getTouchedAccounts()) {
             logger.debug("updated account: {}", account);
+            this.world.setAccount(this.updatedAccounts.get(account.getAddress()));
         }
     }
 }

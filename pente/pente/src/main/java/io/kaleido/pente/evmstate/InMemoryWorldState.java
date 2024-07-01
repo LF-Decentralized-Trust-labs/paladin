@@ -18,16 +18,18 @@ package io.kaleido.pente.evmstate;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.evm.account.Account;
+import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.worldstate.WorldState;
 import org.apache.tuweni.bytes.Bytes32;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class InMemoryWorldState implements WorldState {
 
-    final Map<Address, Account> accounts = new HashMap<>();
+    final Map<Address, MutableAccount> accounts = new HashMap<>();
+
+    private final Set<Address> queriedAccounts = new HashSet<>();
 
     @Override
     public Hash rootHash() {
@@ -45,7 +47,16 @@ public class InMemoryWorldState implements WorldState {
     }
 
     @Override
-    public Account get(Address address) {
+    public MutableAccount get(Address address) {
+        queriedAccounts.add(address);
         return accounts.get(address);
+    }
+
+    void setAccount(MutableAccount account) {
+        this.accounts.put(account.getAddress(), account);
+    }
+
+    public Collection<Address> getQueriedAccounts() {
+        return Collections.unmodifiableSet(queriedAccounts);
     }
 }

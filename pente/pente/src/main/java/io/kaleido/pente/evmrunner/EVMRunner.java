@@ -63,14 +63,16 @@ public class EVMRunner {
         return Address.wrap(Bytes.random(20));
     }
 
+    private final InMemoryWorldState world;
+
     public EVMRunner(EVMVersion evmVersion, long blockNumber) {
         this.evmVersion = evmVersion;
         this.coinbase = randomAddress();
-
-       this.worldUpdater = new InMemoryWorldStateUpdater(
-                new InMemoryWorldState(),
+        this.world = new InMemoryWorldState();
+        this.worldUpdater = new InMemoryWorldStateUpdater(
+                this.world,
                 evmVersion.evmConfiguration());
-       this.virtualBlockchain = new VirtualBlockchain(blockNumber);
+        this.virtualBlockchain = new VirtualBlockchain(blockNumber);
     }
 
     @SuppressWarnings("rawtypes")
@@ -95,7 +97,7 @@ public class EVMRunner {
                 MessageFrame.builder()
                         .type(MessageFrame.Type.CONTRACT_CREATION)
                         .worldUpdater(worldUpdater)
-                        .initialGas(100000)
+                        .initialGas(Long.MAX_VALUE)
                         .originator(sender)
                         .sender(sender)
                         .address(smartContractAddress)
@@ -148,7 +150,7 @@ public class EVMRunner {
                 MessageFrame.builder()
                         .type(MessageFrame.Type.MESSAGE_CALL)
                         .worldUpdater(worldUpdater)
-                        .initialGas(100000)
+                        .initialGas(Long.MAX_VALUE)
                         .originator(sender)
                         .sender(sender)
                         .address(smartContractAddress)
@@ -211,4 +213,7 @@ public class EVMRunner {
         }
     }
 
+    public InMemoryWorldState getWorld() {
+        return world;
+    }
 }
