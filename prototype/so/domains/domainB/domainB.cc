@@ -1,7 +1,7 @@
 
 #include <iostream>
 #include "domainB.h"
-#include "LoadDomain.pb.h"
+#include "Domain.pb.h"
 
 using namespace std;
 void LoadDomain(const unsigned char* data, unsigned int length){
