@@ -43,7 +43,7 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
         this.updater = new Updater(evmConfiguration);
     }
 
-    final Map<Address, UpdateTrackingAccount<Account>> accounts = new HashMap<>();
+    final Map<Address, PersistedAccount> accounts = new HashMap<>();
 
     private final Set<Address> queriedAccounts = new HashSet<>();
 
@@ -63,14 +63,14 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
     }
 
     @Override
-    public UpdateTrackingAccount<Account> get(Address address) {
+    public PersistedAccount get(Address address) {
         queriedAccounts.add(address);
-        UpdateTrackingAccount<Account> account = accounts.get(address);
+        PersistedAccount account = accounts.get(address);
         if (account == null) {
             try {
-                Optional<Account> loadedAccount = accountLoader.load(address);
+                Optional<PersistedAccount> loadedAccount = accountLoader.load(address);
                 if (loadedAccount.isPresent()) {
-                    account = new UpdateTrackingAccount<>(loadedAccount.get());
+                    account = loadedAccount.get();
                     accounts.put(address, account);
                 }
             } catch (IOException e) {
@@ -88,7 +88,7 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
         return Collections.unmodifiableSet(queriedAccounts);
     }
 
-    private void setAccount(UpdateTrackingAccount<Account> account) {
+    private void setAccount(PersistedAccount account) {
         this.accounts.put(account.getAddress(), account);
     }
 
@@ -96,15 +96,15 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
         this.accounts.remove(account);
     }
 
-    private class Updater extends AbstractWorldUpdater<DynamicLoadWorldState, Account> {
+    private class Updater extends AbstractWorldUpdater<DynamicLoadWorldState, PersistedAccount> {
 
         public Updater(EvmConfiguration evmConfiguration) {
             super(DynamicLoadWorldState.this, evmConfiguration);
         }
 
         @Override
-        protected UpdateTrackingAccount<Account> getForMutation(Address address) {
-            return  DynamicLoadWorldState.this.get(address);
+        protected PersistedAccount getForMutation(Address address) {
+            return DynamicLoadWorldState.this.get(address);
         }
 
         @Override
@@ -128,11 +128,18 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
             // This gets called on the COMPLETED_SUCCESS boundary of every frame.
             // So within a single transaction it might be called multiple times.
             //
-            // We simply use it to propagate the changes to the world, and the world is responsible
+            // We propagate the changes to the world, and the world is responsible
             // for tracking the full list of accessed accounts.
-            for (Account account : getTouchedAccounts()) {
+            for (UpdateTrackingAccount<PersistedAccount> account : getUpdatedAccounts()) {
                 logger.debug("updated account: {}", account);
-                DynamicLoadWorldState.this.setAccount(this.updatedAccounts.get(account.getAddress()));
+                PersistedAccount baseAccount = account.getWrappedAccount();
+                if (baseAccount == null) {
+                    // This is a new account generated in this commit
+                    baseAccount = new PersistedAccount(account.getAddress());
+                }
+                // TODO: Consider persisting the change list
+                baseAccount.applyChanges(account);
+                DynamicLoadWorldState.this.setAccount(baseAccount);
             }
             for (Address account : getDeletedAccounts()) {
                 logger.debug("deleted account: {}", account);

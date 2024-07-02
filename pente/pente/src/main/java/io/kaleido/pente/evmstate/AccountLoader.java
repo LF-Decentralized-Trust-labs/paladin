@@ -23,6 +23,6 @@ import java.util.Optional;
 
 public interface AccountLoader {
 
-    public Optional<Account> load(Address address) throws IOException;
+    public Optional<PersistedAccount> load(Address address) throws IOException;
 
 }

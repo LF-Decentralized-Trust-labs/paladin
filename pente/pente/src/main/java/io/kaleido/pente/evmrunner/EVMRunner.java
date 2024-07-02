@@ -15,7 +15,10 @@
 
 package io.kaleido.pente.evmrunner;
 
-import io.kaleido.pente.evmstate.*;
+import io.kaleido.pente.evmstate.AccountLoader;
+import io.kaleido.pente.evmstate.DebugEVMTracer;
+import io.kaleido.pente.evmstate.DynamicLoadWorldState;
+import io.kaleido.pente.evmstate.VirtualBlockchain;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
@@ -26,7 +29,6 @@ import org.hyperledger.besu.evm.precompile.PrecompileContractRegistry;
 import org.hyperledger.besu.evm.processor.ContractCreationProcessor;
 import org.hyperledger.besu.evm.processor.MessageCallProcessor;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
-import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.abi.FunctionEncoder;
@@ -47,8 +49,6 @@ public class EVMRunner {
 
     private final EVMVersion evmVersion;
 
-    private final AccountLoader accountLoader;
-
     private final VirtualBlockchain virtualBlockchain;
 
     private final Address coinbase;
@@ -62,7 +62,6 @@ public class EVMRunner {
     public EVMRunner(EVMVersion evmVersion, AccountLoader accountLoader, long blockNumber) {
         this.evmVersion = evmVersion;
         this.coinbase = randomAddress();
-        this.accountLoader = accountLoader;
         this.world = new DynamicLoadWorldState(accountLoader, evmVersion.evmConfiguration());
         this.virtualBlockchain = new VirtualBlockchain(blockNumber);
     }
@@ -111,7 +110,6 @@ public class EVMRunner {
     }
 
 
-    @SuppressWarnings("rawtypes")
     public String methodSignature(Function function) {
         StringBuilder result = new StringBuilder();
         result.append(function.getName());
