@@ -16,18 +16,24 @@ type server struct {
 	pb.UnimplementedPaladinServiceServer
 }
 
-// SayHello implements example.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
-	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
+func (s *server) GetStates(ctx context.Context, in *pb.GetStatesRequest) (*pb.GetStatesReply, error) {
+
+	return &pb.GetStatesReply{StateId: []string{"stateA", "stateB"}}, nil
 }
 
 func (s *server) RegisterDomain(stream pb.PaladinService_RegisterDomainServer) error {
 
 	ctx := stream.Context()
-	// go domain.DomainListener(stream)
-	domain.DomainListener(stream)
-
+	newDomain := domain.NewDomain(stream)
 	log.L(ctx).Info("RegisteredDomain")
+
+	err := newDomain.Listen()
+	if err != nil {
+		log.L(ctx).Error("Error listening", err)
+		return err
+	}
+	//if we exit from this function, the stream will be closed
+	log.L(ctx).Info("ClosingDomain")
 	return nil
 }
 

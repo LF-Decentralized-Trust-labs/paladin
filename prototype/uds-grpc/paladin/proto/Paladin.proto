@@ -5,21 +5,20 @@ option go_package = "protos/domain";
 
 // The greeting service definition.
 service PaladinService {
-  // Sends a greeting
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
+  // Fetches states in a given meta state
+  rpc GetStates (GetStatesRequest) returns (GetStatesReply) {}
 
   // Domain opening a bidirectional stream to receive commands and send events
   rpc RegisterDomain (stream DomainEvent) returns (stream DomainCommand) {}
 }
 
-// The request message containing the user's name.
-message HelloRequest {
-  string name = 1;
+// Metastate is spent, unspent, pending or spending
+message GetStatesRequest {
+  string MetaState = 1;
 }
 
-// The response message containing the greetings
-message HelloReply {
-  string message = 1;
+message GetStatesReply {
+  repeated string stateId = 1;
 }
 
 message DomainCommand {

@@ -4,7 +4,6 @@ PROTO_FILE := Paladin.proto
 PROTO_PATH := ./proto
 BINARY_NAME := ./bin/main
 # Default target
-.PHONY: all
 all: generate build run
 
 build: 
