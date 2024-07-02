@@ -11,6 +11,7 @@ build:
 	go build -o $(BINARY_NAME) main.go
 
 run: 
+	rm /tmp/grpc.sock
 	set -o allexport && source .env && set +o allexport && $(BINARY_NAME) 
 
 clean:

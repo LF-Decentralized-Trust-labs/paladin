@@ -7,6 +7,9 @@ option go_package = "protos/domain";
 service PaladinService {
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {}
+
+  // Domain opening a bidirectional stream to receive commands and send events
+  rpc RegisterDomain (stream DomainEvent) returns (stream DomainCommand) {}
 }
 
 // The request message containing the user's name.
@@ -17,4 +20,18 @@ message HelloRequest {
 // The response message containing the greetings
 message HelloReply {
   string message = 1;
+}
+
+message DomainCommand {
+  string domainId = 1;
+  string id = 2;
+  string command = 3;
+  repeated string arguments = 4;
+}
+
+message DomainEvent {
+  string domainId = 1;
+  string id = 2;
+  string commandId = 3;
+  repeated string arguments = 4;
 }

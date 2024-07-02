@@ -2,9 +2,9 @@ package paladin
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -13,11 +13,12 @@ import (
 
 func DoThatThing() {
 
+	ctx := context.Background()
 	//https://github.com/grpc/grpc/blob/master/doc/naming.md#name-syntax
 	conn, err := grpc.NewClient("unix:/tmp/grpc.sock", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	//conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
+		log.L(ctx).Error("fail to dial: ", err)
 	}
 	defer conn.Close()
 
@@ -30,7 +31,23 @@ func DoThatThing() {
 		Name: "domain A",
 	})
 	if err != nil {
-		log.Fatalf("Could not call SayHello: %v", err)
+		log.L(ctx).Error("Could not call SayHello: ", err)
 	}
-	log.Printf("Response from server: %v, -- %s", response, response.GetMessage())
+	log.L(ctx).Infof("Response from server: %v, -- %s", response, response.GetMessage())
+
+	commandStream, err := client.RegisterDomain(ctx)
+	if err != nil {
+		log.L(ctx).Error("failed to register domain", err)
+		return
+	}
+
+	if err := commandStream.Send(&pb.DomainEvent{
+		CommandId: "0",
+		DomainId:  "domainA",
+		Arguments: []string{},
+	}); err != nil {
+		log.L(ctx).Error("failed to send event", err)
+		return
+	}
+
 }
