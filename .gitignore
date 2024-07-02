@@ -1,0 +1,8 @@
+**/coverage.txt
+**/debug.test
+.vscode/*.log
+.DS_Store
+*.iml
+.idea/
+__debug_bin
+runtime/paladin
