@@ -43,7 +43,7 @@ public class SimpleStorageWrappedStoreRetreiveTest {
 
         // Generate a shiny new EVM
         EVMVersion evmVersion = EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT);
-        EVMRunner evmRunner = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
+        EVMRunner evmRunnerFresh = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
 
         // Load some bytecode for our first contract deploy
         String hexByteCode;
@@ -53,14 +53,14 @@ public class SimpleStorageWrappedStoreRetreiveTest {
         }
         final Address smartContractAddress = EVMRunner.randomAddress();
         final Address sender = EVMRunner.randomAddress();
-        MessageFrame deployFrame = evmRunner.runContractDeployment(
+        MessageFrame deployFrame = evmRunnerFresh.runContractDeployment(
                 sender,
                 smartContractAddress,
                 Bytes.fromHexString(hexByteCode),
                 new Uint256(12345)
         );
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, deployFrame.getState());
-        MessageFrame setFrame = evmRunner.runContractInvoke(
+        MessageFrame setFrame = evmRunnerFresh.runContractInvoke(
                 sender,
                 smartContractAddress,
                 "set",
@@ -70,8 +70,8 @@ public class SimpleStorageWrappedStoreRetreiveTest {
 
         // Persist the world we've just built into bytes
         final Map<Address, byte[]> accountBytes = new HashMap<>();
-        evmRunner.getWorld().getQueriedAccounts().forEach(address -> {
-            accountBytes.put(address, evmRunner.getWorld().get(address).serialize());
+        evmRunnerFresh.getWorld().getQueriedAccounts().forEach(address -> {
+            accountBytes.put(address, evmRunnerFresh.getWorld().get(address).serialize());
         });
 
         // Create a new world that dynamically loads those bytes
@@ -86,12 +86,12 @@ public class SimpleStorageWrappedStoreRetreiveTest {
                 "get"
         );
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, getFrame.getState());
-        List<Type<?>> returns = evmRunner.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
+        List<Type<?>> returns = evmRunnerWithLoad.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
         assertEquals(23456, ((Uint256)(returns.getFirst())).getValue().intValue());
 
         // We should see query against all three accounts that were in the storage
         assertEquals(
-                sortedAddressList(evmRunner.getWorld().getQueriedAccounts()),
+                sortedAddressList(evmRunnerWithLoad.getWorld().getQueriedAccounts()),
                 sortedAddressList(accountBytes.keySet())
         );
     }
