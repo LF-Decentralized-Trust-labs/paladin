@@ -56,7 +56,7 @@ The entry-point application of Paladin is under the [./runtime](./runtime/) dire
 
 You can start Paladin's JSON-RPC server as a Golang application:
 ```
-go run runtime/main.go 
+go run runtime/main.go
 ```
 
 You can use the following curl command to test the JSON-RPC endpoint:
