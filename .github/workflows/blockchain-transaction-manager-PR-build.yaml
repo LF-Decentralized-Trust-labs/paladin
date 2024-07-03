@@ -1,0 +1,60 @@
+# This is a template workflow to help you get started with Actions set up for
+# test libraries for PRs
+
+name: blockchain-transaction-manager (PR)
+
+# Defines the triggers of this Github Action
+on:
+  # Run the build once a day for vulnerability scanning - choose a different night time schedule to other builds
+  schedule:
+    - cron: '25 4 * * *'
+  # When there is a pull request event, this Action will be triggered
+  pull_request:
+    # when the pull request is raised against the listed branch(es)
+    # AND the file changes are in the listed path(s)
+    branches:
+      - main
+    paths:
+      - 'blockchain-transaction-manager/**'
+      - 'Makefile.common'
+      - '.github/workflows/blockchain-transaction-manager-PR-build.yaml'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: golang:1.22-bullseye
+    # uncomment database setup as needed
+    # services:
+    #   postgres:
+    #     image: postgres
+    #     env:
+    #       POSTGRES_PASSWORD: my-secret
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Fetch history # See https://github.com/actions/checkout/issues/477
+        run: |-
+          git config --global --add safe.directory $PWD
+          git fetch origin
+
+      - name: Build and Test
+        working-directory: blockchain-transaction-manager
+        run: make
+        # env:
+        #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
+        #   POSTGRES_HOSTNAME: postgres
+        #   POSTGRES_PASSWORD: my-secret
+        #   POSTGRES_PORT: 5432
