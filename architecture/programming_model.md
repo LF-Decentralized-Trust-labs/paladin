@@ -6,32 +6,52 @@ There are three layers of programmability in Paladin for building privacy preser
 
 ## Layer A: Base EVM Ledger
 
-Every privacy preserving smart contract is backed by an EVM smart contract, deployed onto the base EVM ledger of your choosing.
+Every privacy preserving smart contract is backed by an EVM smart contract, deployed onto the base EVM ledger. The base EVM can be a Hyperledger Besu network, or any EVM compliant ledger (permissioned or public).
 
-This base EVM can be Hyperledger Besu, or any EVM compliant ledger (permissioned or public).
+The code that exists at this layer must not require access to the private data, while fulfilling fundamental responsibilities:
 
-> This layer must not access any private data, or leak anonymity.
-
-The code that exists at this layer has some fundamental responsibilities:
-
-1. Ensuring every state transition is only finalized by the blockchain if it is valid:
-    - a) Verifying that an approved notary submitted the transaction
-    - b) Verifying a zero-knowledge proof
-    - c) Both (a) and (b)
-2. Enforcing state spend protection
+1. Ensuring every state transition is only finalized by the blockchain if it is validated:
+    - By verifying a zero-knowledge proof, and/or that the transaction was pre-verified
+2. Enforcing double-spend protections
     - We discuss later how and why a UTXO model is most common in private transactions
 3. Conforming to an interface that allows atomic interop with other smart contracts
     - Learn more in [Atomic interop of privacy preserving smart contracts](./atomic_interop.md)
 
+### ZKP verification, Notary and Endorsement models
+
+Because the base ledger smart contract cannot access or leak the data involved in the transaction, there are two fundamental approaches to finalization of transactions.
+
+![ZKP vs. Notary models](./diagrams/zkp_vs_notary.jpg)
+
+1. The transaction is pre-verified off-chain before submission
+    - The smart contract records the proof of the pre-verification, but cannot directly verify it
+    - The identity of the verifier(s) are known and trusted by the parties transacting
+    - The smart contract only allows spending by the authorized notary / endorsement-group
+    - Example 1: the issuer of a particular tokenized deposit / digital asset
+    - Example 2: the members of a privacy group signing off on every transaction (more on this later)
+2. A zero-knowledge proof is verified during execution of the transaction
+    - The smart contract uses advanced cryptography to verify the rules were obeyed
+    - Anyone can submit a transaction, as long as it comes with a suitable proof
+    - Example 1: a cash token with total conversation of value and ownership enforced via ZKP
+    - Example 2: a non-fungible token with uniqueness and ownership enforced via ZKP
+
+There are strong reasons why both of these approaches exist - some related to efficiency/performance, and others related to fundamental restrictions of either model. The Paladin project embraces this, and allows these two approaches to coexist and interoperate atomically.
+
+The two approaches **can be combined** within a single smart contract, for example where simple transfers are allowed to be performed via ZKP alone, whereas onboarding/freezing trading identities, or minting, might require pre-verification.
+
+Learn more in the [Privacy](./privacy.md) section.
+
 ### Base Ledger EVM development
 
-You only need to develop/update smart contracts at this layer, if you have requirements that are not met by existing EVM modules provided with the Paladin project.
+You will need to develop/update EVM smart contracts at this layer, if you have requirements that are not met by existing EVM modules provided with the Paladin project.
 
 Examples include:
 
-- Making changes to a ZKP based token that require a new proof verifier
+- Making changes to a ZKP based token that require a new or modified circuit design
 - Using a mixture of approaches, such as ZKP for transfer, and notary certificates for issuance
 - Adding a completely new cryptography module to the Paladin project
+
+The diagram below shows the fundamental anatomy of the EVM smart contract, with a mi
 
 > TODO: Provide link to detailed developer guidance / samples / instructions
 
