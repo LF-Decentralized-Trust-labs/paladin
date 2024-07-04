@@ -25,7 +25,7 @@ Because the base ledger smart contract cannot access or leak the data involved i
 
 1. The transaction is pre-verified off-chain before submission
     - The smart contract records the proof of the pre-verification, but cannot directly verify it
-    - The identity of the verifier(s) are known and trusted by the parties transacting
+    - The identity of the verifier(s) are known and trusted by the parties transacting on that contract
     - The smart contract only allows spending by the authorized notary / endorsement-group
     - Example 1: the issuer of a particular tokenized deposit / digital asset
     - Example 2: the members of a privacy group signing off on every transaction (more on this later)
@@ -35,7 +35,7 @@ Because the base ledger smart contract cannot access or leak the data involved i
     - Example 1: a cash token with total conversation of value and ownership enforced via ZKP
     - Example 2: a non-fungible token with uniqueness and ownership enforced via ZKP
 
-There are strong reasons why both of these approaches exist - some related to efficiency/performance, and others related to fundamental restrictions of either model. The Paladin project embraces this, and allows these two approaches to coexist and interoperate atomically.
+There are strong reasons why both of these approaches exist - some related to efficiency/performance, and others related to fundamental characteristics of each model. The Paladin project embraces both approaches, and allows them coexist and interoperate atomically.
 
 The two approaches **can be combined** within a single smart contract, for example where simple transfers are allowed to be performed via ZKP alone, whereas onboarding/freezing trading identities, or minting, might require pre-verification.
 
@@ -51,7 +51,7 @@ Examples include:
 - Using a mixture of approaches, such as ZKP for transfer, and notary certificates for issuance
 - Adding a completely new cryptography module to the Paladin project
 
-The diagram below shows the fundamental anatomy of the EVM smart contract, with a mi
+The diagram below shows the fundamental anatomy of the EVM smart contract. There are a set of standard functions that Paladin uses to coordinate operations with your smart contract, and code that maps these down to EVM state and proof/signature verification functions.
 
 > TODO: Provide link to detailed developer guidance / samples / instructions
 
@@ -73,6 +73,10 @@ The two parts work in collaboration to implement the token.
   - The EVM smart contract is the source of truth of which state is valid
   - Double spend protection is performed with masked data / inclusion proofs
   - A proof is verified on-chain, or notary certificate is recorded on-chain
+
+We discuss this in more detail in [Ledger Layers](./ledger_layers.md).
+
+> The off-chain part of a privacy preserving smart contract cannot assume that any transaction will be successful, until it is finalized by the base ledger.
 
 ### Confidential UTXO models
 

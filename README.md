@@ -18,7 +18,7 @@ Paladin is an privacy preserving transaction manager for Ethereum.
     - _Some_ implement `tokens backed by Zero-knowledge Proofs`
       - Learn more about [Zeto](./architecture/zeto.md)
     - _Some_ implement `tokens backed by Notary Certificates` (issuer/signatory endorsed tokens)
-      - Learn more about [Neeto](./architecture/neeto.md)
+      - Learn more about [Noto](./architecture/noto.md)
     - _Some_ implement domains of `EVM Private Smart Contracts` running in `Privacy Groups` 
       - Learn more about [Pente](./architecture/pente.md)
       > Provides function similar to that provided by the [Tessera](https://github.com/consensys/tessera) project (successor to [Constellation](https://github.com/Consensys/constellation)) with additional interoperability and other enhancements
