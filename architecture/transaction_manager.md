@@ -35,21 +35,4 @@ The major components of the transaction manager are highlighted in this diagram.
     - A standardized interface allows multiple out-of-the-box modules to work, as well as building new modules from scratch
     - Configuration and customization is also supported
 
-> TODO: More detailed sequence flow diagrams need to be brought into this document as they evolve
-
-### Transaction assembly (wallet functions)
-
-In order to assemble a valid transaction, smart contract specific code is required to select some private data in the state originator of the transaction, into .
-
-Often referred to as known as "coin selection" logic.
-
-This logic runs in the security context of the originator, and requires access to signing
-keys that prove authority to initiate the business transaction.
-
-Blockchain transaction consumes existing states, and produces new ones.
-
-![Private UTXO model](./diagrams/private_utxo_model.jpg)
-
-> Don't worry - the EVM model for state will come back in Layer C, where we define
-> "privacy groups" within which programmable workflows share state/
-
+> TODO: More detailed sequence flow diagrams need to be brought into this document as they evolve (Leads John Hosie & Chengxuan Xing)
