@@ -4,4 +4,5 @@ use (
 	./blockchain-transaction-manager
 	./runtime
 	./transaction-manager
+	./prototype/gable
 )

@@ -12,16 +12,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <jni.h>
-#include <stdio.h>
-#include <gable.h>
+package main
 
-JNIEXPORT void JNICALL
-Java_io_kaleido_PaladinJNI_run(JNIEnv *env, jobject obj)
-{
-    printf("Hello From C++ World!\n");
+import "C"
 
-    Run(); // from gable.h
+import (
+	"fmt"
+)
 
-    return;
+//export Run
+func Run() {
+	fmt.Printf("Hello from Golang world\n")
 }
+
+func main() {}
