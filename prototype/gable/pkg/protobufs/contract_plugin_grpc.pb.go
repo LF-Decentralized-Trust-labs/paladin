@@ -63,7 +63,7 @@ func (c *paladinContractPluginServiceClient) Register(ctx context.Context, opts 
 
 type PaladinContractPluginService_RegisterClient interface {
 	Send(*ContractPluginEvent) error
-	Recv() (*ContractPluginCommand, error)
+	Recv() (*ContractPluginEvent, error)
 	grpc.ClientStream
 }
 
@@ -75,8 +75,8 @@ func (x *paladinContractPluginServiceRegisterClient) Send(m *ContractPluginEvent
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *paladinContractPluginServiceRegisterClient) Recv() (*ContractPluginCommand, error) {
-	m := new(ContractPluginCommand)
+func (x *paladinContractPluginServiceRegisterClient) Recv() (*ContractPluginEvent, error) {
+	m := new(ContractPluginEvent)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func _PaladinContractPluginService_Register_Handler(srv interface{}, stream grpc
 }
 
 type PaladinContractPluginService_RegisterServer interface {
-	Send(*ContractPluginCommand) error
+	Send(*ContractPluginEvent) error
 	Recv() (*ContractPluginEvent, error)
 	grpc.ServerStream
 }
@@ -150,7 +150,7 @@ type paladinContractPluginServiceRegisterServer struct {
 	grpc.ServerStream
 }
 
-func (x *paladinContractPluginServiceRegisterServer) Send(m *ContractPluginCommand) error {
+func (x *paladinContractPluginServiceRegisterServer) Send(m *ContractPluginEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 

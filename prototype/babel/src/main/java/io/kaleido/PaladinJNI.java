@@ -20,5 +20,5 @@ public class PaladinJNI {
         System.loadLibrary("paladin");
     }
 
-    public native void run();
+    public native int run(String socketAddress);
 }

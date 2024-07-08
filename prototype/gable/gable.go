@@ -14,15 +14,19 @@
  */
 package main
 
-import "C"
-
 import (
-	"fmt"
+	"C"
+
+	"github.com/kaleido-io/paladin/gable/pkg/server"
 )
 
 //export Run
-func Run() {
-	fmt.Printf("Hello from Golang world\n")
+func Run(socketAddressPtr *C.char) int {
+	ok := server.Start(C.GoString(socketAddressPtr))
+	if !ok {
+		return 1
+	}
+	return 0
 }
 
 func main() {}

@@ -74,7 +74,7 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern void Run();
+extern GoInt Run(char* socketAddressPtr);
 
 #ifdef __cplusplus
 }
