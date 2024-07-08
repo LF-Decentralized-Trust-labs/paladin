@@ -43,7 +43,7 @@ They provide transport-specific routing information:
 
 A single Paladin runtime might expose multiple external connection transports for other Paladin nodes to connect to. However, those remote nodes must be able to establish securely that they are encrypting and transferring data to the right node.
 
-## Routing and delivering 2private data
+## Routing and delivering private data
 
 When constructing a transaction the signing identities of multiple parties might be involved:
 
