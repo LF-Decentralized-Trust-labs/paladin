@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.4.0
 // - protoc             v3.21.12
-// source: pkg/protobufs/contract_plugin.proto
+// source: pkg/proto/contract_plugin.proto
 
-package protobufs
+package proto
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	PaladinContractPluginService_GetStates_FullMethodName = "/paladin.domain.PaladinContractPluginService/GetStates"
-	PaladinContractPluginService_Register_FullMethodName  = "/paladin.domain.PaladinContractPluginService/Register"
+	PaladinContractPluginService_GetStates_FullMethodName = "/paladin.contracts.PaladinContractPluginService/GetStates"
+	PaladinContractPluginService_Register_FullMethodName  = "/paladin.contracts.PaladinContractPluginService/Register"
 )
 
 // PaladinContractPluginServiceClient is the client API for PaladinContractPluginService service.
@@ -166,7 +166,7 @@ func (x *paladinContractPluginServiceRegisterServer) Recv() (*ContractPluginEven
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var PaladinContractPluginService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "paladin.domain.PaladinContractPluginService",
+	ServiceName: "paladin.contracts.PaladinContractPluginService",
 	HandlerType: (*PaladinContractPluginServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -182,5 +182,5 @@ var PaladinContractPluginService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "pkg/protobufs/contract_plugin.proto",
+	Metadata: "pkg/proto/contract_plugin.proto",
 }

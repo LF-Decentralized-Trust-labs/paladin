@@ -7,7 +7,7 @@ import (
 	"github.com/aidarkhanov/nanoid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 
-	"github.com/kaleido-io/paladin/gable/pkg/protobufs"
+	"github.com/kaleido-io/paladin/gable/pkg/proto"
 )
 
 type ContractPlugin interface {
@@ -16,11 +16,11 @@ type ContractPlugin interface {
 
 type contractPlugin struct {
 	eventHandlerDone chan struct{}
-	eventStream      protobufs.PaladinContractPluginService_RegisterServer
+	eventStream      proto.PaladinContractPluginService_RegisterServer
 	contractId       string
 }
 
-func NewContractPlugin(contractEventStream protobufs.PaladinContractPluginService_RegisterServer) ContractPlugin {
+func NewContractPlugin(contractEventStream proto.PaladinContractPluginService_RegisterServer) ContractPlugin {
 	return &contractPlugin{
 		eventStream: contractEventStream,
 	}
@@ -38,7 +38,7 @@ func (cp *contractPlugin) eventHandler(ctx context.Context) {
 		if event.CorrelationId == "" {
 			// Always just send back an ack for now
 			log.L(ctx).Infof("Received event %s [%s]", event, event.Type)
-			if err := cp.eventStream.Send(&protobufs.ContractPluginEvent{
+			if err := cp.eventStream.Send(&proto.ContractPluginEvent{
 				ContractPluginId: cp.contractId,
 				Type:             "ack",
 				Arguments:        []string{},

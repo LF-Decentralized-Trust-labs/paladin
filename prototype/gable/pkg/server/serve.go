@@ -9,19 +9,19 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 
-	"github.com/kaleido-io/paladin/gable/pkg/protobufs"
+	"github.com/kaleido-io/paladin/gable/pkg/proto"
 )
 
 // server is used to implement example.GreeterServer.
 type server struct {
-	protobufs.UnimplementedPaladinContractPluginServiceServer
+	proto.UnimplementedPaladinContractPluginServiceServer
 }
 
-func (s *server) GetStates(ctx context.Context, in *protobufs.GetStatesRequest) (*protobufs.GetStatesReply, error) {
-	return &protobufs.GetStatesReply{StateId: []string{"stateA", "stateB"}}, nil
+func (s *server) GetStates(ctx context.Context, in *proto.GetStatesRequest) (*proto.GetStatesReply, error) {
+	return &proto.GetStatesReply{StateId: []string{"stateA", "stateB"}}, nil
 }
 
-func (s *server) Register(stream protobufs.PaladinContractPluginService_RegisterServer) error {
+func (s *server) Register(stream proto.PaladinContractPluginService_RegisterServer) error {
 	newContract := NewContractPlugin(stream)
 	newContract.Listen()
 	return nil
@@ -36,7 +36,7 @@ func newRPCServer(socketAddress string) (net.Listener, *grpc.Server, error) {
 		return nil, nil, err
 	}
 	s := grpc.NewServer()
-	protobufs.RegisterPaladinContractPluginServiceServer(s, &server{})
+	proto.RegisterPaladinContractPluginServiceServer(s, &server{})
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return l, s, nil
 }
