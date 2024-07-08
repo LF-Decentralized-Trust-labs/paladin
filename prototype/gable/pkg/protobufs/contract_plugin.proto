@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package paladin.domain;
+option go_package = "pkg/protobufs";
+
+service PaladinContractPluginService {
+  // Fetches states in a given meta state
+  rpc GetStates (GetStatesRequest) returns (GetStatesReply) {}
+
+  // Opening a bidirectional stream to receive commands and send events
+  rpc Register (stream ContractPluginEvent) returns (stream ContractPluginCommand) {}
+}
+
+// Metastate is spent, unspent, pending or spending
+message GetStatesRequest {
+  string MetaState = 1;
+}
+
+message GetStatesReply {
+  repeated string stateId = 1;
+}
+
+message ContractPluginCommand {
+  string domainId = 1;
+  string id = 2;
+  string command = 3;
+  repeated string arguments = 4;
+}
+
+message ContractPluginEvent {
+  string domainId = 1;
+  string id = 2;
+  string commandId = 3;
+  repeated string arguments = 4;
+}
