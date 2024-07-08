@@ -22,7 +22,8 @@ type contractPlugin struct {
 
 func NewContractPlugin(contractEventStream proto.PaladinContractPluginService_RegisterServer) ContractPlugin {
 	return &contractPlugin{
-		eventStream: contractEventStream,
+		eventStream:      contractEventStream,
+		eventHandlerDone: make(chan struct{}),
 	}
 }
 

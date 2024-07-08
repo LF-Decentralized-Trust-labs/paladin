@@ -15,11 +15,10 @@
 package io.kaleido;
 
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import io.netty.channel.epoll.EpollDomainSocketChannel;
-import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.kqueue.KQueueDomainSocketChannel;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.unix.DomainSocketAddress;
 import paladin.contracts.ContractPlugin;
 import paladin.contracts.PaladinContractPluginServiceGrpc;
@@ -28,9 +27,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
         File f = File.createTempFile("paladin", ".sock");
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
@@ -43,10 +43,11 @@ public class Main {
         doGRPCPingPong(f.getAbsolutePath());
     }
 
-    static void doGRPCPingPong(String socketAddress) {
+    static void doGRPCPingPong(String socketAddress) throws Exception {
+        KQueueEventLoopGroup kqueue = new KQueueEventLoopGroup();
         ManagedChannel channel = NettyChannelBuilder.forAddress(new DomainSocketAddress(socketAddress))
-                .eventLoopGroup(new EpollEventLoopGroup())
-                .channelType(EpollDomainSocketChannel.class)
+                .eventLoopGroup(kqueue)
+                .channelType(KQueueDomainSocketChannel.class)
                 .usePlaintext()
                 .build();
 
@@ -55,7 +56,7 @@ public class Main {
 
             @Override
             public void onNext(ContractPlugin.ContractPluginEvent contractPluginEvent) {
-                System.out.printf("Response in Java %s [%s] to %s\n",
+                System.err.printf("Response in Java %s [%s] to %s\n",
                         contractPluginEvent.getId(),
                         contractPluginEvent.getType(),
                         contractPluginEvent.getCorrelationId()
@@ -71,7 +72,7 @@ public class Main {
 
             @Override
             public void onCompleted() {
-                System.out.println("Response stream in Java shut down");
+                System.err.println("Response stream in Java shut down");
             }
         };
 
@@ -87,11 +88,15 @@ public class Main {
                 .build()
         );
 
-        try {
-            finishLatch.wait();
-        } catch (InterruptedException e) {
-            System.out.println("Rude");
+        boolean ok = finishLatch.await(1, TimeUnit.MINUTES);
+        if (!ok) {
+            throw new RuntimeException("Failed");
         }
+
+        requestStream.onCompleted();
+        channel.shutdown();
+        channel.awaitTermination(1, TimeUnit.MINUTES);;
+        kqueue.close();
 
     }
 }
