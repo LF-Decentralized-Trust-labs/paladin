@@ -16,8 +16,8 @@ func DoThatThing() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	//https://github.com/grpc/grpc/blob/master/doc/naming.md#name-syntax
-	conn, err := grpc.NewClient("unix:/tmp/grpc.sock", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	//conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	//conn, err := grpc.NewClient("unix:/tmp/grpc.sock", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("0.0.0.0:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.L(ctx).Error("fail to dial: ", err)
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 
-	pb "github.com/kalaeido-io/paladin/internal/protos/domain"
+	pb "github.com/kaleido-io/paladin/internal/protos/domain"
 )
 
 type Domain interface {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/kalaeido-io/paladin/pkg/server"
+	"github.com/kaleido-io/paladin/pkg/server"
 )
 
 func main() {

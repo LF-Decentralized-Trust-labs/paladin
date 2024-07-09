@@ -10,8 +10,8 @@ build:
 	go build -o $(BINARY_NAME) main.go
 
 run: 
-	rm /tmp/grpc.sock
-	set -o allexport && source .env && set +o allexport && $(BINARY_NAME) 
+	rm /tmp/grpc.sock || true
+	$(BINARY_NAME) 
 
 clean:
 	rm $(BINARY_NAME)

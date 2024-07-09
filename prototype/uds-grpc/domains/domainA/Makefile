@@ -21,4 +21,10 @@ log:
 run: 
 	go run main.go
 
-.PHONY: all generate clean run
+build_wasm: 
+	GOOS=wasip1 GOARCH=wasm go build -o web/main.wasm main.go
+
+run_wasm:
+	wasmtime web/main.wasm
+
+.PHONY: all generate clean run run_wasm build_wasm
