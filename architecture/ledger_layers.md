@@ -60,7 +60,7 @@ This layer has some core responsibilities:
 
 This engine is part of the protocol runtime stack, but it runs above the underlying ledger.
 
-The Paladin project focussed on building an enterprise grade runtime for this layer, for the Enterprise EVM Stack.
+The Paladin project focusses on building an enterprise grade runtime for this layer, for the Enterprise EVM Stack.
 
 ### Paladin - modular and atomically interoperable privacy preserving smart contracts
 
