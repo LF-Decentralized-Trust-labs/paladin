@@ -8,7 +8,7 @@ The core function of the Paladin runtime, is to operate as a distributed transac
 - Embedding a high performance state store for managing selectively disclosed private transaction state
 - Integrating key management technology to sign transactions (ZKP proofs, EIP-712 signatures and Ethereum TXs)
 - Processing confirmed blockchain transactions to update the state store
-
+ - Emitting streams of events to report status of submitted transactions
 ### Component flow
 
 ⚠ WORK IN PROGRESS ⚠
