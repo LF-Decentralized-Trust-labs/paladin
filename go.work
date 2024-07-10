@@ -5,4 +5,5 @@ use (
 	./runtime
 	./transaction-manager
 	./prototype/gable
+	./kata
 )
