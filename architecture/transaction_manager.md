@@ -1,6 +1,6 @@
 # Distributed Transaction Manager
 
-The core function of the Paladin runtime, is it operate as a distributed transaction manager:
+The core function of the Paladin runtime, is to operate as a distributed transaction manager:
 
 - Receiving API requests from applications to request new transaction submission
 - Integrating with the privacy preserving smart contract code modules to orchestrate and assemble those transactions
