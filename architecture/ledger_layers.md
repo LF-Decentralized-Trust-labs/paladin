@@ -67,7 +67,7 @@ The Paladin project focusses on building an enterprise grade runtime for this la
 Paladin takes a modular approach, instead of building around a single cryptographic engine, or implementing a high-level orchestration domain-specific language (DSL) for implementing orchestration and business logic.
 
 Some guiding principals that influence the runtime engine architecture include:
-- Supporting the current and future generation of Zero-knowledge Proof (ZKP) cryptography modules
+- Supporting the current and future generations of Zero-knowledge Proof (ZKP) cryptography modules
 - Supporting notary/issuer based pre-verification approaches, with equal priority to ZKP based approaches
 - Supporting scalable tokens using a UTXO approach to managing fragmented private state
 - Supporting EVM as a programming model for private smart contracts
