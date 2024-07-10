@@ -25,7 +25,7 @@ If you see a message such as the following then the Java code has succesfully se
 time="..." level=info msg="Received SubmitTransactionRequest: contractAddress=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, from=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, idempotencyKey=..., payload=&{{\"method\":\"foo\",\"params\":[\"bar\",\"quz\"]}}"
 ```
 
-If you see a message such as the following then Java has recieved a response from the Go code with the transaction id
+If you see a message such as the following then Java has received a response from the Go code with the transaction id
 ```
 Transaction submitted: your-transaction-id
 ```
