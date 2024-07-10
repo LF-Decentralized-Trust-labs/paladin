@@ -65,7 +65,7 @@ There are 4 ***base EVM** ledger smart contracts in this worked example:
    - Transactions are confidential and anonymous between token holding parties
    - The token is maintained through UTXO states representing ownership
    - All tokens are trusted by all parties, because they trust the issuer
-   - Learn more in [Noto](./noto.md
+   - Learn more in [Noto](./noto.md)
 3. Cash Token Contract example - ZKP Based
    - Enforcing total conservation of value for fungible cash tokens
    - Transactions are confidential and anonymous to all
