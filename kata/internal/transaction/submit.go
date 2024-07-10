@@ -18,7 +18,6 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
