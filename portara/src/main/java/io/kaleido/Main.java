@@ -27,7 +27,7 @@ public class Main {
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
-        int rc = new PaladinJNI().run(f.getAbsolutePath());
+        int rc = new PaladinJNA().run(f.getAbsolutePath());
         if (rc != 0) {
             throw new IOException("Failed to start golang gRPC server");
         }

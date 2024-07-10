@@ -3,7 +3,6 @@ import org.gradle.internal.jvm.Jvm
 plugins {
     id 'java'
     id 'application'
-    id 'cpp'
     id 'com.google.protobuf' version '0.9.4'
 }
 
@@ -12,7 +11,7 @@ group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
 
 application {
-    applicationDefaultJvmArgs = ["-Djava.library.path=" + file("${buildDir}/libs/paladin/shared").absolutePath]
+    applicationDefaultJvmArgs = ["-Djna.library.path=../kata"]
 }
 
 repositories {
@@ -26,55 +25,6 @@ dependencies {
 
 test {
     useJUnitPlatform()
-}
-
-model {
-    platforms {
-        x64 {
-            architecture "x86_64"
-        }
-        arm64 {
-            architecture "arm64"
-        }
-        auto {
-            if (operatingSystem.macOsX) {
-                architecture "arm64"
-            } else {
-                architecture "x86"
-            }
-        }
-    }
-
-    components {
-        paladin(NativeLibrarySpec) {
-            targetPlatform "auto"
-            binaries.all {
-                def jvmHome = Jvm.current().javaHome
-                if (targetPlatform.operatingSystem.macOsX) {
-                    cppCompiler.args '-I', "${jvmHome}/include"
-                    cppCompiler.args '-I', "${jvmHome}/include/darwin"
-                    cppCompiler.args '-I', "${projectDir}/../kata"
-                    cppCompiler.args '-mmacosx-version-min=10.4'
-                    linker.args '-mmacosx-version-min=10.4'
-                    linker.args '-shared', "${projectDir}/../kata/kata.so"
-                } else if (targetPlatform.operatingSystem.linux) {
-                    cppCompiler.args '-I', "${projectDir}/../kata"
-                    cppCompiler.args '-I', "${jvmHome}/include"
-                    cppCompiler.args '-I', "${jvmHome}/include/linux"
-                    cppCompiler.args '-D_FILE_OFFSET_BITS=64'
-                    linker.args '-shared', "${projectDir}/../kata/kata.so"
-                } else if (targetPlatform.operatingSystem.windows) {
-                    cppCompiler.args '-I', "${projectDir}/../kata"
-                    cppCompiler.args "-I${jvmHome}/include"
-                    cppCompiler.args "-I${jvmHome}/include/win32"
-                } else if (targetPlatform.operatingSystem.freeBSD) {
-                    cppCompiler.args '-I', "${projectDir}/../kata"
-                    cppCompiler.args '-I', "${jvmHome}/include"
-                    cppCompiler.args '-I', "${jvmHome}/include/freebsd"
-                }
-            }
-        }
-    }
 }
 
 def grpcVersion = '1.65.0'
@@ -91,6 +41,7 @@ dependencies {
             classifier = "osx-aarch_64"
         }
     }
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
 
     compileOnly "org.apache.tomcat:annotations-api:6.0.53"
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
@@ -118,4 +69,3 @@ sourceSets {
     }
 }
 
-classes.dependsOn 'paladinSharedLibrary'
