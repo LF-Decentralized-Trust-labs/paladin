@@ -14,24 +14,11 @@
  */
 package io.kaleido;
 
-import com.sun.jna.Native;
-import com.sun.jna.Library;
+public class PaladinJNI {
 
-public class PaladinJNA {
-
-    private PaladinGo paladinGo;
-
-    interface PaladinGo extends Library {
-        int Run(String socketAddressPtr);
+    static {
+        System.loadLibrary("paladin");
     }
 
-    public PaladinJNA() {
-        System.setProperty("jna.debug_load", "true");
-
-        paladinGo = Native.load("kata", PaladinGo.class);
-    }
-
-    public int run(String socketAddress) {
-        return paladinGo.Run(socketAddress);
-    }
+    public native int run(String socketAddress);
 }

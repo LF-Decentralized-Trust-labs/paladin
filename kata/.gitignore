@@ -1,3 +1,2 @@
 **/*.so
-**/*.dylib
-libkata.h
+kata.h

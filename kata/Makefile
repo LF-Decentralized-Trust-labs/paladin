@@ -17,10 +17,10 @@ GO_FILES := $(shell find * -name '*.go' -print)
 PROTO_FILES := $(shell find * -name '*.proto' -print)
 PATH := $(shell pwd)/bin:$(PATH)
 
-build: protobufs libkata.dylib
+build: protobufs kata.so
 
-libkata.dylib: ${GO_FILES}
-	go build -o libkata.dylib -buildmode=c-shared kata.go
+kata.so: ${GO_FILES}
+	go build -o kata.so -buildmode=c-shared kata.go
 
 protobufs:
     # Use go.mod for dependency version management (tools/tools.go tracks deps for go mod tidy)
@@ -29,4 +29,4 @@ protobufs:
 	protoc --go_out=${PWD} --go-grpc_out=${PWD} --proto_path=${PWD} $(PROTO_FILES)
 
 clean:
-	rm libkata.dylib libkata.h bin/proto-gen-go bin/proto-gen-go-grpc pkg/proto/*.go | true
+	rm kata.so kata.h bin/proto-gen-go bin/proto-gen-go-grpc pkg/proto/*.go | true

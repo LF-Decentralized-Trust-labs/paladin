@@ -9,6 +9,12 @@ make
 popd
 ```
 
+ - copy the kata library to the current directory
+```
+cp ../kata/kata.so .
+```
+TODO: LD_LIBRARY_PATH / LIBPATH do not seem to work on MacOS.  Need to find a way to set the library path for the JVM on MacOS.
+
  - run this project
 ```
 ./gradlew run
