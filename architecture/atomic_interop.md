@@ -69,7 +69,7 @@ There are 4 ***base EVM** ledger smart contracts in this worked example:
 3. Cash Token Contract example - ZKP Based
    - Enforcing total conservation of value for fungible cash tokens
    - Transactions are confidential and anonymous to all
-   - Transfers require a zero-knowledge proof calculated off-chain, to be verified on-chain
+   - Transfers require a zero-knowledge proof pre-calculated by the spender, to be verified on the base EVM ledger
 4. Swap Contract - pure public EVM
    - Records the signature of an immutable set of pre-prepared transactions
    - Records the right privacy preserving smart contract
