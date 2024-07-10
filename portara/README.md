@@ -1,6 +1,6 @@
 # Portara
 
-This is the main process for paladin.  To run this, you will need to have the kata library built and in the same directory as the jar file.  The kata library is a Go library that is used to orchestrate a transaction though assembly, endorsement, notarisation, and submission to the EVM base ledger.  The kata library is built using the following commands:
+This is the main process for paladin.  To run this, you will need to have the kata library built and in the same directory as the jar file.  The kata library is a Go library that is used to orchestrate a transaction through assembly, endorsement, notarisation, and submission to the EVM base ledger.  The kata library is built using the following commands:
 
  - build the kata library
 ```
