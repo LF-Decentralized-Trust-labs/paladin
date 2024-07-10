@@ -87,6 +87,6 @@ Some fundamental architecture principals are applied to our transports, to allow
 2. Resilience is encouraged, but not relied upon by Paladin
    - All requests over the transport are idempotent in nature, and will be retried by the Paladin in the case of error
 3. Encryption must be end-to-end between Paladin runtimes
-   - Where a hub+spoke transport model exists, such a a central JMS/Kafka message bus, or a multi-hop devp2p peering network, the data must be encrypted before it leaves Paladin, and not decrypted again until received by the final destination Paladin
+   - Where a hub+spoke transport model exists, such a a central JMS/Kafka message bus, or a multi-hop gossip based peer to peer network, the data must be encrypted before it leaves Paladin, and not decrypted again until received by the final destination Paladin
 
 > TODO: Details to follow (Lead: Sam May)
