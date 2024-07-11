@@ -55,6 +55,7 @@ Paladin is an privacy preserving transaction manager for Ethereum.
 Install the following pre-reqs:
 - JDK [version 21](https://jdk.java.net/archive/) which is compatible with [Gradle version 8.4](./gradle/wrapper/gradle-wrapper.properties)
 - install [protoc](https://grpc.io/docs/protoc-installation/)
+- install [docker-compose](https://docs.docker.com/compose/install/standalone/)
 
 
 Run the following command to build Paladin:
