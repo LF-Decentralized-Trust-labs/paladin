@@ -94,6 +94,8 @@ task buildSharedLibrary(type:Exec) {
     })
     outputs.files([libName, 'libkata.h'])
 
+    environment("CGO_ENABLED", "1")
+
     executable 'go'
     args 'build'
     args '-o', libName
