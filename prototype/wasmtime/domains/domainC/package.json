@@ -1,0 +1,16 @@
+{
+  "name": "domainb",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@bytecodealliance/componentize-js": "^0.8.3",
+    "@bytecodealliance/jco": "^1.2.4"
+  }
+}

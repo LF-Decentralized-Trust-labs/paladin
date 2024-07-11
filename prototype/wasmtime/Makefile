@@ -11,18 +11,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-all: docker
+.PHONY: run
+run: domains
+	go run main.go
 
-# include the common tasks
-CREATE_TEST_DB := 0
-include ./Makefile.common
+domains: domains/domainC/domainC.wasm
 
-docker:
-ifeq ($(CREATE_TEST_DB),1)
-	$(MAKE) start-db
-	docker build --network=host --build-arg POSTGRES_HOST=host.docker.internal --build-arg BUILD_VERSION=${BUILD_VERSION} ${DOCKER_ARGS} -t kaleido-io/paladin .
-	$(MAKE) stop-db
-else
-	docker build --network=host --build-arg POSTGRES_HOST=host.docker.internal --build-arg BUILD_VERSION=${BUILD_VERSION} ${DOCKER_ARGS} -t kaleido-io/paladin .
-endif
-
+domains/domainC/domainC.wasm: domains/domainC/main.mjs domains/domainC/main.wit
+	cd domains/domainC && npx jco componentize main.mjs --wit main.wit --world-name example --out domainC.wasm

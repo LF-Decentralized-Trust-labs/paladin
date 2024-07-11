@@ -6,3 +6,5 @@
 .idea/
 __debug_bin
 runtime/paladin
+gradle/
+kata.so

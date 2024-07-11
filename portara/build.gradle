@@ -1,0 +1,121 @@
+import org.gradle.internal.jvm.Jvm
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'cpp'
+    id 'com.google.protobuf' version '0.9.4'
+}
+
+mainClassName = 'io.kaleido.Main'
+group = 'io.kaleido'
+version = '1.0-SNAPSHOT'
+
+application {
+    applicationDefaultJvmArgs = ["-Djava.library.path=" + file("${buildDir}/libs/paladin/shared").absolutePath]
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+model {
+    platforms {
+        x64 {
+            architecture "x86_64"
+        }
+        arm64 {
+            architecture "arm64"
+        }
+        auto {
+            if (operatingSystem.macOsX) {
+                architecture "arm64"
+            } else {
+                architecture "x86"
+            }
+        }
+    }
+
+    components {
+        paladin(NativeLibrarySpec) {
+            targetPlatform "auto"
+            binaries.all {
+                def jvmHome = Jvm.current().javaHome
+                if (targetPlatform.operatingSystem.macOsX) {
+                    cppCompiler.args '-I', "${jvmHome}/include"
+                    cppCompiler.args '-I', "${jvmHome}/include/darwin"
+                    cppCompiler.args '-I', "${projectDir}/../kata"
+                    cppCompiler.args '-mmacosx-version-min=10.4'
+                    linker.args '-mmacosx-version-min=10.4'
+                    linker.args '-shared', "${projectDir}/../kata/kata.so"
+                } else if (targetPlatform.operatingSystem.linux) {
+                    cppCompiler.args '-I', "${projectDir}/../kata"
+                    cppCompiler.args '-I', "${jvmHome}/include"
+                    cppCompiler.args '-I', "${jvmHome}/include/linux"
+                    cppCompiler.args '-D_FILE_OFFSET_BITS=64'
+                    linker.args '-shared', "${projectDir}/../kata/kata.so"
+                } else if (targetPlatform.operatingSystem.windows) {
+                    cppCompiler.args '-I', "${projectDir}/../kata"
+                    cppCompiler.args "-I${jvmHome}/include"
+                    cppCompiler.args "-I${jvmHome}/include/win32"
+                } else if (targetPlatform.operatingSystem.freeBSD) {
+                    cppCompiler.args '-I', "${projectDir}/../kata"
+                    cppCompiler.args '-I', "${jvmHome}/include"
+                    cppCompiler.args '-I', "${jvmHome}/include/freebsd"
+                }
+            }
+        }
+    }
+}
+
+def grpcVersion = '1.65.0'
+def protobufVersion = '3.25.1'
+def protocVersion = protobufVersion
+
+dependencies {
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-services:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "io.grpc:grpc-netty:${grpcVersion}"
+    implementation("io.netty:netty-transport-native-kqueue:4.1.111.Final") {
+        artifact {
+            classifier = "osx-aarch_64"
+        }
+    }
+
+    compileOnly "org.apache.tomcat:annotations-api:6.0.53"
+    implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:${protocVersion}" }
+    plugins {
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}" }
+    }
+    generateProtoTasks {
+        all()*.plugins { grpc {} }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/source/proto/main/grpc'
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+        proto {
+            srcDirs '../kata/pkg/proto'
+        }
+    }
+}
+
+classes.dependsOn 'paladinSharedLibrary'
