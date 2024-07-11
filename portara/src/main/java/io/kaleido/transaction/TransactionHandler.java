@@ -59,8 +59,10 @@ public class TransactionHandler {
             this.eventLoopGroup = new EpollEventLoopGroup();
             this.channelBuilder = EpollSocketChannel.class;
         } else {
-            this.eventLoopGroup = new NioEventLoopGroup();
-            this.channelBuilder = NioSocketChannel.class;
+            // TODO: Move to loopback TCP/IP in this case
+//            this.eventLoopGroup = new NioEventLoopGroup();
+//            this.channelBuilder = NioSocketChannel.class;
+            throw new RuntimeException(String.format("Platform combination not supported %s/%s", System.getProperty("os.name"), System.getProperty("os.arch")));
         }
         inflightRequests = new ConcurrentHashMap<>();
     }
