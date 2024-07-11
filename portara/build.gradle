@@ -73,6 +73,12 @@ dependencies {
                             ? 'osx-aarch_64'
                             : 'osx-x86_64'
                     )
+                    : Os.isFamily(Os.FAMILY_UNIX)
+                    ? (
+                        Os.isArch('aarch64')
+                            ? 'linux-aarch_64'
+                            : 'linux-x86_64'
+                    )
                     : null;
         }
     }
