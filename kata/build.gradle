@@ -13,6 +13,85 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+ext {
+    mockeryVersion = 'v2.40.2'
+    golangciLintVersion = 'v1.55.2'
+    goBin = System.getenv('GOPATH') + "/bin"
+    dbComposeFile = "${projectDir}/docker-compose-test.yml"
+}
+
+task installMockery(type: Exec) {
+    commandLine 'go', 'install', "github.com/vektra/mockery/v2@${mockeryVersion}"
+    doLast {
+        println 'Mockery installed'
+    }
+}
+
+task installGolangciLint(type: Exec) {
+    commandLine 'go', 'install', "github.com/golangci/golangci-lint/cmd/golangci-lint@${golangciLintVersion}"
+    doLast {
+        println 'Golangci-lint installed'
+    }
+}
+
+task getDependencies(type: Exec) {
+    dependsOn installMockery
+    commandLine 'go', 'get', './internal/...', './pkg/...'
+    doLast {
+        commandLine 'go', 'mod', 'tidy'
+    }
+}
+
+task lint(type: Exec, dependsOn: installGolangciLint) {
+    commandLine "${goBin}/golangci-lint", 'run', '-v', '--timeout', '5m'
+    environment 'GOGC', '20'
+    doLast {
+        println 'Linting completed'
+    }
+}
+
+task startDb(type: Exec) {
+    commandLine 'docker-compose', '-f', dbComposeFile, 'up', '-d'
+    doLast {
+        println 'Test database started'
+    }
+}
+
+task stopDb(type: Exec) {
+    commandLine 'docker-compose', '-f', dbComposeFile, 'down'
+    doLast {
+        println 'Test database stopped'
+    }
+}
+
+task testRun(type: Exec) {
+    dependsOn 'getDependencies', 'lint'
+    dependsOn 'startDb'
+    commandLine 'go', 'test', './internal/...', './pkg/...', '-cover', '-coverprofile=coverage.txt', '-covermode=atomic', '-timeout=30s'
+    finalizedBy 'stopDb'
+}
+
+
+task checkCoverage {
+    doLast {
+        def coverageOutput = 'go tool cover -func=coverage.txt'.execute().text
+        def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
+        if (totalCoverage && totalCoverage.toFloat() < 100.0) {
+            throw new GradleException("ERROR: Coverage is not 100% (current coverage: ${totalCoverage}%)")
+        } else {
+            println 'Coverage is 100%'
+        }
+    }
+}
+
+task test(dependsOn: testRun) {
+    finalizedBy checkCoverage
+    doLast {
+        println 'Testing completed'
+    }
+}
+
+
 task installTools(type:Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
@@ -92,6 +171,7 @@ task buildSharedLibrary(type:Exec) {
 
 task build {
     dependsOn tasks.buildSharedLibrary
+    dependsOn tasks.test
 }
 
 configurations {

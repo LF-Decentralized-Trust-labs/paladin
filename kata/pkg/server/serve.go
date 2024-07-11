@@ -47,5 +47,5 @@ func Run(socketAddress string) {
 	if err != nil {
 		return
 	}
-	s.Serve(l)
+	_ = s.Serve(l)
 }
