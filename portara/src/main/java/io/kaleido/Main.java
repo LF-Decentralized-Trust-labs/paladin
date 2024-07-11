@@ -27,13 +27,14 @@ public class Main {
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
-        int rc = new PaladinJNI().run(f.getAbsolutePath());
+        String socketFilename = f.getAbsolutePath();
+        int rc = new PaladinJNA().run(socketFilename);
         if (rc != 0) {
             throw new IOException("Failed to start golang gRPC server");
         }
 
         // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
-        TransactionHandler transactionHandler = new TransactionHandler(f.getAbsolutePath());
+        TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
         ManagedChannel channel = transactionHandler.createChannel();
         transactionHandler.submitTransaction();
 
