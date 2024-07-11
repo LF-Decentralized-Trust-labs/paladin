@@ -11,7 +11,7 @@ version = '1.0-SNAPSHOT'
 task wrapper(type: Wrapper){}
 
 application {
-    applicationDefaultJvmArgs = ["-Djna.library.path=../kata"]
+    applicationDefaultJvmArgs = ["-Djna.library.path=" + file("${rootDir}/kata").absolutePath]
 }
 
 repositories {
