@@ -8,6 +8,11 @@ mainClassName = 'io.kaleido.Main'
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
 
+java {
+    sourceCompatibility = 21
+    targetCompatibility = 21
+}
+
 task wrapper(type: Wrapper){}
 
 application {
