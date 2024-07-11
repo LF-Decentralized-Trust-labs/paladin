@@ -23,19 +23,19 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        System.err.println("DYLD_LIBRARY_PATH: " + System.getenv("DYLD_LIBRARY_PATH"));
         File f = File.createTempFile("paladin", ".sock");
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
-        int rc = new PaladinJNI().run(f.getAbsolutePath());
-        if (rc != 0) {
-            throw new IOException("Failed to start golang gRPC server");
-        }
+        String socketFilename = f.getAbsolutePath();
+        new PaladinJNA().start(socketFilename);
 
         // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
-        TransactionHandler transactionHandler = new TransactionHandler(f.getAbsolutePath());
+        TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
         ManagedChannel channel = transactionHandler.createChannel();
-        transactionHandler.submitTransaction();
+        transactionHandler.waitStarted(channel);
+        transactionHandler.submitTransaction(channel);
 
         // Add a shutdown hook to wait for a signal to exit
         final Thread mainThread = Thread.currentThread();

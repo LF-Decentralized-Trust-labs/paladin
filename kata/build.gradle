@@ -1,0 +1,122 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+task installTools(type:Exec) {
+    workingDir '.'
+    environment('GOBIN', "${projectDir}/bin")
+    executable 'go'
+    args 'install'
+    inputs.files('go.mod')
+    outputs.files([
+        "${projectDir}/bin/protoc-gen-go",
+        "${projectDir}/bin/protoc-gen-go-grpc",
+    ])
+    // We use go.mod for dependency version management
+    // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
+    args 'google.golang.org/protobuf/cmd/protoc-gen-go'
+    args 'google.golang.org/grpc/cmd/protoc-gen-go-grpc'
+}
+
+task protoc(type:Exec) {
+    workingDir '.'
+    dependsOn tasks.installTools
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    })
+    outputs.files(fileTree("${projectDir}").matching {
+        include "**/*.pb.go"
+    })
+
+    executable 'protoc'
+    args "--go_out=${projectDir}"
+    args "--go-grpc_out=${projectDir}"
+    args "--proto_path=${projectDir}"
+    args inputs.files
+}
+
+task customCleanUp(type:Delete) {
+    delete '*.dylib'
+    delete '*.so'
+    delete '*.dll'
+    delete fileTree("${projectDir}/bin").matching {
+        exclude "README.md"
+        exclude ".gitignore"
+    }
+}
+
+task clean {
+    dependsOn(tasks.customCleanUp)
+}
+
+task goGet(type:Exec) {
+    workingDir '.'
+
+    inputs.files('go.mod')
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.go"
+    })
+    outputs.files('go.sum')
+    dependsOn tasks.protoc
+
+    executable 'go'
+    args 'get'
+}
+
+task buildSharedLibrary(type:Exec) {
+    workingDir '.'
+
+    dependsOn tasks.goGet
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    })
+    outputs.files(['libkata.dylib', 'libkata.h'])
+
+    executable 'go'
+    args 'build'
+    args '-o', 'libkata.dylib'
+    args '-buildmode=c-shared'
+    args 'kata.go'
+}
+
+task build {
+    dependsOn tasks.buildSharedLibrary
+}
+
+configurations {
+    libkata
+    protocFiles {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+}
+
+tasks.register('zipProtocFiles', Zip) {  
+    from fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    }
+    archiveFileName = "proto.zip"
+    destinationDirectory = file("$projectDir")
+    dependsOn('protoc')
+}
+
+artifacts {
+    protocFiles(zipProtocFiles)
+}
+
+dependencies {
+    libkata files('libkata.dylib')
+}
+
+

@@ -18,7 +18,6 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -38,5 +37,11 @@ func (s *PaladinTransactionService) Submit(ctx context.Context, req *proto.Submi
 
 	return &proto.SubmitTransactionResponse{
 		TransactionId: "your-transaction-id",
+	}, nil
+}
+
+func (s *PaladinTransactionService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
+	return &proto.StatusResponse{
+		Ok: true,
 	}, nil
 }

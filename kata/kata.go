@@ -21,12 +21,8 @@ import (
 )
 
 //export Run
-func Run(socketAddressPtr *C.char) int {
-	ok := server.Start(C.GoString(socketAddressPtr))
-	if !ok {
-		return 1
-	}
-	return 0
+func Run(socketAddressPtr *C.char) {
+	server.Run(C.GoString(socketAddressPtr))
 }
 
 func main() {}

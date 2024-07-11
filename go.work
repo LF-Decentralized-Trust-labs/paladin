@@ -2,7 +2,7 @@ go 1.22.4
 
 use (
 	./blockchain-transaction-manager
+	./kata
 	./runtime
 	./transaction-manager
-	./kata
 )

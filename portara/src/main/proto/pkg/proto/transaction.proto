@@ -12,13 +12,36 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido;
 
-public class PaladinJNI {
+syntax = "proto3";
 
-    static {
-        System.loadLibrary("paladin");
-    }
+package paladin.transaction;
+option go_package = "pkg/proto";
 
-    public native int run(String socketAddress);
+service PaladinTransactionService {
+  // Syncronous function to submit a transaction
+  rpc Submit(SubmitTransactionRequest) returns (SubmitTransactionResponse) {}
+  rpc Status(StatusRequest) returns (StatusResponse) {}
+}
+
+message StatusRequest {}
+
+
+message StatusResponse {
+  bool ok = 1;
+}
+
+
+message SubmitTransactionRequest {
+  string contractAddress = 1;
+  string from = 2;
+  string idempotencyKey = 3;
+  oneof payload {
+    string payloadJSON = 4;
+    string payloadRLP = 5;
+  }
+}
+
+message SubmitTransactionResponse{
+  string transactionId= 1;
 }

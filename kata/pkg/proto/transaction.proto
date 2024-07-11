@@ -21,8 +21,16 @@ option go_package = "pkg/proto";
 service PaladinTransactionService {
   // Syncronous function to submit a transaction
   rpc Submit(SubmitTransactionRequest) returns (SubmitTransactionResponse) {}
-
+  rpc Status(StatusRequest) returns (StatusResponse) {}
 }
+
+message StatusRequest {}
+
+
+message StatusResponse {
+  bool ok = 1;
+}
+
 
 message SubmitTransactionRequest {
   string contractAddress = 1;
@@ -37,4 +45,3 @@ message SubmitTransactionRequest {
 message SubmitTransactionResponse{
   string transactionId= 1;
 }
-
