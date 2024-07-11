@@ -24,44 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        File f = File.createTempFile("paladin", ".sock");
-        if (!f.delete() ){
-            throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
-        }
-        String socketFilename = f.getAbsolutePath();
-        KataJNA kata = new KataJNA();
-        kata.start(socketFilename);
-
-        TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
-        transactionHandler.start();
-
-        // Add a shutdown hook to wait for a signal to exit
-        final Thread mainThread = Thread.currentThread();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutdown signal received.");
-            mainThread.interrupt();
-        }));
-
-        // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
-        CountDownLatch latch = new CountDownLatch(1);
-        transactionHandler.submitTransaction(new SubmitTransactionRequest(
-                transactionHandler,
-                response -> {
-                    System.out.println("response received");
-                    latch.countDown();
-                },
-                "contract1",
-                "from1",
-                "idem1",
-                "{}"
-        ));
-
-        if (!latch.await(5, TimeUnit.SECONDS)) {
-            throw new Exception("timed out waiting for response");
-        }
-        transactionHandler.stop();
-        kata.stop(socketFilename);
-
-        System.out.println("main completed");
+        System.out.println("TODO - start all the components");
     }
 }

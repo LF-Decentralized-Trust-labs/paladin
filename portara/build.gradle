@@ -20,6 +20,7 @@ repositories {
 
 test {
     useJUnitPlatform()
+    environment "DYLD_LIBRARY_PATH", file("${rootDir}/kata").absolutePath
 }
 
 tasks.named('compileJava') {

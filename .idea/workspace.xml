@@ -5,18 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76acb598-9375-4c7c-ac16-4f3d14476b9f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/fileTemplates/internal/Class.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/kata/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/kata/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/kata/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/internal/transaction/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/internal/transaction/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/kata.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/kata.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kata/pkg/server/serve.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/pkg/server/serve.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/portara/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/portara/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/PaladinJNA.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/KataJNA.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,6 +47,11 @@
     </system>
   </component>
   <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
     <option name="SCHEME" value="Project" />
   </component>
   <component name="Git.Settings">
@@ -68,6 +64,9 @@
   &quot;associatedIndex&quot;: 1
 }</component>
   <component name="ProjectId" id="2j57uNSYzEM2AdnTwjbW8OutQL4" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="autoscrollFromSource" value="true" />
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -77,16 +76,22 @@
   "keyToString": {
     "Application.Main.executor": "Coverage",
     "Gradle.Build paladin.executor": "Run",
-    "Gradle.paladin:portara [:portara:Main.main()].executor": "Debug",
+    "Gradle.SimpleTXSubmissionTest.simpleTXSubmission.executor": "Run",
+    "Gradle.paladin:portara [:portara:Main.main()].executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "wholeness",
+    "git-widget-placeholder": "first-gate",
     "kotlin-language-version-configured": "true",
     "settings.editor.selected.configurable": "fileTemplates"
   }
 }]]></component>
-  <component name="RunManager">
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/portara/src" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Gradle.SimpleTXSubmissionTest.simpleTXSubmission">
     <configuration name="Main" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <envs>
         <env name="DYLD_LIBRARY_PATH" value="$PROJECT_DIR$/kata" />
@@ -105,8 +110,33 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="SimpleTXSubmissionTest.simpleTXSubmission" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" value="" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":portara:test" />
+            <option value="--tests" />
+            <option value="&quot;io.kaleido.SimpleTXSubmissionTest.simpleTXSubmission&quot;" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>true</RunAsTest>
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.SimpleTXSubmissionTest.simpleTXSubmission" />
         <item itemvalue="Application.Main" />
       </list>
     </recent_temporary>
