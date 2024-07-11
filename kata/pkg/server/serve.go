@@ -42,12 +42,10 @@ func newRPCServer(socketAddress string) (net.Listener, *grpc.Server, error) {
 	return l, s, nil
 }
 
-func Start(socketAddress string) bool {
+func Run(socketAddress string) {
 	l, s, err := newRPCServer(socketAddress)
 	if err != nil {
-		return false
+		return
 	}
-	go s.Serve(l)
-	// TODO: What if the serve function returns?
-	return true
+	s.Serve(l)
 }

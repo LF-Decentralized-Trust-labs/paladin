@@ -96,8 +96,27 @@ task build {
 
 configurations {
     libkata
+    protocFiles {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+}
+
+tasks.register('zipProtocFiles', Zip) {  
+    from fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    }
+    archiveFileName = "proto.zip"
+    destinationDirectory = file("$projectDir")
+    dependsOn('protoc')
+}
+
+artifacts {
+    protocFiles(zipProtocFiles)
 }
 
 dependencies {
     libkata files('libkata.dylib')
 }
+
+

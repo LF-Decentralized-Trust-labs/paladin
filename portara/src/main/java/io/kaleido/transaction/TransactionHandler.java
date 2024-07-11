@@ -53,6 +53,28 @@ public class TransactionHandler {
         }
     }
 
+    public void waitStarted() throws Exception {
+        boolean started = false;
+        while (!started) {
+            try {
+                Thread.sleep(500);
+                ManagedChannel channel = createChannel();
+                try {
+                    PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub =
+                            PaladinTransactionServiceGrpc.newBlockingStub(channel);
+                    Transaction.StatusResponse response = blockingStub.status(Transaction.StatusRequest.newBuilder()
+                            .build());
+                    started = response.getOk();
+                } finally {
+                    shutdownChannel(channel);
+                }
+            } catch(Exception e) {
+                System.out.printf("not yet started: %s\n", e);
+            }
+        }
+        System.out.println("gRPC server ready");
+    }
+
     public void submitTransaction() throws Exception {
         ManagedChannel channel = createChannel();
 

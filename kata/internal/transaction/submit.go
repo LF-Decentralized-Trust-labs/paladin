@@ -39,3 +39,9 @@ func (s *PaladinTransactionService) Submit(ctx context.Context, req *proto.Submi
 		TransactionId: "your-transaction-id",
 	}, nil
 }
+
+func (s *PaladinTransactionService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
+	return &proto.StatusResponse{
+		Ok: true,
+	}, nil
+}

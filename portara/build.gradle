@@ -18,13 +18,6 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    testImplementation platform('org.junit:junit-bom:5.9.1')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-
-    implementation project(path: ':kata', configuration: 'libkata')
-}
-
 test {
     useJUnitPlatform()
 }
@@ -33,13 +26,26 @@ tasks.named('compileJava') {
     dependsOn ':kata:buildSharedLibrary'
 }
 
+configurations {
+    protocFilesImport
+}
+
+dependencies {
+    protocFilesImport project(path: ':kata', configuration: 'protocFiles')
+}
+
+tasks.register('collectProtocFiles', Copy) {
+    from zipTree(configurations.protocFilesImport.getFiles()[0])
+    into "src/main/proto"
+    dependsOn(':kata:protoc')
+}
+
 tasks.named('generateProto') {
-    dependsOn ':kata:protoc'
-    dependsOn ':kata:buildSharedLibrary'
+    dependsOn 'collectProtocFiles'
 }
 
 tasks.named('processResources') {
-    dependsOn ':kata:buildSharedLibrary'
+    dependsOn 'generateProto'
 }
 
 tasks.named('processResources') {
@@ -60,11 +66,15 @@ dependencies {
             classifier = "osx-aarch_64"
         }
     }
-
+    implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
+    implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
 
     compileOnly "org.apache.tomcat:annotations-api:6.0.53"
-    implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
 }
 
 protobuf {
@@ -82,9 +92,6 @@ sourceSets {
         java {
             srcDirs 'build/generated/source/proto/main/grpc'
             srcDirs 'build/generated/source/proto/main/java'
-        }
-        proto {
-            srcDirs '../kata/pkg/proto'
         }
     }
 }

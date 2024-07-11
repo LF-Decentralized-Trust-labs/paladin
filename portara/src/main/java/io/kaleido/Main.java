@@ -29,10 +29,7 @@ public class Main {
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
         String socketFilename = f.getAbsolutePath();
-        int rc = new PaladinJNA().run(socketFilename);
-        if (rc != 0) {
-            throw new IOException("Failed to start golang gRPC server");
-        }
+        new PaladinJNA().start(socketFilename);
 
         // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
         TransactionHandler transactionHandler = new TransactionHandler(socketFilename);

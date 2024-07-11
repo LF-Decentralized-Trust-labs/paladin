@@ -5,10 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76acb598-9375-4c7c-ac16-4f3d14476b9f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/kata/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/internal/transaction/submit.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/internal/transaction/submit.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/kata.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/kata.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/pkg/proto/transaction.proto" beforeDir="false" afterPath="$PROJECT_DIR$/kata/pkg/proto/transaction.proto" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/pkg/server/serve.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/pkg/server/serve.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/portara/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/PaladinJNA.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/PaladinJNA.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,11 +73,12 @@
   "keyToString": {
     "Application.Main.executor": "Coverage",
     "Gradle.Build paladin.executor": "Run",
-    "Gradle.paladin:portara [:portara:Main.main()].executor": "Run",
+    "Gradle.paladin:portara [:portara:Main.main()].executor": "Debug",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "Merging jni-to-jna",
-    "kotlin-language-version-configured": "true"
+    "git-widget-placeholder": "jni-to-jna",
+    "kotlin-language-version-configured": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
   <component name="RunManager">

@@ -18,7 +18,12 @@ import com.sun.jna.Native;
 import com.sun.jna.Library;
 import com.sun.jna.NativeLibrary;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class PaladinJNA {
+
+    private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     private PaladinGo paladinGo;
 
@@ -33,7 +38,12 @@ public class PaladinJNA {
         paladinGo = Native.load("kata", PaladinGo.class);
     }
 
-    public int run(String socketAddress) {
-        return paladinGo.Run(socketAddress);
+    public void start(final String socketAddress) {
+        executorService.execute(() -> {
+            paladinGo.Run(socketAddress);
+            // Should never return
+            System.err.println("kata returned");
+            System.exit(1);
+        });
     }
 }
