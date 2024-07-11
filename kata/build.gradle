@@ -14,36 +14,11 @@
  */
 
 ext {
-    mockeryVersion = 'v2.40.2'
-    golangciLintVersion = 'v1.55.2'
-    goBin = System.getenv('GOPATH') + "/bin"
     dbComposeFile = "${projectDir}/docker-compose-test.yml"
 }
 
-task installMockery(type: Exec) {
-    commandLine 'go', 'install', "github.com/vektra/mockery/v2@${mockeryVersion}"
-    doLast {
-        println 'Mockery installed'
-    }
-}
-
-task installGolangciLint(type: Exec) {
-    commandLine 'go', 'install', "github.com/golangci/golangci-lint/cmd/golangci-lint@${golangciLintVersion}"
-    doLast {
-        println 'Golangci-lint installed'
-    }
-}
-
-task getDependencies(type: Exec) {
-    dependsOn installMockery
-    commandLine 'go', 'get', './internal/...', './pkg/...'
-    doLast {
-        commandLine 'go', 'mod', 'tidy'
-    }
-}
-
-task lint(type: Exec, dependsOn: installGolangciLint) {
-    commandLine "${goBin}/golangci-lint", 'run', '-v', '--timeout', '5m'
+task lint(type: Exec) {
+    commandLine "${projectDir}/bin/golangci-lint", 'run', '-v', '--timeout', '5m'
     environment 'GOGC', '20'
     doLast {
         println 'Linting completed'
@@ -65,7 +40,8 @@ task stopDb(type: Exec) {
 }
 
 task testRun(type: Exec) {
-    dependsOn 'getDependencies', 'lint'
+    dependsOn 'goGet'
+    dependsOn 'lint'
     dependsOn 'startDb'
     commandLine 'go', 'test', './internal/...', './pkg/...', '-cover', '-coverprofile=coverage.txt', '-covermode=atomic', '-timeout=30s'
     finalizedBy 'stopDb'
@@ -101,11 +77,13 @@ task installTools(type:Exec) {
     outputs.files([
         "${projectDir}/bin/protoc-gen-go",
         "${projectDir}/bin/protoc-gen-go-grpc",
+        "${projectDir}/bin/golangci-lint",
     ])
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
     args 'google.golang.org/protobuf/cmd/protoc-gen-go'
     args 'google.golang.org/grpc/cmd/protoc-gen-go-grpc'
+    args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
 }
 
 task protoc(type:Exec) {
