@@ -22,10 +22,16 @@ repositories {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    implementation project(path: ':kata', configuration: 'libkata')
 }
 
 test {
     useJUnitPlatform()
+}
+
+tasks.named('compileJava') {
+    dependsOn ':kata:buildSharedLibrary'
 }
 
 model {
@@ -56,7 +62,7 @@ model {
                     cppCompiler.args '-I', "${projectDir}/../kata"
                     cppCompiler.args '-mmacosx-version-min=10.4'
                     linker.args '-mmacosx-version-min=10.4'
-                    linker.args '-shared', "${projectDir}/../kata/kata.so"
+                    linker.args '-shared', "${projectDir}/../kata/libkata.dylib"
                 } else if (targetPlatform.operatingSystem.linux) {
                     cppCompiler.args '-I', "${projectDir}/../kata"
                     cppCompiler.args '-I', "${jvmHome}/include"

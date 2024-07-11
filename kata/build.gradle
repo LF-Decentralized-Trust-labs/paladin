@@ -18,6 +18,11 @@ task installTools(type:Exec) {
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
     args 'install'
+    inputs.files('go.mod')
+    outputs.files([
+        "${projectDir}/bin/protoc-gen-go",
+        "${projectDir}/bin/protoc-gen-go-grpc",
+    ])
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
     args 'google.golang.org/protobuf/cmd/protoc-gen-go'
@@ -27,20 +32,21 @@ task installTools(type:Exec) {
 task protoc(type:Exec) {
     workingDir '.'
     dependsOn tasks.installTools
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    })
+
     executable 'protoc'
     args "--go_out=${projectDir}"
     args "--go-grpc_out=${projectDir}"
     args "--proto_path=${projectDir}"
-    args fileTree("${projectDir}").matching {
-        include "**/*.proto"
-    }
+    args inputs.files
 }
 
 task clean {
     delete '*.dylib'
     delete '*.so'
     delete '*.dll'
-    delete 'libkata.h'
     delete fileTree("${projectDir}/bin").matching {
         exclude "README.md"
         exclude ".gitignore"
@@ -57,17 +63,29 @@ task goGet(type:Exec) {
 }
 
 task buildSharedLibrary(type:Exec) {
-  workingDir '.'
+    workingDir '.'
 
-  dependsOn tasks.goGet
+    dependsOn tasks.goGet
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.proto"
+    })
+    outputs.files(['libkata.dylib', 'libkata.h'])
 
-  executable 'go'
-  args 'build'
-  args '-o', 'libkata.dylib'
-  args '-buildmode=c-shared'
-  args 'kata.go'
+    executable 'go'
+    args 'build'
+    args '-o', 'libkata.dylib'
+    args '-buildmode=c-shared'
+    args 'kata.go'
 }
 
 task build {
     dependsOn tasks.buildSharedLibrary
+}
+
+configurations {
+    libkata
+}
+
+dependencies {
+    libkata files('libkata.dylib')
 }

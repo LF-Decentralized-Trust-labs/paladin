@@ -15,7 +15,7 @@
 #include <jni.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <kata.h>
+#include <libkata.h>
 #include <cstring>
 
 // Function to take a Java string, get the UTF-8 bytes from it, then malloc a char*
