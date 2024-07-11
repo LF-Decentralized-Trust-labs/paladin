@@ -13,6 +13,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+
 task installTools(type:Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
@@ -77,15 +79,24 @@ task goGet(type:Exec) {
 task buildSharedLibrary(type:Exec) {
     workingDir '.'
 
+    def libName;
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        libName = "libkata.dll"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        libName = "libkata.dylib"
+    } else {
+        libName = "libkata.so"
+    }
+
     dependsOn tasks.goGet
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.go"
     })
-    outputs.files(['libkata.dylib', 'libkata.h'])
+    outputs.files([libName, 'libkata.h'])
 
     executable 'go'
     args 'build'
-    args '-o', 'libkata.dylib'
+    args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
 }
@@ -116,7 +127,7 @@ artifacts {
 }
 
 dependencies {
-    libkata files('libkata.dylib')
+    libkata files(buildSharedLibrary)
 }
 
 
