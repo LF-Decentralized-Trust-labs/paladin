@@ -15,6 +15,7 @@
 package io.kaleido.transaction;
 
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -34,10 +35,14 @@ public class TransactionHandler {
     private ManagedChannel channel;
     StreamObserver<Transaction.TransactionMessage> messageStream;
     final CountDownLatch finishLatch = new CountDownLatch(1);
+    // Declare the ConcurrentHashMap
+    private ConcurrentHashMap<String, TransactionRequest> inflightRequests;
+
 
     public TransactionHandler(String socketAddress) {
         this.socketAddress = socketAddress;
         this.kqueue = new KQueueEventLoopGroup();
+        inflightRequests = new ConcurrentHashMap<String, TransactionRequest>();
     }
 
     public void start() {
@@ -60,6 +65,9 @@ public class TransactionHandler {
                         transactionMessage.getId(),
                         transactionMessage.getType());
                 if (transactionMessage.getType() == Transaction.MESSAGE_TYPE.RESPONSE_MESSAGE) {
+                    String requestId = transactionMessage.getResponse().getRequestId();
+                    TransactionRequest request = inflightRequests.get(requestId);
+                    request.getResponseHandler().onResponse(transactionMessage.getResponse());
                     if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
                         System.err.printf("Transaction submitted %s\n",
                                 transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
@@ -122,21 +130,17 @@ public class TransactionHandler {
         System.out.println("gRPC server ready");
     }
 
-    public void submitTransaction() throws Exception {
+    public void submitTransaction(TransactionRequest request) throws Exception {
         System.out.println("submitTransaction");
 
         try {
+            String requestId = UUID.randomUUID().toString();
             this.messageStream.onNext(Transaction.TransactionMessage.newBuilder()
-                    .setId(UUID.randomUUID().toString())
+                    .setId(requestId)
                     .setType(Transaction.MESSAGE_TYPE.REQUEST_MESSAGE)
-                    .setRequest(Transaction.TransactionRequest.newBuilder()
-                            .setType(Transaction.REQUEST_TYPE.SUBMIT_TRANSACTION_REQUEST)
-                            .setSubmitTransactionRequest(Transaction.SubmitTransactionRequest.newBuilder()
-                                    .setContractAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-                                    .setFrom("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-                                    .setIdempotencyKey(UUID.randomUUID().toString())
-                                    .setPayloadJSON("{\"method\":\"foo\",\"params\":[\"bar\",\"quz\"]}")))
+                    .setRequest(request.getRequestMessage())
                     .build());
+            this.inflightRequests.put(requestId, request);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -144,4 +148,5 @@ public class TransactionHandler {
         System.out.println("Transaction submitted ");
 
     }
+
 }
