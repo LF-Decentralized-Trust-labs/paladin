@@ -117,7 +117,7 @@ task protoc(type:Exec) {
     outputs.files(fileTree("${projectDir}").matching {
         include "**/*.pb.go"
     })
-
+    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
     executable 'protoc'
     args "--go_out=${projectDir}"
     args "--go-grpc_out=${projectDir}"

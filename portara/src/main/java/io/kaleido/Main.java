@@ -14,7 +14,6 @@
  */
 package io.kaleido;
 
-
 import io.grpc.ManagedChannel;
 import io.kaleido.transaction.TransactionHandler;
 
@@ -31,11 +30,9 @@ public class Main {
         String socketFilename = f.getAbsolutePath();
         new PaladinJNA().start(socketFilename);
 
-        // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
         TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
-        ManagedChannel channel = transactionHandler.createChannel();
-        transactionHandler.waitStarted(channel);
-        transactionHandler.submitTransaction(channel);
+        transactionHandler.start();
+        transactionHandler.waitStarted();
 
         // Add a shutdown hook to wait for a signal to exit
         final Thread mainThread = Thread.currentThread();
@@ -43,6 +40,9 @@ public class Main {
             System.out.println("Shutdown signal received.");
             mainThread.interrupt();
         }));
+
+        // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
+        transactionHandler.submitTransaction();
 
         try {
             // Keep the main thread alive until it's interrupted
@@ -52,6 +52,6 @@ public class Main {
         } catch (InterruptedException e) {
             System.out.println("Main thread interrupted, exiting.");
         }
-        transactionHandler.shutdownChannel(channel);
+        transactionHandler.stop();
     }
 }
