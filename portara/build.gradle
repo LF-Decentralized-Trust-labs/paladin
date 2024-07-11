@@ -11,7 +11,7 @@ version = '1.0-SNAPSHOT'
 task wrapper(type: Wrapper){}
 
 application {
-    applicationDefaultJvmArgs = ["-Djava.library.path=" + file("${buildDir}/libs/paladin/shared").absolutePath]
+    applicationDefaultJvmArgs = ["-Djna.library.path=../kata"]
 }
 
 repositories {

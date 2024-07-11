@@ -16,7 +16,6 @@ package io.kaleido;
 
 import com.sun.jna.Native;
 import com.sun.jna.Library;
-import com.sun.jna.NativeLibrary;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,7 +33,6 @@ public class PaladinJNA {
     public PaladinJNA() {
         System.setProperty("jna.debug_load", "true");
 
-        NativeLibrary.addSearchPath("kata","../kata");
         paladinGo = Native.load("kata", PaladinGo.class);
     }
 
