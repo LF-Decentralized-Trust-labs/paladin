@@ -14,21 +14,31 @@
  */
 package io.kaleido.transaction;
 
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
 
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import io.netty.channel.Channel;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import paladin.transaction.PaladinTransactionServiceGrpc;
 import paladin.transaction.Transaction;
 
 public class TransactionHandler {
 
-    private KQueueEventLoopGroup kqueue;
+    private final MultithreadEventLoopGroup eventLoopGroup;
+    private final Class<? extends Channel> channelBuilder;
     private String socketAddress;
     private ManagedChannel channel;
     StreamObserver<Transaction.TransactionMessage> messageStream;
@@ -42,7 +52,16 @@ public class TransactionHandler {
 
     public TransactionHandler(String socketAddress) {
         this.socketAddress = socketAddress;
-        this.kqueue = new KQueueEventLoopGroup();
+        if (KQueue.isAvailable()) {
+            this.eventLoopGroup = new KQueueEventLoopGroup();
+            this.channelBuilder = KQueueDomainSocketChannel.class;
+        } else if (Epoll.isAvailable()) {
+            this.eventLoopGroup = new EpollEventLoopGroup();
+            this.channelBuilder = EpollSocketChannel.class;
+        } else {
+            this.eventLoopGroup = new NioEventLoopGroup();
+            this.channelBuilder = NioSocketChannel.class;
+        }
         inflightRequests = new ConcurrentHashMap<>();
     }
 
@@ -50,8 +69,8 @@ public class TransactionHandler {
         System.out.println("start" + this.socketAddress);
 
         this.channel = NettyChannelBuilder.forAddress(new DomainSocketAddress(this.socketAddress))
-                .eventLoopGroup(this.kqueue)
-                .channelType(KQueueDomainSocketChannel.class)
+                .eventLoopGroup(this.eventLoopGroup)
+                .channelType(this.channelBuilder)
                 .usePlaintext()
                 .build();
 
@@ -119,8 +138,8 @@ public class TransactionHandler {
             this.channel.shutdown();
             this.channel.awaitTermination(1, TimeUnit.MINUTES);
         }
-        if (this.kqueue != null) {
-            this.kqueue.shutdownGracefully();
+        if (this.eventLoopGroup != null) {
+            this.eventLoopGroup.shutdownGracefully();
         }
     }
 
