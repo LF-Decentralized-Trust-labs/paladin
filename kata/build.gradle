@@ -79,7 +79,7 @@ task buildSharedLibrary(type:Exec) {
 
     dependsOn tasks.goGet
     inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.proto"
+        include "**/*.go"
     })
     outputs.files(['libkata.dylib', 'libkata.h'])
 

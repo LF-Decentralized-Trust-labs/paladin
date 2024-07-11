@@ -5,8 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76acb598-9375-4c7c-ac16-4f3d14476b9f" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/fileTemplates/internal/Class.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/kata/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/kata/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/kata/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/internal/transaction/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/internal/transaction/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/kata.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/kata.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kata/pkg/server/serve.go" beforeDir="false" afterPath="$PROJECT_DIR$/kata/pkg/server/serve.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/Main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/PaladinJNA.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/KataJNA.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -46,6 +55,9 @@
       </state>
     </system>
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="SCHEME" value="Project" />
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -65,12 +77,13 @@
   "keyToString": {
     "Application.Main.executor": "Coverage",
     "Gradle.Build paladin.executor": "Run",
-    "Gradle.paladin:portara [:portara:Main.main()].executor": "Run",
+    "Gradle.paladin:portara [:portara:Main.main()].executor": "Debug",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "jni-to-jna-mk2",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "wholeness",
     "kotlin-language-version-configured": "true",
-    "settings.editor.selected.configurable": "preferences.pluginManager"
+    "settings.editor.selected.configurable": "fileTemplates"
   }
 }]]></component>
   <component name="RunManager">
@@ -115,6 +128,16 @@
       <updated>1720665305154</updated>
     </task>
     <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java</url>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/paladin$Main.ic" NAME="Main Coverage Results" MODIFIED="1720665795415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false">

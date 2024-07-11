@@ -15,9 +15,7 @@
 package io.kaleido.transaction;
 
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
@@ -34,15 +32,18 @@ public class TransactionHandler {
     private String socketAddress;
     private ManagedChannel channel;
     StreamObserver<Transaction.TransactionMessage> messageStream;
-    final CountDownLatch finishLatch = new CountDownLatch(1);
     // Declare the ConcurrentHashMap
+
+    private static final class DrainMonitor {}
+    private final DrainMonitor drainMonitor = new DrainMonitor();
+
     private ConcurrentHashMap<String, TransactionRequest> inflightRequests;
 
 
     public TransactionHandler(String socketAddress) {
         this.socketAddress = socketAddress;
         this.kqueue = new KQueueEventLoopGroup();
-        inflightRequests = new ConcurrentHashMap<String, TransactionRequest>();
+        inflightRequests = new ConcurrentHashMap<>();
     }
 
     public void start() {
@@ -53,6 +54,8 @@ public class TransactionHandler {
                 .channelType(KQueueDomainSocketChannel.class)
                 .usePlaintext()
                 .build();
+
+        waitGRPCReady();
 
         PaladinTransactionServiceGrpc.PaladinTransactionServiceStub asyncStub = PaladinTransactionServiceGrpc
                 .newStub(this.channel);
@@ -66,20 +69,25 @@ public class TransactionHandler {
                         transactionMessage.getType());
                 if (transactionMessage.getType() == Transaction.MESSAGE_TYPE.RESPONSE_MESSAGE) {
                     String requestId = transactionMessage.getResponse().getRequestId();
-                    TransactionRequest request = inflightRequests.get(requestId);
-                    request.getResponseHandler().onResponse(transactionMessage.getResponse());
-                    if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
-                        System.err.printf("Transaction submitted %s\n",
-                                transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
+                    TransactionRequest request = inflightRequests.remove(requestId);
+                    if (request != null) {
+                        request.getResponseHandler().onResponse(transactionMessage.getResponse());
+                        if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
+                            System.err.printf("Transaction submitted %s\n",
+                                    transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
+                        }
+                        synchronized (drainMonitor) {
+                            if (inflightRequests.isEmpty()) {
+                                drainMonitor.notifyAll();
+                            }
+                        }
                     }
                 }
-                finishLatch.countDown();
             }
 
             @Override
             public void onError(Throwable e) {
                 e.printStackTrace(System.err);
-                finishLatch.countDown();
             }
 
             @Override
@@ -95,12 +103,15 @@ public class TransactionHandler {
     }
 
     public void stop() throws InterruptedException {
-        System.out.println("stop");
+        System.out.println("quiescing");
 
-        boolean ok = this.finishLatch.await(1, TimeUnit.MINUTES);
-        if (!ok) {
-            throw new RuntimeException("Failed");
+        // Quiesce the server, giving a little time for in-flight requests to run to completion
+        synchronized (drainMonitor) {
+           if (!inflightRequests.isEmpty()) {
+               drainMonitor.wait(5000 /* TODO: Configurable */);
+           }
         }
+        System.out.println("stopping");
 
         this.messageStream.onCompleted();
 
@@ -113,21 +124,23 @@ public class TransactionHandler {
         }
     }
 
-    public void waitStarted() throws Exception {
+    private void waitGRPCReady() {
         boolean started = false;
         while (!started) {
             try {
                 Thread.sleep(500);
-                PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub = PaladinTransactionServiceGrpc
-                        .newBlockingStub(channel);
-                Transaction.StatusResponse response = blockingStub.status(Transaction.StatusRequest.newBuilder()
-                        .build());
-                started = response.getOk();
+                started = getStatus().getOk();
             } catch (Exception e) {
                 System.out.printf("not yet started: %s\n", e);
             }
         }
         System.out.println("gRPC server ready");
+    }
+
+    public Transaction.StatusResponse getStatus() {
+        PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub = PaladinTransactionServiceGrpc
+                .newBlockingStub(channel);
+        return blockingStub.status(Transaction.StatusRequest.newBuilder().build());
     }
 
     public void submitTransaction(TransactionRequest request) throws Exception {
