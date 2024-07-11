@@ -6,11 +6,6 @@ plugins {
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
 
-java {
-    sourceCompatibility = 21
-    targetCompatibility = 21
-}
-
 test {
     testLogging {
         showStandardStreams = true

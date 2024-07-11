@@ -5,7 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76acb598-9375-4c7c-ac16-4f3d14476b9f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pente/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/pente/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/portara/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/portara/src/test/java/io/kaleido/SimpleTXSubmissionTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/test/java/io/kaleido/SimpleTXSubmissionTest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

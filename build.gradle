@@ -2,11 +2,6 @@ plugins {
     id 'java'
 }
 
-java {
-    sourceCompatibility = 21
-    targetCompatibility = 21
-}
-
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
 

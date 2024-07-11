@@ -28,6 +28,8 @@ public class SimpleTXSubmissionTest {
 
     @Test
     void simpleTXSubmission() throws Exception {
+        System.out.println(System.getProperty("os.arch"));
+
         File f = File.createTempFile("paladin", ".sock");
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));

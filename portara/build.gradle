@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id 'java'
     id 'application'
@@ -7,11 +9,6 @@ plugins {
 mainClassName = 'io.kaleido.Main'
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
-
-java {
-    sourceCompatibility = 21
-    targetCompatibility = 21
-}
 
 task wrapper(type: Wrapper){}
 
@@ -70,7 +67,13 @@ dependencies {
     implementation "io.grpc:grpc-netty:${grpcVersion}"
     implementation("io.netty:netty-transport-native-kqueue:4.1.111.Final") {
         artifact {
-            classifier = "osx-aarch_64"
+            classifier = Os.isFamily(Os.FAMILY_MAC)
+                    ? (
+                        Os.isArch('aarch64')
+                            ? 'osx-aarch_64'
+                            : 'osx-x86_64'
+                    )
+                    : null;
         }
     }
     implementation project(path: ':kata', configuration: 'libkata')
