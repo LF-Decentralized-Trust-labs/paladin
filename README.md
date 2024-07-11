@@ -50,24 +50,26 @@ Paladin is an privacy preserving transaction manager for Ethereum.
     - Support for `Java` and `WebAssembly` high performance code modules
     - Learn more about the [Paladin programming model](./architecture/programming_model.md)
 
+## Dev environment setup
+
+Install the following pre-reqs:
+- JDK [version 21](https://jdk.java.net/archive/) which is compatible with [Gradle version 8.4](./gradle/wrapper/gradle-wrapper.properties)
+- install [protoc](https://grpc.io/docs/protoc-installation/)
+
+
+Run the following command to build Paladin:
+
+```shell
+./gradlew build
+```
+
 ## How to run Paladin
 
-The entry-point application of Paladin is under the [./runtime](./runtime/) directory.
-
-You can start Paladin's JSON-RPC server as a Golang application:
-```
-go run runtime/main.go
-```
-
-You can use the following curl command to test the JSON-RPC endpoint:
-
-```
-curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method": "pld.SubmitTransaction", "params": [{"From": "Alice", "To": "Bob", "Amount": 10.5}], "id": 1}' http://localhost:1234/rpc
-```
+TBD
 
 ### Build Paladin docker image
 
-Run `make docker` in the root or any subrepo directories.
+TBD
 
 ## Repo structure
 This is a [Monorepo](https://en.wikipedia.org/wiki/Monorepo). To avoid overcomplicating monorepo setup, you should adhere to the following practices:
