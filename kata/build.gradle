@@ -35,6 +35,9 @@ task protoc(type:Exec) {
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.proto"
     })
+    outputs.files(fileTree("${projectDir}").matching {
+        include "**/*.pb.go"
+    })
 
     executable 'protoc'
     args "--go_out=${projectDir}"
@@ -43,7 +46,7 @@ task protoc(type:Exec) {
     args inputs.files
 }
 
-task clean {
+task customCleanUp(type:Delete) {
     delete '*.dylib'
     delete '*.so'
     delete '*.dll'
@@ -53,13 +56,22 @@ task clean {
     }
 }
 
+task clean {
+    dependsOn(tasks.customCleanUp)
+}
+
 task goGet(type:Exec) {
-  workingDir '.'
+    workingDir '.'
 
-  dependsOn tasks.protoc
+    inputs.files('go.mod')
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.go"
+    })
+    outputs.files('go.sum')
+    dependsOn tasks.protoc
 
-  executable 'go'
-  args 'get'
+    executable 'go'
+    args 'get'
 }
 
 task buildSharedLibrary(type:Exec) {
