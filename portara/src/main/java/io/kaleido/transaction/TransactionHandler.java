@@ -53,21 +53,16 @@ public class TransactionHandler {
         }
     }
 
-    public void waitStarted() throws Exception {
+    public void waitStarted(ManagedChannel channel) throws Exception {
         boolean started = false;
         while (!started) {
             try {
                 Thread.sleep(500);
-                ManagedChannel channel = createChannel();
-                try {
-                    PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub =
-                            PaladinTransactionServiceGrpc.newBlockingStub(channel);
-                    Transaction.StatusResponse response = blockingStub.status(Transaction.StatusRequest.newBuilder()
-                            .build());
-                    started = response.getOk();
-                } finally {
-                    shutdownChannel(channel);
-                }
+                PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub =
+                        PaladinTransactionServiceGrpc.newBlockingStub(channel);
+                Transaction.StatusResponse response = blockingStub.status(Transaction.StatusRequest.newBuilder()
+                        .build());
+                started = response.getOk();
             } catch(Exception e) {
                 System.out.printf("not yet started: %s\n", e);
             }
@@ -75,9 +70,7 @@ public class TransactionHandler {
         System.out.println("gRPC server ready");
     }
 
-    public void submitTransaction() throws Exception {
-        ManagedChannel channel = createChannel();
-
+    public void submitTransaction(ManagedChannel channel) throws Exception {
         PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub =
                 PaladinTransactionServiceGrpc.newBlockingStub(channel);
         Transaction.SubmitTransactionResponse response = blockingStub.submit(Transaction.SubmitTransactionRequest.newBuilder()
@@ -86,9 +79,6 @@ public class TransactionHandler {
                 .setIdempotencyKey(UUID.randomUUID().toString())
                 .setPayloadJSON("{\"method\":\"foo\",\"params\":[\"bar\",\"quz\"]}")
                 .build());
-
-        shutdownChannel(channel);
-
         System.out.println("Transaction submitted: " + response.getTransactionId());
     }
 }

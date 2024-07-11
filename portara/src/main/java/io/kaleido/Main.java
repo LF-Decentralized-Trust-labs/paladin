@@ -34,7 +34,8 @@ public class Main {
         // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
         TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
         ManagedChannel channel = transactionHandler.createChannel();
-        transactionHandler.submitTransaction();
+        transactionHandler.waitStarted(channel);
+        transactionHandler.submitTransaction(channel);
 
         // Add a shutdown hook to wait for a signal to exit
         final Thread mainThread = Thread.currentThread();
