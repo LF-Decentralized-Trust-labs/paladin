@@ -37,7 +37,7 @@ dependencies {
 tasks.register('collectProtocFiles', Copy) {
     from zipTree(configurations.protocFilesImport.getFiles()[0])
     into "src/main/proto"
-    dependsOn(':kata:protoc')
+    dependsOn(':kata:zipProtocFiles')
 }
 
 tasks.named('generateProto') {
