@@ -24,8 +24,9 @@ public class Main {
     public static void main(String[] args) throws Exception {
         System.err.println("DYLD_LIBRARY_PATH: " + System.getenv("DYLD_LIBRARY_PATH"));
         File f = File.createTempFile("paladin", ".sock");
-        if (!f.delete() ){
-            throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
+        if (!f.delete()) {
+            throw new IOException(
+                    String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
         String socketFilename = f.getAbsolutePath();
         new PaladinJNA().start(socketFilename);
@@ -41,8 +42,9 @@ public class Main {
             mainThread.interrupt();
         }));
 
-        // in lieu of a JSONRCP listener, just submit a single transaction to prove things work for now
-        transactionHandler.submitTransaction();
+        // in lieu of a JSONRCP listener, just submit a single transaction to prove
+        // things work for now
+        transactionHandler.submitTransaction(null);
 
         try {
             // Keep the main thread alive until it's interrupted
