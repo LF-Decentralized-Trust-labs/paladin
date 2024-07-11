@@ -26,7 +26,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: gradle/gradle-build-action@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -35,8 +36,8 @@ jobs:
           check-latest: true
 
       - name: Build and Test
-        working-directory: runtime
-        run: ./gradlew build
+        uses: gradle/gradle-build-action@v3
+
         # env:
         #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
         #   POSTGRES_HOSTNAME: postgres
