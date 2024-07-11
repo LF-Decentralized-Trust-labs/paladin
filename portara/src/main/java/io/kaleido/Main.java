@@ -23,6 +23,7 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        System.err.println("DYLD_LIBRARY_PATH: " + System.getenv("DYLD_LIBRARY_PATH"));
         File f = File.createTempFile("paladin", ".sock");
         if (!f.delete() ){
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
