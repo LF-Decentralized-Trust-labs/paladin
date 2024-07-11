@@ -152,7 +152,8 @@ public class TransactionHandler {
                 Thread.sleep(500);
                 started = getStatus().getOk();
             } catch (Exception e) {
-                System.out.printf("not yet started: %s\n", e);
+                e.printStackTrace(System.err);
+                System.out.println("not yet started");
             }
         }
         System.out.println("gRPC server ready");

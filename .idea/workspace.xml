@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76acb598-9375-4c7c-ac16-4f3d14476b9f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/portara/src/main/java/io/kaleido/transaction/TransactionHandler.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
