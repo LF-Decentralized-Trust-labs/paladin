@@ -35,6 +35,11 @@ tasks.named('compileJava') {
 
 tasks.named('generateProto') {
     dependsOn ':kata:protoc'
+    dependsOn ':kata:buildSharedLibrary'
+}
+
+tasks.named('processResources') {
+    dependsOn ':kata:buildSharedLibrary'
 }
 
 tasks.named('processResources') {
