@@ -172,7 +172,7 @@ task testRun(type: Exec) {
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.go"
     })
-    outputs.files([])
+    outputs.files(['coverage.txt'])
 
     executable 'go'
     args 'test'
