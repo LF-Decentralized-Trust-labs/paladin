@@ -54,7 +54,6 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 		switch msg.GetType() {
 		case proto.MESSAGE_TYPE_RESPONSE_MESSAGE:
 			log.L(ctx).Info("Received MESSAGE_TYPE_RESPONSE_MESSAGE")
-			break
 
 		case proto.MESSAGE_TYPE_REQUEST_MESSAGE:
 			log.L(ctx).Info("Received MESSAGE_TYPE_REQUEST_MESSAGE")
@@ -89,6 +88,7 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 					log.L(ctx).Error("Error sending submitTransactionResponse", err)
 					return err
 				}
+				log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
 
 			case proto.REQUEST_TYPE_CLOSE_STREAM_REQUEST:
 				log.L(ctx).Info("Received REQUEST_TYPE_CLOSE_STREAM_REQUEST")

@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id 'java'
     id 'application'
@@ -20,6 +22,8 @@ repositories {
 
 test {
     useJUnitPlatform()
+    environment "DYLD_LIBRARY_PATH", file("${rootDir}/kata").absolutePath
+    environment "LD_LIBRARY_PATH", file("${rootDir}/kata").absolutePath
 }
 
 tasks.named('compileJava') {
@@ -61,11 +65,31 @@ dependencies {
     implementation "io.grpc:grpc-services:${grpcVersion}"
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
+
+    // Native UDS support on Mac
     implementation("io.netty:netty-transport-native-kqueue:4.1.111.Final") {
         artifact {
-            classifier = "osx-aarch_64"
+            classifier = Os.isFamily(Os.FAMILY_MAC)
+                    ? (
+                        Os.isArch('aarch64')
+                            ? 'osx-aarch_64'
+                            : 'osx-x86_64'
+                    ): null;
         }
     }
+
+    // Native UDS support on Linux
+    implementation("io.netty:netty-transport-native-epoll:4.1.111.Final") {
+        artifact {
+            classifier = (!Os.isFamily(Os.FAMILY_MAC) && Os.isFamily(Os.FAMILY_UNIX))
+                    ? (
+                    Os.isArch('aarch64')
+                            ? 'linux-aarch_64'
+                            : 'linux-x86_64'
+            ): null;
+        }
+    }
+
     implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"

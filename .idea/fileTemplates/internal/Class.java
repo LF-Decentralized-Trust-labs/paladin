@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
+ * Copyright © 2024 Kaleido, Inc. 
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -12,31 +12,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package main
-
-import (
-	"C"
-
-	"github.com/kaleido-io/paladin/kata/pkg/server"
-)
-import (
-	"context"
-	"os"
-	"strconv"
-
-	"github.com/hyperledger/firefly-common/pkg/log"
-)
-
-var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
-
-//export Run
-func Run(socketAddressPtr *C.char) {
-	server.Run(rootCtx, C.GoString(socketAddressPtr))
+ 
+ #if (${PACKAGE_NAME} && ${PACKAGE_NAME} != "")package ${PACKAGE_NAME};#end
+#parse("File Header.java")
+public class ${NAME} {
 }
-
-//export Stop
-func Stop(socketAddressPtr *C.char) {
-	server.Stop(rootCtx, C.GoString(socketAddressPtr))
-}
-
-func main() {}

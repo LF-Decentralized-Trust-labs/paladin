@@ -14,45 +14,69 @@
  */
 package io.kaleido.transaction;
 
+import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import io.netty.channel.Channel;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.epoll.EpollDomainSocketChannel;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import paladin.transaction.PaladinTransactionServiceGrpc;
 import paladin.transaction.Transaction;
 
 public class TransactionHandler {
 
-    private KQueueEventLoopGroup kqueue;
+    private final MultithreadEventLoopGroup eventLoopGroup;
+    private final Class<? extends Channel> channelBuilder;
     private String socketAddress;
     private ManagedChannel channel;
     StreamObserver<Transaction.TransactionMessage> messageStream;
-    final CountDownLatch finishLatch = new CountDownLatch(1);
     // Declare the ConcurrentHashMap
+
+    private static final class DrainMonitor {}
+    private final DrainMonitor drainMonitor = new DrainMonitor();
+
     private ConcurrentHashMap<String, TransactionRequest> inflightRequests;
 
 
     public TransactionHandler(String socketAddress) {
         this.socketAddress = socketAddress;
-        this.kqueue = new KQueueEventLoopGroup();
-        inflightRequests = new ConcurrentHashMap<String, TransactionRequest>();
+        if (KQueue.isAvailable()) {
+            this.eventLoopGroup = new KQueueEventLoopGroup();
+            this.channelBuilder = KQueueDomainSocketChannel.class;
+        } else if (Epoll.isAvailable()) {
+            this.eventLoopGroup = new EpollEventLoopGroup();
+            this.channelBuilder = EpollDomainSocketChannel.class;
+        } else {
+            this.eventLoopGroup = new NioEventLoopGroup();
+            this.channelBuilder = NioSocketChannel.class;
+            // TODO: Move to loopback TCP/IP in this case
+            throw new RuntimeException(String.format("Platform combination not supported %s/%s", System.getProperty("os.name"), System.getProperty("os.arch")));
+        }
+        inflightRequests = new ConcurrentHashMap<>();
     }
 
     public void start() {
         System.out.println("start" + this.socketAddress);
 
         this.channel = NettyChannelBuilder.forAddress(new DomainSocketAddress(this.socketAddress))
-                .eventLoopGroup(this.kqueue)
-                .channelType(KQueueDomainSocketChannel.class)
+                .eventLoopGroup(this.eventLoopGroup)
+                .channelType(this.channelBuilder)
                 .usePlaintext()
                 .build();
+
+        waitGRPCReady();
 
         PaladinTransactionServiceGrpc.PaladinTransactionServiceStub asyncStub = PaladinTransactionServiceGrpc
                 .newStub(this.channel);
@@ -66,20 +90,25 @@ public class TransactionHandler {
                         transactionMessage.getType());
                 if (transactionMessage.getType() == Transaction.MESSAGE_TYPE.RESPONSE_MESSAGE) {
                     String requestId = transactionMessage.getResponse().getRequestId();
-                    TransactionRequest request = inflightRequests.get(requestId);
-                    request.getResponseHandler().onResponse(transactionMessage.getResponse());
-                    if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
-                        System.err.printf("Transaction submitted %s\n",
-                                transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
+                    TransactionRequest request = inflightRequests.remove(requestId);
+                    if (request != null) {
+                        request.getResponseHandler().onResponse(transactionMessage.getResponse());
+                        if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
+                            System.err.printf("Transaction submitted %s\n",
+                                    transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
+                        }
+                        synchronized (drainMonitor) {
+                            if (inflightRequests.isEmpty()) {
+                                drainMonitor.notifyAll();
+                            }
+                        }
                     }
                 }
-                finishLatch.countDown();
             }
 
             @Override
             public void onError(Throwable e) {
                 e.printStackTrace(System.err);
-                finishLatch.countDown();
             }
 
             @Override
@@ -95,12 +124,15 @@ public class TransactionHandler {
     }
 
     public void stop() throws InterruptedException {
-        System.out.println("stop");
+        System.out.println("quiescing");
 
-        boolean ok = this.finishLatch.await(1, TimeUnit.MINUTES);
-        if (!ok) {
-            throw new RuntimeException("Failed");
+        // Quiesce the server, giving a little time for in-flight requests to run to completion
+        synchronized (drainMonitor) {
+           if (!inflightRequests.isEmpty()) {
+               drainMonitor.wait(5000 /* TODO: Configurable */);
+           }
         }
+        System.out.println("stopping");
 
         this.messageStream.onCompleted();
 
@@ -108,26 +140,29 @@ public class TransactionHandler {
             this.channel.shutdown();
             this.channel.awaitTermination(1, TimeUnit.MINUTES);
         }
-        if (this.kqueue != null) {
-            this.kqueue.shutdownGracefully();
+        if (this.eventLoopGroup != null) {
+            this.eventLoopGroup.shutdownGracefully();
         }
     }
 
-    public void waitStarted() throws Exception {
+    private void waitGRPCReady() {
         boolean started = false;
         while (!started) {
             try {
                 Thread.sleep(500);
-                PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub = PaladinTransactionServiceGrpc
-                        .newBlockingStub(channel);
-                Transaction.StatusResponse response = blockingStub.status(Transaction.StatusRequest.newBuilder()
-                        .build());
-                started = response.getOk();
+                started = getStatus().getOk();
             } catch (Exception e) {
-                System.out.printf("not yet started: %s\n", e);
+                e.printStackTrace(System.err);
+                System.out.println("not yet started");
             }
         }
         System.out.println("gRPC server ready");
+    }
+
+    public Transaction.StatusResponse getStatus() {
+        PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub = PaladinTransactionServiceGrpc
+                .newBlockingStub(channel);
+        return blockingStub.status(Transaction.StatusRequest.newBuilder().build());
     }
 
     public void submitTransaction(TransactionRequest request) throws Exception {
