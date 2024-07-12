@@ -6,7 +6,7 @@ CREATE TABLE transactions (
 
   id                        TEXT            NOT NULL,
   idempotency_key           TEXT            NOT NULL,
-  status                    VARCHAR(65)     NOT NULL,
+  status                    INT             NOT NULL,
   status_message            TEXT,
 
   -- assembled_pre_req_txs     TEXT,

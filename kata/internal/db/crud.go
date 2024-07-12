@@ -20,12 +20,10 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/dbsql"
-	"github.com/hyperledger/firefly-common/pkg/ffapi"
+	"gorm.io/gorm"
 )
 
 type Persistence interface {
-	Transactions() TransactionsCollection
 	RunTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 
 	UTDeleteAllData(ctx context.Context) error
@@ -34,28 +32,16 @@ type Persistence interface {
 // Efficient cleanup function to speed up tests - do not use for any other purposes
 func (p *persistence) UTDeleteAllData(ctx context.Context) error {
 	return p.RunTransaction(ctx, func(ctx context.Context) (err error) {
-		err = p.deleteChain(ctx, err, p.Transactions())
+		err = p.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&Transaction{}).Error
 		return err
 	})
-}
-
-type crudDeleteMany interface {
-	DeleteMany(ctx context.Context, filter ffapi.Filter, hooks ...dbsql.PostCompletionHook) (err error)
-}
-
-func (p *persistence) deleteChain(ctx context.Context, lastErr error, db crudDeleteMany) error {
-	fb := (&ffapi.QueryFields{}).NewFilter(ctx).And()
-	if lastErr == nil {
-		lastErr = db.DeleteMany(ctx, fb)
-	}
-	return lastErr
 }
 
 var psql *Postgres
 var initialized bool = false
 
 type persistence struct {
-	db *dbsql.Database
+	db *gorm.DB
 }
 
 // InitConfig gets called after config reset to initialize the config structure
@@ -74,13 +60,15 @@ func Init(ctx context.Context, conf config.Section) error {
 }
 
 func (p *persistence) RunTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	return p.db.RunAsGroup(ctx, fn)
+	return p.db.Transaction(func(tx *gorm.DB) error {
+		return fn(ctx)
+	})
 }
 
 // NewPersistence can be called as often as required (future versions might
 // parameterize this with scoping information)
 func NewPersistence() Persistence {
 	return &persistence{
-		db: &psql.Database,
+		db: psql.db,
 	}
 }

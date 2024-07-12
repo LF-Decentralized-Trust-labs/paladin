@@ -35,15 +35,15 @@ type Transaction struct {
 	StatusMessage  *string            `ffstruct:"Transaction" json:"statusMessage,omitempty"`
 
 	PreReqTxs       *string `ffstruct:"Transaction" json:"preReqTxs,omitempty"`
-	From            *string `ffstruct:"Transaction" json:"from"`
-	ContractAddress *string `ffstruct:"Transaction" json:"contractAddress"`
-	Payload         *string `ffstruct:"Transaction" json:"payload"`
+	From            *string `ffstruct:"Transaction" json:"from" gorm:"column:tx_from"`
+	ContractAddress *string `ffstruct:"Transaction" json:"contractAddress" gorm:"column:tx_contract_address"`
+	Payload         *string `ffstruct:"Transaction" json:"payload" gorm:"column:tx_payload"`
 
-	AssembledPreReqTxs     *string `ffstruct:"Transaction" json:"assembledPreReqTxs,omitempty"`
-	AssembledPayload       *string `ffstruct:"Transaction" json:"assembledPayload,omitempty"`
-	AssembledInputStates   *string `ffstruct:"Transaction" json:"assembledInputStates,omitempty"`
-	AssembledOutputStates  *string `ffstruct:"Transaction" json:"assembledOutputStates,omitempty"`
-	ConfirmationTrackingId *string `ffstruct:"Transaction" json:"confirmationTrackingId,omitempty"`
+	AssembledPreReqTxs     *string `ffstruct:"Transaction" json:"assembledPreReqTxs,omitempty" gorm:"-"`
+	AssembledPayload       *string `ffstruct:"Transaction" json:"assembledPayload,omitempty" gorm:"-"`
+	AssembledInputStates   *string `ffstruct:"Transaction" json:"assembledInputStates,omitempty" gorm:"-"`
+	AssembledOutputStates  *string `ffstruct:"Transaction" json:"assembledOutputStates,omitempty" gorm:"-"`
+	ConfirmationTrackingId *string `ffstruct:"Transaction" json:"confirmationTrackingId,omitempty" gorm:"-"`
 }
 
 func (t *Transaction) GetID() string {

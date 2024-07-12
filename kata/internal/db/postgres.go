@@ -25,9 +25,12 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	migratedb "github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/dbsql"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	// Import pq driver
 	_ "github.com/lib/pq"
@@ -35,6 +38,7 @@ import (
 
 type Postgres struct {
 	dbsql.Database
+	db *gorm.DB
 }
 
 func (psql *Postgres) InitConfig(conf config.Section) {
@@ -42,6 +46,14 @@ func (psql *Postgres) InitConfig(conf config.Section) {
 }
 
 func (psql *Postgres) Init(ctx context.Context, config config.Section) error {
+	if config.GetString(dbsql.SQLConfDatasourceURL) == "" {
+		return i18n.NewError(ctx, i18n.MsgMissingConfig, "url", fmt.Sprintf("database.%s", psql.Name()))
+	}
+	db, err := gorm.Open(postgres.Open(config.GetString(dbsql.SQLConfDatasourceURL)))
+	psql.db = db
+	if err != nil {
+		return err
+	}
 	return psql.Database.Init(ctx, psql, config)
 }
 
@@ -91,9 +103,5 @@ func (psql *Postgres) Open(url string) (*sql.DB, error) {
 }
 
 func (psql *Postgres) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
-	return postgres.WithInstance(db, &postgres.Config{})
-}
-
-func NewPersistenceDB(db *dbsql.Database) Persistence {
-	return &persistence{db: db}
+	return migratepg.WithInstance(db, &migratepg.Config{})
 }
