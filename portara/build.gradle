@@ -66,29 +66,7 @@ dependencies {
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
-    // Native UDS support on Mac
-    implementation("io.netty:netty-transport-native-kqueue:4.1.111.Final") {
-        artifact {
-            classifier = Os.isFamily(Os.FAMILY_MAC)
-                    ? (
-                        Os.isArch('aarch64')
-                            ? 'osx-aarch_64'
-                            : 'osx-x86_64'
-                    ): null;
-        }
-    }
-
-    // Native UDS support on Linux
-    implementation("io.netty:netty-transport-native-epoll:4.1.111.Final") {
-        artifact {
-            classifier = (!Os.isFamily(Os.FAMILY_MAC) && Os.isFamily(Os.FAMILY_UNIX))
-                    ? (
-                    Os.isArch('aarch64')
-                            ? 'linux-aarch_64'
-                            : 'linux-x86_64'
-            ): null;
-        }
-    }
+    implementation 'io.netty:netty-all:4.1.111.Final' // supports Java 16 UDS natively since Netty 4.4.110
 
     implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
