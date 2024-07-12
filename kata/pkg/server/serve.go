@@ -19,6 +19,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
@@ -27,25 +28,70 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-func newRPCServer(socketAddress string) (net.Listener, *grpc.Server, error) {
+type grpcServer struct {
+	listener net.Listener
+	server   *grpc.Server
+	done     chan error
+}
+
+var serverLock sync.Mutex
+
+var servers = map[string]*grpcServer{}
+
+func newRPCServer(socketAddress string) (*grpcServer, error) {
 	ctx := log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
 	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
 	l, err := net.Listen("unix", socketAddress)
 	if err != nil {
 		log.L(ctx).Error("failed to listen: ", err)
-		return nil, nil, err
+		return nil, err
 	}
 	s := grpc.NewServer()
 
 	proto.RegisterPaladinTransactionServiceServer(s, &transaction.PaladinTransactionService{})
 	log.L(ctx).Infof("server listening at %v", l.Addr())
-	return l, s, nil
+	return &grpcServer{
+		listener: l,
+		server:   s,
+		done:     make(chan error),
+	}, nil
 }
 
-func Run(socketAddress string) {
-	l, s, err := newRPCServer(socketAddress)
+func Run(ctx context.Context, socketAddress string) {
+	serverLock.Lock()
+	_, exists := servers[socketAddress]
+	serverLock.Unlock()
+
+	if exists {
+		log.L(ctx).Errorf("Server %s already running", socketAddress)
+		return
+	}
+	s, err := newRPCServer(socketAddress)
 	if err != nil {
 		return
 	}
-	_ = s.Serve(l)
+
+	serverLock.Lock()
+	servers[socketAddress] = s
+	serverLock.Unlock()
+
+	log.L(ctx).Infof("Server %s started", socketAddress)
+	s.done <- s.server.Serve(s.listener)
+	log.L(ctx).Infof("Server %s ended", socketAddress)
+}
+
+func Stop(ctx context.Context, socketAddress string) {
+	serverLock.Lock()
+	s := servers[socketAddress]
+	serverLock.Unlock()
+
+	if s != nil {
+		s.server.GracefulStop()
+		serverErr := <-s.done
+		log.L(ctx).Infof("Server %s stopped (err=%v)", socketAddress, serverErr)
+	}
+
+	serverLock.Lock()
+	delete(servers, socketAddress)
+	serverLock.Unlock()
 }

@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id 'java'
     id 'application'
@@ -20,6 +22,7 @@ repositories {
 
 test {
     useJUnitPlatform()
+    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath
 }
 
 tasks.named('compileJava') {
@@ -61,11 +64,9 @@ dependencies {
     implementation "io.grpc:grpc-services:${grpcVersion}"
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
-    implementation("io.netty:netty-transport-native-kqueue:4.1.111.Final") {
-        artifact {
-            classifier = "osx-aarch_64"
-        }
-    }
+
+    implementation 'io.netty:netty-all:4.1.111.Final' // supports Java 16 UDS natively since Netty 4.4.110
+
     implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"

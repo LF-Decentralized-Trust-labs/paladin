@@ -95,6 +95,7 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 					log.L(ctx).Error("Error sending submitTransactionResponse", err)
 					return err
 				}
+				log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
 
 			case proto.REQUEST_TYPE_CLOSE_STREAM_REQUEST:
 				log.L(ctx).Info("Received REQUEST_TYPE_CLOSE_STREAM_REQUEST")

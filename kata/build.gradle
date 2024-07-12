@@ -13,6 +13,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+
 ext {
     dbComposeFile = "${projectDir}/docker-compose-test.yml"
 }
@@ -66,7 +68,6 @@ task test(dependsOn: testRun) {
         println 'Testing completed'
     }
 }
-
 
 task installTools(type:Exec) {
     workingDir '.'
@@ -134,15 +135,26 @@ task goGet(type:Exec) {
 task buildSharedLibrary(type:Exec) {
     workingDir '.'
 
+    def libName;
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        libName = "libkata.dll"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        libName = "libkata.dylib"
+    } else {
+        libName = "libkata.so"
+    }
+
     dependsOn tasks.goGet
     inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.proto"
+        include "**/*.go"
     })
-    outputs.files(['libkata.dylib', 'libkata.h'])
+    outputs.files([libName, 'libkata.h'])
+
+    environment("CGO_ENABLED", "1")
 
     executable 'go'
     args 'build'
-    args '-o', 'libkata.dylib'
+    args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
 }
@@ -174,7 +186,7 @@ artifacts {
 }
 
 dependencies {
-    libkata files('libkata.dylib')
+    libkata files(buildSharedLibrary)
 }
 
 

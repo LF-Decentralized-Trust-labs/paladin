@@ -19,29 +19,42 @@ import com.sun.jna.Library;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-public class PaladinJNA {
+public class KataJNA {
 
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private Thread kataThread;
 
     private PaladinGo paladinGo;
 
     interface PaladinGo extends Library {
-        int Run(String socketAddressPtr);
+        void Run(String socketAddressPtr);
+        void Stop(String socketAddressPtr);
     }
 
-    public PaladinJNA() {
+    public KataJNA() {
         System.setProperty("jna.debug_load", "true");
-
         paladinGo = Native.load("kata", PaladinGo.class);
     }
 
-    public void start(final String socketAddress) {
-        executorService.execute(() -> {
-            paladinGo.Run(socketAddress);
-            // Should never return
-            System.err.println("kata returned");
-            System.exit(1);
-        });
+    public synchronized void start(final String socketAddress) {
+        kataThread = new Thread(() -> paladinGo.Run(socketAddress));
+        kataThread.start();
     }
+
+    public synchronized void stop(final String socketAddress) {
+        if (kataThread == null) {
+            return;
+        }
+        paladinGo.Stop(socketAddress);
+        try {
+            kataThread.join(60000);
+        } catch(InterruptedException e) {
+            System.out.println("interrupted awaiting termination");
+        }
+        if (kataThread.isAlive()) {
+            throw new RuntimeException("stop timed out");
+        }
+    }
+
 }
