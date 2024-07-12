@@ -16,7 +16,6 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    dbComposeFile = "${projectDir}/docker-compose-test.yml"
     targetCoverage = 40.7
 }
 
@@ -129,17 +128,38 @@ task buildSharedLibrary(type:Exec) {
     args 'kata.go'
 }
 
-task startDb(type: Exec) {
-    inputs.files(dbComposeFile)
-    outputs.files([])
-    mustRunAfter(tasks.protoc)
-    commandLine 'docker', 'compose', '-f', dbComposeFile, 'up', '-d'
+class DockerCompose extends Exec {
+    DockerCompose() {
+        def dbComposeFile = "${getProject().projectDir}/docker-compose-test.yml"
+        inputs.files(dbComposeFile)
+        outputs.files([])
+        def dockerComposeV2Check = getProject().exec({
+            ignoreExitValue = true
+            executable "docker"
+            args "compose", "version"
+        })
+        if (dockerComposeV2Check.getExitValue() == 0){
+            executable 'docker'
+            args 'compose'
+        } else {
+            executable 'docker-compose'
+        }
+        args '-f'
+        args dbComposeFile
+    }
 }
 
-task stopDb(type: Exec) {
-    inputs.files(dbComposeFile)
-    outputs.files([])
-    commandLine 'docker', 'compose', '-f', dbComposeFile, 'down'
+ext.dockerCompose = { param1, param2 ->
+    // Method body here
+}
+
+task startDb(type: DockerCompose) {
+    mustRunAfter(tasks.protoc)
+    args 'up', '-d'
+}
+
+task stopDb(type: DockerCompose) {
+    args 'down'
 }
 
 task testRun(type: Exec) {
