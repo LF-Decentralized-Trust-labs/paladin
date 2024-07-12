@@ -30,6 +30,8 @@ public class SimpleTXSubmissionTest {
     void simpleTXSubmission() throws Exception {
         System.out.println(System.getProperty("os.name"));
         System.out.println(System.getProperty("os.arch"));
+        System.out.println(System.getProperty("java.library.path"));
+        System.setProperty("jna.debug_load", "true");
 
         File f = File.createTempFile("paladin", ".sock");
         if (!f.delete() ){

@@ -14,24 +14,19 @@
  */
 package io.kaleido.transaction;
 
+import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.net.UnixDomainSocketAddress;
 
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.Channel;
 import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.kqueue.KQueue;
-import io.netty.channel.kqueue.KQueueDomainSocketChannel;
-import io.netty.channel.kqueue.KQueueEventLoopGroup;
-import io.netty.channel.epoll.EpollDomainSocketChannel;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.Epoll;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.channel.unix.DomainSocketAddress;
+import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import paladin.transaction.PaladinTransactionServiceGrpc;
 import paladin.transaction.Transaction;
 
@@ -52,25 +47,15 @@ public class TransactionHandler {
 
     public TransactionHandler(String socketAddress) {
         this.socketAddress = socketAddress;
-        if (KQueue.isAvailable()) {
-            this.eventLoopGroup = new KQueueEventLoopGroup();
-            this.channelBuilder = KQueueDomainSocketChannel.class;
-        } else if (Epoll.isAvailable()) {
-            this.eventLoopGroup = new EpollEventLoopGroup();
-            this.channelBuilder = EpollDomainSocketChannel.class;
-        } else {
-            this.eventLoopGroup = new NioEventLoopGroup();
-            this.channelBuilder = NioSocketChannel.class;
-            // TODO: Move to loopback TCP/IP in this case
-            throw new RuntimeException(String.format("Platform combination not supported %s/%s", System.getProperty("os.name"), System.getProperty("os.arch")));
-        }
+        this.eventLoopGroup = new NioEventLoopGroup();
+        this.channelBuilder = NioDomainSocketChannel.class;
         inflightRequests = new ConcurrentHashMap<>();
     }
 
     public void start() {
         System.out.println("start" + this.socketAddress);
 
-        this.channel = NettyChannelBuilder.forAddress(new DomainSocketAddress(this.socketAddress))
+        this.channel = NettyChannelBuilder.forAddress(UnixDomainSocketAddress.of(this.socketAddress))
                 .eventLoopGroup(this.eventLoopGroup)
                 .channelType(this.channelBuilder)
                 .usePlaintext()
