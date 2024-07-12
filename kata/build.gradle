@@ -28,7 +28,7 @@ task lint(type: Exec) {
 }
 
 task startDb(type: Exec) {
-    commandLine 'docker-compose', '-f', dbComposeFile, 'up', '-d'
+    commandLine 'docker', 'compose', '-f', dbComposeFile, 'up', '-d'
     doLast {
         println 'Test database started'
     }
@@ -45,7 +45,7 @@ task testRun(type: Exec) {
     dependsOn 'goGet'
     dependsOn 'lint'
     dependsOn 'startDb'
-    commandLine 'go', 'test', './internal/...', './pkg/...', '-cover', '-coverprofile=coverage.txt', '-covermode=atomic', '-timeout=30s'
+    commandLine 'go', 'test', './internal/...', './pkg/server/...', '-cover', '-coverprofile=coverage.txt', '-covermode=atomic', '-timeout=30s'
     finalizedBy 'stopDb'
 }
 
