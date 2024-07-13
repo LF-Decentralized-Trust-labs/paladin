@@ -25,22 +25,23 @@ import (
 )
 
 type Persistence interface {
-	Transactions() TransactionsCollection
-	RunTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+	// *** REMEMBER to add to UTDeleteAllData() below too ***
+	States() StatesCRUD
 
+	RunTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 	UTDeleteAllData(ctx context.Context) error
+}
+
+type crudDeleteMany interface {
+	DeleteMany(ctx context.Context, filter ffapi.Filter, hooks ...dbsql.PostCompletionHook) (err error)
 }
 
 // Efficient cleanup function to speed up tests - do not use for any other purposes
 func (p *persistence) UTDeleteAllData(ctx context.Context) error {
 	return p.RunTransaction(ctx, func(ctx context.Context) (err error) {
-		err = p.deleteChain(ctx, err, p.Transactions())
+		err = p.deleteChain(ctx, err, p.States())
 		return err
 	})
-}
-
-type crudDeleteMany interface {
-	DeleteMany(ctx context.Context, filter ffapi.Filter, hooks ...dbsql.PostCompletionHook) (err error)
 }
 
 func (p *persistence) deleteChain(ctx context.Context, lastErr error, db crudDeleteMany) error {
@@ -51,36 +52,33 @@ func (p *persistence) deleteChain(ctx context.Context, lastErr error, db crudDel
 	return lastErr
 }
 
-var psql *Postgres
-var initialized bool = false
-
 type persistence struct {
 	db *dbsql.Database
 }
 
-// InitConfig gets called after config reset to initialize the config structure
-func InitConfig(conf config.Section) {
-	psql = &Postgres{}
-	psql.InitConfig(conf)
+func InitConfig(conf config.Section) *Postgres {
+	newPsql := &Postgres{}
+	newPsql.InitConfig(conf)
+
+	return newPsql
 }
 
-// Init gets called once to initialize the database connection itself
-func Init(ctx context.Context, conf config.Section) error {
-	if !initialized {
-		initialized = true
-		return psql.Init(ctx, conf)
+func NewPersistencePSQL(newPsql *Postgres) Persistence {
+	return newPersistence(&newPsql.Database)
+}
+
+func newPersistence(db *dbsql.Database) Persistence {
+	p := &persistence{
+		db: db,
 	}
-	return nil
+	return p
 }
 
 func (p *persistence) RunTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return p.db.RunAsGroup(ctx, fn)
 }
 
-// NewPersistence can be called as often as required (future versions might
-// parameterize this with scoping information)
-func NewPersistence() Persistence {
-	return &persistence{
-		db: &psql.Database,
-	}
+// For tests
+func UTNewPersistenceDB(db *dbsql.Database) Persistence {
+	return newPersistence(db)
 }

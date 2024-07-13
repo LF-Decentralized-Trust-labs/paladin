@@ -74,6 +74,7 @@ func (psql *Postgres) Features() dbsql.SQLFeatures {
 		return fmt.Sprintf(`SELECT pg_advisory_xact_lock(%d);`, lockIndex(lockName))
 	}
 	features.MultiRowInsert = true
+	features.DBOptimizedUpsertBuilder = dbsql.BuildPostgreSQLOptimizedUpsert
 	return features
 }
 
@@ -92,8 +93,4 @@ func (psql *Postgres) Open(url string) (*sql.DB, error) {
 
 func (psql *Postgres) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
 	return postgres.WithInstance(db, &postgres.Config{})
-}
-
-func NewPersistenceDB(db *dbsql.Database) Persistence {
-	return &persistence{db: db}
 }

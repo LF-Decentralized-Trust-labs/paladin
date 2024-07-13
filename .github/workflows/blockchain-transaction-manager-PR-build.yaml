@@ -1,13 +1,13 @@
 # This is a template workflow to help you get started with Actions set up for
 # test libraries for PRs
 
-name: REPLACE_WITH_FOLDER_NAME
+name: blockchain-transaction-manager (PR)
 
 # Defines the triggers of this Github Action
 on:
   # Run the build once a day for vulnerability scanning - choose a different night time schedule to other builds
-  # schedule:
-  #   - cron: '25 4 * * *'
+  schedule:
+    - cron: '25 4 * * *'
   # When there is a pull request event, this Action will be triggered
   pull_request:
     # when the pull request is raised against the listed branch(es)
@@ -15,29 +15,16 @@ on:
     branches:
       - main
     paths:
-      - 'REPLACE_WITH_FOLDER_NAME/**'
-      - '.github/workflows/REPLACE_WITH_WORKFLOW_YAML_NAME.yaml'
+      - 'blockchain-transaction-manager/**'
+      - 'Makefile.common'
+      - '.github/workflows/blockchain-transaction-manager-PR-build.yaml'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
     container: golang:1.22-bullseye
-<<<<<<< HEAD
-    # uncomment database setup as needed
-    # services:
-    #   postgres:
-    #     image: postgres
-    #     env:
-    #       POSTGRES_PASSWORD: my-secret
-    #     options: >-
-    #       --health-cmd pg_isready
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
-=======
 
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,11 +37,11 @@ jobs:
       #   with:
       #     node-version: 20.x
 
-      # - name: Set up Go
-      #   uses: actions/setup-go@v4
-      #   with:
-      #     go-version: '1.22'
-      #     check-latest: true
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          check-latest: true
 
       - name: Fetch history # See https://github.com/actions/checkout/issues/477
         run: |-
@@ -62,13 +49,5 @@ jobs:
           git fetch origin
 
       - name: Build and Test
-        working-directory: REPLACE_WITH_FOLDER_NAME
+        working-directory: blockchain-transaction-manager
         run: make
-<<<<<<< HEAD
-        # env:
-        #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
-        #   POSTGRES_HOSTNAME: postgres
-        #   POSTGRES_PASSWORD: my-secret
-        #   POSTGRES_PORT: 5432
-=======
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2

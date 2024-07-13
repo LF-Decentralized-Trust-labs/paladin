@@ -55,7 +55,7 @@ func TestE2E(t *testing.T) {
 		ContractAddress: &fakeString,
 		Payload:         &fakeString,
 	}
-	testStoreRetrieve(tCtx, t1)
+	testStoreRetrieve(tCtx, crud.Transactions(), t1)
 	assert.NoError(t, crud.UTDeleteAllData(ctx))
 
 }
@@ -68,12 +68,12 @@ type crudTestActivity struct {
 	names          []string
 }
 
-func testStoreRetrieve[T dbsql.Resource](tCtx *crudTestActivity, obj T, generators ...func(obj, rObj T)) {
-	result := tCtx.crud.db.Create(obj)
-	assert.NoError(tCtx.t, result.Error)
-	var rObj T
-	result = tCtx.crud.db.Model(&Transaction{ID: fftypes.MustParseUUID(obj.GetID())}).First(&rObj)
-	assert.NoError(tCtx.t, result.Error)
+func testStoreRetrieve[T dbsql.Resource](tCtx *crudTestActivity, coll dbsql.CRUD[T], obj T, generators ...func(obj, rObj T)) {
+	created, err := coll.Upsert(tCtx, obj, dbsql.UpsertOptimizationNew)
+	assert.NoError(tCtx.t, err)
+	assert.True(tCtx.t, created)
+	rObj, err := coll.GetByID(tCtx, obj.GetID(), dbsql.FailIfNotFound)
+	assert.NoError(tCtx.t, err)
 	for _, g := range generators {
 		g(obj, rObj)
 	}

@@ -2,7 +2,13 @@ go 1.22.4
 
 use (
 	./blockchain-transaction-manager
+<<<<<<< HEAD
 	./kata
 	./runtime
 	./transaction-manager
+=======
+	./runtime
+	./transaction-manager
+	./state-manager
+>>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 )

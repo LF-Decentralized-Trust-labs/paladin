@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Copyright © 2024 Kaleido, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
@@ -12,11 +13,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+=======
+>>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 # define the default make task at the top
 .PHONY: all
 all: test build
 
 # Mockery setup to override the default mock in common task below
+<<<<<<< HEAD
 .PHONY: setbtxmanagerpath settxmanagerpath
 setbtxmanagerpath:
 	$(eval BTXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-blockchain-transaction-manager/pkg/manager))
@@ -30,6 +34,26 @@ include ../Makefile.common
 # register mocks
 $(eval $(call makemock, $$(BTXM_PATH), BlockchainTransactionManager, btxmMocks, setbtxmanagerpath))
 $(eval $(call makemock, $$(TXM_PATH), PaladinTransactionManager, txmMocks, settxmanagerpath))
+=======
+.PHONY: btxmanager txmanager
+btxmanager:
+	$(eval BTXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-blockchain-transaction-manager/pkg/manager))
+txmanager:
+	$(eval TXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-transaction-manager/pkg/manager))
+
+.PHONY: mock
+mock: deps btxmanager txmanager
+	$(MOCKERY) --case underscore --dir $(BTXM_PATH) --name BlockchainTransactionManager --outpkg btxmMocks --output mocks/btxmMocks
+	$(MOCKERY) --case underscore --dir $(TXM_PATH) --name PaladinTransactionManager --outpkg txmMocks --output mocks/txmMocks
+
+# include the common tasks
+USE_TEST_DB := 0
+include ../Makefile.common
+
+# register mocks
+$(eval $(call makemock, $$(BTXM_PATH), BlockchainTransactionManager, btxmMocks, btxmanager))
+$(eval $(call makemock, $$(TXM_PATH), PaladinTransactionManager, txmMocks, txmanager))
+>>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 
 # build
 .PHONY: clean
