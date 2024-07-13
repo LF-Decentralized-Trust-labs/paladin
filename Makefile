@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Copyright © 2024 Kaleido, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
@@ -27,8 +26,3 @@ else
 	docker build --network=host --build-arg POSTGRES_HOST=host.docker.internal --build-arg BUILD_VERSION=${BUILD_VERSION} ${DOCKER_ARGS} -t kaleido-io/paladin .
 endif
 
-=======
-all: docker
-docker:
-		docker build --build-arg BUILD_VERSION=${BUILD_VERSION} ${DOCKER_ARGS} -t kaleido-io/paladin .
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2

@@ -1,6 +1,5 @@
 **/coverage.txt
 **/debug.test
-<<<<<<< HEAD
 **/__debug_*
 .vscode/*.log
 **/.DS_Store
@@ -54,11 +53,3 @@ bin/
 
 ### Mac OS ###
 .DS_Store
-=======
-.vscode/*.log
-.DS_Store
-*.iml
-.idea/
-__debug_bin
-runtime/paladin
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2

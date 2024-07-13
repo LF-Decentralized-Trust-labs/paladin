@@ -1,10 +1,6 @@
 # You can override these variables in your Makefile
 SRC_DIR ?= ./pkg/...
-<<<<<<< HEAD
 CREATE_TEST_DB ?= 1
-=======
-USE_TEST_DB ?= 1
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 
 # Common configuration
 VGO=go
@@ -62,7 +58,6 @@ stop-db:
 	$(DOCKER) compose -f $(DB_COMPOSE_FILE) down
 
 # Testing
-<<<<<<< HEAD
 .PHONY: test-run coverage
 coverage: test-run
 	$(VGO) tool cover -html=coverage.txt
@@ -74,30 +69,11 @@ ifeq ($(CREATE_TEST_DB),1)
 	$(MAKE) stop-db
 else
 	$(VGO) test $(SRC_DIR) -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s $(TEST_FLAGS)
-=======
-.PHONY: test-run test-full coverage
-test-run: deps lint mocks
-	$(VGO) test $(SRC_DIR) -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s $(TEST_FLAGS)
-coverage: test-full
-	$(VGO) tool cover -html=coverage.txt
-
-test-full:
-ifeq ($(USE_TEST_DB),1)
-	$(MAKE) start-db
-	$(MAKE) test-run
-	$(MAKE) stop-db
-else
-	$(MAKE) test-run
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 endif
 
 # Target to enforce 100% coverage
 .PHONY: test
-<<<<<<< HEAD
 test: test-run
-=======
-test: test-full
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 	@echo "Checking test coverage..."
 	@total_coverage=`$(VGO) tool cover -func=coverage.txt | grep total | awk '{print $$3}'`; \
 	if [ "$$total_coverage" != "100.0%" ]; then \

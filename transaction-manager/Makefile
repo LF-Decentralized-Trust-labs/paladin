@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Copyright © 2024 Kaleido, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
@@ -25,18 +24,3 @@ include ../Makefile.common
 
 # register mocks
 $(eval $(call makemock, $$(BTXM_PATH), BlockchainTransactionManager, btxmMocks, setbtxmanagerpath))
-=======
-.PHONY: all
-all: test
-
-.PHONY: btxmanager
-btxmanager:
-	$(eval BTXM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/kaleido-io/paladin-blockchain-transaction-manager/pkg/manager))
-
-# include the common tasks
-USE_TEST_DB := 0
-include ../Makefile.common
-
-# register mocks
-$(eval $(call makemock, $$(BTXM_PATH), BlockchainTransactionManager, btxmMocks, btxmanager))
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2

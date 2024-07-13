@@ -23,7 +23,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: golang:1.22-bullseye
-<<<<<<< HEAD
     # uncomment database setup as needed
     # services:
     #   postgres:
@@ -35,9 +34,6 @@ jobs:
     #       --health-interval 10s
     #       --health-timeout 5s
     #       --health-retries 5
-=======
-
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,11 +60,8 @@ jobs:
       - name: Build and Test
         working-directory: REPLACE_WITH_FOLDER_NAME
         run: make
-<<<<<<< HEAD
         # env:
         #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
         #   POSTGRES_HOSTNAME: postgres
         #   POSTGRES_PASSWORD: my-secret
         #   POSTGRES_PORT: 5432
-=======
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2

@@ -11,11 +11,8 @@ WORKDIR /runtime
 RUN mkdir /.cache \
     && chgrp -R 0 /.cache \
     && chmod -R g+rwX /.cache
-<<<<<<< HEAD
 # A PSQL DB must be setup already for running all the tests.
 ENV CREATE_TEST_DB=0
-=======
->>>>>>> d664889020b1294dc3305d0940e7f3baff5bbce2
 USER 1001
 RUN make
 
