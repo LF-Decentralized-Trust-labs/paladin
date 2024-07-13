@@ -19,10 +19,18 @@ import (
 	"io"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/db"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
+func NewPaladinTransactionService() *PaladinTransactionService {
+	return &PaladinTransactionService{
+		persistence: db.NewPersistence(),
+	}
+}
+
 type PaladinTransactionService struct {
+	persistence db.Persistence
 	proto.UnimplementedPaladinTransactionServiceServer
 }
 
@@ -54,7 +62,6 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 		switch msg.GetType() {
 		case proto.MESSAGE_TYPE_RESPONSE_MESSAGE:
 			log.L(ctx).Info("Received MESSAGE_TYPE_RESPONSE_MESSAGE")
-
 		case proto.MESSAGE_TYPE_REQUEST_MESSAGE:
 			log.L(ctx).Info("Received MESSAGE_TYPE_REQUEST_MESSAGE")
 			requestType := msg.GetRequest().GetType()

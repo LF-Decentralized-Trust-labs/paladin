@@ -16,6 +16,7 @@ package transaction
 
 import (
 	"context"
+	"errors"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
@@ -29,7 +30,37 @@ func (s *PaladinTransactionService) submit(ctx context.Context, req *proto.Submi
 
 	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", req.ContractAddress, req.From, req.IdempotencyKey, req.Payload)
 
-	// TODO: Implement the logic to submit a transaction
+	// High level checks goes into here:
+
+	payload := req.GetPayloadJSON()
+	if payload == "" {
+		payload = req.GetPayloadRLP()
+	}
+
+	if payload == "" || req.From == "" || req.ContractAddress == "" || req.IdempotencyKey == "" {
+		return nil, errors.New("must provide a payload")
+	}
+
+	//
+	// pendingStatus := db.TransactionPending
+	// txID := fftypes.NewUUID()
+	// DB level checks:
+	// Uniqueness of idempotency key, id etc
+
+	// if err := s.persistence.Transactions().Insert(ctx, &db.Transaction{
+	// 	ID:              txID,
+	// 	Created:         fftypes.Now(),
+	// 	Updated:         fftypes.Now(),
+	// 	IdempotencyKey:  &req.IdempotencyKey,
+	// 	ContractAddress: &req.ContractAddress,
+	// 	Status:          &pendingStatus,
+	// 	From:            &req.From,
+	// 	Payload:         &payload,
+	// }); err != nil {
+	// 	return nil, err
+	// }
+
+	// What happens next
 
 	return &proto.SubmitTransactionResponse{
 		TransactionId: "your-transaction-id",
