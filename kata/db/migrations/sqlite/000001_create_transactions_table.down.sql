@@ -1,5 +1,1 @@
-BEGIN;
-
 -- TODO 
-
-COMMIT;

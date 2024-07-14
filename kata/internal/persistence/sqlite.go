@@ -26,22 +26,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type sqliteProvider struct {
-	*sqlProvider
-}
+type sqliteProvider struct{}
 
-func newSQLitePersistence(ctx context.Context, conf *Config) (_ Persistence, err error) {
-	p := &sqliteProvider{}
-	p.sqlProvider, err = newSQLProvider(ctx, p, &conf.SQLite.SQLDBConfig, &SQLDBConfigDefaults{
+func newSQLiteProvider(ctx context.Context, conf *Config) (p *provider, err error) {
+	return newSQLProvider(ctx, &sqliteProvider{}, &conf.SQLite.SQLDBConfig, &SQLDBConfigDefaults{
 		MaxOpenConns:    1,
 		MaxIdleConns:    1,
 		ConnMaxIdleTime: 0,
 		ConnMaxLifetime: 0,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return
 }
 
 func (p *sqliteProvider) DBName() string {

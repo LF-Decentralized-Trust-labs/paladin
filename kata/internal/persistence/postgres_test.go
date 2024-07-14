@@ -14,45 +14,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package confutil
+package persistence
 
-import "time"
+import (
+	"reflect"
+	"testing"
 
-func Int(iVal *int, def int) int {
-	if iVal == nil {
-		return def
-	}
-	return *iVal
-}
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+)
 
-func IntMin(iVal *int, min int, def int) int {
-	if iVal == nil || *iVal < min {
-		return def
-	}
-	return *iVal
-}
-
-func Bool(bVal *bool, def bool) bool {
-	if bVal == nil {
-		return def
-	}
-	return *bVal
-}
-
-func Duration(sVal *string, def time.Duration) time.Duration {
-	var dVal *time.Duration
-	if sVal != nil {
-		d, err := time.ParseDuration(*sVal)
-		if err == nil {
-			dVal = &d
-		}
-	}
-	if dVal == nil {
-		return def
-	}
-	return *dVal
-}
-
-func P[T any](v T) *T {
-	return &v
+func TestPostgresProvider(t *testing.T) {
+	p := &postgresProvider{}
+	assert.Equal(t, "postgres", p.DBName())
+	assert.Equal(t, "*postgres.Dialector", reflect.TypeOf(p.Open("")).String())
+	db, _, _ := sqlmock.New()
+	_, err := p.GetMigrationDriver(db)
+	assert.Error(t, err)
 }

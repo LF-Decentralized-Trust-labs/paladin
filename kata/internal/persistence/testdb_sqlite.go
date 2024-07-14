@@ -14,45 +14,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package confutil
+//go:build !testdbpostgres
+// +build !testdbpostgres
 
-import "time"
+package persistence
 
-func Int(iVal *int, def int) int {
-	if iVal == nil {
-		return def
-	}
-	return *iVal
-}
+import (
+	"context"
 
-func IntMin(iVal *int, min int, def int) int {
-	if iVal == nil || *iVal < min {
-		return def
-	}
-	return *iVal
-}
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+)
 
-func Bool(bVal *bool, def bool) bool {
-	if bVal == nil {
-		return def
-	}
-	return *bVal
-}
-
-func Duration(sVal *string, def time.Duration) time.Duration {
-	var dVal *time.Duration
-	if sVal != nil {
-		d, err := time.ParseDuration(*sVal)
-		if err == nil {
-			dVal = &d
-		}
-	}
-	if dVal == nil {
-		return def
-	}
-	return *dVal
-}
-
-func P[T any](v T) *T {
-	return &v
+// Used for unit tests throughout the project that want to test against a real DB
+// This version return an in-memory DB
+func NewUnitTestPersistence(ctx context.Context) (Persistence, error) {
+	return newSQLiteProvider(ctx, &Config{
+		Type: "sqlite",
+		SQLite: SQLiteConfig{
+			SQLDBConfig: SQLDBConfig{
+				URI:           ":memory:",
+				AutoMigrate:   confutil.P(true),
+				MigrationsDir: "../../db/migrations/sqlite",
+			},
+		},
+	})
 }

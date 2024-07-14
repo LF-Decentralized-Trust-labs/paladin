@@ -29,11 +29,15 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 
 	"gorm.io/gorm"
+	// Import migrate file source
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-type sqlProvider struct {
-	gdb *gorm.DB
-	db  *sql.DB
+type provider struct {
+	p    SQLDBProvider
+	gdb  *gorm.DB
+	db   *sql.DB
+	conf *SQLDBConfig
 }
 
 type SQLDBProvider interface {
@@ -59,14 +63,18 @@ type SQLDBConfigDefaults struct {
 	ConnMaxLifetime time.Duration
 }
 
-func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, defs *SQLDBConfigDefaults) (gp *sqlProvider, err error) {
+func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, defs *SQLDBConfigDefaults) (gp *provider, err error) {
 	if conf.URI == "" {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPersistenceMissingURI)
 	}
 
 	gdb, err := gorm.Open(p.Open(conf.URI), &gorm.Config{})
 	if err == nil {
-		gp = &sqlProvider{gdb: gdb}
+		gp = &provider{
+			p:    p,
+			gdb:  gdb,
+			conf: conf,
+		}
 		gp.db, err = gdb.DB()
 	}
 	if err != nil {
@@ -78,34 +86,39 @@ func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, def
 	gp.db.SetConnMaxLifetime(confutil.Duration(conf.ConnMaxLifetime, defs.ConnMaxLifetime))
 
 	if confutil.Bool(conf.AutoMigrate, false) {
-		if err = gp.applyDBMigrations(ctx, p, conf); err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgPersistenceMigrationFailed)
+		if err = gp.runMigration(ctx, func(m *migrate.Migrate) error { return m.Up() }); err != nil {
+			return nil, err
 		}
 	}
 	return gp, nil
 }
 
-func (gp *sqlProvider) applyDBMigrations(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig) error {
-	if conf.MigrationsDir == "" {
-		return i18n.NewError(ctx, msgs.MsgPersistenceMissingMigrationDir)
-	}
-
-	driver, err := p.GetMigrationDriver(gp.db)
+func (gp *provider) runMigration(ctx context.Context, mig func(m *migrate.Migrate) error) error {
+	m, err := gp.getMigrate(ctx)
 	if err == nil {
-		fileURL := "file://" + conf.MigrationsDir
-		log.L(ctx).Infof("Running migrations in: %s", fileURL)
-		var m *migrate.Migrate
-		m, err = migrate.NewWithDatabaseInstance(
-			fileURL,
-			p.DBName(), driver)
-		if err == nil {
-			err = m.Up()
-		}
-		version, dirty, _ := m.Version()
-		log.L(ctx).Infof("Migrations now at: v=%d dirty=%t", version, dirty)
+		err = mig(m)
 	}
 	if err != nil && err != migrate.ErrNoChange {
 		return i18n.WrapError(ctx, err, msgs.MsgPersistenceMigrationFailed)
 	}
+	version, dirty, _ := m.Version()
+	log.L(ctx).Infof("Migrations now at: v=%d dirty=%t", version, dirty)
 	return nil
+}
+
+func (gp *provider) getMigrate(ctx context.Context) (m *migrate.Migrate, err error) {
+	if gp.conf.MigrationsDir == "" {
+		return nil, i18n.NewError(ctx, msgs.MsgPersistenceMissingMigrationDir)
+	}
+	driver, err := gp.p.GetMigrationDriver(gp.db)
+	if err == nil {
+		fileURL := "file://" + gp.conf.MigrationsDir
+		log.L(ctx).Infof("Running migrations in: %s", fileURL)
+		m, err = migrate.NewWithDatabaseInstance(fileURL, gp.p.DBName(), driver)
+	}
+	return m, err
+}
+
+func (gp *provider) DB() *gorm.DB {
+	return gp.gdb
 }

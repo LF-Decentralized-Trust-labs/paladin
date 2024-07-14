@@ -22,10 +22,12 @@ import (
 	// Import pq driver
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	_ "github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
-type Persistence interface{}
+type Persistence interface {
+	DB() *gorm.DB
+}
 
 const (
 	TypePostgres = "postgres"
@@ -49,9 +51,9 @@ type SQLiteConfig struct {
 func NewPersistence(ctx context.Context, conf *Config) (Persistence, error) {
 	switch conf.Type {
 	case "", TypeSQLite: // default
-		return newSQLitePersistence(ctx, conf)
+		return newSQLiteProvider(ctx, conf)
 	case TypePostgres:
-		return newPostgresPersistence(ctx, conf)
+		return newPostgresProvider(ctx, conf)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPersistenceInvalidType, conf.Type)
 	}

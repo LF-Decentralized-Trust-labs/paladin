@@ -29,22 +29,15 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 )
 
-type postgresProvider struct {
-	*sqlProvider
-}
+type postgresProvider struct{}
 
-func newPostgresPersistence(ctx context.Context, conf *Config) (_ Persistence, err error) {
-	p := &postgresProvider{}
-	p.sqlProvider, err = newSQLProvider(ctx, p, &conf.Postgres.SQLDBConfig, &SQLDBConfigDefaults{
+func newPostgresProvider(ctx context.Context, conf *Config) (p *provider, err error) {
+	return newSQLProvider(ctx, &postgresProvider{}, &conf.Postgres.SQLDBConfig, &SQLDBConfigDefaults{
 		MaxOpenConns:    100,
 		MaxIdleConns:    100,
 		ConnMaxIdleTime: 60 * time.Second,
 		ConnMaxLifetime: 0,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return
 }
 
 func (p *postgresProvider) DBName() string {
