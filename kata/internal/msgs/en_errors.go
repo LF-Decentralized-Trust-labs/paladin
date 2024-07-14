@@ -40,8 +40,7 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 
 var (
 
-	// GUID PD0101XX
-	MsgGUIDInvalidEyeCatcher = ffe("PD010100", "Invalid eye-catcher for GUID %q")
-	MsgGUIDNil               = ffe("PD010101", "GUID is null")
-	MsgGUIDZero              = ffe("PD010102", "GUID is zero")
+	// States PD0101XX
+	MsgStateInvalidHex    = ffe("PD010100", "Invalid hex: %s")
+	MsgStateInvalidLength = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
 )
