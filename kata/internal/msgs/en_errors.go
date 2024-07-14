@@ -43,4 +43,11 @@ var (
 	// States PD0101XX
 	MsgStateInvalidHex    = ffe("PD010100", "Invalid hex: %s")
 	MsgStateInvalidLength = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
+
+	// Persistence PD0102XX
+	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
+	MsgPersistenceMissingURI          = ffe("PD010201", "Missing database connection URI")
+	MsgPersistenceInitFailed          = ffe("PD010202", "Database init failed")
+	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
+	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 )

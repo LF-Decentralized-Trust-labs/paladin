@@ -31,22 +31,22 @@ import (
 // HashID is a 32 byte value, optimized for DB storage using a compound key
 // of two UUIDs (which is faster than either bytea(16) or char(32) it seems)
 type HashID struct {
-	l uuid.UUID
-	h uuid.UUID
+	L uuid.UUID `gorm:"type:uuid;"`
+	H uuid.UUID `gorm:"type:uuid;"`
 }
 
 func NewHashID(bytes [32]byte) *HashID {
 	h := &HashID{}
-	copy(h.l[:], bytes[0:16])
-	copy(h.h[:], bytes[16:32])
+	copy(h.L[:], bytes[0:16])
+	copy(h.H[:], bytes[16:32])
 	return h
 }
 
 // No checking in this function on length
 func NewHashIDSlice32(bytes []byte) *HashID {
 	h := &HashID{}
-	copy(h.l[:], bytes[0:16])
-	copy(h.h[:], bytes[16:32])
+	copy(h.L[:], bytes[0:16])
+	copy(h.H[:], bytes[16:32])
 	return h
 }
 
@@ -106,7 +106,7 @@ func (id *HashID) HexString0xPrefix() string {
 	if id == nil {
 		return (&HashID{}).HexString0xPrefix()
 	}
-	return fmt.Sprintf("0x%s%s", hex.EncodeToString(id.l[:]), hex.EncodeToString(id.h[:]))
+	return fmt.Sprintf("0x%s%s", hex.EncodeToString(id.L[:]), hex.EncodeToString(id.H[:]))
 }
 
 // Get string (without 0x prefix) - nil is all zeros
@@ -114,7 +114,7 @@ func (id *HashID) HexString() string {
 	if id == nil {
 		return (&HashID{}).HexString()
 	}
-	return fmt.Sprintf("%s%s", hex.EncodeToString(id.l[:]), hex.EncodeToString(id.h[:]))
+	return fmt.Sprintf("%s%s", hex.EncodeToString(id.L[:]), hex.EncodeToString(id.H[:]))
 }
 
 // Get bytes - or nil
@@ -123,8 +123,8 @@ func (id *HashID) Bytes() []byte {
 		return nil
 	}
 	var b32 [32]byte
-	copy(b32[0:16], id.l[:])
-	copy(b32[16:32], id.h[:])
+	copy(b32[0:16], id.L[:])
+	copy(b32[16:32], id.H[:])
 	return b32[:]
 }
 
@@ -132,8 +132,8 @@ func (id *HashID) Bytes() []byte {
 func (id *HashID) Bytes32() [32]byte {
 	var b32 [32]byte
 	if id != nil {
-		copy(b32[0:16], id.l[:])
-		copy(b32[16:32], id.h[:])
+		copy(b32[0:16], id.L[:])
+		copy(b32[16:32], id.H[:])
 	}
 	return b32
 }

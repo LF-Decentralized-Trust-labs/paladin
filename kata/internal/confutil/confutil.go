@@ -14,8 +14,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package state
+package confutil
 
-type State struct {
-	Hash HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+import "time"
+
+func Int(iVal *int, def int) int {
+	if iVal == nil {
+		return def
+	}
+	return *iVal
+}
+
+func IntMin(iVal *int, min int, def int) int {
+	if iVal == nil || *iVal < min {
+		return def
+	}
+	return *iVal
+}
+
+func Bool(bVal *bool, def bool) bool {
+	if bVal == nil {
+		return def
+	}
+	return *bVal
+}
+
+func Duration(sVal *string, def time.Duration) time.Duration {
+	var dVal *time.Duration
+	if sVal != nil {
+		d, err := time.ParseDuration(*sVal)
+		if err == nil {
+			dVal = &d
+		}
+	}
+	if dVal == nil {
+		return def
+	}
+	return *dVal
 }
