@@ -32,6 +32,20 @@ func IntMin(iVal *int, min int, def int) int {
 	return *iVal
 }
 
+func Int64(iVal *int64, def int64) int64 {
+	if iVal == nil {
+		return def
+	}
+	return *iVal
+}
+
+func Int64Min(iVal *int64, min int64, def int64) int64 {
+	if iVal == nil || *iVal < min {
+		return def
+	}
+	return *iVal
+}
+
 func Bool(bVal *bool, def bool) bool {
 	if bVal == nil {
 		return def

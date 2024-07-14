@@ -16,22 +16,6 @@
 
 package statestore
 
-import (
-	"time"
-
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
-)
-
-type TransactionStatus int
-
-const (
-	TransactionPending TransactionStatus = iota
-	TransactionAssembling
-	TransactionTracking
-)
-
-type Transaction struct {
-	ID      *fftypes.UUID `ffstruct:"Transaction" json:"id"`
-	Created *time.Time    `ffstruct:"Transaction" json:"created"`
-	Updated *time.Time    `ffstruct:"Transaction" json:"updated"`
+type State struct {
+	Hash HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 }
