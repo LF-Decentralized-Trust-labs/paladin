@@ -29,6 +29,7 @@ task installTools(type:Exec) {
         "${projectDir}/bin/protoc-gen-go",
         "${projectDir}/bin/protoc-gen-go-grpc",
         "${projectDir}/bin/golangci-lint",
+        "${projectDir}/bin/atlas"
     ])
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
@@ -131,12 +132,12 @@ task buildSharedLibrary(type:Exec) {
 class DockerCompose extends Exec {
     DockerCompose() {
         def dbComposeFile = "${getProject().projectDir}/docker-compose-test.yml"
-        inputs.files(dbComposeFile)
-        outputs.files([])
         def dockerComposeV2Check = getProject().exec({
             ignoreExitValue = true
             executable "docker"
-            args "compose", "version"
+            args "compose", "-f", dbComposeFile, "ps"
+            standardOutput = new ByteArrayOutputStream()
+            errorOutput = new ByteArrayOutputStream()
         })
         if (dockerComposeV2Check.getExitValue() == 0){
             executable 'docker'
@@ -162,12 +163,10 @@ task stopDb(type: DockerCompose) {
     args 'down'
 }
 
-task testRun(type: Exec) {
+task testRunSQLite(type: Exec) {
     workingDir '.'
 
     dependsOn tasks.goGet
-    dependsOn tasks.lint
-    dependsOn tasks.startDb
 
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.go"
@@ -184,6 +183,27 @@ task testRun(type: Exec) {
     args '-timeout=30s'
 }
 
+task testRunPostgres(type: Exec) {
+    workingDir '.'
+
+    dependsOn tasks.goGet
+    dependsOn tasks.startDb
+
+    inputs.files(fileTree("${projectDir}").matching {
+        include "**/*.go"
+    })
+    outputs.files(['coverage.txt'])
+
+    executable 'go'
+    args 'test'
+    args './internal/...'
+    args './pkg/server/...'
+    args '-tags', 'testdbpostgres'
+    args '-cover'
+    args '-coverprofile=coverage.txt'
+    args '-covermode=atomic'
+    args '-timeout=30s'
+}
 
 task checkCoverage {
     doLast {
@@ -197,13 +217,16 @@ task checkCoverage {
     }
 }
 
-task test(dependsOn: testRun) {
+task test(dependsOn: testRunSQLite) {
     finalizedBy checkCoverage
 }
 
 task build {
     dependsOn tasks.buildSharedLibrary
+    dependsOn tasks.lint
     dependsOn tasks.test
+    dependsOn tasks.testRunPostgres
+    dependsOn tasks.stopDb
 }
 
 configurations {

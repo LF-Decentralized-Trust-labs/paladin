@@ -14,6 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build testdbpostgres
+// +build testdbpostgres
+
 package db
 
 import (
