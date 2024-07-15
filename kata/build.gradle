@@ -226,6 +226,7 @@ task build {
     dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.testRunPostgres
+    dependsOn tasks.stopDb
 }
 
 configurations {
