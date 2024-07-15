@@ -15,32 +15,3 @@
 // limitations under the License.
 
 package statestore
-
-import (
-	"context"
-
-	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
-)
-
-type Config struct {
-	SchemaCache cache.Config `yaml:"schemaCache"`
-}
-
-type StateStore interface {
-	GetSchema(context.Context, *HashID) (Schema, error)
-}
-
-type stateStore struct {
-	p              persistence.Persistence
-	abiSchemaCache cache.Cache[string, Schema]
-}
-
-func NewStateStore(ctx context.Context, conf *Config, p persistence.Persistence) StateStore {
-	return &stateStore{
-		p: p,
-		abiSchemaCache: cache.NewCache[string, Schema](&conf.SchemaCache, &cache.Defaults{
-			Capacity: 1000,
-		}),
-	}
-}

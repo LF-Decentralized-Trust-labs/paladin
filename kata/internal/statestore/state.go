@@ -17,5 +17,6 @@
 package statestore
 
 type State struct {
-	Hash HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash   HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Schema HashID `gorm:"embedded;embeddedPrefix:schema_;"`
 }

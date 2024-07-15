@@ -14,30 +14,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !testdbpostgres
-// +build !testdbpostgres
-
-package persistence
+package cache
 
 import (
-	"context"
+	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/stretchr/testify/assert"
 )
 
-// Used for unit tests throughout the project that want to test against a real DB
-// This version return an in-memory DB
-func NewUnitTestPersistence(ctx context.Context) (Persistence, func(), error) {
-	p, err := newSQLiteProvider(ctx, &Config{
-		Type: "sqlite",
-		SQLite: SQLiteConfig{
-			SQLDBConfig: SQLDBConfig{
-				URI:           ":memory:",
-				AutoMigrate:   confutil.P(true),
-				MigrationsDir: "../../db/migrations/sqlite",
-				DebugQueries:  true,
-			},
-		},
-	})
-	return p, func() { p.Close() }, err
+func TestCache(t *testing.T) {
+
+	c := NewCache[string, string](&Config{}, &Defaults{Capacity: 1})
+
+	c.Set("key1", "val1")
+	v, ok := c.Get("key1")
+	assert.True(t, ok)
+	assert.Equal(t, "val1", v)
+
+	c.Set("key2", "val2")
+	v, ok = c.Get("key2")
+	assert.True(t, ok)
+	assert.Equal(t, "val2", v)
+
+	_, ok = c.Get("key1")
+	assert.False(t, ok)
+
+	c.Delete("key2")
+	_, ok = c.Get("key2")
+	assert.False(t, ok)
 }

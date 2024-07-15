@@ -27,6 +27,7 @@ import (
 
 type Persistence interface {
 	DB() *gorm.DB
+	Close()
 }
 
 const (

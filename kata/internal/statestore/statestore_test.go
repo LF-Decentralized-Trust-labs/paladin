@@ -15,3 +15,19 @@
 // limitations under the License.
 
 package statestore
+
+import (
+	"context"
+	"testing"
+
+	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/stretchr/testify/assert"
+)
+
+func newTestStateStore(t *testing.T) (context.Context, *stateStore, func()) {
+	ctx := context.Background()
+	p, done, err := persistence.NewUnitTestPersistence(ctx)
+	assert.NoError(t, err)
+	ss := NewStateStore(ctx, &Config{}, p)
+	return ctx, ss.(*stateStore), done
+}

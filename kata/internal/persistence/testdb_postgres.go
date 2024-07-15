@@ -30,7 +30,7 @@ import (
 
 // Used for unit tests throughout the project that want to test against a real DB
 // - This version uses PostgreSQL
-func NewUnitTestPersistence(ctx context.Context) (p Persistence, err error) {
+func NewUnitTestPersistence(ctx context.Context) (p Persistence, cleanup func(), err error) {
 	dbURL := func(dbname string) string {
 		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
 	}
@@ -52,9 +52,16 @@ func NewUnitTestPersistence(ctx context.Context) (p Persistence, err error) {
 					URI:           dbURL(utdbName),
 					MigrationsDir: "../../db/migrations/postgres",
 					AutoMigrate:   confutil.P(true),
+					DebugQueries:  true,
 				},
 			},
 		})
 	}
-	return
+	return p, func() {
+		adminDB, err := sql.Open("postgres", dbURL("postgres"))
+		if err == nil {
+			_, _ = adminDB.Exec(fmt.Sprintf(`DROP DATABASE "%s" WITH(FORCE);`, utdbName))
+			adminDB.Close()
+		}
+	}, err
 }

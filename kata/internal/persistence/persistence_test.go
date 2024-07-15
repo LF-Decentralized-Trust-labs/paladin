@@ -29,9 +29,10 @@ func TestMigrateUpDown(t *testing.T) {
 	ctx := context.Background()
 
 	// Up runs as part of the init
-	p, err := NewUnitTestPersistence(ctx)
+	p, done, err := NewUnitTestPersistence(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, p.DB())
+	defer done()
 
 	// Get the migration drive directly using the internal function, to run Down()
 	err = p.(*provider).runMigration(ctx, func(m *migrate.Migrate) error { return m.Down() })

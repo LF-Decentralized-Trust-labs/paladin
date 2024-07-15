@@ -54,6 +54,7 @@ type SQLDBConfig struct {
 	ConnMaxLifetime *string `yaml:"connMaxLifetime"`
 	AutoMigrate     *bool   `yaml:"autoMigrate"`
 	MigrationsDir   string  `yaml:"migrationsDir"`
+	DebugQueries    bool    `yaml:"debugQueries"`
 }
 
 type SQLDBConfigDefaults struct {
@@ -79,6 +80,9 @@ func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, def
 	}
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPersistenceInitFailed)
+	}
+	if conf.DebugQueries {
+		gp.gdb = gp.gdb.Debug()
 	}
 	gp.db.SetMaxOpenConns(confutil.IntMin(conf.MaxOpenConns, 1, defs.MaxOpenConns))
 	gp.db.SetMaxIdleConns(confutil.Int(conf.MaxIdleConns, defs.MaxIdleConns))
@@ -121,4 +125,9 @@ func (gp *provider) getMigrate(ctx context.Context) (m *migrate.Migrate, err err
 
 func (gp *provider) DB() *gorm.DB {
 	return gp.gdb
+}
+
+func (gp *provider) Close() {
+	err := gp.db.Close()
+	log.L(context.Background()).Infof("DB closed (err=%v)", err)
 }
