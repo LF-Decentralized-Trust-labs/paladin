@@ -16,21 +16,52 @@
 
 package statestore
 
-import "github.com/kaleido-io/paladin/kata/internal/types"
+import (
+	"context"
+
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
+)
 
 type State struct {
 	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
-	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
 	DomainID  string
 	Schema    HashID `gorm:"embedded;embeddedPrefix:schema_;"`
+	Data      string
+	TXCreated string
+	TXSpent   string
+	Labels    []StateLabel
+}
+
+type StateLabel struct {
+	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Label string `gorm:"primaryKey;"`
+	Value string
 }
 
 type StateUpdate struct {
-	ID        int64           `gorm:"primaryKey;autoIncrement;"`
-	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
-	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
-	Status    string
-	Ref       string
-	State     HashID `gorm:"embedded;embeddedPrefix:state_;"`
+	TXCreated *string
+	TXSpent   *string
+}
+
+func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
+
+	schema, err := ss.GetSchema(ctx, &s.Schema)
+	if err != nil {
+		return err
+	}
+	if schema == nil {
+		return i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, &s.Schema)
+	}
+
+	if err := schema.ProcessState(ctx, s); err != nil {
+		return err
+	}
+
+	op := ss.writer.newWriteOp(s.DomainID)
+	op.states = []*State{s}
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
 }

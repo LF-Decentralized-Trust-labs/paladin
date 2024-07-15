@@ -41,12 +41,16 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 var (
 
 	// States PD0101XX
-	MsgStateInvalidHex        = ffe("PD010100", "Invalid hex: %s")
-	MsgStateInvalidLength     = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
-	MsgStateInvalidABIParam   = ffe("PD010102", "Invalid ABI parameter")
-	MsgStateInvalidSchemaType = ffe("PD010103", "Invalid state schema type: %s")
-	MsgStateManagerQuiescing  = ffe("PD010104", "State store shutting down")
-	MsgStateOpInvalid         = ffe("PD010105", "State operation invalid")
+	MsgStateInvalidHex                 = ffe("PD010100", "Invalid hex: %s")
+	MsgStateInvalidLength              = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
+	MsgStateInvalidABIParam            = ffe("PD010102", "Invalid ABI parameter")
+	MsgStateInvalidSchemaType          = ffe("PD010103", "Invalid state schema type: %s")
+	MsgStateManagerQuiescing           = ffe("PD010104", "State store shutting down")
+	MsgStateOpInvalid                  = ffe("PD010105", "State operation invalid")
+	MsgStateSchemaNotFound             = ffe("PD010106", "Schema not found with hash %s")
+	MsgStateLabelFieldNotElementary    = ffe("PD010107", "Label field %s is not elementary type (%s)")
+	MsgStateLabelFieldUnsupportedValue = ffe("PD010108", "Label field %s has unsupported value type (%T)")
+	MsgStateLabelFieldMissing          = ffe("PD010110", "Label field %s missing")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")

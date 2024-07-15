@@ -55,6 +55,18 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	schemaHash := "0xfa09c5ccfdbd9fea4bbda7c565697c93cb3c27ffa3b1ae300070c41b7406d243"
 	assert.Equal(t, schemaHash, as.Persisted().Hash.String())
 
+	// Check it handles data
+	state1 := &State{
+		Data: `{"field1": 12345, "field2": "hello world", "field3": false}`,
+	}
+	err = as.ProcessState(ctx, state1)
+	assert.NoError(t, err)
+	assert.Equal(t, []StateLabel{
+		{State: state1.Hash, Label: "field1", Value: "0000000000000000000000000000000000000000000000000000000000003039"},
+		{State: state1.Hash, Label: "field2", Value: "hello world"},
+	}, state1.Labels)
+	assert.Equal(t, "0x70f5850c0e7f3eeec9a4fd279f64f0e16123e179b42b0cadf31926ab7656d521", state1.Hash.String())
+
 	err = ss.PersistSchema(ctx, as)
 	assert.NoError(t, err)
 

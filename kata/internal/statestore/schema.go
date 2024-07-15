@@ -33,8 +33,7 @@ const (
 
 type SchemaEntity struct {
 	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
-	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
 	DomainID  string
 	Type      SchemaType
 	Signature string
@@ -45,6 +44,7 @@ type SchemaEntity struct {
 type Schema interface {
 	Type() SchemaType
 	Persisted() *SchemaEntity
+	ProcessState(ctx context.Context, s *State) error
 }
 
 func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
