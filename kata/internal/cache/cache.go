@@ -25,10 +25,6 @@ type Config struct {
 	Capacity *int `yaml:"capacity"`
 }
 
-type Defaults struct {
-	Capacity int
-}
-
 type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool)
 	Set(key K, val V)
@@ -39,10 +35,10 @@ type cache[K comparable, V any] struct {
 	cache *lru.Cache[K, V]
 }
 
-func NewCache[K comparable, V any](conf *Config, defs *Defaults) Cache[K, V] {
+func NewCache[K comparable, V any](conf *Config, defs *Config) Cache[K, V] {
 	c := &cache[K, V]{
 		cache: lru.NewCache[K, V](
-			lru.WithCapacity(confutil.Int(conf.Capacity, defs.Capacity)),
+			lru.WithCapacity(confutil.Int(conf.Capacity, *defs.Capacity)),
 		),
 	}
 	return c

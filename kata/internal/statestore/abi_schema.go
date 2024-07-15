@@ -38,9 +38,13 @@ type abiSchema struct {
 	definition *abi.Parameter
 }
 
-func NewABISchema(ctx context.Context, def *abi.Parameter) (ABISchema, error) {
+func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
 	as := &abiSchema{
-		persisted:  &SchemaEntity{Type: SchemaTypeABI, Labels: []string{}},
+		persisted: &SchemaEntity{
+			DomainID: domainID,
+			Type:     SchemaTypeABI,
+			Labels:   []string{},
+		},
 		definition: def,
 	}
 	abiJSON, err := json.Marshal(def)

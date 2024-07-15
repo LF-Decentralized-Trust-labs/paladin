@@ -25,10 +25,10 @@ import (
 
 func TestStoreRetrieveABISchema(t *testing.T) {
 
-	ctx, ss, done := newTestStateStore(t)
+	ctx, ss, done := newDBTestStateStore(t)
 	defer done()
 
-	as, err := NewABISchema(ctx, &abi.Parameter{
+	as, err := NewABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",

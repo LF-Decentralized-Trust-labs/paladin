@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"gorm.io/gorm/clause"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type SchemaType string
@@ -32,7 +32,10 @@ const (
 )
 
 type SchemaEntity struct {
-	Hash      HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
+	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	DomainID  string
 	Type      SchemaType
 	Signature string
 	Content   string
@@ -45,17 +48,10 @@ type Schema interface {
 }
 
 func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
-	// TODO: Move to flush-writer
-	err := ss.p.DB().
-		Table("schemas").
-		Clauses(clause.OnConflict{DoNothing: true}).
-		Create(s.Persisted()).
-		Error
-	if err != nil {
-		return err
-	}
-	ss.abiSchemaCache.Set(s.Persisted().Hash.String(), s)
-	return nil
+	op := ss.writer.newWriteOp(s.Persisted().DomainID)
+	op.schemas = []*SchemaEntity{s.Persisted()}
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, hash *HashID) (Schema, error) {

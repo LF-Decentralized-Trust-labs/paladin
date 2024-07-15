@@ -16,7 +16,21 @@
 
 package statestore
 
+import "github.com/kaleido-io/paladin/kata/internal/types"
+
 type State struct {
-	Hash   HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	Schema HashID `gorm:"embedded;embeddedPrefix:schema_;"`
+	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
+	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	DomainID  string
+	Schema    HashID `gorm:"embedded;embeddedPrefix:schema_;"`
+}
+
+type StateUpdate struct {
+	ID        int64           `gorm:"primaryKey;autoIncrement;"`
+	CreatedAt types.Timestamp `gorm:"autoUpdateTime:nano"`
+	UpdatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	Status    string
+	Ref       string
+	State     HashID `gorm:"embedded;embeddedPrefix:state_;"`
 }

@@ -45,6 +45,8 @@ var (
 	MsgStateInvalidLength     = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
 	MsgStateInvalidABIParam   = ffe("PD010102", "Invalid ABI parameter")
 	MsgStateInvalidSchemaType = ffe("PD010103", "Invalid state schema type: %s")
+	MsgStateManagerQuiescing  = ffe("PD010104", "State store shutting down")
+	MsgStateOpInvalid         = ffe("PD010105", "State operation invalid")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
