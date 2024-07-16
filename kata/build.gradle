@@ -16,7 +16,7 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    targetCoverage = 40.7
+    targetCoverage = 52.4
 }
 
 task installTools(type:Exec) {
@@ -211,8 +211,10 @@ task checkCoverage {
         def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
             throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
+        } else if ( totalCoverage.toFloat() - targetCoverage > 1) {
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than 1%, please update the targetCoverage value in ./kata/build.gradle file")
         } else {
-            println "Coverage is above ${targetCoverage} %"
+            println "Coverage is above ${targetCoverage} %, current value: ${totalCoverage}"
         }
     }
 }

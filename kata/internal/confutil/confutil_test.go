@@ -48,3 +48,8 @@ func TestDuration(t *testing.T) {
 	assert.Equal(t, 50*time.Second, Duration(P("wrong"), 50*time.Second))
 	assert.Equal(t, 100*time.Millisecond, Duration(P("100ms"), 50*time.Second))
 }
+
+func TestDurationToBeMerged(t *testing.T) {
+	assert.Equal(t, 50*time.Second, *DurationToBeMerged(nil, P(50*time.Second)))
+	assert.Equal(t, 100*time.Millisecond, *DurationToBeMerged(P(100*time.Millisecond), P(50*time.Second)))
+}

@@ -8,7 +8,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/uuid v1.6.0
-	github.com/hyperledger/firefly-common v1.4.6
+	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.13
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.23.0

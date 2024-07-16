@@ -52,4 +52,7 @@ var (
 	MsgPersistenceInitFailed          = ffe("PD010202", "Database init failed")
 	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
+
+	// Transaction Processor PD0103XX
+	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
 )

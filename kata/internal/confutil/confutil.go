@@ -70,3 +70,10 @@ func Duration(sVal *string, def time.Duration) time.Duration {
 func P[T any](v T) *T {
 	return &v
 }
+
+func DurationToBeMerged(tVal *time.Duration, def *time.Duration) *time.Duration {
+	if tVal == nil {
+		return def
+	}
+	return tVal
+}
