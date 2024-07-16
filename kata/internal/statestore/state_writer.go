@@ -32,21 +32,13 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 )
 
-type stateUpdateType int
-
-const (
-	updateWriteState stateUpdateType = iota
-	updateWriteStateUpdate
-)
-
 type writeOperation struct {
-	id           string
-	domain       string
-	done         chan error
-	isShutdown   bool
-	states       []*State
-	schemas      []*SchemaEntity
-	stateUpdates []*StateUpdate
+	id         string
+	domain     string
+	done       chan error
+	isShutdown bool
+	states     []*State
+	schemas    []*SchemaEntity
 }
 
 type stateWriter struct {
