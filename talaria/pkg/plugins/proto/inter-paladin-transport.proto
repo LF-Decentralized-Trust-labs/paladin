@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package protos.InterPaladinTransport;
+option go_package = "protos/InterPaladinTransport";
+
+service InterPaladinTransport {
+  rpc InterPaladinMessageFlow(InterPaladinMessage) returns (InterPaladinReceipt) {}
+}
+
+message InterPaladinMessage {
+  string content = 1;
+}
+
+message InterPaladinReceipt {
+  string content = 1;
+}

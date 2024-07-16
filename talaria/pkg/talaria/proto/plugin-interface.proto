@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package protos.PluginInterface;
+option go_package = "protos/PluginInterface";
+
+service PluginInterface {
+  rpc PluginMessageFlow(PaladinMessage) returns (PaladinMessageReceipt) {}
+}
+
+message PaladinMessage {
+  string routingInformation = 1;
+  string messageContent = 2;
+}
+
+message PaladinMessageReceipt {
+  string content = 1;
+}
