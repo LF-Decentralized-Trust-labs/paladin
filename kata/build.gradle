@@ -135,7 +135,9 @@ class DockerCompose extends Exec {
         def dockerComposeV2Check = getProject().exec({
             ignoreExitValue = true
             executable "docker"
-            args "compose", "version"
+            args "compose", "-f", dbComposeFile, "ps"
+            standardOutput = new ByteArrayOutputStream()
+            errorOutput = new ByteArrayOutputStream()
         })
         if (dockerComposeV2Check.getExitValue() == 0){
             executable 'docker'
@@ -224,6 +226,7 @@ task build {
     dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.testRunPostgres
+    dependsOn tasks.stopDb
 }
 
 configurations {
