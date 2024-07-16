@@ -5,3 +5,7 @@
 This folder serves as an implementation of the diagram below, with fake versions of some major components to demonstrate messaging flow.
 
 ![](img/talaria.png)
+
+### Getting started
+
+`make proto` to generate the protobuf client files
