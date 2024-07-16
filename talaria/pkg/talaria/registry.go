@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package talaria
 
 import (
@@ -9,7 +24,12 @@ import (
 )
 
 /*
-	Don't know what the registry looks like at the moment so let's take a big ol' stab in the dark
+	Similar to the comms bus, we're not really sure what the registry looks like, but it's definitely not
+	going to look like this. Right now, we're defining an interface for what we think interactions to the
+	registry look like and then implementing a basic HTTP API behind it which allow us to poke through to
+	the messaging flow.
+
+	TODO: Refine this with whatever our interface to the registry looks like (maybe more gRPC)?
 */
 
 type RegistryEntry struct {
