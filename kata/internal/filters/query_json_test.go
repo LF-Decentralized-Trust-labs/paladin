@@ -45,7 +45,7 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 		"eq": [
 			{
 				"field": "masked",
-				"value": true
+				"value": "true"
 			}
 		],
 		"neq": [
@@ -237,13 +237,13 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 		"limit": 10,
 		"count": true,
 		"sort": [
-			"tag",
+			"TaG",
 			"sequence"
 		],
 		"equal": [
 			{
 				"field": "created",
-				"value": 0
+				"value": "2001-02-03T04:05:06.000Z"
 			},
 			{
 				"not": true,
@@ -258,7 +258,7 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 			{
 				"caseInsensitive": true,
 				"not": true,
-				"field": "tag",
+				"field": "TAG",
 				"value": "abc"
 			}
 		],
@@ -280,12 +280,12 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 			"sequence": Int64Field("sequence"),
 			"masked":   BoolField("masked"),
 			"cid":      StringField("correl_id"),
-			"created":  Int64Field("created_at"),
+			"created":  TimestampField("created_at"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE created_at = 0 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE created_at = 981173106000000000 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONLike(t *testing.T) {
@@ -533,6 +533,9 @@ func TestBuildQueryJSONBadFields(t *testing.T) {
 		}).Count(&count)
 		return db.Error
 	}
+
+	err = testJSON(`{"sort": ["-wrong"]}`)
+	assert.Regexp(t, "PD010300", err)
 
 	err = testJSON(`{"equal": [{"field": "wrong"}]}`)
 	assert.Regexp(t, "PD010300", err)
