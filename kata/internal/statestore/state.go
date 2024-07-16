@@ -30,14 +30,12 @@ type State struct {
 	DomainID  string
 	Schema    HashID `gorm:"embedded;embeddedPrefix:schema_;"`
 	Data      string
-	TXCreated string
-	TXSpent   string
-	Labels    []StateLabel
+	Labels    []StateLabel `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
 type StateLabel struct {
-	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	Label string `gorm:"primaryKey;"`
+	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	Label string
 	Value string
 }
 
@@ -48,7 +46,7 @@ type StateUpdate struct {
 
 func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 
-	schema, err := ss.GetSchema(ctx, &s.Schema)
+	schema, err := ss.GetSchema(ctx, s.DomainID, &s.Schema)
 	if err != nil {
 		return err
 	}
@@ -64,4 +62,19 @@ func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 	op.states = []*State{s}
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)
+}
+
+func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error) {
+	q := ss.p.DB().Table("states")
+	if withLabels {
+		q = q.Preload("Labels")
+	}
+	err = q.
+		Where("domain_id = ?", domainID).
+		Where("hash_l = ?", hash.L.String()).
+		Where("hash_h = ?", hash.H.String()).
+		Limit(1).
+		Find(&s).
+		Error
+	return s, err
 }

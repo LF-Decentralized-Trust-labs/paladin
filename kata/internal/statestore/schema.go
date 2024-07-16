@@ -47,6 +47,10 @@ type Schema interface {
 	ProcessState(ctx context.Context, s *State) error
 }
 
+func schemaCacheKey(domainID string, hash *HashID) string {
+	return domainID + "/" + hash.String()
+}
+
 func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 	op := ss.writer.newWriteOp(s.Persisted().DomainID)
 	op.schemas = []*SchemaEntity{s.Persisted()}
@@ -54,16 +58,17 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetSchema(ctx context.Context, hash *HashID) (Schema, error) {
-	hk := hash.String()
-	s, ok := ss.abiSchemaCache.Get(hk)
-	if ok {
+func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *HashID) (Schema, error) {
+	cacheKey := schemaCacheKey(domainID, hash)
+	s, cached := ss.abiSchemaCache.Get(cacheKey)
+	if cached {
 		return s, nil
 	}
 
 	var persisted *SchemaEntity
 	err := ss.p.DB().
 		Table("schemas").
+		Where("domain_id = ?", domainID).
 		Where("hash_l = ?", hash.L.String()).
 		Where("hash_h = ?", hash.H.String()).
 		Limit(1).
@@ -82,6 +87,6 @@ func (ss *stateStore) GetSchema(ctx context.Context, hash *HashID) (Schema, erro
 	if err != nil {
 		return nil, err
 	}
-	ss.abiSchemaCache.Set(s.Persisted().Hash.String(), s)
+	ss.abiSchemaCache.Set(cacheKey, s)
 	return s, nil
 }

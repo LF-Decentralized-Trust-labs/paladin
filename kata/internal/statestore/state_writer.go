@@ -193,7 +193,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 	// Build lists of things to insert (we are insert only)
 	var schemas []*SchemaEntity
 	var states []*State
-	var stateUpdates []*StateUpdate
+	var stateLabels []*StateLabel
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
@@ -201,32 +201,44 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 		if len(op.states) > 0 {
 			states = append(states, op.states...)
 		}
-		if len(op.stateUpdates) > 0 {
-			stateUpdates = append(stateUpdates, op.stateUpdates...)
+		for _, s := range op.states {
+			for i := range s.Labels {
+				stateLabels = append(stateLabels, &s.Labels[i])
+			}
 		}
 	}
-	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d stateUpdates=%d", len(schemas), len(states), len(stateUpdates))
+	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d stateUpdates=%d", len(schemas), len(states), len(stateLabels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
 			err = tx.
 				Table("schemas").
-				Clauses(clause.OnConflict{DoNothing: true}).
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					DoNothing: true,
+				}).
 				Create(schemas).
 				Error
 		}
 		if err == nil && len(states) > 0 {
 			err = tx.
 				Table("states").
-				Clauses(clause.OnConflict{DoNothing: true}).
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					DoNothing: true,
+				}).
+				Omit("Labels"). // we do this ourselves below
 				Create(states).
 				Error
 		}
-		if err == nil && len(stateUpdates) > 0 {
+		if err == nil && len(stateLabels) > 0 {
 			err = tx.
-				Table("state_updates").
-				Clauses(clause.OnConflict{DoNothing: true}).
-				Create(stateUpdates).
+				Table("state_labels").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					DoNothing: true,
+				}).
+				Create(stateLabels).
 				Error
 		}
 		return err
