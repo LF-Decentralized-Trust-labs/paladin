@@ -20,6 +20,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
 type StringField string
@@ -28,8 +31,16 @@ func (sf StringField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf StringField) SQLValue(ctx context.Context, v json.RawMessage) (driver.Value, error) {
-	var res string
-	err := json.Unmarshal(v, &res)
-	return res, err
+func (sf StringField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+	var untyped interface{}
+	err := json.Unmarshal(jsonValue, &untyped)
+	if err != nil {
+		return nil, err
+	}
+	switch v := untyped.(type) {
+	case string:
+		return v, nil
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForString, string(jsonValue))
+	}
 }

@@ -19,11 +19,7 @@ package filters
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strconv"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"gorm.io/gorm"
 )
 
@@ -83,33 +79,6 @@ type FilterJSONOps struct {
 	In                 []*FilterJSONKeyValues `json:"in,omitempty"`
 	NIn                []*FilterJSONKeyValues `json:"nin,omitempty"` // negated short name
 	Null               []*FilterJSONBase      `json:"null,omitempty"`
-}
-
-type SimpleFilterValue string
-
-func (js *SimpleFilterValue) UnmarshalJSON(b []byte) error {
-	var v interface{}
-	err := json.Unmarshal(b, &v)
-	if err != nil {
-		return err
-	}
-	switch vi := v.(type) {
-	case float64:
-		*js = (SimpleFilterValue)(strconv.FormatFloat(vi, 'f', -1, 64))
-		return nil
-	case string:
-		*js = (SimpleFilterValue)(vi)
-		return nil
-	case bool:
-		*js = (SimpleFilterValue)(fmt.Sprintf("%t", vi))
-		return nil
-	default:
-		return i18n.NewError(context.Background(), msgs.MsgFiltersJSONQueryValueUnsupported, string(b))
-	}
-}
-
-func (js SimpleFilterValue) String() string {
-	return (string)(js)
 }
 
 func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldList FieldList) *gorm.DB {

@@ -200,6 +200,30 @@ func TestBuildQuerySingleNestedWithResolverErrorValue(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
 			"tag": StringField("tag"),
 		}).Count(&count)
+		assert.Regexp(t, "PD010308.*tag.*PD010305", db.Error)
+		return db
+	})
+}
+
+func TestBuildQueryResolverErrorMissing(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"eq": [
+			{
+				"field": "tag"
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	_ = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"tag": StringField("tag"),
+		}).Count(&count)
 		assert.Regexp(t, "PD010306.*tag", db.Error)
 		return db
 	})
@@ -264,366 +288,326 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE created_at = 0 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
 }
 
-// func TestBuildQueryJSONContains(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"contains": [
-// 			{
-// 				"field": "tag",
-// 				"value": 0
-// 			},
-// 			{
-// 				"not": true,
-// 				"field": "tag",
-// 				"value": "abc"
-// 			},
-// 			{
-// 				"caseInsensitive": true,
-// 				"field": "tag",
-// 				"value": "ABC"
-// 			},
-// 			{
-// 				"caseInsensitive": true,
-// 				"not": true,
-// 				"field": "tag",
-// 				"value": "abc"
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "( tag %= '0' ) && ( tag !% 'abc' ) && ( tag :% 'ABC' ) && ( tag ;% 'abc' ) skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONStartsWith(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"startsWith": [
-// 			{
-// 				"field": "tag",
-// 				"value": 0
-// 			},
-// 			{
-// 				"not": true,
-// 				"field": "tag",
-// 				"value": "abc"
-// 			},
-// 			{
-// 				"caseInsensitive": true,
-// 				"field": "tag",
-// 				"value": "ABC"
-// 			},
-// 			{
-// 				"caseInsensitive": true,
-// 				"not": true,
-// 				"field": "tag",
-// 				"value": true
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "( tag ^= '0' ) && ( tag !^ 'abc' ) && ( tag :^ 'ABC' ) && ( tag ;^ 'true' ) skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONGreaterThan(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"greaterThan": [
-// 			{
-// 				"field": "sequence",
-// 				"value": 0
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "sequence >> 0 skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONLessThan(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"lessThan": [
-// 			{
-// 				"field": "sequence",
-// 				"value": "12345"
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "sequence << 12345 skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"greaterThanOrEqual": [
-// 			{
-// 				"field": "sequence",
-// 				"value": 0
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "sequence >= 0 skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"lessThanOrEqual": [
-// 			{
-// 				"field": "sequence",
-// 				"value": "12345"
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "sequence <= 12345 skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONIn(t *testing.T) {
-
-// 	var qf QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"skip": 5,
-// 		"limit": 10,
-// 		"in": [
-// 			{
-// 				"field": "tag",
-// 				"values": ["a","b","c"]
-// 			},
-// 			{
-// 				"not": true,
-// 				"field": "tag",
-// 				"values": ["x","y","z"]
-// 			}
-// 		]
-// 	}`), &qf)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "( tag IN ['a','b','c'] ) && ( tag NI ['x','y','z'] ) skip=5 limit=10", fi.String())
-// }
-
-// func TestBuildQueryJSONBadModifiers(t *testing.T) {
-
-// 	var qf1 QueryJSON
-// 	err := json.Unmarshal([]byte(`{"lessThan": [{"not": true, "field": "tag"}]}`), &qf1)
-// 	assert.NoError(t, err)
-// 	_, err = qf1.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// 	var qf2 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"lessThanOrEqual": [{"not": true, "field": "tag"}]}`), &qf2)
-// 	assert.NoError(t, err)
-// 	_, err = qf2.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// 	var qf3 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"greaterThan": [{"not": true, "field": "tag"}]}`), &qf3)
-// 	assert.NoError(t, err)
-// 	_, err = qf3.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// 	var qf4 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"greaterThanOrEqual": [{"not": true, "field": "tag"}]}`), &qf4)
-// 	assert.NoError(t, err)
-// 	_, err = qf4.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// 	var qf5 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"in": [{"caseInsensitive": true, "field": "tag"}]}`), &qf5)
-// 	assert.NoError(t, err)
-// 	_, err = qf5.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// 	var qf6 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"or": [{"in": [{"caseInsensitive": true, "field": "tag"}]}] }`), &qf6)
-// 	assert.NoError(t, err)
-// 	_, err = qf6.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00240", err)
-
-// }
-
-// func TestStringableParseFail(t *testing.T) {
-
-// 	var js SimpleFilterValue
-// 	err := js.UnmarshalJSON([]byte(`{!!! not json`))
-// 	assert.Error(t, err)
-
-// 	err = js.UnmarshalJSON([]byte(`{"this": "is an object"}`))
-// 	assert.Error(t, err)
-
-// }
-
-// func TestBuildQueryJSONBadFields(t *testing.T) {
-
-// 	var qf1 QueryJSON
-// 	err := json.Unmarshal([]byte(`{"equal": [{"field": "wrong"}]}`), &qf1)
-// 	assert.NoError(t, err)
-// 	_, err = qf1.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf2 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"contains": [{"field": "wrong"}]}`), &qf2)
-// 	assert.NoError(t, err)
-// 	_, err = qf2.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf3 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"startsWith": [{"field": "wrong"}]}`), &qf3)
-// 	assert.NoError(t, err)
-// 	_, err = qf3.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf4 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"lessThan": [{"field": "wrong"}]}`), &qf4)
-// 	assert.NoError(t, err)
-// 	_, err = qf4.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf5 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"lessThanOrEqual": [{"field": "wrong"}]}`), &qf5)
-// 	assert.NoError(t, err)
-// 	_, err = qf5.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf6 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"greaterThan": [{"field": "wrong"}]}`), &qf6)
-// 	assert.NoError(t, err)
-// 	_, err = qf6.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf7 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"greaterThanOrEqual": [{"field": "wrong"}]}`), &qf7)
-// 	assert.NoError(t, err)
-// 	_, err = qf7.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf8 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"in": [{"field": "wrong"}]}`), &qf8)
-// 	assert.NoError(t, err)
-// 	_, err = qf8.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-
-// 	var qf9 QueryJSON
-// 	err = json.Unmarshal([]byte(`{"null": [{"field": "wrong"}]}`), &qf9)
-// 	assert.NoError(t, err)
-// 	_, err = qf9.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.Regexp(t, "FF00142", err)
-// }
-
-// func TestBuildQueryJSONDocumented(t *testing.T) {
-// 	CheckObjectDocumented(&QueryJSON{})
-// }
-
-// func TestBuildQueryJSONContainsShortNames(t *testing.T) {
-
-// 	var qf1 QueryJSON
-// 	err := json.Unmarshal([]byte(`{
-// 		"eq": [
-// 			{
-// 				"field": "sequence",
-// 				"value": "12345"
-// 			}
-// 		]
-// 	}`), &qf1)
-// 	assert.NoError(t, err)
-
-// 	filter, err := qf1.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err := filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "sequence == 12345", fi.String())
-
-// 	var qf2 QueryJSON
-// 	err = json.Unmarshal([]byte(`{
-// 		"gt": [
-// 			{
-// 				"field": "sequence",
-// 				"value": "12345"
-// 			}
-// 		],
-// 		"lte": [
-// 			{
-// 				"field": "sequence",
-// 				"value": "12345"
-// 			}
-// 		]
-// 	}`), &qf2)
-// 	assert.NoError(t, err)
-
-// 	filter, err = qf2.BuildFilter(context.Background(), TestQueryFactory)
-// 	assert.NoError(t, err)
-
-// 	fi, err = filter.Finalize()
-// 	assert.NoError(t, err)
-
-// 	assert.Equal(t, "( sequence <= 12345 ) && ( sequence >> 12345 )", fi.String())
-// }
+func TestBuildQueryJSONLike(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"like": [
+			{
+				"field": "tag",
+				"value": "%%stuff%%"
+			},
+			{
+				"not": true,
+				"field": "tag",
+				"value": "abc"
+			},
+			{
+				"caseInsensitive": true,
+				"field": "tag",
+				"value": "ABC"
+			},
+			{
+				"caseInsensitive": true,
+				"not": true,
+				"field": "tag",
+				"value": "abc"
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"tag":      StringField("tag"),
+			"sequence": Int64Field("sequence"),
+			"masked":   BoolField("masked"),
+			"cid":      StringField("correl_id"),
+			"created":  Int64Field("created_at"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag LIKE '%%stuff%%' AND tag NOT LIKE 'abc' AND tag ILIKE 'ABC' AND tag NOT ILIKE 'abc' LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONGreaterThan(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"greaterThan": [
+			{
+				"field": "sequence",
+				"value": 0
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence > 0 LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONLessThan(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"lessThan": [
+			{
+				"field": "sequence",
+				"value": "12345"
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence < 12345 LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"greaterThanOrEqual": [
+			{
+				"field": "sequence",
+				"value": 0
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence >= 0 LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"lessThanOrEqual": [
+			{
+				"field": "sequence",
+				"value": "12345"
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONIn(t *testing.T) {
+
+	var qf QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"skip": 5,
+		"limit": 10,
+		"in": [
+			{
+				"field": "tag",
+				"values": ["a","b","c"]
+			},
+			{
+				"not": true,
+				"field": "tag",
+				"values": ["x","y","z"]
+			}
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
+			"tag": StringField("tag"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag IN ('a','b','c') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
+}
+
+func TestBuildQueryJSONBadModifiers(t *testing.T) {
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+
+	testJSON := func(j string) error {
+		var qf QueryJSON
+		err := json.Unmarshal([]byte(j), &qf)
+		assert.NoError(t, err)
+		var count int64
+		db := qf.Build(context.Background(), p.P.DB().Table("test"), FieldList{
+			"tag": StringField("tag"),
+		}).Count(&count)
+		return db.Error
+	}
+
+	err = testJSON(`{"lessThan": [{"not": true, "field": "tag", "value": ""}]}`)
+	assert.Regexp(t, "PD010302", err)
+
+	err = testJSON(`{"lessThanOrEqual": [{"not": true, "field": "tag", "value": ""}]}`)
+	assert.Regexp(t, "PD010302", err)
+
+	err = testJSON(`{"greaterThan": [{"not": true, "field": "tag", "value": ""}]}`)
+	assert.Regexp(t, "PD010302", err)
+
+	err = testJSON(`{"greaterThanOrEqual": [{"not": true, "field": "tag", "value": ""}]}`)
+	assert.Regexp(t, "PD010302", err)
+
+	err = testJSON(`{"in": [{"caseInsensitive": true, "field": "tag", "value": ""}]}`)
+	assert.Regexp(t, "PD010302", err)
+
+	err = testJSON(`{"or": [{"in": [{"caseInsensitive": true, "field": "tag", "value": ""}]}] }`)
+	assert.Regexp(t, "PD010302", err)
+
+}
+
+func TestBuildQueryJSONBadFields(t *testing.T) {
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+
+	testJSON := func(j string) error {
+		var qf QueryJSON
+		err := json.Unmarshal([]byte(j), &qf)
+		assert.NoError(t, err)
+		var count int64
+		db := qf.Build(context.Background(), p.P.DB().Table("test"), FieldList{
+			"tag": StringField("tag"),
+		}).Count(&count)
+		return db.Error
+	}
+
+	err = testJSON(`{"equal": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"like": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"lessThan": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"lessThanOrEqual": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"greaterThan": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"greaterThanOrEqual": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"in": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+
+	err = testJSON(`{"null": [{"field": "wrong"}]}`)
+	assert.Regexp(t, "PD010300", err)
+}
+
+func TestBuildQueryJSONContainsShortNames(t *testing.T) {
+
+	var qf1 QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"eq": [
+			{
+				"field": "sequence",
+				"value": "12345"
+			}
+		]
+	}`), &qf1)
+	assert.NoError(t, err)
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf1.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence = 12345", generatedSQL)
+
+	var qf2 QueryJSON
+	err = json.Unmarshal([]byte(`{
+		"gt": [
+			{
+				"field": "sequence",
+				"value": "12345"
+			}
+		],
+		"lte": [
+			{
+				"field": "sequence",
+				"value": "12345"
+			}
+		]
+	}`), &qf2)
+	assert.NoError(t, err)
+
+	generatedSQL = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var count int64
+		db := qf2.Build(context.Background(), tx.Table("test"), FieldList{
+			"sequence": Int64Field("sequence"),
+		}).Count(&count)
+		assert.NoError(t, db.Error)
+		return db
+	})
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 AND sequence > 12345", generatedSQL)
+}

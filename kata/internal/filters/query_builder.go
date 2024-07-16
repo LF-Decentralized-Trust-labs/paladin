@@ -97,6 +97,9 @@ func (qb *queryBuilder) resolveField(fieldName string) (FieldResolver, error) {
 }
 
 func (qb *queryBuilder) resolveValue(fieldName string, field FieldResolver, jsonValue json.RawMessage) (driver.Value, error) {
+	if len(jsonValue) == 0 {
+		return nil, i18n.NewError(qb.ctx, msgs.MsgFiltersValueMissing, fieldName)
+	}
 	value, err := field.SQLValue(qb.ctx, jsonValue)
 	if err != nil {
 		return nil, i18n.NewError(qb.ctx, msgs.MsgFiltersJSONValueParseError, fieldName, field, err)
