@@ -30,14 +30,27 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-/**
-	This plugin is waiting for clients to create connections, and send through data to be
-	sent to other Paladin nodes. When it gets data, it should extract the information and
-	then make the connect and send the data.
-**/
+/*
+	This is the gRPC plugin that Talaria will talk to in order to send comms to other paladin
+	nodes in the network. In theory, there's little stopping us connecting the gRPC transport
+	layer at Talaria directly to another Talaria, but a dedicated plugin here proves that the
+	plugin architecture not only works, but is in use.
+	
+	Here we implement 2 comms flows:
 
-// This is all the information we should need to be able to find another node in the network
+	1. gRPC to boundary Talaria layer using unix domain sockets
+	2. gRPC over TLS to another gRPC residing on another Paladin node (potentially)
+	
+	It's important to note that it's possible for a transacting entity to need to send comms
+	to another transacting entity that is actually on the same node, if that's the case then
+	we still treat it as an outbound connection, but the actual call is to loopback.
+*/
+
 type GRPCRoutingInformation struct {
+	// In theory this is an opaque object in the Registry that only this plugin knows how to
+	// use and decode, for gRPC the amount of information we need is quite minimal though
+
+	// TODO: mTLS credentials need to go here
 	Address string `json:"address"`
 }
 
@@ -50,6 +63,7 @@ type GRPCTransportPlugin struct {
 }
 
 func (gtp *GRPCTransportPlugin) InterPaladinMessageFlow(ctx context.Context, in *interPaladinProto.InterPaladinMessage) (*interPaladinProto.InterPaladinReceipt, error) {
+	// TODO: This is dumb, but also I don't know what a receipt should look like right now
 	log.Printf("Got (external) message content %s", in.Content)
 	return &interPaladinProto.InterPaladinReceipt{
 		Content: "ACK",
@@ -57,8 +71,10 @@ func (gtp *GRPCTransportPlugin) InterPaladinMessageFlow(ctx context.Context, in 
 }
 
 func (gtp *GRPCTransportPlugin) PluginMessageFlow(ctx context.Context, in *pluginInterfaceProto.PaladinMessage) (*pluginInterfaceProto.PaladinMessageReceipt, error) {
+	// TODO: Review of logging
 	log.Printf("Got message content %s, forming inter paladin message", in.MessageContent)
 
+	// TODO: What is routing information? Doesn't feel like it makes much sense
 	routingInfo := &GRPCRoutingInformation{}
 	err := json.Unmarshal([]byte(in.RoutingInformation), routingInfo)
 	if err != nil {
@@ -67,8 +83,6 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(ctx context.Context, in *plugi
 	}
 
 	// TODO: mTLS for TCP connections
-	// TODO: mTLS for domain sockets?
-
 	conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to establish a client, err: %s", err)
@@ -90,11 +104,14 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(ctx context.Context, in *plugi
 	}, nil
 }
 
+// TODO: What is the different between initialise and start if one does essentially nothing?
 func (gtp *GRPCTransportPlugin) Initialise(ctx context.Context) {
 	gtp.socketName = fmt.Sprintf("/tmp/%s.sock", uuid.New().String())
 }
 
 func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
+	// TODO: Review of threading model
+
 	log.Printf("initialising connection to local socket %s\n", gtp.socketName)
 	lis, err := net.Listen("unix", gtp.socketName)
 	if err != nil {
@@ -126,6 +143,12 @@ func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
 	}()
 }
 
+// TODO: Not this
+//
+// I am super not-sold on how plugin registration is being done here, I have lots of thoughts of
+// why this is not what we want, but for now this is good enough to get this sample working. It
+// sounds like there's going to be a tonne of precedent from other places in the code base for how
+// plugins are going to fit in, so we're going to want to do something like that
 func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	return PluginRegistration{
 		Name: "grpc-transport-plugin",
