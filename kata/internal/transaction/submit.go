@@ -41,25 +41,6 @@ func (s *PaladinTransactionService) submit(ctx context.Context, req *proto.Submi
 		return nil, errors.New("must provide a payload")
 	}
 
-	//
-	// pendingStatus := db.TransactionPending
-	// txID := fftypes.NewUUID()
-	// DB level checks:
-	// Uniqueness of idempotency key, id etc
-
-	// if err := s.persistence.Transactions().Insert(ctx, &db.Transaction{
-	// 	ID:              txID,
-	// 	Created:         fftypes.Now(),
-	// 	Updated:         fftypes.Now(),
-	// 	IdempotencyKey:  &req.IdempotencyKey,
-	// 	ContractAddress: &req.ContractAddress,
-	// 	Status:          &pendingStatus,
-	// 	From:            &req.From,
-	// 	Payload:         &payload,
-	// }); err != nil {
-	// 	return nil, err
-	// }
-
 	// What happens next
 
 	return &proto.SubmitTransactionResponse{
