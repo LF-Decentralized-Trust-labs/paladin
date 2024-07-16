@@ -23,7 +23,7 @@ import (
 
 // Almost certainly not right, but works well enough for now
 type PluginRegistration struct {
-	Name 					 string
+	Name           string
 	SocketLocation string
 }
 
