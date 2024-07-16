@@ -19,18 +19,14 @@ import (
 	"io"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/db"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
 func NewPaladinTransactionService() *PaladinTransactionService {
-	return &PaladinTransactionService{
-		persistence: db.NewPersistence(),
-	}
+	return &PaladinTransactionService{}
 }
 
 type PaladinTransactionService struct {
-	persistence db.Persistence
 	proto.UnimplementedPaladinTransactionServiceServer
 }
 
