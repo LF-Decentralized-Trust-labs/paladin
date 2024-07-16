@@ -58,4 +58,13 @@ var (
 	MsgPersistenceInitFailed          = ffe("PD010202", "Database init failed")
 	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
+
+	// Filters PD0103XX
+	MsgFiltersUnknownField              = ffe("PD010300", "Unknown field '%s'")
+	MsgFiltersJSONQueryValueUnsupported = ffe("PD010301", "JSON query value not supported: %s")
+	MsgFiltersJSONQueryOpUnsupportedMod = ffe("PD010302", "Operation '%s' does not support modifiers: %v")
+	MsgFiltersValueInvalidForInt64      = ffe("PD010303", "Value '%s' cannot be parsed as a 64bit signed integer")
+	MsgFiltersValueInvalidForBool       = ffe("PD010304", "Value '%s' cannot be parsed as a boolean")
+	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010305", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
+	MsgFiltersJSONValueParseError       = ffe("PD010306", "Failed to parse value for field '%s' (as %T): %v")
 )
