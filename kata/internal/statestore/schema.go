@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"gorm.io/gorm/clause"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type SchemaType string
@@ -32,7 +32,9 @@ const (
 )
 
 type SchemaEntity struct {
-	Hash      HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
+	DomainID  string
 	Type      SchemaType
 	Signature string
 	Content   string
@@ -42,32 +44,31 @@ type SchemaEntity struct {
 type Schema interface {
 	Type() SchemaType
 	Persisted() *SchemaEntity
+	ProcessState(ctx context.Context, s *State) error
+}
+
+func schemaCacheKey(domainID string, hash *HashID) string {
+	return domainID + "/" + hash.String()
 }
 
 func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
-	// TODO: Move to flush-writer
-	err := ss.p.DB().
-		Table("schemas").
-		Clauses(clause.OnConflict{DoNothing: true}).
-		Create(s.Persisted()).
-		Error
-	if err != nil {
-		return err
-	}
-	ss.abiSchemaCache.Set(s.Persisted().Hash.String(), s)
-	return nil
+	op := ss.writer.newWriteOp(s.Persisted().DomainID)
+	op.schemas = []*SchemaEntity{s.Persisted()}
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetSchema(ctx context.Context, hash *HashID) (Schema, error) {
-	hk := hash.String()
-	s, ok := ss.abiSchemaCache.Get(hk)
-	if ok {
+func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *HashID) (Schema, error) {
+	cacheKey := schemaCacheKey(domainID, hash)
+	s, cached := ss.abiSchemaCache.Get(cacheKey)
+	if cached {
 		return s, nil
 	}
 
 	var persisted *SchemaEntity
 	err := ss.p.DB().
 		Table("schemas").
+		Where("domain_id = ?", domainID).
 		Where("hash_l = ?", hash.L.String()).
 		Where("hash_h = ?", hash.H.String()).
 		Limit(1).
@@ -86,6 +87,6 @@ func (ss *stateStore) GetSchema(ctx context.Context, hash *HashID) (Schema, erro
 	if err != nil {
 		return nil, err
 	}
-	ss.abiSchemaCache.Set(s.Persisted().Hash.String(), s)
+	ss.abiSchemaCache.Set(cacheKey, s)
 	return s, nil
 }

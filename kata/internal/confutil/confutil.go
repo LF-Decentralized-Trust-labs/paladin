@@ -53,7 +53,7 @@ func Bool(bVal *bool, def bool) bool {
 	return *bVal
 }
 
-func Duration(sVal *string, def time.Duration) time.Duration {
+func Duration(sVal *string, def string) time.Duration {
 	var dVal *time.Duration
 	if sVal != nil {
 		d, err := time.ParseDuration(*sVal)
@@ -62,7 +62,8 @@ func Duration(sVal *string, def time.Duration) time.Duration {
 		}
 	}
 	if dVal == nil {
-		return def
+		defDuration, _ := time.ParseDuration(def)
+		return defDuration
 	}
 	return *dVal
 }

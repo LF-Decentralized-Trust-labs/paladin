@@ -14,40 +14,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package persistence
+package mockpersistence
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	migratedb "github.com/golang-migrate/migrate/v4/database"
-	migratesqlite3 "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	gormSQLite "gorm.io/driver/sqlite"
+	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
-type sqliteProvider struct{}
-
-var SQLiteDefaults = &SQLDBConfig{
+var SQLMockDefaults = &persistence.SQLDBConfig{
 	MaxOpenConns:    confutil.P(1),
 	MaxIdleConns:    confutil.P(1),
 	ConnMaxIdleTime: confutil.P("0"),
 	ConnMaxLifetime: confutil.P("0"),
 }
 
-func newSQLiteProvider(ctx context.Context, conf *Config) (p Persistence, err error) {
-	return NewSQLProvider(ctx, &sqliteProvider{}, &conf.SQLite.SQLDBConfig, SQLiteDefaults)
+type SQLMockProvider struct {
+	DB   *sql.DB
+	Mock sqlmock.Sqlmock
+	P    persistence.Persistence
 }
 
-func (p *sqliteProvider) DBName() string {
-	return "sqlite"
+func NewSQLMockProvider() (p *SQLMockProvider, err error) {
+	mp := &SQLMockProvider{}
+	mp.DB, mp.Mock, err = sqlmock.New()
+	if err == nil {
+		mp.P, err = persistence.NewSQLProvider(context.Background(), mp, &persistence.SQLDBConfig{
+			URI: "mocked",
+		}, SQLMockDefaults)
+	}
+	return mp, err
 }
 
-func (p *sqliteProvider) Open(uri string) gorm.Dialector {
-	return gormSQLite.Open(uri)
+func (p *SQLMockProvider) DBName() string {
+	return "sqlmock"
 }
 
-func (p *sqliteProvider) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
-	return migratesqlite3.WithInstance(db, &migratesqlite3.Config{})
+func (p *SQLMockProvider) Open(uri string) gorm.Dialector {
+	return mysql.New(mysql.Config{
+		Conn:                      p.DB,
+		SkipInitializeWithVersion: true,
+	})
+}
+
+func (p *SQLMockProvider) GetMigrationDriver(db *sql.DB) (migratedb.Driver, error) {
+	return nil, fmt.Errorf("not supported")
 }

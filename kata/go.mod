@@ -5,17 +5,19 @@ go 1.22.4
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/aidarkhanov/nanoid v1.0.8
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.13
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240715211227-a9475113106b
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.23.0
 	golang.org/x/text v0.15.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.4.0
 	google.golang.org/protobuf v1.34.2
+	gorm.io/driver/mysql v1.5.7
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.2
 	gorm.io/gorm v1.25.10
@@ -35,7 +37,6 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.1.0 // indirect
-	github.com/aidarkhanov/nanoid v1.0.8 // indirect
 	github.com/alecthomas/go-check-sumtype v0.1.3 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.2 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
@@ -69,6 +70,7 @@ require (
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.2.3 // indirect
 	github.com/go-critic/go-critic v0.9.0 // indirect
+	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
 	github.com/go-toolsmith/astcopy v1.1.0 // indirect
 	github.com/go-toolsmith/astequal v1.1.0 // indirect
