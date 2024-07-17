@@ -35,7 +35,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		Components: abi.ParameterArray{
 			{
 				Name:    "field1",
-				Type:    "uint256",
+				Type:    "uint256", // too big for an integer label
 				Indexed: true,
 			},
 			{
@@ -44,15 +44,20 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 				Indexed: true,
 			},
 			{
-				Name: "field3",
+				Name:    "field3",
+				Type:    "int64", // fits as an integer label
+				Indexed: true,
+			},
+			{
+				Name: "field4",
 				Type: "bool",
 			},
 		},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
-	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,bool field3),labels=[field1,field2]", as.Persisted().Signature)
-	cacheKey := "domain1/0xfa09c5ccfdbd9fea4bbda7c565697c93cb3c27ffa3b1ae300070c41b7406d243"
+	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4),tLabels=[field1,field2],iLabels=[field3]", as.Persisted().Signature)
+	cacheKey := "domain1/0xf5fea885135ae680363fa1b583e8aa9baa7af34022dd3af511a46083309c6ebe"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().Hash))
 
 	err = ss.PersistSchema(ctx, as)
@@ -62,16 +67,19 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	state1 := &State{
 		Schema:   as.Persisted().Hash,
 		DomainID: "domain1",
-		Data:     `{"field1": 12345, "field2": "hello world", "field3": false}`,
+		Data:     `{"field1": "0x0123456789012345678901234567890123456789", "field2": "hello world", "field3": 42, "field4": false}`,
 	}
 	err = ss.PersistState(ctx, state1)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
-	assert.Equal(t, []StateLabel{
-		{State: state1.Hash, Label: "field1", Value: "0000000000000000000000000000000000000000000000000000000000003039"},
+	assert.Equal(t, []StateTextLabel{
+		{State: state1.Hash, Label: "field1", Value: "0x123456789012345678901234567890123456789"},
 		{State: state1.Hash, Label: "field2", Value: "hello world"},
-	}, state1.Labels)
-	assert.Equal(t, "0x70f5850c0e7f3eeec9a4fd279f64f0e16123e179b42b0cadf31926ab7656d521", state1.Hash.String())
+	}, state1.TextLabels)
+	assert.Equal(t, []StateIntegerLabel{
+		{State: state1.Hash, Label: "field3", Value: 42},
+	}, state1.IntegerLabels)
+	assert.Equal(t, "0x014d2bce7c71ec0e86d3e48f9c1015b18849c1255c053633c1b459ea40cbf82a", state1.Hash.String())
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)

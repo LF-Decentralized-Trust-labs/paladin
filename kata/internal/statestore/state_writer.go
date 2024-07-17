@@ -185,7 +185,8 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 	// Build lists of things to insert (we are insert only)
 	var schemas []*SchemaEntity
 	var states []*State
-	var stateLabels []*StateLabel
+	var textLabels []*StateTextLabel
+	var integerLabels []*StateIntegerLabel
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
@@ -194,12 +195,15 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			states = append(states, op.states...)
 		}
 		for _, s := range op.states {
-			for i := range s.Labels {
-				stateLabels = append(stateLabels, &s.Labels[i])
+			for i := range s.TextLabels {
+				textLabels = append(textLabels, &s.TextLabels[i])
+			}
+			for i := range s.IntegerLabels {
+				integerLabels = append(integerLabels, &s.IntegerLabels[i])
 			}
 		}
 	}
-	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d stateUpdates=%d", len(schemas), len(states), len(stateLabels))
+	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d textLabels=%d integerLabels=%d", len(schemas), len(states), len(textLabels), len(integerLabels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
@@ -219,18 +223,28 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
 					DoNothing: true,
 				}).
-				Omit("Labels"). // we do this ourselves below
+				Omit("TextLabels", "IntegerLabels"). // we do this ourselves below
 				Create(states).
 				Error
 		}
-		if err == nil && len(stateLabels) > 0 {
+		if err == nil && len(textLabels) > 0 {
 			err = tx.
-				Table("state_labels").
+				Table("state_text_labels").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
 					DoNothing: true,
 				}).
-				Create(stateLabels).
+				Create(textLabels).
+				Error
+		}
+		if err == nil && len(textLabels) > 0 {
+			err = tx.
+				Table("state_integer_labels").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					DoNothing: true,
+				}).
+				Create(integerLabels).
 				Error
 		}
 		return err

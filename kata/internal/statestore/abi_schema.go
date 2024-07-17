@@ -45,18 +45,44 @@ type abiSchema struct {
 func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
 	as := &abiSchema{
 		persisted: &SchemaEntity{
-			DomainID: domainID,
-			Type:     SchemaTypeABI,
-			Labels:   []string{},
+			DomainID:      domainID,
+			Type:          SchemaTypeABI,
+			TextLabels:    []string{},
+			IntegerLabels: []string{},
 		},
 		definition: def,
 	}
 	abiJSON, err := json.Marshal(def)
 	if err == nil {
 		as.persisted.Content = string(abiJSON)
-		for _, p := range def.Components {
+		for i, p := range def.Components {
 			if p.Indexed {
-				as.persisted.Labels = append(as.persisted.Labels, p.Name)
+				if len(p.Name) == 0 {
+					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotNamed, i)
+				}
+				tc, err := p.TypeComponentTreeCtx(ctx)
+				if err != nil {
+					return nil, err
+				}
+				et := tc.ElementaryType()
+				if et == nil {
+					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, p.Name, tc.String())
+				}
+				baseType := et.BaseType()
+				switch baseType {
+				case abi.BaseTypeInt, abi.BaseTypeUInt:
+					if baseType == abi.BaseTypeInt && tc.ElementaryM() > 64 ||
+						baseType == abi.BaseTypeUInt && tc.ElementaryM() >= 64 {
+						// To big to fit into a signed 8 byte int64 value - must fall back to text index
+						as.persisted.TextLabels = append(as.persisted.TextLabels, p.Name)
+					} else {
+						as.persisted.IntegerLabels = append(as.persisted.IntegerLabels, p.Name)
+					}
+				case abi.BaseTypeAddress, abi.BaseTypeBytes, abi.BaseTypeFunction, abi.BaseTypeString:
+					as.persisted.TextLabels = append(as.persisted.TextLabels, p.Name)
+				default:
+					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnsupportedType, p.Name, tc.String())
+				}
 			}
 		}
 		err = as.typedDataV4Setup(ctx)
@@ -114,7 +140,8 @@ func (as *abiSchema) typedDataV4Setup(ctx context.Context) error {
 
 func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
 	typeSig := as.typeSet.Encode(as.primaryType)
-	return fmt.Sprintf("type=%s,labels=[%s]", typeSig, strings.Join(as.persisted.Labels, ",")), nil
+	return fmt.Sprintf("type=%s,tLabels=[%s],iLabels=[%s]", typeSig,
+		strings.Join(as.persisted.TextLabels, ","), strings.Join(as.persisted.IntegerLabels, ",")), nil
 }
 
 // Take the state, parse the value into the type tree of this schema, and from that
@@ -135,8 +162,8 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 		return err
 	}
 
-	labels := make([]StateLabel, len(as.persisted.Labels))
-	for i, fieldName := range as.persisted.Labels {
+	textLabels := make([]StateTextLabel, 0, len(as.persisted.TextLabels))
+	for _, fieldName := range as.persisted.TextLabels {
 		matched := false
 		for _, f := range cv.Children {
 			if f.Component.KeyName() == fieldName {
@@ -146,22 +173,49 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 				}
 				switch vt := f.Value.(type) {
 				case *big.Int:
-					labels[i] = StateLabel{
+					textLabels = append(textLabels, StateTextLabel{
 						Label: fieldName,
-						Value: fmt.Sprintf("%064s", vt.Text(16)),
-					}
+						Value: "0x" + vt.Text(16), // we store a hex encoded string - not sortable if a text field is used, but no max value
+					})
 				case []byte:
-					labels[i] = StateLabel{
+					textLabels = append(textLabels, StateTextLabel{
 						Label: fieldName,
-						Value: hex.EncodeToString(vt),
-					}
+						Value: "0x" + hex.EncodeToString(vt),
+					})
 				case string:
-					labels[i] = StateLabel{
+					textLabels = append(textLabels, StateTextLabel{
 						Label: fieldName,
 						Value: vt,
-					}
+					})
 				default:
-					return i18n.NewError(ctx, msgs.MsgStateLabelFieldUnsupportedValue, fieldName, f.Value)
+					return i18n.NewError(ctx, msgs.MsgStateLabelFieldUnsupportedType, fieldName, et.String())
+				}
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return i18n.NewError(ctx, msgs.MsgStateLabelFieldMissing, fieldName)
+		}
+	}
+
+	integerLabels := make([]StateIntegerLabel, 0, len(as.persisted.IntegerLabels))
+	for _, fieldName := range as.persisted.IntegerLabels {
+		matched := false
+		for _, f := range cv.Children {
+			if f.Component.KeyName() == fieldName {
+				et := f.Component.ElementaryType()
+				if et == nil {
+					return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
+				}
+				switch vt := f.Value.(type) {
+				case *big.Int:
+					integerLabels = append(integerLabels, StateIntegerLabel{
+						Label: fieldName,
+						Value: vt.Int64(),
+					})
+				default:
+					return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
 				}
 				matched = true
 				break
@@ -179,10 +233,14 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 	}
 
 	s.Hash = *NewHashIDSlice32(hash)
-	for i := range labels {
-		labels[i].State = s.Hash
+	for i := range textLabels {
+		textLabels[i].State = s.Hash
 	}
-	s.Labels = labels
+	s.TextLabels = textLabels
+	for i := range integerLabels {
+		integerLabels[i].State = s.Hash
+	}
+	s.IntegerLabels = integerLabels
 
 	return nil
 }

@@ -32,13 +32,14 @@ const (
 )
 
 type SchemaEntity struct {
-	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
-	DomainID  string
-	Type      SchemaType
-	Signature string
-	Content   string
-	Labels    []string `gorm:"type:text[]; serializer:json"`
+	Hash          HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt     types.Timestamp `gorm:"autoCreateTime:nano"`
+	DomainID      string
+	Type          SchemaType
+	Signature     string
+	Content       string
+	TextLabels    []string `gorm:"type:text[]; serializer:json"`
+	IntegerLabels []string `gorm:"type:text[]; serializer:json"`
 }
 
 type Schema interface {

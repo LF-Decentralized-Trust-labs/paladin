@@ -25,18 +25,25 @@ import (
 )
 
 type State struct {
-	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`
-	DomainID  string
-	Schema    HashID `gorm:"embedded;embeddedPrefix:schema_;"`
-	Data      string
-	Labels    []StateLabel `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Hash          HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt     types.Timestamp `gorm:"autoCreateTime:nano"`
+	DomainID      string
+	Schema        HashID `gorm:"embedded;embeddedPrefix:schema_;"`
+	Data          string
+	TextLabels    []StateTextLabel    `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	IntegerLabels []StateIntegerLabel `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
-type StateLabel struct {
+type StateTextLabel struct {
 	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
 	Label string
 	Value string
+}
+
+type StateIntegerLabel struct {
+	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	Label string
+	Value int64
 }
 
 type StateUpdate struct {
@@ -67,7 +74,7 @@ func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error) {
 	q := ss.p.DB().Table("states")
 	if withLabels {
-		q = q.Preload("Labels")
+		q = q.Preload("TextLabels").Preload("IntegerLabels")
 	}
 	err = q.
 		Where("domain_id = ?", domainID).

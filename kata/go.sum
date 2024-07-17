@@ -339,6 +339,8 @@ github.com/hyperledger/firefly-common v1.4.6 h1:qqXoSaRml3WjUnWcWxrrXs5AIOWa+UcM
 github.com/hyperledger/firefly-common v1.4.6/go.mod h1:jkErZdQmC9fsAJZQO427tURdwB9iiW+NMUZSqS3eBIE=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240715211227-a9475113106b h1:kxMDx4EzEfOPEKqs5MySd490H2vqwrU3QcHHwyJzghY=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240715211227-a9475113106b/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240717022455-5aafe814f460 h1:EdBZfbIKDlvwLOj6/PXVXZUsSVjJX+WQ6pqPEHRPlns=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240717022455-5aafe814f460/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
