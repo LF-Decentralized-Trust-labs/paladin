@@ -19,7 +19,6 @@ package persistence
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	gormPostgres "gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -27,17 +26,20 @@ import (
 	// Import pq driver
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 )
+
+var PostgresDefaults = &SQLDBConfig{
+	MaxOpenConns:    confutil.P(100),
+	MaxIdleConns:    confutil.P(100),
+	ConnMaxIdleTime: confutil.P("60s"),
+	ConnMaxLifetime: confutil.P("0"),
+}
 
 type postgresProvider struct{}
 
-func newPostgresProvider(ctx context.Context, conf *Config) (p *provider, err error) {
-	return newSQLProvider(ctx, &postgresProvider{}, &conf.Postgres.SQLDBConfig, &SQLDBConfigDefaults{
-		MaxOpenConns:    100,
-		MaxIdleConns:    100,
-		ConnMaxIdleTime: 60 * time.Second,
-		ConnMaxLifetime: 0,
-	})
+func newPostgresProvider(ctx context.Context, conf *Config) (p Persistence, err error) {
+	return NewSQLProvider(ctx, &postgresProvider{}, &conf.Postgres.SQLDBConfig, PostgresDefaults)
 }
 
 func (p *postgresProvider) DBName() string {

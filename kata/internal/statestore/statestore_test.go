@@ -20,14 +20,29 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestStateStore(t *testing.T) (context.Context, *stateStore, func()) {
+func newDBTestStateStore(t *testing.T) (context.Context, *stateStore, func()) {
 	ctx := context.Background()
-	p, done, err := persistence.NewUnitTestPersistence(ctx)
+	p, pDone, err := persistence.NewUnitTestPersistence(ctx)
 	assert.NoError(t, err)
 	ss := NewStateStore(ctx, &Config{}, p)
-	return ctx, ss.(*stateStore), done
+	return ctx, ss.(*stateStore), func() {
+		ss.Close()
+		pDone()
+	}
+}
+
+func newDBMockStateStore(t *testing.T) (context.Context, *stateStore, sqlmock.Sqlmock, func()) {
+	ctx := context.Background()
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+	ss := NewStateStore(ctx, &Config{}, p.P)
+	return ctx, ss.(*stateStore), p.Mock, func() {
+		assert.NoError(t, p.Mock.ExpectationsWereMet())
+	}
 }
