@@ -31,6 +31,17 @@ const (
 	SchemaTypeABI SchemaType = "abi"
 )
 
+type labelType int
+
+const (
+	labelTypeInt64 labelType = iota
+	labelTypeInt256
+	labelTypeUint256
+	labelTypeBytes
+	labelTypeString
+	labelTypeBool
+)
+
 type SchemaEntity struct {
 	Hash      HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	CreatedAt types.Timestamp `gorm:"autoCreateTime:nano"`

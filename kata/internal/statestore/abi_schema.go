@@ -37,19 +37,11 @@ type ABISchema interface {
 }
 
 type abiSchema struct {
-	persisted   *SchemaEntity
-	definition  *abi.Parameter
-	primaryType string
-	typeSet     eip712.TypeSet
-}
-
-var supportedABIBaseTypesForLabels = map[abi.BaseTypeName]bool{
-	abi.BaseTypeInt:      true,
-	abi.BaseTypeUInt:     true,
-	abi.BaseTypeAddress:  true,
-	abi.BaseTypeBytes:    true,
-	abi.BaseTypeFunction: true,
-	abi.BaseTypeString:   true,
+	persisted    *SchemaEntity
+	definition   *abi.Parameter
+	primaryType  string
+	typeSet      eip712.TypeSet
+	filterFields map[string]filters.FieldResolver
 }
 
 func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
@@ -59,7 +51,8 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
 		},
-		definition: def,
+		definition:   def,
+		filterFields: make(map[string]filters.FieldResolver),
 	}
 	abiJSON, err := json.Marshal(def)
 	if err == nil {
@@ -73,13 +66,11 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 				if err != nil {
 					return nil, err
 				}
-				et := tc.ElementaryType()
-				if et == nil {
-					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, p.Name, tc.String())
+				labelResolver, err := as.getLabelResolver(ctx, len(as.persisted.Labels), p.Name, tc)
+				if err != nil {
+					return nil, err
 				}
-				if !supportedABIBaseTypesForLabels[et.BaseType()] {
-					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotSupported, p.Name, tc.String())
-				}
+				as.filterFields[p.Name] = labelResolver
 				as.persisted.Labels = append(as.persisted.Labels, p.Name)
 			}
 		}
@@ -141,60 +132,119 @@ func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
 	return fmt.Sprintf("type=%s,labels=[%s]", typeSig, strings.Join(as.persisted.Labels, ",")), nil
 }
 
-func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.ComponentValue) (*StateLabel, *StateInt64Label, error) {
-	tc := f.Component
+func (as *abiSchema) getLabelType(ctx context.Context, fieldName string, tc abi.TypeComponent) (labelType, error) {
 	et := tc.ElementaryType()
 	if et == nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
+		return -1, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, tc.String())
 	}
 	baseType := et.BaseType()
 	switch baseType {
-	case abi.BaseTypeInt, abi.BaseTypeUInt:
+	case abi.BaseTypeInt:
+		if tc.ElementaryM() <= 64 {
+			// Up to signed int64 fits into an integer field in all DBs we currently support
+			return labelTypeInt64, nil
+		}
+		// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
+		return labelTypeInt256, nil
+	case abi.BaseTypeUInt, abi.BaseTypeAddress /* address is uint160 really */ :
+		if tc.ElementaryM() < 64 {
+			// Up to signed uint63 fits into an integer field in all DBs we currently support (uint64 does not fit)
+			return labelTypeInt64, nil
+		}
+		// Otherwise we fall back to encoding as a fixed-width hex string
+		return labelTypeUint256, nil
+	case abi.BaseTypeBytes, abi.BaseTypeFunction:
+		return labelTypeBytes, nil
+	case abi.BaseTypeString:
+		return labelTypeString, nil
+	case abi.BaseTypeBool:
+		return labelTypeBool, nil
+	default:
+		return -1, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, tc.String())
+	}
+}
+
+func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.ComponentValue) (*StateLabel, *StateInt64Label, error) {
+	labelType, err := as.getLabelType(ctx, fieldName, f.Component)
+	if err != nil {
+		return nil, nil, err
+	}
+	switch labelType {
+	case labelTypeInt64:
 		bigIntVal, ok := f.Value.(*big.Int)
 		if !ok {
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
-		if baseType == abi.BaseTypeInt {
-			if tc.ElementaryM() <= 64 {
-				// Up to signed int64 fits into an integer field in all DBs we currently support
-				return nil, &StateInt64Label{Label: fieldName, Value: bigIntVal.Int64()}, nil
-			}
-			// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
-			filterString, err := filters.Int256ToFilterString(ctx, bigIntVal)
-			if err != nil {
-				return nil, nil, err
-			}
-			return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
-		} else {
-			bigIntVal = bigIntVal.Abs(bigIntVal)
-			if tc.ElementaryM() < 64 {
-				// Up to signed uint63 fits into an integer field in all DBs we currently support (uint64 does not fit)
-				return nil, &StateInt64Label{Label: fieldName, Value: bigIntVal.Int64()}, nil
-			}
-			// Otherwise we fall back to encoding as a fixed-width hex string
-			filterString, err := filters.Uint256ToFilterString(ctx, bigIntVal)
-			if err != nil {
-				return nil, nil, err
-			}
-			return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
-		}
-	case abi.BaseTypeAddress, abi.BaseTypeBytes, abi.BaseTypeFunction:
-		byteValue, ok := f.Value.([]byte)
+		return nil, &StateInt64Label{Label: fieldName, Value: bigIntVal.Int64()}, nil
+	case labelTypeInt256:
+		bigIntVal, ok := f.Value.(*big.Int)
 		if !ok {
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
+		}
+		// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
+		filterString, err := filters.Int256ToFilterString(ctx, bigIntVal)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
+	case labelTypeUint256:
+		bigIntVal, ok := f.Value.(*big.Int)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
+		}
+		bigIntVal = bigIntVal.Abs(bigIntVal)
+		filterString, err := filters.Uint256ToFilterString(ctx, bigIntVal)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
+	case labelTypeBytes:
+		byteValue, ok := f.Value.([]byte)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, []byte{})
 		}
 		// We do NOT use an 0x prefix on bytes types
 		return &StateLabel{Label: fieldName, Value: hex.EncodeToString(byteValue)}, nil, nil
-	case abi.BaseTypeString:
+	case labelTypeString:
 		strValue, ok := f.Value.(string)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, "")
+		}
+		return &StateLabel{Label: fieldName, Value: strValue}, nil, nil
+	case labelTypeBool:
+		bValue, ok := f.Value.(*big.Int)
 		if !ok {
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
-		return &StateLabel{Label: fieldName, Value: strValue}, nil, nil
+		return nil, &StateInt64Label{Label: fieldName, Value: bValue.Int64()}, nil
 	default:
-		// We shouldn't ever get here, as we should handle all types in supportedABIBaseTypesForLabels,
-		// which is what we use when parsing the schema itself
-		return nil, nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, tc.String())
+		// Should not get here - if covered all the types above
+		return nil, nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, f.Component.String())
+	}
+}
+
+func (as *abiSchema) getLabelResolver(ctx context.Context, labelIndex int, fieldName string, tc abi.TypeComponent) (filters.FieldResolver, error) {
+	labelType, err := as.getLabelType(ctx, fieldName, tc)
+	if err != nil {
+		return nil, err
+	}
+	sqlColumn := fmt.Sprintf("l%d", labelIndex)
+	switch labelType {
+	case labelTypeInt64:
+		return filters.Int64Field(sqlColumn), nil
+	case labelTypeInt256:
+		return filters.Int256Field(sqlColumn), nil
+	case labelTypeUint256:
+		return filters.Uint256Field(sqlColumn), nil
+	case labelTypeBytes:
+		return filters.StringField(sqlColumn), nil
+	case labelTypeString:
+		return filters.StringField(sqlColumn), nil
+	case labelTypeBool:
+		return filters.BoolField(sqlColumn), nil
+	default:
+		// Should not get here - if covered all the types above
+		return nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, sqlColumn)
 	}
 }
 

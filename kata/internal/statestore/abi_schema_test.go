@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// This is an E2E test using the actual database, the flush-writer DB storage system, and the schema cache
 func TestStoreRetrieveABISchema(t *testing.T) {
 
 	ctx, ss, done := newDBTestStateStore(t)
@@ -49,15 +50,35 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 				Indexed: true,
 			},
 			{
-				Name: "field4",
-				Type: "bool",
+				Name:    "field4",
+				Type:    "bool",
+				Indexed: true,
+			},
+			{
+				Name:    "field5",
+				Type:    "address",
+				Indexed: true,
+			},
+			{
+				Name:    "field6",
+				Type:    "int256",
+				Indexed: true,
+			},
+			{
+				Name:    "field7",
+				Type:    "bytes",
+				Indexed: true,
+			},
+			{
+				Name: "field8",
+				Type: "string",
 			},
 		},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
-	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4),labels=[field1,field2,field3]", as.Persisted().Signature)
-	cacheKey := "domain1/0x1dcdbb678274c1598f91163c606916736070bb6cef44bcb6cb113506ee4afdf6"
+	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4,address field5,int256 field6,bytes field7,string field8),labels=[field1,field2,field3,field4,field5,field6,field7]", as.Persisted().Signature)
+	cacheKey := "domain1/0xf2fe6e1d0405d9607cf291dd0c24ce40f01b8cf9d84e48664aea4785c0e28926"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().Hash))
 
 	err = ss.PersistSchema(ctx, as)
@@ -67,7 +88,16 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	state1 := &State{
 		Schema:   as.Persisted().Hash,
 		DomainID: "domain1",
-		Data:     `{"field1": "0x0123456789012345678901234567890123456789", "field2": "hello world", "field3": 42, "field4": false}`,
+		Data: `{
+			"field1": "0x0123456789012345678901234567890123456789",
+			"field2": "hello world",
+			"field3": 42,
+			"field4": true,
+			"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
+			"field6": "10203040506070809",
+			"field7": "0xfeedbeef",
+			"field8": "things and stuff"
+		}`,
 	}
 	err = ss.PersistState(ctx, state1)
 	assert.NoError(t, err)
@@ -75,11 +105,15 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.Equal(t, []*StateLabel{
 		{State: state1.Hash, Label: "field1", Value: "0000000000000000000000000123456789012345678901234567890123456789"},
 		{State: state1.Hash, Label: "field2", Value: "hello world"},
+		{State: state1.Hash, Label: "field5", Value: "000000000000000000000000687414c0b8b4182b823aec5436965cf19b197386"},
+		{State: state1.Hash, Label: "field6", Value: "100000000000000000000000000000000000000000000000000243f9c7cfe4719"},
+		{State: state1.Hash, Label: "field7", Value: "feedbeef"},
 	}, state1.Labels)
 	assert.Equal(t, []*StateInt64Label{
 		{State: state1.Hash, Label: "field3", Value: 42},
+		{State: state1.Hash, Label: "field4", Value: 1},
 	}, state1.Int64Labels)
-	assert.Equal(t, "0x014d2bce7c71ec0e86d3e48f9c1015b18849c1255c053633c1b459ea40cbf82a", state1.Hash.String())
+	assert.Equal(t, "0x67c4953ad84c34fef7efacd3b3642e11278bed482efa5ff92d35b2306084f15a", state1.Hash.String())
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
