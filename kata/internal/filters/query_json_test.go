@@ -110,7 +110,7 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
 			"masked":   BoolField("masked"),
-			"cid":      StringField("correl_id"),
+			"cid":      Int256Field("correl_id"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
 		return db
@@ -200,7 +200,7 @@ func TestBuildQuerySingleNestedWithResolverErrorValue(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.Regexp(t, "PD010308.*tag.*PD010305", db.Error)
+		assert.Regexp(t, "PD010310.*tag.*PD010305", db.Error)
 		return db
 	})
 }
@@ -224,7 +224,7 @@ func TestBuildQueryResolverErrorMissing(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.Regexp(t, "PD010306.*tag", db.Error)
+		assert.Regexp(t, "PD010308.*tag", db.Error)
 		return db
 	})
 }
@@ -279,7 +279,7 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
 			"masked":   BoolField("masked"),
-			"cid":      StringField("correl_id"),
+			"cid":      Int256Field("correl_id"),
 			"created":  TimestampField("created_at"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
@@ -327,7 +327,7 @@ func TestBuildQueryJSONLike(t *testing.T) {
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
 			"masked":   BoolField("masked"),
-			"cid":      StringField("correl_id"),
+			"cid":      Int256Field("correl_id"),
 			"created":  Int64Field("created_at"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
@@ -373,8 +373,12 @@ func TestBuildQueryJSONLessThan(t *testing.T) {
 		"limit": 10,
 		"lessThan": [
 			{
-				"field": "sequence",
+				"field": "amount",
 				"value": "12345"
+			},
+			{
+				"field": "delta",
+				"value": "-100"
 			}
 		]
 	}`), &qf)
@@ -385,12 +389,13 @@ func TestBuildQueryJSONLessThan(t *testing.T) {
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
-			"sequence": Int64Field("sequence"),
+			"amount": Uint256Field("amount"),
+			"delta":  Int256Field("delta"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence < 12345 LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '00000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
@@ -403,6 +408,10 @@ func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
 			{
 				"field": "sequence",
 				"value": 0
+			},
+			{
+				"field": "delta",
+				"value": 100
 			}
 		]
 	}`), &qf)
@@ -414,11 +423,12 @@ func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
 		var count int64
 		db := qf.Build(context.Background(), tx.Table("test"), FieldList{
 			"sequence": Int64Field("sequence"),
+			"delta":    Int256Field("delta"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence >= 0 LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence >= 0 AND delta >= '10000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
