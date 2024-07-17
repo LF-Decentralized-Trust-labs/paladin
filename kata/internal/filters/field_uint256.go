@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"math/big"
 )
 
 type Uint256Field string
@@ -29,19 +30,19 @@ func (sf Uint256Field) SQLColumn() string {
 }
 
 func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
-	var untyped interface{}
-	err := json.Unmarshal(jsonValue, &untyped)
+	var jsonResult interface{}
+	err := json.Unmarshal(jsonValue, &jsonResult)
 	if err != nil {
 		return nil, err
 	}
-	return Uint256ToFilterString(ctx, untyped)
-}
-
-func Uint256ToFilterString(ctx context.Context, jsonResult interface{}) (string, error) {
-	bi, err := JSONResultToBigInt(ctx, jsonResult)
+	bi, err := jsonResultToBigInt(ctx, jsonResult)
 	if err != nil {
 		return "", err
 	}
+	return Uint256ToFilterString(ctx, bi)
+}
+
+func Uint256ToFilterString(ctx context.Context, bi *big.Int) (string, error) {
 	zeroPaddedUint256 := PadHexAbsBigInt(bi, make([]byte, 64))
 	return (string)(zeroPaddedUint256), nil
 }

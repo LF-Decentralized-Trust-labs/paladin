@@ -12,7 +12,7 @@ CREATE TABLE states (
     FOREIGN KEY (schema_l, schema_h) REFERENCES schemas (hash_l, hash_h) ON DELETE CASCADE
 );
 
-CREATE TABLE state_text_labels (
+CREATE TABLE state_labels (
     state_l     UUID,
     state_h     UUID,   
     label       TEXT,
@@ -20,9 +20,9 @@ CREATE TABLE state_text_labels (
     PRIMARY KEY (state_l, state_h, label),
     FOREIGN KEY (state_l, state_h) REFERENCES states (hash_l, hash_h) ON DELETE CASCADE
 );
-CREATE INDEX state_text_labels_value ON state_text_labels(value);
+CREATE INDEX state_labels_value ON state_labels(value);
 
-CREATE TABLE state_integer_labels (
+CREATE TABLE state_int64_labels (
     state_l     UUID,
     state_h     UUID,   
     label       TEXT,
@@ -30,6 +30,6 @@ CREATE TABLE state_integer_labels (
     PRIMARY KEY (state_l, state_h, label),
     FOREIGN KEY (state_l, state_h) REFERENCES states (hash_l, hash_h) ON DELETE CASCADE
 );
-CREATE INDEX state_integer_labels_value ON state_integer_labels(value);
+CREATE INDEX state_int64_labels_value ON state_int64_labels(value);
 
 COMMIT;

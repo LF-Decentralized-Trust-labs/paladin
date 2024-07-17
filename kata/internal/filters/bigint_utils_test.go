@@ -24,12 +24,13 @@ import (
 )
 
 func TestJSONResultToBigInt(t *testing.T) {
-	_, err := JSONResultToBigInt(context.Background(), "! this string isn't going to parse")
+	_, err := jsonResultToBigInt(context.Background(), "! this string isn't going to parse")
 	assert.Regexp(t, "PD010307", err)
 
-	_, err = JSONResultToBigInt(context.Background(), false)
+	_, err = jsonResultToBigInt(context.Background(), false)
 	assert.Regexp(t, "PD010306", err)
 
-	_, err = JSONResultToBigInt(context.Background(), false)
+	_, err = jsonResultToBigInt(context.Background(), false)
 	assert.Regexp(t, "PD010306", err)
+
 }

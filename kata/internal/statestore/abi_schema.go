@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
@@ -42,13 +43,21 @@ type abiSchema struct {
 	typeSet     eip712.TypeSet
 }
 
+var supportedABIBaseTypesForLabels = map[abi.BaseTypeName]bool{
+	abi.BaseTypeInt:      true,
+	abi.BaseTypeUInt:     true,
+	abi.BaseTypeAddress:  true,
+	abi.BaseTypeBytes:    true,
+	abi.BaseTypeFunction: true,
+	abi.BaseTypeString:   true,
+}
+
 func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
 	as := &abiSchema{
 		persisted: &SchemaEntity{
-			DomainID:      domainID,
-			Type:          SchemaTypeABI,
-			TextLabels:    []string{},
-			IntegerLabels: []string{},
+			DomainID: domainID,
+			Type:     SchemaTypeABI,
+			Labels:   []string{},
 		},
 		definition: def,
 	}
@@ -68,21 +77,10 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 				if et == nil {
 					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, p.Name, tc.String())
 				}
-				baseType := et.BaseType()
-				switch baseType {
-				case abi.BaseTypeInt, abi.BaseTypeUInt:
-					if baseType == abi.BaseTypeInt && tc.ElementaryM() > 64 ||
-						baseType == abi.BaseTypeUInt && tc.ElementaryM() >= 64 {
-						// To big to fit into a signed 8 byte int64 value - must fall back to text index
-						as.persisted.TextLabels = append(as.persisted.TextLabels, p.Name)
-					} else {
-						as.persisted.IntegerLabels = append(as.persisted.IntegerLabels, p.Name)
-					}
-				case abi.BaseTypeAddress, abi.BaseTypeBytes, abi.BaseTypeFunction, abi.BaseTypeString:
-					as.persisted.TextLabels = append(as.persisted.TextLabels, p.Name)
-				default:
-					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnsupportedType, p.Name, tc.String())
+				if !supportedABIBaseTypesForLabels[et.BaseType()] {
+					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotSupported, p.Name, tc.String())
 				}
+				as.persisted.Labels = append(as.persisted.Labels, p.Name)
 			}
 		}
 		err = as.typedDataV4Setup(ctx)
@@ -140,8 +138,64 @@ func (as *abiSchema) typedDataV4Setup(ctx context.Context) error {
 
 func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
 	typeSig := as.typeSet.Encode(as.primaryType)
-	return fmt.Sprintf("type=%s,tLabels=[%s],iLabels=[%s]", typeSig,
-		strings.Join(as.persisted.TextLabels, ","), strings.Join(as.persisted.IntegerLabels, ",")), nil
+	return fmt.Sprintf("type=%s,labels=[%s]", typeSig, strings.Join(as.persisted.Labels, ",")), nil
+}
+
+func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.ComponentValue) (*StateLabel, *StateInt64Label, error) {
+	tc := f.Component
+	et := tc.ElementaryType()
+	if et == nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
+	}
+	baseType := et.BaseType()
+	switch baseType {
+	case abi.BaseTypeInt, abi.BaseTypeUInt:
+		bigIntVal, ok := f.Value.(*big.Int)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
+		}
+		if baseType == abi.BaseTypeInt {
+			if tc.ElementaryM() <= 64 {
+				// Up to signed int64 fits into an integer field in all DBs we currently support
+				return nil, &StateInt64Label{Label: fieldName, Value: bigIntVal.Int64()}, nil
+			}
+			// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
+			filterString, err := filters.Int256ToFilterString(ctx, bigIntVal)
+			if err != nil {
+				return nil, nil, err
+			}
+			return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
+		} else {
+			bigIntVal = bigIntVal.Abs(bigIntVal)
+			if tc.ElementaryM() < 64 {
+				// Up to signed uint63 fits into an integer field in all DBs we currently support (uint64 does not fit)
+				return nil, &StateInt64Label{Label: fieldName, Value: bigIntVal.Int64()}, nil
+			}
+			// Otherwise we fall back to encoding as a fixed-width hex string
+			filterString, err := filters.Uint256ToFilterString(ctx, bigIntVal)
+			if err != nil {
+				return nil, nil, err
+			}
+			return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
+		}
+	case abi.BaseTypeAddress, abi.BaseTypeBytes, abi.BaseTypeFunction:
+		byteValue, ok := f.Value.([]byte)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
+		}
+		// We do NOT use an 0x prefix on bytes types
+		return &StateLabel{Label: fieldName, Value: hex.EncodeToString(byteValue)}, nil, nil
+	case abi.BaseTypeString:
+		strValue, ok := f.Value.(string)
+		if !ok {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
+		}
+		return &StateLabel{Label: fieldName, Value: strValue}, nil, nil
+	default:
+		// We shouldn't ever get here, as we should handle all types in supportedABIBaseTypesForLabels,
+		// which is what we use when parsing the schema itself
+		return nil, nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, tc.String())
+	}
 }
 
 // Take the state, parse the value into the type tree of this schema, and from that
@@ -162,60 +216,20 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 		return err
 	}
 
-	textLabels := make([]StateTextLabel, 0, len(as.persisted.TextLabels))
-	for _, fieldName := range as.persisted.TextLabels {
+	var labels []*StateLabel
+	var int64Labels []*StateInt64Label
+	for _, fieldName := range as.persisted.Labels {
 		matched := false
 		for _, f := range cv.Children {
 			if f.Component.KeyName() == fieldName {
-				et := f.Component.ElementaryType()
-				if et == nil {
-					return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
+				textLabel, int64Label, err := as.buildLabel(ctx, fieldName, f)
+				if err != nil {
+					return err
 				}
-				switch vt := f.Value.(type) {
-				case *big.Int:
-					textLabels = append(textLabels, StateTextLabel{
-						Label: fieldName,
-						Value: "0x" + vt.Text(16), // we store a hex encoded string - not sortable if a text field is used, but no max value
-					})
-				case []byte:
-					textLabels = append(textLabels, StateTextLabel{
-						Label: fieldName,
-						Value: "0x" + hex.EncodeToString(vt),
-					})
-				case string:
-					textLabels = append(textLabels, StateTextLabel{
-						Label: fieldName,
-						Value: vt,
-					})
-				default:
-					return i18n.NewError(ctx, msgs.MsgStateLabelFieldUnsupportedType, fieldName, et.String())
-				}
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return i18n.NewError(ctx, msgs.MsgStateLabelFieldMissing, fieldName)
-		}
-	}
-
-	integerLabels := make([]StateIntegerLabel, 0, len(as.persisted.IntegerLabels))
-	for _, fieldName := range as.persisted.IntegerLabels {
-		matched := false
-		for _, f := range cv.Children {
-			if f.Component.KeyName() == fieldName {
-				et := f.Component.ElementaryType()
-				if et == nil {
-					return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
-				}
-				switch vt := f.Value.(type) {
-				case *big.Int:
-					integerLabels = append(integerLabels, StateIntegerLabel{
-						Label: fieldName,
-						Value: vt.Int64(),
-					})
-				default:
-					return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, f.Component.String())
+				if textLabel != nil {
+					labels = append(labels, textLabel)
+				} else {
+					int64Labels = append(int64Labels, int64Label)
 				}
 				matched = true
 				break
@@ -233,14 +247,14 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 	}
 
 	s.Hash = *NewHashIDSlice32(hash)
-	for i := range textLabels {
-		textLabels[i].State = s.Hash
+	for i := range labels {
+		labels[i].State = s.Hash
 	}
-	s.TextLabels = textLabels
-	for i := range integerLabels {
-		integerLabels[i].State = s.Hash
+	s.Labels = labels
+	for i := range int64Labels {
+		int64Labels[i].State = s.Hash
 	}
-	s.IntegerLabels = integerLabels
+	s.Int64Labels = int64Labels
 
 	return nil
 }

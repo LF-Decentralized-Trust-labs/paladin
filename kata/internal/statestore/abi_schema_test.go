@@ -35,7 +35,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		Components: abi.ParameterArray{
 			{
 				Name:    "field1",
-				Type:    "uint256", // too big for an integer label
+				Type:    "uint256", // too big for an integer label, gets a 64 char hex string
 				Indexed: true,
 			},
 			{
@@ -56,8 +56,8 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
-	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4),tLabels=[field1,field2],iLabels=[field3]", as.Persisted().Signature)
-	cacheKey := "domain1/0xf5fea885135ae680363fa1b583e8aa9baa7af34022dd3af511a46083309c6ebe"
+	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4),labels=[field1,field2,field3]", as.Persisted().Signature)
+	cacheKey := "domain1/0x1dcdbb678274c1598f91163c606916736070bb6cef44bcb6cb113506ee4afdf6"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().Hash))
 
 	err = ss.PersistSchema(ctx, as)
@@ -72,13 +72,13 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	err = ss.PersistState(ctx, state1)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
-	assert.Equal(t, []StateTextLabel{
-		{State: state1.Hash, Label: "field1", Value: "0x123456789012345678901234567890123456789"},
+	assert.Equal(t, []*StateLabel{
+		{State: state1.Hash, Label: "field1", Value: "0000000000000000000000000123456789012345678901234567890123456789"},
 		{State: state1.Hash, Label: "field2", Value: "hello world"},
-	}, state1.TextLabels)
-	assert.Equal(t, []StateIntegerLabel{
+	}, state1.Labels)
+	assert.Equal(t, []*StateInt64Label{
 		{State: state1.Hash, Label: "field3", Value: 42},
-	}, state1.IntegerLabels)
+	}, state1.Int64Labels)
 	assert.Equal(t, "0x014d2bce7c71ec0e86d3e48f9c1015b18849c1255c053633c1b459ea40cbf82a", state1.Hash.String())
 
 	// Second should succeed, but not do anything

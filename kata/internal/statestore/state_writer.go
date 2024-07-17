@@ -185,8 +185,8 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 	// Build lists of things to insert (we are insert only)
 	var schemas []*SchemaEntity
 	var states []*State
-	var textLabels []*StateTextLabel
-	var integerLabels []*StateIntegerLabel
+	var labels []*StateLabel
+	var int64Labels []*StateInt64Label
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
@@ -195,15 +195,11 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			states = append(states, op.states...)
 		}
 		for _, s := range op.states {
-			for i := range s.TextLabels {
-				textLabels = append(textLabels, &s.TextLabels[i])
-			}
-			for i := range s.IntegerLabels {
-				integerLabels = append(integerLabels, &s.IntegerLabels[i])
-			}
+			labels = append(labels, s.Labels...)
+			int64Labels = append(int64Labels, s.Int64Labels...)
 		}
 	}
-	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d textLabels=%d integerLabels=%d", len(schemas), len(states), len(textLabels), len(integerLabels))
+	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d labels=%d int64Labels=%d", len(schemas), len(states), len(labels), len(int64Labels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
@@ -223,28 +219,28 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
 					DoNothing: true,
 				}).
-				Omit("TextLabels", "IntegerLabels"). // we do this ourselves below
+				Omit("Labels", "Int64Labels"). // we do this ourselves below
 				Create(states).
 				Error
 		}
-		if err == nil && len(textLabels) > 0 {
+		if err == nil && len(labels) > 0 {
 			err = tx.
-				Table("state_text_labels").
+				Table("state_labels").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
 					DoNothing: true,
 				}).
-				Create(textLabels).
+				Create(labels).
 				Error
 		}
-		if err == nil && len(textLabels) > 0 {
+		if err == nil && len(labels) > 0 {
 			err = tx.
-				Table("state_integer_labels").
+				Table("state_int64_labels").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
 					DoNothing: true,
 				}).
-				Create(integerLabels).
+				Create(int64Labels).
 				Error
 		}
 		return err

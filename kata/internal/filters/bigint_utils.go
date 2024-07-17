@@ -24,10 +24,10 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-// JSONResultToBigInt takes the types that are supported from Unmarshal into interface{}
+// jsonResultToBigInt takes the types that are supported from Unmarshal into interface{}
 // and where possible converts into a big integer, including string parsing using the
 // default prefix handling (hex with 0x, octal, decimal etc.)
-func JSONResultToBigInt(ctx context.Context, jsonResult interface{}) (*big.Int, error) {
+func jsonResultToBigInt(ctx context.Context, jsonResult interface{}) (*big.Int, error) {
 	switch v := jsonResult.(type) {
 	case string:
 		bi, ok := new(big.Int).SetString(v, 0)

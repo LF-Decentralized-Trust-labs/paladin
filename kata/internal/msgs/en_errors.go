@@ -50,8 +50,9 @@ var (
 	MsgStateSchemaNotFound            = ffe("PD010106", "Schema not found with hash %s")
 	MsgStateLabelFieldNotElementary   = ffe("PD010107", "Label field %s is not elementary type (%s)")
 	MsgStateLabelFieldNotNamed        = ffe("PD010108", "Label field with index %d is not named")
-	MsgStateLabelFieldUnsupportedType = ffe("PD010109", "Text label field %s has unsupported type '%s'")
+	MsgStateLabelFieldUnexpectedValue = ffe("PD010109", "Value type for field %s %T from ABI decoding library does not match expected value type %T")
 	MsgStateLabelFieldMissing         = ffe("PD010110", "Label field %s missing")
+	MsgStateLabelFieldNotSupported    = ffe("PD010111", "Label field %s is not a supported elementary type (%s)")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
@@ -67,7 +68,9 @@ var (
 	MsgFiltersValueInvalidForInt64      = ffe("PD010303", "Value '%s' cannot be parsed as a 64bit signed integer")
 	MsgFiltersValueInvalidForBool       = ffe("PD010304", "Value '%s' cannot be parsed as a boolean")
 	MsgFiltersValueInvalidForString     = ffe("PD010305", "Value '%s' cannot be parsed as a string")
-	MsgFiltersValueMissing              = ffe("PD010306", "Value missing for filter field '%s'")
-	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010307", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
-	MsgFiltersJSONValueParseError       = ffe("PD010308", "Failed to parse value for field '%s' (as %T): %v")
+	MsgFiltersValueInvalidForBigInt     = ffe("PD010306", "Type '%T' cannot be converted to a big integer")
+	MsgFiltersValueIntStringParseFail   = ffe("PD010307", "Value '%s' cannot be converted to a big integer")
+	MsgFiltersValueMissing              = ffe("PD010308", "Value missing for filter field '%s'")
+	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010309", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
+	MsgFiltersJSONValueParseError       = ffe("PD010310", "Failed to parse value for field '%s' (as %T): %v")
 )

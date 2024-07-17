@@ -7,8 +7,7 @@ CREATE TABLE schemas (
     type           TEXT,
     signature      TEXT,
     content        TEXT,
-    text_labels    TEXT,
-    integer_labels  TEXT,
+    labels         TEXT,
     PRIMARY KEY (hash_l, hash_h)
 );
 COMMIT;
