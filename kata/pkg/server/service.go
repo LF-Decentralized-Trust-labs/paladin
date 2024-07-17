@@ -12,13 +12,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package transaction
+package server
 
 import (
 	"context"
 	"io"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -69,7 +70,7 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 				log.L(ctx).Info("Received REQUEST_TYPE_SUBMIT_TRANSACTION_REQUEST")
 				submitTransactionRequest := msg.GetRequest().GetSubmitTransactionRequest()
 
-				response, err := s.submit(stream.Context(), submitTransactionRequest)
+				response, err := transaction.Submit(stream.Context(), submitTransactionRequest)
 				if err != nil {
 					// Handle the error
 					return err

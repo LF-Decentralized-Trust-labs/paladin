@@ -24,7 +24,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 
-	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -48,7 +47,7 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterPaladinTransactionServiceServer(s, &transaction.PaladinTransactionService{})
+	proto.RegisterPaladinTransactionServiceServer(s, NewPaladinTransactionService())
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{

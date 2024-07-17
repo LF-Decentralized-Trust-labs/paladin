@@ -23,7 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-func (s *PaladinTransactionService) submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.SubmitTransactionResponse, error) {
+func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.SubmitTransactionResponse, error) {
 	// TODO: Implement the logic to submit a transaction
 	// You can access the request fields using req.contractAddress, req.from, req.idempotencyKey, and req.payload
 	// You can create a new transaction ID using a UUID library or any other method you prefer
