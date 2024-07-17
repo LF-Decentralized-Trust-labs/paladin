@@ -214,7 +214,7 @@ task checkCoverage {
         } else if ( totalCoverage.toFloat() - targetCoverage > 1) {
             throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than 1%, please update the targetCoverage value in ./kata/build.gradle file")
         } else {
-            println "Coverage is above ${targetCoverage} %, current value: ${totalCoverage}"
+            println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
         }
     }
 }
