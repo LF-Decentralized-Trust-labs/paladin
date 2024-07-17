@@ -31,6 +31,8 @@ type PaladinTransactionService struct {
 }
 
 func (s *PaladinTransactionService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
+	log.L(ctx).Info("Status")
+
 	return &proto.StatusResponse{
 		Ok: true,
 	}, nil
@@ -92,9 +94,6 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 					return err
 				}
 				log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
-
-			case proto.REQUEST_TYPE_CLOSE_STREAM_REQUEST:
-				log.L(ctx).Info("Received REQUEST_TYPE_CLOSE_STREAM_REQUEST")
 
 			default:
 				log.L(ctx).Info("Received unkonwn request type")

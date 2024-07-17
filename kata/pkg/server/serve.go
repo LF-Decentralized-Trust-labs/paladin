@@ -49,6 +49,7 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	s := grpc.NewServer()
 
 	proto.RegisterPaladinTransactionServiceServer(s, &transaction.PaladinTransactionService{})
+
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
 		listener: l,
@@ -58,6 +59,8 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 }
 
 func Run(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Run: %s", socketAddress)
+
 	serverLock.Lock()
 	_, exists := servers[socketAddress]
 	serverLock.Unlock()
@@ -81,14 +84,20 @@ func Run(ctx context.Context, socketAddress string) {
 }
 
 func Stop(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Stop: %s", socketAddress)
+
 	serverLock.Lock()
 	s := servers[socketAddress]
 	serverLock.Unlock()
 
 	if s != nil {
+		log.L(ctx).Infof("Stopping server on address %s", socketAddress)
 		s.server.GracefulStop()
 		serverErr := <-s.done
 		log.L(ctx).Infof("Server %s stopped (err=%v)", socketAddress, serverErr)
+	} else {
+		log.L(ctx).Infof("No server for address %s", socketAddress)
+
 	}
 
 	serverLock.Lock()

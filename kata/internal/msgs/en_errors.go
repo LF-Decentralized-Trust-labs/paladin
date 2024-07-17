@@ -52,4 +52,7 @@ var (
 	MsgPersistenceInitFailed          = ffe("PD010202", "Database init failed")
 	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
+
+	// Transaction store PD0104XX
+	MsgTransactionMissingField = ffe("PD010400", "must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
 )

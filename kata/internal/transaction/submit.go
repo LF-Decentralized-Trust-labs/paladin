@@ -16,9 +16,10 @@ package transaction
 
 import (
 	"context"
-	"errors"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -37,8 +38,18 @@ func (s *PaladinTransactionService) submit(ctx context.Context, req *proto.Submi
 		payload = req.GetPayloadRLP()
 	}
 
-	if payload == "" || req.From == "" || req.ContractAddress == "" || req.IdempotencyKey == "" {
-		return nil, errors.New("must provide a payload")
+	if payload == "" || req.From == "" || req.ContractAddress == "" {
+		missingFields := make([]string, 4)
+		if payload == "" {
+			missingFields = append(missingFields, "PayloadJSON", "PayloadRLP")
+		}
+		if req.From == "" {
+			missingFields = append(missingFields, "From")
+		}
+		if req.ContractAddress == "" {
+			missingFields = append(missingFields, "payload")
+		}
+		return nil, i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
 	}
 
 	// What happens next
