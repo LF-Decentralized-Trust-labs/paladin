@@ -18,8 +18,6 @@ package filters
 
 import (
 	"context"
-	"fmt"
-	"math/big"
 	"testing"
 
 	"encoding/json"
@@ -27,26 +25,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInt64Field(t *testing.T) {
+func TestHexBytesField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Int64Field("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Int64Field("test").SQLValue(ctx, (json.RawMessage)(`[]`))
-	assert.Regexp(t, "PD010303", err)
+	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
+	assert.Regexp(t, "PD010305", err)
 
-	// Too big to fit (by 1)
-	tooBig := new(big.Int).Add(big.NewInt(9223372036854775807), big.NewInt(1))
-	_, err = Int64Field("test").SQLValue(ctx, (json.RawMessage)(fmt.Sprintf(`"%s"`, tooBig)))
-	assert.Regexp(t, "PD010303", err)
+	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"not hex"`))
+	assert.Regexp(t, "PD010311", err)
 
-	// We handle bool -> Int64 conversion
-	iTrue, err := Int64Field("test").SQLValue(ctx, (json.RawMessage)(`true`))
+	v, err := HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"0xAAbbCCdd"`))
 	assert.NoError(t, err)
-	assert.Equal(t, (int64)(1), iTrue)
-	iFalse, err := Int64Field("test").SQLValue(ctx, (json.RawMessage)(`false`))
-	assert.NoError(t, err)
-	assert.Equal(t, (int64)(0), iFalse)
+	assert.Equal(t, "aabbccdd", v)
+	assert.Equal(t, "test", HexBytesField("test").SQLColumn())
+
 }

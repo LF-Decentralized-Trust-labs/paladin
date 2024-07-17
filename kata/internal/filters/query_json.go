@@ -88,7 +88,7 @@ func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldList FieldList
 		// in GORM I can't work out how to detect), then it will aggregate WHERE clauses
 		// and cause us to do all kinds of wonky nesting.
 		// So use this function to get a clean session to do our nested db.Where() clauses against.
-		rootDB:     db.Session(&gorm.Session{DryRun: true, SkipDefaultTransaction: true}),
+		rootDB:     db.Session(&gorm.Session{SkipDefaultTransaction: true}),
 		jsonFilter: qj,
 		fieldList:  fieldList,
 	}

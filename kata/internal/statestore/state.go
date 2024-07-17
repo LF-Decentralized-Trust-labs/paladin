@@ -18,8 +18,10 @@ package statestore
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
@@ -53,12 +55,9 @@ type StateUpdate struct {
 
 func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 
-	schema, err := ss.GetSchema(ctx, s.DomainID, &s.Schema)
+	schema, err := ss.GetSchema(ctx, s.DomainID, &s.Schema, true)
 	if err != nil {
 		return err
-	}
-	if schema == nil {
-		return i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, &s.Schema)
 	}
 
 	if err := schema.ProcessState(ctx, s); err != nil {
@@ -71,7 +70,7 @@ func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error) {
+func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (s *State, err error) {
 	q := ss.p.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
@@ -83,5 +82,49 @@ func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashI
 		Limit(1).
 		Find(&s).
 		Error
+	if err == nil && s == nil && failNotFound {
+		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, hash)
+	}
 	return s, err
+}
+
+func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID *HashID, query *filters.QueryJSON) (s []*State, err error) {
+
+	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	fieldList := map[string]filters.FieldResolver{
+		// Built in fields all start with "." as that prevents them
+		// clashing with variable names in ABI structs ($ and _ are valid leading chars there)
+		//
+		// Only field you can query on outside of the labels, is the created timestamp.
+		// - if getting by the state ID you make a different API call
+		// - when submitting a query you have to specify the domain + schema to scope your query
+		".created": filters.TimestampField("created_at"),
+	}
+
+	// We need to build the joins for each of the labels - it's only a valid state according to the
+	// schema if every label field has a corresponding value.
+	db := ss.p.DB().Table("states")
+	for i, fi := range schema.LabelInfo() {
+		fieldList[fi.label] = fi.resolver
+		typeMod := ""
+		if fi.labelType == labelTypeInt64 || fi.labelType == labelTypeBool {
+			typeMod = "int64_"
+		}
+		db = db.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS l%[2]d ON l%[2]d.state_l = hash_l AND l%[2]d.state_h = hash_h AND l%[2]d.label = ?", typeMod, i), fi.label)
+	}
+
+	var states []*State
+	q := query.Build(ctx, db, fieldList).
+		Where("domain_id = ?", domainID).
+		Where("schema_l = ?", schemaID.L).
+		Where("schema_h = ?", schemaID.H).
+		Find(&states)
+	if q.Error != nil {
+		return nil, q.Error
+	}
+	return states, nil
 }

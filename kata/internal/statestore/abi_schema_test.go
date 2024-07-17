@@ -17,9 +17,11 @@
 package statestore
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -128,7 +130,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	getValidate := func() {
-		as1, err := ss.GetSchema(ctx, as.Persisted().DomainID, &as.Persisted().Hash)
+		as1, err := ss.GetSchema(ctx, as.Persisted().DomainID, &as.Persisted().Hash, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, as1)
 		as1Sig, err := as1.(*abiSchema).FullSignature(ctx)
@@ -147,7 +149,47 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	getValidate()
 
 	// Get the state back too
-	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, &state1.Hash, true)
+	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, &state1.Hash, true, true)
 	assert.NoError(t, err)
 	assert.Equal(t, state1, state1a)
+
+	// Do a query on just one state, based on all the label fields
+	var query *filters.QueryJSON
+	err = json.Unmarshal(([]byte)(`{
+		"eq": [
+		  {"field":"field1","value":"0x0123456789012345678901234567890123456789"},
+		  {"field":"field2","value":"hello world"},
+		  {"field":"field3","value":42},
+		  {"field":"field4","value":true},
+		  {"field":"field5","value":"0x687414C0B8B4182B823Aec5436965cf19b197386"},
+		  {"field":"field6","value":"-10203040506070809"},
+		  {"field":"field7","value":"0xfeedbeef"}
+		]
+	}`), &query)
+	assert.NoError(t, err)
+	states, err := ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	assert.NoError(t, err)
+	assert.Len(t, states, 1)
+
+	// Do a query that should fail on a string based label
+	err = json.Unmarshal(([]byte)(`{
+		"eq": [
+		  {"field":"field2","value":"hello sun"}
+		]
+	}`), &query)
+	assert.NoError(t, err)
+	states, err = ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	assert.NoError(t, err)
+	assert.Len(t, states, 0)
+
+	// Do a query that should fail on an integer base label
+	err = json.Unmarshal(([]byte)(`{
+		"eq": [
+		  {"field":"field3","value":43}
+		]
+	}`), &query)
+	assert.NoError(t, err)
+	states, err = ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	assert.NoError(t, err)
+	assert.Len(t, states, 0)
 }

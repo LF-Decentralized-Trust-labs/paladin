@@ -53,6 +53,7 @@ var (
 	MsgStateLabelFieldUnexpectedValue = ffe("PD010109", "Value type for field %s %T from ABI decoding library does not match expected value type %T")
 	MsgStateLabelFieldMissing         = ffe("PD010110", "Label field %s missing")
 	MsgStateLabelFieldNotSupported    = ffe("PD010111", "Label field %s is not a supported elementary type (%s)")
+	MsgStateNotFound                  = ffe("PD010112", "State not found with hash %s")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
@@ -73,4 +74,5 @@ var (
 	MsgFiltersValueMissing              = ffe("PD010308", "Value missing for filter field '%s'")
 	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010309", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
 	MsgFiltersJSONValueParseError       = ffe("PD010310", "Failed to parse value for field '%s' (as %T): %v")
+	MsgFiltersValueInvalidHex           = ffe("PD010311", "Failed to parse value as hex: %v")
 )

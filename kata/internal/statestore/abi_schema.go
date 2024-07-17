@@ -37,11 +37,11 @@ type ABISchema interface {
 }
 
 type abiSchema struct {
-	persisted    *SchemaEntity
-	definition   *abi.Parameter
-	primaryType  string
-	typeSet      eip712.TypeSet
-	filterFields map[string]filters.FieldResolver
+	persisted   *SchemaEntity
+	definition  *abi.Parameter
+	primaryType string
+	typeSet     eip712.TypeSet
+	labelInfo   []*schemaLabelInfo
 }
 
 func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
@@ -51,29 +51,14 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
 		},
-		definition:   def,
-		filterFields: make(map[string]filters.FieldResolver),
+		definition: def,
 	}
 	abiJSON, err := json.Marshal(def)
 	if err == nil {
 		as.persisted.Content = string(abiJSON)
-		for i, p := range def.Components {
-			if p.Indexed {
-				if len(p.Name) == 0 {
-					return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotNamed, i)
-				}
-				tc, err := p.TypeComponentTreeCtx(ctx)
-				if err != nil {
-					return nil, err
-				}
-				labelResolver, err := as.getLabelResolver(ctx, len(as.persisted.Labels), p.Name, tc)
-				if err != nil {
-					return nil, err
-				}
-				as.filterFields[p.Name] = labelResolver
-				as.persisted.Labels = append(as.persisted.Labels, p.Name)
-			}
-		}
+		err = as.labelSetup(ctx, true)
+	}
+	if err == nil {
 		err = as.typedDataV4Setup(ctx)
 	}
 	if err == nil {
@@ -96,7 +81,10 @@ func newABISchemaFromDB(ctx context.Context, persisted *SchemaEntity) (ABISchema
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidABIParam)
 	}
-	err = as.typedDataV4Setup(ctx)
+	err = as.labelSetup(ctx, false)
+	if err == nil {
+		err = as.typedDataV4Setup(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +103,10 @@ func (as *abiSchema) Definition() *abi.Parameter {
 	return as.definition
 }
 
+func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
+	return as.labelInfo
+}
+
 // Build the TypedDataV4 signature of the struct, from the ABI definition
 // Note the "internalType" field of form "struct SomeTypeName" is required for
 // nested tuple types in the ABI.
@@ -125,6 +117,36 @@ func (as *abiSchema) typedDataV4Setup(ctx context.Context) error {
 	}
 	as.primaryType, as.typeSet, err = eip712.ABItoTypedDataV4(ctx, tc)
 	return err
+}
+
+func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
+	labelIndex := 0
+	def := as.definition
+	for i, p := range def.Components {
+		if p.Indexed {
+			if len(p.Name) == 0 {
+				return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotNamed, i)
+			}
+			tc, err := p.TypeComponentTreeCtx(ctx)
+			if err != nil {
+				return err
+			}
+			labelType, labelResolver, err := as.getLabelResolver(ctx, labelIndex, p.Name, tc)
+			if err != nil {
+				return err
+			}
+			as.labelInfo = append(as.labelInfo, &schemaLabelInfo{
+				label:     p.Name,
+				labelType: labelType,
+				resolver:  labelResolver,
+			})
+			if isNew {
+				as.persisted.Labels = append(as.persisted.Labels, p.Name)
+			}
+			labelIndex++
+		}
+	}
+	return nil
 }
 
 func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
@@ -223,28 +245,28 @@ func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.Co
 	}
 }
 
-func (as *abiSchema) getLabelResolver(ctx context.Context, labelIndex int, fieldName string, tc abi.TypeComponent) (filters.FieldResolver, error) {
+func (as *abiSchema) getLabelResolver(ctx context.Context, labelIndex int, fieldName string, tc abi.TypeComponent) (labelType, filters.FieldResolver, error) {
 	labelType, err := as.getLabelType(ctx, fieldName, tc)
 	if err != nil {
-		return nil, err
+		return -1, nil, err
 	}
-	sqlColumn := fmt.Sprintf("l%d", labelIndex)
+	sqlColumn := fmt.Sprintf("l%d.value", labelIndex)
 	switch labelType {
 	case labelTypeInt64:
-		return filters.Int64Field(sqlColumn), nil
+		return labelType, filters.Int64Field(sqlColumn), nil
 	case labelTypeInt256:
-		return filters.Int256Field(sqlColumn), nil
+		return labelType, filters.Int256Field(sqlColumn), nil
 	case labelTypeUint256:
-		return filters.Uint256Field(sqlColumn), nil
+		return labelType, filters.Uint256Field(sqlColumn), nil
 	case labelTypeBytes:
-		return filters.StringField(sqlColumn), nil
+		return labelType, filters.HexBytesField(sqlColumn), nil
 	case labelTypeString:
-		return filters.StringField(sqlColumn), nil
+		return labelType, filters.StringField(sqlColumn), nil
 	case labelTypeBool:
-		return filters.BoolField(sqlColumn), nil
+		return labelType, filters.Int64Field(sqlColumn), nil // stored in the int64 index
 	default:
 		// Should not get here - if covered all the types above
-		return nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, sqlColumn)
+		return -1, nil, i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, sqlColumn)
 	}
 }
 

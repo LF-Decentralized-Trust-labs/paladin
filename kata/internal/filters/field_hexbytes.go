@@ -19,20 +19,21 @@ package filters
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
-	"math/big"
+	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-type Int64Field string
+type HexBytesField string
 
-func (sf Int64Field) SQLColumn() string {
+func (sf HexBytesField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf Int64Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {
@@ -40,19 +41,12 @@ func (sf Int64Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) (d
 	}
 	switch v := untyped.(type) {
 	case string:
-		bi, ok := new(big.Int).SetString(v, 0)
-		if ok && bi.IsInt64() {
-			return bi.Int64(), nil
+		byteBytes, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidHex, err)
 		}
-		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForInt64, v)
-	case float64:
-		return (int64)(v), nil
-	case bool:
-		if v {
-			return (int64)(1), nil
-		}
-		return (int64)(0), nil
+		return hex.EncodeToString(byteBytes), nil
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForInt64, string(jsonValue))
+		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForString, string(jsonValue))
 	}
 }

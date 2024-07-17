@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
@@ -52,9 +53,16 @@ type SchemaEntity struct {
 	Labels    []string `gorm:"type:text[]; serializer:json"`
 }
 
+type schemaLabelInfo struct {
+	label     string
+	labelType labelType
+	resolver  filters.FieldResolver
+}
+
 type Schema interface {
 	Type() SchemaType
 	Persisted() *SchemaEntity
+	LabelInfo() []*schemaLabelInfo
 	ProcessState(ctx context.Context, s *State) error
 }
 
@@ -69,7 +77,7 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *HashID) (Schema, error) {
+func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *HashID, failNotFound bool) (Schema, error) {
 	cacheKey := schemaCacheKey(domainID, hash)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
 	if cached {
@@ -86,6 +94,9 @@ func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *Hash
 		Find(&persisted).
 		Error
 	if err != nil || persisted == nil {
+		if err == nil && failNotFound {
+			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, hash)
+		}
 		return s, err
 	}
 

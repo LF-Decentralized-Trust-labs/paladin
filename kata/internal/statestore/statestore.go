@@ -42,8 +42,8 @@ var StateWriterConfigDefaults = StateWriterConfig{
 }
 
 type StateStore interface {
-	GetSchema(context.Context, string, *HashID) (Schema, error)
-	GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error)
+	GetSchema(ctx context.Context, domainID string, id *HashID, failNotFound bool) (Schema, error)
+	GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (s *State, err error)
 	Close()
 }
 
