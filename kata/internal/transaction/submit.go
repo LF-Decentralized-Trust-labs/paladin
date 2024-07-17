@@ -20,11 +20,19 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
+var ts transactionstore.TransactionStore
+
+func init() {
+	persistence, _, _ := persistence.NewUnitTestPersistence(context.Background())
+	ts = transactionstore.NewTransactionStore(context.Background(), &transactionstore.Config{}, persistence)
+}
+
 func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.SubmitTransactionResponse, error) {
-	// TODO: Implement the logic to submit a transaction
 	// You can access the request fields using req.contractAddress, req.from, req.idempotencyKey, and req.payload
 	// You can create a new transaction ID using a UUID library or any other method you prefer
 	// You can return the transaction ID in the response using &SubmitTransactionResponse{transactionId: "your-transaction-id"}
@@ -52,9 +60,22 @@ func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.Su
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
 	}
 
-	// What happens next
+	payloadJSON := req.GetPayloadJSON()
+	payloadRLP := req.GetPayloadRLP()
+
+	createdTransaction, err := ts.InsertTransaction(ctx, transactionstore.Transaction{
+		Contract:    req.GetContractAddress(),
+		From:        req.GetFrom(),
+		PayloadJSON: &payloadJSON,
+		PayloadRLP:  &payloadRLP,
+	})
+
+	if err != nil {
+		log.L(ctx).Errorf("Failed to create transaction: %s", err)
+		return nil, err
+	}
 
 	return &proto.SubmitTransactionResponse{
-		TransactionId: "your-transaction-id",
+		TransactionId: createdTransaction.ID.String(),
 	}, nil
 }
