@@ -1,6 +1,6 @@
 # Paladin
 
-Paladin is an privacy preserving transaction manager for Ethereum.
+Paladin is a privacy preserving transaction manager for Ethereum.
 
 ## Architecture overview
 
@@ -76,7 +76,3 @@ TBD
 This is a [Monorepo](https://en.wikipedia.org/wiki/Monorepo). To avoid overcomplicating monorepo setup, you should adhere to the following practices:
 1. One folder per repo. (a "repo" contains a set of code that could be separated into a standalone Github repo)
 2. You can use folders to group repos, however, nested repos are not allowed.
-
-## Github Action setup
-
-- If adding a new library repo, you should add a Github Action using [./.github/workflows/library-build-template.yaml](./.github/workflows/library-build-template.yaml)
