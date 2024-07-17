@@ -1,2 +1,0 @@
-# Paladin transaction manager
-

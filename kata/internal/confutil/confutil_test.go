@@ -44,7 +44,7 @@ func TestBool(t *testing.T) {
 }
 
 func TestDuration(t *testing.T) {
-	assert.Equal(t, 50*time.Second, Duration(nil, 50*time.Second))
-	assert.Equal(t, 50*time.Second, Duration(P("wrong"), 50*time.Second))
-	assert.Equal(t, 100*time.Millisecond, Duration(P("100ms"), 50*time.Second))
+	assert.Equal(t, 50*time.Second, Duration(nil, "50s"))
+	assert.Equal(t, 50*time.Second, Duration(P("wrong"), "50s"))
+	assert.Equal(t, 100*time.Millisecond, Duration(P("100ms"), "50s"))
 }

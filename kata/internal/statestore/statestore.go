@@ -20,27 +20,52 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/kata/internal/cache"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 )
 
 type Config struct {
-	SchemaCache cache.Config `yaml:"schemaCache"`
+	SchemaCache cache.Config      `yaml:"schemaCache"`
+	StateWriter StateWriterConfig `yaml:"stateWriter"`
+}
+
+type StateWriterConfig struct {
+	WorkerCount  *int    `yaml:"workerCount"`
+	BatchTimeout *string `yaml:"batchTimeout"`
+	BatchMaxSize *int    `yaml:"batchMaxSize"`
+}
+
+var StateWriterConfigDefaults = StateWriterConfig{
+	WorkerCount:  confutil.P(10),
+	BatchTimeout: confutil.P("25ms"),
+	BatchMaxSize: confutil.P(100),
 }
 
 type StateStore interface {
-	GetSchema(context.Context, *HashID) (Schema, error)
+	GetSchema(context.Context, string, *HashID) (Schema, error)
+	GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error)
+	Close()
 }
 
 type stateStore struct {
 	p              persistence.Persistence
+	writer         *stateWriter
 	abiSchemaCache cache.Cache[string, Schema]
 }
 
+var SchemaCacheDefaults = &cache.Config{
+	Capacity: confutil.P(1000),
+}
+
 func NewStateStore(ctx context.Context, conf *Config, p persistence.Persistence) StateStore {
-	return &stateStore{
-		p: p,
-		abiSchemaCache: cache.NewCache[string, Schema](&conf.SchemaCache, &cache.Defaults{
-			Capacity: 1000,
-		}),
+	ss := &stateStore{
+		p:              p,
+		abiSchemaCache: cache.NewCache[string, Schema](&conf.SchemaCache, SchemaCacheDefaults),
 	}
+	ss.writer = newStateWriter(ctx, ss, &conf.StateWriter)
+	return ss
+}
+
+func (ss *stateStore) Close() {
+	ss.writer.stop()
 }
