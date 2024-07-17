@@ -18,9 +18,11 @@ package filters
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
@@ -42,17 +44,31 @@ func jsonResultToBigInt(ctx context.Context, jsonResult interface{}) (*big.Int, 
 	}
 }
 
-// PadHexBigUint returns the supplied buffer, with all the bytes to the left of the integer
-// set to '0', and a HEX representation of the integer on the right
-func PadHexAbsBigInt(bi *big.Int, buff []byte) []byte {
-	bi = bi.Abs(bi) // we don't handle negative values in this function
-	unPadded := bi.Text(16)
+// PadHexBigUint returns the supplied buffer, with all the bytes to the left of the integer set to '0'
+func PadHexBigUint(bi *big.Int, buff []byte) []byte {
+	unPadded := bi.Abs(bi).Text(16)
 	boundary := len(buff) - len(unPadded)
 	for i := 0; i < len(buff); i++ {
 		if i >= boundary {
 			buff[i] = unPadded[i-boundary]
 		} else {
 			buff[i] = '0'
+		}
+	}
+	return buff
+}
+
+// PadHexBigIntTwosCompliment returns the supplied buffer, with all the bytes to the left of
+// the two's compliment formatted string set to 0
+func PadHexBigIntTwosCompliment(bi *big.Int, buff []byte) []byte {
+	twosCompliment := abi.SerializeInt256TwosComplementBytes(bi)
+	unPadded := hex.EncodeToString(twosCompliment)
+	boundary := len(buff) - len(unPadded)
+	for i := 0; i < len(buff); i++ {
+		if i >= boundary {
+			buff[i] = unPadded[i-boundary]
+		} else {
+			buff[i] = 'f'
 		}
 	}
 	return buff

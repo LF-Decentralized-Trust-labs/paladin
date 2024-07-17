@@ -395,7 +395,7 @@ func TestBuildQueryJSONLessThan(t *testing.T) {
 		assert.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '00000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9c' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {

@@ -94,7 +94,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 			"field3": 42,
 			"field4": true,
 			"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
-			"field6": "10203040506070809",
+			"field6": "-10203040506070809",
 			"field7": "0xfeedbeef",
 			"field8": "things and stuff"
 		}`,
@@ -103,17 +103,25 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	assert.Equal(t, []*StateLabel{
+		// uint256 written as zero padded string
 		{State: state1.Hash, Label: "field1", Value: "0000000000000000000000000123456789012345678901234567890123456789"},
+		// string written as it is
 		{State: state1.Hash, Label: "field2", Value: "hello world"},
+		// address is really a uint160, so that's how we handle it
 		{State: state1.Hash, Label: "field5", Value: "000000000000000000000000687414c0b8b4182b823aec5436965cf19b197386"},
-		{State: state1.Hash, Label: "field6", Value: "100000000000000000000000000000000000000000000000000243f9c7cfe4719"},
+		// int256 needs an extra byte ahead of the zero-padded string to say it's negative,
+		// and is two's compliment for that negative number so less negative number are string "higher"
+		{State: state1.Hash, Label: "field6", Value: "0ffffffffffffffffffffffffffffffffffffffffffffffffffdbc0638301b8e7"},
+		// bytes are just bytes
 		{State: state1.Hash, Label: "field7", Value: "feedbeef"},
 	}, state1.Labels)
 	assert.Equal(t, []*StateInt64Label{
+		// int64 can just be stored directly in a numeric index
 		{State: state1.Hash, Label: "field3", Value: 42},
+		// bool also gets an efficient numeric index - we don't attempt to allocate anything smaller than int64 to this
 		{State: state1.Hash, Label: "field4", Value: 1},
 	}, state1.Int64Labels)
-	assert.Equal(t, "0x67c4953ad84c34fef7efacd3b3642e11278bed482efa5ff92d35b2306084f15a", state1.Hash.String())
+	assert.Equal(t, "0x7c14548eb0ddd2b200236f5f55034e36dc24beb7b7d1b07bddf2027d6277ef0f", state1.Hash.String())
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
