@@ -48,11 +48,11 @@ const (
 )
 
 type OrchestratorConfig struct {
-	MaxConcurrentProcess    *int           `yaml:"maxConcurrentProcess,omitempty"`
-	StageRetry              *time.Duration `yaml:"stageRetry,omitempty"`
-	EvaluationInterval      *time.Duration `yaml:"evalInterval,omitempty"`
-	PersistenceRetryTimeout *time.Duration `yaml:"persistenceRetryTimeout,omitempty"`
-	StaleTimeout            *time.Duration `yaml:"staleTimeout,omitempty"`
+	MaxConcurrentProcess    *int    `yaml:"maxConcurrentProcess,omitempty"`
+	StageRetry              *string `yaml:"stageRetry,omitempty"`
+	EvaluationInterval      *string `yaml:"evalInterval,omitempty"`
+	PersistenceRetryTimeout *string `yaml:"persistenceRetryTimeout,omitempty"`
+	StaleTimeout            *string `yaml:"staleTimeout,omitempty"`
 }
 
 // metrics
@@ -124,10 +124,10 @@ type Orchestrator struct {
 
 var orchestratorConfigDefault = OrchestratorConfig{
 	MaxConcurrentProcess:    confutil.P(500),
-	StageRetry:              confutil.P(5 * time.Second),
-	EvaluationInterval:      confutil.P(5 * time.Minute),
-	PersistenceRetryTimeout: confutil.P(5 * time.Second),
-	StaleTimeout:            confutil.P(10 * time.Minute),
+	StageRetry:              confutil.P("5s"),
+	EvaluationInterval:      confutil.P("5m"),
+	PersistenceRetryTimeout: confutil.P("5s"),
+	StaleTimeout:            confutil.P("10m"),
 }
 
 func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig) *Orchestrator {
@@ -136,16 +136,16 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
 		initiated:            time.Now(),
 		contractAddress:      contractAddress,
-		evalInterval:         *confutil.DurationToBeMerged(oc.EvaluationInterval, orchestratorConfigDefault.EvaluationInterval),
+		evalInterval:         confutil.Duration(oc.EvaluationInterval, *orchestratorConfigDefault.EvaluationInterval),
 		maxConcurrentProcess: confutil.Int(oc.MaxConcurrentProcess, *orchestratorConfigDefault.MaxConcurrentProcess),
 		state:                OrchestratorStateNew,
 		stateEntryTime:       time.Now(),
 
 		// in-flight transaction configs
-		stageRetryTimeout:       *confutil.DurationToBeMerged(oc.StageRetry, orchestratorConfigDefault.StageRetry),
-		persistenceRetryTimeout: *confutil.DurationToBeMerged(oc.PersistenceRetryTimeout, orchestratorConfigDefault.PersistenceRetryTimeout),
+		stageRetryTimeout:       confutil.Duration(oc.StageRetry, *orchestratorConfigDefault.StageRetry),
+		persistenceRetryTimeout: confutil.Duration(oc.PersistenceRetryTimeout, *orchestratorConfigDefault.PersistenceRetryTimeout),
 
-		staleTimeout:                 *confutil.DurationToBeMerged(oc.StaleTimeout, orchestratorConfigDefault.StageRetry),
+		staleTimeout:                 confutil.Duration(oc.StaleTimeout, *orchestratorConfigDefault.StageRetry),
 		processedTxIDs:               make(map[string]bool),
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
