@@ -18,15 +18,9 @@ package engine
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
-
-// defines the methods for checking whether a transaction's dependents matches a specific criteria
-type DependencyChecker interface {
-	PreReqsMatchCondition(ctx context.Context, preReqTxIDs []string, conditionFunc func(tsg transactionstore.TxStateGetters) (preReqComplete bool)) (filteredPreReqTxIDs []string)
-	GetPreReqDispatchAddresses(ctx context.Context, preReqTxIDs []string) (dispatchAddresses []string)
-	RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *TxProcessPreReq)
-}
 
 // dependency checker functions are used to efficiently figure out the states of pre-req transactions based on their tx IDs
 
@@ -38,6 +32,6 @@ func (oc *Orchestrator) GetPreReqDispatchAddresses(ctx context.Context, preReqTx
 	// TODO
 	return nil
 }
-func (oc *Orchestrator) RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *TxProcessPreReq) {
+func (oc *Orchestrator) RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *stage.TxProcessPreReq) {
 	// TODO
 }

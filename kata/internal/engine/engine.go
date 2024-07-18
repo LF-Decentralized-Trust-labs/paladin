@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
@@ -73,24 +74,24 @@ func (me *MockEngine) HandleNewTx(ctx context.Context, txID uuid.UUID) {
 	}
 }
 
-func (me *MockEngine) handleNewEvents(ctx context.Context, stageEvent *StageEvent) {
+func (me *MockEngine) handleNewEvents(ctx context.Context, stageEvent *stage.StageEvent) {
 
 }
 
 func (me *MockEngine) StartEventListener(ctx context.Context) (done <-chan bool) {
 	me.done = make(chan bool)
-	mockEvents := make(chan *StageEvent)
+	mockEvents := make(chan *stage.StageEvent)
 	go generateMockEvents(ctx, mockEvents)
 	go me.listenerLoop(ctx, mockEvents)
 	return done
 }
 
-func generateMockEvents(ctx context.Context, receiver chan<- *StageEvent) {
+func generateMockEvents(ctx context.Context, receiver chan<- *stage.StageEvent) {
 	tick := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-tick.C:
-			receiver <- &StageEvent{
+			receiver <- &stage.StageEvent{
 				// TODO: figure out how to mock UUID of the event
 				Stage: "test",
 				TxID:  "test",
@@ -102,7 +103,7 @@ func generateMockEvents(ctx context.Context, receiver chan<- *StageEvent) {
 	}
 }
 
-func (me *MockEngine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *StageEvent) {
+func (me *MockEngine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *stage.StageEvent) {
 	defer close(me.done)
 	for {
 		select {

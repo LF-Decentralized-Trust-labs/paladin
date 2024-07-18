@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 
@@ -155,11 +156,7 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		stopProcess:                  make(chan bool, 1),
 	}
 
-	newOrchestrator.stageController = NewPaladinStageController(ctx, &PaladinStageFoundationService{
-		dependencyChecker:   newOrchestrator,
-		stateStore:          ss,
-		nodeAndWalletLookUp: &MockNodeAndWalletLookUpService{},
-	})
+	newOrchestrator.stageController = NewPaladinStageController(ctx, stage.NewPaladinStageFoundationService(newOrchestrator, ss, &stage.MockNodeAndWalletLookUpService{}))
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
 
@@ -296,7 +293,7 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tsm transacti
 	}
 }
 
-func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *StageEvent) (queued bool) {
+func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *stage.StageEvent) (queued bool) {
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
 	txProc := oc.incompleteTxSProcessMap[stageEvent.TxID]

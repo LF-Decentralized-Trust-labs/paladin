@@ -223,6 +223,14 @@ task test(dependsOn: testRunSQLite) {
     finalizedBy checkCoverage
 }
 
+task testcov(type: Exec, dependsOn: testRunSQLite) {
+    workingDir '.'
+    executable 'go'
+    args 'tool'
+    args 'cover'
+    args '-html=coverage.txt'
+}
+
 task build {
     dependsOn tasks.buildSharedLibrary
     dependsOn tasks.lint

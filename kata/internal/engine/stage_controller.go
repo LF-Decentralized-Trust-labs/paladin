@@ -19,39 +19,28 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
-type StageProcessNextStep int
-
-const (
-	NextStepWait StageProcessNextStep = iota
-	NextStepNewStage
-	NextStepNewAction
-)
-
 type TxStageProcessor interface {
-	ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService, stageEvents []*StageEvent) (unprocessedStageEvents []*StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep StageProcessNextStep)
-	PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) (actionOutput interface{}, actionErr error)
-	GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) *TxProcessPreReq
-	MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) bool
+	ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs stage.StageFoundationService, stageEvents []*stage.StageEvent) (unprocessedStageEvents []*stage.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep stage.StageProcessNextStep)
+	PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs stage.StageFoundationService) (actionOutput interface{}, actionErr error)
+	GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs stage.StageFoundationService) *stage.TxProcessPreReq
+	MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs stage.StageFoundationService) bool
 	Name() string
-}
-
-type TxProcessPreReq struct {
-	TxIDs []string `json:"transactionIds,omitempty"`
 }
 
 type StageController interface {
 	CalculateStage(ctx context.Context, tsg transactionstore.TxStateGetters) string // output the processing stage a transaction is on based on the transaction state
-	ProcessEventsForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters, stageEvents []*StageEvent) (unprocessedStageEvents []*StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep StageProcessNextStep)
+	ProcessEventsForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters, stageEvents []*stage.StageEvent) (unprocessedStageEvents []*stage.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep stage.StageProcessNextStep)
 	PerformActionForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionErr error)
 	GetAllStages() []string
 }
 
 type PaladinStageController struct {
-	stageFoundationService StageFoundationService
+	stageFoundationService stage.StageFoundationService
 	stageProcessors        map[string]TxStageProcessor
 	stageNames             []string
 }
@@ -71,7 +60,7 @@ func (psc *PaladinStageController) CalculateStage(ctx context.Context, tsg trans
 	return calculatedStage
 }
 
-func (psc *PaladinStageController) ProcessEventsForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters, stageEvents []*StageEvent) (unprocessedStageEvents []*StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep StageProcessNextStep) {
+func (psc *PaladinStageController) ProcessEventsForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters, stageEvents []*stage.StageEvent) (unprocessedStageEvents []*stage.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep stage.StageProcessNextStep) {
 	stageProcessor := psc.stageProcessors[stage]
 	if stageProcessor == nil {
 		panic(i18n.NewError(ctx, msgs.MsgTransactionProcessorInvalidStage, stage)) // This is a code bug, CalculateStage function should never return stage that doesn't have StageProcessor registered
@@ -102,8 +91,8 @@ func (psc *PaladinStageController) GetAllStages() []string {
 	return psc.stageNames
 }
 
-func NewPaladinStageController(ctx context.Context, stageFoundationService StageFoundationService) StageController {
-	ds := &DispatchStage{}
+func NewPaladinStageController(ctx context.Context, stageFoundationService stage.StageFoundationService) StageController {
+	ds := &stage.DispatchStage{}
 	return &PaladinStageController{
 		stageProcessors: map[string]TxStageProcessor{
 			ds.Name(): ds,

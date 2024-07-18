@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package stage
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -60,4 +60,14 @@ func (psfs *PaladinStageFoundationService) StateStore() statestore.StateStore {
 
 func (psfs *PaladinStageFoundationService) NodeAndWallet() NodeAndWalletLookUpService {
 	return psfs.nodeAndWalletLookUp
+}
+
+func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
+	stateStore statestore.StateStore,
+	nodeAndWalletLookUp NodeAndWalletLookUpService) StageFoundationService {
+	return &PaladinStageFoundationService{
+		dependencyChecker:   dependencyChecker,
+		stateStore:          stateStore,
+		nodeAndWalletLookUp: nodeAndWalletLookUp,
+	}
 }
