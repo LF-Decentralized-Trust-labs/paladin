@@ -318,10 +318,25 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 
 	// Now do a typed data v4 hash of the struct value itself
 	hash, err := eip712.HashStruct(ctx, as.primaryType, jsonTree, as.typeSet)
+
+	// We need to re-serialize the data according to the ABI to:
+	// - Ensure it's valid
+	// - Remove anything that is not part of the schema
+	// - Standardize formatting of all the data elements so domains do not need to worry
+	var jsonData []byte
+	if err == nil {
+		jsonData, err = abi.NewSerializer().
+			SetFormattingMode(abi.FormatAsObjects).
+			SetIntSerializer(abi.Base10StringIntSerializer).
+			SetFloatSerializer(abi.Base10StringFloatSerializer).
+			SetByteSerializer(abi.HexByteSerializer0xPrefix).
+			SerializeJSONCtx(ctx, cv)
+	}
 	if err != nil {
 		return err
 	}
 
+	s.Data = string(jsonData)
 	s.Hash = *NewHashIDSlice32(hash)
 	for i := range labels {
 		labels[i].State = s.Hash

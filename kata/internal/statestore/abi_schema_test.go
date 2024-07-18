@@ -108,7 +108,8 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 			"field6": "-10203040506070809",
 			"field7": "0xfeedbeef",
 			"field8": 12345,
-			"field9": "things and stuff"
+			"field9": "things and stuff",
+			"cruft": "to remove"
 		}`,
 	}
 	err = ss.PersistState(ctx, state1)
@@ -136,6 +137,19 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		{State: state1.Hash, Label: "field8", Value: 12345},
 	}, state1.Int64Labels)
 	assert.Equal(t, "0x90c1f63e32a708ef59b3708c57d165a87bddf758709313c57448e85a10c59544", state1.Hash.String())
+
+	// Check we get all the data in the canonical format, with the cruft removed
+	assert.JSONEq(t, `{
+		"field1": "6495562831695638750381182724034531561381914505",
+		"field2": "hello world",
+		"field3": "42",
+		"field4": true,
+		"field5": "0x687414c0b8b4182b823aec5436965cf19b197386",
+		"field6": "-10203040506070809",
+		"field7": "0xfeedbeef",
+		"field8": "12345",
+		"field9": "things and stuff"
+	}`, string(state1.Data))
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
@@ -508,6 +522,30 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 }
 
 func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{Name: "field1", Type: "function"},
+			},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`,
+	})
+	assert.Regexp(t, "FF22073", err)
+}
+
+func TestABISchemaProcessStateDataFailure(t *testing.T) {
 
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()

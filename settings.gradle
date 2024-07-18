@@ -1,2 +1,5 @@
 rootProject.name = 'paladin'
 
+includeBuild 'pente'
+include 'kata'
+include 'portara'
