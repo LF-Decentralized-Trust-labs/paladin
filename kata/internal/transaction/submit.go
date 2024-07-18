@@ -16,13 +16,13 @@ package transaction
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
 var ts transactionstore.TransactionStore
@@ -32,17 +32,25 @@ func Init(ctx context.Context, persistence persistence.Persistence) {
 	ts = transactionstore.NewTransactionStore(ctx, &transactionstore.Config{}, persistence)
 }
 
-func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.SubmitTransactionResponse, error) {
-	// You can access the request fields using req.contractAddress, req.from, req.idempotencyKey, and req.payload
-	// You can create a new transaction ID using a UUID library or any other method you prefer
-	// You can return the transaction ID in the response using &SubmitTransactionResponse{transactionId: "your-transaction-id"}
-
-	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", req.ContractAddress, req.From, req.IdempotencyKey, req.Payload)
-
-	payload := req.GetPayloadJSON()
-	if payload == "" {
-		payload = req.GetPayloadRLP()
+func Submit(ctx context.Context, requestJSON string) (string, error) {
+	req := struct {
+		ContractAddress string `json:"contractAddress"`
+		From            string `json:"from"`
+		IdempotencyKey  string `json:"idempotencyKey"`
+		PayloadJSON     string `json:"payloadJSON"`
+		PayloadRLP      string `json:"payloadRLP"`
+	}{}
+	err := json.Unmarshal([]byte(requestJSON), &req)
+	if err != nil {
+		return "", i18n.WrapError(ctx, err, msgs.MsgTransactionParseError)
 	}
+
+	payload := req.PayloadJSON
+	if payload == "" {
+		payload = req.PayloadRLP
+	}
+
+	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", req.ContractAddress, req.From, req.IdempotencyKey, payload)
 
 	if payload == "" || req.From == "" || req.ContractAddress == "" {
 		missingFields := make([]string, 4)
@@ -55,25 +63,33 @@ func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.Su
 		if req.ContractAddress == "" {
 			missingFields = append(missingFields, "payload")
 		}
-		return nil, i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
+		return "", i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
 	}
 
-	payloadJSON := req.GetPayloadJSON()
-	payloadRLP := req.GetPayloadRLP()
+	payloadJSON := req.PayloadJSON
+	payloadRLP := req.PayloadRLP
 
 	createdTransaction, err := ts.InsertTransaction(ctx, transactionstore.Transaction{
-		Contract:    req.GetContractAddress(),
-		From:        req.GetFrom(),
+		Contract:    req.ContractAddress,
+		From:        req.From,
 		PayloadJSON: &payloadJSON,
 		PayloadRLP:  &payloadRLP,
 	})
 
 	if err != nil {
 		log.L(ctx).Errorf("Failed to create transaction: %s", err)
-		return nil, err
+		return "", err
 	}
 
-	return &proto.SubmitTransactionResponse{
-		TransactionId: createdTransaction.ID.String(),
-	}, nil
+	response := struct {
+		TransactionID string `json:"transactionID"`
+	}{
+		TransactionID: createdTransaction.ID.String(),
+	}
+
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		return "", i18n.WrapError(ctx, err, msgs.MsgTransactionSerializeError)
+	}
+	return string(responseJSON), nil
 }

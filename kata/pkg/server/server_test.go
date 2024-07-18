@@ -85,19 +85,22 @@ grpc:
 	streams, err := client.OpenStreams(ctx)
 	require.NoError(t, err, "failed to call OpenStreams")
 
+	submitTransactionJSON := `
+	{
+		"from":            "fromID",
+		"contractAddress": "contract",
+		"payloadJSON":  "{\"foo\":\"bar\"}"
+	}
+	`
+
 	requestId := "requestID"
 	submitTransactionRequest := &proto.Message{
 		Type: proto.MESSAGE_TYPE_REQUEST_MESSAGE,
 		Id:   requestId,
 		Message: &proto.Message_Request{
 			Request: &proto.Request{
-				Request: &proto.Request_SubmitTransactionRequest{
-					SubmitTransactionRequest: &proto.SubmitTransactionRequest{
-						From:            "fromID",
-						ContractAddress: "contract",
-						Payload:         &proto.SubmitTransactionRequest_PayloadJSON{PayloadJSON: `{"foo":"bar"}`},
-					},
-				},
+				Type:    "SUBMIT_TRANSACTION_REQUEST",
+				Payload: submitTransactionJSON,
 			},
 		},
 	}
@@ -110,7 +113,7 @@ grpc:
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
 	assert.Equal(t, requestId, resp.GetResponse().GetRequestId())
-	assert.NotNil(t, resp.GetResponse().GetSubmitTransactionResponse().GetTransactionId())
+	assert.NotNil(t, resp.GetResponse().GetPayload())
 	err = streams.CloseSend()
 	require.NoError(t, err)
 	resp, err = streams.Recv()

@@ -75,9 +75,9 @@ public class Handler {
                     Request request = inflightRequests.remove(requestId);
                     if (request != null) {
                         request.getResponseHandler().onResponse(transactionMessage.getResponse());
-                        if (transactionMessage.getResponse().getType() == Kata.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
+                        if (transactionMessage.getResponse().getType() == "SUBMIT_TRANSACTION_RESPONSE") {
                             System.err.printf("Transaction submitted %s\n",
-                                    transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
+                                    transactionMessage.getResponse().getPayload());
                         }
                         synchronized (drainMonitor) {
                             if (inflightRequests.isEmpty()) {

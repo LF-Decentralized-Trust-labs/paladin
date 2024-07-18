@@ -32,22 +32,6 @@ enum MESSAGE_TYPE {
   EVENT_MESSAGE =2;
 }
 
-enum REQUEST_TYPE {
-  SUBMIT_TRANSACTION_REQUEST = 0;
-  CLOSE_STREAM_REQUEST = 1;
-}
-
-enum RESPONSE_TYPE {
-  SUBMIT_TRANSACTION_RESPONSE = 0;
-  CLOSE_STREAM_RESPONSE = 1;
-}
-
-enum EVENT_TYPE {
-  TRANSACTION_INITIATED = 0;
-  TRANSACTION_COMPLETED = 1;
-  TRANSACTION_FAILED = 2;
-}
-
 // Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
 message QuiesceStreamRequest {
 }
@@ -72,42 +56,18 @@ message Message {
 }
 
 message Request {
-  REQUEST_TYPE type = 1;
-  oneof request {
-    SubmitTransactionRequest SubmitTransactionRequest = 16;
-    QuiesceStreamRequest closeStreamRequest = 17;
-  }
+  string type = 1;
+  string payload = 2;
 }
 
 message Response {
-  RESPONSE_TYPE type = 1;
+  string type = 1;
   string requestId = 2;
-  oneof response {
-    SubmitTransactionResponse SubmitTransactionResponse = 16;
-    QuiesceStreamResponse closeStreamResponse = 17;
-  }
-}
-
-message SubmitTransactionRequest {
-  string contractAddress = 1;
-  string from = 2;
-  string idempotencyKey = 3;
-  oneof payload {
-    string payloadJSON = 4;
-    string payloadRLP = 5;
-  }
-}
-
-message SubmitTransactionResponse{
-  string transactionId= 1;
+  string payload = 3;
 }
 
 message Event {
-  EVENT_TYPE type = 1;
+  string type = 1;
   string id = 2;
-  string commandId = 3;
-  oneof message {
-    SubmitTransactionResponse       SubmitTransactionResponse = 16;
-    QuiesceStreamResponse  suiesceStreamResponse = 17;
-  }
+  string payload = 4;
 }

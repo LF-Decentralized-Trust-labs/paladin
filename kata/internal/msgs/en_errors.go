@@ -60,7 +60,9 @@ var (
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
 
 	// Config PD0105XX
 	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")

@@ -66,9 +66,9 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 			requestType := msg.GetRequest().GetType()
 			requestId := msg.GetId()
 			switch requestType {
-			case proto.REQUEST_TYPE_SUBMIT_TRANSACTION_REQUEST:
-				log.L(ctx).Info("Received REQUEST_TYPE_SUBMIT_TRANSACTION_REQUEST")
-				submitTransactionRequest := msg.GetRequest().GetSubmitTransactionRequest()
+			case "SUBMIT_TRANSACTION_REQUEST":
+				log.L(ctx).Info("Received SUBMIT_TRANSACTION_REQUEST")
+				submitTransactionRequest := msg.GetRequest().GetPayload()
 
 				response, err := transaction.Submit(stream.Context(), submitTransactionRequest)
 				if err != nil {
@@ -80,12 +80,9 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 					Type: proto.MESSAGE_TYPE_RESPONSE_MESSAGE,
 					Message: &proto.Message_Response{
 						Response: &proto.Response{
+							Type:      "SUBMIT_TRANSACTION_RESPONSE",
 							RequestId: requestId,
-							Response: &proto.Response_SubmitTransactionResponse{
-								SubmitTransactionResponse: &proto.SubmitTransactionResponse{
-									TransactionId: response.TransactionId,
-								},
-							},
+							Payload:   response,
 						},
 					},
 				}
