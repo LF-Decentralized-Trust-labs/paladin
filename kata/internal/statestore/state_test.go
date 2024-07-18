@@ -17,8 +17,10 @@
 package statestore
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
@@ -72,6 +74,29 @@ func TestFindStatesMissingSchema(t *testing.T) {
 	assert.Regexp(t, "PD010106", err)
 }
 
+func TestFindStatesBadQuery(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	schemaHash := HashIDKeccak(([]byte)("schema1"))
+	cacheKey := schemaCacheKey("domain1", schemaHash)
+	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
+		definition: &abi.Parameter{},
+	})
+
+	_, err := ss.FindStates(ctx, "domain1", schemaHash, &filters.QueryJSON{
+		FilterJSON: filters.FilterJSON{
+			FilterJSONOps: filters.FilterJSONOps{
+				Equal: []*filters.FilterJSONKeyValue{
+					{FilterJSONBase: filters.FilterJSONBase{Field: "wrong"}},
+				},
+			},
+		},
+	})
+	assert.Regexp(t, "PD010300.*wrong", err)
+
+}
+
 func TestFindStatesFail(t *testing.T) {
 	ctx, ss, db, done := newDBMockStateStore(t)
 	defer done()
@@ -82,9 +107,19 @@ func TestFindStatesFail(t *testing.T) {
 		definition: &abi.Parameter{},
 	})
 
-	db.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("pop"))
+	db.ExpectQuery("SELECT.*created_at").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := ss.FindStates(ctx, "domain1", schemaHash, &filters.QueryJSON{})
+	_, err := ss.FindStates(ctx, "domain1", schemaHash, &filters.QueryJSON{
+		FilterJSON: filters.FilterJSON{
+			FilterJSONOps: filters.FilterJSONOps{
+				GreaterThan: []*filters.FilterJSONKeyValue{
+					{FilterJSONBase: filters.FilterJSONBase{
+						Field: ".created",
+					}, Value: json.RawMessage(fmt.Sprintf("%d", time.Now().UnixNano()))},
+				},
+			},
+		},
+	})
 	assert.Regexp(t, "pop", err)
 
 }

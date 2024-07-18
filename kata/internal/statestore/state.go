@@ -89,6 +89,33 @@ func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashI
 	return states[0], err
 }
 
+// Built in fields all start with "." as that prevents them
+// clashing with variable names in ABI structs ($ and _ are valid leading chars there)
+var baseStateFields = map[string]filters.FieldResolver{
+	// Only field you can query on outside of the labels, is the created timestamp.
+	// - if getting by the state ID you make a different API call
+	// - when submitting a query you have to specify the domain + schema to scope your query
+	".created": filters.TimestampField("created_at"),
+}
+
+type labelTracker struct {
+	labels map[string]*schemaLabelInfo
+	used   map[string]*schemaLabelInfo
+}
+
+func (ft labelTracker) ResolverFor(fieldName string) filters.FieldResolver {
+	baseField := baseStateFields[fieldName]
+	if baseField != nil {
+		return baseField
+	}
+	f := ft.labels[fieldName]
+	if f != nil {
+		ft.used[fieldName] = f
+		return f.resolver
+	}
+	return nil
+}
+
 func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID *HashID, query *filters.QueryJSON) (s []*State, err error) {
 
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
@@ -96,30 +123,28 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID 
 		return nil, err
 	}
 
-	fieldList := map[string]filters.FieldResolver{
-		// Built in fields all start with "." as that prevents them
-		// clashing with variable names in ABI structs ($ and _ are valid leading chars there)
-		//
-		// Only field you can query on outside of the labels, is the created timestamp.
-		// - if getting by the state ID you make a different API call
-		// - when submitting a query you have to specify the domain + schema to scope your query
-		".created": filters.TimestampField("created_at"),
+	tracker := labelTracker{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
+	for _, fi := range schema.LabelInfo() {
+		tracker.labels[fi.label] = fi
 	}
 
-	// We need to build the joins for each of the labels - it's only a valid state according to the
-	// schema if every label field has a corresponding value.
-	db := ss.p.DB().Table("states")
-	for i, fi := range schema.LabelInfo() {
-		fieldList[fi.label] = fi.resolver
+	// Build the query
+	q := query.Build(ctx, ss.p.DB().Table("states"), tracker)
+	if q.Error != nil {
+		return nil, q.Error
+	}
+
+	// Add joins only for the fields actually used in the query
+	for _, fi := range tracker.used {
 		typeMod := ""
 		if fi.labelType == labelTypeInt64 || fi.labelType == labelTypeBool {
 			typeMod = "int64_"
 		}
-		db = db.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS l%[2]d ON l%[2]d.state_l = hash_l AND l%[2]d.state_h = hash_h AND l%[2]d.label = ?", typeMod, i), fi.label)
+		q = q.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS %[2]s ON %[2]s.state_l = hash_l AND %[2]s.state_h = hash_h AND %[2]s.label = ?", typeMod, fi.virtualColumn), fi.label)
 	}
 
 	var states []*State
-	q := query.Build(ctx, db, fieldList).
+	q = q.
 		Where("domain_id = ?", domainID).
 		Where("schema_l = ?", schemaID.L).
 		Where("schema_h = ?", schemaID.H).

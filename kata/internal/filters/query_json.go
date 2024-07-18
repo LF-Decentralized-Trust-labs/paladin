@@ -81,7 +81,7 @@ type FilterJSONOps struct {
 	Null               []*FilterJSONBase      `json:"null,omitempty"`
 }
 
-func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldList FieldList) *gorm.DB {
+func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldSet FieldSet) *gorm.DB {
 	qb := &queryBuilder{
 		ctx: ctx,
 		// We can't assume anything about the db passed in - if it's a clone (internal concept
@@ -90,7 +90,7 @@ func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldList FieldList
 		// So use this function to get a clean session to do our nested db.Where() clauses against.
 		rootDB:     db.Session(&gorm.Session{SkipDefaultTransaction: true}),
 		jsonFilter: qj,
-		fieldList:  fieldList,
+		fieldSet:   fieldSet,
 	}
 	return qb.build(db)
 }

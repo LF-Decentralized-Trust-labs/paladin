@@ -137,9 +137,10 @@ func (as *abiSchema) labelSetup(ctx context.Context, rootTC abi.TypeComponent, i
 				return err
 			}
 			as.labelInfo = append(as.labelInfo, &schemaLabelInfo{
-				label:     p.Name,
-				labelType: labelType,
-				resolver:  labelResolver,
+				label:         p.Name,
+				virtualColumn: fmt.Sprintf("l%d", labelIndex),
+				labelType:     labelType,
+				resolver:      labelResolver,
 			})
 			if isNew {
 				as.persisted.Labels = append(as.persisted.Labels, p.Name)

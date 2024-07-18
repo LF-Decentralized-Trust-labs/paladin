@@ -37,13 +37,25 @@ type FieldResolver interface {
 	SQLValue(ctx context.Context, v json.RawMessage) (driver.Value, error)
 }
 
-type FieldList map[string]FieldResolver
+// FieldSet is an interface (rather than a simple map) as the function
+// provides a way for consumers to know which fields from the total
+// possible set are being referenced in a query.
+type FieldSet interface {
+	ResolverFor(fieldName string) FieldResolver // nil for not found
+}
+
+// Simple implementation of FieldSet
+type FieldMap map[string]FieldResolver
+
+func (fm FieldMap) ResolverFor(fieldName string) FieldResolver {
+	return fm[fieldName]
+}
 
 type queryBuilder struct {
 	ctx        context.Context
 	rootDB     *gorm.DB
 	jsonFilter *QueryJSON
-	fieldList  FieldList
+	fieldSet   FieldSet
 }
 
 func (qb *queryBuilder) withErr(db *gorm.DB, err error) *gorm.DB {
@@ -83,15 +95,9 @@ func (qb *queryBuilder) resolveSortField(fieldName string) (string, error) {
 
 func (qb *queryBuilder) resolveField(fieldName string) (FieldResolver, error) {
 	// case sensitive match wins
-	field := qb.fieldList[fieldName]
+	field := qb.fieldSet.ResolverFor(fieldName)
 	if field != nil {
 		return field, nil
-	}
-	// Fall back to case insensitive match before failing
-	for k, field := range qb.fieldList {
-		if strings.EqualFold(fieldName, k) {
-			return field, nil
-		}
 	}
 	return nil, i18n.NewError(qb.ctx, msgs.MsgFiltersUnknownField, fieldName)
 }

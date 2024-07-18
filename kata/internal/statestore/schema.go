@@ -54,9 +54,10 @@ type SchemaEntity struct {
 }
 
 type schemaLabelInfo struct {
-	label     string
-	labelType labelType
-	resolver  filters.FieldResolver
+	label         string
+	virtualColumn string
+	labelType     labelType
+	resolver      filters.FieldResolver
 }
 
 type Schema interface {
