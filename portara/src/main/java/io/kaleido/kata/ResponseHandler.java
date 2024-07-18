@@ -14,8 +14,8 @@
  */
 
  
-package io.kaleido.transaction;
-import paladin.transaction.Transaction;
-public interface TransactionResponseHandler {
-    void onResponse(Transaction.TransactionResponse response);
+package io.kaleido.kata;
+import paladin.kata.Kata;
+public interface ResponseHandler {
+    void onResponse(Kata.Response response);
 }

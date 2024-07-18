@@ -69,7 +69,7 @@ grpc:
 	require.NoError(t, err)
 	defer conn.Close()
 	// Create a new instance of the gRPC client
-	client := proto.NewPaladinTransactionServiceClient(conn)
+	client := proto.NewKataMessageServiceClient(conn)
 	status, err := client.Status(ctx, &proto.StatusRequest{})
 
 	delay := 0
@@ -82,16 +82,16 @@ grpc:
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())
 
-	streams, err := client.Listen(ctx)
-	require.NoError(t, err, "failed to call Listen")
+	streams, err := client.OpenStreams(ctx)
+	require.NoError(t, err, "failed to call OpenStreams")
 
 	requestId := "requestID"
-	submitTransactionRequest := &proto.TransactionMessage{
+	submitTransactionRequest := &proto.Message{
 		Type: proto.MESSAGE_TYPE_REQUEST_MESSAGE,
 		Id:   requestId,
-		Message: &proto.TransactionMessage_Request{
-			Request: &proto.TransactionRequest{
-				Request: &proto.TransactionRequest_SubmitTransactionRequest{
+		Message: &proto.Message_Request{
+			Request: &proto.Request{
+				Request: &proto.Request_SubmitTransactionRequest{
 					SubmitTransactionRequest: &proto.SubmitTransactionRequest{
 						From:            "fromID",
 						ContractAddress: "contract",

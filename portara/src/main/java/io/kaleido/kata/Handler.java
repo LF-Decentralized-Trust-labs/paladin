@@ -12,10 +12,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido.transaction;
+package io.kaleido.kata;
 
-import java.io.File;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.net.UnixDomainSocketAddress;
@@ -27,25 +25,24 @@ import io.netty.channel.Channel;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDomainSocketChannel;
-import paladin.transaction.PaladinTransactionServiceGrpc;
-import paladin.transaction.Transaction;
+import paladin.kata.Kata;
+import paladin.kata.KataMessageServiceGrpc;
 
-public class TransactionHandler {
+public class Handler {
 
     private final MultithreadEventLoopGroup eventLoopGroup;
     private final Class<? extends Channel> channelBuilder;
     private String socketAddress;
     private ManagedChannel channel;
-    StreamObserver<Transaction.TransactionMessage> messageStream;
+    StreamObserver<Kata.Message> messageStream;
     // Declare the ConcurrentHashMap
 
     private static final class DrainMonitor {}
     private final DrainMonitor drainMonitor = new DrainMonitor();
 
-    private ConcurrentHashMap<String, TransactionRequest> inflightRequests;
+    private ConcurrentHashMap<String, Request> inflightRequests;
 
-
-    public TransactionHandler(String socketAddress) {
+    public Handler(String socketAddress) {
         this.socketAddress = socketAddress;
         this.eventLoopGroup = new NioEventLoopGroup();
         this.channelBuilder = NioDomainSocketChannel.class;
@@ -63,22 +60,22 @@ public class TransactionHandler {
 
         waitGRPCReady();
 
-        PaladinTransactionServiceGrpc.PaladinTransactionServiceStub asyncStub = PaladinTransactionServiceGrpc
+        KataMessageServiceGrpc.KataMessageServiceStub asyncStub = KataMessageServiceGrpc
                 .newStub(this.channel);
 
-        StreamObserver<Transaction.TransactionMessage> responseObserver = new StreamObserver<>() {
+        StreamObserver<Kata.Message> responseObserver = new StreamObserver<>() {
 
             @Override
-            public void onNext(Transaction.TransactionMessage transactionMessage) {
+            public void onNext(Kata.Message transactionMessage) {
                 System.err.printf("Response in Java %s [%s]\n",
                         transactionMessage.getId(),
                         transactionMessage.getType());
-                if (transactionMessage.getType() == Transaction.MESSAGE_TYPE.RESPONSE_MESSAGE) {
+                if (transactionMessage.getType() == Kata.MESSAGE_TYPE.RESPONSE_MESSAGE) {
                     String requestId = transactionMessage.getResponse().getRequestId();
-                    TransactionRequest request = inflightRequests.remove(requestId);
+                    Request request = inflightRequests.remove(requestId);
                     if (request != null) {
                         request.getResponseHandler().onResponse(transactionMessage.getResponse());
-                        if (transactionMessage.getResponse().getType() == Transaction.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
+                        if (transactionMessage.getResponse().getType() == Kata.RESPONSE_TYPE.SUBMIT_TRANSACTION_RESPONSE) {
                             System.err.printf("Transaction submitted %s\n",
                                     transactionMessage.getResponse().getSubmitTransactionResponse().getTransactionId());
                         }
@@ -103,7 +100,7 @@ public class TransactionHandler {
         };
 
         System.out.println("listening");
-        this.messageStream = asyncStub.listen(responseObserver);
+        this.messageStream = asyncStub.openStreams(responseObserver);
         System.out.println("listener stopped: " + this.messageStream.toString());
 
     }
@@ -144,20 +141,20 @@ public class TransactionHandler {
         System.out.println("gRPC server ready");
     }
 
-    public Transaction.StatusResponse getStatus() {
-        PaladinTransactionServiceGrpc.PaladinTransactionServiceBlockingStub blockingStub = PaladinTransactionServiceGrpc
+    public Kata.StatusResponse getStatus() {
+        KataMessageServiceGrpc.KataMessageServiceBlockingStub blockingStub = KataMessageServiceGrpc
                 .newBlockingStub(channel);
-        return blockingStub.status(Transaction.StatusRequest.newBuilder().build());
+        return blockingStub.status(Kata.StatusRequest.newBuilder().build());
     }
 
-    public void submitTransaction(TransactionRequest request) throws Exception {
+    public void submitTransaction(Request request) throws Exception {
         System.out.println("submitTransaction");
 
         try {
             String requestId = UUID.randomUUID().toString();
-            this.messageStream.onNext(Transaction.TransactionMessage.newBuilder()
+            this.messageStream.onNext(Kata.Message.newBuilder()
                     .setId(requestId)
-                    .setType(Transaction.MESSAGE_TYPE.REQUEST_MESSAGE)
+                    .setType(Kata.MESSAGE_TYPE.REQUEST_MESSAGE)
                     .setRequest(request.getRequestMessage())
                     .build());
             this.inflightRequests.put(requestId, request);

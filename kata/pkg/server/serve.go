@@ -50,7 +50,7 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterPaladinTransactionServiceServer(s, NewPaladinTransactionService())
+	proto.RegisterKataMessageServiceServer(s, NewKataMessageService())
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{

@@ -15,9 +15,10 @@
 
 package io.kaleido;
 
-import io.kaleido.transaction.SubmitTransactionRequest;
-import io.kaleido.transaction.TransactionHandler;
 import org.junit.jupiter.api.Test;
+
+import io.kaleido.kata.SubmitTransactionRequest;
+import io.kaleido.kata.Handler;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -74,7 +75,7 @@ grpc:
 
 
         // Start the Java GRPC client
-        TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
+        Handler transactionHandler = new Handler(socketFilename);
         transactionHandler.start();
 
         // Add a shutdown hook to wait for a signal to exit
