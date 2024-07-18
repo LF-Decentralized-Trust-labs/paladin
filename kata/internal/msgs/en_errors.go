@@ -54,6 +54,10 @@ var (
 	MsgStateLabelFieldMissing         = ffe("PD010110", "Label field %s missing")
 	MsgStateLabelFieldNotSupported    = ffe("PD010111", "Label field %s is not a supported elementary type (%s)")
 	MsgStateNotFound                  = ffe("PD010112", "State not found with hash %s")
+	MsgStateInvalidSchema             = ffe("PD010113", "Invalid schema")
+	MsgStateABITypeMustBeTuple        = ffe("PD010114", "ABI type definition must be a tuple parameter with an internalType such as 'struct StructName'")
+	MsgStateLabelFieldNotUnique       = ffe("PD010115", "Label field with index %d has a duplicate name '%s'")
+	MsgStateInvalidValue              = ffe("PD010116", "Invalid value")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")

@@ -39,10 +39,10 @@ func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) 
 	if err != nil {
 		return "", err
 	}
-	return Uint256ToFilterString(ctx, bi)
+	return Uint256ToFilterString(ctx, bi), nil
 }
 
-func Uint256ToFilterString(ctx context.Context, bi *big.Int) (string, error) {
+func Uint256ToFilterString(ctx context.Context, bi *big.Int) string {
 	zeroPaddedUint256 := PadHexBigUint(bi, make([]byte, 64))
-	return (string)(zeroPaddedUint256), nil
+	return (string)(zeroPaddedUint256)
 }

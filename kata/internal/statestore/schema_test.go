@@ -15,3 +15,43 @@
 // limitations under the License.
 
 package statestore
+
+import (
+	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGetSchemaNotFoundNil(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	s, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")), false)
+	assert.NoError(t, err)
+	assert.Nil(t, s)
+}
+
+func TestGetSchemaNotFoundError(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")), true)
+	assert.Regexp(t, "PD010106", err)
+}
+
+func TestGetSchemaInvalidType(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows(
+		[]string{"type"},
+	).AddRow("wrong"))
+
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")), true)
+	assert.Regexp(t, "PD010103.*wrong", err)
+}

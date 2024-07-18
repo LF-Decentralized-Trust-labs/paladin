@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/stretchr/testify/assert"
 )
@@ -72,15 +74,22 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 				Indexed: true,
 			},
 			{
-				Name: "field8",
+				Name:    "field8",
+				Type:    "uint32",
+				Indexed: true,
+			},
+			{
+				Name: "field9",
 				Type: "string",
 			},
 		},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
-	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4,address field5,int256 field6,bytes field7,string field8),labels=[field1,field2,field3,field4,field5,field6,field7]", as.Persisted().Signature)
-	cacheKey := "domain1/0xf2fe6e1d0405d9607cf291dd0c24ce40f01b8cf9d84e48664aea4785c0e28926"
+	assert.Equal(t, SchemaTypeABI, as.Type())
+	assert.NotNil(t, as.Definition())
+	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4,address field5,int256 field6,bytes field7,uint32 field8,string field9),labels=[field1,field2,field3,field4,field5,field6,field7,field8]", as.Persisted().Signature)
+	cacheKey := "domain1/0xcf41493c8bb9652d1483ee6cb5122efbec6fbdf67cc27363ba5b030b59244cad"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().Hash))
 
 	err = ss.PersistSchema(ctx, as)
@@ -98,7 +107,8 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 			"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
 			"field6": "-10203040506070809",
 			"field7": "0xfeedbeef",
-			"field8": "things and stuff"
+			"field8": 12345,
+			"field9": "things and stuff"
 		}`,
 	}
 	err = ss.PersistState(ctx, state1)
@@ -122,8 +132,10 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		{State: state1.Hash, Label: "field3", Value: 42},
 		// bool also gets an efficient numeric index - we don't attempt to allocate anything smaller than int64 to this
 		{State: state1.Hash, Label: "field4", Value: 1},
+		// uint32 also
+		{State: state1.Hash, Label: "field8", Value: 12345},
 	}, state1.Int64Labels)
-	assert.Equal(t, "0x7c14548eb0ddd2b200236f5f55034e36dc24beb7b7d1b07bddf2027d6277ef0f", state1.Hash.String())
+	assert.Equal(t, "0x90c1f63e32a708ef59b3708c57d165a87bddf758709313c57448e85a10c59544", state1.Hash.String())
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
@@ -163,7 +175,8 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		  {"field":"field4","value":true},
 		  {"field":"field5","value":"0x687414C0B8B4182B823Aec5436965cf19b197386"},
 		  {"field":"field6","value":"-10203040506070809"},
-		  {"field":"field7","value":"0xfeedbeef"}
+		  {"field":"field7","value":"0xfeedbeef"},
+		  {"field":"field8","value":12345}
 		]
 	}`), &query)
 	assert.NoError(t, err)
@@ -192,4 +205,406 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	states, err = ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
 	assert.NoError(t, err)
 	assert.Len(t, states, 0)
+}
+
+func TestNewABISchemaInvalidTypedDataType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+		Type:         "tuple",
+		Name:         "MyStruct",
+		InternalType: "struct MyStruct",
+		Components: abi.ParameterArray{
+			{
+				Name: "field1",
+				Type: "function",
+			},
+		},
+	})
+	assert.Regexp(t, "FF22072", err)
+
+}
+
+func TestGetSchemaInvalidJSON(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows(
+		[]string{"type", "content"},
+	).AddRow(SchemaTypeABI, "!!! { bad json"))
+
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")), true)
+	assert.Regexp(t, "PD010113", err)
+}
+
+func TestRestoreABISchemaInvalidType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
+		Content: `{}`,
+	})
+	assert.Regexp(t, "PD010114", err)
+
+}
+
+func TestRestoreABISchemaInvalidTypeTree(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
+		Content: `{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`,
+	})
+	assert.Regexp(t, "FF22025.*wrong", err)
+
+}
+
+func TestABILabelSetupMissingName(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+		Type:         "tuple",
+		Name:         "MyStruct",
+		InternalType: "struct MyStruct",
+		Components: abi.ParameterArray{
+			{
+				Indexed: true,
+				Type:    "uint256",
+			},
+		},
+	})
+	assert.Regexp(t, "PD010108", err)
+
+}
+
+func TestABILabelSetupBadTree(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+		Type:         "tuple",
+		Name:         "MyStruct",
+		InternalType: "struct MyStruct",
+		Components: abi.ParameterArray{
+			{
+				Indexed: true,
+				Name:    "broken",
+			},
+		},
+	})
+	assert.Regexp(t, "FF22025", err)
+
+}
+
+func TestABILabelSetupDuplicateField(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+		Type:         "tuple",
+		Name:         "MyStruct",
+		InternalType: "struct MyStruct",
+		Components: abi.ParameterArray{
+			{
+				Indexed: true,
+				Name:    "field1",
+				Type:    "uint256",
+			},
+			{
+				Indexed: true,
+				Name:    "field1",
+				Type:    "uint256",
+			},
+		},
+	})
+	assert.Regexp(t, "PD010115", err)
+}
+
+func TestABILabelSetupUnsupportedType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+		Type:         "tuple",
+		Name:         "MyStruct",
+		InternalType: "struct MyStruct",
+		Components: abi.ParameterArray{
+			{
+				Indexed:      true,
+				Name:         "nested",
+				InternalType: "struct MyNested",
+				Type:         "tuple",
+				Components:   abi.ParameterArray{},
+			},
+		},
+	})
+	assert.Regexp(t, "PD010107", err)
+}
+
+func TestABISchemaGetLabelTypeBadType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{
+					Indexed:    true,
+					Type:       "fixed",
+					Components: abi.ParameterArray{},
+				},
+			},
+		},
+	}
+	tc, err := as.definition.TypeComponentTree()
+	assert.NoError(t, err)
+
+	_, err = as.getLabelType(ctx, "f1", tc.TupleChildren()[0])
+	assert.Regexp(t, "PD010103", err)
+}
+
+func TestABISchemaProcessStateInvalidType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{
+					Indexed: true,
+					Type:    "fixed",
+					Name:    "field1",
+				},
+			},
+		},
+		primaryType: "MyStruct",
+		typeSet: eip712.TypeSet{
+			"MyStruct": eip712.Type{
+				{
+					Name: "field1",
+					Type: "uint256",
+				},
+			},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1": 12345}`,
+	})
+	assert.Regexp(t, "PD010103", err)
+}
+
+func TestABISchemaProcessStateLabelMissing(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components:   abi.ParameterArray{},
+		},
+		primaryType: "MyStruct",
+		typeSet: eip712.TypeSet{
+			"MyStruct": eip712.Type{
+				{
+					Name: "field1",
+					Type: "uint256",
+				},
+			},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1": 12345}`,
+	})
+	assert.Regexp(t, "PD010110", err)
+}
+
+func TestABISchemaProcessStateBadDefinition(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1": 12345}`,
+	})
+	assert.Regexp(t, "FF22025", err)
+}
+
+func TestABISchemaProcessStateBadValue(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components:   abi.ParameterArray{},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{!!! wrong`,
+	})
+	assert.Regexp(t, "PD010116", err)
+}
+
+func TestABISchemaProcessStateMismatchValue(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{Name: "field1", Type: "uint256"},
+			},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1":{}}`,
+	})
+	assert.Regexp(t, "FF22030", err)
+}
+
+func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{Name: "field1", Type: "function"},
+			},
+		},
+	}
+	err := as.ProcessState(ctx, &State{
+		Data: `{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`,
+	})
+	assert.Regexp(t, "FF22073", err)
+}
+
+func TestABISchemaMapLabelResolverBadType(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Type:         "tuple",
+			Name:         "MyStruct",
+			InternalType: "struct MyStruct",
+			Components: abi.ParameterArray{
+				{Name: "field1", Type: "function"},
+			},
+		},
+	}
+	_, _, err := as.mapLabelResolver(ctx, "", -1)
+	assert.Regexp(t, "PD010103", err)
+}
+
+func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
+
+	ctx, _, _, done := newDBMockStateStore(t)
+	defer done()
+
+	as := &abiSchema{
+		persisted: &SchemaEntity{
+			Labels: []string{"field1"},
+		},
+		definition: &abi.Parameter{
+			Components: abi.ParameterArray{
+				{Name: "field1", Type: "function"},
+				{Name: "field2", Type: "uint256"},
+			},
+		},
+	}
+	tc, err := as.definition.Components[0].TypeComponentTree()
+	assert.NoError(t, err)
+	cv, err := tc.ParseExternal("0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2")
+	assert.NoError(t, err)
+
+	// bad type
+	_, _, err = as.mapValueToLabel(ctx, "", -1, cv)
+	assert.Regexp(t, "PD010103", err)
+
+	// int64
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeInt64, cv)
+	assert.Regexp(t, "PD010109", err)
+
+	// int256
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeInt256, cv)
+	assert.Regexp(t, "PD010109", err)
+
+	// uint256
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeUint256, cv)
+	assert.Regexp(t, "PD010109", err)
+
+	// string
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeString, cv)
+	assert.Regexp(t, "PD010109", err)
+
+	// bool
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeBool, cv)
+	assert.Regexp(t, "PD010109", err)
+
+	tc, err = as.definition.Components[1].TypeComponentTree()
+	assert.NoError(t, err)
+	cv, err = tc.ParseExternal("0x12345")
+	assert.NoError(t, err)
+
+	// bytes
+	_, _, err = as.mapValueToLabel(ctx, "", labelTypeBytes, cv)
+	assert.Regexp(t, "PD010109", err)
+
 }

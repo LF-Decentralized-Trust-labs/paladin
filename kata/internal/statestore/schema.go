@@ -84,27 +84,28 @@ func (ss *stateStore) GetSchema(ctx context.Context, domainID string, hash *Hash
 		return s, nil
 	}
 
-	var persisted *SchemaEntity
+	var results []*SchemaEntity
 	err := ss.p.DB().
 		Table("schemas").
 		Where("domain_id = ?", domainID).
 		Where("hash_l = ?", hash.L.String()).
 		Where("hash_h = ?", hash.H.String()).
 		Limit(1).
-		Find(&persisted).
+		Find(&results).
 		Error
-	if err != nil || persisted == nil {
+	if err != nil || len(results) == 0 {
 		if err == nil && failNotFound {
 			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, hash)
 		}
 		return s, err
 	}
 
+	persisted := results[0]
 	switch persisted.Type {
 	case SchemaTypeABI:
 		s, err = newABISchemaFromDB(ctx, persisted)
 	default:
-		err = i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, s.Type())
+		err = i18n.NewError(ctx, msgs.MsgStateInvalidSchemaType, persisted.Type)
 	}
 	if err != nil {
 		return nil, err

@@ -10,7 +10,7 @@ require (
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/uuid v1.6.0
 	github.com/hyperledger/firefly-common v1.4.6
-	github.com/hyperledger/firefly-signer v1.1.14-0.20240717022455-5aafe814f460
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240718030252-61a5a5a32f50
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.23.0
 	golang.org/x/text v0.15.0

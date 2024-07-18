@@ -70,22 +70,23 @@ func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (s *State, err error) {
+func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (*State, error) {
 	q := ss.p.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
 	}
-	err = q.
+	var states []*State
+	err := q.
 		Where("domain_id = ?", domainID).
 		Where("hash_l = ?", hash.L.String()).
 		Where("hash_h = ?", hash.H.String()).
 		Limit(1).
-		Find(&s).
+		Find(&states).
 		Error
-	if err == nil && s == nil && failNotFound {
+	if err == nil && len(states) == 0 && failNotFound {
 		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, hash)
 	}
-	return s, err
+	return states[0], err
 }
 
 func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID *HashID, query *filters.QueryJSON) (s []*State, err error) {

@@ -39,10 +39,10 @@ func (sf Int256Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) (
 	if err != nil {
 		return "", err
 	}
-	return Int256ToFilterString(ctx, bi)
+	return Int256ToFilterString(ctx, bi), nil
 }
 
-func Int256ToFilterString(ctx context.Context, bi *big.Int) (string, error) {
+func Int256ToFilterString(ctx context.Context, bi *big.Int) string {
 	sign := bi.Sign()
 	signPlusZeroPaddedInt256 := PadHexBigIntTwosCompliment(bi, make([]byte, 65))
 	if sign < 0 {
@@ -51,5 +51,5 @@ func Int256ToFilterString(ctx context.Context, bi *big.Int) (string, error) {
 		// Zero or positive get a "1" in the first string position, which makes them
 		signPlusZeroPaddedInt256[0] = '1'
 	}
-	return (string)(signPlusZeroPaddedInt256), nil
+	return (string)(signPlusZeroPaddedInt256)
 }

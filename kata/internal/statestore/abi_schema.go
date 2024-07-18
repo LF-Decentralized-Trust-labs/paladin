@@ -56,10 +56,7 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 	abiJSON, err := json.Marshal(def)
 	if err == nil {
 		as.persisted.Content = string(abiJSON)
-		err = as.labelSetup(ctx, true)
-	}
-	if err == nil {
-		err = as.typedDataV4Setup(ctx)
+		err = as.typedDataV4Setup(ctx, true)
 	}
 	if err == nil {
 		as.persisted.Signature, err = as.FullSignature(ctx)
@@ -79,12 +76,9 @@ func newABISchemaFromDB(ctx context.Context, persisted *SchemaEntity) (ABISchema
 	}
 	err := json.Unmarshal([]byte(persisted.Content), &as.definition)
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidABIParam)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidSchema)
 	}
-	err = as.labelSetup(ctx, false)
-	if err == nil {
-		err = as.typedDataV4Setup(ctx)
-	}
+	err = as.typedDataV4Setup(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -110,27 +104,34 @@ func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
 // Build the TypedDataV4 signature of the struct, from the ABI definition
 // Note the "internalType" field of form "struct SomeTypeName" is required for
 // nested tuple types in the ABI.
-func (as *abiSchema) typedDataV4Setup(ctx context.Context) error {
+func (as *abiSchema) typedDataV4Setup(ctx context.Context, isNew bool) error {
+	if as.definition.Type != "tuple" || as.definition.InternalType == "" {
+		return i18n.NewError(ctx, msgs.MsgStateABITypeMustBeTuple)
+	}
 	tc, err := as.definition.TypeComponentTreeCtx(ctx)
 	if err != nil {
 		return err
 	}
 	as.primaryType, as.typeSet, err = eip712.ABItoTypedDataV4(ctx, tc)
+	if err == nil {
+		err = as.labelSetup(ctx, tc, isNew)
+	}
 	return err
 }
 
-func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
+func (as *abiSchema) labelSetup(ctx context.Context, rootTC abi.TypeComponent, isNew bool) error {
 	labelIndex := 0
-	def := as.definition
-	for i, p := range def.Components {
+	uniqueMap := map[string]bool{}
+	for i, tc := range rootTC.TupleChildren() {
+		p := tc.Parameter()
 		if p.Indexed {
 			if len(p.Name) == 0 {
 				return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotNamed, i)
 			}
-			tc, err := p.TypeComponentTreeCtx(ctx)
-			if err != nil {
-				return err
+			if _, exists := uniqueMap[p.Name]; exists {
+				return i18n.NewError(ctx, msgs.MsgStateLabelFieldNotUnique, i, p.Name)
 			}
+			uniqueMap[p.Name] = true
 			labelType, labelResolver, err := as.getLabelResolver(ctx, labelIndex, p.Name, tc)
 			if err != nil {
 				return err
@@ -155,10 +156,10 @@ func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
 }
 
 func (as *abiSchema) getLabelType(ctx context.Context, fieldName string, tc abi.TypeComponent) (labelType, error) {
-	et := tc.ElementaryType()
-	if et == nil {
+	if tc.ComponentType() != abi.ElementaryComponent {
 		return -1, i18n.NewError(ctx, msgs.MsgStateLabelFieldNotElementary, fieldName, tc.String())
 	}
+	et := tc.ElementaryType()
 	baseType := et.BaseType()
 	switch baseType {
 	case abi.BaseTypeInt:
@@ -191,6 +192,10 @@ func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.Co
 	if err != nil {
 		return nil, nil, err
 	}
+	return as.mapValueToLabel(ctx, fieldName, labelType, f)
+}
+
+func (as *abiSchema) mapValueToLabel(ctx context.Context, fieldName string, labelType labelType, f *abi.ComponentValue) (*StateLabel, *StateInt64Label, error) {
 	switch labelType {
 	case labelTypeInt64:
 		bigIntVal, ok := f.Value.(*big.Int)
@@ -204,10 +209,7 @@ func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.Co
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
 		// Otherwise we fall back to encoding as a fixed-width hex string - with a leading sign character
-		filterString, err := filters.Int256ToFilterString(ctx, bigIntVal)
-		if err != nil {
-			return nil, nil, err
-		}
+		filterString := filters.Int256ToFilterString(ctx, bigIntVal)
 		return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
 	case labelTypeUint256:
 		bigIntVal, ok := f.Value.(*big.Int)
@@ -215,10 +217,7 @@ func (as *abiSchema) buildLabel(ctx context.Context, fieldName string, f *abi.Co
 			return nil, nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldUnexpectedValue, fieldName, f.Value, new(big.Int))
 		}
 		bigIntVal = bigIntVal.Abs(bigIntVal)
-		filterString, err := filters.Uint256ToFilterString(ctx, bigIntVal)
-		if err != nil {
-			return nil, nil, err
-		}
+		filterString := filters.Uint256ToFilterString(ctx, bigIntVal)
 		return &StateLabel{Label: fieldName, Value: filterString}, nil, nil
 	case labelTypeBytes:
 		byteValue, ok := f.Value.([]byte)
@@ -251,6 +250,10 @@ func (as *abiSchema) getLabelResolver(ctx context.Context, labelIndex int, field
 		return -1, nil, err
 	}
 	sqlColumn := fmt.Sprintf("l%d.value", labelIndex)
+	return as.mapLabelResolver(ctx, sqlColumn, labelType)
+}
+
+func (as *abiSchema) mapLabelResolver(ctx context.Context, sqlColumn string, labelType labelType) (labelType, filters.FieldResolver, error) {
 	switch labelType {
 	case labelTypeInt64:
 		return labelType, filters.Int64Field(sqlColumn), nil
@@ -281,7 +284,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 	var jsonTree interface{}
 	err = json.Unmarshal([]byte(s.Data), &jsonTree)
 	if err != nil {
-		return err
+		return i18n.WrapError(ctx, err, msgs.MsgStateInvalidValue)
 	}
 	cv, err := tc.ParseExternalCtx(ctx, jsonTree)
 	if err != nil {
