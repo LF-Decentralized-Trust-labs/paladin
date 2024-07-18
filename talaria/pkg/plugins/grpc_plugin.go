@@ -22,6 +22,7 @@ import (
 	"log"
 	"net"
 	"fmt"
+	"io"
 
 	"github.com/google/uuid"
 	interPaladinProto "github.com/kaleido-io/talaria/pkg/plugins/proto"
@@ -58,90 +59,134 @@ type GRPCTransportPlugin struct {
 	interPaladinProto.UnimplementedInterPaladinTransportServer
 	pluginInterfaceProto.UnimplementedPluginInterfaceServer
 	
-	socketName string
+	SocketName string
 	port       int
+	messages   chan []byte
+
+	pluginListener       net.Listener
+	interPaladinListener net.Listener
 }
 
-func (gtp *GRPCTransportPlugin) InterPaladinMessageFlow(ctx context.Context, in *interPaladinProto.InterPaladinMessage) (*interPaladinProto.InterPaladinReceipt, error) {
-	// TODO: This is dumb, but also I don't know what a receipt should look like right now
-	log.Printf("Got (external) message content %s", in.Content)
-	return &interPaladinProto.InterPaladinReceipt{
-		Content: "ACK",
-	}, nil
-}
+// --------------------------------------------------------------------------------------------------------- Inter-Paladin Server
 
-func (gtp *GRPCTransportPlugin) PluginMessageFlow(ctx context.Context, in *pluginInterfaceProto.PaladinMessage) (*pluginInterfaceProto.PaladinMessageReceipt, error) {
-	// TODO: Review of logging
-	log.Printf("Got message content %s, forming inter paladin message", in.MessageContent)
-
-	// TODO: What is routing information? Doesn't feel like it makes much sense
-	routingInfo := &GRPCRoutingInformation{}
-	err := json.Unmarshal([]byte(in.RoutingInformation), routingInfo)
-	if err != nil {
-		log.Printf("Could not unmarshal routing information, err: %v", err)
-		return nil, err
-	}
-
-	// TODO: mTLS for TCP connections
-	conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Failed to establish a client, err: %s", err)
-	}
-	defer conn.Close()
-
-	client := interPaladinProto.NewInterPaladinTransportClient(conn)
-
-	r, err := client.InterPaladinMessageFlow(ctx, &interPaladinProto.InterPaladinMessage{
-		Content: in.MessageContent,
-	})
-	if err != nil {
-		log.Fatalf("error sending message through gRPC: %v", err)
-	}
-	log.Printf("response was: %s", r.GetContent())
-
-	return &pluginInterfaceProto.PaladinMessageReceipt{
-		Content: "ACK",
-	}, nil
-}
-
-// TODO: What is the different between initialise and start if one does essentially nothing?
-func (gtp *GRPCTransportPlugin) Initialise(ctx context.Context) {
-	gtp.socketName = fmt.Sprintf("/tmp/%s.sock", uuid.New().String())
-}
-
-func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
-	// TODO: Review of threading model
-
-	log.Printf("initialising connection to local socket %s\n", gtp.socketName)
-	lis, err := net.Listen("unix", gtp.socketName)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	go func(){
-		s := grpc.NewServer()
-		pluginInterfaceProto.RegisterPluginInterfaceServer(s, &GRPCTransportPlugin{})
-		log.Printf("server listening at %v", lis.Addr())
-		if err := s.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
-		}
-	}()
-
-	log.Printf("initialising connection for inbound gRPC connections %s\n", gtp.socketName)
+func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Context) {
+	log.Printf("initialising connection for inbound gRPC connections %s\n", gtp.SocketName)
 	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%d", gtp.port))
 	if err != nil {
 		log.Fatalf("failed to listen for grpc connections: %v", err)
 	}
 
+	gtp.interPaladinListener = grpcLis
+
 	go func(){
 		s := grpc.NewServer()
-		interPaladinProto.RegisterInterPaladinTransportServer(s, &GRPCTransportPlugin{})
+		interPaladinProto.RegisterInterPaladinTransportServer(s, gtp)
 		log.Printf("grpc server listening at %v", grpcLis.Addr())
 		if err := s.Serve(grpcLis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
+			log.Printf("failed to serve: %v", err)
 		}
 	}()
 }
+
+func (gtp *GRPCTransportPlugin) SendInterPaladinMessage(ctx context.Context, in *interPaladinProto.InterPaladinMessage) (*interPaladinProto.Empty, error) {
+	// TODO: Figure out if we need to send messages here
+	log.Println("Got an external message")
+	gtp.messages <- in.Payload
+	return &interPaladinProto.Empty{}, nil
+}
+
+// --------------------------------------------------------------------------------------------------------- Plugin Server
+
+func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
+	log.Printf("initialising connection to local socket %s\n", gtp.SocketName)
+	lis, err := net.Listen("unix", gtp.SocketName)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	gtp.pluginListener = lis
+
+	go func(){
+		s := grpc.NewServer()
+		pluginInterfaceProto.RegisterPluginInterfaceServer(s, gtp)
+		log.Printf("server listening at %v", lis.Addr())
+		if err := s.Serve(lis); err != nil {
+			log.Printf("failed to serve: %v", err)
+		}
+	}()
+}
+
+func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.PluginInterface_PluginMessageFlowServer) error {
+	ctx := server.Context()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case collectedMessage := <- gtp.messages: {
+			if err := server.Send(&pluginInterfaceProto.PaladinMessage{
+				MessageContent: string(collectedMessage),
+			}); err != nil {
+				log.Printf("send error %v", err)
+			}
+		}
+		default:
+		}
+
+		pluginReq, err := server.Recv()
+		if err == io.EOF {
+			log.Println("shutdown")
+			return nil
+		}
+		if err != nil {
+			log.Printf("receive error %v", err)
+			continue
+		}
+
+		routingInfo := &GRPCRoutingInformation{}
+		err = json.Unmarshal([]byte(pluginReq.RoutingInformation), routingInfo)
+		if err != nil {
+			log.Printf("Could not unmarshal routing information, err: %v", err)
+			return err
+		}
+
+		conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("Failed to establish a client, err: %s", err)
+		}
+		defer conn.Close()
+
+		client := interPaladinProto.NewInterPaladinTransportClient(conn)
+
+		_, err = client.SendInterPaladinMessage(ctx, &interPaladinProto.InterPaladinMessage{
+			Payload: []byte(pluginReq.MessageContent),
+		})
+		if err != nil {
+			log.Fatalf("error sending message through gRPC: %v", err)
+		}
+	}
+}
+
+func (gtp *GRPCTransportPlugin) Status(ctx context.Context, _ *pluginInterfaceProto.StatusRequest) (*pluginInterfaceProto.PluginStatus, error) {
+	return &pluginInterfaceProto.PluginStatus{
+		Ok: true,
+	}, nil
+}
+
+// --------------------------------------------------------------------------------------------------------------------------
+
+func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
+	// TODO: Review of threading model
+	gtp.startPluginServer(ctx)
+	gtp.startInterPaladinMessageServer(ctx)
+}
+
+func (gtp *GRPCTransportPlugin) Close(ctx context.Context) {
+	// TODO: Yeah this really isn't how shutdown is supposed to be done
+	gtp.interPaladinListener.Close()
+	gtp.pluginListener.Close()
+}
+
 
 // TODO: Not this
 //
@@ -152,12 +197,14 @@ func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
 func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	return PluginRegistration{
 		Name: "grpc-transport-plugin",
-		SocketLocation: gtp.socketName,
+		SocketLocation: gtp.SocketName,
 	}
 }
 
 func NewGRPCTransportPlugin(port int) *GRPCTransportPlugin {
 	return &GRPCTransportPlugin{
 		port: port,
+		SocketName: fmt.Sprintf("/tmp/%s.sock", uuid.New().String()),
+		messages: make(chan []byte, 10),
 	}
 }

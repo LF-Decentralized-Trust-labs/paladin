@@ -17,8 +17,6 @@ package plugins
 
 import (
 	"context"
-	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
-	interPaladinProto "github.com/kaleido-io/talaria/pkg/plugins/proto"
 )
 
 // Almost certainly not right, but works well enough for now
@@ -32,10 +30,6 @@ type TransportPlugin interface {
 
 	// Methods specifically for plugin lifecycle
 	GetRegistration() PluginRegistration
-	Initialise(context.Context)
-	Start(context.Context)
-
-	// A Plugin MUST be able to do comms over a socket, and to other nodes
-	PluginMessageFlow(context.Context, *pluginInterfaceProto.PaladinMessage) (*pluginInterfaceProto.PaladinMessageReceipt, error)
-	InterPaladinMessageFlow(context.Context, *interPaladinProto.InterPaladinMessage) (*interPaladinProto.InterPaladinReceipt, error)
+	Start(ctx context.Context)
+	Close(ctx context.Context)
 }

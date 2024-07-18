@@ -48,11 +48,11 @@ func main() {
 	re := talaria.NewLocalAPIRegistryProvider(*registryport)
 
 	// Initialise talaria
-	b := talaria.NewTalaria(re, *talariaport)
-	b.InitialisePlugins(ctx)
+	tal := talaria.NewTalaria(re, *talariaport)
+	tal.Initialise(ctx)
 
 	// Start the comms bus
-	cas := commsbus.NewCommsBusAPIServer(*commsbusport, b)
+	cas := commsbus.NewCommsBusAPIServer(*commsbusport, tal)
 	wg.Add(1)
 	go func(){
 		cas.StartServer()

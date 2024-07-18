@@ -19,7 +19,14 @@ package protos.PluginInterface;
 option go_package = "protos/PluginInterface";
 
 service PluginInterface {
-  rpc PluginMessageFlow(PaladinMessage) returns (PaladinMessageReceipt) {}
+  rpc PluginMessageFlow(stream PaladinMessage) returns (stream PaladinMessage) {}
+  rpc Status(StatusRequest) returns (PluginStatus) {}
+}
+
+message StatusRequest {}
+
+message PluginStatus {
+  bool ok = 1;
 }
 
 message PaladinMessage {
