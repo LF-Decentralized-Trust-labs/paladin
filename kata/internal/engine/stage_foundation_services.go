@@ -19,35 +19,35 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 )
 
-type MockTalariaInfo struct {
+type MockNodeAndWalletLookUpService struct {
 }
 
-func (mti *MockTalariaInfo) IsCurrentNode(nodeID string) bool {
+func (mti *MockNodeAndWalletLookUpService) IsCurrentNode(nodeID string) bool {
 	return nodeID == "current-node"
 }
 
-func (mti *MockTalariaInfo) GetDispatchAddress(preferredAddresses []string) string {
+func (mti *MockNodeAndWalletLookUpService) GetDispatchAddress(preferredAddresses []string) string {
 	if len(preferredAddresses) > 0 {
 		return preferredAddresses[0]
 	}
 	return ""
 }
 
-type TalariaInfo interface {
+type NodeAndWalletLookUpService interface {
 	IsCurrentNode(nodeID string) bool
 	GetDispatchAddress(preferredAddresses []string) string
 }
 
 type StageFoundationService interface {
-	TalariaInfo() TalariaInfo
+	NodeAndWallet() NodeAndWalletLookUpService
 	DependencyChecker() DependencyChecker
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
 }
 
 type PaladinStageFoundationService struct {
-	dependencyChecker DependencyChecker
-	stateStore        statestore.StateStore
-	talariaInfo       TalariaInfo
+	dependencyChecker   DependencyChecker
+	stateStore          statestore.StateStore
+	nodeAndWalletLookUp NodeAndWalletLookUpService
 }
 
 func (psfs *PaladinStageFoundationService) DependencyChecker() DependencyChecker {
@@ -58,6 +58,6 @@ func (psfs *PaladinStageFoundationService) StateStore() statestore.StateStore {
 	return psfs.stateStore
 }
 
-func (psfs *PaladinStageFoundationService) TalariaInfo() TalariaInfo {
-	return psfs.talariaInfo
+func (psfs *PaladinStageFoundationService) NodeAndWallet() NodeAndWalletLookUpService {
+	return psfs.nodeAndWalletLookUp
 }

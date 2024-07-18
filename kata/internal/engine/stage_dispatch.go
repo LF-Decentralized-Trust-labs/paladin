@@ -98,7 +98,7 @@ func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore
 }
 
 func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) bool {
-	if tsg.GetDispatchTxPayload(ctx) != "" && sfs.TalariaInfo().IsCurrentNode(tsg.GetDispatchNode(ctx)) && tsg.GetDispatchTxID(ctx) == "" {
+	if tsg.GetDispatchTxPayload(ctx) != "" && sfs.NodeAndWallet().IsCurrentNode(tsg.GetDispatchNode(ctx)) && tsg.GetDispatchTxID(ctx) == "" {
 		// NOTE: we will use transaction payload hash as idempotency key, so it's retry safe
 		return true
 	}
@@ -108,7 +108,7 @@ func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) (actionOutput interface{}, actionErr error) {
 	if tsg.GetDispatchAddress(ctx) == "" {
 		preReqAddresses := sfs.DependencyChecker().GetPreReqDispatchAddresses(ctx, tsg.GetPreReqTransactions(ctx))
-		address := sfs.TalariaInfo().GetDispatchAddress(preReqAddresses)
+		address := sfs.NodeAndWallet().GetDispatchAddress(preReqAddresses)
 		if address != "" {
 			return DispatchAddress(address), nil
 		}

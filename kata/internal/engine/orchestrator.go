@@ -49,8 +49,6 @@ const (
 	OrchestratorSection = "orchestrator"
 )
 
-
-
 type OrchestratorConfig struct {
 	MaxConcurrentProcess    *int    `yaml:"maxConcurrentProcess,omitempty"`
 	StageRetry              *string `yaml:"stageRetry,omitempty"`
@@ -158,9 +156,9 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 	}
 
 	newOrchestrator.stageController = NewPaladinStageController(ctx, &PaladinStageFoundationService{
-		dependencyChecker: newOrchestrator,
-		stateStore:        ss,
-		talariaInfo:       &MockTalariaInfo{},
+		dependencyChecker:   newOrchestrator,
+		stateStore:          ss,
+		nodeAndWalletLookUp: &MockNodeAndWalletLookUpService{},
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)

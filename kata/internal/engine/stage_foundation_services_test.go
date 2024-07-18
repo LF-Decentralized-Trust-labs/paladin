@@ -17,7 +17,7 @@ package engine
 
 func newTestStageFoundationService() StageFoundationService {
 	return &PaladinStageFoundationService{
-		dependencyChecker: &Orchestrator{},
-		talariaInfo:       &MockTalariaInfo{},
+		dependencyChecker:   &Orchestrator{},
+		nodeAndWalletLookUp: &MockNodeAndWalletLookUpService{},
 	}
 }
