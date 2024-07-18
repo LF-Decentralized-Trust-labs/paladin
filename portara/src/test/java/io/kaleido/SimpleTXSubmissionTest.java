@@ -20,6 +20,7 @@ import io.kaleido.transaction.TransactionHandler;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -38,9 +39,41 @@ public class SimpleTXSubmissionTest {
             throw new IOException(String.format("Failed to deleted socket placeholder after creation: %s", f.getAbsolutePath()));
         }
         String socketFilename = f.getAbsolutePath();
-        KataJNA kata = new KataJNA();
-        kata.start(socketFilename);
 
+        //Create a config file
+
+        String yamlContent = """
+persistence:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: %s
+    debugQueries:  true
+grpc:
+  socketAddress: %s
+""".formatted(System.getProperty("user.dir") + "/../kata/db/migrations/sqlite",socketFilename);
+
+        File yamlFile = File.createTempFile("paladin", "kata.conf.yaml");
+        yamlFile.deleteOnExit();
+        try (FileWriter writer = new FileWriter(yamlFile)) {
+            writer.write(yamlContent);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Start the Kata Golang GRPC server
+        KataJNA kata; 
+        try{
+            kata = new KataJNA();
+        }catch (Exception e){
+            System.err.println("Failed to start kata");
+            throw e;
+        }
+        kata.start(yamlFile.getAbsolutePath());
+
+
+        // Start the Java GRPC client
         TransactionHandler transactionHandler = new TransactionHandler(socketFilename);
         transactionHandler.start();
 
@@ -72,5 +105,6 @@ public class SimpleTXSubmissionTest {
         kata.stop(socketFilename);
 
         System.out.println("main completed");
+
     }
 }
