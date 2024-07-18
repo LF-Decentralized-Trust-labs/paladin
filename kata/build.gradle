@@ -29,7 +29,6 @@ task installTools(type:Exec) {
         "${projectDir}/bin/protoc-gen-go",
         "${projectDir}/bin/protoc-gen-go-grpc",
         "${projectDir}/bin/golangci-lint",
-        "${projectDir}/bin/atlas"
     ])
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
