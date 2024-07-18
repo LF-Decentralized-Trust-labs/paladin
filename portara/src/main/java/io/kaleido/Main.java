@@ -14,16 +14,33 @@
  */
 package io.kaleido;
 
-import io.kaleido.transaction.SubmitTransactionRequest;
-import io.kaleido.transaction.TransactionHandler;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
 public class Main {
     public static void main(String[] args) throws Exception {
         System.out.println("TODO - start all the components");
+        System.out.println("DYLD_LIBRARY_PATH: " + System.getenv("DYLD_LIBRARY_PATH"));
+
+        String kataConfigFilePath = System.getenv("KATA_CONFIG_FILE");
+        System.out.println("KATA_CONFIG_FILE: " + kataConfigFilePath);
+
+        new KataJNA().start(kataConfigFilePath);
+
+        
+        // Add a shutdown hook to wait for a signal to exit
+        final Thread mainThread = Thread.currentThread();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutdown signal received.");
+            mainThread.interrupt();
+        }));
+
+
+        try {
+            // Keep the main thread alive until it's interrupted
+            while (!Thread.interrupted()) {
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            System.out.println("Main thread interrupted, exiting.");
+        }
+        
     }
 }
