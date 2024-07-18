@@ -131,11 +131,10 @@ task buildSharedLibrary(type:Exec) {
 
 class DockerCompose extends Exec {
     DockerCompose() {
-        def dbComposeFile = "${getProject().projectDir}/docker-compose-test.yml"
         def dockerComposeV2Check = getProject().exec({
             ignoreExitValue = true
             executable "docker"
-            args "compose", "-f", dbComposeFile, "ps"
+            args "compose", "ps"
             standardOutput = new ByteArrayOutputStream()
             errorOutput = new ByteArrayOutputStream()
         })
@@ -146,6 +145,19 @@ class DockerCompose extends Exec {
             executable 'docker-compose'
         }
         args '-f'
+    }
+}
+
+class DockerComposeTest extends DockerCompose {
+    DockerComposeTest() {
+        def dbComposeFile = "${getProject().projectDir}/docker-compose-test.yml"
+        args dbComposeFile
+    }
+}
+
+class DockerComposeDemo extends DockerCompose {
+    DockerComposeDemo() {
+        def dbComposeFile = "${getProject().rootDir}/demo/docker-compose.yml"
         args dbComposeFile
     }
 }
@@ -154,14 +166,24 @@ ext.dockerCompose = { param1, param2 ->
     // Method body here
 }
 
-task startDb(type: DockerCompose) {
+task startDb(type: DockerComposeTest) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
 }
 
-task stopDb(type: DockerCompose) {
+task startDemoDb(type: DockerComposeDemo) {
+    mustRunAfter(tasks.protoc)
+    args 'up', '-d'
+}
+
+task stopDb(type: DockerComposeTest) {
     args 'down'
 }
+
+task stopDemoDb(type: DockerComposeDemo) {
+    args 'down'
+}
+
 
 task testRunSQLite(type: Exec) {
     workingDir '.'
