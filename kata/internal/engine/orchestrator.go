@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -35,6 +36,7 @@ import (
 //    a. events through a buffered channel for back-pressure to drive the pace
 //    b. fetching from DB as a fallback mechanism when events are missed
 // 1. Provide transaction data access for stage processing with a consistent cache for efficiency
+// 1. Provide an efficient lookup for pre req tx check
 
 // TBD: decide whether this generic logic should be reused by the following levels of orchestrations:
 // 1. Transactions in a chain
@@ -46,6 +48,8 @@ import (
 const (
 	OrchestratorSection = "orchestrator"
 )
+
+
 
 type OrchestratorConfig struct {
 	MaxConcurrentProcess    *int    `yaml:"maxConcurrentProcess,omitempty"`
@@ -97,6 +101,8 @@ type Orchestrator struct {
 	stageRetryTimeout       time.Duration
 	persistenceRetryTimeout time.Duration
 
+	stageController StageController
+
 	// each orchestrator has its own go routine
 	initiated       time.Time     // when orchestrator is created
 	evalInterval    time.Duration // between how long the orchestrator will do an evaluation to check & remove transactions that missed events
@@ -130,7 +136,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -150,6 +156,12 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
 	}
+
+	newOrchestrator.stageController = NewPaladinStageController(ctx, &PaladinStageFoundationService{
+		dependencyChecker: newOrchestrator,
+		stateStore:        ss,
+		talariaInfo:       &MockTalariaInfo{},
+	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
 
@@ -194,28 +206,33 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 	oc.incompleteTxSProcessMap = make(map[string]TxProcessor, len(oldIncompleteMap))
 
 	stageCounts := make(map[string]int)
-	for _, stageName := range AllIncompleteTxStages {
+	for _, stageName := range oc.stageController.GetAllStages() {
 		// map for saving number of known incomplete transactions per stage
 		stageCounts[stageName] = 0
 	}
+
+	// TODO: how to distinguish the engine states below
+	stageCounts["remove"] = 0
+	stageCounts["suspend"] = 0
+	stageCounts["queued"] = 0
 
 	for txID, txp := range oldIncompleteMap {
 		oc.processedTxIDs[txID] = true
 		sc := txp.GetStageContext(ctx)
 		if sc != nil {
-			if sc.Stage == TxStageComplete {
+			if sc.Stage == "remove" {
 				// no longer in an incomplete stage
 				delete(oc.incompleteTxSProcessMap, txID)
 				oc.totalCompleted = oc.totalCompleted + 1
 				hasActivity = true
 				log.L(ctx).Debugf("Orchestrator evaluate and process, marking %s as complete.", txID)
-			} else if sc.Stage == TxStageSuspend {
+			} else if sc.Stage == "suspend" {
 				log.L(ctx).Debugf("Orchestrator evaluate and process, removed suspended tx %s", txID)
 			} else {
-				stageCounts[string(sc.Stage)] = stageCounts[string(sc.Stage)] + 1
+				stageCounts[sc.Stage] = stageCounts[sc.Stage] + 1
 			}
 		} else {
-			stageCounts[string(TxStageQueued)] = stageCounts[string(TxStageQueued)] + 1
+			stageCounts["queued"] = stageCounts["queued"] + 1
 
 		}
 	}
@@ -275,7 +292,7 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tsm transacti
 		// tx processing pool is full, queue the item
 		return true
 	} else {
-		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = NewPaladinTransactionProcessor(ctx, tsm)
+		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = NewPaladinTransactionProcessor(ctx, tsm, oc.stageController)
 		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)].Continue(ctx)
 		return false
 	}

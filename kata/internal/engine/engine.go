@@ -63,7 +63,7 @@ func (me *MockEngine) HandleNewTx(ctx context.Context, txID uuid.UUID) {
 	if valid {
 		// TODO how to measure fairness/ per From address / contract address / something else
 		if me.ocs[tx.GetContract(ctx)] == nil {
-			me.ocs[tx.GetContract(ctx)] = NewOrchestrator(ctx, tx.GetContract(ctx), nil)
+			me.ocs[tx.GetContract(ctx)] = NewOrchestrator(ctx, tx.GetContract(ctx) /** TODO: fill in the real plug-ins*/, nil, nil)
 		}
 		oc := me.ocs[tx.GetContract(ctx)]
 		queued := oc.ProcessNewTransaction(ctx, tx)
@@ -92,9 +92,9 @@ func generateMockEvents(ctx context.Context, receiver chan<- *StageEvent) {
 		case <-tick.C:
 			receiver <- &StageEvent{
 				// TODO: figure out how to mock UUID of the event
-				Type: TxStageOrdering,
-				TxID: "test",
-				Data: "test",
+				Stage: "test",
+				TxID:  "test",
+				Data:  "test",
 			}
 		case <-ctx.Done():
 			return

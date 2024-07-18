@@ -32,6 +32,14 @@ type Config struct {
 type TxStateGetters interface {
 	GetContract(ctx context.Context) string
 	GetTxID(ctx context.Context) string
+
+	GetDispatchTxPayload(ctx context.Context) string
+
+	GetPreReqTransactions(ctx context.Context) []string
+	GetDispatchAddress(ctx context.Context) string
+	GetDispatchNode(ctx context.Context) string
+	GetDispatchTxID(ctx context.Context) string
+	GetConfirmedTxHash(ctx context.Context) string
 }
 
 type TxStateSetters interface {
@@ -51,10 +59,19 @@ type Transaction struct {
 	Contract    string    `gorm:"type:uuid"`
 	PayloadJSON string    `gorm:"type:text"`
 	PayloadRLP  string    `gorm:"type:text"`
+
+	PreReqTxs         []string `gorm:"type:text[]; serializer:json"`
+	DispatchNode      string   `gorm:"type:text"`
+	DispatchAddress   string   `gorm:"type:text"`
+	DispatchTxID      string   `gorm:"type:text"`
+	DispatchTxPayload string   `gorm:"type:text"`
+	ConfirmedTxHash   string   `gorm:"type:text"`
 }
 
 type TransactionUpdate struct { // TODO define updatable fields
-	SequenceID *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
+	SequenceID      *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
+	DispatchTxID    *string
+	DispatchAddress *string
 }
 
 func NewTransaction(ctx context.Context, txID uuid.UUID) TxStateManager {
@@ -68,6 +85,9 @@ func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *Transaction
 	if txUpdates.SequenceID != nil {
 		t.SequenceID = *txUpdates.SequenceID
 	}
+	if txUpdates.DispatchTxID != nil {
+		t.DispatchTxID = *txUpdates.DispatchTxID
+	}
 	// TODO, plug in DB persistence
 	// 1. persist to DB first
 	// 2. update in memory object
@@ -78,6 +98,30 @@ func (t *Transaction) GetContract(ctx context.Context) string {
 
 func (t *Transaction) GetTxID(ctx context.Context) string {
 	return t.ID.String()
+}
+
+func (t *Transaction) GetDispatchAddress(ctx context.Context) string {
+	return t.DispatchAddress
+}
+
+func (t *Transaction) GetDispatchNode(ctx context.Context) string {
+	return t.DispatchNode
+}
+
+func (t *Transaction) GetDispatchTxID(ctx context.Context) string {
+	return t.DispatchTxID
+}
+
+func (t *Transaction) GetDispatchTxPayload(ctx context.Context) string {
+	return t.DispatchTxPayload
+}
+
+func (t *Transaction) GetConfirmedTxHash(ctx context.Context) string {
+	return t.ConfirmedTxHash
+}
+
+func (t *Transaction) GetPreReqTransactions(ctx context.Context) []string {
+	return t.PreReqTxs
 }
 
 type TransactionStore interface {

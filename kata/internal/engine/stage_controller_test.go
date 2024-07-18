@@ -35,14 +35,26 @@ type testActionOutput struct {
 type testStageProcessor struct {
 }
 
-func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, stageEvents []*StageEvent) (unprocessedStageEvents []*StageEvent, txUpdates *transactionstore.TransactionUpdate, stageCompleted bool) {
+func (tsp *testStageProcessor) Name() string {
+	return "test"
+}
+
+func (tsp *testStageProcessor) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) *TxProcessPreReq {
+	return nil
+}
+
+func (tsp *testStageProcessor) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) bool {
+	return true
+}
+
+func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService, stageEvents []*StageEvent) (unprocessedStageEvents []*StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep StageProcessNextStep) {
 	unprocessedStageEvents = []*StageEvent{}
-	stageCompleted = false
+	nextStep = NextStepWait
 	for _, se := range stageEvents {
-		if string(se.Type) == testStage {
+		if string(se.Stage) == testStage {
 			// pretend we processed it
 			if se.Data.(*testActionOutput).Message == "complete" {
-				stageCompleted = true
+				nextStep = NextStepNewStage
 			} else {
 				txUpdates = &transactionstore.TransactionUpdate{
 					SequenceID: confutil.P(uuid.New()),
@@ -54,7 +66,7 @@ func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactio
 	}
 	return
 }
-func (tsp *testStageProcessor) TriggerAction(ctx context.Context, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionErr error) {
+func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs StageFoundationService) (actionOutput interface{}, actionErr error) {
 	if tsg.GetContract(ctx) == "error" {
 		return nil, errors.New("pop")
 	} else if tsg.GetContract(ctx) == "complete" {
@@ -69,7 +81,7 @@ func (tsp *testStageProcessor) TriggerAction(ctx context.Context, tsg transactio
 }
 
 func newTestStageController(ctx context.Context) *PaladinStageController {
-	sc := NewStageController(ctx).(*PaladinStageController)
+	sc := NewPaladinStageController(ctx, newTestStageFoundationService()).(*PaladinStageController)
 
 	sc.stageProcessors = map[string]TxStageProcessor{
 		testStage: &testStageProcessor{},
@@ -86,29 +98,28 @@ func TestBasicStageController(t *testing.T) {
 	}
 	// TODO: replace dummy checks with real implementation
 	// test function works with test processor
-	stage, prereq := sc.CalculateStage(ctx, testTx)
+	stage := sc.CalculateStage(ctx, testTx)
 	assert.Equal(t, "test", string(stage))
-	assert.Empty(t, prereq)
 
-	output, err := sc.TriggerActionForStage(ctx, testStage, testTx)
+	output, err := sc.PerformActionForStage(ctx, testStage, testTx)
 	assert.Equal(t, "complete", output.(*testActionOutput).Message)
 	assert.Empty(t, err)
 
 	events, txUpdates, completed := sc.ProcessEventsForStage(ctx, testStage, testTx, []*StageEvent{
 		{
-			Type: testStage,
-			Data: output,
+			Stage: testStage,
+			Data:  output,
 		},
 	})
 	assert.Empty(t, events)
 	assert.Empty(t, txUpdates)
-	assert.True(t, completed)
+	assert.Equal(t, NextStepNewStage, completed)
 
 	// panic when stage is unknown
 	unknownStage := "unknown"
 
 	assert.Panics(t, func() {
-		_, _ = sc.TriggerActionForStage(ctx, unknownStage, testTx)
+		_, _ = sc.PerformActionForStage(ctx, unknownStage, testTx)
 	})
 
 	assert.Panics(t, func() {

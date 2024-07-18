@@ -25,43 +25,26 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
-type TxStageName string
-
-const (
-	TxStageQueued   TxStageName = "Queued"
-	TxStageOrdering TxStageName = "Ordering"
-	TxStageSubmit   TxStageName = "Submit"
-	TxStageComplete TxStageName = "Complete"
-	TxStageSuspend  TxStageName = "Suspend"
-)
-
-var AllIncompleteTxStages = []string{
-	string(TxStageQueued),
-	string(TxStageOrdering),
-	string(TxStageSubmit),
-	string(TxStageComplete),
-}
-
 type TxProcessor interface {
 	GetStageContext(ctx context.Context) *StageContext
 	GetStageTriggerError(ctx context.Context) error
 
 	// stage outputs management
 	AddStageEvent(ctx context.Context, stageEvent *StageEvent)
-	Continue(ctx context.Context) *TxProcessPreReq
+	Continue(ctx context.Context)
 }
 
 type StageContext struct {
 	ctx            context.Context
 	ID             string
-	Stage          TxStageName
+	Stage          string
 	stageEntryTime time.Time
 }
 
-func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.TxStateManager) TxProcessor {
+func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.TxStateManager, sc StageController) TxProcessor {
 	return &PaladinTxProcessor{
 		tsm:                 tsm,
-		stageController:     NewStageController(ctx),
+		stageController:     sc,
 		bufferedStageEvents: make([]*StageEvent, 0),
 	}
 }
@@ -78,61 +61,66 @@ type PaladinTxProcessor struct {
 }
 
 type StageEvent struct {
-	ID   string      `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
-	Type TxStageName `json:"type"`
-	TxID string      `json:"transactionId"`
-	Data interface{} `json:"data"` // schema decided by each stage
+	ID          string           `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
+	Stage       string           `json:"stage"`
+	TxID        string           `json:"transactionId"`
+	PreReqTxIDs *TxProcessPreReq `json:"preReq,omitempty"`
+	Data        interface{}      `json:"data"` // schema decided by each stage
 }
 
-func (ts *PaladinTxProcessor) Continue(ctx context.Context) *TxProcessPreReq {
-	return ts.initiateStageContext(ctx, true)
+func (ts *PaladinTxProcessor) Continue(ctx context.Context) {
+	ts.initiateStageContext(ctx, true)
 }
 
-func (ts *PaladinTxProcessor) initiateStageContext(ctx context.Context, triggerActions bool) *TxProcessPreReq {
+func (ts *PaladinTxProcessor) initiateStageContext(ctx context.Context, performAction bool) {
 	nowTime := time.Now() // pin the now time
-	stage, txPreReq := ts.stageController.CalculateStage(ctx, ts.tsm)
-	if txPreReq != nil {
-		return txPreReq
-	}
-	newStageContext := &StageContext{
+	stage := ts.stageController.CalculateStage(ctx, ts.tsm)
+	nextStepContext := &StageContext{
 		Stage:          stage,
 		ID:             uuid.NewString(),
 		stageEntryTime: nowTime,
 		ctx:            log.WithLogField(ctx, "stage", string(stage)),
 	}
 	if ts.stageContext != nil {
-		if ts.stageContext.Stage == newStageContext.Stage {
+		if ts.stageContext.Stage == nextStepContext.Stage {
 			// redoing the current stage
 			log.L(ctx).Tracef("Transaction with ID %s, already on stage %s for %s", ts.tsm.GetTxID(ctx), stage, time.Since(ts.stageContext.stageEntryTime))
-			newStageContext.stageEntryTime = ts.stageContext.stageEntryTime
+			nextStepContext.stageEntryTime = ts.stageContext.stageEntryTime
 		} else {
-			log.L(ctx).Tracef("Transaction with ID %s, switching from %s to %s after %s", ts.tsm.GetTxID(ctx), ts.stageContext.Stage, newStageContext.Stage, time.Since(ts.stageContext.stageEntryTime))
+			log.L(ctx).Tracef("Transaction with ID %s, switching from %s to %s after %s", ts.tsm.GetTxID(ctx), ts.stageContext.Stage, nextStepContext.Stage, time.Since(ts.stageContext.stageEntryTime))
 		}
 	} else {
-		log.L(ctx).Tracef("Transaction with ID %s, initiated on stage %s", ts.tsm.GetTxID(ctx), newStageContext.Stage)
+		log.L(ctx).Tracef("Transaction with ID %s, initiated on stage %s", ts.tsm.GetTxID(ctx), nextStepContext.Stage)
 
 	}
-	ts.stageContext = newStageContext
+	ts.stageContext = nextStepContext
 	ts.stageTriggerError = nil
 
-	if triggerActions {
-		log.L(ctx).Tracef("Transaction with ID %s, triggering action for %s stage", ts.tsm.GetTxID(ctx), stage)
-		ts.executeAsync(func() {
-			synchronousActionOutput, err := ts.stageController.TriggerActionForStage(ctx, string(stage), ts.tsm)
-			ts.stageTriggerError = err
-			if synchronousActionOutput != nil {
-				ts.AddStageEvent(ts.stageContext.ctx, &StageEvent{
-					ID:   newStageContext.ID,
-					TxID: ts.tsm.GetTxID(ctx),
-					Type: stage,
-					Data: synchronousActionOutput,
-				})
-			}
-		}, ctx)
+	if performAction {
+		ts.PerformActionForStageAsync(ctx)
 	} else {
 		log.L(ctx).Tracef("Transaction with ID %s, resuming for %s stage", ts.tsm.GetTxID(ctx), stage)
 	}
-	return nil
+}
+
+func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
+	stageContext := ts.stageContext
+	if stageContext == nil {
+		panic("stage context not set")
+	}
+	log.L(ctx).Tracef("Transaction with ID %s, triggering action for %s stage", ts.tsm.GetTxID(ctx), stageContext.Stage)
+	ts.executeAsync(func() {
+		synchronousActionOutput, err := ts.stageController.PerformActionForStage(ctx, string(stageContext.Stage), ts.tsm)
+		ts.stageTriggerError = err
+		if synchronousActionOutput != nil {
+			ts.AddStageEvent(ts.stageContext.ctx, &StageEvent{
+				ID:    stageContext.ID,
+				TxID:  ts.tsm.GetTxID(ctx),
+				Stage: stageContext.Stage,
+				Data:  synchronousActionOutput,
+			})
+		}
+	}, ctx)
 }
 
 func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc StageContext) {
@@ -140,9 +128,9 @@ func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc StageContex
 	// unexpected error, set an empty input for the stage
 	// so that the stage handler will handle this as unexpected error
 	ts.AddStageEvent(ctx, &StageEvent{
-		Type: sc.Stage,
-		ID:   sc.ID,
-		TxID: ts.tsm.GetTxID(ctx),
+		Stage: sc.Stage,
+		ID:    sc.ID,
+		TxID:  ts.tsm.GetTxID(ctx),
 	})
 	log.L(ctx).Debugf("%s addPanicOutput took %s to write the result", ts.tsm.GetTxID(ctx), time.Since(start))
 }
@@ -175,18 +163,18 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *Sta
 	ts.bufferedStageEvents = append(ts.bufferedStageEvents, stageEvent)
 
 	if ts.stageContext == nil {
-		preReq := ts.initiateStageContext(ctx, false)
-		if preReq != nil {
-			return
-		}
+		ts.initiateStageContext(ctx, false)
 	}
-	unProcessedBufferedStageEvents, txUpdates, stageCompleted := ts.stageController.ProcessEventsForStage(ctx, string(ts.stageContext.Stage), ts.tsm, ts.bufferedStageEvents)
+	// TODO: need to make ProcessEventsForStage blocking safe like the PerformAction function
+	unProcessedBufferedStageEvents, txUpdates, nextStep := ts.stageController.ProcessEventsForStage(ctx, string(ts.stageContext.Stage), ts.tsm, ts.bufferedStageEvents)
 	ts.bufferedStageEvents = unProcessedBufferedStageEvents
 	if txUpdates != nil {
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)
 	}
-	if stageCompleted {
+	if nextStep == NextStepNewStage {
 		ts.initiateStageContext(ctx, true)
+	} else if nextStep == NextStepNewAction {
+		ts.PerformActionForStageAsync(ctx)
 	}
 }

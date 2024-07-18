@@ -7,6 +7,13 @@ CREATE TABLE transactions (
   from_id                   UUID            NOT NULL,
   sequence_id               UUID,
   payload_json              TEXT,
-  payload_rlp               TEXT
+  payload_rlp               TEXT,
+  
+  pre_req_txs               TEXT,
+  dispatch_node             TEXT,
+  dispatch_address          TEXT,
+  dispatch_tx_id            TEXT,
+  dispatch_tx_payload       TEXT,
+  confirmed_tx_hash         TEXT
 );
 

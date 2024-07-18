@@ -60,5 +60,7 @@ var (
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 
 	// Transaction Processor PD0103XX
-	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+	MsgTransactionProcessorInvalidStage      = ffe("PD010300", "Invalid stage: %s")
+	MsgTransactionProcessorUndeterminedStage = ffe("PD010302", "Cannot determine a processing stage for transaction with ID: %s")
+	MsgTransactionProcessorNoValidActions    = ffe("PD010303", "No valid actions for transaction with ID: %s")
 )

@@ -29,7 +29,7 @@ func TestTransactionProcessor(t *testing.T) {
 	testTx := &transactionstore.Transaction{
 		ID: uuid.New(),
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
@@ -41,7 +41,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 		ID:       uuid.New(),
 		Contract: "continue",
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
@@ -51,7 +51,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	assert.NotEmpty(t, tp.stageContext)
 
 	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},
@@ -61,7 +61,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 
 	testTx.Contract = "complete"
 	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},
@@ -75,7 +75,7 @@ func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 		ID:       uuid.New(),
 		Contract: "continue",
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
@@ -84,7 +84,7 @@ func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 	assert.Empty(t, tp.stageContext)
 
 	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},
