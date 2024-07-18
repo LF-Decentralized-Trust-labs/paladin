@@ -70,6 +70,7 @@ type Config struct {
 }
 
 func Run(ctx context.Context, configFilePath string) {
+	log.L(ctx).Infof("Kata Run: %s", configFilePath)
 	config := Config{}
 
 	err := confutil.ReadAndParseYAMLFile(ctx, configFilePath, &config)
