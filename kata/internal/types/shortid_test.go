@@ -14,26 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package types
 
 import (
-	"context"
-	"log"
-	"net/http"
+	"testing"
 
-	"github.com/kaleido-io/paladin-runtime/pkg/server"
+	"github.com/stretchr/testify/assert"
 )
 
-func main() {
-	ctx := context.Background()
-	// Create a new RPC server
-	s, err := server.NewRPCServer(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	// Set up HTTP server
-	http.Handle("/rpc", s)
-	log.Println("Starting JSON-RPC server on http://localhost:1234/rpc")
-	log.Fatal(http.ListenAndServe(":1234", nil))
+func TestShortID(t *testing.T) {
+	id := ShortID()
+	assert.Regexp(t, "[a-zA-Z0-9_-]{8}", id)
 }

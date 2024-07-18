@@ -64,11 +64,12 @@ type SQLDBConfigDefaults struct {
 	ConnMaxLifetime time.Duration
 }
 
-func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, defs *SQLDBConfigDefaults) (gp *provider, err error) {
+func NewSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, defs *SQLDBConfig) (_ Persistence, err error) {
 	if conf.URI == "" {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPersistenceMissingURI)
 	}
 
+	var gp *provider
 	gdb, err := gorm.Open(p.Open(conf.URI), &gorm.Config{})
 	if err == nil {
 		gp = &provider{
@@ -84,10 +85,10 @@ func newSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, def
 	if conf.DebugQueries {
 		gp.gdb = gp.gdb.Debug()
 	}
-	gp.db.SetMaxOpenConns(confutil.IntMin(conf.MaxOpenConns, 1, defs.MaxOpenConns))
-	gp.db.SetMaxIdleConns(confutil.Int(conf.MaxIdleConns, defs.MaxIdleConns))
-	gp.db.SetConnMaxIdleTime(confutil.Duration(conf.ConnMaxIdleTime, defs.ConnMaxIdleTime))
-	gp.db.SetConnMaxLifetime(confutil.Duration(conf.ConnMaxLifetime, defs.ConnMaxLifetime))
+	gp.db.SetMaxOpenConns(confutil.IntMin(conf.MaxOpenConns, 1, *defs.MaxOpenConns))
+	gp.db.SetMaxIdleConns(confutil.Int(conf.MaxIdleConns, *defs.MaxIdleConns))
+	gp.db.SetConnMaxIdleTime(confutil.Duration(conf.ConnMaxIdleTime, *defs.ConnMaxIdleTime))
+	gp.db.SetConnMaxLifetime(confutil.Duration(conf.ConnMaxLifetime, *defs.ConnMaxLifetime))
 
 	if confutil.Bool(conf.AutoMigrate, false) {
 		if err = gp.runMigration(ctx, func(m *migrate.Migrate) error { return m.Up() }); err != nil {
