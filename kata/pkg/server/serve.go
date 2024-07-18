@@ -24,6 +24,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -57,7 +60,42 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}, nil
 }
 
-func Run(ctx context.Context, socketAddress string) {
+type GRPCConfig struct {
+	SocketAddress *string `yaml:"socketAddress"`
+}
+
+type Config struct {
+	Peristence *persistence.Config `yaml:"persistence"`
+	GRPC       *GRPCConfig         `yaml:"grpc"`
+}
+
+func Run(ctx context.Context, configFilePath string) {
+	config := Config{}
+
+	err := confutil.ReadAndParseYAMLFile(ctx, configFilePath, &config)
+	if err != nil {
+		log.L(ctx).Errorf("failed to read and parse YAML file: %v", err)
+		return
+	}
+	//Validate config
+	if config.GRPC == nil || config.GRPC.SocketAddress == nil {
+		log.L(ctx).Errorf("missing grpc config in config file %s", configFilePath)
+		return
+	}
+
+	//Initialise the persistence layer
+	persistence, err := persistence.NewPersistence(ctx, config.Peristence)
+	if err != nil {
+		log.L(ctx).Errorf("failed to initialise persistence: %v", err)
+		return
+	}
+
+	//Initialise the transaction manager
+	transaction.Init(ctx, persistence)
+
+	runGRPCServer(ctx, *config.GRPC.SocketAddress)
+}
+func runGRPCServer(ctx context.Context, socketAddress string) {
 	log.L(ctx).Infof("Run: %s", socketAddress)
 
 	serverLock.Lock()

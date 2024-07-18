@@ -27,9 +27,9 @@ import (
 
 var ts transactionstore.TransactionStore
 
-func init() {
-	persistence, _, _ := persistence.NewUnitTestPersistence(context.Background())
-	ts = transactionstore.NewTransactionStore(context.Background(), &transactionstore.Config{}, persistence)
+func Init(ctx context.Context, persistence persistence.Persistence) {
+	log.L(ctx).Info("Initializing transaction store")
+	ts = transactionstore.NewTransactionStore(ctx, &transactionstore.Config{}, persistence)
 }
 
 func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.SubmitTransactionResponse, error) {
@@ -38,8 +38,6 @@ func Submit(ctx context.Context, req *proto.SubmitTransactionRequest) (*proto.Su
 	// You can return the transaction ID in the response using &SubmitTransactionResponse{transactionId: "your-transaction-id"}
 
 	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", req.ContractAddress, req.From, req.IdempotencyKey, req.Payload)
-
-	// High level checks goes into here:
 
 	payload := req.GetPayloadJSON()
 	if payload == "" {

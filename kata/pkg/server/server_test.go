@@ -17,7 +17,6 @@ package server
 import (
 	"context"
 	"io"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -34,21 +33,40 @@ func TestRun(t *testing.T) {
 
 	// get a valid file name for a temp file by first creating a temp file and then removing it
 	file, err := os.CreateTemp("", "paladin.sock")
-	if err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, err)
 	socketAddress := file.Name()
 	os.Remove(file.Name())
 
+	//Create and write a config file
+	configFile, err := os.CreateTemp("", "test_*.yaml")
+	require.NoError(t, err)
+
+	defer os.Remove(configFile.Name())
+
+	// Write YAML content to the temporary file
+	yamlContent := []byte(`
+persistence:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: ../../db/migrations/sqlite
+    debugQueries:  true
+grpc:
+  socketAddress: ` + socketAddress + `
+`)
+	_, err = configFile.Write(yamlContent)
+	require.NoError(t, err)
+
+	configFile.Close()
+
 	// Start the server
-	go Run(ctx, socketAddress)
+	go Run(ctx, configFile.Name())
 	time.Sleep(time.Second * 2)
 
 	// Create a gRPC client connection
 	conn, err := grpc.NewClient("unix:"+socketAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatalf("Failed to dial server: %v", err)
-	}
+	require.NoError(t, err)
 	defer conn.Close()
 	// Create a new instance of the gRPC client
 	client := proto.NewPaladinTransactionServiceClient(conn)
@@ -65,9 +83,7 @@ func TestRun(t *testing.T) {
 	assert.True(t, status.GetOk())
 
 	streams, err := client.Listen(ctx)
-	if err != nil {
-		t.Fatalf("Failed to call gRPC method: %v", err)
-	}
+	require.NoError(t, err, "failed to call Listen")
 
 	requestId := "requestID"
 	submitTransactionRequest := &proto.TransactionMessage{
