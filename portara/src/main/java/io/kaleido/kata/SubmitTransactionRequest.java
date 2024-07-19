@@ -13,11 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.transaction;
+package io.kaleido.kata;
 
-import paladin.transaction.Transaction;
+import paladin.kata.Kata;
 
-public class SubmitTransactionRequest extends TransactionRequest {
+public class SubmitTransactionRequest extends Request {
 
     private final String contractAddress;
     private final String from;
@@ -25,8 +25,8 @@ public class SubmitTransactionRequest extends TransactionRequest {
     private final String payloadJSON;
 
     public SubmitTransactionRequest(
-            TransactionHandler transactionHandler,
-            TransactionResponseHandler responseHandler,
+            Handler transactionHandler,
+            ResponseHandler responseHandler,
             String contractAddress,
             String from,
             String idempotencyKey,
@@ -39,10 +39,10 @@ public class SubmitTransactionRequest extends TransactionRequest {
     }
 
     @Override
-    public Transaction.TransactionRequest getRequestMessage() {
-        return Transaction.TransactionRequest.newBuilder()
-                .setType(Transaction.REQUEST_TYPE.SUBMIT_TRANSACTION_REQUEST)
-                .setSubmitTransactionRequest(Transaction.SubmitTransactionRequest.newBuilder()
+    public Kata.Request getRequestMessage() {
+        return Kata.Request.newBuilder()
+                .setType(Kata.REQUEST_TYPE.SUBMIT_TRANSACTION_REQUEST)
+                .setSubmitTransactionRequest(Kata.SubmitTransactionRequest.newBuilder()
                         .setContractAddress(this.contractAddress)
                         .setFrom(this.from)
                         .setIdempotencyKey(this.idempotencyKey)

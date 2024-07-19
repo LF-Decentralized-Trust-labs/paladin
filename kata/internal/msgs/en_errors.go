@@ -61,6 +61,14 @@ var (
 
 	// Transaction Processor PD0103XX
 	MsgTransactionProcessorInvalidStage      = ffe("PD010300", "Invalid stage: %s")
-	MsgTransactionProcessorUndeterminedStage = ffe("PD010302", "Cannot determine a processing stage for transaction with ID: %s")
-	MsgTransactionProcessorNoValidActions    = ffe("PD010303", "No valid actions for transaction with ID: %s")
+	MsgTransactionProcessorUndeterminedStage = ffe("PD010301", "Cannot determine a processing stage for transaction with ID: %s")
+	MsgTransactionProcessorNoValidActions    = ffe("PD010302", "No valid actions for transaction with ID: %s")
+
+	// Transaction store PD0104XX
+	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+
+	// Config PD0105XX
+	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
+	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 )

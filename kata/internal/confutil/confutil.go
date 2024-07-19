@@ -16,7 +16,16 @@
 
 package confutil
 
-import "time"
+import (
+	"context"
+	"os"
+	"time"
+
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"gopkg.in/yaml.v3"
+)
 
 func Int(iVal *int, def int) int {
 	if iVal == nil {
@@ -66,6 +75,27 @@ func Duration(sVal *string, def string) time.Duration {
 		return defDuration
 	}
 	return *dVal
+}
+
+func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		log.L(ctx).Errorf("file not found: %s", filePath)
+		return i18n.NewError(ctx, msgs.MsgConfigFileMissing, filePath)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		log.L(ctx).Errorf("failed to read file: %v", err)
+		return i18n.NewError(ctx, msgs.MsgConfigFileReadError, filePath, err.Error())
+	}
+
+	err = yaml.Unmarshal(data, config)
+	if err != nil {
+		log.L(ctx).Errorf("failed to parse file: %v", err)
+		return i18n.NewError(ctx, msgs.MsgConfigFileParseError, err.Error())
+	}
+
+	return nil
 }
 
 func P[T any](v T) *T {

@@ -53,12 +53,12 @@ type TxStateManager interface {
 
 type Transaction struct {
 	gorm.Model
-	ID          uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()"`
-	FromID      uuid.UUID `gorm:"type:uuid"`
-	SequenceID  uuid.UUID `gorm:"type:uuid"`
-	Contract    string    `gorm:"type:uuid"`
-	PayloadJSON string    `gorm:"type:text"`
-	PayloadRLP  string    `gorm:"type:text"`
+	ID          uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
+	From        string     `gorm:"type:text"`
+	SequenceID  *uuid.UUID `gorm:"type:uuid"`
+	Contract    string     `gorm:"type:uuid"`
+	PayloadJSON *string    `gorm:"type:text"`
+	PayloadRLP  *string    `gorm:"type:text"`
 
 	PreReqTxs         []string `gorm:"type:text[]; serializer:json"`
 	DispatchNode      string   `gorm:"type:text"`
@@ -83,7 +83,10 @@ func NewTransaction(ctx context.Context, txID uuid.UUID) TxStateManager {
 
 func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *TransactionUpdate) {
 	if txUpdates.SequenceID != nil {
-		t.SequenceID = *txUpdates.SequenceID
+		t.SequenceID = txUpdates.SequenceID
+	}
+	if txUpdates.DispatchTxID != nil {
+		t.DispatchTxID = *txUpdates.DispatchTxID
 	}
 	if txUpdates.DispatchTxID != nil {
 		t.DispatchTxID = *txUpdates.DispatchTxID
