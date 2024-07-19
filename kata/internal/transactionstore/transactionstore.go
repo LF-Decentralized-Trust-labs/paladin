@@ -29,6 +29,20 @@ import (
 type Config struct {
 }
 
+type TxStateGetters interface {
+	GetContract(ctx context.Context) string
+	GetTxID(ctx context.Context) string
+}
+
+type TxStateSetters interface {
+	ApplyTxUpdates(ctx context.Context, txUpdates *TransactionUpdate)
+}
+
+type TxStateManager interface {
+	TxStateGetters
+	TxStateSetters
+}
+
 type Transaction struct {
 	gorm.Model
 	ID          uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
@@ -37,6 +51,33 @@ type Transaction struct {
 	Contract    string     `gorm:"type:uuid"`
 	PayloadJSON *string    `gorm:"type:text"`
 	PayloadRLP  *string    `gorm:"type:text"`
+}
+
+type TransactionUpdate struct { // TODO define updatable fields
+	SequenceID *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
+}
+
+func NewTransaction(ctx context.Context, txID uuid.UUID) TxStateManager {
+	// TODO: this function should use a cache
+	return &Transaction{
+		ID: txID,
+	}
+}
+
+func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *TransactionUpdate) {
+	if txUpdates.SequenceID != nil {
+		t.SequenceID = txUpdates.SequenceID
+	}
+	// TODO, plug in DB persistence
+	// 1. persist to DB first
+	// 2. update in memory object
+}
+func (t *Transaction) GetContract(ctx context.Context) string {
+	return t.Contract
+}
+
+func (t *Transaction) GetTxID(ctx context.Context) string {
+	return t.ID.String()
 }
 
 type TransactionStore interface {
