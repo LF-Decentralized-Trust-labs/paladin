@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"google.golang.org/grpc/metadata"
 )
 
 func NewKataMessageService(ctx context.Context, messageBroker commsbus.Broker) *KataMessageService {
@@ -49,9 +50,27 @@ func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusReques
 func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStreamsServer) error {
 	ctx := stream.Context()
 	log.L(ctx).Info("OpenStreams")
-	//TODO: defaulting to an ephemeral session which means a new destination ID is generated for each stream
-	// however, should really allow the client to specify a destination ID so that they can resume a session if needed
+	//defaulting to an ephemeral session which means a new destination ID is generated for each stream
 	destinationID := uuid.New().String()
+
+	// allow the client to specify a destination ID in metadata so that they can resume a session if needed
+	if md, ok := metadata.FromIncomingContext(stream.Context()); ok {
+		log.L(ctx).Debug("got metadata")
+
+		if val, ok := md["destination"]; ok {
+			log.L(ctx).Debug("got destination from metadata", val[0])
+
+			destinationID = val[0]
+		} else {
+			log.L(ctx).Debug("metadata does not contain destination")
+
+		}
+	} else {
+		log.L(ctx).Debug("no metadata")
+
+	}
+	log.L(ctx).Infof("Destination ID: %s", destinationID)
+
 	messageHandler, err := s.messageBroker.Listen(ctx, destinationID)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to listen for messages: %s", err)
