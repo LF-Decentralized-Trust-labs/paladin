@@ -80,7 +80,7 @@ func (cs *CommsBusAPIServer) sendMessage(w http.ResponseWriter, r *http.Request)
 	//
 	// TODO: Change from using strings here and show something more interesting like objects.
 	// ---------------------------------------------------------------------------------------------------------------------------------------
-	err = cs.transportProvider.SendMessage(context.Background(), message.To, message.Content)
+	err = cs.transportProvider.SendMessage(context.Background(), message.To, []byte(message.Content))
 	if err != nil {
 		http.Error(w, "Unable to unmarshal request body", http.StatusInternalServerError)
 		return
