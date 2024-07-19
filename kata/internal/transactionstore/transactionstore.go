@@ -31,12 +31,12 @@ type Config struct {
 
 type Transaction struct {
 	gorm.Model
-	ID          uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()"`
-	FromID      uuid.UUID `gorm:"type:uuid"`
-	SequenceID  uuid.UUID `gorm:"type:uuid"`
-	Contract    string    `gorm:"type:uuid"`
-	PayloadJSON string    `gorm:"type:text"`
-	PayloadRLP  string    `gorm:"type:text"`
+	ID          uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
+	From        string     `gorm:"type:text"`
+	SequenceID  *uuid.UUID `gorm:"type:uuid"`
+	Contract    string     `gorm:"type:uuid"`
+	PayloadJSON *string    `gorm:"type:text"`
+	PayloadRLP  *string    `gorm:"type:text"`
 }
 
 type TransactionStore interface {

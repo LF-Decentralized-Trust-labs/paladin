@@ -15,14 +15,14 @@
 
 syntax = "proto3";
 
-package paladin.transaction;
+package paladin.kata;
 option go_package = "pkg/proto";
 
-service PaladinTransactionService {
+service KataMessageService {
   // Bidirectional streams to send and receive messages. 
   // Each message is either a request message, a response message for a given request message, or an event message.
   // Each message type can be sent in either direction, although a response message is normaly sent in the opposite direction from its corresponding request message.
-  rpc Listen(stream TransactionMessage) returns (stream TransactionMessage) {}
+  rpc OpenStreams(stream Message) returns (stream Message) {}
   rpc Status(StatusRequest) returns (StatusResponse) {}
 }
 
@@ -48,43 +48,43 @@ enum EVENT_TYPE {
   TRANSACTION_FAILED = 2;
 }
 
-message CloseTransactionStreamRequest {
+// Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
+message QuiesceStreamRequest {
 }
 
-message CloseTransactionStreamResponse {
+message QuiesceStreamResponse {
 }
 
 message StatusRequest {}
 
-  
 message StatusResponse {
   bool ok = 1;
 }
 
-message TransactionMessage {
+message Message {
   MESSAGE_TYPE type = 1;
   string id = 2;
   oneof message {
-    TransactionRequest request = 16;
-    TransactionResponse response = 17;
-    TransactionEvent event = 18;
+    Request request = 16;
+    Response response = 17;
+    Event event = 18;
   }
 }
 
-message TransactionRequest {
+message Request {
   REQUEST_TYPE type = 1;
   oneof request {
-    SubmitTransactionRequest submitTransactionRequest = 16;
-    CloseTransactionStreamRequest closeStreamRequest = 17;
+    SubmitTransactionRequest SubmitTransactionRequest = 16;
+    QuiesceStreamRequest closeStreamRequest = 17;
   }
 }
 
-message TransactionResponse {
+message Response {
   RESPONSE_TYPE type = 1;
   string requestId = 2;
   oneof response {
-    SubmitTransactionResponse submitTransactionResponse = 16;
-    CloseTransactionStreamResponse closeStreamResponse = 17;
+    SubmitTransactionResponse SubmitTransactionResponse = 16;
+    QuiesceStreamResponse closeStreamResponse = 17;
   }
 }
 
@@ -102,12 +102,12 @@ message SubmitTransactionResponse{
   string transactionId= 1;
 }
 
-message TransactionEvent {
+message Event {
   EVENT_TYPE type = 1;
   string id = 2;
   string commandId = 3;
   oneof message {
-    SubmitTransactionResponse       submitTransactionResponse = 16;
-    CloseTransactionStreamResponse  closeTransactionStreamResponse = 17;
+    SubmitTransactionResponse       SubmitTransactionResponse = 16;
+    QuiesceStreamResponse  suiesceStreamResponse = 17;
   }
 }

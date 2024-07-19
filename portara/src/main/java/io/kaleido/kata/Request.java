@@ -13,28 +13,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.transaction;
+package io.kaleido.kata;
 
-import paladin.transaction.Transaction;
+import paladin.kata.Kata;
 
 // Create a class that includes a method receiving a callback function
-public abstract class TransactionRequest {
-    private TransactionHandler transactionHandler;
-    private TransactionResponseHandler responseHandler;
+public abstract class Request {
+    private Handler transactionHandler;
+    private ResponseHandler responseHandler;
 
-    public TransactionRequest(TransactionHandler transactionHandler, TransactionResponseHandler responseHandler) {
+    public Request(Handler transactionHandler, ResponseHandler responseHandler) {
         this.transactionHandler = transactionHandler;
         this.responseHandler = responseHandler;
     }
 
     // Method that receives a callback function
-    public void send(TransactionResponseHandler responseHandler) throws Exception {
+    public void send(ResponseHandler responseHandler) throws Exception {
         this.transactionHandler.submitTransaction(this);
     }
     
-    public abstract Transaction.TransactionRequest getRequestMessage();
+    public abstract Kata.Request getRequestMessage();
 
-    public TransactionResponseHandler getResponseHandler() {
+    public ResponseHandler getResponseHandler() {
         return responseHandler;
     }
 }
