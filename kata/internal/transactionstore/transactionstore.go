@@ -66,7 +66,7 @@ func NewTransaction(ctx context.Context, txID uuid.UUID) TxStateManager {
 
 func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *TransactionUpdate) {
 	if txUpdates.SequenceID != nil {
-		t.SequenceID = *txUpdates.SequenceID
+		t.SequenceID = txUpdates.SequenceID
 	}
 	// TODO, plug in DB persistence
 	// 1. persist to DB first

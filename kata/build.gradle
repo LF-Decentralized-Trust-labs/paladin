@@ -16,7 +16,7 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    targetCoverage = 64
+    targetCoverage = 72
 }
 
 task installTools(type:Exec) {
@@ -55,18 +55,11 @@ task protoc(type:Exec) {
     args inputs.files
 }
 
-task customCleanUp(type:Delete) {
-    delete '*.dylib'
-    delete '*.so'
-    delete '*.dll'
-    delete fileTree("${projectDir}/bin").matching {
-        exclude "README.md"
-        exclude ".gitignore"
-    }
-}
-
-task clean {
-    dependsOn(tasks.customCleanUp)
+task clean(type:Exec) {
+    workingDir '.'
+    executable 'git'
+    args "clean"
+    args "-fdX"
 }
 
 task goGet(type:Exec) {
@@ -113,6 +106,7 @@ task buildSharedLibrary(type:Exec) {
         libName = "libkata.so"
     }
 
+    dependsOn tasks.clean
     dependsOn tasks.goGet
     dependsOn tasks.lint
     inputs.files(fileTree("${projectDir}").matching {
@@ -134,7 +128,7 @@ class DockerCompose extends Exec {
         def dockerComposeV2Check = getProject().exec({
             ignoreExitValue = true
             executable "docker"
-            args "compose", "ps"
+            args "compose", "version"
             standardOutput = new ByteArrayOutputStream()
             errorOutput = new ByteArrayOutputStream()
         })
@@ -243,6 +237,14 @@ task checkCoverage {
 
 task test(dependsOn: testRunSQLite) {
     finalizedBy checkCoverage
+}
+
+task testcov(type: Exec, dependsOn: testRunSQLite) {
+    workingDir '.'
+    executable 'go'
+    args 'tool'
+    args 'cover'
+    args '-html=coverage.txt'
 }
 
 task build {
