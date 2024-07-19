@@ -85,9 +85,7 @@ func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *Transaction
 	if txUpdates.SequenceID != nil {
 		t.SequenceID = txUpdates.SequenceID
 	}
-	if txUpdates.DispatchTxID != nil {
-		t.DispatchTxID = *txUpdates.DispatchTxID
-	}
+
 	if txUpdates.DispatchTxID != nil {
 		t.DispatchTxID = *txUpdates.DispatchTxID
 	}
