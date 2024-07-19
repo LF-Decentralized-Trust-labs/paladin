@@ -36,7 +36,7 @@ func TestTalariaNonBlocking(t *testing.T) {
 
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
-		RoutingInformation: "{\"address\":\"localhost:8080\"}",
+		RoutingInformation: []byte("{\"address\":\"localhost:8080\"}"),
 		TransactingEntity: "someone-on-this-machine",
 	}, nil)
 
@@ -44,7 +44,7 @@ func TestTalariaNonBlocking(t *testing.T) {
 	tal.Initialise(ctx)
 	assert.NotNil(t, tal)
 
-	collectedMessages := make(chan string, 100)
+	collectedMessages := make(chan []byte, 100)
 	go func(){
 		recvMessages := tal.GetMessages()
 
@@ -62,10 +62,10 @@ func TestTalariaNonBlocking(t *testing.T) {
 	// Publish batches of 10 messages and then wait before sending the next batch
 	for i := 0; i < 10; i += 1 {
 		for j := 0; j < 10; j += 1 {
-			err := tal.SendMessage(ctx, "someone-on-this-machine", "Hello, World!")
+			err := tal.SendMessage(ctx, "someone-on-this-machine", []byte("Hello, World!"))
 			assert.Nil(t, err)
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	assert.Equal(t, 100, len(collectedMessages))
@@ -77,7 +77,7 @@ func TestTalariaMessageFlow(t *testing.T) {
 	
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
-		RoutingInformation: "{\"address\":\"localhost:8080\"}",
+		RoutingInformation: []byte("{\"address\":\"localhost:8080\"}"),
 		TransactingEntity: "someone-on-this-machine",
 	}, nil)
 
@@ -85,24 +85,24 @@ func TestTalariaMessageFlow(t *testing.T) {
 	tal.Initialise(ctx)
 	assert.NotNil(t, tal)
 
-	err := tal.SendMessage(ctx, "someone-on-this-machine", "Hello, World! 1")
+	err := tal.SendMessage(ctx, "someone-on-this-machine", []byte("Hello, World! 1"))
 	assert.Nil(t, err)
-	err = tal.SendMessage(ctx, "someone-on-this-machine", "Hello, World! 2")
+	err = tal.SendMessage(ctx, "someone-on-this-machine", []byte("Hello, World! 2"))
 	assert.Nil(t, err)
-	err = tal.SendMessage(ctx, "someone-on-this-machine", "Hello, World! 3")
+	err = tal.SendMessage(ctx, "someone-on-this-machine", []byte("Hello, World! 3"))
 	assert.Nil(t, err)
 
 	recvMessages := tal.GetMessages()
 	for i := 0; i < 3; i++ {
 		message := <- recvMessages
-		assert.Contains(t, message, "Hello, World!")
+		assert.Contains(t, string(message), string("Hello, World!"))
 	}
 }
 
 func TestInitNewTalaria(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	rp := frm.NewRegistryProvider(t)
 	tal := talaria.NewTalaria(rp, 8080)
 	tal.Initialise(ctx)

@@ -38,14 +38,14 @@ var PluginBufferSize = 10
 
 type TransportProvider interface {
 	Initialise(ctx context.Context)
-	SendMessage(ctx context.Context, node string, content string) error
-	GetMessages() <- chan string
+	SendMessage(ctx context.Context, node string, content []byte) error
+	GetMessages() <- chan []byte
 }
 
 type PluginID string
 type PluginMessage struct {
-	MessageContent     string
-	RoutingInformation string
+	Payload            []byte
+	RoutingInformation []byte
 }
 
 type Talaria struct {
@@ -55,7 +55,7 @@ type Talaria struct {
 	plugins          []plugins.TransportPlugin
 	pluginLocations  map[PluginID]string
 
-	recvMessages     chan string
+	recvMessages     chan []byte
 	sendingMessages  map[PluginID]chan PluginMessage
 }
 
@@ -73,12 +73,12 @@ func NewTalaria(rp RegistryProvider, port int) *Talaria {
 		// TODO: Inbound messages here are buffered, but the read channel isn't which means
 		// we're able to cope with whole bunch of inbound messages with some seperation to
 		// the sending of those messages, but read is always one by one.
-		recvMessages: make(chan string, len(transportPlugins) * 10),
+		recvMessages: make(chan []byte, len(transportPlugins) * 10),
 		sendingMessages: make(map[PluginID]chan PluginMessage),
 	}
 }
 
-func (t *Talaria) GetMessages() <- chan string {
+func (t *Talaria) GetMessages() <- chan []byte {
 	return t.recvMessages
 }
 
@@ -128,7 +128,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 					continue
 				}
 
-				t.recvMessages <- returnedMessage.MessageContent
+				t.recvMessages <- returnedMessage.Payload
 			}
 		}()
 
@@ -139,7 +139,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 					return
 				case message := <-t.sendingMessages[PluginID(reg.Name)]: {
 					req := &pluginInterfaceProto.PaladinMessage{
-							MessageContent: message.MessageContent,
+							Payload: message.Payload,
 							RoutingInformation: message.RoutingInformation,
 						}
 						// TODO: When is this a blocking operation? What happens if a message cannot be sent?
@@ -155,7 +155,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 }
 
 // This is the client-facing API
-func (t *Talaria) SendMessage(ctx context.Context, paladinNode, content string) error {
+func (t *Talaria) SendMessage(ctx context.Context, paladinNode string, content []byte) error {
 	transpTarget, err := t.registryProvider.LookupPaladinEntity(paladinNode)
 	if err != nil {
 		log.Printf("could not find entity from the DB, err: %v", err)
@@ -164,7 +164,7 @@ func (t *Talaria) SendMessage(ctx context.Context, paladinNode, content string) 
 
 	// TODO: Plugin determination
 	t.sendingMessages["grpc-transport-plugin"] <- PluginMessage{
-		MessageContent: content,
+		Payload: content,
 		RoutingInformation: transpTarget.RoutingInformation,
 	}
 

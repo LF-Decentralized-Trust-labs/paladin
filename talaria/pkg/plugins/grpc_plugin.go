@@ -137,7 +137,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 			return ctx.Err()
 		case collectedMessage := <- gtp.messages: {
 			if err := server.Send(&pluginInterfaceProto.PaladinMessage{
-				MessageContent: string(collectedMessage),
+				Payload: collectedMessage,
 			}); err != nil {
 				log.Printf("send error %v", err)
 			}
@@ -171,7 +171,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 		client := interPaladinProto.NewInterPaladinTransportClient(conn)
 
 		_, err = client.SendInterPaladinMessage(ctx, &interPaladinProto.InterPaladinMessage{
-			Payload: []byte(pluginReq.MessageContent),
+			Payload: pluginReq.Payload,
 		})
 		if err != nil {
 			log.Fatalf("error sending message through gRPC: %v", err)
@@ -179,6 +179,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 	}
 }
 
+// Actually unlikely to be needed
 func (gtp *GRPCTransportPlugin) Status(ctx context.Context, _ *pluginInterfaceProto.StatusRequest) (*pluginInterfaceProto.PluginStatus, error) {
 	return &pluginInterfaceProto.PluginStatus{
 		Ok: true,

@@ -43,7 +43,7 @@ func TestMessageFlowSingleMessage(t *testing.T) {
 	// Essentially this test is pretending that it's Talaria
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	gp := getTestGRPCPlugin(ctx)
 
 	conn, err := grpc.NewClient(fmt.Sprintf("unix://%s", gp.SocketName), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -69,7 +69,7 @@ func TestMessageFlowSingleMessage(t *testing.T) {
 				assert.Nil(t, err)
 			}
 
-			messages <- []byte(returnedMessage.MessageContent)
+			messages <- []byte(returnedMessage.Payload)
 
 			// When we get 10 messages in the channel, let's exit
 			if len(messages) == 10 {
@@ -83,8 +83,8 @@ func TestMessageFlowSingleMessage(t *testing.T) {
 	go func(){
 		for i := 0; i < 10; i++ {
 			req := &pluginInterfaceProto.PaladinMessage{
-				MessageContent: "Hello, World!",
-				RoutingInformation: "{\"address\":\"localhost:10001\"}",
+				Payload: []byte("Hello, World!"),
+				RoutingInformation: []byte("{\"address\":\"localhost:10001\"}"),
 			}
 			if err := stream.Send(req); err != nil {
 				log.Fatalf("can not send %v", err)

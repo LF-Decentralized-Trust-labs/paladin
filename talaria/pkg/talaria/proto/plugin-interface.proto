@@ -30,10 +30,6 @@ message PluginStatus {
 }
 
 message PaladinMessage {
-  string routingInformation = 1;
-  string messageContent = 2;
-}
-
-message PaladinMessageReceipt {
-  string content = 1;
+  bytes routingInformation = 1;
+  bytes payload = 2;
 }
