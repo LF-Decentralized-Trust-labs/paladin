@@ -77,10 +77,16 @@ func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Conte
 	}
 
 	gtp.interPaladinListener = grpcLis
+	s := grpc.NewServer()
+	interPaladinProto.RegisterInterPaladinTransportServer(s, gtp)
 
 	go func(){
-		s := grpc.NewServer()
-		interPaladinProto.RegisterInterPaladinTransportServer(s, gtp)
+		<-ctx.Done()
+		s.Stop()
+		grpcLis.Close()
+	}()
+
+	go func(){
 		log.Printf("grpc server listening at %v", grpcLis.Addr())
 		if err := s.Serve(grpcLis); err != nil {
 			log.Printf("failed to serve: %v", err)
@@ -105,10 +111,16 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 	}
 
 	gtp.pluginListener = lis
+	s := grpc.NewServer()
+	pluginInterfaceProto.RegisterPluginInterfaceServer(s, gtp)
 
 	go func(){
-		s := grpc.NewServer()
-		pluginInterfaceProto.RegisterPluginInterfaceServer(s, gtp)
+		<-ctx.Done()
+		s.Stop()
+		lis.Close()
+	}()
+
+	go func(){
 		log.Printf("server listening at %v", lis.Addr())
 		if err := s.Serve(lis); err != nil {
 			log.Printf("failed to serve: %v", err)
@@ -176,24 +188,12 @@ func (gtp *GRPCTransportPlugin) Status(ctx context.Context, _ *pluginInterfacePr
 // --------------------------------------------------------------------------------------------------------------------------
 
 func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
-	// TODO: Review of threading model
 	gtp.startPluginServer(ctx)
 	gtp.startInterPaladinMessageServer(ctx)
 }
 
-func (gtp *GRPCTransportPlugin) Close(ctx context.Context) {
-	// TODO: Yeah this really isn't how shutdown is supposed to be done
-	gtp.interPaladinListener.Close()
-	gtp.pluginListener.Close()
-}
 
-
-// TODO: Not this
-//
-// I am super not-sold on how plugin registration is being done here, I have lots of thoughts of
-// why this is not what we want, but for now this is good enough to get this sample working. It
-// sounds like there's going to be a tonne of precedent from other places in the code base for how
-// plugins are going to fit in, so we're going to want to do something like that
+// TODO: Rip all of this out and replace it with whatever registration framework we get with kata
 func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	return PluginRegistration{
 		Name: "grpc-transport-plugin",
@@ -201,10 +201,12 @@ func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	}
 }
 
+// TODO: Config
 func NewGRPCTransportPlugin(port int) *GRPCTransportPlugin {
 	return &GRPCTransportPlugin{
 		port: port,
 		SocketName: fmt.Sprintf("/tmp/%s.sock", uuid.New().String()),
+		// Buffer size needs to be configurable
 		messages: make(chan []byte, 10),
 	}
 }

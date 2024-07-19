@@ -41,7 +41,9 @@ func TestMessageFlowSingleMessage(t *testing.T) {
 	// to itself on localhost and then vertify that we're able to see the message coming through to the channel
 	//
 	// Essentially this test is pretending that it's Talaria
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
 	gp := getTestGRPCPlugin(ctx)
 
 	conn, err := grpc.NewClient(fmt.Sprintf("unix://%s", gp.SocketName), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -95,15 +97,15 @@ func TestMessageFlowSingleMessage(t *testing.T) {
 
 	// Verify after the flow is complete that we have 10 messages in our buffer
 	assert.Equal(t, 10, len(messages))
-	gp.Close(ctx)
 }
 
 func TestGetRegistration(t *testing.T){
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	gp := getTestGRPCPlugin(ctx)
 
 	reg := gp.GetRegistration()
 	assert.NotNil(t, reg.Name)
 	assert.NotNil(t, reg.SocketLocation)
-	gp.Close(ctx)
 }

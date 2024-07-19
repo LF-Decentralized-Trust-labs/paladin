@@ -31,5 +31,4 @@ type TransportPlugin interface {
 	// Methods specifically for plugin lifecycle
 	GetRegistration() PluginRegistration
 	Start(ctx context.Context)
-	Close(ctx context.Context)
 }

@@ -31,7 +31,8 @@ func TestTalariaNonBlocking(t *testing.T) {
 	// Throw slightly random combinations of messages at Talaria to show that it's not
 	// blocking when it's processing messages
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
@@ -71,7 +72,8 @@ func TestTalariaNonBlocking(t *testing.T) {
 }
 
 func TestTalariaMessageFlow(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
@@ -98,7 +100,9 @@ func TestTalariaMessageFlow(t *testing.T) {
 }
 
 func TestInitNewTalaria(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
 	rp := frm.NewRegistryProvider(t)
 	tal := talaria.NewTalaria(rp, 8080)
 	tal.Initialise(ctx)

@@ -27,22 +27,14 @@ import (
 	plugins "github.com/kaleido-io/talaria/pkg/plugins"
 )
 
-/*
-	Talaria feels very amorphous at the moment but I think from code that it has the following reponsibilties
-	right now:
+// TODO: Talaria is a plugin that speaks to other plugins, all of the code in here at the moment for
+// orchestration of those plugins should be removed and replaced by whatever framework we have in Kata
 
-	1. Handling inbound requests to send messages to other Paladin transacting entities (PTE)
-	2. Performing lookups with whatever our registry looks like to figure out how to talk to other PTE's
-	3. Doing lifecycle of transport plugins, making sure they're initialised and handling connections
-	4. Doing comms to the plugins
-*/
+// TODO: There is a fundamental problem if the context is cancelled with the in-memory sending messages 
+// buffer that will be lost if kept in memory. This might be a concern of the higher-level components
+// above Talaria
 
-// TODO: Talaria should really be initialising the plugins and then doing IPC to those processes
-// TODO: Need to find some way to plug in peering information
-// TODO: What does the output of this section look like?
-// TODO: How are we going to manage config for plugins (feels like not just a me-problem)
-// TODO: What happens if we exceed buffer sizes? Do we block?
-// TODO: Review Todo's
+var PluginBufferSize = 10
 
 type TransportProvider interface {
 	Initialise(ctx context.Context)
@@ -67,7 +59,7 @@ type Talaria struct {
 	sendingMessages  map[PluginID]chan PluginMessage
 }
 
-// TODO: Terrible hack because no config for plugins
+// TODO: Terrible hack because no config for plugins (this will not be Talaria's concern)
 func NewTalaria(rp RegistryProvider, port int) *Talaria {
 	transportPlugins := []plugins.TransportPlugin{}
 
@@ -78,6 +70,9 @@ func NewTalaria(rp RegistryProvider, port int) *Talaria {
 		registryProvider: rp,
 		plugins: transportPlugins,
 		pluginLocations: make(map[PluginID]string),
+		// TODO: Inbound messages here are buffered, but the read channel isn't which means
+		// we're able to cope with whole bunch of inbound messages with some seperation to
+		// the sending of those messages, but read is always one by one.
 		recvMessages: make(chan string, len(transportPlugins) * 10),
 		sendingMessages: make(map[PluginID]chan PluginMessage),
 	}
@@ -88,61 +83,67 @@ func (t *Talaria) GetMessages() <- chan string {
 }
 
 func (t *Talaria) Initialise(ctx context.Context) {
-	// TODO: Need to figure out what the actual framework for putting in plugins looks like here
 	for _, plugin := range t.plugins {
+		pluginCtx, cancel := context.WithCancel(ctx)
+
 		reg := plugin.GetRegistration()
 		t.pluginLocations[PluginID(reg.Name)] = reg.SocketLocation
-		plugin.Start(ctx)
+		plugin.Start(pluginCtx)
 
 		// For each of the plugins spin up the comms threads
-		t.sendingMessages[PluginID(reg.Name)] = make(chan PluginMessage, 10)
+		t.sendingMessages[PluginID(reg.Name)] = make(chan PluginMessage, PluginBufferSize)
 		
 		socketLocationFormatted := fmt.Sprintf("unix://%s", reg.SocketLocation)
 		conn, err := grpc.NewClient(socketLocationFormatted, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Fatalf("Failed to establish connection to plugin: %s, err: %v", reg.Name, err)
-		}
-
-		client := pluginInterfaceProto.NewPluginInterfaceClient(conn)
-		stream, err := client.PluginMessageFlow(context.Background())
-		if err != nil {
+			log.Printf("Failed to establish connection to plugin: %s, err: %v", reg.Name, err)
+			cancel()
 			return
 		}
 
+		client := pluginInterfaceProto.NewPluginInterfaceClient(conn)
+		stream, err := client.PluginMessageFlow(pluginCtx)
+		if err != nil {
+			cancel()
+			return
+		}
+
+		go func(){
+			<-ctx.Done()
+			cancel()
+			conn.Close()
+		}()
+			
 		// Handle inbound messages back from the plugin
 		go func(){
 			for {
-				select {
-					case <- ctx.Done():
-						return
-					default: {
-						returnedMessage, err := stream.Recv()
-						if err == io.EOF {
-							log.Println("shutdown")
-							conn.Close()
-							return
-						}
-						if err != nil {
-							log.Printf("receive error %v", err)
-							continue
-						}
-
-						t.recvMessages <- returnedMessage.MessageContent
-					}
+				returnedMessage, err := stream.Recv() 
+				if err == io.EOF {
+					log.Println("shutdown")
+					conn.Close()
+					return
 				}
+				if err != nil {
+					log.Printf("receive error %v", err)
+					continue
+				}
+
+				t.recvMessages <- returnedMessage.MessageContent
 			}
 		}()
 
 		go func(){
 			for {
 				select {
-				case <- ctx.Done():
+				case <- pluginCtx.Done():
 					return
 				case message := <-t.sendingMessages[PluginID(reg.Name)]: {
 					req := &pluginInterfaceProto.PaladinMessage{
 							MessageContent: message.MessageContent,
 							RoutingInformation: message.RoutingInformation,
 						}
+						// TODO: When is this a blocking operation? What happens if a message cannot be sent?
+						// TODO: What is our retry mechanism?
 						if err := stream.Send(req); err != nil {
 							log.Fatalf("can not send %v", err)
 						}
@@ -155,7 +156,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 
 // This is the client-facing API
 func (t *Talaria) SendMessage(ctx context.Context, paladinNode, content string) error {
-	transTarget, err := t.registryProvider.LookupPaladinEntity(paladinNode)
+	transpTarget, err := t.registryProvider.LookupPaladinEntity(paladinNode)
 	if err != nil {
 		log.Printf("could not find entity from the DB, err: %v", err)
 		return err
@@ -164,7 +165,7 @@ func (t *Talaria) SendMessage(ctx context.Context, paladinNode, content string) 
 	// TODO: Plugin determination
 	t.sendingMessages["grpc-transport-plugin"] <- PluginMessage{
 		MessageContent: content,
-		RoutingInformation: transTarget.RoutingInformation,
+		RoutingInformation: transpTarget.RoutingInformation,
 	}
 
 	return nil
