@@ -79,6 +79,7 @@ var (
 	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010309", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
 	MsgFiltersJSONValueParseError       = ffe("PD010310", "Failed to parse value for field '%s' (as %T): %v")
 	MsgFiltersValueInvalidHex           = ffe("PD010311", "Failed to parse value as hex: %v")
+
 	// Transaction store PD0104XX
 	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
 
@@ -86,4 +87,18 @@ var (
 	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
 	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
+
+	// JSON/RPC PD0106XX
+	MsgJSONRPCInvalidRequest   = ffe("PD010600", "Invalid JSON/RPC request data")
+	MsgJSONRPCMissingRequestID = ffe("PD010601", "Invalid JSON/RPC request. Must set request ID")
+
+	// TLS PD0107XX
+	MsgTLSInvalidCAFile             = ffe("PD010700", "Invalid CA certificates file")
+	MsgTLSConfigFailed              = ffe("PD010701", "Failed to initialize TLS configuration")
+	MsgTLSInvalidKeyPairFiles       = ffe("PD010702", "Invalid certificate and key pair files")
+	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010703", "Unknown DN attribute '%s'")
+	MsgTLSInvalidTLSDnMatcherType   = ffe("PD010704", "Expected string value for '%s' field of requiredDNAttributes (found %T)")
+	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010705", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
+	MsgTLSInvalidTLSDnChain         = ffe("PD010706", "Cannot match subject distinguished name as cert chain is not verified")
+	MsgTLSInvalidTLSDnMismatch      = ffe("PD010707", "Certificate subject does not meet requirements")
 )
