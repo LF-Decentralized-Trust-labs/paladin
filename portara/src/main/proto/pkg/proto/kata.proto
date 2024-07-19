@@ -26,12 +26,6 @@ service KataMessageService {
   rpc Status(StatusRequest) returns (StatusResponse) {}
 }
 
-enum MESSAGE_TYPE {
-  REQUEST_MESSAGE = 0;
-  RESPONSE_MESSAGE = 1;
-  EVENT_MESSAGE =2;
-}
-
 // Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
 message QuiesceStreamRequest {
 }
@@ -46,28 +40,10 @@ message StatusResponse {
 }
 
 message Message {
-  MESSAGE_TYPE type = 1;
-  string id = 2;
-  oneof message {
-    Request request = 16;
-    Response response = 17;
-    Event event = 18;
-  }
-}
+  string destination = 1;
+  string type = 2;
+  string id = 3;
+  optional string correlationId = 4;
+  string body = 6;
 
-message Request {
-  string type = 1;
-  string payload = 2;
-}
-
-message Response {
-  string type = 1;
-  string requestId = 2;
-  string payload = 3;
-}
-
-message Event {
-  string type = 1;
-  string id = 2;
-  string payload = 4;
 }

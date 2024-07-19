@@ -18,17 +18,21 @@ import (
 	"context"
 	"io"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/transaction"
+	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-func NewKataMessageService() *KataMessageService {
-	return &KataMessageService{}
+func NewKataMessageService(ctx context.Context, messageBroker commsbus.Broker) *KataMessageService {
+	return &KataMessageService{
+		messageBroker: messageBroker,
+	}
 }
 
 type KataMessageService struct {
 	proto.UnimplementedKataMessageServiceServer
+	messageBroker commsbus.Broker
 }
 
 func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
@@ -44,9 +48,39 @@ func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusReques
 // The body and type of the messages control routing to specific functions within the kata and its plugins.
 func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStreamsServer) error {
 	ctx := stream.Context()
-	log.L(ctx).Info("Listen")
+	log.L(ctx).Info("OpenStreams")
+	//TODO: defaulting to an ephemeral session which means a new destination ID is generated for each stream
+	// however, should really allow the client to specify a destination ID so that they can resume a session if needed
+	destinationID := uuid.New().String()
+	messageHandler, err := s.messageBroker.Listen(ctx, destinationID)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to listen for messages: %s", err)
+		return err
+	}
+	// Start a goroutine to handle incoming messages from the internal comms bus and forward them to the client
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-messageHandler.Channel:
+				log.L(ctx).Info("Received message from comms bus to forward to client")
+
+				response := &proto.Message{
+					Id:            msg.ID,
+					Type:          msg.Type,
+					Body:          string(msg.Body),
+					CorrelationId: msg.CorrelationID,
+				}
+				err := stream.Send(response)
+				if err != nil {
+					log.L(ctx).Error("Error sending message", err)
+				}
+			}
+		}
+	}()
 	for {
-		// Read the next message from the stream
+		// Read the next message from the stream and forward it to the internal comms bus
 		msg, err := stream.Recv()
 		if err == io.EOF {
 			// End of stream, exit the loop
@@ -58,49 +92,21 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 			// Handle the error
 			return err
 		}
-		switch msg.GetType() {
-		case proto.MESSAGE_TYPE_RESPONSE_MESSAGE:
-			log.L(ctx).Info("Received MESSAGE_TYPE_RESPONSE_MESSAGE")
-		case proto.MESSAGE_TYPE_REQUEST_MESSAGE:
-			log.L(ctx).Info("Received MESSAGE_TYPE_REQUEST_MESSAGE")
-			requestType := msg.GetRequest().GetType()
-			requestId := msg.GetId()
-			switch requestType {
-			case "SUBMIT_TRANSACTION_REQUEST":
-				log.L(ctx).Info("Received SUBMIT_TRANSACTION_REQUEST")
-				submitTransactionRequest := msg.GetRequest().GetPayload()
+		log.L(ctx).Info("Received message")
+		commsbusMessage := commsbus.Message{
+			Destination:   msg.GetDestination(),
+			Body:          []byte(msg.GetBody()),
+			ID:            msg.GetId(),
+			Type:          msg.GetType(),
+			ReplyTo:       &destinationID, // We always set replyto just incase the client wants to send a response back
+			CorrelationID: msg.CorrelationId,
+		}
 
-				response, err := transaction.Submit(stream.Context(), submitTransactionRequest)
-				if err != nil {
-					// Handle the error
-					return err
-				}
-
-				submitTransactionResponse := &proto.Message{
-					Type: proto.MESSAGE_TYPE_RESPONSE_MESSAGE,
-					Message: &proto.Message_Response{
-						Response: &proto.Response{
-							Type:      "SUBMIT_TRANSACTION_RESPONSE",
-							RequestId: requestId,
-							Payload:   response,
-						},
-					},
-				}
-
-				if err := stream.Send(submitTransactionResponse); err != nil {
-					log.L(ctx).Error("Error sending submitTransactionResponse", err)
-					return err
-				}
-				log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
-
-			default:
-				log.L(ctx).Info("Received unkonwn request type")
-			}
-
-		default:
-			log.L(ctx).Info("Received unkonwn message type")
-
-			// Handle unknown message types
+		err = s.messageBroker.SendMessage(ctx, commsbusMessage)
+		if err != nil {
+			log.L(ctx).Error("Error sending message", err)
+			// Handle the error
+			return err
 		}
 
 		// Optionally, you can also check if the client has requested to cancel the stream

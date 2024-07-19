@@ -14,7 +14,6 @@
  */
 package io.kaleido.kata;
 
-import java.util.UUID;
 import java.util.concurrent.*;
 import java.net.UnixDomainSocketAddress;
 
@@ -67,17 +66,18 @@ public class Handler {
 
             @Override
             public void onNext(Kata.Message transactionMessage) {
-                System.err.printf("Response in Java %s [%s]\n",
+                System.out.printf("Response in Java %s [%s]\n",
                         transactionMessage.getId(),
                         transactionMessage.getType());
-                if (transactionMessage.getType() == Kata.MESSAGE_TYPE.RESPONSE_MESSAGE) {
-                    String requestId = transactionMessage.getResponse().getRequestId();
+                String type = transactionMessage.getType();
+                if (type.equals("SUBMIT_TRANSACTION_RESPONSE")) {
+                    String requestId = transactionMessage.getCorrelationId();
                     Request request = inflightRequests.remove(requestId);
                     if (request != null) {
-                        request.getResponseHandler().onResponse(transactionMessage.getResponse());
-                        if (transactionMessage.getResponse().getType() == "SUBMIT_TRANSACTION_RESPONSE") {
+                        request.getResponseHandler().onResponse(transactionMessage);
+                        if (transactionMessage.getType() == "SUBMIT_TRANSACTION_RESPONSE") {
                             System.err.printf("Transaction submitted %s\n",
-                                    transactionMessage.getResponse().getPayload());
+                                    transactionMessage.getBody());
                         }
                         synchronized (drainMonitor) {
                             if (inflightRequests.isEmpty()) {
@@ -151,12 +151,8 @@ public class Handler {
         System.out.println("submitTransaction");
 
         try {
-            String requestId = UUID.randomUUID().toString();
-            this.messageStream.onNext(Kata.Message.newBuilder()
-                    .setId(requestId)
-                    .setType(Kata.MESSAGE_TYPE.REQUEST_MESSAGE)
-                    .setRequest(request.getRequestMessage())
-                    .build());
+            String requestId = request.getId();
+            this.messageStream.onNext(request.getRequestMessage());
             this.inflightRequests.put(requestId, request);
 
         } catch (Exception e) {

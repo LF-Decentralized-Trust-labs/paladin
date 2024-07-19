@@ -38,8 +38,10 @@ public class SubmitTransactionRequest extends Request {
         this.payloadJSON = payloadJSON;
     }
 
+
+
     @Override
-    public Kata.Request getRequestMessage() {
+    public Kata.Message getRequestMessage() {
         String payloadJSON = """
                         {
                             "contractAddress": "%s",
@@ -48,9 +50,11 @@ public class SubmitTransactionRequest extends Request {
                             "payloadJSON": "%s"
                         }
                         """.formatted(this.contractAddress, this.from, this.idempotencyKey, this.payloadJSON);
-        return Kata.Request.newBuilder()
+        return Kata.Message.newBuilder()
                 .setType("SUBMIT_TRANSACTION_REQUEST")
-                .setPayload(payloadJSON)
+                .setBody(payloadJSON)
+                .setId(getId())
+                .setDestination("kata-txn-engine")
                 .build();
     }
 

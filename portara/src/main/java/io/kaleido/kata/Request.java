@@ -15,16 +15,25 @@
 
 package io.kaleido.kata;
 
+import java.util.UUID;
+
 import paladin.kata.Kata;
 
 // Create a class that includes a method receiving a callback function
 public abstract class Request {
     private Handler transactionHandler;
     private ResponseHandler responseHandler;
+    private final String id;
 
     public Request(Handler transactionHandler, ResponseHandler responseHandler) {
         this.transactionHandler = transactionHandler;
         this.responseHandler = responseHandler;
+                this.id = UUID.randomUUID().toString();
+
+    }
+
+    public String getId() {
+        return this.id;
     }
 
     // Method that receives a callback function
@@ -32,7 +41,7 @@ public abstract class Request {
         this.transactionHandler.submitTransaction(this);
     }
     
-    public abstract Kata.Request getRequestMessage();
+    public abstract Kata.Message getRequestMessage();
 
     public ResponseHandler getResponseHandler() {
         return responseHandler;

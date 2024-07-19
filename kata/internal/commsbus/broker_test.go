@@ -36,7 +36,7 @@ func TestBroker_SendMessageOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := NewBroker(ctx, &Config{})
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
 	require.NoError(t, err)
 
 	// Create a channel to signal test completion
@@ -89,7 +89,7 @@ func TestBroker_SendMessageHandlerTimeout(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := NewBroker(ctx, &Config{})
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
 	require.NoError(t, err)
 
 	_, err = testBroker.Listen(ctx, "test.destination")
@@ -119,7 +119,7 @@ func TestBroker_Unlisten(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := NewBroker(ctx, &Config{})
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
 	require.NoError(t, err)
 
 	handler, err := testBroker.Listen(ctx, "test.destination")

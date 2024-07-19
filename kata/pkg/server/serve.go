@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 
+	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transaction"
@@ -40,7 +41,7 @@ var serverLock sync.Mutex
 
 var servers = map[string]*grpcServer{}
 
-func newRPCServer(socketAddress string) (*grpcServer, error) {
+func newRPCServer(socketAddress string, broker commsbus.Broker) (*grpcServer, error) {
 	ctx := log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
 	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
 	l, err := net.Listen("unix", socketAddress)
@@ -50,7 +51,7 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterKataMessageServiceServer(s, NewKataMessageService())
+	proto.RegisterKataMessageServiceServer(s, NewKataMessageService(ctx, broker))
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
@@ -91,12 +92,23 @@ func Run(ctx context.Context, configFilePath string) {
 		return
 	}
 
-	//Initialise the transaction manager
-	transaction.Init(ctx, persistence)
+	//Initialise the commsbus
+	broker, err := commsbus.NewBroker(ctx, &commsbus.BrokerConfig{})
+	if err != nil {
+		log.L(ctx).Errorf("failed to initialise broker: %v", err)
+		return
+	}
 
-	runGRPCServer(ctx, *config.GRPC.SocketAddress)
+	//Initialise the transaction manager
+	err = transaction.Init(ctx, persistence, broker)
+	if err != nil {
+		log.L(ctx).Errorf("failed to initialise transaction manager: %v", err)
+		return
+	}
+
+	runGRPCServer(ctx, *config.GRPC.SocketAddress, broker)
 }
-func runGRPCServer(ctx context.Context, socketAddress string) {
+func runGRPCServer(ctx context.Context, socketAddress string, broker commsbus.Broker) {
 	log.L(ctx).Infof("Run: %s", socketAddress)
 
 	serverLock.Lock()
@@ -107,7 +119,7 @@ func runGRPCServer(ctx context.Context, socketAddress string) {
 		log.L(ctx).Errorf("Server %s already running", socketAddress)
 		return
 	}
-	s, err := newRPCServer(socketAddress)
+	s, err := newRPCServer(socketAddress, broker)
 	if err != nil {
 		return
 	}
@@ -135,7 +147,6 @@ func Stop(ctx context.Context, socketAddress string) {
 		log.L(ctx).Infof("Server %s stopped (err=%v)", socketAddress, serverErr)
 	} else {
 		log.L(ctx).Infof("No server for address %s", socketAddress)
-
 	}
 
 	serverLock.Lock()

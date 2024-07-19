@@ -28,16 +28,20 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-type Config struct {
+type BrokerConfig struct {
 }
 
 type Message struct {
-	Destination string
-	Body        []byte
-	ReplyTo     *string
+	Destination   string
+	Body          []byte
+	ReplyTo       *string
+	ID            string
+	CorrelationID *string
+	Type          string
 }
 
 type Event struct {
@@ -73,7 +77,7 @@ type broker struct {
 	destinationsLock sync.Mutex
 }
 
-func NewBroker(ctx context.Context, conf *Config) (Broker, error) {
+func NewBroker(ctx context.Context, conf *BrokerConfig) (Broker, error) {
 	return &broker{
 		destinations: make(map[string]MessageHandler),
 	}, nil
@@ -104,6 +108,8 @@ func (b *broker) Unlisten(ctx context.Context, destination string) error {
 
 // SendMessage implements Broker.
 func (b *broker) SendMessage(ctx context.Context, message Message) error {
+	log.L(ctx).Infof("SendMessage: %s", message.Destination)
+
 	b.destinationsLock.Lock()
 	handler, ok := b.destinations[message.Destination]
 	b.destinationsLock.Unlock()
@@ -113,6 +119,7 @@ func (b *broker) SendMessage(ctx context.Context, message Message) error {
 	select {
 	case handler.Channel <- message:
 	case <-time.After(time.Second):
+		log.L(ctx).Error("Timed out")
 		return i18n.NewError(ctx, msgs.MsgHandlerError)
 	}
 

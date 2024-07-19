@@ -95,14 +95,10 @@ grpc:
 
 	requestId := "requestID"
 	submitTransactionRequest := &proto.Message{
-		Type: proto.MESSAGE_TYPE_REQUEST_MESSAGE,
-		Id:   requestId,
-		Message: &proto.Message_Request{
-			Request: &proto.Request{
-				Type:    "SUBMIT_TRANSACTION_REQUEST",
-				Payload: submitTransactionJSON,
-			},
-		},
+		Destination: "kata-txn-engine",
+		Id:          requestId,
+		Type:        "SUBMIT_TRANSACTION_REQUEST",
+		Body:        submitTransactionJSON,
 	}
 
 	err = streams.Send(submitTransactionRequest)
@@ -112,8 +108,8 @@ grpc:
 
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
-	assert.Equal(t, requestId, resp.GetResponse().GetRequestId())
-	assert.NotNil(t, resp.GetResponse().GetPayload())
+	assert.Equal(t, requestId, resp.GetCorrelationId())
+	assert.NotNil(t, resp.GetBody())
 	err = streams.CloseSend()
 	require.NoError(t, err)
 	resp, err = streams.Recv()

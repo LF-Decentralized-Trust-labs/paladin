@@ -20,16 +20,83 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
 var ts transactionstore.TransactionStore
+var handler commsbus.MessageHandler
+var broker commsbus.Broker
 
-func Init(ctx context.Context, persistence persistence.Persistence) {
+const SUBMIT_TRANSACTION_REQUEST = "SUBMIT_TRANSACTION_REQUEST"
+const SUBMIT_TRANSACTION_RESPONSE = "SUBMIT_TRANSACTION_RESPONSE"
+const SUBMIT_TRANSACTION_ERROR = "SUBMIT_TRANSACTION_ERROR"
+const MESSAGE_DESTINATION = "kata-txn-engine"
+
+func Init(ctx context.Context, persistence persistence.Persistence, messageBroker commsbus.Broker) error {
 	log.L(ctx).Info("Initializing transaction store")
 	ts = transactionstore.NewTransactionStore(ctx, &transactionstore.Config{}, persistence)
+	var err error
+	handler, err = messageBroker.Listen(ctx, MESSAGE_DESTINATION)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to listen for messages: %s", err)
+		return err
+	}
+	broker = messageBroker
+	go messageHandler(ctx)
+	return nil
+}
+
+func handleMessage(ctx context.Context, msg commsbus.Message) error {
+	log.L(ctx).Infof("Received message: %s", msg.Body)
+	switch msg.Type {
+	case SUBMIT_TRANSACTION_REQUEST:
+		log.L(ctx).Info("Received SUBMIT_TRANSACTION_REQUEST")
+		requestId := msg.ID
+		submitTransactionRequest := msg.Body
+
+		response, err := Submit(ctx, string(submitTransactionRequest))
+		if err != nil {
+			// Handle the error
+			log.L(ctx).Errorf("Error submitting transaction: %s", err)
+			return err
+		}
+
+		if msg.ReplyTo != nil {
+			submitTransactionResponse := commsbus.Message{
+				Type:          SUBMIT_TRANSACTION_RESPONSE,
+				Body:          []byte(response),
+				CorrelationID: &requestId,
+				Destination:   *msg.ReplyTo,
+			}
+
+			err = broker.SendMessage(ctx, submitTransactionResponse)
+			if err != nil {
+				log.L(ctx).Errorf("Error sending response: %s", err)
+				return err
+			}
+			log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
+		}
+
+	default:
+		log.L(ctx).Info("Received unkonwn message type")
+		// TODO Handle unknown message types
+	}
+	return nil
+}
+
+func messageHandler(ctx context.Context) {
+
+	for msg := range handler.Channel {
+		log.L(ctx).Infof("Received message: %s", msg.Body)
+		err := handleMessage(ctx, msg)
+		if err != nil {
+			log.L(ctx).Errorf("Error handling message: %s", err)
+			//TODO error handling
+		}
+	}
 }
 
 func Submit(ctx context.Context, requestJSON string) (string, error) {
