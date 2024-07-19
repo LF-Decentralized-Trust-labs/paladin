@@ -52,6 +52,7 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 	log.L(ctx).Info("OpenStreams")
 	//defaulting to an ephemeral session which means a new destination ID is generated for each stream
 	destinationID := uuid.New().String()
+	ephemeralSession := true
 
 	// allow the client to specify a destination ID in metadata so that they can resume a session if needed
 	if md, ok := metadata.FromIncomingContext(stream.Context()); ok {
@@ -61,6 +62,7 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 			log.L(ctx).Debug("got destination from metadata", val[0])
 
 			destinationID = val[0]
+			ephemeralSession = false
 		} else {
 			log.L(ctx).Debug("metadata does not contain destination")
 
@@ -113,12 +115,16 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 		}
 		log.L(ctx).Info("Received message")
 		commsbusMessage := commsbus.Message{
-			Destination:   msg.GetDestination(),
-			Body:          []byte(msg.GetBody()),
-			ID:            msg.GetId(),
-			Type:          msg.GetType(),
-			ReplyTo:       &destinationID, // We always set replyto just incase the client wants to send a response back
+			Destination: msg.GetDestination(),
+			Body:        []byte(msg.GetBody()),
+			ID:          msg.GetId(),
+			Type:        msg.GetType(),
+
 			CorrelationID: msg.CorrelationId,
+		}
+
+		if ephemeralSession && commsbusMessage.ReplyTo == nil {
+			commsbusMessage.ReplyTo = &destinationID // We set replyto just incase the client wants to send a response back
 		}
 
 		err = s.messageBroker.SendMessage(ctx, commsbusMessage)
