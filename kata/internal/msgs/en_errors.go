@@ -68,4 +68,8 @@ var (
 	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
 	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
+
+	// Comms bus PD0106XX
+	MsgDestinationNotFound = ffe("PD010600", "Destination not found: %s")
+	MsgHandlerError        = ffe("PD010601", "Error from message handler")
 )
