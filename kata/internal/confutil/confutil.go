@@ -18,6 +18,7 @@ package confutil
 
 import (
 	"context"
+	"math"
 	"os"
 	"time"
 
@@ -62,7 +63,28 @@ func Bool(bVal *bool, def bool) bool {
 	return *bVal
 }
 
-func Duration(sVal *string, def string) time.Duration {
+func StringNotEmpty(sVal *string, def string) string {
+	if sVal == nil || *sVal == "" {
+		return def
+	}
+	return *sVal
+}
+
+func StringOrEmpty(sVal *string, def string) string {
+	if sVal == nil {
+		return def
+	}
+	return *sVal
+}
+
+func StringSlice(sVal []string, def []string) []string {
+	if sVal == nil {
+		return def
+	}
+	return sVal
+}
+
+func DurationMin(sVal *string, min time.Duration, def string) time.Duration {
 	var dVal *time.Duration
 	if sVal != nil {
 		d, err := time.ParseDuration(*sVal)
@@ -70,11 +92,16 @@ func Duration(sVal *string, def string) time.Duration {
 			dVal = &d
 		}
 	}
-	if dVal == nil {
+	if dVal == nil || *dVal < min {
 		defDuration, _ := time.ParseDuration(def)
-		return defDuration
+		dVal = &defDuration
 	}
 	return *dVal
+}
+
+func DurationSeconds(sVal *string, min time.Duration, def string) int64 {
+	d := DurationMin(sVal, min, def)
+	return (int64)(math.Ceil(d.Seconds()))
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

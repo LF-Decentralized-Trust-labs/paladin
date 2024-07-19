@@ -63,7 +63,7 @@ type stateWriterBatch struct {
 func newStateWriter(bgCtx context.Context, ss *stateStore, conf *StateWriterConfig) *stateWriter {
 	workerCount := confutil.IntMin(conf.WorkerCount, 1, *StateWriterConfigDefaults.WorkerCount)
 	batchMaxSize := confutil.IntMin(conf.BatchMaxSize, 1, *StateWriterConfigDefaults.BatchMaxSize)
-	batchTimeout := confutil.Duration(conf.BatchTimeout, *StateWriterConfigDefaults.BatchTimeout)
+	batchTimeout := confutil.DurationMin(conf.BatchTimeout, 0, *StateWriterConfigDefaults.BatchTimeout)
 	sw := &stateWriter{
 		ss:           ss,
 		workerCount:  (uint32)(workerCount),

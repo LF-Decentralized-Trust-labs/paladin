@@ -89,8 +89,9 @@ var (
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 
 	// JSON/RPC PD0106XX
-	MsgJSONRPCInvalidRequest   = ffe("PD010600", "Invalid JSON/RPC request data")
-	MsgJSONRPCMissingRequestID = ffe("PD010601", "Invalid JSON/RPC request. Must set request ID")
+	MsgJSONRPCInvalidRequest    = ffe("PD010600", "Invalid JSON/RPC request data")
+	MsgJSONRPCMissingRequestID  = ffe("PD010601", "Invalid JSON/RPC request. Must set request ID")
+	MsgJSONRPCServerStartFailed = ffe("PD010602", "Failed to start server on '%s'")
 
 	// TLS PD0107XX
 	MsgTLSInvalidCAFile             = ffe("PD010700", "Invalid CA certificates file")
