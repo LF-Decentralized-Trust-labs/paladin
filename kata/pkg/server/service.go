@@ -12,34 +12,37 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package transaction
+package server
 
 import (
 	"context"
 	"io"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-func NewPaladinTransactionService() *PaladinTransactionService {
-	return &PaladinTransactionService{}
+func NewKataMessageService() *KataMessageService {
+	return &KataMessageService{}
 }
 
-type PaladinTransactionService struct {
-	proto.UnimplementedPaladinTransactionServiceServer
+type KataMessageService struct {
+	proto.UnimplementedKataMessageServiceServer
 }
 
-func (s *PaladinTransactionService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
+func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
+	log.L(ctx).Info("Status")
+
 	return &proto.StatusResponse{
 		Ok: true,
 	}, nil
 }
 
-// Listen implements the Listen RPC method of PaladinTransactionService which is the main entry point for bidirectional communication
-// between the public API and the transaction service. It receives a stream of TransactionEvent messages and sends a stream of TransactionEvent messages.
-// The body and type of the TransactionEvent messages control routing to specific functions within the transaction service.
-func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionService_ListenServer) error {
+// OpenStreams implements the OpenStreams RPC method of KataService which is the main entry point for bidirectional communication
+// between plugins and kata. It receives a stream of messages and sends a stream of messages.
+// The body and type of the messages control routing to specific functions within the kata and its plugins.
+func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStreamsServer) error {
 	ctx := stream.Context()
 	log.L(ctx).Info("Listen")
 	for {
@@ -67,18 +70,18 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 				log.L(ctx).Info("Received REQUEST_TYPE_SUBMIT_TRANSACTION_REQUEST")
 				submitTransactionRequest := msg.GetRequest().GetSubmitTransactionRequest()
 
-				response, err := s.submit(stream.Context(), submitTransactionRequest)
+				response, err := transaction.Submit(stream.Context(), submitTransactionRequest)
 				if err != nil {
 					// Handle the error
 					return err
 				}
 
-				submitTransactionResponse := &proto.TransactionMessage{
+				submitTransactionResponse := &proto.Message{
 					Type: proto.MESSAGE_TYPE_RESPONSE_MESSAGE,
-					Message: &proto.TransactionMessage_Response{
-						Response: &proto.TransactionResponse{
+					Message: &proto.Message_Response{
+						Response: &proto.Response{
 							RequestId: requestId,
-							Response: &proto.TransactionResponse_SubmitTransactionResponse{
+							Response: &proto.Response_SubmitTransactionResponse{
 								SubmitTransactionResponse: &proto.SubmitTransactionResponse{
 									TransactionId: response.TransactionId,
 								},
@@ -92,9 +95,6 @@ func (s *PaladinTransactionService) Listen(stream proto.PaladinTransactionServic
 					return err
 				}
 				log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
-
-			case proto.REQUEST_TYPE_CLOSE_STREAM_REQUEST:
-				log.L(ctx).Info("Received REQUEST_TYPE_CLOSE_STREAM_REQUEST")
 
 			default:
 				log.L(ctx).Info("Received unkonwn request type")

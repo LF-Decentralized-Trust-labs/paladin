@@ -13,9 +13,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- 
-package io.kaleido.transaction;
-import paladin.transaction.Transaction;
-public interface TransactionResponseHandler {
-    void onResponse(Transaction.TransactionResponse response);
+package transaction
+
+import "github.com/kaleido-io/paladin/kata/internal/persistence"
+
+type Config struct {
+	Persistence persistence.Config `yaml:"persistence"`
 }
