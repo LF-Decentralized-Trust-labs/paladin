@@ -24,6 +24,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
@@ -48,7 +50,8 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterPaladinTransactionServiceServer(s, &transaction.PaladinTransactionService{})
+	proto.RegisterKataMessageServiceServer(s, NewKataMessageService())
+
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
 		listener: l,
@@ -57,7 +60,45 @@ func newRPCServer(socketAddress string) (*grpcServer, error) {
 	}, nil
 }
 
-func Run(ctx context.Context, socketAddress string) {
+type GRPCConfig struct {
+	SocketAddress *string `yaml:"socketAddress"`
+}
+
+type Config struct {
+	Peristence *persistence.Config `yaml:"persistence"`
+	GRPC       *GRPCConfig         `yaml:"grpc"`
+}
+
+func Run(ctx context.Context, configFilePath string) {
+	log.L(ctx).Infof("Kata Run: %s", configFilePath)
+	config := Config{}
+
+	err := confutil.ReadAndParseYAMLFile(ctx, configFilePath, &config)
+	if err != nil {
+		log.L(ctx).Errorf("failed to read and parse YAML file: %v", err)
+		return
+	}
+	//Validate config
+	if config.GRPC == nil || config.GRPC.SocketAddress == nil {
+		log.L(ctx).Errorf("missing grpc config in config file %s", configFilePath)
+		return
+	}
+
+	//Initialise the persistence layer
+	persistence, err := persistence.NewPersistence(ctx, config.Peristence)
+	if err != nil {
+		log.L(ctx).Errorf("failed to initialise persistence: %v", err)
+		return
+	}
+
+	//Initialise the transaction manager
+	transaction.Init(ctx, persistence)
+
+	runGRPCServer(ctx, *config.GRPC.SocketAddress)
+}
+func runGRPCServer(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Run: %s", socketAddress)
+
 	serverLock.Lock()
 	_, exists := servers[socketAddress]
 	serverLock.Unlock()
@@ -81,14 +122,20 @@ func Run(ctx context.Context, socketAddress string) {
 }
 
 func Stop(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Stop: %s", socketAddress)
+
 	serverLock.Lock()
 	s := servers[socketAddress]
 	serverLock.Unlock()
 
 	if s != nil {
+		log.L(ctx).Infof("Stopping server on address %s", socketAddress)
 		s.server.GracefulStop()
 		serverErr := <-s.done
 		log.L(ctx).Infof("Server %s stopped (err=%v)", socketAddress, serverErr)
+	} else {
+		log.L(ctx).Infof("No server for address %s", socketAddress)
+
 	}
 
 	serverLock.Lock()

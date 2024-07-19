@@ -79,4 +79,11 @@ var (
 	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010309", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
 	MsgFiltersJSONValueParseError       = ffe("PD010310", "Failed to parse value for field '%s' (as %T): %v")
 	MsgFiltersValueInvalidHex           = ffe("PD010311", "Failed to parse value as hex: %v")
+	// Transaction store PD0104XX
+	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+
+	// Config PD0105XX
+	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
+	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 )

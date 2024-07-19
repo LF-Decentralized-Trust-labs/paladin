@@ -1,0 +1,16 @@
+services:
+    postgres:
+        container_name: paladin-test-db
+        image: postgres
+        ports:
+            - 5432:5432
+        volumes:
+            - ../demo/init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: my-secret
+    adminer:
+        container_name: paladin-test-adminer
+        image: adminer
+        ports:
+            - 8080:8080

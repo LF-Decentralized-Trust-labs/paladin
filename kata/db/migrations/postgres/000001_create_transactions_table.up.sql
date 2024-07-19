@@ -5,7 +5,7 @@ CREATE TABLE transactions (
   deleted_at                TIMESTAMP       ,
   id                        UUID            NOT NULL default gen_random_uuid(),
   contract                  TEXT            NOT NULL,
-  from_id                   UUID            NOT NULL,
+  "from"                    TEXT            NOT NULL,
   sequence_id               UUID,
   payload_json              TEXT,
   payload_rlp               TEXT
