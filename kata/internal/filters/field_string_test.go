@@ -33,6 +33,6 @@ func TestStringField(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = StringField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
-	assert.Regexp(t, "PD010305", err)
+	assert.Regexp(t, "PD010605", err)
 
 }

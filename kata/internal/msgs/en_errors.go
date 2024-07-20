@@ -66,19 +66,9 @@ var (
 	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 
-	// Filters PD0103XX
-	MsgFiltersUnknownField              = ffe("PD010300", "Unknown field '%s'")
-	MsgFiltersJSONQueryValueUnsupported = ffe("PD010301", "JSON query value not supported: %s")
-	MsgFiltersJSONQueryOpUnsupportedMod = ffe("PD010302", "Operation '%s' does not support modifiers: %v")
-	MsgFiltersValueInvalidForInt64      = ffe("PD010303", "Value '%s' cannot be parsed as a 64bit signed integer")
-	MsgFiltersValueInvalidForBool       = ffe("PD010304", "Value '%s' cannot be parsed as a boolean")
-	MsgFiltersValueInvalidForString     = ffe("PD010305", "Value '%s' cannot be parsed as a string")
-	MsgFiltersValueInvalidForBigInt     = ffe("PD010306", "Type '%T' cannot be converted to a big integer")
-	MsgFiltersValueIntStringParseFail   = ffe("PD010307", "Value '%s' cannot be converted to a big integer")
-	MsgFiltersValueMissing              = ffe("PD010308", "Value missing for filter field '%s'")
-	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010309", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
-	MsgFiltersJSONValueParseError       = ffe("PD010310", "Failed to parse value for field '%s' (as %T): %v")
-	MsgFiltersValueInvalidHex           = ffe("PD010311", "Failed to parse value as hex: %v")
+	// Transaction Processor PD0103XX
+	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+
 	// Transaction store PD0104XX
 	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
 
@@ -86,4 +76,18 @@ var (
 	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
 	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
+
+	// Filters PD0106XX
+	MsgFiltersUnknownField              = ffe("PD010600", "Unknown field '%s'")
+	MsgFiltersJSONQueryValueUnsupported = ffe("PD010601", "JSON query value not supported: %s")
+	MsgFiltersJSONQueryOpUnsupportedMod = ffe("PD010602", "Operation '%s' does not support modifiers: %v")
+	MsgFiltersValueInvalidForInt64      = ffe("PD010603", "Value '%s' cannot be parsed as a 64bit signed integer")
+	MsgFiltersValueInvalidForBool       = ffe("PD010604", "Value '%s' cannot be parsed as a boolean")
+	MsgFiltersValueInvalidForString     = ffe("PD010605", "Value '%s' cannot be parsed as a string")
+	MsgFiltersValueInvalidForBigInt     = ffe("PD010606", "Type '%T' cannot be converted to a big integer")
+	MsgFiltersValueIntStringParseFail   = ffe("PD010607", "Value '%s' cannot be converted to a big integer")
+	MsgFiltersValueMissing              = ffe("PD010608", "Value missing for filter field '%s'")
+	MsgFiltersMustBeBuiltUnscoped       = ffe("PD010609", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
+	MsgFiltersJSONValueParseError       = ffe("PD010610", "Failed to parse value for field '%s' (as %T): %v")
+	MsgFiltersValueInvalidHex           = ffe("PD010611", "Failed to parse value as hex: %v")
 )

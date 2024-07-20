@@ -33,5 +33,5 @@ func TestBoolField(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = BoolField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
-	assert.Regexp(t, "PD010304", err)
+	assert.Regexp(t, "PD010604", err)
 }

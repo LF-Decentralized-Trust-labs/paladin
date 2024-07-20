@@ -171,7 +171,7 @@ func TestBuildQuerySingleNestedWithResolverErrorTag(t *testing.T) {
 	_ = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{}).Count(&count)
-		assert.Regexp(t, "PD010300.*tag", db.Error)
+		assert.Regexp(t, "PD010600.*tag", db.Error)
 		return db
 	})
 }
@@ -200,7 +200,7 @@ func TestBuildQuerySingleNestedWithResolverErrorValue(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.Regexp(t, "PD010310.*tag.*PD010305", db.Error)
+		assert.Regexp(t, "PD010610.*tag.*PD010605", db.Error)
 		return db
 	})
 }
@@ -224,7 +224,7 @@ func TestBuildQueryResolverErrorMissing(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.Regexp(t, "PD010308.*tag", db.Error)
+		assert.Regexp(t, "PD010608.*tag", db.Error)
 		return db
 	})
 }
@@ -509,22 +509,22 @@ func TestBuildQueryJSONBadModifiers(t *testing.T) {
 	}
 
 	err = testJSON(`{"lessThan": [{"not": true, "field": "tag", "value": ""}]}`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 	err = testJSON(`{"lessThanOrEqual": [{"not": true, "field": "tag", "value": ""}]}`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 	err = testJSON(`{"greaterThan": [{"not": true, "field": "tag", "value": ""}]}`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 	err = testJSON(`{"greaterThanOrEqual": [{"not": true, "field": "tag", "value": ""}]}`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 	err = testJSON(`{"in": [{"caseInsensitive": true, "field": "tag", "value": ""}]}`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 	err = testJSON(`{"or": [{"in": [{"caseInsensitive": true, "field": "tag", "value": ""}]}] }`)
-	assert.Regexp(t, "PD010302", err)
+	assert.Regexp(t, "PD010602", err)
 
 }
 
@@ -545,31 +545,31 @@ func TestBuildQueryJSONBadFields(t *testing.T) {
 	}
 
 	err = testJSON(`{"sort": ["-wrong"]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"equal": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"like": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"lessThan": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"lessThanOrEqual": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"greaterThan": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"greaterThanOrEqual": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"in": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 
 	err = testJSON(`{"null": [{"field": "wrong"}]}`)
-	assert.Regexp(t, "PD010300", err)
+	assert.Regexp(t, "PD010600", err)
 }
 
 func TestBuildQueryJSONContainsShortNames(t *testing.T) {

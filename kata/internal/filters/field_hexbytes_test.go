@@ -33,10 +33,10 @@ func TestHexBytesField(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
-	assert.Regexp(t, "PD010305", err)
+	assert.Regexp(t, "PD010605", err)
 
 	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"not hex"`))
-	assert.Regexp(t, "PD010311", err)
+	assert.Regexp(t, "PD010611", err)
 
 	v, err := HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"0xAAbbCCdd"`))
 	assert.NoError(t, err)
