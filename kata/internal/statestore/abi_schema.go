@@ -29,24 +29,20 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
-type ABISchema interface {
-	Schema
-	Definition() *abi.Parameter
-}
-
 type abiSchema struct {
-	persisted   *SchemaEntity
+	*SchemaEntity
 	definition  *abi.Parameter
 	primaryType string
 	typeSet     eip712.TypeSet
 	labelInfo   []*schemaLabelInfo
 }
 
-func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABISchema, error) {
+func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			DomainID: domainID,
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
@@ -55,14 +51,14 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 	}
 	abiJSON, err := json.Marshal(def)
 	if err == nil {
-		as.persisted.Content = string(abiJSON)
+		as.Definition = abiJSON
 		err = as.typedDataV4Setup(ctx, true)
 	}
 	if err == nil {
-		as.persisted.Signature, err = as.FullSignature(ctx)
+		as.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.persisted.Hash = *HashIDKeccak([]byte(as.persisted.Signature))
+		as.Hash = *HashIDKeccak([]byte(as.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -70,11 +66,11 @@ func NewABISchema(ctx context.Context, domainID string, def *abi.Parameter) (ABI
 	return as, nil
 }
 
-func newABISchemaFromDB(ctx context.Context, persisted *SchemaEntity) (ABISchema, error) {
+func newABISchemaFromDB(ctx context.Context, persisted *SchemaEntity) (*abiSchema, error) {
 	as := &abiSchema{
-		persisted: persisted,
+		SchemaEntity: persisted,
 	}
-	err := json.Unmarshal([]byte(persisted.Content), &as.definition)
+	err := json.Unmarshal(persisted.Definition, &as.definition)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidSchema)
 	}
@@ -90,11 +86,7 @@ func (as *abiSchema) Type() SchemaType {
 }
 
 func (as *abiSchema) Persisted() *SchemaEntity {
-	return as.persisted
-}
-
-func (as *abiSchema) Definition() *abi.Parameter {
-	return as.definition
+	return as.SchemaEntity
 }
 
 func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
@@ -143,7 +135,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, rootTC abi.TypeComponent, i
 				resolver:      labelResolver,
 			})
 			if isNew {
-				as.persisted.Labels = append(as.persisted.Labels, p.Name)
+				as.Labels = append(as.Labels, p.Name)
 			}
 			labelIndex++
 		}
@@ -153,7 +145,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, rootTC abi.TypeComponent, i
 
 func (as *abiSchema) FullSignature(ctx context.Context) (string, error) {
 	typeSig := as.typeSet.Encode(as.primaryType)
-	return fmt.Sprintf("type=%s,labels=[%s]", typeSig, strings.Join(as.persisted.Labels, ",")), nil
+	return fmt.Sprintf("type=%s,labels=[%s]", typeSig, strings.Join(as.Labels, ",")), nil
 }
 
 func (as *abiSchema) getLabelType(ctx context.Context, fieldName string, tc abi.TypeComponent) (labelType, error) {
@@ -276,31 +268,31 @@ func (as *abiSchema) mapLabelResolver(ctx context.Context, sqlColumn string, lab
 
 // Take the state, parse the value into the type tree of this schema, and from that
 // build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
+func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*State, error) {
 
 	tc, err := as.definition.TypeComponentTreeCtx(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var jsonTree interface{}
-	err = json.Unmarshal([]byte(s.Data), &jsonTree)
+	err = json.Unmarshal([]byte(data), &jsonTree)
 	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgStateInvalidValue)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidValue)
 	}
 	cv, err := tc.ParseExternalCtx(ctx, jsonTree)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var labels []*StateLabel
 	var int64Labels []*StateInt64Label
-	for _, fieldName := range as.persisted.Labels {
+	for _, fieldName := range as.Labels {
 		matched := false
 		for _, f := range cv.Children {
 			if f.Component.KeyName() == fieldName {
 				textLabel, int64Label, err := as.buildLabel(ctx, fieldName, f)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if textLabel != nil {
 					labels = append(labels, textLabel)
@@ -312,7 +304,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 			}
 		}
 		if !matched {
-			return i18n.NewError(ctx, msgs.MsgStateLabelFieldMissing, fieldName)
+			return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldMissing, fieldName)
 		}
 	}
 
@@ -333,19 +325,22 @@ func (as *abiSchema) ProcessState(ctx context.Context, s *State) error {
 			SerializeJSONCtx(ctx, cv)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	s.Data = string(jsonData)
-	s.Hash = *NewHashIDSlice32(hash)
+	hashID := *NewHashIDSlice32(hash)
 	for i := range labels {
-		labels[i].State = s.Hash
+		labels[i].State = hashID
 	}
-	s.Labels = labels
 	for i := range int64Labels {
-		int64Labels[i].State = s.Hash
+		int64Labels[i].State = hashID
 	}
-	s.Int64Labels = int64Labels
-
-	return nil
+	return &State{
+		Hash:        hashID,
+		DomainID:    as.DomainID,
+		Schema:      as.Hash,
+		Data:        jsonData,
+		Labels:      labels,
+		Int64Labels: int64Labels,
+	}, nil
 }

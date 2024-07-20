@@ -22,6 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 )
 
 type Config struct {
@@ -42,8 +43,7 @@ var StateWriterConfigDefaults = StateWriterConfig{
 }
 
 type StateStore interface {
-	GetSchema(ctx context.Context, domainID string, id *HashID, failNotFound bool) (Schema, error)
-	GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (s *State, err error)
+	RPCModule() *rpcserver.RPCModule
 	Close()
 }
 
@@ -51,6 +51,7 @@ type stateStore struct {
 	p              persistence.Persistence
 	writer         *stateWriter
 	abiSchemaCache cache.Cache[string, Schema]
+	rpcModule      *rpcserver.RPCModule
 }
 
 var SchemaCacheDefaults = &cache.Config{
@@ -63,6 +64,7 @@ func NewStateStore(ctx context.Context, conf *Config, p persistence.Persistence)
 		abiSchemaCache: cache.NewCache[string, Schema](&conf.SchemaCache, SchemaCacheDefaults),
 	}
 	ss.writer = newStateWriter(ctx, ss, &conf.StateWriter)
+	ss.initRPC()
 	return ss
 }
 

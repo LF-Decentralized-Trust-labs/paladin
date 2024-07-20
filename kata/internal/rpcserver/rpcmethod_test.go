@@ -18,12 +18,12 @@ package rpcserver
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +36,7 @@ func TestRCPMethod0(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -67,7 +67,7 @@ func TestRCPMethod1(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -101,7 +101,7 @@ func TestRCPMethod2(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -137,7 +137,7 @@ func TestRCPMethod3(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -175,7 +175,7 @@ func TestRCPMethod4(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -215,7 +215,7 @@ func TestRCPMethod5(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -253,7 +253,7 @@ func TestRCPMethodNullParamPointerPassed(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -288,7 +288,7 @@ func TestRCPMethodNullParamNonPointerEmptyVal(t *testing.T) {
 		return "result0", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",

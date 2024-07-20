@@ -21,6 +21,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"math/big"
+
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type Int256Field string
@@ -29,7 +31,7 @@ func (sf Int256Field) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf Int256Field) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf Int256Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	var jsonResult interface{}
 	err := json.Unmarshal(jsonValue, &jsonResult)
 	if err != nil {

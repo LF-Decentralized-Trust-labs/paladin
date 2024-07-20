@@ -18,8 +18,8 @@ package filters
 
 import (
 	"context"
-	"encoding/json"
 
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"gorm.io/gorm"
 )
 
@@ -50,12 +50,12 @@ type FilterJSONBase struct {
 
 type FilterJSONKeyValue struct {
 	FilterJSONBase
-	Value json.RawMessage `json:"value,omitempty"`
+	Value types.RawJSON `json:"value,omitempty"`
 }
 
 type FilterJSONKeyValues struct {
 	FilterJSONBase
-	Values []json.RawMessage `json:"values,omitempty"`
+	Values []types.RawJSON `json:"values,omitempty"`
 }
 
 type FilterJSON struct {

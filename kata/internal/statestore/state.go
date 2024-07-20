@@ -27,13 +27,13 @@ import (
 )
 
 type State struct {
-	Hash        HashID          `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt   types.Timestamp `gorm:"autoCreateTime:nano"`
-	DomainID    string
-	Schema      HashID `gorm:"embedded;embeddedPrefix:schema_;"`
-	Data        string
-	Labels      []*StateLabel      `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Int64Labels []*StateInt64Label `gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Hash        HashID             `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt   types.Timestamp    `json:"created"     gorm:"autoCreateTime:nano"`
+	DomainID    string             `json:"domain"`
+	Schema      HashID             `json:"schema"      gorm:"embedded;embeddedPrefix:schema_;"`
+	Data        types.RawJSON      `json:"data"`
+	Labels      []*StateLabel      `json:"-"           gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Int64Labels []*StateInt64Label `json:"-"           gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
 type StateLabel struct {
@@ -53,21 +53,22 @@ type StateUpdate struct {
 	TXSpent   *string
 }
 
-func (ss *stateStore) PersistState(ctx context.Context, s *State) error {
+func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaID string, data types.RawJSON) (*State, error) {
 
-	schema, err := ss.GetSchema(ctx, s.DomainID, &s.Schema, true)
+	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := schema.ProcessState(ctx, s); err != nil {
-		return err
+	s, err := schema.ProcessState(ctx, data)
+	if err != nil {
+		return nil, err
 	}
 
 	op := ss.writer.newWriteOp(s.DomainID)
 	op.states = []*State{s}
 	ss.writer.queue(ctx, op)
-	return op.flush(ctx)
+	return s, op.flush(ctx)
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (*State, error) {
@@ -116,8 +117,7 @@ func (ft labelTracker) ResolverFor(fieldName string) filters.FieldResolver {
 	return nil
 }
 
-func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID *HashID, query *filters.QueryJSON) (s []*State, err error) {
-
+func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON) (s []*State, err error) {
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, err
@@ -146,8 +146,8 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID string, schemaID 
 	var states []*State
 	q = q.
 		Where("domain_id = ?", domainID).
-		Where("schema_l = ?", schemaID.L).
-		Where("schema_h = ?", schemaID.H).
+		Where("schema_l = ?", schema.Persisted().Hash.L).
+		Where("schema_h = ?", schema.Persisted().Hash.H).
 		Find(&states)
 	if q.Error != nil {
 		return nil, q.Error

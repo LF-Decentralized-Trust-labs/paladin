@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type StringField string
@@ -31,7 +32,7 @@ func (sf StringField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf StringField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf StringField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {

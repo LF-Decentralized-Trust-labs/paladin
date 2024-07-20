@@ -30,7 +30,7 @@ func (sf TimestampField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf TimestampField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf TimestampField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	var timestamp types.Timestamp
 	err := json.Unmarshal(jsonValue, &timestamp)
 	return timestamp, err

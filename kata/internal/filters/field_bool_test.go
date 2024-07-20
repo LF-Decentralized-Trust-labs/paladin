@@ -20,8 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"encoding/json"
-
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,9 +28,9 @@ func TestBoolField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := BoolField("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := BoolField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = BoolField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
+	_, err = BoolField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010604", err)
 }

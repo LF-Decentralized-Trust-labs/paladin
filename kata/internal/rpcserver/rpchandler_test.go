@@ -18,7 +18,6 @@ package rpcserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +45,7 @@ func TestRPCMessageBatch(t *testing.T) {
 		return "resultB", nil
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -97,7 +97,7 @@ func TestRPCMessageBatchOneFails200WithError(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -156,7 +156,7 @@ func TestRPCMessageBatchAllFail(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{

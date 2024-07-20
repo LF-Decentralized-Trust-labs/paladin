@@ -25,6 +25,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type HexBytesField string
@@ -33,7 +34,7 @@ func (sf HexBytesField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {

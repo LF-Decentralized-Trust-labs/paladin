@@ -19,6 +19,7 @@ package rpcserver
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"sync"
 
@@ -32,6 +33,8 @@ type Server interface {
 	Register(module *RPCModule)
 	Start() error
 	Stop()
+	HTTPAddr() net.Addr
+	WSAddr() net.Addr
 }
 
 func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
@@ -73,6 +76,20 @@ type rpcServer struct {
 
 func (s *rpcServer) Register(module *RPCModule) {
 	s.rpcModules[module.group] = module
+}
+
+func (s *rpcServer) HTTPAddr() (a net.Addr) {
+	if s.httpServer != nil {
+		a = s.httpServer.Addr()
+	}
+	return a
+}
+
+func (s *rpcServer) WSAddr() (a net.Addr) {
+	if s.wsServer != nil {
+		a = s.wsServer.Addr()
+	}
+	return a
 }
 
 func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {

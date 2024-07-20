@@ -6,7 +6,7 @@ CREATE TABLE schemas (
     domain_id      TEXT,
     type           TEXT,
     signature      TEXT,
-    content        TEXT,
+    definition     TEXT,
     labels         TEXT,
     PRIMARY KEY (hash_l, hash_h)
 );

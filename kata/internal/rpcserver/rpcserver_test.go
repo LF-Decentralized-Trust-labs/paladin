@@ -38,7 +38,7 @@ func newTestServerHTTP(t *testing.T, conf *Config) (string, *rpcServer, func()) 
 	err = s.Start()
 	assert.NoError(t, err)
 	rs := s.(*rpcServer)
-	return fmt.Sprintf("http://%s", rs.httpServer.Addr()), rs, s.Stop
+	return fmt.Sprintf("http://%s", rs.HTTPAddr()), rs, s.Stop
 
 }
 
@@ -52,7 +52,7 @@ func newTestServerWebSockets(t *testing.T, conf *Config) (string, *rpcServer, fu
 	err = s.Start()
 	assert.NoError(t, err)
 	rs := s.(*rpcServer)
-	return fmt.Sprintf("ws://%s", rs.wsServer.Addr()), rs, s.Stop
+	return fmt.Sprintf("ws://%s", rs.WSAddr()), rs, s.Stop
 
 }
 
@@ -110,7 +110,7 @@ func TestBadWSUpgrade(t *testing.T) {
 	_, s, done := newTestServerWebSockets(t, &Config{})
 	defer done()
 
-	res, err := http.DefaultClient.Get(fmt.Sprintf("http://%s", s.wsServer.Addr()))
+	res, err := http.DefaultClient.Get(fmt.Sprintf("http://%s", s.WSAddr()))
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 

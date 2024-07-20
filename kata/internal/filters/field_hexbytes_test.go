@@ -20,8 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"encoding/json"
-
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,16 +28,16 @@ func TestHexBytesField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
+	_, err = HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010605", err)
 
-	_, err = HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"not hex"`))
+	_, err = HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`"not hex"`))
 	assert.Regexp(t, "PD010611", err)
 
-	v, err := HexBytesField("test").SQLValue(ctx, (json.RawMessage)(`"0xAAbbCCdd"`))
+	v, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`"0xAAbbCCdd"`))
 	assert.NoError(t, err)
 	assert.Equal(t, "aabbccdd", v)
 	assert.Equal(t, "test", HexBytesField("test").SQLColumn())

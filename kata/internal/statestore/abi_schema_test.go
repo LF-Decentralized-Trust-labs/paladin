@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +34,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	ctx, ss, done := newDBTestStateStore(t)
 	defer done()
 
-	as, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	as, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -87,32 +88,28 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
 	assert.Equal(t, SchemaTypeABI, as.Type())
-	assert.NotNil(t, as.Definition())
+	assert.NotNil(t, as.definition)
 	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4,address field5,int256 field6,bytes field7,uint32 field8,string field9),labels=[field1,field2,field3,field4,field5,field6,field7,field8]", as.Persisted().Signature)
 	cacheKey := "domain1/0xcf41493c8bb9652d1483ee6cb5122efbec6fbdf67cc27363ba5b030b59244cad"
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().Hash))
 
 	err = ss.PersistSchema(ctx, as)
 	assert.NoError(t, err)
+	schemaHash := as.Persisted().Hash.String()
 
 	// Check it handles data
-	state1 := &State{
-		Schema:   as.Persisted().Hash,
-		DomainID: "domain1",
-		Data: `{
-			"field1": "0x0123456789012345678901234567890123456789",
-			"field2": "hello world",
-			"field3": 42,
-			"field4": true,
-			"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
-			"field6": "-10203040506070809",
-			"field7": "0xfeedbeef",
-			"field8": 12345,
-			"field9": "things and stuff",
-			"cruft": "to remove"
-		}`,
-	}
-	err = ss.PersistState(ctx, state1)
+	state1, err := ss.PersistState(ctx, "domain1", schemaHash, types.RawJSON(`{
+		"field1": "0x0123456789012345678901234567890123456789",
+		"field2": "hello world",
+		"field3": 42,
+		"field4": true,
+		"field5": "0x687414C0B8B4182B823Aec5436965cf19b197386",
+		"field6": "-10203040506070809",
+		"field7": "0xfeedbeef",
+		"field8": 12345,
+		"field9": "things and stuff",
+		"cruft": "to remove"
+	}`))
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	assert.Equal(t, []*StateLabel{
@@ -154,9 +151,10 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
 	assert.NoError(t, err)
+	schemaID := as.Persisted().Hash.String()
 
 	getValidate := func() {
-		as1, err := ss.GetSchema(ctx, as.Persisted().DomainID, &as.Persisted().Hash, true)
+		as1, err := ss.GetSchema(ctx, as.Persisted().DomainID, schemaID, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, as1)
 		as1Sig, err := as1.(*abiSchema).FullSignature(ctx)
@@ -194,7 +192,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	assert.NoError(t, err)
-	states, err := ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	states, err := ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query)
 	assert.NoError(t, err)
 	assert.Len(t, states, 1)
 
@@ -205,7 +203,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	assert.NoError(t, err)
-	states, err = ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	states, err = ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query)
 	assert.NoError(t, err)
 	assert.Len(t, states, 0)
 
@@ -216,7 +214,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	assert.NoError(t, err)
-	states, err = ss.FindStates(ctx, as.Persisted().DomainID, &as.Persisted().Hash, query)
+	states, err = ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query)
 	assert.NoError(t, err)
 	assert.Len(t, states, 0)
 }
@@ -226,7 +224,7 @@ func TestNewABISchemaInvalidTypedDataType(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	_, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -249,7 +247,7 @@ func TestGetSchemaInvalidJSON(t *testing.T) {
 		[]string{"type", "content"},
 	).AddRow(SchemaTypeABI, "!!! { bad json"))
 
-	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")), true)
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), true)
 	assert.Regexp(t, "PD010113", err)
 }
 
@@ -259,7 +257,7 @@ func TestRestoreABISchemaInvalidType(t *testing.T) {
 	defer done()
 
 	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
-		Content: `{}`,
+		Definition: types.RawJSON(`{}`),
 	})
 	assert.Regexp(t, "PD010114", err)
 
@@ -271,7 +269,7 @@ func TestRestoreABISchemaInvalidTypeTree(t *testing.T) {
 	defer done()
 
 	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
-		Content: `{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`,
+		Definition: types.RawJSON(`{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`),
 	})
 	assert.Regexp(t, "FF22025.*wrong", err)
 
@@ -282,7 +280,7 @@ func TestABILabelSetupMissingName(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	_, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -302,7 +300,7 @@ func TestABILabelSetupBadTree(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	_, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -322,7 +320,7 @@ func TestABILabelSetupDuplicateField(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	_, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -347,7 +345,7 @@ func TestABILabelSetupUnsupportedType(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := NewABISchema(ctx, "domain1", &abi.Parameter{
+	_, err := newABISchema(ctx, "domain1", &abi.Parameter{
 		Type:         "tuple",
 		Name:         "MyStruct",
 		InternalType: "struct MyStruct",
@@ -396,7 +394,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -421,9 +419,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 			},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1": 12345}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010103", err)
 }
 
@@ -433,7 +429,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -452,9 +448,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 			},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1": 12345}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010110", err)
 }
 
@@ -464,14 +458,12 @@ func TestABISchemaProcessStateBadDefinition(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1": 12345}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "FF22025", err)
 }
 
@@ -481,7 +473,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -491,9 +483,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 			Components:   abi.ParameterArray{},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{!!! wrong`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{!!! wrong`))
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -503,7 +493,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -515,9 +505,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 			},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1":{}}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":{}}`))
 	assert.Regexp(t, "FF22030", err)
 }
 
@@ -527,7 +515,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -539,9 +527,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 			},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -551,7 +537,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -563,9 +549,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 			},
 		},
 	}
-	err := as.ProcessState(ctx, &State{
-		Data: `{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`,
-	})
+	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -575,7 +559,7 @@ func TestABISchemaMapLabelResolverBadType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -597,7 +581,7 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		persisted: &SchemaEntity{
+		SchemaEntity: &SchemaEntity{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{

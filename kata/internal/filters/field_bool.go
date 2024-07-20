@@ -24,6 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
 type BoolField string
@@ -32,7 +33,7 @@ func (sf BoolField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf BoolField) SQLValue(ctx context.Context, jsonValue json.RawMessage) (driver.Value, error) {
+func (sf BoolField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {

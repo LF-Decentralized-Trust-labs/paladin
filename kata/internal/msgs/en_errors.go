@@ -113,4 +113,8 @@ var (
 	MsgJSONRPCIncorrectParamCount = ffe("PD010903", "method %s requires %d params (supplied=%d)")
 	MsgJSONRPCInvalidParam        = ffe("PD010904", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = ffe("PD010905", "method %s result serialization failed: %s")
+
+	// Types PD0110XX
+	MsgTypesUnmarshalNil = ffe("PD011000", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail     = ffe("PD011001", "Unable to scan type %T into type %T")
 )

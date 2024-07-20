@@ -20,8 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"encoding/json"
-
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,10 +28,10 @@ func TestStringField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := StringField("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := StringField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = StringField("test").SQLValue(ctx, (json.RawMessage)(`[]`))
+	_, err = StringField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010605", err)
 
 }

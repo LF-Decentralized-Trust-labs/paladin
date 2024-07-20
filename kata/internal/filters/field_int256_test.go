@@ -21,8 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"encoding/json"
-
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,33 +29,33 @@ func TestInt256Field(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Int256Field("test").SQLValue(ctx, (json.RawMessage)(`[]`))
+	_, err = Int256Field("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010606", err)
 
-	vBigNeg, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	vBigNeg, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	assert.NoError(t, err)
 	assert.Equal(t, "00000000000000000000000000000000000000000000000000000000000000001", vBigNeg)
 	assert.Len(t, vBigNeg, 65)
 
-	vBigPos, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
+	vBigPos, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	assert.NoError(t, err)
 	assert.Equal(t, "1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vBigPos)
 	assert.Len(t, vBigPos, 65)
 
-	vZero, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`0`))
+	vZero, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`0`))
 	assert.NoError(t, err)
 	assert.Equal(t, "10000000000000000000000000000000000000000000000000000000000000000", vZero)
 	assert.Len(t, vZero, 65)
 
-	vSmallNeg, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`-12345`))
+	vSmallNeg, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`-12345`))
 	assert.NoError(t, err)
 	assert.Equal(t, "0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffcfc7", vSmallNeg)
 	assert.Len(t, vSmallNeg, 65)
 
-	vSmallPos, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`12345`))
+	vSmallPos, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`12345`))
 	assert.NoError(t, err)
 	assert.Equal(t, "10000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 65)

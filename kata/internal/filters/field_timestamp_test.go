@@ -20,8 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"encoding/json"
-
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,10 +28,10 @@ func TestTimestampField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := TimestampField("test").SQLValue(ctx, (json.RawMessage)(`!json`))
+	_, err := TimestampField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = TimestampField("test").SQLValue(ctx, (json.RawMessage)(`"not a valid timestamp"`))
+	_, err = TimestampField("test").SQLValue(ctx, (types.RawJSON)(`"not a valid timestamp"`))
 	assert.Regexp(t, "FF00136", err)
 
 }

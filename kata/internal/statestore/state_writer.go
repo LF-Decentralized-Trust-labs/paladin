@@ -233,7 +233,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Create(labels).
 				Error
 		}
-		if err == nil && len(labels) > 0 {
+		if err == nil && len(int64Labels) > 0 {
 			err = tx.
 				Table("state_int64_labels").
 				Clauses(clause.OnConflict{

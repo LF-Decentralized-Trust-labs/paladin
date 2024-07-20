@@ -19,13 +19,13 @@ package filters
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +34,7 @@ var justCaseInsensitive = []string{"caseInsensitive"}
 
 type FieldResolver interface {
 	SQLColumn() string
-	SQLValue(ctx context.Context, v json.RawMessage) (driver.Value, error)
+	SQLValue(ctx context.Context, v types.RawJSON) (driver.Value, error)
 }
 
 // FieldSet is an interface (rather than a simple map) as the function
@@ -102,7 +102,7 @@ func (qb *queryBuilder) resolveField(fieldName string) (FieldResolver, error) {
 	return nil, i18n.NewError(qb.ctx, msgs.MsgFiltersUnknownField, fieldName)
 }
 
-func (qb *queryBuilder) resolveValue(fieldName string, field FieldResolver, jsonValue json.RawMessage) (driver.Value, error) {
+func (qb *queryBuilder) resolveValue(fieldName string, field FieldResolver, jsonValue types.RawJSON) (driver.Value, error) {
 	if len(jsonValue) == 0 {
 		return nil, i18n.NewError(qb.ctx, msgs.MsgFiltersValueMissing, fieldName)
 	}
@@ -113,7 +113,7 @@ func (qb *queryBuilder) resolveValue(fieldName string, field FieldResolver, json
 	return value, nil
 }
 
-func (qb *queryBuilder) resolveFieldAndValue(fieldName string, jsonValue json.RawMessage) (FieldResolver, driver.Value, error) {
+func (qb *queryBuilder) resolveFieldAndValue(fieldName string, jsonValue types.RawJSON) (FieldResolver, driver.Value, error) {
 	field, err := qb.resolveField(fieldName)
 	if err != nil {
 		return nil, nil, err
@@ -125,7 +125,7 @@ func (qb *queryBuilder) resolveFieldAndValue(fieldName string, jsonValue json.Ra
 	return field, value, nil
 }
 
-func (qb *queryBuilder) resolveFieldAndValues(fieldName string, jsonValues []json.RawMessage) (FieldResolver, []driver.Value, error) {
+func (qb *queryBuilder) resolveFieldAndValues(fieldName string, jsonValues []types.RawJSON) (FieldResolver, []driver.Value, error) {
 	field, err := qb.resolveField(fieldName)
 	if err != nil {
 		return nil, nil, err

@@ -18,10 +18,10 @@ package rpcserver
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +36,7 @@ func TestRCPModule(t *testing.T) {
 		})),
 	)
 
-	var jsonResponse json.RawMessage
+	var jsonResponse types.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
