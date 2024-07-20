@@ -152,6 +152,8 @@ func TestBroker_Unlisten(t *testing.T) {
 	err = testBroker.SendMessage(ctx, message)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "PD010600")
+	//wait for a second to make sure the message is not delivered
+	time.Sleep(1 * time.Second)
 
 }
 
@@ -173,4 +175,138 @@ func TestBroker_ListDestinationsOK(t *testing.T) {
 	assert.Contains(t, destinations, "test.destination.1")
 	assert.Contains(t, destinations, "test.destination.2")
 
+}
+
+func TestBroker_SubscribeEventsOK(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	// Create a channel to signal test completion
+	completionChan := make(chan error)
+
+	// and set it up to time out with errror after 5 seconds
+	go func() {
+		// Simulate a timeout by sending an error to the channel after 5 seconds
+		time.Sleep(5 * time.Second)
+		// Send an error to the response channel
+		completionChan <- fmt.Errorf("Timed out")
+	}()
+
+	handler, err := testBroker.Listen(ctx, "test.destination.1")
+	require.NoError(t, err)
+
+	// spin up a thread to listen for messages
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case message := <-handler.Channel:
+				assert.Equal(t, "test subscribe message body", string(message.Body))
+				completionChan <- nil
+				return
+			}
+		}
+	}()
+
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.NoError(t, err)
+
+	event := Event{
+		Topic: "test.topic",
+		Body:  []byte("test subscribe message body"),
+	}
+	// Call the SendEvent method
+	err = testBroker.SendEvent(ctx, event)
+	require.NoError(t, err)
+
+	// Read the response from the channel
+	response := <-completionChan
+	assert.NoError(t, response)
+}
+
+func TestBroker_PublishEventsNoSubscribers(t *testing.T) {
+	//TODO
+}
+
+func TestBroker_UnSubscribeEventsOK(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	handler, err := testBroker.Listen(ctx, "test.destination.1")
+	require.NoError(t, err)
+
+	// spin up a thread to listen for messages
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-handler.Channel:
+				assert.Fail(t, "Message received after unsubscribe")
+				return
+			}
+		}
+	}()
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.NoError(t, err)
+
+	err = testBroker.UnsubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.NoError(t, err)
+
+	// Create a test event
+	event := Event{
+		Topic: "test.topic",
+		Body:  []byte("test event body"),
+	}
+
+	// Call the SendEvent method
+	err = testBroker.SendEvent(ctx, event)
+	require.NoError(t, err)
+
+	//wait for a second to make sure the message is not delivered
+	time.Sleep(1 * time.Second)
+}
+
+func TestBroker_DoubleSubscribeFail(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	_, err = testBroker.Listen(ctx, "test.destination.1")
+	require.NoError(t, err)
+
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.NoError(t, err)
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PD010602")
+	assert.Contains(t, err.Error(), "test.topic")
+	assert.Contains(t, err.Error(), "test.destination.1")
+}
+
+func TestBroker_SubscribeUnknownDestinationFail(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	_, err = testBroker.Listen(ctx, "test.destination.1")
+	require.NoError(t, err)
+
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	require.NoError(t, err)
+	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.2")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PD010600")
+	assert.Contains(t, err.Error(), "test.destination.2")
 }

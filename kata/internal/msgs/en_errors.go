@@ -73,6 +73,7 @@ var (
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 
 	// Comms bus PD0106XX
-	MsgDestinationNotFound = ffe("PD010600", "Destination not found: %s")
-	MsgHandlerError        = ffe("PD010601", "Error from message handler")
+	MsgDestinationNotFound   = ffe("PD010600", "Destination not found: %s")
+	MsgHandlerError          = ffe("PD010601", "Error from message handler")
+	MsgDuplicateSubscription = ffe("PD010602", "Destination %s already subscribed to topic %s")
 )

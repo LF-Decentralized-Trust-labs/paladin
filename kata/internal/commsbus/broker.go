@@ -68,19 +68,22 @@ type Broker interface {
 	SendEvent(ctx context.Context, event Event) error
 	Listen(ctx context.Context, destination string) (MessageHandler, error)
 	Unlisten(ctx context.Context, destination string) error
-	SubscribeEvent(ctx context.Context, topic string, destination string) (string, error)
+	SubscribeEvent(ctx context.Context, topic string, destination string) error
 	UnsubscribeEvent(ctx context.Context, topic string, destination string) error
 	ListDestinations(ctx context.Context) ([]string, error)
 }
 
 type broker struct {
-	destinations     map[string]MessageHandler
-	destinationsLock sync.Mutex
+	destinations      map[string]MessageHandler
+	subscriptions     map[string][]string
+	destinationsLock  sync.Mutex
+	subscriptionsLock sync.Mutex
 }
 
 func NewBroker(ctx context.Context, conf *BrokerConfig) (Broker, error) {
 	return &broker{
-		destinations: make(map[string]MessageHandler),
+		destinations:  make(map[string]MessageHandler),
+		subscriptions: make(map[string][]string),
 	}, nil
 }
 
@@ -128,18 +131,70 @@ func (b *broker) SendMessage(ctx context.Context, message Message) error {
 }
 
 // SubscribeEvent implements Broker.
-func (b *broker) SubscribeEvent(ctx context.Context, topic string, destination string) (string, error) {
-	panic("unimplemented")
+func (b *broker) SubscribeEvent(ctx context.Context, topic string, destination string) error {
+	//check that the destination is valid we do this before taking the subscriptions lock
+	// so that we don't take one lock while holding another and risk a deadlock
+	b.destinationsLock.Lock()
+	_, ok := b.destinations[destination]
+	b.destinationsLock.Unlock()
+	if !ok {
+		return i18n.NewError(ctx, msgs.MsgDestinationNotFound, destination)
+	}
+
+	b.subscriptionsLock.Lock()
+	defer b.subscriptionsLock.Unlock()
+	// first check that we don't already have this destination subscribed to this topic
+	for _, v := range b.subscriptions[topic] {
+		if v == destination {
+			return i18n.NewError(ctx, msgs.MsgDuplicateSubscription, destination, topic)
+		}
+	}
+
+	b.subscriptions[topic] = append(b.subscriptions[topic], destination)
+	return nil
 }
 
 // SendEvent implements Broker.
 func (b *broker) SendEvent(ctx context.Context, event Event) error {
-	panic("unimplemented")
+	log.L(ctx).Infof("SendEvent: %s", event.Topic)
+	b.subscriptionsLock.Lock()
+	defer b.subscriptionsLock.Unlock()
+
+	subscribers := b.subscriptions[event.Topic]
+
+	//TODO would it be better make an immutable copy of the slice here so that we can release the lock sooner?
+	for _, destination := range subscribers {
+		message := Message{
+			Destination: destination,
+			Body:        event.Body,
+		}
+		if err := b.SendMessage(ctx, message); err != nil {
+			log.L(ctx).Error("Error sending message", err)
+			//TODO Dead letter queue? Retry?
+			// don't throw an error here, just log it because we don't want
+			// one consumer to be able to stop the event from being sent to other consumers
+		}
+	}
+	return nil
+}
+
+func remove(slice []string, s string) []string {
+	//TODO could be a more effiecient way to do this if we dont care about order
+	//TODO this assumes that the element only occurs once in the slice
+	for i, v := range slice {
+		if v == s {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
 }
 
 // UnsubscribeEvent implements Broker.
 func (b *broker) UnsubscribeEvent(ctx context.Context, topic string, destination string) error {
-	panic("unimplemented")
+	b.subscriptionsLock.Lock()
+	defer b.subscriptionsLock.Unlock()
+	b.subscriptions[topic] = remove(b.subscriptions[topic], destination)
+	return nil
 }
 
 // ListDestinations implements Broker.
