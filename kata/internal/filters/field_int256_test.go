@@ -34,7 +34,7 @@ func TestInt256Field(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = Int256Field("test").SQLValue(ctx, (json.RawMessage)(`[]`))
-	assert.Regexp(t, "PD010306", err)
+	assert.Regexp(t, "PD010606", err)
 
 	vBigNeg, err := Int256Field("test").SQLValue(ctx, (json.RawMessage)(`"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	assert.NoError(t, err)

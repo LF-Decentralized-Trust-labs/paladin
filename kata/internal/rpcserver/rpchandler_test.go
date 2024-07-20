@@ -226,7 +226,7 @@ func TestRPCHandleBadDataEmptySpace(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)
-	assert.Regexp(t, "PD010800", jsonResponse.Error.Message)
+	assert.Regexp(t, "PD010900", jsonResponse.Error.Message)
 
 }
 
@@ -239,7 +239,7 @@ func TestRPCHandleIOError(t *testing.T) {
 	assert.False(t, ok)
 	jsonResponse := iRPCResponse.(*rpcbackend.RPCResponse)
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)
-	assert.Regexp(t, "PD010800", jsonResponse.Error.Message)
+	assert.Regexp(t, "PD010900", jsonResponse.Error.Message)
 
 }
 
@@ -252,6 +252,6 @@ func TestRPCBadArrayError(t *testing.T) {
 	assert.False(t, ok)
 	jsonResponse := iRPCResponse.(*rpcbackend.RPCResponse)
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)
-	assert.Regexp(t, "PD010800", jsonResponse.Error.Message)
+	assert.Regexp(t, "PD010900", jsonResponse.Error.Message)
 
 }

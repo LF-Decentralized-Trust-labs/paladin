@@ -16,7 +16,7 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    targetCoverage = 40.7
+    targetCoverage = 88
 }
 
 task installTools(type:Exec) {
@@ -54,18 +54,11 @@ task protoc(type:Exec) {
     args inputs.files
 }
 
-task customCleanUp(type:Delete) {
-    delete '*.dylib'
-    delete '*.so'
-    delete '*.dll'
-    delete fileTree("${projectDir}/bin").matching {
-        exclude "README.md"
-        exclude ".gitignore"
-    }
-}
-
-task clean {
-    dependsOn(tasks.customCleanUp)
+task clean(type:Exec) {
+    workingDir '.'
+    executable 'git'
+    args "clean"
+    args "-fdX"
 }
 
 task goGet(type:Exec) {
@@ -112,6 +105,7 @@ task buildSharedLibrary(type:Exec) {
         libName = "libkata.so"
     }
 
+    dependsOn tasks.clean
     dependsOn tasks.goGet
     dependsOn tasks.lint
     inputs.files(fileTree("${projectDir}").matching {
@@ -133,7 +127,7 @@ class DockerCompose extends Exec {
         def dockerComposeV2Check = getProject().exec({
             ignoreExitValue = true
             executable "docker"
-            args "compose", "ps"
+            args "compose", "version"
             standardOutput = new ByteArrayOutputStream()
             errorOutput = new ByteArrayOutputStream()
         })
@@ -228,18 +222,29 @@ task testRunPostgres(type: Exec) {
 
 task checkCoverage {
     doLast {
-        def coverageOutput = 'go tool cover -func=kata/coverage.txt'.execute().text
+        def coverageOutput = "go tool cover -func=${projectDir}/coverage.txt".execute().text
         def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
+        println "Coverage is ${totalCoverage}%"
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
             throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
+        } else if ( totalCoverage.toFloat() - targetCoverage > 1) {
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than 1%, please update the targetCoverage value in ./kata/build.gradle file")
         } else {
-            println "Coverage is above ${targetCoverage} %"
+            println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
         }
     }
 }
 
 task test(dependsOn: testRunSQLite) {
     finalizedBy checkCoverage
+}
+
+task testcov(type: Exec, dependsOn: testRunSQLite) {
+    workingDir '.'
+    executable 'go'
+    args 'tool'
+    args 'cover'
+    args '-html=coverage.txt'
 }
 
 task build {
