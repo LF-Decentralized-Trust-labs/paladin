@@ -34,12 +34,12 @@ func TestRPCMessageBatch(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueA0", param0)
 		assert.Equal(t, "valueA1", param1)
 		return "resultA", nil
 	}))
-	s.Register("ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueB0", param0)
 		assert.Equal(t, "valueB1", param1)
 		return "resultB", nil
@@ -86,12 +86,12 @@ func TestRPCMessageBatchOneFails200WithError(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueA0", param0)
 		assert.Equal(t, "valueA1", param1)
 		return "resultA", nil
 	}))
-	s.Register("ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueB0", param0)
 		assert.Equal(t, "valueB1", param1)
 		return "", fmt.Errorf("pop")
@@ -141,17 +141,17 @@ func TestRPCMessageBatchAllFail(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodA", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueA0", param0)
 		assert.Equal(t, "valueA1", param1)
 		return "", fmt.Errorf("snap")
 	}))
-	s.Register("ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
+	regTestRPC(s, "ut_methodB", RPCMethod2(func(ctx context.Context, param0, param1 string) (string, error) {
 		assert.Equal(t, "valueB0", param0)
 		assert.Equal(t, "valueB1", param1)
 		return "", fmt.Errorf("crackle")
 	}))
-	s.Register("ut_methodC", RPCMethod1(func(ctx context.Context, param0 map[string]string) (string, error) {
+	regTestRPC(s, "ut_methodC", RPCMethod1(func(ctx context.Context, param0 map[string]string) (string, error) {
 		assert.Equal(t, map[string]string{"some": "things"}, param0)
 		return "", fmt.Errorf("pop")
 	}))

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
@@ -53,6 +54,16 @@ func newTestServerWebSockets(t *testing.T, conf *Config) (string, *rpcServer, fu
 	rs := s.(*rpcServer)
 	return fmt.Sprintf("ws://%s", rs.wsServer.Addr()), rs, s.Stop
 
+}
+
+func regTestRPC(s *rpcServer, method string, handler RPCHandler) {
+	group := strings.SplitN(method, "_", 2)[0]
+	module := s.rpcModules[group]
+	if module == nil {
+		module = NewRPCModule(group)
+		s.Register(module)
+	}
+	module.Add(method, handler)
 }
 
 func TestBadHTTPConfig(t *testing.T) {

@@ -24,26 +24,21 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 )
 
 type Server interface {
-	Register(method string, handler RPCHandler)
+	Register(module *RPCModule)
 	Start() error
 	Stop()
 }
-
-// RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
-// These use generics to avoid you needing to do any messy type mapping in your functions.
-type RPCHandler func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
 
 func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
 	s := &rpcServer{
 		bgCtx:         ctx,
 		wsConnections: make(map[string]*webSocketConnection),
-		rpcHandlers:   make(map[string]RPCHandler),
+		rpcModules:    make(map[string]*RPCModule),
 	}
 
 	if !conf.HTTP.Disabled {
@@ -73,11 +68,11 @@ type rpcServer struct {
 	wsMux         sync.Mutex
 	wsUpgrader    *websocket.Upgrader
 	wsConnections map[string]*webSocketConnection
-	rpcHandlers   map[string]RPCHandler
+	rpcModules    map[string]*RPCModule
 }
 
-func (s *rpcServer) Register(method string, handler RPCHandler) {
-	s.rpcHandlers[method] = handler
+func (s *rpcServer) Register(module *RPCModule) {
+	s.rpcModules[module.group] = module
 }
 
 func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {

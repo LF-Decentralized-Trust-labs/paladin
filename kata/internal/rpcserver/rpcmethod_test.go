@@ -32,7 +32,7 @@ func TestRCPMethod0(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod0(func(ctx context.Context) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod0(func(ctx context.Context) (string, error) {
 		return "result0", nil
 	}))
 
@@ -62,7 +62,7 @@ func TestRCPMethod1(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod1(func(ctx context.Context, param0 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod1(func(ctx context.Context, param0 string) (string, error) {
 		assert.Equal(t, "value0", param0)
 		return "result0", nil
 	}))
@@ -95,7 +95,7 @@ func TestRCPMethod2(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod2(func(ctx context.Context, param0 string, param1 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod2(func(ctx context.Context, param0 string, param1 string) (string, error) {
 		assert.Equal(t, "value0", param0)
 		assert.Equal(t, "value1", param1)
 		return "result0", nil
@@ -130,7 +130,7 @@ func TestRCPMethod3(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod3(func(ctx context.Context, param0 string, param1 string, param2 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod3(func(ctx context.Context, param0 string, param1 string, param2 string) (string, error) {
 		assert.Equal(t, "value0", param0)
 		assert.Equal(t, "value1", param1)
 		assert.Equal(t, "value2", param2)
@@ -167,7 +167,7 @@ func TestRCPMethod4(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod4(func(ctx context.Context, param0 string, param1 string, param2 string, param3 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod4(func(ctx context.Context, param0 string, param1 string, param2 string, param3 string) (string, error) {
 		assert.Equal(t, "value0", param0)
 		assert.Equal(t, "value1", param1)
 		assert.Equal(t, "value2", param2)
@@ -206,7 +206,7 @@ func TestRCPMethod5(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod5(func(ctx context.Context, param0 string, param1 string, param2 string, param3 string, param4 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod5(func(ctx context.Context, param0 string, param1 string, param2 string, param3 string, param4 string) (string, error) {
 		assert.Equal(t, "value0", param0)
 		assert.Equal(t, "value1", param1)
 		assert.Equal(t, "value2", param2)
@@ -247,7 +247,7 @@ func TestRCPMethodNullParamPointerPassed(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod2(func(ctx context.Context, param0 *string, param1 *ethtypes.Address0xHex) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod2(func(ctx context.Context, param0 *string, param1 *ethtypes.Address0xHex) (string, error) {
 		assert.Nil(t, param0)
 		assert.Nil(t, param1)
 		return "result0", nil
@@ -282,7 +282,7 @@ func TestRCPMethodNullParamNonPointerEmptyVal(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod2(func(ctx context.Context, param0 string, param1 ethtypes.Address0xHex) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod2(func(ctx context.Context, param0 string, param1 ethtypes.Address0xHex) (string, error) {
 		assert.Empty(t, param0)
 		assert.Equal(t, "0x0000000000000000000000000000000000000000", param1.String())
 		return "result0", nil
@@ -317,7 +317,7 @@ func TestRCPMethodInvalidValue(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod1(func(ctx context.Context, param0 []string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod1(func(ctx context.Context, param0 []string) (string, error) {
 		assert.Fail(t, "should not be called")
 		return "", nil
 	}))
@@ -344,7 +344,7 @@ func TestRCPMethodWrongParamCount(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod1(func(ctx context.Context, param0 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod1(func(ctx context.Context, param0 string) (string, error) {
 		assert.Fail(t, "should not be called")
 		return "", nil
 	}))
@@ -371,7 +371,7 @@ func TestRCPMethodBadResult(t *testing.T) {
 	url, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	s.Register("stringy_method", RPCMethod0(func(ctx context.Context) (map[bool]bool, error) {
+	regTestRPC(s, "stringy_method", RPCMethod0(func(ctx context.Context) (map[bool]bool, error) {
 		return map[bool]bool{false: true} /* good luck JSON */, nil
 	}))
 

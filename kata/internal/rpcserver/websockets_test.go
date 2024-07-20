@@ -38,7 +38,7 @@ func TestWebSocketRPCRequestResponse(t *testing.T) {
 	err := client.Connect(ctx)
 	assert.NoError(t, err)
 
-	s.Register("stringy_method", RPCMethod2(func(ctx context.Context, p0, p1 string) (string, error) {
+	regTestRPC(s, "stringy_method", RPCMethod2(func(ctx context.Context, p0, p1 string) (string, error) {
 		assert.Equal(t, "v0", p0)
 		assert.Equal(t, "v1", p1)
 		return "result", nil

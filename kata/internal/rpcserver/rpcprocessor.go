@@ -18,6 +18,7 @@ package rpcserver
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -32,7 +33,12 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcbackend.RPCReques
 		return rpcbackend.RPCErrorResponse(err, rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false
 	}
 
-	handler := s.rpcHandlers[rpcReq.Method]
+	var handler RPCHandler
+	group := strings.SplitN(rpcReq.Method, "_", 2)[0]
+	module := s.rpcModules[group]
+	if module != nil {
+		handler = module.methods[rpcReq.Method]
+	}
 	if handler == nil {
 		err := i18n.NewError(ctx, msgs.MsgJSONRPCUnsupportedMethod)
 		return rpcbackend.RPCErrorResponse(err, rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false

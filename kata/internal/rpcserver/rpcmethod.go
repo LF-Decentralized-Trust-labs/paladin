@@ -26,6 +26,10 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
+// RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
+// These use generics to avoid you needing to do any messy type mapping in your functions.
+type RPCHandler func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
+
 func RPCMethod0[R any](impl func(ctx context.Context) (R, error)) RPCHandler {
 	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
