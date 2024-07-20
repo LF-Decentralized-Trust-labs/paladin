@@ -154,3 +154,23 @@ func TestBroker_Unlisten(t *testing.T) {
 	assert.Contains(t, err.Error(), "PD010600")
 
 }
+
+func TestBroker_ListDestinationsOK(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testBroker, err := NewBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	_, err = testBroker.Listen(ctx, "test.destination.1")
+	require.NoError(t, err)
+
+	_, err = testBroker.Listen(ctx, "test.destination.2")
+	require.NoError(t, err)
+
+	destinations, err := testBroker.ListDestinations(ctx)
+	require.NoError(t, err)
+	assert.Contains(t, destinations, "test.destination.1")
+	assert.Contains(t, destinations, "test.destination.2")
+
+}

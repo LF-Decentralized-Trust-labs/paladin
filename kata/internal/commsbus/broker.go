@@ -70,6 +70,7 @@ type Broker interface {
 	Unlisten(ctx context.Context, destination string) error
 	SubscribeEvent(ctx context.Context, topic string, destination string) (string, error)
 	UnsubscribeEvent(ctx context.Context, topic string, destination string) error
+	ListDestinations(ctx context.Context) ([]string, error)
 }
 
 type broker struct {
@@ -139,4 +140,21 @@ func (b *broker) SendEvent(ctx context.Context, event Event) error {
 // UnsubscribeEvent implements Broker.
 func (b *broker) UnsubscribeEvent(ctx context.Context, topic string, destination string) error {
 	panic("unimplemented")
+}
+
+// ListDestinations implements Broker.
+func (b *broker) ListDestinations(ctx context.Context) ([]string, error) {
+	log.L(ctx).Info("ListDestinations")
+
+	b.destinationsLock.Lock()
+	keys := make([]string, len(b.destinations))
+
+	i := 0
+	for k := range b.destinations {
+		keys[i] = k
+		i++
+	}
+	b.destinationsLock.Unlock()
+
+	return keys, nil
 }

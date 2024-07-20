@@ -210,6 +210,29 @@ func TestRunPointToPoint(t *testing.T) {
 	streams2, err := client2.OpenStreams(ctx2)
 	require.NoError(t, err, "failed to call OpenStreams")
 
+	areBothClientsConnected := func() bool {
+		client1Connected := false
+		client2Connected := false
+		listDestinationsResponse, err := client1.ListDestinations(ctx, &proto.ListDestinationsRequest{})
+		require.NoError(t, err)
+		for _, connectedClient := range listDestinationsResponse.Destinations {
+			if connectedClient == client1Destination {
+				client1Connected = true
+			}
+			if connectedClient == client2Destination {
+				client2Connected = true
+			}
+		}
+		return client1Connected && client2Connected
+	}
+
+	delay := 0
+	for !areBothClientsConnected() {
+		delay++
+		time.Sleep(time.Second)
+		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
+	}
+
 	body1 := "hello from client 1"
 
 	requestId := "request001"

@@ -24,6 +24,7 @@ service KataMessageService {
   // Each message type can be sent in either direction, although a response message is normaly sent in the opposite direction from its corresponding request message.
   rpc OpenStreams(stream Message) returns (stream Message) {}
   rpc Status(StatusRequest) returns (StatusResponse) {}
+  rpc ListDestinations(ListDestinationsRequest) returns (ListDestinationsResponse) {}
 }
 
 // Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
@@ -31,6 +32,12 @@ message QuiesceStreamRequest {
 }
 
 message QuiesceStreamResponse {
+}
+
+message ListDestinationsRequest {}
+
+message ListDestinationsResponse {
+  repeated string destinations = 1;
 }
 
 message StatusRequest {}

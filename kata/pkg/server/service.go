@@ -44,6 +44,20 @@ func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusReques
 	}, nil
 }
 
+func (s *KataMessageService) ListDestinations(ctx context.Context, req *proto.ListDestinationsRequest) (*proto.ListDestinationsResponse, error) {
+	log.L(ctx).Info("ListDestinations")
+
+	destinations, err := s.messageBroker.ListDestinations(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to list destinations: %s", err)
+		return nil, err
+	}
+
+	return &proto.ListDestinationsResponse{
+		Destinations: destinations,
+	}, nil
+}
+
 // OpenStreams implements the OpenStreams RPC method of KataService which is the main entry point for bidirectional communication
 // between plugins and kata. It receives a stream of messages and sends a stream of messages.
 // The body and type of the messages control routing to specific functions within the kata and its plugins.
