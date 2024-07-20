@@ -83,6 +83,17 @@ func TestBadWSConfig(t *testing.T) {
 
 }
 
+func TestBadHTTPMethod(t *testing.T) {
+
+	url, _, done := newTestServerHTTP(t, &Config{})
+	defer done()
+
+	res, err := http.DefaultClient.Get(url)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
+
+}
+
 func TestBadWSUpgrade(t *testing.T) {
 
 	_, s, done := newTestServerWebSockets(t, &Config{})

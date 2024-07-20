@@ -81,6 +81,10 @@ func (s *rpcServer) Register(method string, handler RPCHandler) {
 }
 
 func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		res.WriteHeader(http.StatusMethodNotAllowed)
+	}
+
 	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
