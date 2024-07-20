@@ -89,8 +89,9 @@ var (
 	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 
 	// HTTPServer PD0106XX
-	MsgHTTPServerStartFailed = ffe("PD010600", "Failed to start server on '%s'")
-	MsgHTTPServerMissingPort = ffe("PD010601", "HTTP server port must be specified for '%s'")
+	MsgHTTPServerStartFailed        = ffe("PD010600", "Failed to start server on '%s'")
+	MsgHTTPServerMissingPort        = ffe("PD010601", "HTTP server port must be specified for '%s'")
+	MsgHTTPServerNoWSUpgradeSupport = ffe("PD010602", "HTTP server does not support WebSocket upgrade (%T)")
 
 	// TLS PD0107XX
 	MsgTLSInvalidCAFile             = ffe("PD010700", "Invalid CA certificates file")
@@ -103,7 +104,10 @@ var (
 	MsgTLSInvalidTLSDnMismatch      = ffe("PD010707", "Certificate subject does not meet requirements")
 
 	// JSON/RPC PD0108XX
-	MsgJSONRPCInvalidRequest    = ffe("PD010800", "Invalid JSON/RPC request data")
-	MsgJSONRPCMissingRequestID  = ffe("PD010801", "Invalid JSON/RPC request. Must set request ID")
-	MsgJSONRPCUnsupportedMethod = ffe("PD010802", "method not supported")
+	MsgJSONRPCInvalidRequest      = ffe("PD010800", "Invalid JSON/RPC request data")
+	MsgJSONRPCMissingRequestID    = ffe("PD010801", "Invalid JSON/RPC request. Must set request ID")
+	MsgJSONRPCUnsupportedMethod   = ffe("PD010802", "method not supported")
+	MsgJSONRPCIncorrectParamCount = ffe("PD010803", "method %s requires %d params (supplied=%d)")
+	MsgJSONRPCInvalidParam        = ffe("PD010804", "method %s parameter %d invalid: %s")
+	MsgJSONRPCResultSerialization = ffe("PD010805", "method %s result serialization failed: %s")
 )

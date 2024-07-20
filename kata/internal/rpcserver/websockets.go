@@ -35,6 +35,7 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
 		id:      types.ShortID(),
 		server:  s,
 		conn:    conn,
+		send:    make(chan []byte),
 		closing: make(chan struct{}),
 	}
 	c.ctx, c.cancelCtx = context.WithCancel(log.WithLogField(s.bgCtx, "wsconn", c.id))
@@ -69,6 +70,7 @@ func (c *webSocketConnection) close() {
 		c.closed = true
 		c.conn.Close()
 		close(c.closing)
+		c.cancelCtx()
 	}
 	c.closeMux.Unlock()
 
@@ -95,6 +97,10 @@ func (c *webSocketConnection) sender() {
 
 func (c *webSocketConnection) handleMessage(payload []byte) {
 	res, _ := c.server.rpcHandler(c.ctx, bytes.NewBuffer(payload))
+	c.sendMessage(res)
+}
+
+func (c *webSocketConnection) sendMessage(res interface{}) {
 	payload, err := json.Marshal(res)
 	if err != nil {
 		log.L(c.ctx).Errorf("Failed to serialize JSON/RPC response %s", payload)

@@ -33,7 +33,7 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader) (interface{}, b
 
 	b, err := io.ReadAll(r)
 	if err != nil {
-		return s.replyRPCParseError(ctx, b)
+		return s.replyRPCParseError(ctx, b, err)
 	}
 
 	log.L(ctx).Tracef("RPC --> %s", b)
@@ -43,7 +43,7 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader) (interface{}, b
 		err := json.Unmarshal(b, &rpcArray)
 		if err != nil || len(rpcArray) == 0 {
 			log.L(ctx).Errorf("Bad RPC array received %s", b)
-			return s.replyRPCParseError(ctx, b)
+			return s.replyRPCParseError(ctx, b, err)
 		}
 		return s.handleRPCBatch(ctx, rpcArray)
 	}
@@ -51,14 +51,14 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader) (interface{}, b
 	var rpcRequest rpcbackend.RPCRequest
 	err = json.Unmarshal(b, &rpcRequest)
 	if err != nil {
-		return s.replyRPCParseError(ctx, b)
+		return s.replyRPCParseError(ctx, b, err)
 	}
 	return s.processRPC(ctx, &rpcRequest)
 
 }
 
-func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte) (*rpcbackend.RPCResponse, bool) {
-	log.L(ctx).Errorf("Request could not be parsed: %s", b)
+func (s *rpcServer) replyRPCParseError(ctx context.Context, b []byte, err error) (*rpcbackend.RPCResponse, bool) {
+	log.L(ctx).Errorf("Request could not be parsed (err=%v): %s", err, b)
 	return rpcbackend.RPCErrorResponse(
 		i18n.NewError(ctx, msgs.MsgJSONRPCInvalidRequest),
 		fftypes.JSONAnyPtr("1"), // we couldn't parse the request ID
@@ -101,5 +101,5 @@ func (s *rpcServer) handleRPCBatch(ctx context.Context, rpcArray []*rpcbackend.R
 		}
 	}
 	// Only return a failure response code if all the requests in the batch failed
-	return rpcResponses, failCount == len(rpcArray)
+	return rpcResponses, failCount != len(rpcArray)
 }

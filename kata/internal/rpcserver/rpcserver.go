@@ -35,6 +35,8 @@ type Server interface {
 	Stop()
 }
 
+// RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
+// These use generics to avoid you needing to do any messy type mapping in your functions.
 type RPCHandler func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
 
 func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
@@ -56,7 +58,7 @@ func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
 			WriteBufferSize: int(confutil.ByteSize(conf.WS.WriteBufferSize, 0, *WSDefaults.WriteBufferSize)),
 		}
 		log.L(ctx).Infof("WebSocket server readBufferSize=%d writeBufferSize=%d", s.wsUpgrader.ReadBufferSize, s.wsUpgrader.WriteBufferSize)
-		if s.wsServer, err = httpserver.NewServer(ctx, "JSON/RPC (WebSocket)", &conf.HTTP.Config, http.HandlerFunc(s.wsHandler)); err != nil {
+		if s.wsServer, err = httpserver.NewServer(ctx, "JSON/RPC (WebSocket)", &conf.WS.Config, http.HandlerFunc(s.wsHandler)); err != nil {
 			return nil, err
 		}
 	}
@@ -112,12 +114,14 @@ func (s *rpcServer) Start() (err error) {
 func (s *rpcServer) Stop() {
 	wg := new(sync.WaitGroup)
 	if s.httpServer != nil {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			s.httpServer.Stop()
 		}()
 	}
 	if s.wsServer != nil {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			s.wsServer.Stop()

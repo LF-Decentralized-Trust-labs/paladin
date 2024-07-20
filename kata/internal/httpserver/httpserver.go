@@ -17,6 +17,7 @@
 package httpserver
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -35,6 +36,7 @@ import (
 type Server interface {
 	Start() error
 	Stop()
+	Addr() net.Addr
 }
 
 type httpServer struct {
@@ -132,6 +134,10 @@ func (s *httpServer) calcRequestTimeout(req *http.Request, defaultTimeout, maxTi
 	return reqTimeout
 }
 
+func (s *httpServer) Addr() net.Addr {
+	return s.listener.Addr()
+}
+
 type logCapture struct {
 	status int
 	res    http.ResponseWriter
@@ -148,6 +154,14 @@ func (lc *logCapture) Write(data []byte) (int, error) {
 func (lc *logCapture) WriteHeader(statusCode int) {
 	lc.status = statusCode
 	lc.res.WriteHeader(statusCode)
+}
+
+func (lc *logCapture) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := lc.res.(http.Hijacker)
+	if !ok {
+		return nil, nil, i18n.NewError(context.Background(), msgs.MsgHTTPServerNoWSUpgradeSupport, lc.res)
+	}
+	return hj.Hijack()
 }
 
 func (s *httpServer) withLogAndTimeout(handler http.Handler, defaultRequestTimeout, maxRequestTimeout time.Duration) http.Handler {

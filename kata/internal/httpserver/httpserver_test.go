@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +41,7 @@ func newTestServer(t *testing.T, conf *Config, handler http.HandlerFunc) (string
 	err = s.Start()
 	assert.NoError(t, err)
 
-	return fmt.Sprintf("http://%s", hs.listener.Addr()), hs, s.Stop
+	return fmt.Sprintf("http://%s", s.Addr()), hs, s.Stop
 
 }
 
@@ -146,4 +148,30 @@ func TestParseCustomTimeout(t *testing.T) {
 
 	req.Header.Set("Request-Timeout", "wrongness")
 	assert.Equal(t, 10*time.Second, s.calcRequestTimeout(req, 10*time.Second, 20*time.Second))
+}
+
+type mockResponseWriter struct{}
+
+func (*mockResponseWriter) Header() http.Header { return nil }
+
+func (*mockResponseWriter) Write(data []byte) (int, error) { return -1, nil }
+
+func (*mockResponseWriter) WriteHeader(statusCode int) {}
+
+func TestLogCaptureBadWSResponseWriter(t *testing.T) {
+	_, _, err := (&logCapture{res: &mockResponseWriter{}}).Hijack()
+	assert.Regexp(t, "PD010602", err)
+}
+
+func TestWSUpgradeSupported(t *testing.T) {
+	url, _, done := newTestServer(t, &Config{}, func(w http.ResponseWriter, r *http.Request) {
+		wsUpgrader := websocket.Upgrader{}
+		_, err := wsUpgrader.Upgrade(w, r, r.Header)
+		assert.NoError(t, err)
+	})
+	defer done()
+
+	c, _, err := websocket.DefaultDialer.Dial(strings.Replace(url, "http", "ws", 1), http.Header{})
+	assert.NoError(t, err)
+	_ = c.Close()
 }
