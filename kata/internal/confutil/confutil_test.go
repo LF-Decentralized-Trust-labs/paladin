@@ -72,6 +72,11 @@ func TestDuration(t *testing.T) {
 	assert.Equal(t, int64(1000000001), DurationSeconds(P("1000000001000ms"), 0, "0s"))
 }
 
+func TestByteSize(t *testing.T) {
+	assert.Equal(t, int64(1024*1024), ByteSize(nil, 0, "1Mb"))
+	assert.Equal(t, int64(16*1024), ByteSize(P("16Kb"), 0, "1Mb"))
+}
+
 func TestReadAndParseYAMLFileFlatStruct(t *testing.T) {
 	ctx := context.Background()
 

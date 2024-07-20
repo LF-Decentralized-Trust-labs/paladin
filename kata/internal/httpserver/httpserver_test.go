@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/pkg/tls"
+	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,8 +43,14 @@ func newTestServer(t *testing.T, conf *Config, handler http.HandlerFunc) (string
 
 }
 
+func TestMissingPort(t *testing.T) {
+	_, err := NewServer(context.Background(), "unittest", &Config{}, nil)
+	assert.Regexp(t, "PD010601", err)
+}
+
 func TestBadTLSConfig(t *testing.T) {
 	_, err := NewServer(context.Background(), "unittest", &Config{
+		Port: confutil.P(0),
 		TLS: tls.Config{
 			Enabled: true,
 			CAFile:  "!!!!!badness",
@@ -56,9 +62,10 @@ func TestBadTLSConfig(t *testing.T) {
 func TestBadAddress(t *testing.T) {
 
 	_, err := NewServer(context.Background(), "unittest", &Config{
+		Port:    confutil.P(0),
 		Address: confutil.P(":::::badness"),
 	}, nil)
-	assert.Regexp(t, "PD010602", err)
+	assert.Regexp(t, "PD010600", err)
 
 }
 
@@ -67,7 +74,8 @@ func TestServeOK(t *testing.T) {
 		assert.Equal(t, r.Method, http.MethodPut)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Write(([]byte)(`{"some":"data"}`))
+		_, err := w.Write(([]byte)(`{"some":"data"}`))
+		assert.NoError(t, err)
 	})
 	defer done()
 

@@ -28,8 +28,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/kata/internal/types"
-	"github.com/kaleido-io/paladin/kata/pkg/tls"
 )
 
 type Server interface {
@@ -57,9 +57,13 @@ func NewServer(ctx context.Context, description string, conf *Config, handler ht
 	}
 	s.ctx, s.cancelCtx = context.WithCancel(ctx)
 
-	listenAddr := fmt.Sprintf("%s:%d", confutil.StringNotEmpty(conf.Address, *HTTPDefaults.Address), confutil.IntMin(conf.Port, 0, *HTTPDefaults.Port))
+	if conf.Port == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgHTTPServerMissingPort, description)
+	}
+
+	listenAddr := fmt.Sprintf("%s:%d", confutil.StringNotEmpty(conf.Address, *HTTPDefaults.Address), *conf.Port)
 	if s.listener, err = net.Listen("tcp", listenAddr); err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgJSONRPCServerStartFailed, listenAddr)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgHTTPServerStartFailed, listenAddr)
 	}
 	log.L(ctx).Infof("%s server listening on %s", description, s.listener.Addr())
 
@@ -160,7 +164,7 @@ func (s *httpServer) withLogAndTimeout(handler http.Handler, defaultRequestTimeo
 		handler.ServeHTTP(lc, req)
 
 		durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
-		log.L(ctx).Infof("<-- %s %s [%d] (%.2fms)", req.Method, req.URL.Path, lc.status, durationMS)
+		log.L(ctx).Debugf("<-- %s %s [%d] (%.2fms)", req.Method, req.URL.Path, lc.status, durationMS)
 	})
 }
 

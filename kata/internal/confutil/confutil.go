@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
@@ -102,6 +103,21 @@ func DurationMin(sVal *string, min time.Duration, def string) time.Duration {
 func DurationSeconds(sVal *string, min time.Duration, def string) int64 {
 	d := DurationMin(sVal, min, def)
 	return (int64)(math.Ceil(d.Seconds()))
+}
+
+func ByteSize(sVal *string, min int64, def string) int64 {
+	var iVal *int64
+	if sVal != nil {
+		i, err := units.RAMInBytes(*sVal)
+		if err == nil {
+			iVal = &i
+		}
+	}
+	if iVal == nil || *iVal < min {
+		i, _ := units.RAMInBytes(def)
+		iVal = &i
+	}
+	return *iVal
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

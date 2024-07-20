@@ -18,7 +18,7 @@ package httpserver
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/pkg/tls"
+	"github.com/kaleido-io/paladin/kata/internal/tls"
 )
 
 type Config struct {
@@ -35,7 +35,6 @@ type Config struct {
 
 var HTTPDefaults = &Config{
 	Address:               confutil.P("127.0.0.1"),
-	Port:                  confutil.P(8645),
 	DefaultRequestTimeout: confutil.P("2m"),
 	MaxRequestTimeout:     confutil.P("10m"),
 	ShutdownTimeout:       confutil.P("10s"),

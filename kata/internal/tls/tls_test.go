@@ -67,13 +67,15 @@ func buildSelfSignedTLSKeyPair(t *testing.T, subject pkix.Name) (string, string)
 
 func buildSelfSignedTLSKeyPairFiles(t *testing.T, subject pkix.Name) (string, string) {
 	// Create an X509 certificate pair
-	privatekey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privatekey, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
 	publickey := &privatekey.PublicKey
 	var privateKeyBytes []byte = x509.MarshalPKCS1PrivateKey(privatekey)
 	tmpDir := t.TempDir()
 	privateKeyFile, _ := os.CreateTemp(tmpDir, "key.pem")
 	privateKeyBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}
-	pem.Encode(privateKeyFile, privateKeyBlock)
+	err = pem.Encode(privateKeyFile, privateKeyBlock)
+	assert.NoError(t, err)
 	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	x509Template := &x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -86,8 +88,10 @@ func buildSelfSignedTLSKeyPairFiles(t *testing.T, subject pkix.Name) (string, st
 	}
 	derBytes, err := x509.CreateCertificate(rand.Reader, x509Template, x509Template, publickey, privatekey)
 	assert.NoError(t, err)
-	publicKeyFile, _ := os.CreateTemp(tmpDir, "cert.pem")
-	pem.Encode(publicKeyFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	publicKeyFile, err := os.CreateTemp(tmpDir, "cert.pem")
+	assert.NoError(t, err)
+	err = pem.Encode(publicKeyFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	assert.NoError(t, err)
 	return publicKeyFile.Name(), privateKeyFile.Name()
 }
 
