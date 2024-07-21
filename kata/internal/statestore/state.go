@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
@@ -74,13 +75,18 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 	return s, op.flush(ctx)
 }
 
-func (ss *stateStore) GetState(ctx context.Context, domainID string, hash *HashID, failNotFound, withLabels bool) (*State, error) {
+func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
+	hash, err := ParseHashID(ctx, stateID)
+	if err != nil {
+		return nil, err
+	}
+
 	q := ss.p.DB().Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
 	}
 	var states []*State
-	err := q.
+	err = q.
 		Where("domain_id = ?", domainID).
 		Where("hash_l = ?", hash.L.String()).
 		Where("hash_h = ?", hash.H.String()).
@@ -132,7 +138,8 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 	}
 
 	// Build the query
-	q := query.Build(ctx, ss.p.DB().Table("states"), tracker)
+	db := ss.p.DB()
+	q := query.Build(ctx, db.Table("states"), tracker)
 	if q.Error != nil {
 		return nil, q.Error
 	}
@@ -146,14 +153,15 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 		q = q.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS %[2]s ON %[2]s.state_l = hash_l AND %[2]s.state_h = hash_h AND %[2]s.label = ?", typeMod, fi.virtualColumn), fi.label)
 	}
 
-	q = q.Where("domain_id = ?", domainID).
+	q = q.Joins("Confirmed", db.Select("transaction")).
+		Joins("Spent", db.Select("transaction")).
+		Joins("Locked", db.Select("sequence")).
+		Where("domain_id = ?", domainID).
 		Where("schema_l = ?", schema.Persisted().Hash.L).
 		Where("schema_h = ?", schema.Persisted().Hash.H)
 
 	// Scope the query based of the qualifier
-	if status != StateStatusAll {
-		q = q.Where(status.whereClause(ss.p.DB()))
-	}
+	q = q.Where(status.whereClause(ss.p.DB()))
 
 	var states []*State
 	q = q.Find(&states)
@@ -161,4 +169,64 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 		return nil, q.Error
 	}
 	return states, nil
+}
+
+func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
+	hash, err := ParseHashID(ctx, stateID)
+	if err != nil {
+		return err
+	}
+
+	op := ss.writer.newWriteOp(domainID)
+	op.stateConfirms = []*StateConfirm{
+		{State: *hash, Transaction: transactionID},
+	}
+
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
+}
+
+func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
+	hash, err := ParseHashID(ctx, stateID)
+	if err != nil {
+		return err
+	}
+
+	op := ss.writer.newWriteOp(domainID)
+	op.stateSpends = []*StateSpend{
+		{State: *hash, Transaction: transactionID},
+	}
+
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
+}
+
+func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID) error {
+	hash, err := ParseHashID(ctx, stateID)
+	if err != nil {
+		return err
+	}
+
+	op := ss.writer.newWriteOp(domainID)
+	op.stateLocks = []*StateLock{
+		{State: *hash, Sequence: sequenceID},
+	}
+
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
+}
+
+func (ss *stateStore) ClearLocked(ctx context.Context, domainID, stateID string) error {
+	hash, err := ParseHashID(ctx, stateID)
+	if err != nil {
+		return err
+	}
+
+	op := ss.writer.newWriteOp(domainID)
+	op.stateLockDeletes = []*StateLock{
+		{State: *hash},
+	}
+
+	ss.writer.queue(ctx, op)
+	return op.flush(ctx)
 }

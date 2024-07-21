@@ -57,7 +57,7 @@ func TestGetStateMissing(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.GetState(ctx, "domain1", HashIDKeccak(([]byte)("state1")), true, false)
+	_, err := ss.GetState(ctx, "domain1", HashIDKeccak(([]byte)("state1")).String(), true, false)
 	assert.Regexp(t, "PD010112", err)
 }
 

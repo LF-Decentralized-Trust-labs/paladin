@@ -62,25 +62,34 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 	switch q {
 	case StateStatusAvailable:
 		return db.
-			Where("confirmed.transaction IS NOT NULL").
-			Where("locked.sequence IS NULL")
+			Where("Confirmed__transaction IS NOT NULL").
+			Where("Spent__transaction IS NULL").
+			Where("Locked__sequence IS NULL")
 	case StateStatusConfirmed:
 		return db.
-			Where("confirmed.transaction IS NOT NULL")
+			Where("Confirmed__transaction IS NOT NULL").
+			Where("Spent__transaction IS NULL")
 	case StateStatusUnconfirmed:
 		return db.
-			Where("confirmed.transaction IS NULL")
+			Where("Confirmed__transaction IS NULL")
 	case StateStatusLocked:
 		return db.
-			Where("locked.sequence IS NOT NULL")
+			Where("Locked__sequence IS NOT NULL")
 	case StateStatusSpent:
 		return db.
-			Where("spent.transaction IS NOT NULL")
+			Where("Spent__transaction IS NOT NULL")
 	case StateStatusAll:
 		return db.Where("TRUE")
 	default:
+		// Querying in the context of a sequence, gives you only states locked specifically into
+		// that sequence - NOT the ones available for that sequence to use.
+		//
+		// The assembler routine provides that facility to domains during the assemble call using
+		// in-memory state as well as database state.
+		//
+		// TODO: Determine if we need to move the JSON/RPC call to be the more obvious thing
+		//       of the same thing as the assembler (once we've implemented that)
 		return db.
-			Where("locked.sequence = ?", q).
-			Or("locked.sequence IS NULL")
+			Where("Locked__sequence = ?", q)
 	}
 }

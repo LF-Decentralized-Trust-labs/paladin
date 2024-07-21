@@ -28,6 +28,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func testABIParam(t *testing.T, jsonParam string) *abi.Parameter {
+	var a abi.Parameter
+	err := json.Unmarshal([]byte(jsonParam), &a)
+	assert.NoError(t, err)
+	return &a
+}
+
 // This is an E2E test using the actual database, the flush-writer DB storage system, and the schema cache
 func TestStoreRetrieveABISchema(t *testing.T) {
 
@@ -173,7 +180,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	getValidate()
 
 	// Get the state back too
-	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, &state1.Hash, true, true)
+	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, state1.Hash.String(), true, true)
 	assert.NoError(t, err)
 	assert.Equal(t, state1, state1a)
 

@@ -52,27 +52,6 @@ func newTestRPCServer(t *testing.T) (context.Context, rpcbackend.Backend, func()
 
 }
 
-const widgetABI = `{
-	"type": "tuple",
-	"internalType": "struct Widget",
-	"components": [
-		{
-			"name": "size",
-			"type": "int64"
-		},
-		{
-			"name": "color",
-			"type": "string",
-			"indexed": true
-		},
-		{
-			"name": "price",
-			"type": "uint256",
-			"indexed": true
-		}
-	]
-}`
-
 func jsonTestLog(t *testing.T, desc string, f interface{}) {
 	b, err := json.MarshalIndent(f, "", "  ")
 	assert.NoError(t, err)
@@ -95,10 +74,11 @@ func TestRPC(t *testing.T) {
 	assert.Nil(t, rpcErr)
 	assert.Len(t, schemas, 1)
 	assert.Equal(t, SchemaTypeABI, schemas[0].Type)
-	assert.Equal(t, "0xb15915ec54368a54e1dbce187a1111c27a696a7dc540a7c8e57ce64fca8291ce", schemas[0].Hash.String())
+	assert.Equal(t, "0x3612029bf239cbed1e27548e9211ecfe72496dfec4183fd3ea79a3a54eb126be", schemas[0].Hash.String())
 
 	var state *State
 	rpcErr = c.CallRPC(ctx, &state, "pstate_storeState", "domain1", schemas[0].Hash, types.RawJSON(`{
+	    "salt": "fd2724ce91a859e24c228e50ae17b9443454514edce9a64437c208b0184d8910",
 		"size": 10,
 		"color": "blue",
 		"price": "1230000000000000000"
@@ -107,7 +87,7 @@ func TestRPC(t *testing.T) {
 	assert.Nil(t, rpcErr)
 	assert.Equal(t, schemas[0].Hash, state.Schema)
 	assert.Equal(t, "domain1", state.DomainID)
-	assert.Equal(t, "0xb24d2370ac43801bb8c8df9cd2c0c298f1711b361cd7a8d978cea7649aace18f", state.Hash.String())
+	assert.Equal(t, "0x30e278bca8d876cdceb24520b0ebe736a64a9cb8019157f40fa5b03f083f824d", state.Hash.String())
 
 	var states []*State
 	rpcErr = c.CallRPC(ctx, &states, "pstate_queryStates", "domain1", schemas[0].Hash, types.RawJSON(`{
