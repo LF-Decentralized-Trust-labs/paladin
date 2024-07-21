@@ -24,6 +24,9 @@ import (
 func Stop(ctx context.Context, socketAddress string) {
 	log.L(ctx).Infof("Stop: %s", socketAddress)
 	if commsBus != nil {
-		commsBus.GRPCServer().Stop(ctx)
+		err := commsBus.GRPCServer().Stop(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to stop GRPC server: %s", err)
+		}
 	}
 }
