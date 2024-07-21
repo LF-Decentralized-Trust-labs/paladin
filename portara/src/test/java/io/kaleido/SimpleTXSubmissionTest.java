@@ -51,8 +51,9 @@ persistence:
     autoMigrate:   true
     migrationsDir: %s
     debugQueries:  true
-grpc:
-  socketAddress: %s
+commsBus:
+  grpc:
+    socketAddress: %s
 """.formatted(System.getProperty("user.dir") + "/../kata/db/migrations/sqlite",socketFilename);
 
         File yamlFile = File.createTempFile("paladin", "kata.conf.yaml");
