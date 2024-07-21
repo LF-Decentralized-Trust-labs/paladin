@@ -115,7 +115,7 @@ func TestRPC(t *testing.T) {
 		  "field": "color",
 		  "value": "blue"
 		}]
-	}`))
+	}`), "all")
 	jsonTestLog(t, "pstate_storeState", states)
 	assert.Nil(t, rpcErr)
 	assert.Len(t, states, 1)

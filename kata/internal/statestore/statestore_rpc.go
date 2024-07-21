@@ -69,11 +69,12 @@ func (ss *stateStore) rpcStoreState() rpcserver.RPCHandler {
 }
 
 func (ss *stateStore) rpcQuery() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod3(func(ctx context.Context,
+	return rpcserver.RPCMethod4(func(ctx context.Context,
 		domain string,
 		schema string,
 		query filters.QueryJSON,
+		status StateStatusQualifier,
 	) ([]*State, error) {
-		return ss.FindStates(ctx, domain, schema, &query)
+		return ss.FindStates(ctx, domain, schema, &query, status)
 	})
 }

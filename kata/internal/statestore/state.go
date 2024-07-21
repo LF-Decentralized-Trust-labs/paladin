@@ -27,13 +27,16 @@ import (
 )
 
 type State struct {
-	Hash        HashID             `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	CreatedAt   types.Timestamp    `json:"created"     gorm:"autoCreateTime:nano"`
+	Hash        HashID             `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	CreatedAt   types.Timestamp    `json:"created"             gorm:"autoCreateTime:nano"`
 	DomainID    string             `json:"domain"`
-	Schema      HashID             `json:"schema"      gorm:"embedded;embeddedPrefix:schema_;"`
+	Schema      HashID             `json:"schema"              gorm:"embedded;embeddedPrefix:schema_;"`
 	Data        types.RawJSON      `json:"data"`
-	Labels      []*StateLabel      `json:"-"           gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Int64Labels []*StateInt64Label `json:"-"           gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Labels      []*StateLabel      `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Int64Labels []*StateInt64Label `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Confirmed   *StateConfirm      `json:"confirmed,omitempty" gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Spent       *StateSpend        `json:"spent,omitempty"     gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
 type StateLabel struct {
@@ -117,7 +120,7 @@ func (ft labelTracker) ResolverFor(fieldName string) filters.FieldResolver {
 	return nil
 }
 
-func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON) (s []*State, err error) {
+func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, err
@@ -143,12 +146,17 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 		q = q.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS %[2]s ON %[2]s.state_l = hash_l AND %[2]s.state_h = hash_h AND %[2]s.label = ?", typeMod, fi.virtualColumn), fi.label)
 	}
 
-	var states []*State
-	q = q.
-		Where("domain_id = ?", domainID).
+	q = q.Where("domain_id = ?", domainID).
 		Where("schema_l = ?", schema.Persisted().Hash.L).
-		Where("schema_h = ?", schema.Persisted().Hash.H).
-		Find(&states)
+		Where("schema_h = ?", schema.Persisted().Hash.H)
+
+	// Scope the query based of the qualifier
+	if status != StateStatusAll {
+		q = q.Where(status.whereClause(ss.p.DB()))
+	}
+
+	var states []*State
+	q = q.Find(&states)
 	if q.Error != nil {
 		return nil, q.Error
 	}

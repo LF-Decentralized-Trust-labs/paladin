@@ -1,6 +1,6 @@
 CREATE TABLE states (
-    hash_l      UUID,
-    hash_h      UUID,
+    hash_l      UUID     NOT NULL,
+    hash_h      UUID     NOT NULL,
     created_at  BIGINT,
     domain_id   VARCHAR,
     schema_l    UUID,
@@ -11,9 +11,9 @@ CREATE TABLE states (
 );
 
 CREATE TABLE state_labels (
-    state_l     UUID,
-    state_h     UUID,   
-    label       VARCHAR,
+    state_l     UUID     NOT NULL,
+    state_h     UUID     NOT NULL,   
+    label       VARCHAR  NOT NULL,
     value       VARCHAR,
     PRIMARY KEY (state_l, state_h, label),
     FOREIGN KEY (state_l, state_h) REFERENCES states (hash_l, hash_h) ON DELETE CASCADE
@@ -21,9 +21,9 @@ CREATE TABLE state_labels (
 CREATE INDEX state_labels_value ON state_labels(value);
 
 CREATE TABLE state_int64_labels (
-    state_l     UUID,
-    state_h     UUID,   
-    label       VARCHAR,
+    state_l     UUID     NOT NULL,
+    state_h     UUID     NOT NULL,   
+    label       VARCHAR  NOT NULL,
     value       BIGINT,
     PRIMARY KEY (state_l, state_h, label),
     FOREIGN KEY (state_l, state_h) REFERENCES states (hash_l, hash_h) ON DELETE CASCADE

@@ -67,7 +67,7 @@ func TestFindStatesMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.FindStates(ctx, "domain1", HashIDKeccak(([]byte)("schema1")).String(), &filters.QueryJSON{})
+	_, err := ss.FindStates(ctx, "domain1", HashIDKeccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -89,7 +89,7 @@ func TestFindStatesBadQuery(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, "all")
 	assert.Regexp(t, "PD010600.*wrong", err)
 
 }
@@ -117,7 +117,7 @@ func TestFindStatesFail(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, "all")
 	assert.Regexp(t, "pop", err)
 
 }

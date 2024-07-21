@@ -1,6 +1,6 @@
 CREATE TABLE schemas (
-    hash_l        UUID,
-    hash_h        UUID,
+    hash_l        UUID     NOT NULL,
+    hash_h        UUID     NOT NULL,
     created_at    BIGINT,
     domain_id     VARCHAR,
     type          VARCHAR,
