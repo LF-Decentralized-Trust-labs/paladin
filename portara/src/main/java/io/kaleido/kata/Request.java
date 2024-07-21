@@ -22,6 +22,7 @@ import paladin.kata.Kata;
 // Create a class that includes a method receiving a callback function
 public abstract class Request {
     private Handler transactionHandler;
+
     private ResponseHandler responseHandler;
     private final String id;
 
@@ -46,4 +47,9 @@ public abstract class Request {
     public ResponseHandler getResponseHandler() {
         return responseHandler;
     }
+
+    public Handler getTransactionHandler() {
+        return transactionHandler;
+    }
+    
 }

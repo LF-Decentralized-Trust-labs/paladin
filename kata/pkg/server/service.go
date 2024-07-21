@@ -16,13 +16,10 @@ package server
 
 import (
 	"context"
-	"io"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"google.golang.org/grpc/metadata"
 )
 
 func NewKataMessageService(ctx context.Context, messageBroker commsbus.Broker) *KataMessageService {
@@ -58,33 +55,62 @@ func (s *KataMessageService) ListDestinations(ctx context.Context, req *proto.Li
 	}, nil
 }
 
-// OpenStreams implements the OpenStreams RPC method of KataService which is the main entry point for bidirectional communication
-// between plugins and kata. It receives a stream of messages and sends a stream of messages.
-// The body and type of the messages control routing to specific functions within the kata and its plugins.
-func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStreamsServer) error {
-	ctx := stream.Context()
-	log.L(ctx).Info("OpenStreams")
-	//defaulting to an ephemeral session which means a new destination ID is generated for each stream
-	destinationID := uuid.New().String()
-	ephemeralSession := true
+func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message) (*proto.SendMessageResponse, error) {
 
-	// allow the client to specify a destination ID in metadata so that they can resume a session if needed
-	if md, ok := metadata.FromIncomingContext(stream.Context()); ok {
-		log.L(ctx).Debug("got metadata")
-
-		if val, ok := md["destination"]; ok {
-			log.L(ctx).Debug("got destination from metadata", val[0])
-
-			destinationID = val[0]
-			ephemeralSession = false
-		} else {
-			log.L(ctx).Debug("metadata does not contain destination")
-
-		}
-	} else {
-		log.L(ctx).Debug("no metadata")
-
+	log.L(ctx).Info("SendMessage")
+	var replyDestinationPtr *string
+	replyDestination := msg.GetReplyTo()
+	if replyDestination != "" {
+		//protobuf does not differentiate between an optional field being "" vs being missing
+		replyDestinationPtr = &replyDestination
 	}
+
+	commsbusMessage := commsbus.Message{
+		Destination:   msg.GetDestination(),
+		Body:          []byte(msg.GetBody()),
+		ID:            msg.GetId(),
+		Type:          msg.GetType(),
+		ReplyTo:       replyDestinationPtr,
+		CorrelationID: msg.CorrelationId,
+	}
+
+	err := s.messageBroker.SendMessage(ctx, commsbusMessage)
+	if err != nil {
+		log.L(ctx).Error("Error sending message", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.SendMessageResponse{
+		Result: proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK,
+	}, nil
+}
+
+func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Event) (*proto.PublishEventResponse, error) {
+	log.L(ctx).Info("PublishEvent")
+	commsbusEvent := commsbus.Event{
+		Topic: event.GetTopic(),
+		Body:  []byte(event.GetBody()),
+		Type:  event.GetType(),
+	}
+
+	err := s.messageBroker.PublishEvent(ctx, commsbusEvent)
+	if err != nil {
+		log.L(ctx).Error("Error publishing event", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.PublishEventResponse{
+		Result: proto.PUBLISH_EVENT_RESULT_PUBLISH_EVENT_OK,
+	}, nil
+}
+
+// Listen implements the Listen RPC method of KataService which is the main entry point for sending messages to plugins
+func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream proto.KataMessageService_ListenServer) error {
+	//TODO validate
+	ctx := stream.Context()
+	log.L(ctx).Info("Listen")
+	destinationID := listenRequest.GetDestination()
+	//TODO validate destinationID is unique and send an error message on the stream and exit if not
 	log.L(ctx).Infof("Destination ID: %s", destinationID)
 
 	messageHandler, err := s.messageBroker.Listen(ctx, destinationID)
@@ -92,68 +118,24 @@ func (s *KataMessageService) OpenStreams(stream proto.KataMessageService_OpenStr
 		log.L(ctx).Errorf("Failed to listen for messages: %s", err)
 		return err
 	}
-	// Start a goroutine to handle incoming messages from the internal comms bus and forward them to the client
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-messageHandler.Channel:
-				log.L(ctx).Info("Received message from comms bus to forward to client")
+	// handle incoming messages from the internal comms bus and forward them to the client
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case msg := <-messageHandler.Channel:
+			log.L(ctx).Info("Received message from comms bus to forward to client")
 
-				response := &proto.Message{
-					Id:            msg.ID,
-					Type:          msg.Type,
-					Body:          string(msg.Body),
-					CorrelationId: msg.CorrelationID,
-				}
-				err := stream.Send(response)
-				if err != nil {
-					log.L(ctx).Error("Error sending message", err)
-				}
+			response := &proto.Message{
+				Id:            msg.ID,
+				Type:          msg.Type,
+				Body:          string(msg.Body),
+				CorrelationId: msg.CorrelationID,
+			}
+			err := stream.Send(response)
+			if err != nil {
+				log.L(ctx).Error("Error sending message", err)
 			}
 		}
-	}()
-	for {
-		// Read the next message from the stream and forward it to the internal comms bus
-		msg, err := stream.Recv()
-		if err == io.EOF {
-			// End of stream, exit the loop
-			log.L(ctx).Info("EOF")
-			break
-		}
-		if err != nil {
-			log.L(ctx).Error("Error from stream", err)
-			// Handle the error
-			return err
-		}
-		log.L(ctx).Info("Received message")
-		commsbusMessage := commsbus.Message{
-			Destination: msg.GetDestination(),
-			Body:        []byte(msg.GetBody()),
-			ID:          msg.GetId(),
-			Type:        msg.GetType(),
-
-			CorrelationID: msg.CorrelationId,
-		}
-
-		if ephemeralSession && commsbusMessage.ReplyTo == nil {
-			commsbusMessage.ReplyTo = &destinationID // We set replyto just incase the client wants to send a response back
-		}
-
-		err = s.messageBroker.SendMessage(ctx, commsbusMessage)
-		if err != nil {
-			log.L(ctx).Error("Error sending message", err)
-			// Handle the error
-			return err
-		}
-
-		// Optionally, you can also check if the client has requested to cancel the stream
-		if stream.Context().Err() != nil {
-			// Client has canceled the stream, exit the loop
-			break
-		}
 	}
-
-	return nil
 }

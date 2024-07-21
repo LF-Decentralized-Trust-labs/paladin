@@ -38,8 +38,6 @@ public class SubmitTransactionRequest extends Request {
         this.payloadJSON = payloadJSON;
     }
 
-
-
     @Override
     public Kata.Message getRequestMessage() {
         String payloadJSON = """
@@ -55,6 +53,7 @@ public class SubmitTransactionRequest extends Request {
                 .setBody(payloadJSON)
                 .setId(getId())
                 .setDestination("kata-txn-engine")
+                .setReplyTo(getTransactionHandler().getDestinationName())
                 .build();
     }
 

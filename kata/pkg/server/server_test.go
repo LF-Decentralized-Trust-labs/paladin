@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 )
 
 func TestRunTransactionSubmission(t *testing.T) {
@@ -83,40 +82,43 @@ grpc:
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())
 
-	streams, err := client.OpenStreams(ctx)
-	require.NoError(t, err, "failed to call OpenStreams")
+	testDestination := "test-destination"
+	listenerContext, stopListener := context.WithCancel(ctx)
+	streams, err := client.Listen(listenerContext, &proto.ListenRequest{
+		Destination: testDestination,
+	})
+	require.NoError(t, err, "failed to call Listen")
 
 	submitTransactionJSON := `
 	{
 		"from":            "fromID",
 		"contractAddress": "contract",
-		"payloadJSON":  "{\"foo\":\"bar\"}"
+		"payloadJSON":     "{\"foo\":\"bar\"}"
 	}
 	`
-
 	requestId := "requestID"
 	submitTransactionRequest := &proto.Message{
 		Destination: "kata-txn-engine",
 		Id:          requestId,
 		Type:        "SUBMIT_TRANSACTION_REQUEST",
 		Body:        submitTransactionJSON,
+		ReplyTo:     &testDestination,
 	}
 
-	err = streams.Send(submitTransactionRequest)
+	sendMessageResponse, err := client.SendMessage(ctx, submitTransactionRequest)
 	require.NoError(t, err)
+	require.NotNil(t, sendMessageResponse)
+	assert.Equal(t, proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
 
+	// attempt to receive the response message
 	resp, err := streams.Recv()
 
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
 	assert.Equal(t, requestId, resp.GetCorrelationId())
 	assert.NotNil(t, resp.GetBody())
-	err = streams.CloseSend()
-	require.NoError(t, err)
-	resp, err = streams.Recv()
-	require.Equal(t, err, io.EOF)
-	assert.Nil(t, resp)
 
+	stopListener()
 	// Stop the server
 	Stop(ctx, socketAddress)
 }
@@ -190,44 +192,34 @@ func TestRunPointToPoint(t *testing.T) {
 	socketAddress, done := runServiceForTesting(ctx, t)
 	defer done()
 
-	client1Destination := "client1-destination"
 	client2Destination := "client2-destination"
 
 	client1, done := newClientForTesting(ctx, t, socketAddress)
 	defer done()
 
-	md1 := metadata.Pairs("destination", client1Destination)
-	ctx1 := metadata.NewOutgoingContext(context.Background(), md1)
-
-	streams1, err := client1.OpenStreams(ctx1)
-	require.NoError(t, err, "failed to call OpenStreams")
-
 	client2, done := newClientForTesting(ctx, t, socketAddress)
 	defer done()
 
-	md2 := metadata.Pairs("destination", client2Destination)
-	ctx2 := metadata.NewOutgoingContext(context.Background(), md2)
-	streams2, err := client2.OpenStreams(ctx2)
-	require.NoError(t, err, "failed to call OpenStreams")
+	// client 2 listens, client 1 sends
+	listenerContext, stopListener := context.WithCancel(ctx)
+	streams2, err := client2.Listen(listenerContext, &proto.ListenRequest{
+		Destination: client2Destination,
+	})
+	require.NoError(t, err, "failed to call Listen")
 
-	areBothClientsConnected := func() bool {
-		client1Connected := false
-		client2Connected := false
+	isClient2Listenting := func() bool {
 		listDestinationsResponse, err := client1.ListDestinations(ctx, &proto.ListDestinationsRequest{})
 		require.NoError(t, err)
 		for _, connectedClient := range listDestinationsResponse.Destinations {
-			if connectedClient == client1Destination {
-				client1Connected = true
-			}
 			if connectedClient == client2Destination {
-				client2Connected = true
+				return true
 			}
 		}
-		return client1Connected && client2Connected
+		return false
 	}
 
 	delay := 0
-	for !areBothClientsConnected() {
+	for !isClient2Listenting() {
 		delay++
 		time.Sleep(time.Second)
 		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
@@ -243,8 +235,9 @@ func TestRunPointToPoint(t *testing.T) {
 		Body:        body1,
 	}
 
-	err = streams1.Send(helloMessage1)
+	sendMessageResponse, err := client1.SendMessage(ctx, helloMessage1)
 	require.NoError(t, err)
+	assert.Equal(t, proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
 
 	resp, err := streams2.Recv()
 	require.NotEqual(t, err, io.EOF)
@@ -253,18 +246,7 @@ func TestRunPointToPoint(t *testing.T) {
 	assert.NotNil(t, resp.GetBody())
 	assert.Equal(t, body1, resp.GetBody())
 
-	err = streams1.CloseSend()
-	require.NoError(t, err)
-	resp, err = streams1.Recv()
-	require.Equal(t, err, io.EOF)
-	assert.Nil(t, resp)
-
-	err = streams2.CloseSend()
-	require.NoError(t, err)
-	resp, err = streams2.Recv()
-	require.Equal(t, err, io.EOF)
-	assert.Nil(t, resp)
-
+	stopListener()
 	// Stop the server
 	Stop(ctx, socketAddress)
 }

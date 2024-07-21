@@ -17,15 +17,18 @@ package io.kaleido.kata;
 import java.util.concurrent.*;
 import java.net.UnixDomainSocketAddress;
 
+import io.grpc.Context.CancellableContext;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import io.grpc.Context;
 import io.netty.channel.Channel;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import paladin.kata.Kata;
 import paladin.kata.KataMessageServiceGrpc;
+import paladin.kata.Kata.ListenRequest;
 
 public class Handler {
 
@@ -33,19 +36,23 @@ public class Handler {
     private final Class<? extends Channel> channelBuilder;
     private String socketAddress;
     private ManagedChannel channel;
-    StreamObserver<Kata.Message> messageStream;
-    // Declare the ConcurrentHashMap
+    private CancellableContext listenerContext;
+    private String destinationName; // unique name that can be used by other kata services and plugins to send messages to this handler
+    public String getDestinationName() {
+        return destinationName;
+    }
 
     private static final class DrainMonitor {}
     private final DrainMonitor drainMonitor = new DrainMonitor();
 
     private ConcurrentHashMap<String, Request> inflightRequests;
 
-    public Handler(String socketAddress) {
+    public Handler(String socketAddress, String destinationName) {
         this.socketAddress = socketAddress;
         this.eventLoopGroup = new NioEventLoopGroup();
         this.channelBuilder = NioDomainSocketChannel.class;
         inflightRequests = new ConcurrentHashMap<>();
+        this.destinationName = destinationName;
     }
 
     public void start() {
@@ -100,8 +107,12 @@ public class Handler {
         };
 
         System.out.println("listening");
-        this.messageStream = asyncStub.openStreams(responseObserver);
-        System.out.println("listener stopped: " + this.messageStream.toString());
+        this.listenerContext = Context.current().withCancellation();
+        this.listenerContext.run(() -> {
+            asyncStub.listen(ListenRequest.newBuilder().setDestination(this.destinationName).build(), responseObserver);
+        });
+        
+        System.out.println("listener stopped");
 
     }
 
@@ -116,7 +127,9 @@ public class Handler {
         }
         System.out.println("stopping");
 
-        this.messageStream.onCompleted();
+        if (this.listenerContext != null) {
+            this.listenerContext.cancel(null);
+        }
 
         if (this.channel != null) {
             this.channel.shutdown();
@@ -152,7 +165,9 @@ public class Handler {
 
         try {
             String requestId = request.getId();
-            this.messageStream.onNext(request.getRequestMessage());
+            KataMessageServiceGrpc.KataMessageServiceBlockingStub blockingStub = KataMessageServiceGrpc
+                .newBlockingStub(channel);
+            blockingStub.sendMessage(request.getRequestMessage());
             this.inflightRequests.put(requestId, request);
 
         } catch (Exception e) {

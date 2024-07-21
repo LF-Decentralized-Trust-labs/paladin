@@ -45,10 +45,15 @@ type Message struct {
 }
 
 type Event struct {
-	Topic string
-	Body  []byte
+	Topic         string
+	Body          []byte
+	Type          string
+	ID            string
+	CorrelationID *string
 }
 
+// EventMessage is a struct that wraps an event with a destination string so that it can be sent as a message
+// to a named listener.
 type EventMessage struct {
 	Destination string
 	Event
@@ -65,7 +70,7 @@ type MessageHandler struct {
 
 type Broker interface {
 	SendMessage(ctx context.Context, message Message) error
-	SendEvent(ctx context.Context, event Event) error
+	PublishEvent(ctx context.Context, event Event) error
 	Listen(ctx context.Context, destination string) (MessageHandler, error)
 	Unlisten(ctx context.Context, destination string) error
 	SubscribeEvent(ctx context.Context, topic string, destination string) error
@@ -154,9 +159,9 @@ func (b *broker) SubscribeEvent(ctx context.Context, topic string, destination s
 	return nil
 }
 
-// SendEvent implements Broker.
-func (b *broker) SendEvent(ctx context.Context, event Event) error {
-	log.L(ctx).Infof("SendEvent: %s", event.Topic)
+// PublishEvent implements Broker.
+func (b *broker) PublishEvent(ctx context.Context, event Event) error {
+	log.L(ctx).Infof("PublishEvent: %s", event.Topic)
 	b.subscriptionsLock.Lock()
 	defer b.subscriptionsLock.Unlock()
 

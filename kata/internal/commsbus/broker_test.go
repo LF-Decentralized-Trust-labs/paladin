@@ -219,8 +219,8 @@ func TestBroker_SubscribeEventsOK(t *testing.T) {
 		Topic: "test.topic",
 		Body:  []byte("test subscribe message body"),
 	}
-	// Call the SendEvent method
-	err = testBroker.SendEvent(ctx, event)
+	// Call the PublishEvent method
+	err = testBroker.PublishEvent(ctx, event)
 	require.NoError(t, err)
 
 	// Read the response from the channel
@@ -266,8 +266,8 @@ func TestBroker_UnSubscribeEventsOK(t *testing.T) {
 		Body:  []byte("test event body"),
 	}
 
-	// Call the SendEvent method
-	err = testBroker.SendEvent(ctx, event)
+	// Call the PublishEvent method
+	err = testBroker.PublishEvent(ctx, event)
 	require.NoError(t, err)
 
 	//wait for a second to make sure the message is not delivered

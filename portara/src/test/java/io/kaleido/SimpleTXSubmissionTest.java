@@ -75,7 +75,7 @@ grpc:
 
 
         // Start the Java GRPC client
-        Handler transactionHandler = new Handler(socketFilename);
+        Handler transactionHandler = new Handler(socketFilename, "test-handler");
         transactionHandler.start();
 
         // Add a shutdown hook to wait for a signal to exit

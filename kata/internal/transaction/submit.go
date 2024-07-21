@@ -72,12 +72,17 @@ func handleMessage(ctx context.Context, msg commsbus.Message) error {
 				Destination:   *msg.ReplyTo,
 			}
 
+			log.L(ctx).Infof("Sending reply to %s", submitTransactionResponse.Destination)
+
 			err = broker.SendMessage(ctx, submitTransactionResponse)
 			if err != nil {
 				log.L(ctx).Errorf("Error sending response: %s", err)
 				return err
 			}
 			log.L(ctx).Info("Sent MESSAGE_TYPE_RESPONSE_MESSAGE")
+		} else {
+			log.L(ctx).Info("No reply requested")
+
 		}
 
 	default:
