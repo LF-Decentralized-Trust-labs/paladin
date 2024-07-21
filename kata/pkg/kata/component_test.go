@@ -36,57 +36,11 @@ import (
 func TestRunTransactionSubmission(t *testing.T) {
 	ctx := context.Background()
 
-	// get a valid file name for a temp file by first creating a temp file and then removing it
-	file, err := os.CreateTemp("", "paladin.sock")
-	require.NoError(t, err)
-	socketAddress := file.Name()
-	os.Remove(file.Name())
+	socketAddress, done := runServiceForTesting(ctx, t)
+	defer done()
 
-	//Create and write a config file
-	configFile, err := os.CreateTemp("", "test_*.yaml")
-	require.NoError(t, err)
-
-	defer os.Remove(configFile.Name())
-
-	// Write YAML content to the temporary file
-	yamlContent := []byte(`
-persistence:
-  type: sqlite
-  sqlite:
-    uri:           ":memory:"
-    autoMigrate:   true
-    migrationsDir: ../../db/migrations/sqlite
-    debugQueries:  true
-commsBus:
-  grpc:
-    socketAddress: ` + socketAddress + `
-`)
-	_, err = configFile.Write(yamlContent)
-	require.NoError(t, err)
-
-	configFile.Close()
-
-	// Start the server
-	go Run(ctx, configFile.Name())
-	time.Sleep(time.Second * 2)
-
-	// Create a gRPC client connection
-	conn, err := grpc.NewClient("unix:"+socketAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
-	defer conn.Close()
-	// Create a new instance of the gRPC client
-	client := proto.NewKataMessageServiceClient(conn)
-	status, err := client.Status(ctx, &proto.StatusRequest{})
-
-	delay := 0
-	for !status.GetOk() {
-		time.Sleep(time.Second)
-		delay++
-		status, err = client.Status(ctx, &proto.StatusRequest{})
-		require.Less(t, delay, 2, "Server did not start after 2 seconds")
-	}
-	require.NoError(t, err)
-	assert.True(t, status.GetOk())
+	client, done := newClientForTesting(ctx, t, socketAddress)
+	defer done()
 
 	testDestination := "test-destination"
 	listenerContext, stopListener := context.WithCancel(ctx)
