@@ -19,11 +19,24 @@ package paladin.kata;
 option go_package = "pkg/proto";
 
 service KataMessageService {
-  // Bidirectional streams to send and receive messages. 
-  // Each message is either a request message, a response message for a given request message, or an event message.
-  // Each message type can be sent in either direction, although a response message is normaly sent in the opposite direction from its corresponding request message.
-  rpc OpenStreams(stream Message) returns (stream Message) {}
+  // Bidirectional stream to receive messages. 
+  rpc Listen(ListenRequest) returns (stream Message) {}
+  
+  //TODO need to think carefully how to do this without allowing one plugin to stop a listener for another
+  // for now, the listeners thread will stop when the context is cancelled (e.g. connection is dopped)
+  //rpc StopListener() returns (stream Message) {}
+
+  
+  // Simple RPC to Send a message to a specified destination
+  rpc SendMessage(Message) returns (SendMessageResponse) {}
+
+  // Simple RPC to publish an event to all subscribers of a given topic
+  rpc PublishEvent(Event) returns (PublishEventResponse) {}
+
   rpc Status(StatusRequest) returns (StatusResponse) {}
+
+  // get a list of all listeners (internal components and other plugins) 
+  rpc ListDestinations(ListDestinationsRequest) returns (ListDestinationsResponse) {}
 }
 
 // Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
@@ -33,10 +46,22 @@ message QuiesceStreamRequest {
 message QuiesceStreamResponse {
 }
 
+message ListDestinationsRequest {}
+
+message ListDestinationsResponse {
+  repeated string destinations = 1;
+}
+
 message StatusRequest {}
 
 message StatusResponse {
   bool ok = 1;
+}
+
+message ListenRequest {
+  // unique id for this destination, can be used by other plugins to send messages directly to this listener
+  // and also used when subscribing to events
+  string destination = 1;
 }
 
 message Message {
@@ -44,6 +69,35 @@ message Message {
   string type = 2;
   string id = 3;
   optional string correlationId = 4;
-  string body = 6;
+  string body = 5;
+  optional string replyTo = 6;
+}
 
+enum SEND_MESSAGE_RESULT {
+  SEND_MESSAGE_OK   = 0;
+  SEND_MESSAGE_FAIL = 1;
+}
+
+message SendMessageResponse {
+  SEND_MESSAGE_RESULT result = 1;
+  //if result is "OK" then reason is omitted otherwise, reason contains an error code explaining the non OK result
+  optional string reason = 2;
+}
+
+enum PUBLISH_EVENT_RESULT {
+  PUBLISH_EVENT_OK   = 0;
+  PUBLISH_EVENT_FAIL = 1;
+}
+
+message PublishEventResponse {
+  PUBLISH_EVENT_RESULT result = 1;
+  //if result is "OK" then reason is omitted otherwise, reason contains an error code explaining the non OK result
+  optional string reason = 2;
+}
+
+message Event {
+  string topic = 1;
+  string type = 2;
+  string id = 3;
+  string body = 4;
 }
