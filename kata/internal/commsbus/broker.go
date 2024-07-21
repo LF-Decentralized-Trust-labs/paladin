@@ -85,7 +85,7 @@ type broker struct {
 	subscriptionsLock sync.Mutex
 }
 
-func NewBroker(ctx context.Context, conf *BrokerConfig) (Broker, error) {
+func newBroker(ctx context.Context, conf *BrokerConfig) (Broker, error) {
 	return &broker{
 		destinations:  make(map[string]MessageHandler),
 		subscriptions: make(map[string][]string),

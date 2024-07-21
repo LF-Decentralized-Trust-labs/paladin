@@ -12,30 +12,18 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package main
 
-import (
-	"C"
-)
+package kata
+
 import (
 	"context"
-	"os"
-	"strconv"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/pkg/kata"
 )
 
-var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
-
-//export Run
-func Run(socketAddressPtr *C.char) {
-	kata.Run(rootCtx, C.GoString(socketAddressPtr))
+func Stop(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Stop: %s", socketAddress)
+	if commsBus != nil {
+		commsBus.GRPCServer().Stop(ctx)
+	}
 }
-
-//export Stop
-func Stop(socketAddressPtr *C.char) {
-	kata.Stop(rootCtx, C.GoString(socketAddressPtr))
-}
-
-func main() {}

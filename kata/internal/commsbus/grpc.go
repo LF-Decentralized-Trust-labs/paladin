@@ -12,17 +12,82 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package server
+package commsbus
 
 import (
 	"context"
+	"net"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"google.golang.org/grpc"
 )
 
-func NewKataMessageService(ctx context.Context, messageBroker commsbus.Broker) *KataMessageService {
+type GRPCServer interface {
+	Run(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
+type grpcServer struct {
+	listener net.Listener
+	server   *grpc.Server
+	done     chan error
+}
+
+type GRPCConfig struct {
+	SocketAddress *string `yaml:"socketAddress"`
+}
+
+func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCServer, error) {
+	if conf == nil || conf.SocketAddress == nil {
+		log.L(ctx).Error("missing grpc config in config")
+		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "socketAddress")
+	}
+	socketAddress := *conf.SocketAddress
+	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
+	l, err := net.Listen("unix", socketAddress)
+	if err != nil {
+		log.L(ctx).Error("failed to listen: ", err)
+		return nil, err
+	}
+	s := grpc.NewServer()
+
+	proto.RegisterKataMessageServiceServer(s, newKataMessageService(ctx, broker))
+
+	log.L(ctx).Infof("server listening at %v", l.Addr())
+	return &grpcServer{
+		listener: l,
+		server:   s,
+		done:     make(chan error),
+	}, nil
+}
+
+func (s *grpcServer) Run(ctx context.Context) error {
+	log.L(ctx).Infof("Run GRPC Server")
+
+	log.L(ctx).Infof("Server started")
+	s.done <- s.server.Serve(s.listener)
+	log.L(ctx).Infof("Server ended")
+	return nil
+}
+
+func (s *grpcServer) Stop(ctx context.Context) error {
+	log.L(ctx).Infof("Stop")
+
+	s.server.GracefulStop()
+	serverErr := <-s.done
+	if serverErr != nil {
+		log.L(ctx).Error("Error stopping server")
+		return i18n.WrapError(ctx, serverErr, msgs.MsgErrorStoppingGRPCServer)
+	}
+	log.L(ctx).Info("Server stopped")
+
+	return nil
+}
+
+func newKataMessageService(ctx context.Context, messageBroker Broker) *KataMessageService {
 	return &KataMessageService{
 		messageBroker: messageBroker,
 	}
@@ -30,7 +95,7 @@ func NewKataMessageService(ctx context.Context, messageBroker commsbus.Broker) *
 
 type KataMessageService struct {
 	proto.UnimplementedKataMessageServiceServer
-	messageBroker commsbus.Broker
+	messageBroker Broker
 }
 
 func (s *KataMessageService) Status(ctx context.Context, req *proto.StatusRequest) (*proto.StatusResponse, error) {
@@ -65,7 +130,7 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 		replyDestinationPtr = &replyDestination
 	}
 
-	commsbusMessage := commsbus.Message{
+	commsbusMessage := Message{
 		Destination:   msg.GetDestination(),
 		Body:          []byte(msg.GetBody()),
 		ID:            msg.GetId(),
@@ -87,7 +152,7 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 
 func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Event) (*proto.PublishEventResponse, error) {
 	log.L(ctx).Info("PublishEvent")
-	commsbusEvent := commsbus.Event{
+	commsbusEvent := Event{
 		Topic: event.GetTopic(),
 		Body:  []byte(event.GetBody()),
 		Type:  event.GetType(),

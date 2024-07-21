@@ -35,16 +35,18 @@ const SUBMIT_TRANSACTION_RESPONSE = "SUBMIT_TRANSACTION_RESPONSE"
 const SUBMIT_TRANSACTION_ERROR = "SUBMIT_TRANSACTION_ERROR"
 const MESSAGE_DESTINATION = "kata-txn-engine"
 
-func Init(ctx context.Context, persistence persistence.Persistence, messageBroker commsbus.Broker) error {
+func Init(ctx context.Context, persistence persistence.Persistence, commsBus commsbus.CommsBus) error {
 	log.L(ctx).Info("Initializing transaction store")
 	ts = transactionstore.NewTransactionStore(ctx, &transactionstore.Config{}, persistence)
 	var err error
-	handler, err = messageBroker.Listen(ctx, MESSAGE_DESTINATION)
+	broker = commsBus.Broker()
+
+	handler, err = broker.Listen(ctx, MESSAGE_DESTINATION)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to listen for messages: %s", err)
 		return err
 	}
-	broker = messageBroker
+
 	go messageHandler(ctx)
 	return nil
 }

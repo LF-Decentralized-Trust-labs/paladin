@@ -12,7 +12,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package server
+
+/*
+Test Kata component with no mocking of any internal units.
+Starts the GRPC server and drives the internal functions via GRPC messages
+*/
+package kata
 
 import (
 	"context"
@@ -52,8 +57,9 @@ persistence:
     autoMigrate:   true
     migrationsDir: ../../db/migrations/sqlite
     debugQueries:  true
-grpc:
-  socketAddress: ` + socketAddress + `
+commsBus:
+  grpc:
+    socketAddress: ` + socketAddress + `
 `)
 	_, err = configFile.Write(yamlContent)
 	require.NoError(t, err)
@@ -143,8 +149,9 @@ persistence:
     autoMigrate:   true
     migrationsDir: ../../db/migrations/sqlite
     debugQueries:  true
-grpc:
-  socketAddress: ` + socketAddress + `
+commsBus:  
+  grpc:
+    socketAddress: ` + socketAddress + `
 `)
 	_, err = configFile.Write(yamlContent)
 	require.NoError(t, err)

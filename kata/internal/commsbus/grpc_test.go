@@ -12,30 +12,6 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package main
+package commsbus
 
-import (
-	"C"
-)
-import (
-	"context"
-	"os"
-	"strconv"
-
-	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/pkg/kata"
-)
-
-var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
-
-//export Run
-func Run(socketAddressPtr *C.char) {
-	kata.Run(rootCtx, C.GoString(socketAddressPtr))
-}
-
-//export Stop
-func Stop(socketAddressPtr *C.char) {
-	kata.Stop(rootCtx, C.GoString(socketAddressPtr))
-}
-
-func main() {}
+// No unit tests yet because converage is provided by the component tests in the kata package.
