@@ -27,7 +27,7 @@ service KataMessageService {
   //rpc StopListener() returns (stream Message) {}
   // Simple RPC to Subscribe to an event, request provides the destination name for the listener
   // to recieve events on the given topic
-  rpc SubscribeEvent(SubscribeEventRequest) returns (SubscribeEventResponse) {}
+  rpc SubscribeToTopic(SubscribeToTopicRequest) returns (SubscribeToTopicResponse) {}
 
   // Simple RPC to Send a message to a specified destination
   rpc SendMessage(Message) returns (SendMessageResponse) {}
@@ -97,18 +97,18 @@ message PublishEventResponse {
   optional string reason = 2;
 }
 
-enum SUBSCRIBE_EVENT_RESULT {
-  SUBSCRIBE_EVENT_OK   = 0;
-  SUBSCRIBE_EVENT_FAIL = 1;
+enum SUBSCRIBE_TO_TOPIC_RESULT {
+  SUBSCRIBE_TO_TOPIC_OK   = 0;
+  SUBSCRIBE_TO_TOPIC_FAIL = 1;
 }
 
-message SubscribeEventRequest {
+message SubscribeToTopicRequest {
   string topic = 1;
   string destination = 2;
 }
 
-message SubscribeEventResponse {
-  SUBSCRIBE_EVENT_RESULT result = 1;
+message SubscribeToTopicResponse {
+  SUBSCRIBE_TO_TOPIC_RESULT result = 1;
   //if result is "OK" then reason is omitted otherwise, reason contains an error code explaining the non OK result
   optional string reason = 2;
 }

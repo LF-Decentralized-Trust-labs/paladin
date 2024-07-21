@@ -177,7 +177,7 @@ func TestBroker_ListDestinationsOK(t *testing.T) {
 
 }
 
-func TestBroker_SubscribeEventsOK(t *testing.T) {
+func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -212,7 +212,7 @@ func TestBroker_SubscribeEventsOK(t *testing.T) {
 		}
 	}()
 
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.1")
 	require.NoError(t, err)
 
 	event := Event{
@@ -232,7 +232,7 @@ func TestBroker_PublishEventsNoSubscribers(t *testing.T) {
 	//TODO
 }
 
-func TestBroker_UnSubscribeEventsOK(t *testing.T) {
+func TestBroker_UnSubscribeToTopicsOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -254,10 +254,10 @@ func TestBroker_UnSubscribeEventsOK(t *testing.T) {
 			}
 		}
 	}()
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.1")
 	require.NoError(t, err)
 
-	err = testBroker.UnsubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.UnsubscribeFromTopic(ctx, "test.topic", "test.destination.1")
 	require.NoError(t, err)
 
 	// Create a test event
@@ -284,9 +284,9 @@ func TestBroker_DoubleSubscribeFail(t *testing.T) {
 	_, err = testBroker.Listen(ctx, "test.destination.1")
 	require.NoError(t, err)
 
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.1")
 	require.NoError(t, err)
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.1")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PD010602")
 	assert.Contains(t, err.Error(), "test.topic")
@@ -303,9 +303,9 @@ func TestBroker_SubscribeUnknownDestinationFail(t *testing.T) {
 	_, err = testBroker.Listen(ctx, "test.destination.1")
 	require.NoError(t, err)
 
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.1")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.1")
 	require.NoError(t, err)
-	err = testBroker.SubscribeEvent(ctx, "test.topic", "test.destination.2")
+	err = testBroker.SubscribeToTopic(ctx, "test.topic", "test.destination.2")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PD010600")
 	assert.Contains(t, err.Error(), "test.destination.2")

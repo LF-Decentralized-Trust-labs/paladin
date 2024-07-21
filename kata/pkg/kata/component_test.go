@@ -282,19 +282,19 @@ func TestPubSub(t *testing.T) {
 		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
 	}
 
-	subscribeResponse, err := client2.SubscribeEvent(ctx, &proto.SubscribeEventRequest{
+	subscribeResponse, err := client2.SubscribeToTopic(ctx, &proto.SubscribeToTopicRequest{
 		Destination: client2Destination,
 		Topic:       testTopic,
 	})
 	require.NoError(t, err, "failed to subscribe")
-	require.Equal(t, proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK, subscribeResponse.GetResult())
+	require.Equal(t, proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
 
-	subscribeResponse, err = client3.SubscribeEvent(ctx, &proto.SubscribeEventRequest{
+	subscribeResponse, err = client3.SubscribeToTopic(ctx, &proto.SubscribeToTopicRequest{
 		Destination: client3Destination,
 		Topic:       testTopic,
 	})
 	require.NoError(t, err, "failed to subscribe")
-	require.Equal(t, proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK, subscribeResponse.GetResult())
+	require.Equal(t, proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
 
 	body1 := "hello from client 1"
 	eventId := "event001"

@@ -170,17 +170,17 @@ func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Even
 	}, nil
 }
 
-func (s *KataMessageService) SubscribeEvent(ctx context.Context, request *proto.SubscribeEventRequest) (*proto.SubscribeEventResponse, error) {
-	log.L(ctx).Info("SubscribeEvent")
+func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *proto.SubscribeToTopicRequest) (*proto.SubscribeToTopicResponse, error) {
+	log.L(ctx).Info("SubscribeToTopic")
 
-	err := s.messageBroker.SubscribeEvent(ctx, request.GetTopic(), request.GetDestination())
+	err := s.messageBroker.SubscribeToTopic(ctx, request.GetTopic(), request.GetDestination())
 	if err != nil {
 		log.L(ctx).Error("Error subscribing to topic", err)
 		// Handle the error
 		return nil, err
 	}
-	return &proto.SubscribeEventResponse{
-		Result: proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK,
+	return &proto.SubscribeToTopicResponse{
+		Result: proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK,
 	}, nil
 }
 

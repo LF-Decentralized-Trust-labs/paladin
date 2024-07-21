@@ -73,8 +73,8 @@ type Broker interface {
 	PublishEvent(ctx context.Context, event Event) error
 	Listen(ctx context.Context, destination string) (MessageHandler, error)
 	Unlisten(ctx context.Context, destination string) error
-	SubscribeEvent(ctx context.Context, topic string, destination string) error
-	UnsubscribeEvent(ctx context.Context, topic string, destination string) error
+	SubscribeToTopic(ctx context.Context, topic string, destination string) error
+	UnsubscribeFromTopic(ctx context.Context, topic string, destination string) error
 	ListDestinations(ctx context.Context) ([]string, error)
 }
 
@@ -135,8 +135,8 @@ func (b *broker) SendMessage(ctx context.Context, message Message) error {
 	return nil
 }
 
-// SubscribeEvent implements Broker.
-func (b *broker) SubscribeEvent(ctx context.Context, topic string, destination string) error {
+// SubscribeToTopic implements Broker.
+func (b *broker) SubscribeToTopic(ctx context.Context, topic string, destination string) error {
 	//check that the destination is valid we do this before taking the subscriptions lock
 	// so that we don't take one lock while holding another and risk a deadlock
 	b.destinationsLock.Lock()
@@ -195,8 +195,8 @@ func remove(slice []string, s string) []string {
 	return slice
 }
 
-// UnsubscribeEvent implements Broker.
-func (b *broker) UnsubscribeEvent(ctx context.Context, topic string, destination string) error {
+// UnsubscribeFromTopic implements Broker.
+func (b *broker) UnsubscribeFromTopic(ctx context.Context, topic string, destination string) error {
 	b.subscriptionsLock.Lock()
 	defer b.subscriptionsLock.Unlock()
 	b.subscriptions[topic] = remove(b.subscriptions[topic], destination)
