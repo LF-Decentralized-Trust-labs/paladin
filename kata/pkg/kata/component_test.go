@@ -211,3 +211,128 @@ func TestRunPointToPoint(t *testing.T) {
 	// Stop the server
 	Stop(ctx, socketAddress)
 }
+
+func TestPubSub(t *testing.T) {
+	// Test that events published by one client can be subscribed by other clients
+	// and that they are delivered to only those clients and not other clients who are not subscribed
+	ctx := context.Background()
+
+	socketAddress, done := runServiceForTesting(ctx, t)
+	defer done()
+
+	client2Destination := "client2-destination"
+	client3Destination := "client3-destination"
+	client4Destination := "client4-destination"
+
+	client1, done := newClientForTesting(ctx, t, socketAddress)
+	defer done()
+
+	client2, done := newClientForTesting(ctx, t, socketAddress)
+	defer done()
+
+	client3, done := newClientForTesting(ctx, t, socketAddress)
+	defer done()
+
+	client4, done := newClientForTesting(ctx, t, socketAddress)
+	defer done()
+
+	testTopic := "test-topic"
+	// client 1 published, clients 2 and 3 subscribe 4 does not
+	listenerContext, stopListeners := context.WithCancel(ctx)
+
+	streams2, err := client2.Listen(listenerContext, &proto.ListenRequest{
+		Destination: client2Destination,
+	})
+	require.NoError(t, err, "failed to call Listen")
+
+	streams3, err := client3.Listen(listenerContext, &proto.ListenRequest{
+		Destination: client3Destination,
+	})
+	require.NoError(t, err, "failed to call Listen")
+
+	streams4, err := client4.Listen(listenerContext, &proto.ListenRequest{
+		Destination: client4Destination,
+	})
+	require.NoError(t, err, "failed to call Listen")
+
+	areAllClientsListenting := func() bool {
+		listDestinationsResponse, err := client1.ListDestinations(ctx, &proto.ListDestinationsRequest{})
+		require.NoError(t, err)
+		isClient2Listenting := false
+		isClient3Listenting := false
+		isClient4Listenting := false
+		for _, connectedClient := range listDestinationsResponse.Destinations {
+			if connectedClient == client2Destination {
+				isClient2Listenting = true
+			}
+			if connectedClient == client3Destination {
+				isClient3Listenting = true
+			}
+			if connectedClient == client4Destination {
+				isClient4Listenting = true
+			}
+		}
+		return isClient2Listenting && isClient3Listenting && isClient4Listenting
+	}
+
+	delay := 0
+	for !areAllClientsListenting() {
+		delay++
+		time.Sleep(time.Second)
+		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
+	}
+
+	subscribeResponse, err := client2.SubscribeEvent(ctx, &proto.SubscribeEventRequest{
+		Destination: client2Destination,
+		Topic:       testTopic,
+	})
+	require.NoError(t, err, "failed to subscribe")
+	require.Equal(t, proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK, subscribeResponse.GetResult())
+
+	subscribeResponse, err = client3.SubscribeEvent(ctx, &proto.SubscribeEventRequest{
+		Destination: client3Destination,
+		Topic:       testTopic,
+	})
+	require.NoError(t, err, "failed to subscribe")
+	require.Equal(t, proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK, subscribeResponse.GetResult())
+
+	body1 := "hello from client 1"
+	eventId := "event001"
+
+	helloEvent1 := &proto.Event{
+		Id:    eventId,
+		Topic: testTopic,
+		Type:  "HELLO",
+		Body:  body1,
+	}
+
+	publishEventResponse, err := client1.PublishEvent(ctx, helloEvent1)
+	require.NoError(t, err)
+	assert.Equal(t, proto.PUBLISH_EVENT_RESULT_PUBLISH_EVENT_OK, publishEventResponse.GetResult())
+
+	resp, err := streams2.Recv()
+	require.NotEqual(t, err, io.EOF)
+	require.NoError(t, err)
+	assert.Equal(t, eventId, resp.GetId())
+	assert.NotNil(t, resp.GetBody())
+	assert.Equal(t, body1, resp.GetBody())
+
+	resp, err = streams3.Recv()
+	require.NotEqual(t, err, io.EOF)
+	require.NoError(t, err)
+	assert.Equal(t, eventId, resp.GetId())
+	assert.NotNil(t, resp.GetBody())
+	assert.Equal(t, body1, resp.GetBody())
+
+	go func() {
+		_, err = streams4.Recv()
+		assert.Contains(t, err.Error(), "context canceled")
+	}()
+
+	//wait for a second to ensure that client 4 does not receive the message
+	time.Sleep(time.Second)
+
+	stopListeners()
+	// Stop the server
+	Stop(ctx, socketAddress)
+}

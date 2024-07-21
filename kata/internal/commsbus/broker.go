@@ -170,6 +170,7 @@ func (b *broker) PublishEvent(ctx context.Context, event Event) error {
 	//TODO would it be better make an immutable copy of the slice here so that we can release the lock sooner?
 	for _, destination := range subscribers {
 		message := Message{
+			ID:          event.ID,
 			Destination: destination,
 			Body:        event.Body,
 		}

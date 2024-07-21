@@ -153,6 +153,7 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Event) (*proto.PublishEventResponse, error) {
 	log.L(ctx).Info("PublishEvent")
 	commsbusEvent := Event{
+		ID:    event.GetId(),
 		Topic: event.GetTopic(),
 		Body:  []byte(event.GetBody()),
 		Type:  event.GetType(),
@@ -166,6 +167,20 @@ func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Even
 	}
 	return &proto.PublishEventResponse{
 		Result: proto.PUBLISH_EVENT_RESULT_PUBLISH_EVENT_OK,
+	}, nil
+}
+
+func (s *KataMessageService) SubscribeEvent(ctx context.Context, request *proto.SubscribeEventRequest) (*proto.SubscribeEventResponse, error) {
+	log.L(ctx).Info("SubscribeEvent")
+
+	err := s.messageBroker.SubscribeEvent(ctx, request.GetTopic(), request.GetDestination())
+	if err != nil {
+		log.L(ctx).Error("Error subscribing to topic", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.SubscribeEventResponse{
+		Result: proto.SUBSCRIBE_EVENT_RESULT_SUBSCRIBE_EVENT_OK,
 	}, nil
 }
 
