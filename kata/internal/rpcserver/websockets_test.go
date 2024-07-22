@@ -61,9 +61,15 @@ func TestWebSocketConnectionFailureHandling(t *testing.T) {
 	assert.NoError(t, err)
 
 	var wsConn *webSocketConnection
-	for _, wsConn = range s.wsConnections {
+	before := time.Now()
+	for wsConn == nil {
+		time.Sleep(1 * time.Millisecond)
+		for _, wsConn = range s.wsConnections {
+		}
+		if time.Since(before) > 1*time.Second {
+			panic("timed out waiting for connection")
+		}
 	}
-	assert.NotNil(t, wsConn)
 
 	// Close the connection
 	client.Close()
