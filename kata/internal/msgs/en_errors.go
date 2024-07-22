@@ -92,9 +92,9 @@ var (
 	MsgFiltersJSONValueParseError         = ffe("PD010610", "Failed to parse value for field '%s' (as %T): %v")
 	MsgFiltersValueInvalidHex             = ffe("PD010611", "Failed to parse value as hex: %v")
 	MsgFiltersUnexpectedFieldResolverType = ffe("PD010612", "Unsupported type '%T' returned from field resolver '%T'")
-	MsgFiltersUnexpectedResolvedValueType = ffe("PD010612", "Value type '%T' mismatched from compare type '%T'")
-	MsgFiltersLikeNotSupportedForIntValue = ffe("PD010613", "LIKE operation not supported for int64 stored values")
-	MsgFiltersLikeConversionToRegexpFail  = ffe("PD010614", "Failed to convert LIKE string '%s' to regexp: %s")
+	MsgFiltersUnexpectedResolvedValueType = ffe("PD010613", "Value type '%T' mismatched from compare type '%T'")
+	MsgFiltersLikeNotSupportedForIntValue = ffe("PD010614", "LIKE operation not supported for int64 stored values")
+	MsgFiltersLikeConversionToRegexpFail  = ffe("PD010615", "Failed to convert LIKE string '%s' to regexp: %s")
 
 	// HTTPServer PD0107XX
 	MsgHTTPServerStartFailed        = ffe("PD010700", "Failed to start server on '%s'")
