@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,7 +51,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	tp.Continue(ctx)
 	assert.NotEmpty(t, tp.stageContext)
 
-	tp.AddStageEvent(ctx, &stage.StageEvent{
+	tp.AddStageEvent(ctx, &types.StageEvent{
 		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
@@ -61,7 +61,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	assert.NotEmpty(t, testTx.SequenceID)
 
 	testTx.Contract = "complete"
-	tp.AddStageEvent(ctx, &stage.StageEvent{
+	tp.AddStageEvent(ctx, &types.StageEvent{
 		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
@@ -84,7 +84,7 @@ func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 
 	assert.Empty(t, tp.stageContext)
 
-	tp.AddStageEvent(ctx, &stage.StageEvent{
+	tp.AddStageEvent(ctx, &types.StageEvent{
 		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",

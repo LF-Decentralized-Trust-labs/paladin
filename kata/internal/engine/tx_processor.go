@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/engine/stage"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
@@ -31,7 +31,7 @@ type TxProcessor interface {
 	GetStageTriggerError(ctx context.Context) error
 
 	// stage outputs management
-	AddStageEvent(ctx context.Context, stageEvent *stage.StageEvent)
+	AddStageEvent(ctx context.Context, stageEvent *types.StageEvent)
 	Continue(ctx context.Context)
 }
 
@@ -46,7 +46,7 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 	return &PaladinTxProcessor{
 		tsm:                 tsm,
 		stageController:     sc,
-		bufferedStageEvents: make([]*stage.StageEvent, 0),
+		bufferedStageEvents: make([]*types.StageEvent, 0),
 	}
 }
 
@@ -58,7 +58,7 @@ type PaladinTxProcessor struct {
 	stageController StageController
 
 	bufferedStageEventsMapMutex sync.Mutex
-	bufferedStageEvents         []*stage.StageEvent
+	bufferedStageEvents         []*types.StageEvent
 }
 
 func (ts *PaladinTxProcessor) Continue(ctx context.Context) {
@@ -106,7 +106,7 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 		synchronousActionOutput, err := ts.stageController.PerformActionForStage(ctx, string(stageContext.Stage), ts.tsm)
 		ts.stageTriggerError = err
 		if synchronousActionOutput != nil {
-			ts.AddStageEvent(ts.stageContext.ctx, &stage.StageEvent{
+			ts.AddStageEvent(ts.stageContext.ctx, &types.StageEvent{
 				ID:    stageContext.ID,
 				TxID:  ts.tsm.GetTxID(ctx),
 				Stage: stageContext.Stage,
@@ -120,7 +120,7 @@ func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc StageContex
 	start := time.Now()
 	// unexpected error, set an empty input for the stage
 	// so that the stage handler will handle this as unexpected error
-	ts.AddStageEvent(ctx, &stage.StageEvent{
+	ts.AddStageEvent(ctx, &types.StageEvent{
 		Stage: sc.Stage,
 		ID:    sc.ID,
 		TxID:  ts.tsm.GetTxID(ctx),
@@ -150,7 +150,7 @@ func (ts *PaladinTxProcessor) GetStageTriggerError(ctx context.Context) error {
 	return ts.stageTriggerError
 }
 
-func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *stage.StageEvent) {
+func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *types.StageEvent) {
 	ts.bufferedStageEventsMapMutex.Lock()
 	defer ts.bufferedStageEventsMapMutex.Unlock()
 	ts.bufferedStageEvents = append(ts.bufferedStageEvents, stageEvent)
@@ -165,9 +165,9 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *sta
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)
 	}
-	if nextStep == stage.NextStepNewStage {
+	if nextStep == types.NextStepNewStage {
 		ts.initiateStageContext(ctx, true)
-	} else if nextStep == stage.NextStepNewAction {
+	} else if nextStep == types.NextStepNewAction {
 		ts.PerformActionForStageAsync(ctx)
 	}
 }

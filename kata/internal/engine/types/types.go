@@ -13,33 +13,66 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package stage
+package types
 
 import (
+	"context"
+
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
-type MockNodeAndWalletLookUpService struct {
+type StageProcessNextStep int
+
+const (
+	NextStepWait StageProcessNextStep = iota
+	NextStepNewStage
+	NextStepNewAction
+)
+
+type StageEvent struct {
+	ID    string      `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
+	Stage string      `json:"stage"`
+	TxID  string      `json:"transactionId"`
+	Data  interface{} `json:"data"` // schema decided by each stage
 }
 
-func (mti *MockNodeAndWalletLookUpService) IsCurrentNode(nodeID string) bool {
+type TxProcessPreReq struct {
+	TxIDs []string `json:"transactionIds,omitempty"`
+}
+
+// defines the methods for checking whether a transaction's dependents matches a specific criteria
+type DependencyChecker interface {
+	PreReqsMatchCondition(ctx context.Context, preReqTxIDs []string, conditionFunc func(tsg transactionstore.TxStateGetters) (preReqComplete bool)) (filteredPreReqTxIDs []string)
+	GetPreReqDispatchAddresses(ctx context.Context, preReqTxIDs []string) (dispatchAddresses []string)
+	RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *TxProcessPreReq)
+}
+
+type MockIdentityResolver struct {
+}
+
+func (mti *MockIdentityResolver) IsCurrentNode(nodeID string) bool {
 	return nodeID == "current-node"
 }
 
-func (mti *MockNodeAndWalletLookUpService) GetDispatchAddress(preferredAddresses []string) string {
+func (mti *MockIdentityResolver) GetDispatchAddress(preferredAddresses []string) string {
 	if len(preferredAddresses) > 0 {
 		return preferredAddresses[0]
 	}
 	return ""
 }
 
-type NodeAndWalletLookUpService interface {
+func (mti *MockIdentityResolver) ConnectToBaseLeger() {
+}
+
+type IdentityResolver interface {
 	IsCurrentNode(nodeID string) bool
+	ConnectToBaseLeger() // TODO: does this function connects to the base ledger of current node/any available node as well? How about events?
 	GetDispatchAddress(preferredAddresses []string) string
 }
 
 type StageFoundationService interface {
-	NodeAndWallet() NodeAndWalletLookUpService
+	IdentityResolver() IdentityResolver
 	DependencyChecker() DependencyChecker
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
 }
@@ -47,7 +80,7 @@ type StageFoundationService interface {
 type PaladinStageFoundationService struct {
 	dependencyChecker   DependencyChecker
 	stateStore          statestore.StateStore
-	nodeAndWalletLookUp NodeAndWalletLookUpService
+	nodeAndWalletLookUp IdentityResolver
 }
 
 func (psfs *PaladinStageFoundationService) DependencyChecker() DependencyChecker {
@@ -58,13 +91,13 @@ func (psfs *PaladinStageFoundationService) StateStore() statestore.StateStore {
 	return psfs.stateStore
 }
 
-func (psfs *PaladinStageFoundationService) NodeAndWallet() NodeAndWalletLookUpService {
+func (psfs *PaladinStageFoundationService) IdentityResolver() IdentityResolver {
 	return psfs.nodeAndWalletLookUp
 }
 
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 	stateStore statestore.StateStore,
-	nodeAndWalletLookUp NodeAndWalletLookUpService) StageFoundationService {
+	nodeAndWalletLookUp IdentityResolver) StageFoundationService {
 	return &PaladinStageFoundationService{
 		dependencyChecker:   dependencyChecker,
 		stateStore:          stateStore,

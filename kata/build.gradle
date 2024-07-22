@@ -64,6 +64,21 @@ task clean(type:Exec) {
     args "-fdX"
 }
 
+
+task mockInternal(type: Exec) {
+    workingDir '.'
+    dependsOn tasks.protoc
+
+    executable 'mockery'
+    args '--all'
+    args '--recursive'
+    args "--dir=${projectDir}/internal"
+    args "--output=${projectDir}/mocks"
+    
+    inputs.dir("${projectDir}/internal")
+}
+
+
 task goGet(type:Exec) {
     workingDir '.'
 
@@ -76,6 +91,9 @@ task goGet(type:Exec) {
 
     executable 'go'
     args 'get'
+
+    // generate mocks after go get
+    finalizedBy tasks.mockInternal
 }
 
 
