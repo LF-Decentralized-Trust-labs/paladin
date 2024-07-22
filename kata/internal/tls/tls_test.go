@@ -105,7 +105,9 @@ func buildTLSListener(t *testing.T, conf *Config, tlsType TLSType) (string, func
 	server, err := tls.Listen("tcp4", "127.0.0.1:0", tlsConfig)
 	assert.NoError(t, err)
 
+	listenerDone := make(chan struct{})
 	go func() {
+		defer close(listenerDone)
 		for {
 			tlsConn, err := server.Accept()
 			if err != nil {
@@ -129,6 +131,7 @@ func buildTLSListener(t *testing.T, conf *Config, tlsType TLSType) (string, func
 	return server.Addr().String(), func() {
 		err := server.Close()
 		assert.NoError(t, err)
+		<-listenerDone
 	}
 
 }
