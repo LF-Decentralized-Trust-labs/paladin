@@ -109,14 +109,14 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
-			"masked":   BoolField("masked"),
+			"masked":   Int64BoolField("masked"),
 			"cid":      Int256Field("correl_id"),
 		}).Count(&count)
 		assert.NoError(t, db.Error)
 		return db
 	})
 
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a' AND masked = true AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = true AND tag IN ('a','b','c') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = false) LIMIT 10", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a' AND masked = 1 AND sequence != 999 AND correl_id IS NULL AND sequence > 10 AND ((masked = 1 AND tag IN ('a','b','c') AND tag NOT IN ('x','y') AND tag NOT IN ('z')) OR masked = 0) LIMIT 10", generatedSQL)
 }
 
 func TestBuildQuerySingleNestedOr(t *testing.T) {
@@ -278,7 +278,7 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
-			"masked":   BoolField("masked"),
+			"masked":   Int64BoolField("masked"),
 			"cid":      Int256Field("correl_id"),
 			"created":  TimestampField("created_at"),
 		}).Count(&count)
@@ -326,7 +326,7 @@ func TestBuildQueryJSONLike(t *testing.T) {
 		db := qf.Build(context.Background(), tx.Table("test"), FieldMap{
 			"tag":      StringField("tag"),
 			"sequence": Int64Field("sequence"),
-			"masked":   BoolField("masked"),
+			"masked":   Int64BoolField("masked"),
 			"cid":      Int256Field("correl_id"),
 			"created":  Int64Field("created_at"),
 		}).Count(&count)

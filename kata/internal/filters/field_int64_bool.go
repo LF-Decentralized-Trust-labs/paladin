@@ -20,18 +20,37 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
-type TimestampField string
+type Int64BoolField string
 
-func (sf TimestampField) SQLColumn() string {
+func (sf Int64BoolField) SQLColumn() string {
 	return (string)(sf)
 }
 
-func (sf TimestampField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
-	var timestamp types.Timestamp
-	err := json.Unmarshal(jsonValue, &timestamp)
-	return int64(timestamp), err
+func (sf Int64BoolField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+	var untyped interface{}
+	err := json.Unmarshal(jsonValue, &untyped)
+	if err != nil {
+		return nil, err
+	}
+	switch v := untyped.(type) {
+	case string:
+		if strings.EqualFold(v, "true") {
+			return int64(1), nil
+		}
+		return int64(0), nil
+	case bool:
+		if v {
+			return int64(1), nil
+		}
+		return int64(0), nil
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForBool, string(jsonValue))
+	}
 }

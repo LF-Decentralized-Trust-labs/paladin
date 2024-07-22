@@ -18,33 +18,19 @@ package filters
 
 import (
 	"context"
-	"database/sql/driver"
-	"encoding/json"
-	"strings"
+	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/stretchr/testify/assert"
 )
 
-type BoolField string
+func TestBoolField(t *testing.T) {
 
-func (sf BoolField) SQLColumn() string {
-	return (string)(sf)
-}
+	ctx := context.Background()
 
-func (sf BoolField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
-	var untyped interface{}
-	err := json.Unmarshal(jsonValue, &untyped)
-	if err != nil {
-		return nil, err
-	}
-	switch v := untyped.(type) {
-	case string:
-		return strings.EqualFold(v, "true"), nil
-	case bool:
-		return v, nil
-	default:
-		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForBool, string(jsonValue))
-	}
+	_, err := Int64BoolField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
+	assert.Error(t, err)
+
+	_, err = Int64BoolField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
+	assert.Regexp(t, "PD010604", err)
 }
