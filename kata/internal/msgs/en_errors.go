@@ -66,7 +66,8 @@ var (
 	MsgTransactionProcessorBlockedOnDependency = ffe("PD010303", "Transaction with ID: %s cannot be processed by %s stage due to dependent transactions.")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionInvalidTransactionID = ffe("PD010401", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Config PD0105XX
 	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")

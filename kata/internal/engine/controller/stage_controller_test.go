@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package controller
 
 import (
 	"context"
@@ -82,11 +82,7 @@ func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactio
 }
 
 func newTestStageController(ctx context.Context) *PaladinStageController {
-	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil)).(*PaladinStageController)
-
-	sc.stageProcessors = map[string]TxStageProcessor{
-		testStage: &testStageProcessor{},
-	}
+	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
 	return sc
 }
 

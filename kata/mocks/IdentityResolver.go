@@ -10,8 +10,21 @@ type IdentityResolver struct {
 }
 
 // ConnectToBaseLeger provides a mock function with given fields:
-func (_m *IdentityResolver) ConnectToBaseLeger() {
-	_m.Called()
+func (_m *IdentityResolver) ConnectToBaseLeger() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConnectToBaseLeger")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // GetDispatchAddress provides a mock function with given fields: preferredAddresses

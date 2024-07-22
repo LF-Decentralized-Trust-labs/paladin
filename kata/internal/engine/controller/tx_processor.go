@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package controller
 
 import (
 	"context"
@@ -62,7 +62,9 @@ type PaladinTxProcessor struct {
 }
 
 func (ts *PaladinTxProcessor) Continue(ctx context.Context) {
-	ts.initiateStageContext(ctx, true)
+	if ts.stageContext == nil {
+		ts.initiateStageContext(ctx, true)
+	}
 }
 
 func (ts *PaladinTxProcessor) initiateStageContext(ctx context.Context, performAction bool) {
@@ -160,7 +162,11 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 	}
 	// TODO: need to make ProcessEventsForStage blocking safe like the PerformAction function
 	unProcessedBufferedStageEvents, txUpdates, nextStep := ts.stageController.ProcessEventsForStage(ctx, string(ts.stageContext.Stage), ts.tsm, ts.bufferedStageEvents)
-	ts.bufferedStageEvents = unProcessedBufferedStageEvents
+
+	if unProcessedBufferedStageEvents != nil {
+		ts.bufferedStageEvents = unProcessedBufferedStageEvents
+	}
+
 	if txUpdates != nil {
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)

@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package controller
 
 import (
 	"context"
@@ -91,9 +91,13 @@ func (psc *PaladinStageController) GetAllStages() []string {
 	return psc.stageNames
 }
 
-func NewPaladinStageController(ctx context.Context, stageFoundationService types.StageFoundationService) StageController {
+func NewPaladinStageController(ctx context.Context, stageFoundationService types.StageFoundationService, tsps []TxStageProcessor) StageController {
+	stageProcessorsMap := map[string]TxStageProcessor{}
+	for _, tsp := range tsps {
+		stageProcessorsMap[tsp.Name()] = tsp
+	}
 	return &PaladinStageController{
-		stageProcessors:        map[string]TxStageProcessor{},
+		stageProcessors:        stageProcessorsMap,
 		stageFoundationService: stageFoundationService,
 	}
 }

@@ -74,10 +74,12 @@ type TransactionUpdate struct { // TODO define updatable fields
 	DispatchAddress *string
 }
 
-func NewTransaction(ctx context.Context, txID uuid.UUID) TxStateManager {
-	// TODO: this function should use a cache
+func NewTransactionStageManager(ctx context.Context, txID string) TxStateManager {
+	txUUID := uuid.MustParse(txID)
+
+	// TODO: this function should use a cache and read from DB first
 	return &Transaction{
-		ID: txID,
+		ID: txUUID,
 	}
 }
 

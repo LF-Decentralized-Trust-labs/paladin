@@ -19,8 +19,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
@@ -55,16 +55,17 @@ type MockEngine struct {
 	stateStore     statestore.StateStore
 	pluginProvider MockPluginProvider
 	done           chan bool
-	ocs            map[string]*Orchestrator
+	ocs            map[string]*orchestrator.Orchestrator
 }
 
-func (me *MockEngine) HandleNewTx(ctx context.Context, txID uuid.UUID) {
-	tx := transactionstore.NewTransaction(ctx, txID)
+func (me *MockEngine) HandleNewTx(ctx context.Context, txID string) {
+	tx := transactionstore.NewTransactionStageManager(ctx, txID)
+
 	valid := me.pluginProvider.Validate(ctx, tx.GetContract(ctx), tx, me.stateStore)
 	if valid {
 		// TODO how to measure fairness/ per From address / contract address / something else
 		if me.ocs[tx.GetContract(ctx)] == nil {
-			me.ocs[tx.GetContract(ctx)] = NewOrchestrator(ctx, tx.GetContract(ctx) /** TODO: fill in the real plug-ins*/, nil, nil)
+			me.ocs[tx.GetContract(ctx)] = orchestrator.NewOrchestrator(ctx, tx.GetContract(ctx) /** TODO: fill in the real plug-ins*/, nil, nil)
 		}
 		oc := me.ocs[tx.GetContract(ctx)]
 		queued := oc.ProcessNewTransaction(ctx, tx)

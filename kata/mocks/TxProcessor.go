@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	engine "github.com/kaleido-io/paladin/kata/internal/engine"
+	controller "github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	mock "github.com/stretchr/testify/mock"
 
 	types "github.com/kaleido-io/paladin/kata/internal/engine/types"
@@ -27,19 +27,19 @@ func (_m *TxProcessor) Continue(ctx context.Context) {
 }
 
 // GetStageContext provides a mock function with given fields: ctx
-func (_m *TxProcessor) GetStageContext(ctx context.Context) *engine.StageContext {
+func (_m *TxProcessor) GetStageContext(ctx context.Context) *controller.StageContext {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStageContext")
 	}
 
-	var r0 *engine.StageContext
-	if rf, ok := ret.Get(0).(func(context.Context) *engine.StageContext); ok {
+	var r0 *controller.StageContext
+	if rf, ok := ret.Get(0).(func(context.Context) *controller.StageContext); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*engine.StageContext)
+			r0 = ret.Get(0).(*controller.StageContext)
 		}
 	}
 

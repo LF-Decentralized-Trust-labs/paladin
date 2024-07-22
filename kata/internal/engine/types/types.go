@@ -62,12 +62,13 @@ func (mti *MockIdentityResolver) GetDispatchAddress(preferredAddresses []string)
 	return ""
 }
 
-func (mti *MockIdentityResolver) ConnectToBaseLeger() {
+func (mti *MockIdentityResolver) ConnectToBaseLeger() error {
+	return nil
 }
 
 type IdentityResolver interface {
 	IsCurrentNode(nodeID string) bool
-	ConnectToBaseLeger() // TODO: does this function connects to the base ledger of current node/any available node as well? How about events?
+	ConnectToBaseLeger() error // TODO: does this function connects to the base ledger of current node/any available node as well? How about events?
 	GetDispatchAddress(preferredAddresses []string) string
 }
 
