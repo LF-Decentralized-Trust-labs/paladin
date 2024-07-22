@@ -46,4 +46,6 @@ func TestHexBytesField(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 
+	assert.False(t, HexBytesField("test").SupportsLIKE())
+
 }

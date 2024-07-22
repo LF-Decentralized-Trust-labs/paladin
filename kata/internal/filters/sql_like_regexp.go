@@ -29,12 +29,15 @@ func sqlLikeToRegexp(likeStr string, caseInsensitive bool, escapeChar rune) (*re
 	}
 	buff.WriteRune('^')
 	for _, c := range likeStr {
+		clearEscape := false
 		switch c {
 		case escapeChar:
 			if lastChar == escapeChar {
 				// Assume regexp escape needed for the SQL escapeChar
 				buff.WriteRune('\\')
 				buff.WriteRune(escapeChar)
+				// Clear the escape, rather than continuing it for the next char
+				clearEscape = true
 			}
 		case '.', '^', '$', '*', '+', '-', '?', '(', ')', '[', ']', '{', '}', '|':
 			// Escape this char in the regexp
@@ -60,7 +63,11 @@ func sqlLikeToRegexp(likeStr string, caseInsensitive bool, escapeChar rune) (*re
 			// Plain old character
 			buff.WriteRune(c)
 		}
-		lastChar = c
+		if clearEscape {
+			lastChar = 0
+		} else {
+			lastChar = c
+		}
 	}
 	buff.WriteRune('$')
 	return regexp.Compile(buff.String())

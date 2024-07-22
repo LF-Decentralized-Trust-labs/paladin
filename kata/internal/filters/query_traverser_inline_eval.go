@@ -34,14 +34,20 @@ type ValueSet interface {
 	GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error)
 }
 
-type SimpleValueSet map[string]types.RawJSON
+type ResolvingValueSet map[string]types.RawJSON
 
-func (vs SimpleValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
+func (vs ResolvingValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
 	val, err := resolver.SQLValue(ctx, vs[fieldName])
 	if err != nil {
 		return nil, err
 	}
 	return val, nil
+}
+
+type PassthroughValueSet map[string]driver.Value
+
+func (vs PassthroughValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
+	return vs[fieldName], nil
 }
 
 func (qj *QueryJSON) Eval(ctx context.Context, fieldSet FieldSet, valueSet ValueSet) (bool, error) {

@@ -53,4 +53,6 @@ func TestUint256Field(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 
+	assert.False(t, Uint256Field("test").SupportsLIKE())
+
 }

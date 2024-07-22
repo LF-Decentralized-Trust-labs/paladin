@@ -38,4 +38,6 @@ func TestStringField(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 
+	assert.True(t, StringField("test").SupportsLIKE())
+
 }

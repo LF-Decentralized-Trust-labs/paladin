@@ -38,4 +38,6 @@ func TestBoolField(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 
+	assert.False(t, Int64BoolField("test").SupportsLIKE())
+
 }

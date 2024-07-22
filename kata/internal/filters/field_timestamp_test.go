@@ -38,4 +38,6 @@ func TestTimestampField(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 
+	assert.False(t, TimestampField("test").SupportsLIKE())
+
 }
