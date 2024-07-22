@@ -62,22 +62,22 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 	switch q {
 	case StateStatusAvailable:
 		return db.
-			Where("Confirmed__transaction IS NOT NULL").
-			Where("Spent__transaction IS NULL").
-			Where("Locked__sequence IS NULL")
+			Where(`"Confirmed"."transaction" IS NOT NULL`).
+			Where(`"Spent"."transaction" IS NULL`).
+			Where(`"Locked"."sequence" IS NULL`)
 	case StateStatusConfirmed:
 		return db.
-			Where("Confirmed__transaction IS NOT NULL").
-			Where("Spent__transaction IS NULL")
+			Where(`"Confirmed"."transaction" IS NOT NULL`).
+			Where(`"Spent"."transaction" IS NULL`)
 	case StateStatusUnconfirmed:
 		return db.
-			Where("Confirmed__transaction IS NULL")
+			Where(`"Confirmed"."transaction" IS NULL`)
 	case StateStatusLocked:
 		return db.
-			Where("Locked__sequence IS NOT NULL")
+			Where(`"Locked"."sequence" IS NOT NULL`)
 	case StateStatusSpent:
 		return db.
-			Where("Spent__transaction IS NOT NULL")
+			Where(`"Spent"."transaction" IS NOT NULL`)
 	case StateStatusAll:
 		return db.Where("TRUE")
 	default:
@@ -90,6 +90,6 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 		// TODO: Determine if we need to move the JSON/RPC call to be the more obvious thing
 		//       of the same thing as the assembler (once we've implemented that)
 		return db.
-			Where("Locked__sequence = ?", q)
+			Where(`"Locked"."sequence" = ?`, q)
 	}
 }

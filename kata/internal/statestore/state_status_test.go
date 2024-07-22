@@ -179,3 +179,14 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, seqQual, 3)
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, StateStatusAvailable)
 }
+
+func TestStateStatusQualifierJSON(t *testing.T) {
+	var q StateStatusQualifier
+	err := json.Unmarshal(([]byte)(`"wrong"`), &q)
+	assert.Regexp(t, "PD010117", err)
+
+	u := uuid.New().String()
+	err = json.Unmarshal(([]byte)(fmt.Sprintf(`"%s"`, u)), &q)
+	assert.NoError(t, err)
+	assert.Equal(t, u, (string)(q))
+}
