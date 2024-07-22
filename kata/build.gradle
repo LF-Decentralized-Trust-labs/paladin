@@ -69,7 +69,7 @@ task mockInternal(type: Exec) {
     workingDir '.'
     dependsOn tasks.protoc
 
-    executable 'mockery'
+    executable "${projectDir}/bin/mockery"
     args '--all'
     args '--recursive'
     args "--dir=${projectDir}/internal"

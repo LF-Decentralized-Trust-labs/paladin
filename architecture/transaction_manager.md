@@ -8,7 +8,8 @@ The core function of the Paladin runtime, is to operate as a distributed transac
 - Embedding a high performance state store for managing selectively disclosed private transaction state
 - Integrating key management technology to sign transactions (ZKP proofs, EIP-712 signatures and Ethereum TXs)
 - Processing confirmed blockchain transactions to update the state store
- - Emitting streams of events to report status of submitted transactions
+- Emitting streams of events to report status of submitted transactions
+
 ### Component flow
 
 ⚠ WORK IN PROGRESS ⚠
@@ -36,3 +37,9 @@ The major components of the transaction manager are highlighted in this diagram.
     - Configuration and customization is also supported
 
 > TODO: More detailed sequence flow diagrams need to be brought into this document as they evolve (Leads John Hosie & Chengxuan Xing)
+
+### Transaction engine processing model
+
+In order to build an engine that works with asynchronous transaction stage update events. The Paladin transaction engine is design with the following principles:
+- **Event driven**
+- ** 
