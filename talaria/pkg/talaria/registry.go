@@ -34,7 +34,7 @@ import (
 
 type RegistryEntry struct {
 	SupportedPlugins   map[string]struct{} `json:"supportedPlugins"`
-	RoutingInformation []byte              `json:"routingInformation"`
+	RoutingInformation string              `json:"routingInformation"`
 	TransactingEntity  string              `json:"transactingEntity"`
 }
 

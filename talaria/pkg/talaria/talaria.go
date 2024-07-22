@@ -110,17 +110,22 @@ func (t *Talaria) Initialise(ctx context.Context) {
 
 		go func(){
 			<-ctx.Done()
-			cancel()
 			conn.Close()
+			cancel()
 		}()
 			
 		// Handle inbound messages back from the plugin
 		go func(){
 			for {
+				select {
+				case <- pluginCtx.Done():
+					return
+				default:
+				}
+
 				returnedMessage, err := stream.Recv() 
 				if err == io.EOF {
 					log.Println("shutdown")
-					conn.Close()
 					return
 				}
 				if err != nil {
@@ -165,7 +170,7 @@ func (t *Talaria) SendMessage(ctx context.Context, paladinNode string, content [
 	// TODO: Plugin determination
 	t.sendingMessages["grpc-transport-plugin"] <- PluginMessage{
 		Payload: content,
-		RoutingInformation: transpTarget.RoutingInformation,
+		RoutingInformation: []byte(transpTarget.RoutingInformation),
 	}
 
 	return nil

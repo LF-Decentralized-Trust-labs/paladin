@@ -36,7 +36,7 @@ func TestTalariaNonBlocking(t *testing.T) {
 
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
-		RoutingInformation: []byte("{\"address\":\"localhost:8080\"}"),
+		RoutingInformation: "{\"address\":\"localhost:8080\"}",
 		TransactingEntity: "someone-on-this-machine",
 	}, nil)
 
@@ -77,7 +77,7 @@ func TestTalariaMessageFlow(t *testing.T) {
 	
 	rp := frm.NewRegistryProvider(t)
 	rp.On("LookupPaladinEntity", mock.Anything).Return(talaria.RegistryEntry{
-		RoutingInformation: []byte("{\"address\":\"localhost:8080\"}"),
+		RoutingInformation: "{\"address\":\"localhost:8080\"}",
 		TransactingEntity: "someone-on-this-machine",
 	}, nil)
 

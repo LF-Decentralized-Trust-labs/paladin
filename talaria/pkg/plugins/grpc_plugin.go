@@ -131,6 +131,8 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.PluginInterface_PluginMessageFlowServer) error {
 	ctx := server.Context()
 	
+	// TODO: This flow fundamentally means right now that sending is blocked on recieving which is not correct
+
 	for {
 		select {
 		case <-ctx.Done():
