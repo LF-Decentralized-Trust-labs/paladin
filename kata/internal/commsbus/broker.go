@@ -14,12 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package commsbus provides functionality for managing communication between internal kata components and plugins.
-// It includes a broker that acts as a central hub for routing messages and events between different components of the system.
-// Messages have a body and a destination. The broker routes messages to the appropriate handler based on the destination.
-// Events have a body and a topic abd are broadcast to all handlers that have subscribed to that topic.
-// Messages may include a reply-to destination, which is used to route responses back to the original sender.
-
 package commsbus
 
 import (
@@ -54,6 +48,7 @@ type Event struct {
 
 // EventMessage is a struct that wraps an event with a destination string so that it can be sent as a message
 // to a named listener.
+// TODO this is currently not used.  Should we add the event fields to the Message struct instead?
 type EventMessage struct {
 	Destination string
 	Event
