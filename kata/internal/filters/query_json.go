@@ -34,9 +34,9 @@ type FilterResultsWithCount struct {
 }
 
 type ItemsResultTyped[T any] struct {
-	Count int    `ffstruct:"CollectionResults" json:"count"`
-	Total *int64 `ffstruct:"CollectionResults" json:"total,omitempty"` // omitted if a count was not calculated (AlwaysPaginate enabled, and count not specified)
-	Items []T    `ffstruct:"CollectionResults" json:"items"`
+	Count int    `json:"count"`
+	Total *int64 `json:"total,omitempty"` // omitted if a count was not calculated (AlwaysPaginate enabled, and count not specified)
+	Items []T    `json:"items"`
 }
 
 type FilterJSONBase struct {
