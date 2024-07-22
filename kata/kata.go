@@ -16,8 +16,6 @@ package main
 
 import (
 	"C"
-
-	"github.com/kaleido-io/paladin/kata/pkg/server"
 )
 import (
 	"context"
@@ -25,18 +23,19 @@ import (
 	"strconv"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/pkg/kata"
 )
 
 var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
 
 //export Run
 func Run(socketAddressPtr *C.char) {
-	server.Run(rootCtx, C.GoString(socketAddressPtr))
+	kata.Run(rootCtx, C.GoString(socketAddressPtr))
 }
 
 //export Stop
 func Stop(socketAddressPtr *C.char) {
-	server.Stop(rootCtx, C.GoString(socketAddressPtr))
+	kata.Stop(rootCtx, C.GoString(socketAddressPtr))
 }
 
 func main() {}

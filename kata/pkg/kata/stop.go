@@ -13,9 +13,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- 
-package io.kaleido.kata;
-import paladin.kata.Kata;
-public interface ResponseHandler {
-    void onResponse(Kata.Message response);
+package kata
+
+import (
+	"context"
+
+	"github.com/hyperledger/firefly-common/pkg/log"
+)
+
+func Stop(ctx context.Context, socketAddress string) {
+	log.L(ctx).Infof("Stop: %s", socketAddress)
+	if commsBus != nil {
+		err := commsBus.GRPCServer().Stop(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to stop GRPC server: %s", err)
+		}
+	}
 }

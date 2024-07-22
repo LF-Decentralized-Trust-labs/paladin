@@ -63,10 +63,19 @@ var (
 	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
 
 	// Config PD0105XX
-	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
-	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
-	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
+	MsgConfigFileMissing               = ffe("PD010500", "Config file not found at path: %s")
+	MsgConfigFileReadError             = ffe("PD010501", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError            = ffe("PD010502", "Failed to parse config file %s with error: %s")
+	MsgConfigFileMissingMandatoryValue = ffe("PD010503", "Mandatory config field %s missing ")
+
+	// Comms bus PD0106XX
+	MsgDestinationNotFound     = ffe("PD010600", "Destination not found: %s")
+	MsgHandlerError            = ffe("PD010601", "Error from message handler")
+	MsgDuplicateSubscription   = ffe("PD010602", "Destination %s already subscribed to topic %s")
+	MsgErrorStoppingGRPCServer = ffe("PD010603", "Error stopping GRPC server")
 )

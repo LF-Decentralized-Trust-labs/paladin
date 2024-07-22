@@ -12,10 +12,6 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package commsbus
 
- 
-package io.kaleido.kata;
-import paladin.kata.Kata;
-public interface ResponseHandler {
-    void onResponse(Kata.Message response);
-}
+// No unit tests yet because converage is provided by the component tests in the kata package.

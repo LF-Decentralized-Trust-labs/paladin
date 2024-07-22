@@ -39,14 +39,21 @@ public class SubmitTransactionRequest extends Request {
     }
 
     @Override
-    public Kata.Request getRequestMessage() {
-        return Kata.Request.newBuilder()
-                .setType(Kata.REQUEST_TYPE.SUBMIT_TRANSACTION_REQUEST)
-                .setSubmitTransactionRequest(Kata.SubmitTransactionRequest.newBuilder()
-                        .setContractAddress(this.contractAddress)
-                        .setFrom(this.from)
-                        .setIdempotencyKey(this.idempotencyKey)
-                        .setPayloadJSON(this.payloadJSON))
+    public Kata.Message getRequestMessage() {
+        String payloadJSON = """
+                        {
+                            "contractAddress": "%s",
+                            "from": "%s",
+                            "idempotencyKey": "%s",
+                            "payloadJSON": "%s"
+                        }
+                        """.formatted(this.contractAddress, this.from, this.idempotencyKey, this.payloadJSON);
+        return Kata.Message.newBuilder()
+                .setType("SUBMIT_TRANSACTION_REQUEST")
+                .setBody(payloadJSON)
+                .setId(getId())
+                .setDestination("kata-txn-engine")
+                .setReplyTo(getTransactionHandler().getDestinationName())
                 .build();
     }
 
