@@ -38,8 +38,40 @@ The major components of the transaction manager are highlighted in this diagram.
 
 > TODO: More detailed sequence flow diagrams need to be brought into this document as they evolve (Leads John Hosie & Chengxuan Xing)
 
-### Transaction engine processing model
+### Key design principles
 
 In order to build an engine that works with asynchronous transaction stage update events. The Paladin transaction engine is design with the following principles:
-- **Event driven**
-- ** 
+- **Async stage based processing driven by events**: To avoid memory & CPU wasted by idle transaction tracking, an in-memory transaction stage processing pool is adopted to only track and progress pending transactions that has active actions to perform. Other pending transactions that are waiting for asynchronous responses are stored in database until the asynchronous response are detected. A stage contains one or more tasks. All transaction stage processes are trigger by one of the following events:
+  - **User instructions**: transaction engine ensures user instructions are validated before any transaction stage process is initiated. If there is already a transaction stage process running, the engine will ensure the instructions are rejected/queued appropriately.  
+  - **Peer messages**: messages from other nodes in the joined privacy group will be pre-scanned by the transaction engine to ensure the corresponding transaction stage process is initiated at the right time. For example, if an event contains a transaction that attempts to spend a future state, the engine will only trigger the stage process when the future state is discovered.
+  - **Base EVM ledger events**: events from the tracked privacy preserving contracts drives the finalization of Paladin transactions. The engine will coordinate and trigger associated completion and rollbacks.
+
+
+![transaction engine event sources](./diagrams/tx_event_sources.png)
+
+
+- **Efficient dependency checks**: A single Paladin node will need to handle transactions from multiple privacy preserving contracts and multiple UTXO states within each privacy preserving contracts. Paladin transaction engine maintains core transaction status information that are discovered through handling transaction events and stage tasks to provide efficient dependency checks. The transaction engine is designed to be the gate for all transaction record updates so that it can maintain data integrity of the core tracking information.
+
+![transaction engine components](./diagrams/tx_engine_components.png)
+
+- **Critical changes must be persisted between stage tasks**: in the situations the transaction stage processor are switching between different stage tasks, any critical changes from the previous task must be persisted on-disk before the next task is triggered. This is to ensure the engine can resume transaction process with the correct context without losing critical information. The stage tasks themselves must be designed with idempotency in mind, so retries with persisted information do not cause unexpected behavior.
+
+
+### Stage processor development
+
+Stage processors is the glue between the generic transaction engine & orchestrators and the domain-specific logic of stage tasks.
+
+
+Responsibilities of the transaction engine:
+
+- it will ensure any provided transaction record update will be persisted between stage tasks and stages.
+- it invokes stage action at the right time (e.g. detect dependency satisfaction based on the stage logic).
+- it filters out outdated transaction events based. 
+
+Responsibilities of stage processors:
+
+- it provides stage specific logic for the generic stage control functions that the transaction engines utilizes
+- it generates transaction information that can be used by transaction engine to do dependency check and event filtering
+- it uses instructions to communicate with the transaction engine for task and stage switch
+- it divides a stage into multiple tasks and decide critical changes between tasks
+- it ensures critical changes are always persisted before performing the affected tasks
