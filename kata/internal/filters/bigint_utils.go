@@ -58,11 +58,11 @@ func PadHexBigUint(bi *big.Int, buff []byte) []byte {
 	return buff
 }
 
-// PadHexBigIntTwosCompliment returns the supplied buffer, with all the bytes to the left of
-// the two's compliment formatted string set to 0
-func PadHexBigIntTwosCompliment(bi *big.Int, buff []byte) []byte {
-	twosCompliment := abi.SerializeInt256TwosComplementBytes(bi)
-	unPadded := hex.EncodeToString(twosCompliment)
+// PadHexBigIntTwosComplement returns the supplied buffer, with all the bytes to the left of
+// the two's complement formatted string set to 0
+func PadHexBigIntTwosComplement(bi *big.Int, buff []byte) []byte {
+	twosComplement := abi.SerializeInt256TwosComplementBytes(bi)
+	unPadded := hex.EncodeToString(twosComplement)
 	boundary := len(buff) - len(unPadded)
 	for i := 0; i < len(buff); i++ {
 		if i >= boundary {

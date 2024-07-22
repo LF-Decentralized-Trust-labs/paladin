@@ -127,7 +127,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		// address is really a uint160, so that's how we handle it
 		{State: state1.Hash, Label: "field5", Value: "000000000000000000000000687414c0b8b4182b823aec5436965cf19b197386"},
 		// int256 needs an extra byte ahead of the zero-padded string to say it's negative,
-		// and is two's compliment for that negative number so less negative number are string "higher"
+		// and is two's complement for that negative number so less negative number are string "higher"
 		{State: state1.Hash, Label: "field6", Value: "0ffffffffffffffffffffffffffffffffffffffffffffffffffdbc0638301b8e7"},
 		// bytes are just bytes
 		{State: state1.Hash, Label: "field7", Value: "feedbeef"},
