@@ -51,8 +51,9 @@ persistence:
     autoMigrate:   true
     migrationsDir: %s
     debugQueries:  true
-grpc:
-  socketAddress: %s
+commsBus:
+  grpc:
+    socketAddress: %s
 """.formatted(System.getProperty("user.dir") + "/../kata/db/migrations/sqlite",socketFilename);
 
         File yamlFile = File.createTempFile("paladin", "kata.conf.yaml");
@@ -75,7 +76,7 @@ grpc:
 
 
         // Start the Java GRPC client
-        Handler transactionHandler = new Handler(socketFilename);
+        Handler transactionHandler = new Handler(socketFilename, "test-handler");
         transactionHandler.start();
 
         // Add a shutdown hook to wait for a signal to exit

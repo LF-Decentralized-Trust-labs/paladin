@@ -37,7 +37,7 @@ func TestRCPMissingID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
-	assert.Regexp(t, "PD010901", errResponse.Error.Message)
+	assert.Regexp(t, "PD011001", errResponse.Error.Message)
 
 }
 
@@ -57,6 +57,6 @@ func TestRCPUnknownMethod(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
-	assert.Regexp(t, "PD010902", errResponse.Error.Message)
+	assert.Regexp(t, "PD011002", errResponse.Error.Message)
 
 }

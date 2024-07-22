@@ -90,7 +90,7 @@ func TestFindStatesBadQuery(t *testing.T) {
 			},
 		},
 	}, "all")
-	assert.Regexp(t, "PD010600.*wrong", err)
+	assert.Regexp(t, "PD010700.*wrong", err)
 
 }
 

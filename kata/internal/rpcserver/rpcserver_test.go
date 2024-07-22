@@ -76,7 +76,7 @@ func TestBadHTTPConfig(t *testing.T) {
 		},
 		WS: WSEndpointConfig{Disabled: true},
 	})
-	assert.Regexp(t, "PD010701", err)
+	assert.Regexp(t, "PD010801", err)
 
 }
 
@@ -90,7 +90,7 @@ func TestBadWSConfig(t *testing.T) {
 		},
 		HTTP: HTTPEndpointConfig{Disabled: true},
 	})
-	assert.Regexp(t, "PD010701", err)
+	assert.Regexp(t, "PD010801", err)
 
 }
 

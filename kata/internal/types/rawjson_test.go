@@ -45,7 +45,7 @@ func TestRawJSON(t *testing.T) {
 	assert.Nil(t, s1.F3.Value())
 
 	err = (*RawJSON)(nil).UnmarshalJSON(nil)
-	assert.Regexp(t, "PD011000", err)
+	assert.Regexp(t, "PD011100", err)
 
 	err = (&s1.F1).Scan(nil)
 	assert.NoError(t, err)
@@ -60,5 +60,5 @@ func TestRawJSON(t *testing.T) {
 	assert.JSONEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.String())
 
 	err = (&s1.F1).Scan(42)
-	assert.Regexp(t, "PD011001", err)
+	assert.Regexp(t, "PD011101", err)
 }

@@ -206,7 +206,7 @@ func TestEvalQueryNotNull(t *testing.T) {
 	_, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
 		"stringField": types.RawJSON(`12345`),
 	})
-	assert.Regexp(t, "PD010605", err)
+	assert.Regexp(t, "PD010705", err)
 
 }
 
@@ -590,7 +590,7 @@ func TestEvalQueryMatchLike(t *testing.T) {
 	err := json.Unmarshal([]byte(`{"like": [{"field": "int64Field", "value": "111"}]}`), &qf)
 	assert.NoError(t, err)
 	match, err := qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{})
-	assert.Regexp(t, "PD010616", err)
+	assert.Regexp(t, "PD010716", err)
 	assert.False(t, match)
 
 	err = json.Unmarshal([]byte(`{"like": [{"field": "stringField", "value": "hello%"}]}`), &qf)
@@ -637,11 +637,11 @@ func TestEvalQueryLikeFail(t *testing.T) {
 	res := eval.NewRoot().IsLike(&FilterJSONKeyValue{
 		FilterJSONBase: FilterJSONBase{Field: "stringField"},
 	}, "stringField", StringField("string_field"), "any")
-	assert.Regexp(t, "PD010615", res.Error())
+	assert.Regexp(t, "PD010715", res.Error())
 
 	res = eval.NewRoot()
 	assert.False(t, res.Result().int64LikeNotSupported(1, 1))
-	assert.Regexp(t, "PD010614", res.Error())
+	assert.Regexp(t, "PD010714", res.Error())
 }
 
 func TestEvalQueryMatchIn(t *testing.T) {
@@ -689,7 +689,7 @@ func TestEvalQueryMatchIn(t *testing.T) {
 	_, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
 		"stringField": types.RawJSON(`false`),
 	})
-	assert.Regexp(t, "PD010605", err)
+	assert.Regexp(t, "PD010705", err)
 
 }
 
@@ -754,5 +754,5 @@ func TestEvalQueryAndOr(t *testing.T) {
 		"stringField": types.RawJSON(`"test1"`),
 		"int64Field":  types.RawJSON(`"wrong"`),
 	})
-	assert.Regexp(t, "PD010603", err)
+	assert.Regexp(t, "PD010703", err)
 }

@@ -71,56 +71,65 @@ var (
 	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
 
 	// Config PD0105XX
-	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
-	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
-	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
+	MsgConfigFileMissing               = ffe("PD010500", "Config file not found at path: %s")
+	MsgConfigFileReadError             = ffe("PD010501", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError            = ffe("PD010502", "Failed to parse config file %s with error: %s")
+	MsgConfigFileMissingMandatoryValue = ffe("PD010503", "Mandatory config field %s missing ")
 
-	// Filters PD0106XX
-	MsgFiltersUnknownField                = ffe("PD010600", "Unknown field '%s'")
-	MsgFiltersJSONQueryValueUnsupported   = ffe("PD010601", "JSON query value not supported: %s")
-	MsgFiltersJSONQueryOpUnsupportedMod   = ffe("PD010602", "Operation '%s' does not support modifiers: %v")
-	MsgFiltersValueInvalidForInt64        = ffe("PD010603", "Value '%s' cannot be parsed as a 64bit signed integer")
-	MsgFiltersValueInvalidForBool         = ffe("PD010604", "Value '%s' cannot be parsed as a boolean")
-	MsgFiltersValueInvalidForString       = ffe("PD010605", "Value '%s' cannot be parsed as a string")
-	MsgFiltersValueInvalidForBigInt       = ffe("PD010606", "Type '%T' cannot be converted to a big integer")
-	MsgFiltersValueIntStringParseFail     = ffe("PD010607", "Value '%s' cannot be converted to a big integer")
-	MsgFiltersValueMissing                = ffe("PD010608", "Value missing for filter field '%s'")
-	MsgFiltersMustBeBuiltUnscoped         = ffe("PD010609", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
-	MsgFiltersJSONValueParseError         = ffe("PD010610", "Failed to parse value for field '%s' (as %T): %v")
-	MsgFiltersValueInvalidHex             = ffe("PD010611", "Failed to parse value as hex: %v")
-	MsgFiltersUnexpectedFieldResolverType = ffe("PD010612", "Unsupported type '%T' returned from field resolver '%T'")
-	MsgFiltersUnexpectedResolvedValueType = ffe("PD010613", "Value type '%T' mismatched from compare type '%T'")
-	MsgFiltersLikeNotSupportedForIntValue = ffe("PD010614", "LIKE operation not supported for int64 stored values")
-	MsgFiltersLikeConversionToRegexpFail  = ffe("PD010615", "Failed to convert LIKE string '%s' to regexp: %s")
-	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010616", "Field does not support LIKE comparison (%T)")
+	// Comms bus PD0106XX
+	MsgDestinationNotFound     = ffe("PD010600", "Destination not found: %s")
+	MsgHandlerError            = ffe("PD010601", "Error from message handler")
+	MsgDuplicateSubscription   = ffe("PD010602", "Destination %s already subscribed to topic %s")
+	MsgErrorStoppingGRPCServer = ffe("PD010603", "Error stopping GRPC server")
 
-	// HTTPServer PD0107XX
-	MsgHTTPServerStartFailed        = ffe("PD010700", "Failed to start server on '%s'")
-	MsgHTTPServerMissingPort        = ffe("PD010701", "HTTP server port must be specified for '%s'")
-	MsgHTTPServerNoWSUpgradeSupport = ffe("PD010702", "HTTP server does not support WebSocket upgrade (%T)")
+	// Filters PD0107XX
+	MsgFiltersUnknownField                = ffe("PD010700", "Unknown field '%s'")
+	MsgFiltersJSONQueryValueUnsupported   = ffe("PD010701", "JSON query value not supported: %s")
+	MsgFiltersJSONQueryOpUnsupportedMod   = ffe("PD010702", "Operation '%s' does not support modifiers: %v")
+	MsgFiltersValueInvalidForInt64        = ffe("PD010703", "Value '%s' cannot be parsed as a 64bit signed integer")
+	MsgFiltersValueInvalidForBool         = ffe("PD010704", "Value '%s' cannot be parsed as a boolean")
+	MsgFiltersValueInvalidForString       = ffe("PD010705", "Value '%s' cannot be parsed as a string")
+	MsgFiltersValueInvalidForBigInt       = ffe("PD010706", "Type '%T' cannot be converted to a big integer")
+	MsgFiltersValueIntStringParseFail     = ffe("PD010707", "Value '%s' cannot be converted to a big integer")
+	MsgFiltersValueMissing                = ffe("PD010708", "Value missing for filter field '%s'")
+	MsgFiltersMustBeBuiltUnscoped         = ffe("PD010709", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
+	MsgFiltersJSONValueParseError         = ffe("PD010710", "Failed to parse value for field '%s' (as %T): %v")
+	MsgFiltersValueInvalidHex             = ffe("PD010711", "Failed to parse value as hex: %v")
+	MsgFiltersUnexpectedFieldResolverType = ffe("PD010712", "Unsupported type '%T' returned from field resolver '%T'")
+	MsgFiltersUnexpectedResolvedValueType = ffe("PD010713", "Value type '%T' mismatched from compare type '%T'")
+	MsgFiltersLikeNotSupportedForIntValue = ffe("PD010714", "LIKE operation not supported for int64 stored values")
+	MsgFiltersLikeConversionToRegexpFail  = ffe("PD010715", "Failed to convert LIKE string '%s' to regexp: %s")
+	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010716", "Field does not support LIKE comparison (%T)")
 
-	// TLS PD0108XX
-	MsgTLSInvalidCAFile             = ffe("PD010800", "Invalid CA certificates file")
-	MsgTLSConfigFailed              = ffe("PD010801", "Failed to initialize TLS configuration")
-	MsgTLSInvalidKeyPairFiles       = ffe("PD010802", "Invalid certificate and key pair files")
-	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010803", "Unknown DN attribute '%s'")
-	MsgTLSInvalidTLSDnMatcherType   = ffe("PD010804", "Expected string value for '%s' field of requiredDNAttributes (found %T)")
-	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010805", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
-	MsgTLSInvalidTLSDnChain         = ffe("PD010806", "Cannot match subject distinguished name as cert chain is not verified")
-	MsgTLSInvalidTLSDnMismatch      = ffe("PD010807", "Certificate subject does not meet requirements")
+	// HTTPServer PD0108XX
+	MsgHTTPServerStartFailed        = ffe("PD010800", "Failed to start server on '%s'")
+	MsgHTTPServerMissingPort        = ffe("PD010801", "HTTP server port must be specified for '%s'")
+	MsgHTTPServerNoWSUpgradeSupport = ffe("PD010802", "HTTP server does not support WebSocket upgrade (%T)")
 
-	// JSON/RPC PD0109XX
-	MsgJSONRPCInvalidRequest      = ffe("PD010900", "Invalid JSON/RPC request data")
-	MsgJSONRPCMissingRequestID    = ffe("PD010901", "Invalid JSON/RPC request. Must set request ID")
-	MsgJSONRPCUnsupportedMethod   = ffe("PD010902", "method not supported")
-	MsgJSONRPCIncorrectParamCount = ffe("PD010903", "method %s requires %d params (supplied=%d)")
-	MsgJSONRPCInvalidParam        = ffe("PD010904", "method %s parameter %d invalid: %s")
-	MsgJSONRPCResultSerialization = ffe("PD010905", "method %s result serialization failed: %s")
+	// TLS PD0198XX
+	MsgTLSInvalidCAFile             = ffe("PD010900", "Invalid CA certificates file")
+	MsgTLSConfigFailed              = ffe("PD010901", "Failed to initialize TLS configuration")
+	MsgTLSInvalidKeyPairFiles       = ffe("PD010902", "Invalid certificate and key pair files")
+	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010903", "Unknown DN attribute '%s'")
+	MsgTLSInvalidTLSDnMatcherType   = ffe("PD010904", "Expected string value for '%s' field of requiredDNAttributes (found %T)")
+	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010905", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
+	MsgTLSInvalidTLSDnChain         = ffe("PD010906", "Cannot match subject distinguished name as cert chain is not verified")
+	MsgTLSInvalidTLSDnMismatch      = ffe("PD010907", "Certificate subject does not meet requirements")
 
-	// Types PD0110XX
-	MsgTypesUnmarshalNil = ffe("PD011000", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail     = ffe("PD011001", "Unable to scan type %T into type %T")
+	// JSON/RPC PD0110XX
+	MsgJSONRPCInvalidRequest      = ffe("PD011000", "Invalid JSON/RPC request data")
+	MsgJSONRPCMissingRequestID    = ffe("PD011001", "Invalid JSON/RPC request. Must set request ID")
+	MsgJSONRPCUnsupportedMethod   = ffe("PD011002", "method not supported")
+	MsgJSONRPCIncorrectParamCount = ffe("PD011003", "method %s requires %d params (supplied=%d)")
+	MsgJSONRPCInvalidParam        = ffe("PD011004", "method %s parameter %d invalid: %s")
+	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
+
+	// Types PD0111XX
+	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
 )

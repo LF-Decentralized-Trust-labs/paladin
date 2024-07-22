@@ -17,5 +17,5 @@
 package io.kaleido.kata;
 import paladin.kata.Kata;
 public interface ResponseHandler {
-    void onResponse(Kata.Response response);
+    void onResponse(Kata.Message response);
 }

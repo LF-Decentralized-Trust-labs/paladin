@@ -335,7 +335,7 @@ func TestRCPMethodInvalidValue(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
-	assert.Regexp(t, "PD010904", errResponse.Error.Message)
+	assert.Regexp(t, "PD011004", errResponse.Error.Message)
 
 }
 
@@ -362,7 +362,7 @@ func TestRCPMethodWrongParamCount(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
-	assert.Regexp(t, "PD010903", errResponse.Error.Message)
+	assert.Regexp(t, "PD011003", errResponse.Error.Message)
 
 }
 
@@ -388,6 +388,6 @@ func TestRCPMethodBadResult(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInternalError), errResponse.Error.Code)
-	assert.Regexp(t, "PD010905", errResponse.Error.Message)
+	assert.Regexp(t, "PD011005", errResponse.Error.Message)
 
 }

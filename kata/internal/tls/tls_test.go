@@ -168,7 +168,7 @@ func TestErrInvalidCAFile(t *testing.T) {
 		Enabled: true,
 		CAFile:  notTheCAFileTheKey,
 	}, ClientType)
-	assert.Regexp(t, "PD010801", err)
+	assert.Regexp(t, "PD010901", err)
 }
 
 func TestErrInvalidCA(t *testing.T) {
@@ -182,7 +182,7 @@ func TestErrInvalidCA(t *testing.T) {
 		Enabled: true,
 		CA:      notTheCATheKey,
 	}, ClientType)
-	assert.Regexp(t, "PD010801", err)
+	assert.Regexp(t, "PD010901", err)
 }
 
 func TestErrInvalidKeyPairFile(t *testing.T) {
@@ -197,7 +197,7 @@ func TestErrInvalidKeyPairFile(t *testing.T) {
 		KeyFile:  notTheKeyFile,
 		CertFile: notTheCertFile,
 	}, ClientType)
-	assert.Regexp(t, "PD010802", err)
+	assert.Regexp(t, "PD010902", err)
 
 }
 
@@ -213,7 +213,7 @@ func TestErrInvalidKeyPair(t *testing.T) {
 		Key:     notTheKey,
 		Cert:    notTheCert,
 	}, ClientType)
-	assert.Regexp(t, "PD010802", err)
+	assert.Regexp(t, "PD010902", err)
 
 }
 
@@ -394,7 +394,7 @@ func TestMTLSInvalidDNConfUnknown(t *testing.T) {
 			"unknown": "anything",
 		},
 	}, ServerType)
-	assert.Regexp(t, "PD010803", err)
+	assert.Regexp(t, "PD010903", err)
 
 }
 
@@ -409,7 +409,7 @@ func TestMTLSInvalidDNConfBadMap(t *testing.T) {
 			},
 		},
 	}, ServerType)
-	assert.Regexp(t, "PD010804", err)
+	assert.Regexp(t, "PD010904", err)
 
 }
 
@@ -421,7 +421,7 @@ func TestMTLSInvalidDNConfBadRegexp(t *testing.T) {
 			"cn": "((((open regexp",
 		},
 	}, ServerType)
-	assert.Regexp(t, "PD010805", err)
+	assert.Regexp(t, "PD010905", err)
 }
 
 func TestMTLSDNValidatorNotVerified(t *testing.T) {
@@ -432,7 +432,7 @@ func TestMTLSDNValidatorNotVerified(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = testValidator(nil, nil)
-	assert.Regexp(t, "PD010806", err)
+	assert.Regexp(t, "PD010906", err)
 }
 
 func TestMTLSDNValidatorEmptyChain(t *testing.T) {
@@ -443,7 +443,7 @@ func TestMTLSDNValidatorEmptyChain(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = testValidator(nil, [][]*x509.Certificate{{}})
-	assert.Regexp(t, "PD010806", err)
+	assert.Regexp(t, "PD010906", err)
 
 }
 
