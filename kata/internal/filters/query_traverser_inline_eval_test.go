@@ -47,7 +47,7 @@ func TestEvalQueryEquals(t *testing.T) {
 			{"field": "uint256Field", "value": 55555}
 		],
 	    "limit": 100,
-		"order": ["stringField"]
+		"sort": ["stringField"]
 	}`), &qf)
 	assert.NoError(t, err)
 
@@ -691,4 +691,68 @@ func TestEvalQueryMatchIn(t *testing.T) {
 	})
 	assert.Regexp(t, "PD010605", err)
 
+}
+
+func TestEvalQueryAndOr(t *testing.T) {
+	var qf *QueryJSON
+	err := json.Unmarshal([]byte(`{
+		"eq": [{"field": "stringField", "value": "test1", "caseInsensitive": true}],
+		"or": [
+		  {
+		    "gt": [{"field": "int64Field", "value": 50}],
+		    "lte": [{"field": "int64Field", "value": 100}]
+		  },
+		  {
+		    "gt": [{"field": "int256Field", "value": 5000}],
+		    "lte": [{"field": "int256Field", "value": 10000}]
+		  }
+		]
+	}`), &qf)
+	assert.NoError(t, err)
+
+	match, err := qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"TesT1"`),
+	})
+	assert.NoError(t, err)
+	assert.False(t, match)
+
+	// Match the base AND match, and the int64 child
+	match, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"TesT1"`),
+		"int64Field":  types.RawJSON(`100`),
+	})
+	assert.NoError(t, err)
+	assert.True(t, match)
+
+	// Match the base AND match, and the int256 child
+	match, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"TesT1"`),
+		"int256Field": types.RawJSON(`5001`),
+	})
+	assert.NoError(t, err)
+	assert.True(t, match)
+
+	// Don't match the base requirement
+	match, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"test2"`),
+		"int256Field": types.RawJSON(`5001`),
+	})
+	assert.NoError(t, err)
+	assert.False(t, match)
+
+	// Don't match the either or criteria
+	match, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"test1"`),
+		"int64Field":  types.RawJSON(`50`),
+		"int256Field": types.RawJSON(`5000`),
+	})
+	assert.NoError(t, err)
+	assert.False(t, match)
+
+	// Roll up errors
+	_, err = qf.Eval(context.Background(), allTypesFieldMap, SimpleValueSet{
+		"stringField": types.RawJSON(`"test1"`),
+		"int64Field":  types.RawJSON(`"wrong"`),
+	})
+	assert.Regexp(t, "PD010603", err)
 }

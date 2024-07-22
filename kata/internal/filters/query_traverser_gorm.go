@@ -78,9 +78,12 @@ func (t *gormTraverser) And(ot *gormTraverser) Traverser[*gormTraverser] {
 	return t
 }
 
-func (t *gormTraverser) Or(ot *gormTraverser) Traverser[*gormTraverser] {
-	t.db = t.db.Or(ot.db)
-	return t
+func (t *gormTraverser) BuildOr(ot ...*gormTraverser) Traverser[*gormTraverser] {
+	or := t.NewRoot().Result()
+	for _, o := range ot {
+		or.db = or.db.Or(o.db)
+	}
+	return or
 }
 
 func (t *gormTraverser) IsEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {

@@ -116,8 +116,15 @@ func (t *inlineEval) And(ot *inlineEval) Traverser[*inlineEval] {
 	return t
 }
 
-func (t *inlineEval) Or(ot *inlineEval) Traverser[*inlineEval] {
-	t.matches = t.matches || ot.matches
+func (t *inlineEval) BuildOr(ot ...*inlineEval) Traverser[*inlineEval] {
+	orMatches := false
+	for _, o := range ot {
+		if o.err != nil {
+			return t.WithError(o.err)
+		}
+		orMatches = orMatches || o.matches
+	}
+	t.matches = t.matches && orMatches
 	return t
 }
 

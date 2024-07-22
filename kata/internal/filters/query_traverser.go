@@ -35,7 +35,7 @@ type Traverser[T any] interface {
 	Limit(l int) Traverser[T]
 	Order(f string) Traverser[T]
 	And(ot T) Traverser[T]
-	Or(ot T) Traverser[T]
+	BuildOr(ot ...T) Traverser[T]
 	IsEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
 	IsLike(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
 	IsNull(e *FilterJSONBase, fieldName string, field FieldResolver) Traverser[T]
@@ -257,15 +257,15 @@ func (qt *queryTraverser[T]) BuildAndFilter(t Traverser[T], jf *FilterJSON) Trav
 		t = t.IsIn(e, e.Field, field, testValues)
 	}
 	if len(jf.Or) > 0 {
-		ors := t.NewRoot()
+		var ors []T
 		for _, child := range jf.Or {
 			sub := qt.BuildAndFilter(t, child)
 			if sub.Error() != nil {
 				return sub
 			}
-			ors = ors.Or(sub.Result())
+			ors = append(ors, sub.Result())
 		}
-		t = t.And(ors.Result())
+		t = t.And(t.BuildOr(ors...).Result())
 	}
 	return t
 }
