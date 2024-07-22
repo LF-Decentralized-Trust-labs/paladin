@@ -19,11 +19,11 @@ package plugins
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net"
 	"fmt"
 	"io"
 
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/google/uuid"
 	interPaladinProto "github.com/kaleido-io/talaria/pkg/plugins/proto"
 	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
@@ -70,10 +70,10 @@ type GRPCTransportPlugin struct {
 // --------------------------------------------------------------------------------------------------------- Inter-Paladin Server
 
 func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Context) {
-	log.Printf("initialising connection for inbound gRPC connections %s\n", gtp.SocketName)
+	log.L(ctx).Debugf("initialising connection for inbound gRPC connections %s\n", gtp.SocketName)
 	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%d", gtp.port))
 	if err != nil {
-		log.Fatalf("failed to listen for grpc connections: %v", err)
+		log.L(ctx).Errorf("failed to listen for grpc connections: %v", err)
 	}
 
 	gtp.interPaladinListener = grpcLis
@@ -87,16 +87,16 @@ func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Conte
 	}()
 
 	go func(){
-		log.Printf("grpc server listening at %v", grpcLis.Addr())
+		log.L(ctx).Debugf("grpc server listening at %v", grpcLis.Addr())
 		if err := s.Serve(grpcLis); err != nil {
-			log.Printf("failed to serve: %v", err)
+			log.L(ctx).Errorf("failed to serve: %v", err)
 		}
 	}()
 }
 
 func (gtp *GRPCTransportPlugin) SendInterPaladinMessage(ctx context.Context, in *interPaladinProto.InterPaladinMessage) (*interPaladinProto.Empty, error) {
 	// TODO: Figure out if we need to send messages here
-	log.Println("Got an external message")
+	log.L(ctx).Tracef("Got an external message")
 	gtp.messages <- in.Payload
 	return &interPaladinProto.Empty{}, nil
 }
@@ -104,10 +104,10 @@ func (gtp *GRPCTransportPlugin) SendInterPaladinMessage(ctx context.Context, in 
 // --------------------------------------------------------------------------------------------------------- Plugin Server
 
 func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
-	log.Printf("initialising connection to local socket %s\n", gtp.SocketName)
+	log.L(ctx).Debugf("initialising connection to local socket %s\n", gtp.SocketName)
 	lis, err := net.Listen("unix", gtp.SocketName)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.L(ctx).Errorf("failed to listen: %v", err)
 	}
 
 	gtp.pluginListener = lis
@@ -121,9 +121,9 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 	}()
 
 	go func(){
-		log.Printf("server listening at %v", lis.Addr())
+		log.L(ctx).Debugf("server listening at %v", lis.Addr())
 		if err := s.Serve(lis); err != nil {
-			log.Printf("failed to serve: %v", err)
+			log.L(ctx).Errorf("failed to serve: %v", err)
 		}
 	}()
 }
@@ -141,7 +141,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 			if err := server.Send(&pluginInterfaceProto.PaladinMessage{
 				Payload: collectedMessage,
 			}); err != nil {
-				log.Printf("send error %v", err)
+				log.L(ctx).Errorf("send error %v", err)
 			}
 		}
 		default:
@@ -149,24 +149,24 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 
 		pluginReq, err := server.Recv()
 		if err == io.EOF {
-			log.Println("shutdown")
+			log.L(ctx).Debugf("Shutting down Plugin listener")
 			return nil
 		}
 		if err != nil {
-			log.Printf("receive error %v", err)
+			log.L(ctx).Errorf("receive error %v", err)
 			continue
 		}
 
 		routingInfo := &GRPCRoutingInformation{}
 		err = json.Unmarshal([]byte(pluginReq.RoutingInformation), routingInfo)
 		if err != nil {
-			log.Printf("Could not unmarshal routing information, err: %v", err)
+			log.L(ctx).Errorf("Could not unmarshal routing information, err: %v", err)
 			return err
 		}
 
 		conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Fatalf("Failed to establish a client, err: %s", err)
+			log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
 		}
 		defer conn.Close()
 
@@ -176,7 +176,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 			Payload: pluginReq.Payload,
 		})
 		if err != nil {
-			log.Fatalf("error sending message through gRPC: %v", err)
+			log.L(ctx).Errorf("error sending message through gRPC: %v", err)
 		}
 	}
 }

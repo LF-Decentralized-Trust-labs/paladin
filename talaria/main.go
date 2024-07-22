@@ -55,7 +55,7 @@ func main() {
 	cas := commsbus.NewCommsBusAPIServer(*commsbusport, tal)
 	wg.Add(1)
 	go func(){
-		cas.StartServer()
+		cas.StartServer(ctx)
 	}()
 
 	wg.Wait()

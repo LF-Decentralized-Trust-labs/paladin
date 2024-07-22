@@ -21,9 +21,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 
+	"github.com/hyperledger/firefly-common/pkg/log"
 	talaria "github.com/kaleido-io/talaria/pkg/talaria"
 )
 
@@ -88,12 +88,12 @@ func (cs *CommsBusAPIServer) sendMessage(w http.ResponseWriter, r *http.Request)
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 } 
 
-func (cs *CommsBusAPIServer) StartServer() {
+func (cs *CommsBusAPIServer) StartServer(ctx context.Context) {
 	http.HandleFunc("/message", cs.sendMessage)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", cs.port), nil)
 	if err != nil {
-		log.Fatalf("Error starting server: %s", err)
+		log.L(ctx).Errorf("Error starting server: %s", err)
 	}
 }
 

@@ -18,7 +18,6 @@ package talaria
 import (
 	"fmt"
 	"net/http"
-	"log"
 	"io"
 	"encoding/json"
 )
@@ -61,8 +60,6 @@ func NewLocalAPIRegistryProvider(port int) *LocalAPIRegistryProvider {
 }
 
 func (larp *LocalAPIRegistryProvider) addPeer(w http.ResponseWriter, r *http.Request) {
-	log.Println("Adding new peer to the store...")
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Unable to read request body", http.StatusBadRequest)
@@ -84,7 +81,7 @@ func (larp *LocalAPIRegistryProvider) listenAndServe() {
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", larp.port), nil)
 	if err != nil {
-		log.Fatalf("Error starting the registry API: %s", err)
+		return
 	}
 }
 

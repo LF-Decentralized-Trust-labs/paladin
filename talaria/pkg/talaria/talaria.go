@@ -17,10 +17,10 @@ package talaria
 
 import (
 	"context"
-	"log"
 	"fmt"
 	"io"
 	
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
@@ -96,7 +96,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 		socketLocationFormatted := fmt.Sprintf("unix://%s", reg.SocketLocation)
 		conn, err := grpc.NewClient(socketLocationFormatted, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Failed to establish connection to plugin: %s, err: %v", reg.Name, err)
+			log.L(ctx).Errorf("Failed to establish connection to plugin: %s, err: %v", reg.Name, err)
 			cancel()
 			return
 		}
@@ -125,11 +125,11 @@ func (t *Talaria) Initialise(ctx context.Context) {
 
 				returnedMessage, err := stream.Recv() 
 				if err == io.EOF {
-					log.Println("shutdown")
+					log.L(ctx).Debugf("Shutting down Talaria listener")
 					return
 				}
 				if err != nil {
-					log.Printf("receive error %v", err)
+					log.L(ctx).Errorf("Talaria receive error %v", err)
 					continue
 				}
 
@@ -150,7 +150,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 						// TODO: When is this a blocking operation? What happens if a message cannot be sent?
 						// TODO: What is our retry mechanism?
 						if err := stream.Send(req); err != nil {
-							log.Fatalf("can not send %v", err)
+							log.L(ctx).Errorf("Talaria send error, can not send %v", err)
 						}
 				}
 				}
@@ -163,7 +163,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 func (t *Talaria) SendMessage(ctx context.Context, paladinNode string, content []byte) error {
 	transpTarget, err := t.registryProvider.LookupPaladinEntity(paladinNode)
 	if err != nil {
-		log.Printf("could not find entity from the DB, err: %v", err)
+		log.L(ctx).Errorf("could not find entity from the DB, err: %v", err)
 		return err
 	}
 
