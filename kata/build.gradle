@@ -16,7 +16,10 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    //TODO reported coverage does not seem to include componet tests.  Need to investigate
+    //TODO reported coverage does not seem to include component tests.  Need to investigate
+    //     (fyi don't know if this comment is still true after recent fixes to the coverage task in this
+    //       build file, or what the above commentor meant by component tests...
+    //       there's no task labelled that in this build file)
     targetCoverage = 84
 }
 
