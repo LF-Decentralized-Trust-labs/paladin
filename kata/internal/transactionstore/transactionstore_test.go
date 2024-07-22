@@ -38,13 +38,13 @@ func newTestTransactionStore(t *testing.T) (context.Context, *transactionStore, 
 
 func createSomeRandomTransactions(t *testing.T, ctx context.Context, ts *transactionStore, count int) {
 	for i := 0; i < count; i++ {
-		fromId := uuid.New()
+		from := uuid.New().String()
 		contract := uuid.New().String()
 		payloadJSON := fmt.Sprintf(`{"foo_%d":"bar"}`, count)
 		txn := Transaction{
-			FromID:      fromId,
+			From:        from,
 			Contract:    contract,
-			PayloadJSON: payloadJSON,
+			PayloadJSON: &payloadJSON,
 		}
 
 		createdTransaction, err := ts.InsertTransaction(ctx, txn)
@@ -72,13 +72,13 @@ func TestStoreRetrieveTransaction(t *testing.T) {
 
 	createSomeRandomTransactions(t, ctx, ts, 10)
 
-	fromId := uuid.New()
+	from := uuid.New().String()
 	contract := uuid.New().String()
 	payloadJSON := `{"foo":"bar"}`
 	txn := Transaction{
-		FromID:      fromId,
+		From:        from,
 		Contract:    contract,
-		PayloadJSON: payloadJSON,
+		PayloadJSON: &payloadJSON,
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
@@ -92,9 +92,9 @@ func TestStoreRetrieveTransaction(t *testing.T) {
 	retreivedTxn, err := ts.GetTransactionByID(ctx, txnID)
 	assert.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
-	assert.Equal(t, fromId, retreivedTxn.FromID)
+	assert.Equal(t, from, retreivedTxn.From)
 	assert.Equal(t, contract, retreivedTxn.Contract)
-	assert.Equal(t, payloadJSON, retreivedTxn.PayloadJSON)
+	assert.Equal(t, payloadJSON, *retreivedTxn.PayloadJSON)
 }
 
 func TestStoreDeleteTransaction(t *testing.T) {
@@ -103,13 +103,13 @@ func TestStoreDeleteTransaction(t *testing.T) {
 	defer done()
 	createSomeRandomTransactions(t, ctx, ts, 10)
 
-	fromId := uuid.New()
+	from := uuid.New().String()
 	contract := uuid.New().String()
 	payloadJSON := `{"foo":"bar"}`
 	txn := Transaction{
-		FromID:      fromId,
+		From:        from,
 		Contract:    contract,
-		PayloadJSON: payloadJSON,
+		PayloadJSON: &payloadJSON,
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
@@ -140,13 +140,13 @@ func TestStoreUpdateTransaction(t *testing.T) {
 	defer done()
 	createSomeRandomTransactions(t, ctx, ts, 10)
 
-	fromId := uuid.New()
+	from := uuid.New().String()
 	contract := uuid.New().String()
 	payloadJSON := `{"foo":"bar"}`
 	txn := Transaction{
-		FromID:      fromId,
+		From:        from,
 		Contract:    contract,
-		PayloadJSON: payloadJSON,
+		PayloadJSON: &payloadJSON,
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
@@ -164,10 +164,10 @@ func TestStoreUpdateTransaction(t *testing.T) {
 	sequenceID := uuid.New()
 	txnUpdate := Transaction{
 		ID:          createdTransaction.ID,
-		FromID:      fromId,
+		From:        from,
 		Contract:    contract,
-		PayloadJSON: payloadJSON,
-		SequenceID:  sequenceID,
+		PayloadJSON: &payloadJSON,
+		SequenceID:  &sequenceID,
 	}
 	updatedTxn, err := ts.UpdateTransaction(ctx, txnUpdate)
 
@@ -177,8 +177,8 @@ func TestStoreUpdateTransaction(t *testing.T) {
 	retreivedTxn, err = ts.GetTransactionByID(ctx, txnID)
 	assert.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
-	assert.Equal(t, fromId, retreivedTxn.FromID)
+	assert.Equal(t, from, retreivedTxn.From)
 	assert.Equal(t, contract, retreivedTxn.Contract)
-	assert.Equal(t, payloadJSON, retreivedTxn.PayloadJSON)
-	assert.Equal(t, sequenceID, retreivedTxn.SequenceID)
+	assert.Equal(t, payloadJSON, *retreivedTxn.PayloadJSON)
+	assert.Equal(t, sequenceID, *retreivedTxn.SequenceID)
 }

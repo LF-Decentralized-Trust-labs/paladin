@@ -58,4 +58,15 @@ var (
 	MsgPersistenceInitFailed          = ffe("PD010202", "Database init failed")
 	MsgPersistenceMigrationFailed     = ffe("PD010203", "Database migration failed")
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
+
+	// Transaction Processor PD0103XX
+	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+
+	// Transaction store PD0104XX
+	MsgTransactionMissingField = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+
+	// Config PD0105XX
+	MsgConfigFileMissing    = ffe("PD010500", "Config file not found at path: %s")
+	MsgConfigFileReadError  = ffe("PD010501", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError = ffe("PD010502", "Failed to parse config file %s with error: %s")
 )

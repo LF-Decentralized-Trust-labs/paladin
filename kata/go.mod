@@ -9,7 +9,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/uuid v1.6.0
-	github.com/hyperledger/firefly-common v1.4.6
+	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14-0.20240715211227-a9475113106b
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.23.0
@@ -17,6 +17,7 @@ require (
 	google.golang.org/grpc v1.65.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.4.0
 	google.golang.org/protobuf v1.34.2
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.2
@@ -215,7 +216,6 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.4.6 // indirect
 	mvdan.cc/gofumpt v0.5.0 // indirect
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
