@@ -47,9 +47,13 @@ func (m *RawJSON) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (m RawJSON) IsNil() bool {
+	return m == nil || (string)(m) == "null"
+}
+
 func (m RawJSON) Value() driver.Value {
 	// Ensure null goes to a null value in the DB (not the string "null")
-	if m == nil || (string)(m) == "null" {
+	if m.IsNil() {
 		return nil
 	}
 	return (string)(m)

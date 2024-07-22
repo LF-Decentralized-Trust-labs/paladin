@@ -48,4 +48,9 @@ func TestInt64Field(t *testing.T) {
 	iFalse, err := Int64Field("test").SQLValue(ctx, (types.RawJSON)(`false`))
 	assert.NoError(t, err)
 	assert.Equal(t, (int64)(0), iFalse)
+
+	nv, err := Int64Field("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	assert.NoError(t, err)
+	assert.Nil(t, nv)
+
 }

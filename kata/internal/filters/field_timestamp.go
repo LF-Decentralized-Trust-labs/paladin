@@ -30,7 +30,14 @@ func (sf TimestampField) SQLColumn() string {
 	return (string)(sf)
 }
 
+func (sf TimestampField) SupportsLIKE() bool {
+	return false
+}
+
 func (sf TimestampField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+	if jsonValue.IsNil() {
+		return nil, nil
+	}
 	var timestamp types.Timestamp
 	err := json.Unmarshal(jsonValue, &timestamp)
 	return int64(timestamp), err

@@ -33,7 +33,14 @@ func (sf Int64BoolField) SQLColumn() string {
 	return (string)(sf)
 }
 
+func (sf Int64BoolField) SupportsLIKE() bool {
+	return false
+}
+
 func (sf Int64BoolField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+	if jsonValue.IsNil() {
+		return nil, nil
+	}
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {

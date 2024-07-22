@@ -68,4 +68,8 @@ func TestInt256Field(t *testing.T) {
 	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vZero.(string)))
 	assert.Equal(t, 1, strings.Compare(vBigPos.(string), vSmallPos.(string)))
 
+	nv, err := Int256Field("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	assert.NoError(t, err)
+	assert.Nil(t, nv)
+
 }

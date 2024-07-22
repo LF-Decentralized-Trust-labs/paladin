@@ -33,4 +33,9 @@ func TestBoolField(t *testing.T) {
 
 	_, err = Int64BoolField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010604", err)
+
+	nv, err := Int64BoolField("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	assert.NoError(t, err)
+	assert.Nil(t, nv)
+
 }

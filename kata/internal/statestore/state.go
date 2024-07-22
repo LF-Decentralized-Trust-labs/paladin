@@ -139,7 +139,7 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 
 	// Build the query
 	db := ss.p.DB()
-	q := query.Build(ctx, db.Table("states"), tracker)
+	q := query.BuildGORM(ctx, db.Table("states"), tracker)
 	if q.Error != nil {
 		return nil, q.Error
 	}

@@ -49,4 +49,8 @@ func TestUint256Field(t *testing.T) {
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 64)
 
+	nv, err := Uint256Field("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	assert.NoError(t, err)
+	assert.Nil(t, nv)
+
 }

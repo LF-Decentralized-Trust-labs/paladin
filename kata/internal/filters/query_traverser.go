@@ -30,7 +30,7 @@ import (
 type Traverser[T any] interface {
 	Result() T
 	NewRoot() Traverser[T]
-	HasError() error
+	Error() error
 	WithError(err error) Traverser[T]
 	Limit(l int) Traverser[T]
 	Order(f string) Traverser[T]
@@ -50,6 +50,7 @@ var allMods = []string{"not", "caseInsensitive"}
 var justCaseInsensitive = []string{"caseInsensitive"}
 
 type FieldResolver interface {
+	SupportsLIKE() bool
 	SQLColumn() string
 	SQLValue(ctx context.Context, v types.RawJSON) (driver.Value, error)
 }
@@ -68,35 +69,35 @@ func (fm FieldMap) ResolverFor(fieldName string) FieldResolver {
 	return fm[fieldName]
 }
 
-type queryBuilder[T any] struct {
+type queryTraverser[T any] struct {
 	ctx        context.Context
 	jsonFilter *QueryJSON
 	fieldSet   FieldSet
 }
 
-func (qb *queryBuilder[T]) build(t Traverser[T]) Traverser[T] {
-	jf := qb.jsonFilter
+func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
+	jf := qt.jsonFilter
 	if jf.Limit != nil && *jf.Limit > 0 {
 		t = t.Limit(*jf.Limit)
 	}
 	for _, s := range jf.Sort {
-		tSortField, err := qb.resolveSortField(s)
+		tSortField, err := qt.resolveSortField(s)
 		if err != nil {
 			return t.WithError(err)
 		}
 		t = t.Order(tSortField)
 	}
-	return qb.BuildAndFilter(t, &jf.FilterJSON)
+	return qt.BuildAndFilter(t, &jf.FilterJSON)
 }
 
-func (qb *queryBuilder[T]) resolveSortField(fieldName string) (string, error) {
+func (qt *queryTraverser[T]) resolveSortField(fieldName string) (string, error) {
 	direction := "asc"
 	startEnd := strings.SplitN(fieldName, " ", 2)
 	fieldName, isNegated := strings.CutPrefix(startEnd[0], "-")
 	if isNegated || (len(startEnd) == 2 && strings.EqualFold(startEnd[1], "desc")) {
 		direction = "desc"
 	}
-	field, err := resolveField(qb.ctx, qb.fieldSet, fieldName)
+	field, err := resolveField(qt.ctx, qt.fieldSet, fieldName)
 	if err != nil {
 		return "", err
 	}
@@ -148,23 +149,26 @@ func resolveFieldAndValues(ctx context.Context, fieldSet FieldSet, fieldName str
 	return field, values, nil
 }
 
-func (qb *queryBuilder[T]) addSimpleFilters(t Traverser[T], jf *FilterJSON) Traverser[T] {
+func (qt *queryTraverser[T]) addSimpleFilters(t Traverser[T], jf *FilterJSON) Traverser[T] {
 	for _, e := range joinShortNames(jf.Equal, jf.Eq, jf.NEq) {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
 		}
 		t = t.IsEqual(e, e.Field, field, testValue)
 	}
 	for _, e := range jf.Like {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
+		}
+		if !field.SupportsLIKE() {
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersFieldTypeDoesNotSupportLike, field))
 		}
 		t = t.IsLike(e, e.Field, field, testValue)
 	}
 	for _, e := range jf.Null {
-		field, err := resolveField(qb.ctx, qb.fieldSet, e.Field)
+		field, err := resolveField(qt.ctx, qt.fieldSet, e.Field)
 		if err != nil {
 			return t.WithError(err)
 		}
@@ -196,67 +200,67 @@ func joinInAndNin(in, nin []*FilterJSONKeyValues) []*FilterJSONKeyValues {
 	return res
 }
 
-func (qb *queryBuilder[T]) BuildAndFilter(t Traverser[T], jf *FilterJSON) Traverser[T] {
+func (qt *queryTraverser[T]) BuildAndFilter(t Traverser[T], jf *FilterJSON) Traverser[T] {
 	t = t.NewRoot()
-	t = qb.addSimpleFilters(t, jf)
-	if t.HasError() != nil {
+	t = qt.addSimpleFilters(t, jf)
+	if t.Error() != nil {
 		return t
 	}
 	for _, e := range joinShortNames(jf.LessThan, jf.LT, nil) {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
 		}
 		if e.CaseInsensitive || e.Not {
-			return t.WithError(i18n.NewError(qb.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "lessThan", allMods))
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "lessThan", allMods))
 		}
 		t = t.IsLessThan(e, e.Field, field, testValue)
 	}
 	for _, e := range joinShortNames(jf.LessThanOrEqual, jf.LTE, nil) {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
 		}
 		if e.CaseInsensitive || e.Not {
-			return t.WithError(i18n.NewError(qb.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "lessThanOrEqual", allMods))
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "lessThanOrEqual", allMods))
 		}
 		t = t.IsLessThanOrEqual(e, e.Field, field, testValue)
 	}
 	for _, e := range joinShortNames(jf.GreaterThan, jf.GT, nil) {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
 		}
 		if e.CaseInsensitive || e.Not {
-			return t.WithError(i18n.NewError(qb.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "greaterThan", allMods))
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "greaterThan", allMods))
 		}
 		t = t.IsGreaterThan(e, e.Field, field, testValue)
 	}
 	for _, e := range joinShortNames(jf.GreaterThanOrEqual, jf.GTE, nil) {
-		field, testValue, err := resolveFieldAndValue(qb.ctx, qb.fieldSet, e.Field, e.Value)
+		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
 			return t.WithError(err)
 		}
 		if e.CaseInsensitive || e.Not {
-			return t.WithError(i18n.NewError(qb.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "greaterThanOrEqual", allMods))
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "greaterThanOrEqual", allMods))
 		}
 		t = t.IsGreaterThanOrEqual(e, e.Field, field, testValue)
 	}
 	for _, e := range joinInAndNin(jf.In, jf.NIn) {
-		field, testValues, err := resolveFieldAndValues(qb.ctx, qb.fieldSet, e.Field, e.Values)
+		field, testValues, err := resolveFieldAndValues(qt.ctx, qt.fieldSet, e.Field, e.Values)
 		if err != nil {
 			return t.WithError(err)
 		}
 		if e.CaseInsensitive {
-			return t.WithError(i18n.NewError(qb.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "in", justCaseInsensitive))
+			return t.WithError(i18n.NewError(qt.ctx, msgs.MsgFiltersJSONQueryOpUnsupportedMod, "in", justCaseInsensitive))
 		}
 		t = t.IsIn(e, e.Field, field, testValues)
 	}
 	if len(jf.Or) > 0 {
 		ors := t.NewRoot()
 		for _, child := range jf.Or {
-			sub := qb.BuildAndFilter(t, child)
-			if sub.HasError() != nil {
+			sub := qt.BuildAndFilter(t, child)
+			if sub.Error() != nil {
 				return sub
 			}
 			ors = ors.Or(sub.Result())

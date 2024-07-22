@@ -17,10 +17,7 @@
 package filters
 
 import (
-	"context"
-
 	"github.com/kaleido-io/paladin/kata/internal/types"
-	"gorm.io/gorm"
 )
 
 type QueryJSON struct {
@@ -79,21 +76,4 @@ type FilterJSONOps struct {
 	In                 []*FilterJSONKeyValues `json:"in,omitempty"`
 	NIn                []*FilterJSONKeyValues `json:"nin,omitempty"` // negated short name
 	Null               []*FilterJSONBase      `json:"null,omitempty"`
-}
-
-func (qj *QueryJSON) Build(ctx context.Context, db *gorm.DB, fieldSet FieldSet) *gorm.DB {
-	gt := &gormTraverser{
-		// We can't assume anything about the db passed in - if it's a clone (internal concept
-		// in GORM I can't work out how to detect), then it will aggregate WHERE clauses
-		// and cause us to do all kinds of wonky nesting.
-		// So use this function to get a clean session to do our nested db.Where() clauses against.
-		rootDB: db.Session(&gorm.Session{SkipDefaultTransaction: true}),
-		db:     db,
-	}
-	qb := &queryBuilder[*gormTraverser]{
-		ctx:        ctx,
-		jsonFilter: qj,
-		fieldSet:   fieldSet,
-	}
-	return qb.build(gt).Result().db
 }

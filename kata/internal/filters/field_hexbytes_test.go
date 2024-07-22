@@ -42,4 +42,8 @@ func TestHexBytesField(t *testing.T) {
 	assert.Equal(t, "aabbccdd", v)
 	assert.Equal(t, "test", HexBytesField("test").SQLColumn())
 
+	nv, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	assert.NoError(t, err)
+	assert.Nil(t, nv)
+
 }

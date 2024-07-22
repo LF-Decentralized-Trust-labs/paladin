@@ -95,6 +95,7 @@ var (
 	MsgFiltersUnexpectedResolvedValueType = ffe("PD010613", "Value type '%T' mismatched from compare type '%T'")
 	MsgFiltersLikeNotSupportedForIntValue = ffe("PD010614", "LIKE operation not supported for int64 stored values")
 	MsgFiltersLikeConversionToRegexpFail  = ffe("PD010615", "Failed to convert LIKE string '%s' to regexp: %s")
+	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010616", "Field does not support LIKE comparison (%T)")
 
 	// HTTPServer PD0107XX
 	MsgHTTPServerStartFailed        = ffe("PD010700", "Failed to start server on '%s'")

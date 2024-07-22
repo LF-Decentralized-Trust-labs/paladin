@@ -31,7 +31,14 @@ func (sf Uint256Field) SQLColumn() string {
 	return (string)(sf)
 }
 
+func (sf Uint256Field) SupportsLIKE() bool {
+	return false
+}
+
 func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+	if jsonValue.IsNil() {
+		return nil, nil
+	}
 	var jsonResult interface{}
 	err := json.Unmarshal(jsonValue, &jsonResult)
 	if err != nil {

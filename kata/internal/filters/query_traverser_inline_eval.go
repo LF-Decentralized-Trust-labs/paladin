@@ -14,9 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build NOT_READY_YET
-// +build NOT_READY_YET
-
 package filters
 
 import (
@@ -31,25 +28,64 @@ import (
 )
 
 type ValueSet interface {
-	GetValue(fieldName string) types.RawJSON
+	// Implementation can choose whether it holds the SQL final value, or does the resolve on demand.
+	// Result needs to be exactly as it would have been if passed through the resolver.
+	// This includes handling of SQL NULL
+	GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error)
+}
+
+type SimpleValueSet map[string]types.RawJSON
+
+func (vs SimpleValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
+	val, err := resolver.SQLValue(ctx, vs[fieldName])
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+func (qj *QueryJSON) Eval(ctx context.Context, fieldSet FieldSet, valueSet ValueSet) (bool, error) {
+	eval := &inlineEval{
+		inlineEvalRoot: &inlineEvalRoot{
+			ctx:      ctx,
+			valueSet: valueSet,
+			convertLike: func(s string, caseInsensitive bool) (*regexp.Regexp, error) {
+				// Use \ escaped LIKE conversion
+				return sqlLikeToRegexp(s, caseInsensitive, '\\')
+			},
+		},
+		matches: true,
+	}
+	qt := &queryTraverser[*inlineEval]{
+		ctx:        ctx,
+		jsonFilter: qj,
+		fieldSet:   fieldSet,
+	}
+	res := qt.traverse(eval).Result()
+	return res.matches, res.err
+}
+
+type inlineEvalRoot struct {
+	ctx         context.Context
+	valueSet    ValueSet
+	convertLike func(s string, caseInsensitive bool) (*regexp.Regexp, error)
 }
 
 type inlineEval struct {
-	ctx      context.Context
-	valueSet ValueSet
-	matches  bool
-	err      error
+	*inlineEvalRoot
+	matches bool
+	err     error
 }
 
 func (t *inlineEval) NewRoot() Traverser[*inlineEval] {
-	return &inlineEval{ctx: t.ctx, valueSet: t.valueSet, matches: true}
+	return &inlineEval{inlineEvalRoot: t.inlineEvalRoot, matches: true}
 }
 
 func (t *inlineEval) Result() *inlineEval {
 	return t
 }
 
-func (t *inlineEval) HasError() error {
+func (t *inlineEval) Error() error {
 	return t.err
 }
 
@@ -90,28 +126,33 @@ func (t *inlineEval) doCompare(e *FilterJSONBase, fieldName string, field FieldR
 	compareInt64 func(s1, s2 int64) bool,
 ) *inlineEval {
 	// Get the actual value to compare against
-	actualValue, err := field.SQLValue(t.ctx, t.valueSet.GetValue(fieldName))
+	actualValue, err := t.valueSet.GetValue(t.ctx, fieldName, field)
 	if err != nil {
 		return t.withError(err)
 	}
-	// Get the value for the test value, to know what type test to perform
 	var valMatches bool
-	switch testValueTyped := testValue.(type) {
-	case string:
-		strValue, ok := actualValue.(string)
-		if !ok {
-			return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedResolvedValueType, actualValue, testValue))
+	if actualValue == nil {
+		// Nil does not match any value - there's a separate nil check operation for that
+		valMatches = false
+	} else {
+		// Get the value for the test value, to know what type test to perform
+		switch testValueTyped := testValue.(type) {
+		case string:
+			strValue, ok := actualValue.(string)
+			if !ok {
+				return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedResolvedValueType, actualValue, testValue))
+			}
+			valMatches = compareStrings(e.CaseInsensitive, strValue, testValueTyped)
+		case int64:
+			int64Value, ok := actualValue.(int64)
+			if !ok {
+				return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedResolvedValueType, actualValue, testValue))
+			}
+			valMatches = compareInt64(int64Value, testValueTyped)
+		default:
+			// We only support a limited number of types from field resolvers as above
+			return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedFieldResolverType, testValue, field))
 		}
-		valMatches = compareStrings(e.CaseInsensitive, strValue, testValueTyped)
-	case int64:
-		int64Value, ok := actualValue.(int64)
-		if !ok {
-			return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedResolvedValueType, actualValue, testValue))
-		}
-		valMatches = compareInt64(int64Value, testValueTyped)
-	default:
-		// We only support a limited number of types from field resolvers as above
-		return t.withError(i18n.NewError(t.ctx, msgs.MsgFiltersUnexpectedFieldResolverType, testValue, field))
 	}
 	if t.err == nil {
 		if e.Not {
@@ -140,73 +181,36 @@ func (t *inlineEval) isEqual(e *FilterJSONBase, fieldName string, field FieldRes
 	)
 }
 
-// We need to support LIKE - simple function to convert a
-// \ escaped SQL LIKE function into a Go regexp for evaluation
-func sqlLikeToRegexp(likeStr string) (*regexp.Regexp, error) {
-	buff := new(strings.Builder)
-	lastChar := rune(0)
-	buff.WriteRune('^')
-	for _, c := range likeStr {
-		switch c {
-		case '\\': // escape not currently configurable
-			if lastChar == '\\' {
-				// Double escape to get an escape char in the output
-				buff.WriteRune('\\')
-				buff.WriteRune('\\')
-			}
-		case '.', '^', '$', '*', '+', '-', '?', '(', ')', '[', ']', '{', '}', '|':
-			// Escape this char in the regexp
-			buff.WriteRune('\\')
-			buff.WriteRune(c)
-		case '_':
-			if lastChar == '\\' {
-				// This was escaped in the source
-				buff.WriteRune('_')
-			} else {
-				// Match a single character
-				buff.WriteRune('.')
-			}
-		case '%':
-			if lastChar == '\\' {
-				// This was escaped in the source
-				buff.WriteRune('%')
-			} else {
-				// Do a lazy match
-				buff.WriteString(".*?")
-			}
-		default:
-			// Plain old character
-			buff.WriteRune(c)
-		}
-		lastChar = c
-	}
-	buff.WriteRune('$')
-	return regexp.Compile(likeStr)
-}
-
 func (t *inlineEval) IsLike(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
 	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
-			re, err := sqlLikeToRegexp(s2)
+			re, err := t.convertLike(s2, caseInsensitive)
 			if err != nil {
+				// Unexpected as we should handle all cases
 				_ = t.WithError(i18n.NewError(t.ctx, msgs.MsgFiltersLikeConversionToRegexpFail, s2, err))
 				return false
 			}
 			return re.MatchString(s1)
 		},
-		func(s1, s2 int64) bool {
-			_ = t.WithError(i18n.NewError(t.ctx, msgs.MsgFiltersLikeNotSupportedForIntValue))
-			return false
-		},
+		t.int64LikeNotSupported,
 	)
+}
+
+func (t *inlineEval) int64LikeNotSupported(s1, s2 int64) bool {
+	_ = t.WithError(i18n.NewError(t.ctx, msgs.MsgFiltersLikeNotSupportedForIntValue))
+	return false
 }
 
 func (t *inlineEval) IsNull(e *FilterJSONBase, fieldName string, field FieldResolver) Traverser[*inlineEval] {
 	var valMatches bool
+	actualValue, err := t.valueSet.GetValue(t.ctx, fieldName, field)
+	if err != nil {
+		return t.withError(err)
+	}
 	if e.Not {
-		valMatches = t.valueSet.GetValue(fieldName) != nil
+		valMatches = actualValue != nil
 	} else {
-		valMatches = t.valueSet.GetValue(fieldName) == nil
+		valMatches = actualValue == nil
 	}
 	t.matches = t.matches && valMatches
 	return t
@@ -257,9 +261,13 @@ func (t *inlineEval) IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName strin
 }
 
 func (t *inlineEval) IsIn(e *FilterJSONKeyValues, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[*inlineEval] {
-	isIn := true
+	// Do not negate the check in the individual compares
+	withoutNegate := e.FilterJSONBase
+	withoutNegate.Not = false
+
+	isIn := false
 	for _, v := range testValues {
-		comp := t.NewRoot().Result().isEqual(&e.FilterJSONBase, fieldName, field, v)
+		comp := t.NewRoot().Result().isEqual(&withoutNegate, fieldName, field, v)
 		if comp.err != nil {
 			return t.withError(comp.Result().err)
 		}

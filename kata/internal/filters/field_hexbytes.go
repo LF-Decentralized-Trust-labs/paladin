@@ -34,7 +34,14 @@ func (sf HexBytesField) SQLColumn() string {
 	return (string)(sf)
 }
 
+func (sf HexBytesField) SupportsLIKE() bool {
+	return false
+}
+
 func (sf HexBytesField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+	if jsonValue.IsNil() {
+		return nil, nil
+	}
 	var untyped interface{}
 	err := json.Unmarshal(jsonValue, &untyped)
 	if err != nil {
