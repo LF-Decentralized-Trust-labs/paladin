@@ -21,6 +21,7 @@ ext {
     //       build file, or what the above commentor meant by component tests...
     //       there's no task labelled that in this build file)
     targetCoverage = 84
+    maxCoverageBarGap = 1
 }
 
 task installTools(type:Exec) {
@@ -225,8 +226,8 @@ task checkCoverage(dependsOn: [tasks.testRunSQLite, tasks.testRunPostgres]) {
         println "Coverage is ${totalCoverage}%"
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
             throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
-        } else if ( totalCoverage.toFloat() - targetCoverage > 2) {
-            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than 1%, please update the targetCoverage value in ./kata/build.gradle file")
+        } else if ( totalCoverage.toFloat() - targetCoverage > maxCoverageBarGap) {
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./kata/build.gradle file")
         } else {
             println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
         }
