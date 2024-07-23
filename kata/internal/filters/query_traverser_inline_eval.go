@@ -149,6 +149,7 @@ func (t *inlineEval) doCompare(e *FilterJSONBase, fieldName string, field FieldR
 		valMatches = false
 	} else {
 		// Get the value for the test value, to know what type test to perform
+		// REMEMBER - if you update this function you must update BuildQueryCompareLessFunc() too
 		switch testValueTyped := testValue.(type) {
 		case string:
 			strValue, ok := actualValue.(string)
