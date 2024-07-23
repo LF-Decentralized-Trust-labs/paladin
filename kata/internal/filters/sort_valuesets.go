@@ -40,27 +40,27 @@ func (s *ValueSetSorter[T]) Swap(i, j int)      { s.Values[i], s.Values[j] = s.V
 func (s *ValueSetSorter[T]) Less(i, j int) bool { return s.LessFunc(s.Values[i], s.Values[j]) }
 func (s *ValueSetSorter[T]) SetError(err error) { s.Error = err }
 
-func SortedValueSetCopy[T WithValueSet](ctx context.Context, query *QueryJSON, fieldSet FieldSet, defaultSortField string, values []T) ([]T, error) {
+func SortedValueSetCopy[T WithValueSet](ctx context.Context, fieldSet FieldSet, values []T, sortInstructions ...string) ([]T, error) {
 	valuesCopy := make([]T, len(values))
 	copy(valuesCopy, values)
 
-	sorter, err := NewValueSetSorter(ctx, query, fieldSet, defaultSortField, valuesCopy)
+	sorter, err := NewValueSetSorter(ctx, fieldSet, valuesCopy, sortInstructions...)
 	if err != nil {
 		return nil, err
 	}
 
 	sort.Sort(sorter)
-	if sorter.Error != nil {
+	err = sorter.Error
+	if err != nil {
 		return nil, err
 	}
 	return valuesCopy, nil
 }
 
-func NewValueSetSorter[T WithValueSet](ctx context.Context, query *QueryJSON, fieldSet FieldSet, defaultSortField string, values []T) (*ValueSetSorter[T], error) {
+func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, values []T, sortInstructions ...string) (*ValueSetSorter[T], error) {
 
-	sortInstructions := query.Sort
 	if len(sortInstructions) == 0 {
-		sortInstructions = []string{defaultSortField}
+		return nil, i18n.NewError(ctx, msgs.MsgFiltersMissingSortField)
 	}
 	sortFields := make([]*sortField, len(sortInstructions))
 	for i, s := range sortInstructions {
