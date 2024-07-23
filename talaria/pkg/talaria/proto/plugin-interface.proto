@@ -16,7 +16,7 @@
 syntax = "proto3";
 
 package protos.PluginInterface;
-option go_package = "protos/PluginInterface";
+option go_package = "pkg/talaria/proto";
 
 service PluginInterface {
   rpc PluginMessageFlow(stream PaladinMessage) returns (stream PaladinMessage) {}
