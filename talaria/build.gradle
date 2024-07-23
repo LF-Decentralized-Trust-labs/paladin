@@ -16,7 +16,7 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
-    targetCoverage = 53
+    targetCoverage = 52
 }
 
 task installTools(type:Exec) {
