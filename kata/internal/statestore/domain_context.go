@@ -50,7 +50,7 @@ type DomainStateInterface interface {
 	// 2) We deliberately return states that are locked to a sequence (but not spent yet) - which means the
 	//    result of the any assemble that uses those states, will be a transaction that must
 	//    be on the same sequence where those states are locked.
-	FindAvailableStates(schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error)
+	FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*State, err error)
 	// MarkStatesSpending writes a lock record so the state is now locked for spending, and
 	// thus subsequent calls to FindAvailableStates will not return these states.
 	MarkStatesSpending(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
@@ -222,7 +222,7 @@ func (dc *domainContext) mergedUnFlushed(states []*State, query *filters.QueryJS
 	return append(states, matches...), nil
 }
 
-func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
+func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*State, err error) {
 
 	// Build a list of excluded states
 	excluded, err := dc.getUnFlushedSpending()
