@@ -45,7 +45,7 @@ var StateWriterConfigDefaults = StateWriterConfig{
 
 type StateStore interface {
 	RPCModule() *rpcserver.RPCModule
-	RunInDomainContext(domainID string, fn func(ctx context.Context, dsi DomainStateInterface) error) error
+	RunInDomainContext(domainID string, fn DomainContextFunction) error
 	Close()
 }
 
@@ -68,6 +68,7 @@ func NewStateStore(ctx context.Context, conf *Config, p persistence.Persistence)
 	ss := &stateStore{
 		p:              p,
 		abiSchemaCache: cache.NewCache[string, SchemaCommon](&conf.SchemaCache, SchemaCacheDefaults),
+		domainContexts: make(map[string]*domainContext),
 	}
 	ss.bgCtx, ss.cancelCtx = context.WithCancel(ctx)
 	ss.writer = newStateWriter(ctx, ss, &conf.StateWriter)

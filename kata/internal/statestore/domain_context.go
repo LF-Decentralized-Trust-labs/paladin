@@ -29,6 +29,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
+type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) error
+
 // The DSI is the state interface that is exposed outside of the statestore package, for the
 // transaction engine to use to safely query and update the state in the context of a particular
 // domain.
@@ -76,7 +78,11 @@ type DomainStateInterface interface {
 	// that happens after the error occurs, and the unFlushed state will be cleared at that point.
 	//
 	// This reverts the domain back in the same way as a crash-restart.
-	Flush() error
+	//
+	// Callback is invoked ONLY on a successful flush, asynchronously on the Domain Context.
+	// So if supplied, the caller must not rely on it being called, and must not block holding the
+	// domain context until it is called.
+	Flush(successCallback ...DomainContextFunction) error
 }
 
 type domainContext struct {
@@ -90,7 +96,7 @@ type domainContext struct {
 	flushed   chan error
 }
 
-func (ss *stateStore) RunInDomainContext(domainID string, fn func(ctx context.Context, dsi DomainStateInterface) error) error {
+func (ss *stateStore) RunInDomainContext(domainID string, fn DomainContextFunction) error {
 	return ss.getDomainContext(domainID).run(fn)
 }
 
@@ -177,9 +183,11 @@ func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
 			spendLocks = append(spendLocks, &hashIDOnly{HashID: l.State})
 		}
 	}
-	for _, l := range dc.flushing.stateLocks {
-		if l.Spending {
-			spendLocks = append(spendLocks, &hashIDOnly{HashID: l.State})
+	if dc.flushing != nil {
+		for _, l := range dc.flushing.stateLocks {
+			if l.Spending {
+				spendLocks = append(spendLocks, &hashIDOnly{HashID: l.State})
+			}
 		}
 	}
 	return spendLocks, nil
@@ -378,7 +386,7 @@ func (dc *domainContext) ResetSequence(sequenceID uuid.UUID) error {
 	return nil
 }
 
-func (dc *domainContext) Flush() error {
+func (dc *domainContext) Flush(successCallbacks ...DomainContextFunction) error {
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
 
@@ -398,13 +406,20 @@ func (dc *domainContext) Flush() error {
 	dc.unFlushed = dc.ss.writer.newWriteOp(dc.domainID)
 
 	// We pass the vars directly to the routine, so the routine does not need the lock
-	go dc.flushOp(dc.flushing, dc.flushed)
+	go dc.flushOp(dc.flushing, dc.flushed, successCallbacks...)
 	return nil
 }
 
 // flushOp MUST NOT take the stateLock
-func (dc *domainContext) flushOp(op *writeOperation, flushed chan error) {
-	flushed <- op.flush(dc.ctx)
+func (dc *domainContext) flushOp(op *writeOperation, flushed chan error, successCallbacks ...DomainContextFunction) {
+	dc.ss.writer.queue(dc.ctx, op)
+	err := op.flush(dc.ctx)
+	flushed <- err
+	if err == nil {
+		for _, cb := range successCallbacks {
+			go dc.run(cb)
+		}
+	}
 }
 
 // handleFlushError MUST be called holding the lock
