@@ -124,6 +124,34 @@ task buildSharedLibrary(type:Exec) {
     args 'kata.go'
 }
 
+task buildTestPluginsSharedLibraries(type:Exec) {
+    workingDir '.'
+
+    def libName;
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        libName = "transportA.dll"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        libName = "transportA.so"
+    } else {
+        libName = "libtransportA.so"
+    }
+
+    dependsOn tasks.clean
+    dependsOn tasks.goGet
+    dependsOn tasks.lint
+    inputs.files(fileTree("${projectDir}").matching {
+        include "test/plugins/transport/*.go"
+    })
+    outputs.files([libName, 'libtransportA.h'])
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', libName
+    args '-buildmode=plugin'
+    args 'test/plugins/transport/main.go'
+}
 class DockerCompose extends Exec {
     DockerCompose() {
         def dockerComposeV2Check = getProject().exec({
@@ -184,6 +212,7 @@ task testRunSQLite(type: Exec) {
     workingDir '.'
 
     dependsOn tasks.goGet
+    dependsOn buildTestPluginsSharedLibraries
 
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.go"
@@ -205,6 +234,7 @@ task testRunPostgres(type: Exec) {
 
     dependsOn tasks.goGet
     dependsOn tasks.startDb
+    dependsOn buildTestPluginsSharedLibraries
 
     inputs.files(fileTree("${projectDir}").matching {
         include "**/*.go"

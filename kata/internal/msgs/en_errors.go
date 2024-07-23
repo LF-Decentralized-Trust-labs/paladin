@@ -78,4 +78,7 @@ var (
 	MsgHandlerError            = ffe("PD010601", "Error from message handler")
 	MsgDuplicateSubscription   = ffe("PD010602", "Destination %s already subscribed to topic %s")
 	MsgErrorStoppingGRPCServer = ffe("PD010603", "Error stopping GRPC server")
+
+	// Plugin registry PD0107XX
+	MsgPluginLoadError = ffe("PD010700", "Failed to load plugin %s with binding %s from %s")
 )
