@@ -225,7 +225,7 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID) error {
+func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID, minting, spending bool) error {
 	hash, err := ParseHashID(ctx, stateID)
 	if err != nil {
 		return err
@@ -233,7 +233,7 @@ func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, 
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateLocks = []*StateLock{
-		{State: *hash, Sequence: sequenceID},
+		{State: *hash, Sequence: sequenceID, Minting: minting, Spending: spending},
 	}
 
 	ss.writer.queue(ctx, op)

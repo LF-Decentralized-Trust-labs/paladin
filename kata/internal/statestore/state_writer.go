@@ -239,7 +239,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
 					DoNothing: true, // immutable
 				}).
-				Omit("Labels", "Int64Labels"). // we do this ourselves below
+				Omit("Labels", "Int64Labels", "Confirmed", "Spent", "Locked"). // we do this ourselves below
 				Create(states).
 				Error
 		}

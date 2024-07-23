@@ -44,8 +44,10 @@ type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) e
 // We can then continue to build the next set of flushable operations, while the first set is
 // still flushing (a simple pipeline approach).
 type DomainStateInterface interface {
+
 	// EnsureABISchema is expected to be called on startup with all schemas required for operation of the domain
 	EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error)
+
 	// FindAvailableStates is the main query function, only returning states that are available.
 	// Note this does not lock these states in any way, you must call that afterwards as:
 	// 1) We don't know which will be selected as important by the domain - some might be un-used
@@ -53,21 +55,26 @@ type DomainStateInterface interface {
 	//    result of the any assemble that uses those states, will be a transaction that must
 	//    be on the same sequence where those states are locked.
 	FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*State, err error)
+
 	// MarkStatesSpending writes a lock record so the state is now locked for spending, and
 	// thus subsequent calls to FindAvailableStates will not return these states.
 	MarkStatesSpending(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
+
 	// MarkStatesRead writes a lock record so the state is now locked to this sequence
 	// for reading - thus subsequent calls to FindAvailableStates will return these states
 	// with the lock record attached.
 	// That will inform them they need to join to this sequence if they wish to use those states.
 	MarkStatesRead(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
+
 	// WriteNewStates creates new states that are locked for reading to the specified sequence from creation.
 	// They are available immediately within the domain for return in FindAvailableStates
 	// (even before the flush)
 	WriteNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (s []*State, err error)
+
 	// DeleteSequence queues up removal of all lock records for a given sequence
 	// Note that the private data of the states themselves are not removed
 	ResetSequence(sequenceID uuid.UUID) error
+
 	// Flush moves the un-flushed set into flushing status, queueing to a DB writer to batch write
 	// to the database.
 	// Subsequent calls to the DMI will add to a new un-flushed set.
@@ -83,7 +90,9 @@ type DomainStateInterface interface {
 	// So if supplied, the caller must not rely on it being called, and must not block holding the
 	// domain context until it is called.
 	Flush(successCallback ...DomainContextFunction) error
-	// Intended only to support convenient unit testing
+
+	// Intended only to support convenient unit testing (blocks the calling routine until the flush
+	// has completed, and returns any error synchronously)
 	UnitTestFlushSync() error
 }
 
@@ -278,7 +287,6 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	}
 
 	// Run the query against the DB
-	// TODO: Need to change what "available" means based on locked-for-spend semantics
 	schema, states, err := dc.ss.findStates(dc.ctx, dc.domainID, schemaID, query, StateStatusAvailable, excluded...)
 	if err != nil {
 		return nil, err
@@ -314,13 +322,14 @@ func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, d
 
 	// This is a new state, so we don't check existing un-flushed records
 	for _, s := range withValues {
-		dc.unFlushed.states = append(dc.unFlushed.states, s)
-		dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, &StateLock{
+		s.Locked = &StateLock{
 			Sequence: sequenceID,
 			State:    s.State.Hash,
 			Minting:  true,
 			Spending: false,
-		})
+		}
+		dc.unFlushed.states = append(dc.unFlushed.states, s)
+		dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, s.Locked)
 	}
 	return states, nil
 }

@@ -151,8 +151,8 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{}`, StateStatusSpent, 0)           // added 0
 	checkQuery(`{}`, seqQual)                       // unchanged
 
-	// lock a confirmed one
-	err = ss.MarkLocked(ctx, "domain1", widgets[1].Hash.String(), seqID)
+	// lock a confirmed one for spending
+	err = ss.MarkLocked(ctx, "domain1", widgets[1].Hash.String(), seqID, false, true)
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
@@ -163,8 +163,8 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{}`, StateStatusSpent, 0)           // added 0
 	checkQuery(`{}`, seqQual, 1)                    // added 1
 
-	// lock the unconfirmed one
-	err = ss.MarkLocked(ctx, "domain1", widgets[3].Hash.String(), seqID)
+	// lock the unconfirmed one for spending
+	err = ss.MarkLocked(ctx, "domain1", widgets[3].Hash.String(), seqID, false, true)
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
