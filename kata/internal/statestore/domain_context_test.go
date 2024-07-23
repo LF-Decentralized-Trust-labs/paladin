@@ -26,6 +26,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -182,7 +183,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		err = dsi.UnitTestFlushSync()
 		assert.NoError(t, err)
 
-		// Check the final state is what we expect
+		// Check the DB persisted state is what we expect
 		states, err = dsi.FindAvailableStates(schemaHash, toQuery(t, `{
 			"sort": [ "owner", "amount" ]
 		}`))
@@ -192,8 +193,238 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(35), parseFakeCoin(t, states[1]).Amount.Int64())
 		assert.Equal(t, int64(100), parseFakeCoin(t, states[2]).Amount.Int64())
 
+		// Write another transaction that splits a coin to two
+		err = dsi.MarkStatesSpending(sequenceIDs[0], schemaHash, []string{
+			states[0].Hash.String(), // 50
+		})
+		assert.NoError(t, err)
+		tx3states, err := dsi.WriteNewStates(sequenceIDs[0], schemaHash, []types.RawJSON{
+			types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))),
+			types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))),
+		})
+		assert.NoError(t, err)
+		assert.Len(t, tx3states, 2)
+
+		// Now check that we merge the DB and in-memory state
+		states, err = dsi.FindAvailableStates(schemaHash, toQuery(t, `{
+					"sort": [ "owner", "amount" ]
+				}`))
+		assert.NoError(t, err)
+		assert.Len(t, states, 4)
+		assert.Equal(t, int64(20), parseFakeCoin(t, states[0]).Amount.Int64())
+		assert.Equal(t, int64(30), parseFakeCoin(t, states[1]).Amount.Int64())
+		assert.Equal(t, int64(35), parseFakeCoin(t, states[2]).Amount.Int64())
+		assert.Equal(t, int64(100), parseFakeCoin(t, states[3]).Amount.Int64())
+
+		// Check the limit works too across this
+		states, err = dsi.FindAvailableStates(schemaHash, toQuery(t, `{
+			"limit": 1,
+			"sort": [ "owner", "amount" ]
+		}`))
+		assert.NoError(t, err)
+		assert.Len(t, states, 1)
+		assert.Equal(t, int64(20), parseFakeCoin(t, states[0]).Amount.Int64())
+
 		return nil
 	})
 	assert.NoError(t, err)
 
+}
+
+func TestDSILatch(t *testing.T) {
+
+	_, ss, done := newDBTestStateStore(t)
+
+	dsi := ss.getDomainContext("domain1")
+	err := dsi.takeLatch()
+	assert.NoError(t, err)
+
+	done()
+	err = dsi.run(func(ctx context.Context, dsi DomainStateInterface) error { return nil })
+	assert.Regexp(t, "FF00154", err)
+
+}
+
+func TestDSIBadSchema(t *testing.T) {
+
+	_, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	err := ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+		_, err := dsi.EnsureABISchemas([]*abi.Parameter{{}})
+		return err
+	})
+	assert.Regexp(t, "PD010114", err)
+
+}
+
+func TestDSIFlushErrorCapture(t *testing.T) {
+
+	_, ss, done := newDBTestStateStore(t)
+	defer done()
+
+	fakeFlushError := func(dc *domainContext) {
+		dc.flushing = &writeOperation{}
+		dc.flushed = make(chan error, 1)
+		dc.flushed <- fmt.Errorf("pop")
+	}
+
+	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+
+		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
+		assert.NoError(t, err)
+		schemaHash := schemas[0].Hash.String()
+		err = dsi.UnitTestFlushSync()
+		assert.NoError(t, err)
+
+		dc := dsi.(*domainContext)
+
+		fakeFlushError(dc)
+		_, err = dsi.EnsureABISchemas(nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		_, err = dsi.FindAvailableStates("", nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		schema, err := ss.getSchemaByHash(ctx, "domain1", &schemas[0].Hash, true)
+		assert.NoError(t, err)
+		_, err = dc.mergedUnFlushed(schema, nil, nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		_, err = dsi.WriteNewStates(uuid.New(), schemaHash, nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		err = dsi.MarkStatesRead(uuid.New(), schemaHash, nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		err = dsi.MarkStatesSpending(uuid.New(), schemaHash, nil)
+		assert.Regexp(t, "pop", err)
+
+		fakeFlushError(dc)
+		err = dsi.ResetSequence(uuid.New())
+		assert.Regexp(t, "pop", err)
+
+		return nil
+
+	})
+
+}
+
+func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
+
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	schema, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	assert.NoError(t, err)
+
+	dc := ss.getDomainContext("domain1")
+
+	s1, err := schema.ProcessState(ctx, types.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		types.RandHex(32))))
+	assert.NoError(t, err)
+	s1.Locked = &StateLock{State: s1.Hash, Sequence: uuid.New(), Minting: true}
+
+	dc.flushing = &writeOperation{
+		states: []*StateWithLabels{s1},
+		stateLocks: []*StateLock{
+			s1.Locked,
+			{State: *HashIDKeccak(([]byte)("another")), Spending: true},
+		},
+	}
+
+	spending, err := dc.getUnFlushedSpending()
+	assert.NoError(t, err)
+	assert.Len(t, spending, 1)
+
+	states, err := dc.mergedUnFlushed(schema, []*State{}, &filters.QueryJSON{})
+	assert.NoError(t, err)
+	assert.Len(t, states, 1)
+
+}
+
+func TestDSIMergedUnFlushedEvalError(t *testing.T) {
+
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	schema, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	assert.NoError(t, err)
+
+	dc := ss.getDomainContext("domain1")
+
+	s1, err := schema.ProcessState(ctx, types.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		types.RandHex(32))))
+	assert.NoError(t, err)
+
+	dc.flushing = &writeOperation{
+		states: []*StateWithLabels{s1},
+	}
+
+	_, err = dc.mergedUnFlushed(schema, []*State{}, toQuery(t,
+		`{"eq": [{ "field": "wrong", "value": "any" }]}`,
+	))
+	assert.Regexp(t, "PD010700", err)
+
+}
+
+func TestDSIMergedInMemoryMatchesRecoverLabelsFail(t *testing.T) {
+
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	schema, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	assert.NoError(t, err)
+
+	dc := ss.getDomainContext("domain1")
+
+	s1, err := schema.ProcessState(ctx, types.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		types.RandHex(32))))
+	assert.NoError(t, err)
+	s1.Data = types.RawJSON(`! wrong `)
+
+	dc.flushing = &writeOperation{
+		states: []*StateWithLabels{s1},
+	}
+
+	_, err = dc.mergeInMemoryMatches(schema, []*State{
+		s1.State,
+	}, []*StateWithLabels{}, nil)
+	assert.Regexp(t, "PD010116", err)
+
+}
+
+func TestDSIMergedInMemoryMatchesSortFail(t *testing.T) {
+
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	schema, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	assert.NoError(t, err)
+
+	dc := ss.getDomainContext("domain1")
+
+	s1, err := schema.ProcessState(ctx, types.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		types.RandHex(32))))
+	assert.NoError(t, err)
+
+	dc.flushing = &writeOperation{
+		states: []*StateWithLabels{s1},
+	}
+
+	_, err = dc.mergeInMemoryMatches(schema, []*State{
+		s1.State,
+	}, []*StateWithLabels{}, toQuery(t,
+		`{"sort": ["wrong"]}`,
+	))
+	assert.Regexp(t, "PD010700", err)
 }

@@ -205,18 +205,29 @@ func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
 }
 
 func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
+	dc.stateLock.Lock()
+	defer dc.stateLock.Unlock()
+	if flushErr := dc.checkFlushCompletion(false); flushErr != nil {
+		return nil, flushErr
+	}
 
 	// Get the list of new un-flushed states, which are not already locked for spend
+	allUnFlushedStates := dc.unFlushed.states
+	allUnFlushedStateLocks := dc.unFlushed.stateLocks
+	if dc.flushing != nil {
+		allUnFlushedStates = append(allUnFlushedStates, dc.flushing.states...)
+		allUnFlushedStateLocks = append(allUnFlushedStateLocks, dc.flushing.stateLocks...)
+	}
 	matches := make([]*StateWithLabels, 0, len(dc.unFlushed.states))
-	for _, s := range dc.unFlushed.states {
+	for _, s := range allUnFlushedStates {
 		var locked *StateLock
-		for _, l := range dc.unFlushed.stateLocks {
+		for _, l := range allUnFlushedStateLocks {
 			if s.Hash == l.State {
 				locked = l
 				break
 			}
 		}
-		// Cannot return it if i'ts locked for spending already
+		// Cannot return it if it's locked for spending already
 		if locked != nil && locked.Spending {
 			continue
 		}
@@ -245,15 +256,23 @@ func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, q
 func (dc *domainContext) mergeInMemoryMatches(schema SchemaCommon, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
 
 	// Reconstitute the labels for all the loaded states into the front of an aggregate list
-	fullList := make([]*StateWithLabels, len(states)+len(extras))
+	fullList := make([]*StateWithLabels, len(states), len(states)+len(extras))
+	persistedStateHashes := make(map[string]bool)
 	for i, s := range states {
 		if fullList[i], err = schema.RecoverLabels(dc.ctx, s); err != nil {
 			return nil, err
 		}
+		persistedStateHashes[s.Hash.String()] = true
 	}
 
 	// Copy the matches to the end of that same list
-	copy(fullList[len(states):], extras)
+	// However, we can't be certain that some of the states that were in the flushing list, haven't made it
+	// to the DB yet - so we do need to de-dup here.
+	for _, s := range extras {
+		if !persistedStateHashes[s.Hash.String()] {
+			fullList = append(fullList, s)
+		}
+	}
 
 	// Sort it in place
 	sortInstructions := query.Sort
@@ -271,8 +290,8 @@ func (dc *domainContext) mergeInMemoryMatches(schema SchemaCommon, states []*Sta
 		len = *query.Limit
 	}
 	retList := make([]*State, len)
-	for i, fs := range fullList {
-		retList[i] = fs.State
+	for i := 0; i < len; i++ {
+		retList[i] = fullList[i].State
 	}
 	return retList, nil
 
