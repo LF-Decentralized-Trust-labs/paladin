@@ -83,6 +83,8 @@ type DomainStateInterface interface {
 	// So if supplied, the caller must not rely on it being called, and must not block holding the
 	// domain context until it is called.
 	Flush(successCallback ...DomainContextFunction) error
+	// Intended only to support convenient unit testing
+	UnitTestFlushSync() error
 }
 
 type domainContext struct {
@@ -408,6 +410,14 @@ func (dc *domainContext) Flush(successCallbacks ...DomainContextFunction) error 
 	// We pass the vars directly to the routine, so the routine does not need the lock
 	go dc.flushOp(dc.flushing, dc.flushed, successCallbacks...)
 	return nil
+}
+
+func (dc *domainContext) UnitTestFlushSync() error {
+	err := dc.Flush()
+	if err == nil {
+		err = dc.checkFlushCompletion(true)
+	}
+	return err
 }
 
 // flushOp MUST NOT take the stateLock
