@@ -38,7 +38,7 @@ type writeOperation struct {
 	domain              string
 	done                chan error
 	isShutdown          bool
-	states              []*NewState
+	states              []*StateWithLabels
 	stateConfirms       []*StateConfirm
 	stateSpends         []*StateSpend
 	stateLocks          []*StateLock
@@ -201,7 +201,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			schemas = append(schemas, op.schemas...)
 		}
 		for _, s := range op.states {
-			states = append(states, &s.State)
+			states = append(states, s.State)
 			labels = append(labels, s.State.Labels...)
 			int64Labels = append(int64Labels, s.State.Int64Labels...)
 		}

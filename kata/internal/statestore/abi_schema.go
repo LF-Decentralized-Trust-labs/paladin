@@ -34,6 +34,7 @@ import (
 
 type abiSchema struct {
 	*Schema
+	tc          abi.TypeComponent
 	definition  *abi.Parameter
 	primaryType string
 	typeSet     eip712.TypeSet
@@ -96,25 +97,24 @@ func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
 // Build the TypedDataV4 signature of the struct, from the ABI definition
 // Note the "internalType" field of form "struct SomeTypeName" is required for
 // nested tuple types in the ABI.
-func (as *abiSchema) typedDataV4Setup(ctx context.Context, isNew bool) error {
+func (as *abiSchema) typedDataV4Setup(ctx context.Context, isNew bool) (err error) {
 	if as.definition.Type != "tuple" || as.definition.InternalType == "" {
 		return i18n.NewError(ctx, msgs.MsgStateABITypeMustBeTuple)
 	}
-	tc, err := as.definition.TypeComponentTreeCtx(ctx)
-	if err != nil {
+	if as.tc, err = as.definition.TypeComponentTreeCtx(ctx); err != nil {
 		return err
 	}
-	as.primaryType, as.typeSet, err = eip712.ABItoTypedDataV4(ctx, tc)
+	as.primaryType, as.typeSet, err = eip712.ABItoTypedDataV4(ctx, as.tc)
 	if err == nil {
-		err = as.labelSetup(ctx, tc, isNew)
+		err = as.labelSetup(ctx, isNew)
 	}
 	return err
 }
 
-func (as *abiSchema) labelSetup(ctx context.Context, rootTC abi.TypeComponent, isNew bool) error {
+func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
 	labelIndex := 0
 	uniqueMap := map[string]bool{}
-	for i, tc := range rootTC.TupleChildren() {
+	for i, tc := range as.tc.TupleChildren() {
 		p := tc.Parameter()
 		if p.Indexed {
 			if len(p.Name) == 0 {
@@ -266,38 +266,40 @@ func (as *abiSchema) mapLabelResolver(ctx context.Context, sqlColumn string, lab
 	}
 }
 
-// Take the state, parse the value into the type tree of this schema, and from that
-// build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*NewState, error) {
+type parsedStateData struct {
+	jsonTree    interface{}
+	cv          *abi.ComponentValue
+	labels      []*StateLabel
+	int64Labels []*StateInt64Label
+	labelValues filters.PassthroughValueSet
+}
 
-	tc, err := as.definition.TypeComponentTreeCtx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var jsonTree interface{}
-	err = json.Unmarshal([]byte(data), &jsonTree)
+func (as *abiSchema) parseStateData(ctx context.Context, data types.RawJSON) (*parsedStateData, error) {
+	var psd parsedStateData
+	err := json.Unmarshal([]byte(data), &psd.jsonTree)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgStateInvalidValue)
 	}
-	cv, err := tc.ParseExternalCtx(ctx, jsonTree)
+	psd.cv, err = as.tc.ParseExternalCtx(ctx, psd.jsonTree)
 	if err != nil {
 		return nil, err
 	}
 
-	var labels []*StateLabel
-	var int64Labels []*StateInt64Label
+	psd.labelValues = make(filters.PassthroughValueSet)
 	for _, fieldName := range as.Labels {
 		matched := false
-		for _, f := range cv.Children {
+		for _, f := range psd.cv.Children {
 			if f.Component.KeyName() == fieldName {
 				textLabel, int64Label, err := as.buildLabel(ctx, fieldName, f)
 				if err != nil {
 					return nil, err
 				}
 				if textLabel != nil {
-					labels = append(labels, textLabel)
+					psd.labels = append(psd.labels, textLabel)
+					psd.labelValues[textLabel.Label] = textLabel.Value
 				} else {
-					int64Labels = append(int64Labels, int64Label)
+					psd.int64Labels = append(psd.int64Labels, int64Label)
+					psd.labelValues[int64Label.Label] = int64Label.Value
 				}
 				matched = true
 				break
@@ -307,9 +309,20 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*New
 			return nil, i18n.NewError(ctx, msgs.MsgStateLabelFieldMissing, fieldName)
 		}
 	}
+	return &psd, nil
+}
+
+// Take the state, parse the value into the type tree of this schema, and from that
+// build the label values to store in the DB for comparison appropriate to the type.
+func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error) {
+
+	psd, err := as.parseStateData(ctx, data)
+	if err != nil {
+		return nil, err
+	}
 
 	// Now do a typed data v4 hash of the struct value itself
-	hash, err := eip712.HashStruct(ctx, as.primaryType, jsonTree, as.typeSet)
+	hash, err := eip712.HashStruct(ctx, as.primaryType, psd.jsonTree, as.typeSet)
 
 	// We need to re-serialize the data according to the ABI to:
 	// - Ensure it's valid
@@ -322,31 +335,39 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*New
 			SetIntSerializer(abi.Base10StringIntSerializer).
 			SetFloatSerializer(abi.Base10StringFloatSerializer).
 			SetByteSerializer(abi.HexByteSerializer0xPrefix).
-			SerializeJSONCtx(ctx, cv)
+			SerializeJSONCtx(ctx, psd.cv)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	hashID := *NewHashIDSlice32(hash)
-	labelValues := make(filters.PassthroughValueSet)
-	for i, l := range labels {
-		labels[i].State = hashID
-		labelValues[l.Label] = l.Value
+	for i := range psd.labels {
+		psd.labels[i].State = hashID
 	}
-	for i, l := range int64Labels {
-		int64Labels[i].State = hashID
-		labelValues[l.Label] = l.Value
+	for i := range psd.int64Labels {
+		psd.int64Labels[i].State = hashID
 	}
-	return &NewState{
-		State: State{
+	return &StateWithLabels{
+		State: &State{
 			Hash:        hashID,
 			DomainID:    as.DomainID,
 			Schema:      as.Hash,
 			Data:        jsonData,
-			Labels:      labels,
-			Int64Labels: int64Labels,
+			Labels:      psd.labels,
+			Int64Labels: psd.int64Labels,
 		},
-		LabelValues: labelValues,
+		LabelValues: psd.labelValues,
+	}, nil
+}
+
+func (as *abiSchema) RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error) {
+	psd, err := as.parseStateData(ctx, s.Data)
+	if err != nil {
+		return nil, err
+	}
+	return &StateWithLabels{
+		State:       s,
+		LabelValues: psd.labelValues,
 	}, nil
 }

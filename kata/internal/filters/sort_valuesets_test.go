@@ -19,7 +19,6 @@ package filters
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -66,9 +65,6 @@ func TestValueSetSorter2D(t *testing.T) {
 
 	resJSON, err := json.MarshalIndent(sorted, "", "  ")
 	assert.NoError(t, err)
-
-	fmt.Println((string)(resJSON))
-
 	assert.JSONEq(t, `[
 	  {"field1": "AAA", "field2": 300},
 	  {"field1": "EEE", "field2": 600},
@@ -78,6 +74,23 @@ func TestValueSetSorter2D(t *testing.T) {
 	  {"field1": "TTT", "field2": 600},
 	  {"field1": "aaa", "field2": 300}
 	]`, string(resJSON))
+	assert.NotEqual(t, values, sorted)
+
+	err = SortValueSetInPlace(ctx, fieldSet, sorted, "field2", "field1")
+	assert.NoError(t, err)
+
+	resJSON, err = json.MarshalIndent(sorted, "", "  ")
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[
+		{"field1": "EEE", "field2": 100},
+		{"field1": "AAA", "field2": 300},
+		{"field1": "aaa", "field2": 300},
+		{"field1": "MMM", "field2": 500},
+		{"field1": "EEE", "field2": 600},
+		{"field1": "EEE", "field2": 600},
+		{"field1": "TTT", "field2": 600}
+	  ]`, string(resJSON))
+	assert.NotEqual(t, values, sorted)
 
 }
 
@@ -85,6 +98,8 @@ func TestValueSetSorterBadSortField(t *testing.T) {
 	_, err := SortedValueSetCopy(context.Background(), FieldMap{}, []*testValuesResolved{}, "wrong")
 	assert.Regexp(t, "PD010700", err)
 
+	err = SortValueSetInPlace(context.Background(), FieldMap{}, []*testValuesResolved{}, "wrong")
+	assert.Regexp(t, "PD010700", err)
 }
 
 func TestValueSetSorterMissingSortField(t *testing.T) {

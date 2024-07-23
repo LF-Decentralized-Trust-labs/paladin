@@ -40,9 +40,9 @@ type State struct {
 	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
-// NewState is a newly prepared state that has not yet been persisted
-type NewState struct {
-	State
+// StateWithLabels is a newly prepared state that has not yet been persisted
+type StateWithLabels struct {
+	*State
 	LabelValues filters.ValueSet
 }
 
@@ -63,7 +63,11 @@ type StateUpdate struct {
 	TXSpent   *string
 }
 
-func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaID string, data types.RawJSON) (*NewState, error) {
+func (s *StateWithLabels) ValueSet() filters.ValueSet {
+	return s.LabelValues
+}
+
+func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaID string, data types.RawJSON) (*StateWithLabels, error) {
 
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
@@ -76,7 +80,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 	}
 
 	op := ss.writer.newWriteOp(s.State.DomainID)
-	op.states = []*NewState{s}
+	op.states = []*StateWithLabels{s}
 	ss.writer.queue(ctx, op)
 	return s, op.flush(ctx)
 }
@@ -141,13 +145,14 @@ func (ss *stateStore) labelSetFor(schema SchemaCommon) *trackingLabelSet {
 }
 
 func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
-	return ss.findStates(ctx, domainID, schemaID, query, status)
+	_, s, err = ss.findStates(ctx, domainID, schemaID, query, status)
+	return s, err
 }
 
-func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (s []*State, err error) {
-	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
+func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (schema SchemaCommon, s []*State, err error) {
+	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tracker := ss.labelSetFor(schema)
@@ -156,7 +161,7 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 	db := ss.p.DB()
 	q := query.BuildGORM(ctx, db.Table("states"), tracker)
 	if q.Error != nil {
-		return nil, q.Error
+		return nil, nil, q.Error
 	}
 
 	// Add joins only for the fields actually used in the query
@@ -185,9 +190,9 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 	var states []*State
 	q = q.Find(&states)
 	if q.Error != nil {
-		return nil, q.Error
+		return nil, nil, q.Error
 	}
-	return states, nil
+	return schema, states, nil
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {

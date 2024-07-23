@@ -48,7 +48,7 @@ func TestPersistStateInvalidState(t *testing.T) {
 	})
 
 	_, err := ss.PersistState(ctx, "domain1", schemaHash.String(), nil)
-	assert.Regexp(t, "FF22025", err)
+	assert.Regexp(t, "PD010116", err)
 }
 
 func TestGetStateMissing(t *testing.T) {

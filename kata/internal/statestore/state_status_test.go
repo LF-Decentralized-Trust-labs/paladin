@@ -53,8 +53,8 @@ const widgetABI = `{
 	]
 }`
 
-func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, schemaHash string, withoutSalt []string) []*NewState {
-	states := make([]*NewState, len(withoutSalt))
+func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, schemaHash string, withoutSalt []string) []*StateWithLabels {
+	states := make([]*StateWithLabels, len(withoutSalt))
 	for i, w := range withoutSalt {
 		var ij map[string]interface{}
 		err := json.Unmarshal([]byte(w), &ij)

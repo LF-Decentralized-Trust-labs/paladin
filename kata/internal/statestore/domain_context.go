@@ -195,10 +195,10 @@ func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
 	return spendLocks, nil
 }
 
-func (dc *domainContext) mergedUnFlushed(states []*State, query *filters.QueryJSON) ([]*State, error) {
+func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
 
 	// Get the list of new un-flushed states, which are not already locked for spend
-	matches := make([]*State, 0, len(dc.unFlushed.states))
+	matches := make([]*StateWithLabels, 0, len(dc.unFlushed.states))
 	for _, s := range dc.unFlushed.states {
 		var locked *StateLock
 		for _, l := range dc.unFlushed.stateLocks {
@@ -211,11 +211,6 @@ func (dc *domainContext) mergedUnFlushed(states []*State, query *filters.QueryJS
 		if locked != nil && locked.Spending {
 			continue
 		}
-		// Need the schema
-		schema, err := dc.ss.getSchemaByHash(dc.ctx, dc.domainID, &s.Schema, true)
-		if err != nil {
-			return nil, err
-		}
 		// Now we see if it matches the query
 		labelSet := dc.ss.labelSetFor(schema)
 		match, err := query.Eval(dc.ctx, labelSet, s.LabelValues)
@@ -224,12 +219,54 @@ func (dc *domainContext) mergedUnFlushed(states []*State, query *filters.QueryJS
 		}
 		if match {
 			log.L(dc.ctx).Debugf("Matched state %s from un-flushed writes", &s.Hash)
-			matches = append(matches, &s.State)
+			matches = append(matches, s)
 		}
 	}
 
-	// TODO: SORTING!
-	return append(states, matches...), nil
+	if len(matches) > 0 {
+		// Build the merged list - this involves extra cost, as we deliberately don't reconstitute
+		// the labels in JOIN on DB load (affecting every call at the DB side), instead we re-parse
+		// them as we need them
+		return dc.mergeInMemoryMatches(schema, states, matches, query)
+	}
+
+	return states, nil
+}
+
+func (dc *domainContext) mergeInMemoryMatches(schema SchemaCommon, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
+
+	// Reconstitute the labels for all the loaded states into the front of an aggregate list
+	fullList := make([]*StateWithLabels, len(states)+len(extras))
+	for i, s := range states {
+		if fullList[i], err = schema.RecoverLabels(dc.ctx, s); err != nil {
+			return nil, err
+		}
+	}
+
+	// Copy the matches to the end of that same list
+	copy(fullList[len(states):], extras)
+
+	// Sort it in place
+	sortInstructions := query.Sort
+	if len(sortInstructions) == 0 {
+		sortInstructions = []string{".created"}
+	}
+	if err = filters.SortValueSetInPlace(dc.ctx, dc.ss.labelSetFor(schema), fullList, sortInstructions...); err != nil {
+		return nil, err
+	}
+
+	// We only want the states (not the labels needed during sort),
+	// and only up to the limit that might have been breached adding in our in-memory states
+	len := len(fullList)
+	if query.Limit != nil && len > *query.Limit {
+		len = *query.Limit
+	}
+	retList := make([]*State, len)
+	for i, fs := range fullList {
+		retList[i] = fs.State
+	}
+	return retList, nil
+
 }
 
 func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*State, err error) {
@@ -242,13 +279,13 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 
 	// Run the query against the DB
 	// TODO: Need to change what "available" means based on locked-for-spend semantics
-	states, err := dc.ss.findStates(dc.ctx, dc.domainID, schemaID, query, StateStatusAvailable, excluded...)
+	schema, states, err := dc.ss.findStates(dc.ctx, dc.domainID, schemaID, query, StateStatusAvailable, excluded...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Merge in un-flushed states to results
-	return dc.mergedUnFlushed(states, query)
+	return dc.mergedUnFlushed(schema, states, query)
 }
 
 func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (states []*State, err error) {
@@ -259,13 +296,13 @@ func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, d
 	}
 
 	states = make([]*State, len(data))
-	withValues := make([]*NewState, len(data))
+	withValues := make([]*StateWithLabels, len(data))
 	for i, d := range data {
 		withValues[i], err = schema.ProcessState(dc.ctx, d)
 		if err != nil {
 			return nil, err
 		}
-		states[i] = &withValues[i].State
+		states[i] = withValues[i].State
 	}
 
 	// Take lock and check flush state

@@ -131,10 +131,11 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		}`))
 		assert.NoError(t, err)
 		assert.Len(t, states, 3)
-		// TODO: SORTING
-		assert.Equal(t, int64(100), parseFakeCoin(t, states[0]).Amount.Int64())
-		assert.Equal(t, int64(10), parseFakeCoin(t, states[1]).Amount.Int64())
-		assert.Equal(t, int64(75), parseFakeCoin(t, states[2]).Amount.Int64())
+
+		// The values should be sorted according to the requested order
+		assert.Equal(t, int64(10), parseFakeCoin(t, states[0]).Amount.Int64())
+		assert.Equal(t, int64(75), parseFakeCoin(t, states[1]).Amount.Int64())
+		assert.Equal(t, int64(100), parseFakeCoin(t, states[2]).Amount.Int64())
 
 		return nil
 	})

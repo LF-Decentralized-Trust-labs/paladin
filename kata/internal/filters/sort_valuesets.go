@@ -57,6 +57,16 @@ func SortedValueSetCopy[T WithValueSet](ctx context.Context, fieldSet FieldSet, 
 	return valuesCopy, nil
 }
 
+func SortValueSetInPlace[T WithValueSet](ctx context.Context, fieldSet FieldSet, values []T, sortInstructions ...string) error {
+	sorter, err := NewValueSetSorter(ctx, fieldSet, values, sortInstructions...)
+	if err != nil {
+		return err
+	}
+
+	sort.Sort(sorter)
+	return sorter.Error
+}
+
 func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, values []T, sortInstructions ...string) (*ValueSetSorter[T], error) {
 
 	if len(sortInstructions) == 0 {

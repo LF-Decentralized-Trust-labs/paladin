@@ -182,7 +182,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	// Get the state back too
 	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, state1.Hash.String(), true, true)
 	assert.NoError(t, err)
-	assert.Equal(t, &state1.State, state1a)
+	assert.Equal(t, state1.State, state1a)
 
 	// Do a query on just one state, based on all the label fields
 	var query *filters.QueryJSON
@@ -426,7 +426,10 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 			},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010103", err)
 }
 
@@ -455,7 +458,10 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 			},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010110", err)
 }
 
@@ -465,12 +471,10 @@ func TestABISchemaProcessStateBadDefinition(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
-			Labels: []string{"field1"},
-		},
+
 		definition: &abi.Parameter{},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
+	_, err := as.definition.TypeComponentTreeCtx(ctx)
 	assert.Regexp(t, "FF22025", err)
 }
 
@@ -490,7 +494,10 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 			Components:   abi.ParameterArray{},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{!!! wrong`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{!!! wrong`))
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -512,7 +519,10 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 			},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":{}}`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":{}}`))
 	assert.Regexp(t, "FF22030", err)
 }
 
@@ -534,7 +544,10 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 			},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -556,7 +569,10 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 			},
 		},
 	}
-	_, err := as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
+	var err error
+	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
+	assert.NoError(t, err)
+	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 

@@ -67,7 +67,7 @@ func (ss *stateStore) rpcStoreState() rpcserver.RPCHandler {
 		var state *State
 		newState, err := ss.PersistState(ctx, domain, schema, value)
 		if err == nil {
-			state = &newState.State
+			state = newState.State
 		}
 		return state, err
 	})
