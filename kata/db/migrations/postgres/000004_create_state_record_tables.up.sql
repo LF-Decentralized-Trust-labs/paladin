@@ -20,6 +20,8 @@ CREATE TABLE state_locks (
     "state_l"     UUID    NOT NULL,
     "state_h"     UUID    NOT NULL,
     "sequence"    UUID    NOT NULL,
+    "minting"     BOOLEAN NOT NULL,
+    "spending"    BOOLEAN NOT NULL,
     PRIMARY KEY (state_l, state_h)
 );
 CREATE INDEX state_lock_sequence ON state_locks("sequence");

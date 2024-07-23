@@ -68,7 +68,7 @@ func TestRPC(t *testing.T) {
 	jsonTestLog(t, "pstate_storeABISchema", schema)
 	assert.Nil(t, rpcErr)
 
-	var schemas []*SchemaEntity
+	var schemas []*Schema
 	rpcErr = c.CallRPC(ctx, &schemas, "pstate_listSchemas", "domain1")
 	jsonTestLog(t, "pstate_listSchemas", schemas)
 	assert.Nil(t, rpcErr)

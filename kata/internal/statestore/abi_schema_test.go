@@ -182,7 +182,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	// Get the state back too
 	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, state1.Hash.String(), true, true)
 	assert.NoError(t, err)
-	assert.Equal(t, state1, state1a)
+	assert.Equal(t, &state1.State, state1a)
 
 	// Do a query on just one state, based on all the label fields
 	var query *filters.QueryJSON
@@ -263,7 +263,7 @@ func TestRestoreABISchemaInvalidType(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
+	_, err := newABISchemaFromDB(ctx, &Schema{
 		Definition: types.RawJSON(`{}`),
 	})
 	assert.Regexp(t, "PD010114", err)
@@ -275,7 +275,7 @@ func TestRestoreABISchemaInvalidTypeTree(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := newABISchemaFromDB(ctx, &SchemaEntity{
+	_, err := newABISchemaFromDB(ctx, &Schema{
 		Definition: types.RawJSON(`{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`),
 	})
 	assert.Regexp(t, "FF22025.*wrong", err)
@@ -401,7 +401,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -436,7 +436,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -465,7 +465,7 @@ func TestABISchemaProcessStateBadDefinition(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{},
@@ -480,7 +480,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -500,7 +500,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -522,7 +522,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -544,7 +544,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -566,7 +566,7 @@ func TestABISchemaMapLabelResolverBadType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -588,7 +588,7 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{

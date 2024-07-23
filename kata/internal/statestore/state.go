@@ -40,6 +40,12 @@ type State struct {
 	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
+// NewState is a newly prepared state that has not yet been persisted
+type NewState struct {
+	State
+	LabelValues filters.ValueSet
+}
+
 type StateLabel struct {
 	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
 	Label string
@@ -57,7 +63,7 @@ type StateUpdate struct {
 	TXSpent   *string
 }
 
-func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaID string, data types.RawJSON) (*State, error) {
+func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaID string, data types.RawJSON) (*NewState, error) {
 
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
@@ -69,8 +75,8 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 		return nil, err
 	}
 
-	op := ss.writer.newWriteOp(s.DomainID)
-	op.states = []*State{s}
+	op := ss.writer.newWriteOp(s.State.DomainID)
+	op.states = []*NewState{s}
 	ss.writer.queue(ctx, op)
 	return s, op.flush(ctx)
 }
@@ -108,12 +114,12 @@ var baseStateFields = map[string]filters.FieldResolver{
 	".created": filters.TimestampField("created_at"),
 }
 
-type labelTracker struct {
+type trackingLabelSet struct {
 	labels map[string]*schemaLabelInfo
 	used   map[string]*schemaLabelInfo
 }
 
-func (ft labelTracker) ResolverFor(fieldName string) filters.FieldResolver {
+func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 	baseField := baseStateFields[fieldName]
 	if baseField != nil {
 		return baseField
@@ -126,16 +132,25 @@ func (ft labelTracker) ResolverFor(fieldName string) filters.FieldResolver {
 	return nil
 }
 
+func (ss *stateStore) labelSetFor(schema SchemaCommon) *trackingLabelSet {
+	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
+	for _, fi := range schema.LabelInfo() {
+		tls.labels[fi.label] = fi
+	}
+	return &tls
+}
+
 func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
+	return ss.findStates(ctx, domainID, schemaID, query, status)
+}
+
+func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (s []*State, err error) {
 	schema, err := ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, err
 	}
 
-	tracker := labelTracker{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
-	for _, fi := range schema.LabelInfo() {
-		tracker.labels[fi.label] = fi
-	}
+	tracker := ss.labelSetFor(schema)
 
 	// Build the query
 	db := ss.p.DB()
@@ -159,6 +174,10 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 		Where("domain_id = ?", domainID).
 		Where("schema_l = ?", schema.Persisted().Hash.L).
 		Where("schema_h = ?", schema.Persisted().Hash.H)
+
+	if len(excluded) > 0 {
+		q = q.Not(&State{}, excluded)
+	}
 
 	// Scope the query based of the qualifier
 	q = q.Where(status.whereClause(ss.p.DB()))
@@ -216,16 +235,9 @@ func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, 
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) ClearLocked(ctx context.Context, domainID, stateID string) error {
-	hash, err := ParseHashID(ctx, stateID)
-	if err != nil {
-		return err
-	}
-
+func (ss *stateStore) ClearLocked(ctx context.Context, domainID string, sequenceID uuid.UUID) error {
 	op := ss.writer.newWriteOp(domainID)
-	op.stateLockDeletes = []*StateLock{
-		{State: *hash},
-	}
+	op.sequenceLockDeletes = []uuid.UUID{sequenceID}
 
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)

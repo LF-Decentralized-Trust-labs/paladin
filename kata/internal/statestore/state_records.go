@@ -40,4 +40,6 @@ type StateSpend struct {
 type StateLock struct {
 	State    HashID    `json:"-"          gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
 	Sequence uuid.UUID `json:"sequence"`
+	Minting  bool      `json:"minting"`
+	Spending bool      `json:"spending"`
 }

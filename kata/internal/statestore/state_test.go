@@ -101,8 +101,8 @@ func TestFindStatesFail(t *testing.T) {
 	schemaHash := HashIDKeccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaHash)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
-		SchemaEntity: &SchemaEntity{Hash: *schemaHash},
-		definition:   &abi.Parameter{},
+		Schema:     &Schema{Hash: *schemaHash},
+		definition: &abi.Parameter{},
 	})
 
 	db.ExpectQuery("SELECT.*created_at").WillReturnError(fmt.Errorf("pop"))

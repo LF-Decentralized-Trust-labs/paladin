@@ -41,7 +41,7 @@ func (ss *stateStore) rpcStoreABISchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domain string,
 		abiParam abi.Parameter,
-	) (Schema, error) {
+	) (SchemaCommon, error) {
 		s, err := newABISchema(ctx, domain, &abiParam)
 		if err == nil {
 			err = ss.PersistSchema(ctx, s)
@@ -53,7 +53,7 @@ func (ss *stateStore) rpcStoreABISchema() rpcserver.RPCHandler {
 func (ss *stateStore) rpcListSchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		domain string,
-	) ([]Schema, error) {
+	) ([]SchemaCommon, error) {
 		return ss.ListSchemas(ctx, domain)
 	})
 }
@@ -64,7 +64,12 @@ func (ss *stateStore) rpcStoreState() rpcserver.RPCHandler {
 		schema string,
 		value types.RawJSON,
 	) (*State, error) {
-		return ss.PersistState(ctx, domain, schema, value)
+		var state *State
+		newState, err := ss.PersistState(ctx, domain, schema, value)
+		if err == nil {
+			state = &newState.State
+		}
+		return state, err
 	})
 }
 

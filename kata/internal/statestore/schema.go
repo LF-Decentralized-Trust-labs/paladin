@@ -43,7 +43,7 @@ const (
 	labelTypeBool
 )
 
-type SchemaEntity struct {
+type Schema struct {
 	Hash       HashID          `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	CreatedAt  types.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
 	DomainID   string          `json:"domain"`
@@ -64,33 +64,33 @@ type hashIDOnly struct {
 	HashID HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 }
 
-type Schema interface {
+type SchemaCommon interface {
 	Type() SchemaType
-	Persisted() *SchemaEntity
+	Persisted() *Schema
 	LabelInfo() []*schemaLabelInfo
-	ProcessState(ctx context.Context, data types.RawJSON) (*State, error)
+	ProcessState(ctx context.Context, data types.RawJSON) (*NewState, error)
 }
 
 func schemaCacheKey(domainID string, hash *HashID) string {
 	return domainID + "/" + hash.String()
 }
 
-func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
+func (ss *stateStore) PersistSchema(ctx context.Context, s SchemaCommon) error {
 	op := ss.writer.newWriteOp(s.Persisted().DomainID)
-	op.schemas = []*SchemaEntity{s.Persisted()}
+	op.schemas = []*Schema{s.Persisted()}
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetSchema(ctx context.Context, domainID, stateID string, failNotFound bool) (Schema, error) {
-	schemaHash, err := ParseHashID(ctx, stateID)
+func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (SchemaCommon, error) {
+	schemaHash, err := ParseHashID(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
 	return ss.getSchemaByHash(ctx, domainID, schemaHash, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *HashID, failNotFound bool) (Schema, error) {
+func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *HashID, failNotFound bool) (SchemaCommon, error) {
 
 	cacheKey := schemaCacheKey(domainID, schemaHash)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -98,7 +98,7 @@ func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, sche
 		return s, nil
 	}
 
-	var results []*SchemaEntity
+	var results []*Schema
 	err := ss.p.DB().
 		Table("schemas").
 		Where("domain_id = ?", domainID).
@@ -128,7 +128,7 @@ func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, sche
 	return s, nil
 }
 
-func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results []Schema, err error) {
+func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results []SchemaCommon, err error) {
 	var ids []*hashIDOnly
 	err = ss.p.DB().
 		Table("schemas").
@@ -139,7 +139,7 @@ func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results
 	if err != nil {
 		return nil, err
 	}
-	results = make([]Schema, len(ids))
+	results = make([]SchemaCommon, len(ids))
 	for i, id := range ids {
 		if results[i], err = ss.getSchemaByHash(ctx, domainID, &id.HashID, true); err != nil {
 			return nil, err

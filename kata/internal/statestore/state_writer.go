@@ -22,6 +22,7 @@ import (
 	"hash/fnv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -33,16 +34,16 @@ import (
 )
 
 type writeOperation struct {
-	id               string
-	domain           string
-	done             chan error
-	isShutdown       bool
-	states           []*State
-	stateConfirms    []*StateConfirm
-	stateSpends      []*StateSpend
-	stateLocks       []*StateLock
-	stateLockDeletes []*StateLock
-	schemas          []*SchemaEntity
+	id                  string
+	domain              string
+	done                chan error
+	isShutdown          bool
+	states              []*NewState
+	stateConfirms       []*StateConfirm
+	stateSpends         []*StateSpend
+	stateLocks          []*StateLock
+	sequenceLockDeletes []uuid.UUID
+	schemas             []*Schema
 }
 
 type stateWriter struct {
@@ -187,24 +188,22 @@ func (sw *stateWriter) worker(i int) {
 func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 
 	// Build lists of things to insert (we are insert only)
-	var schemas []*SchemaEntity
+	var schemas []*Schema
 	var states []*State
 	var labels []*StateLabel
 	var int64Labels []*StateInt64Label
 	var stateConfirms []*StateConfirm
 	var stateSpends []*StateSpend
 	var stateLocks []*StateLock
-	var stateLockDeletes []*StateLock
+	var sequenceLockDeletes []uuid.UUID
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
 		}
-		if len(op.states) > 0 {
-			states = append(states, op.states...)
-			for _, s := range op.states {
-				labels = append(labels, s.Labels...)
-				int64Labels = append(int64Labels, s.Int64Labels...)
-			}
+		for _, s := range op.states {
+			states = append(states, &s.State)
+			labels = append(labels, s.State.Labels...)
+			int64Labels = append(int64Labels, s.State.Int64Labels...)
 		}
 		if len(op.stateConfirms) > 0 {
 			stateConfirms = append(stateConfirms, op.stateConfirms...)
@@ -215,12 +214,12 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 		if len(op.stateLocks) > 0 {
 			stateLocks = append(stateLocks, op.stateLocks...)
 		}
-		if len(op.stateLockDeletes) > 0 {
-			stateLockDeletes = append(stateLockDeletes, op.stateLockDeletes...)
+		if len(op.sequenceLockDeletes) > 0 {
+			sequenceLockDeletes = append(sequenceLockDeletes, op.sequenceLockDeletes...)
 		}
 	}
-	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d confirms=%d spends=%d locks=%d lockDeletes=%d labels=%d int64Labels=%d",
-		len(schemas), len(states), len(stateConfirms), len(stateSpends), len(stateLocks), len(stateLockDeletes), len(labels), len(int64Labels))
+	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d confirms=%d spends=%d locks=%d seqLockDeletes=%d labels=%d int64Labels=%d",
+		len(schemas), len(states), len(stateConfirms), len(stateSpends), len(stateLocks), len(sequenceLockDeletes), len(labels), len(int64Labels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
@@ -290,14 +289,21 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Clauses(clause.OnConflict{
 					Columns: []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
 					// locks can move to another sequence
-					DoUpdates: clause.AssignmentColumns([]string{"sequence"}),
+					DoUpdates: clause.AssignmentColumns([]string{
+						"sequence",
+						"spending",
+						"minting",
+					}),
 				}).
 				Create(stateLocks).
 				Error
 		}
-		if err == nil && len(stateLockDeletes) > 0 {
+		if err == nil && len(sequenceLockDeletes) > 0 {
 			// locks can be removed
-			err = tx.Delete(stateLockDeletes).Error
+			err = tx.
+				Table("state_locks").
+				Delete("sequence IN (?)", sequenceLockDeletes).
+				Error
 		}
 		return err
 	})

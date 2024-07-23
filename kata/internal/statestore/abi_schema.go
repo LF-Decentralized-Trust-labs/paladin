@@ -33,7 +33,7 @@ import (
 )
 
 type abiSchema struct {
-	*SchemaEntity
+	*Schema
 	definition  *abi.Parameter
 	primaryType string
 	typeSet     eip712.TypeSet
@@ -42,7 +42,7 @@ type abiSchema struct {
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
 	as := &abiSchema{
-		SchemaEntity: &SchemaEntity{
+		Schema: &Schema{
 			DomainID: domainID,
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
@@ -66,9 +66,9 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 	return as, nil
 }
 
-func newABISchemaFromDB(ctx context.Context, persisted *SchemaEntity) (*abiSchema, error) {
+func newABISchemaFromDB(ctx context.Context, persisted *Schema) (*abiSchema, error) {
 	as := &abiSchema{
-		SchemaEntity: persisted,
+		Schema: persisted,
 	}
 	err := json.Unmarshal(persisted.Definition, &as.definition)
 	if err != nil {
@@ -85,8 +85,8 @@ func (as *abiSchema) Type() SchemaType {
 	return SchemaTypeABI
 }
 
-func (as *abiSchema) Persisted() *SchemaEntity {
-	return as.SchemaEntity
+func (as *abiSchema) Persisted() *Schema {
+	return as.Schema
 }
 
 func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
@@ -268,7 +268,7 @@ func (as *abiSchema) mapLabelResolver(ctx context.Context, sqlColumn string, lab
 
 // Take the state, parse the value into the type tree of this schema, and from that
 // build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*State, error) {
+func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*NewState, error) {
 
 	tc, err := as.definition.TypeComponentTreeCtx(ctx)
 	if err != nil {
@@ -329,18 +329,24 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	}
 
 	hashID := *NewHashIDSlice32(hash)
-	for i := range labels {
+	labelValues := make(filters.PassthroughValueSet)
+	for i, l := range labels {
 		labels[i].State = hashID
+		labelValues[l.Label] = l.Value
 	}
-	for i := range int64Labels {
+	for i, l := range int64Labels {
 		int64Labels[i].State = hashID
+		labelValues[l.Label] = l.Value
 	}
-	return &State{
-		Hash:        hashID,
-		DomainID:    as.DomainID,
-		Schema:      as.Hash,
-		Data:        jsonData,
-		Labels:      labels,
-		Int64Labels: int64Labels,
+	return &NewState{
+		State: State{
+			Hash:        hashID,
+			DomainID:    as.DomainID,
+			Schema:      as.Hash,
+			Data:        jsonData,
+			Labels:      labels,
+			Int64Labels: int64Labels,
+		},
+		LabelValues: labelValues,
 	}, nil
 }
