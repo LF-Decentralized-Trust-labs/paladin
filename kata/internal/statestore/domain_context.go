@@ -44,10 +44,13 @@ import (
 type DomainStateInterface interface {
 	// EnsureABISchema is expected to be called on startup with all schemas required for operation of the domain
 	EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error)
-	// FindAvailableStates is the main query function, only returning states available to the current sequence.
-	// Note this does not lock these states to the sequence, you must call that afterwards (as we don't know
-	// which will be selected as important by the domain - some might be un-used).
-	FindAvailableStates(sequenceID uuid.UUID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error)
+	// FindAvailableStates is the main query function, only returning states that are available.
+	// Note this does not lock these states in any way, you must call that afterwards as:
+	// 1) We don't know which will be selected as important by the domain - some might be un-used
+	// 2) We deliberately return states that are locked to a sequence (but not spent yet) - which means the
+	//    result of the any assemble that uses those states, will be a transaction that must
+	//    be on the same sequence where those states are locked.
+	FindAvailableStates(schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error)
 	// MarkStatesSpending writes a lock record so the state is now locked for spending, and
 	// thus subsequent calls to FindAvailableStates will not return these states.
 	MarkStatesSpending(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
@@ -219,7 +222,7 @@ func (dc *domainContext) mergedUnFlushed(states []*State, query *filters.QueryJS
 	return append(states, matches...), nil
 }
 
-func (dc *domainContext) FindAvailableStates(sequenceID uuid.UUID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
+func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.QueryJSON, status StateStatusQualifier) (s []*State, err error) {
 
 	// Build a list of excluded states
 	excluded, err := dc.getUnFlushedSpending()
@@ -228,7 +231,8 @@ func (dc *domainContext) FindAvailableStates(sequenceID uuid.UUID, schemaID stri
 	}
 
 	// Run the query against the DB
-	states, err := dc.ss.findStates(dc.ctx, dc.domainID, schemaID, query, StateStatusQualifier(sequenceID.String()), excluded...)
+	// TODO: Need to change what "available" means based on locked-for-spend semantics
+	states, err := dc.ss.findStates(dc.ctx, dc.domainID, schemaID, query, StateStatusAvailable, excluded...)
 	if err != nil {
 		return nil, err
 	}
