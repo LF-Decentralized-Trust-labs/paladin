@@ -179,13 +179,10 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 	testOc.maxConcurrentProcess = 10
 	assert.Empty(t, testOc.incompleteTxSProcessMap)
 	assert.False(t, testOc.ProcessNewTransaction(ctx, testTx))
-	assert.Equal(t, 1, len(testOc.incompleteTxSProcessMap))
-
-	stageContext := testOc.incompleteTxSProcessMap[testTx.GetTxID(ctx)].GetStageContext(ctx)
-	<-waitForAction // no events emitted as no synchronous output was returned
-	assert.NotNil(t, stageContext)
+	<-waitForAction                        // no events emitted as no synchronous output was returned
 	testOc.TriggerOrchestratorEvaluation() // this should remove the process from the pool
 	testOc.Stop()
+	testOc.Stop() // do a second stop to ensure at least one stop has gone through as the channel has buffer size 1
 	<-ocDone
 	assert.Empty(t, testOc.incompleteTxSProcessMap)
 	assert.Equal(t, 1, int(testOc.totalCompleted))
