@@ -102,7 +102,7 @@ persistence:
   sqlite:
     uri:           ":memory:"
     autoMigrate:   true
-    migrationsDir: ../../db/migrations/sqlite
+    migrationsDir: ../db/migrations/sqlite
     debugQueries:  true
 commsBus:  
   grpc:
