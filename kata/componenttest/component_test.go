@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kaleido-io/paladin/kata/pkg/kata"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +81,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }
 
 func runServiceForTesting(ctx context.Context, t *testing.T) (string, func()) {
@@ -113,7 +114,7 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go Run(ctx, configFile.Name())
+	go kata.Run(ctx, configFile.Name())
 
 	// todo do we really need to sleep here?
 	time.Sleep(time.Second * 2)
@@ -209,7 +210,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -334,5 +335,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }
