@@ -4,4 +4,3 @@ plugins {
 
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
-

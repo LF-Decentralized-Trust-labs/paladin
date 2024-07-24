@@ -22,6 +22,7 @@ import (
 	"hash/fnv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -33,12 +34,16 @@ import (
 )
 
 type writeOperation struct {
-	id         string
-	domain     string
-	done       chan error
-	isShutdown bool
-	states     []*State
-	schemas    []*SchemaEntity
+	id                  string
+	domain              string
+	done                chan error
+	isShutdown          bool
+	states              []*StateWithLabels
+	stateConfirms       []*StateConfirm
+	stateSpends         []*StateSpend
+	stateLocks          []*StateLock
+	sequenceLockDeletes []uuid.UUID
+	schemas             []*Schema
 }
 
 type stateWriter struct {
@@ -63,7 +68,7 @@ type stateWriterBatch struct {
 func newStateWriter(bgCtx context.Context, ss *stateStore, conf *StateWriterConfig) *stateWriter {
 	workerCount := confutil.IntMin(conf.WorkerCount, 1, *StateWriterConfigDefaults.WorkerCount)
 	batchMaxSize := confutil.IntMin(conf.BatchMaxSize, 1, *StateWriterConfigDefaults.BatchMaxSize)
-	batchTimeout := confutil.Duration(conf.BatchTimeout, *StateWriterConfigDefaults.BatchTimeout)
+	batchTimeout := confutil.DurationMin(conf.BatchTimeout, 0, *StateWriterConfigDefaults.BatchTimeout)
 	sw := &stateWriter{
 		ss:           ss,
 		workerCount:  (uint32)(workerCount),
@@ -183,23 +188,38 @@ func (sw *stateWriter) worker(i int) {
 func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 
 	// Build lists of things to insert (we are insert only)
-	var schemas []*SchemaEntity
+	var schemas []*Schema
 	var states []*State
-	var stateLabels []*StateLabel
+	var labels []*StateLabel
+	var int64Labels []*StateInt64Label
+	var stateConfirms []*StateConfirm
+	var stateSpends []*StateSpend
+	var stateLocks []*StateLock
+	var sequenceLockDeletes []uuid.UUID
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
 		}
-		if len(op.states) > 0 {
-			states = append(states, op.states...)
-		}
 		for _, s := range op.states {
-			for i := range s.Labels {
-				stateLabels = append(stateLabels, &s.Labels[i])
-			}
+			states = append(states, s.State)
+			labels = append(labels, s.State.Labels...)
+			int64Labels = append(int64Labels, s.State.Int64Labels...)
+		}
+		if len(op.stateConfirms) > 0 {
+			stateConfirms = append(stateConfirms, op.stateConfirms...)
+		}
+		if len(op.stateSpends) > 0 {
+			stateSpends = append(stateSpends, op.stateSpends...)
+		}
+		if len(op.stateLocks) > 0 {
+			stateLocks = append(stateLocks, op.stateLocks...)
+		}
+		if len(op.sequenceLockDeletes) > 0 {
+			sequenceLockDeletes = append(sequenceLockDeletes, op.sequenceLockDeletes...)
 		}
 	}
-	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d stateUpdates=%d", len(schemas), len(states), len(stateLabels))
+	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d confirms=%d spends=%d locks=%d seqLockDeletes=%d labels=%d int64Labels=%d",
+		len(schemas), len(states), len(stateConfirms), len(stateSpends), len(stateLocks), len(sequenceLockDeletes), len(labels), len(int64Labels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
@@ -207,7 +227,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Table("schemas").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
-					DoNothing: true,
+					DoNothing: true, // immutable
 				}).
 				Create(schemas).
 				Error
@@ -217,20 +237,72 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Table("states").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
-					DoNothing: true,
+					DoNothing: true, // immutable
 				}).
-				Omit("Labels"). // we do this ourselves below
+				Omit("Labels", "Int64Labels", "Confirmed", "Spent", "Locked"). // we do this ourselves below
 				Create(states).
 				Error
 		}
-		if err == nil && len(stateLabels) > 0 {
+		if err == nil && len(stateConfirms) > 0 {
+			err = tx.
+				Table("state_confirms").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					DoNothing: true, // immutable
+				}).
+				Create(stateConfirms).
+				Error
+		}
+		if err == nil && len(labels) > 0 {
 			err = tx.
 				Table("state_labels").
 				Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
-					DoNothing: true,
+					DoNothing: true, // immutable
 				}).
-				Create(stateLabels).
+				Create(labels).
+				Error
+		}
+		if err == nil && len(int64Labels) > 0 {
+			err = tx.
+				Table("state_int64_labels").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					DoNothing: true, // immutable
+				}).
+				Create(int64Labels).
+				Error
+		}
+		if err == nil && len(stateSpends) > 0 {
+			err = tx.
+				Table("state_spends").
+				Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					DoNothing: true, // immutable
+				}).
+				Create(stateSpends).
+				Error
+		}
+		if err == nil && len(stateLocks) > 0 {
+			err = tx.
+				Table("state_locks").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					// locks can move to another sequence
+					DoUpdates: clause.AssignmentColumns([]string{
+						"sequence",
+						"spending",
+						"minting",
+					}),
+				}).
+				Create(stateLocks).
+				Error
+		}
+		if err == nil && len(sequenceLockDeletes) > 0 {
+			// locks can be removed
+			err = tx.
+				Table("state_locks").
+				Delete(&State{}, "sequence IN (?)", sequenceLockDeletes).
 				Error
 		}
 		return err

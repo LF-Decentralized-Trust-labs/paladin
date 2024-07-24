@@ -18,10 +18,12 @@ package statestore
 
 import (
 	"context"
+	"sync"
 
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 )
 
 type Config struct {
@@ -42,15 +44,20 @@ var StateWriterConfigDefaults = StateWriterConfig{
 }
 
 type StateStore interface {
-	GetSchema(context.Context, string, *HashID) (Schema, error)
-	GetState(ctx context.Context, domainID string, hash *HashID, withLabels bool) (s *State, err error)
+	RPCModule() *rpcserver.RPCModule
+	RunInDomainContext(domainID string, fn DomainContextFunction) error
 	Close()
 }
 
 type stateStore struct {
 	p              persistence.Persistence
+	bgCtx          context.Context
+	cancelCtx      context.CancelFunc
 	writer         *stateWriter
-	abiSchemaCache cache.Cache[string, Schema]
+	abiSchemaCache cache.Cache[string, SchemaCommon]
+	rpcModule      *rpcserver.RPCModule
+	domainLock     sync.Mutex
+	domainContexts map[string]*domainContext
 }
 
 var SchemaCacheDefaults = &cache.Config{
@@ -60,12 +67,16 @@ var SchemaCacheDefaults = &cache.Config{
 func NewStateStore(ctx context.Context, conf *Config, p persistence.Persistence) StateStore {
 	ss := &stateStore{
 		p:              p,
-		abiSchemaCache: cache.NewCache[string, Schema](&conf.SchemaCache, SchemaCacheDefaults),
+		abiSchemaCache: cache.NewCache[string, SchemaCommon](&conf.SchemaCache, SchemaCacheDefaults),
+		domainContexts: make(map[string]*domainContext),
 	}
+	ss.bgCtx, ss.cancelCtx = context.WithCancel(ctx)
 	ss.writer = newStateWriter(ctx, ss, &conf.StateWriter)
+	ss.initRPC()
 	return ss
 }
 
 func (ss *stateStore) Close() {
 	ss.writer.stop()
+	ss.cancelCtx()
 }

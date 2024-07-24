@@ -87,8 +87,8 @@ func NewSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, def
 	}
 	gp.db.SetMaxOpenConns(confutil.IntMin(conf.MaxOpenConns, 1, *defs.MaxOpenConns))
 	gp.db.SetMaxIdleConns(confutil.Int(conf.MaxIdleConns, *defs.MaxIdleConns))
-	gp.db.SetConnMaxIdleTime(confutil.Duration(conf.ConnMaxIdleTime, *defs.ConnMaxIdleTime))
-	gp.db.SetConnMaxLifetime(confutil.Duration(conf.ConnMaxLifetime, *defs.ConnMaxLifetime))
+	gp.db.SetConnMaxIdleTime(confutil.DurationMin(conf.ConnMaxIdleTime, 0, *defs.ConnMaxIdleTime))
+	gp.db.SetConnMaxLifetime(confutil.DurationMin(conf.ConnMaxLifetime, 0, *defs.ConnMaxLifetime))
 
 	if confutil.Bool(conf.AutoMigrate, false) {
 		if err = gp.runMigration(ctx, func(m *migrate.Migrate) error { return m.Up() }); err != nil {

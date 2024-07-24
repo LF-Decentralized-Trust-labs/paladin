@@ -46,10 +46,35 @@ func TestBool(t *testing.T) {
 	assert.True(t, Bool(P(true), false))
 }
 
+func TestStringNotEmpty(t *testing.T) {
+	assert.Equal(t, "def", StringNotEmpty(nil, "def"))
+	assert.Equal(t, "def", StringNotEmpty(P(""), "def"))
+	assert.Equal(t, "val", StringNotEmpty(P("val"), "def"))
+}
+
+func TestStringOrEmpty(t *testing.T) {
+	assert.Equal(t, "def", StringOrEmpty(nil, "def"))
+	assert.Equal(t, "", StringOrEmpty(P(""), "def"))
+	assert.Equal(t, "val", StringOrEmpty(P("val"), "def"))
+}
+
+func TestStringSlice(t *testing.T) {
+	assert.Equal(t, []string{"def"}, StringSlice(nil, []string{"def"}))
+	assert.Equal(t, []string{"set"}, StringSlice([]string{"set"}, []string{"def"}))
+}
+
 func TestDuration(t *testing.T) {
-	assert.Equal(t, 50*time.Second, Duration(nil, "50s"))
-	assert.Equal(t, 50*time.Second, Duration(P("wrong"), "50s"))
-	assert.Equal(t, 100*time.Millisecond, Duration(P("100ms"), "50s"))
+	assert.Equal(t, 50*time.Second, DurationMin(nil, 0, "50s"))
+	assert.Equal(t, 50*time.Second, DurationMin(P("wrong"), 0, "50s"))
+	assert.Equal(t, 100*time.Millisecond, DurationMin(P("100ms"), 0, "50s"))
+
+	assert.Equal(t, int64(1000000000), DurationSeconds(P("1000000000000ms"), 0, "0s"))
+	assert.Equal(t, int64(1000000001), DurationSeconds(P("1000000001000ms"), 0, "0s"))
+}
+
+func TestByteSize(t *testing.T) {
+	assert.Equal(t, int64(1024*1024), ByteSize(nil, 0, "1Mb"))
+	assert.Equal(t, int64(16*1024), ByteSize(P("16Kb"), 0, "1Mb"))
 }
 
 func TestReadAndParseYAMLFileFlatStruct(t *testing.T) {
@@ -214,6 +239,14 @@ func TestReadAndParseYAMLFileFailMissingFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "PD010500")
 	assert.Contains(t, err.Error(), tempFile.Name())
 
+}
+
+func TestReadAndParseYAMLFileFailDirNotFile(t *testing.T) {
+	ctx := context.Background()
+
+	err := ReadAndParseYAMLFile(ctx, t.TempDir(), P(struct{}{}))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "PD010501")
 }
 
 func TestReadAndParseYAMLFileFailedParse(t *testing.T) {

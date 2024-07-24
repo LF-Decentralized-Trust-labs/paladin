@@ -4,4 +4,3 @@ includeBuild 'pente'
 include 'kata'
 include 'talaria'
 include 'portara'
-

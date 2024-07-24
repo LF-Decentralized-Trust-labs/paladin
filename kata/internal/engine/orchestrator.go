@@ -136,16 +136,16 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
 		initiated:            time.Now(),
 		contractAddress:      contractAddress,
-		evalInterval:         confutil.Duration(oc.EvaluationInterval, *orchestratorConfigDefault.EvaluationInterval),
+		evalInterval:         confutil.DurationMin(oc.EvaluationInterval, 1*time.Millisecond, *orchestratorConfigDefault.EvaluationInterval),
 		maxConcurrentProcess: confutil.Int(oc.MaxConcurrentProcess, *orchestratorConfigDefault.MaxConcurrentProcess),
 		state:                OrchestratorStateNew,
 		stateEntryTime:       time.Now(),
 
 		// in-flight transaction configs
-		stageRetryTimeout:       confutil.Duration(oc.StageRetry, *orchestratorConfigDefault.StageRetry),
-		persistenceRetryTimeout: confutil.Duration(oc.PersistenceRetryTimeout, *orchestratorConfigDefault.PersistenceRetryTimeout),
+		stageRetryTimeout:       confutil.DurationMin(oc.StageRetry, 1*time.Millisecond, *orchestratorConfigDefault.StageRetry),
+		persistenceRetryTimeout: confutil.DurationMin(oc.PersistenceRetryTimeout, 1*time.Millisecond, *orchestratorConfigDefault.PersistenceRetryTimeout),
 
-		staleTimeout:                 confutil.Duration(oc.StaleTimeout, *orchestratorConfigDefault.StageRetry),
+		staleTimeout:                 confutil.DurationMin(oc.StaleTimeout, 1*time.Millisecond, *orchestratorConfigDefault.StageRetry),
 		processedTxIDs:               make(map[string]bool),
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
