@@ -20,7 +20,7 @@ ext {
     //     (fyi don't know if this comment is still true after recent fixes to the coverage task in this
     //       build file, or what the above commentor meant by component tests...
     //       there's no task labelled that in this build file)
-    targetCoverage = 84
+    targetCoverage = 87
     maxCoverageBarGap = 1
 }
 
