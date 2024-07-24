@@ -16,6 +16,12 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 ext {
+    goFiles = files(
+        getProject().fileTree("internal").matching { include "**/*.go" },
+        getProject().fileTree("pkg").matching { include "**/*.go" },
+        getProject().fileTree("componenttest").matching { include "**/*.go" },
+    )
+
     targetCoverage = 83
     maxCoverageBarGap = 1
 }
@@ -66,9 +72,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files('go.mod')
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
+    inputs.files(goFiles)
     outputs.files('go.sum')
 
     executable 'go'
@@ -78,9 +82,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
 task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    });
+    inputs.files(goFiles);
     outputs.files([]);
     environment 'GOGC', '20'
 
@@ -103,9 +105,7 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
         libName = "libkata.so"
     }
 
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
+    inputs.files(goFiles)
     outputs.files([libName, 'libkata.h'])
 
     environment("CGO_ENABLED", "1")
@@ -150,10 +150,6 @@ class DockerComposeDemo extends DockerCompose {
     }
 }
 
-ext.dockerCompose = { param1, param2 ->
-    // Method body here
-}
-
 task startDb(type: DockerComposeTest) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
@@ -174,12 +170,10 @@ task stopDemoDb(type: DockerComposeDemo) {
 
 abstract class UnitTests extends Exec {
     {
-        workingDir '.'
-        inputs.files(getProject().fileTree("${getProject().projectDir}").matching {
-            include "**/*.go"
-        })
-        outputs.files([])
+        inputs.files(getProject().goFiles)
+        outputs.dir('coverage')
 
+        workingDir '.'
         executable 'go'
         args 'test'
         args './pkg/...', './internal/...'
@@ -192,12 +186,10 @@ abstract class UnitTests extends Exec {
 
 abstract class ComponentTest extends Exec {
     {
-        workingDir '.'
-        inputs.files(getProject().fileTree("${getProject().projectDir}").matching {
-            include "**/*.go"
-        })
-        outputs.files([])
+        inputs.files(getProject().goFiles)
+        outputs.dir('coverage')
 
+        workingDir '.'
         executable 'go'
         args 'test'
         args './componenttest'
@@ -209,46 +201,52 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(type: Delete) {
-    doLast {
-        delete fileTree (project.mkdir('coverage')) {
-            include "**/*"
-        }
+task cleanCoverage(type: Delete) {
+    delete fileTree (project.mkdir('coverage')) {
+        include "coverage.txt"
+        include "covcounters.*"
+        include "covmeta.*"
     }
 }
 
+task setupCoverage(dependsOn: tasks.protoc) {
+    finalizedBy tasks.cleanCoverage
+}
+
 task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+    mustRunAfter tasks.cleanCoverage
 }
 
 task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
+    mustRunAfter tasks.cleanCoverage
     args '-tags', "testdbpostgres"
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
-
+    mustRunAfter tasks.cleanCoverage
 }
 
 // task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
-//    args '-tags', "testdbpostgres"
 // }
 
-task test(dependsOn: [
+task aggregateCoverage(type: Exec, dependsOn: [tasks.protoc,
         tasks.unitTestSQLite,
         tasks.unitTestPostgres,
         tasks.componentTestSQLite,
         // tasks.componentTestPostgres
     ]) {
-}
-
-task aggregateCoverage(type: Exec, dependsOn: tasks.test) {
+    inputs.files(getProject().fileTree("${getProject().projectDir}/coverage").matching {
+        include "**/*.out"
+    })
+    outputs.files('coverage/coverage.txt')
     executable 'go'
     args 'tool', 'covdata', 'textfmt'
     args '-i', './coverage'
     args '-o', './coverage/coverage.txt'
 }
 
-task checkCoverage(dependsOn: [tasks.test, tasks.aggregateCoverage]) {
-    inputs.dir("coverage")
+task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
+    inputs.files('coverage/coverage.txt')
     outputs.files([])
 
     doLast {
@@ -265,6 +263,11 @@ task checkCoverage(dependsOn: [tasks.test, tasks.aggregateCoverage]) {
     }
 }
 
+task test() {
+    finalizedBy [
+        tasks.checkCoverage,
+    ]
+}
 
 task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
