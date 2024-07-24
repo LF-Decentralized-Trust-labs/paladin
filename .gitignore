@@ -1,4 +1,4 @@
-**/coverage.txt
+**/coverage*.txt
 **/debug.test
 **/__debug_*
 .vscode/*.log

@@ -83,13 +83,13 @@ func (ts *Timestamp) UnixNano() int64 {
 	return (int64)(*ts)
 }
 
-func (ts *Timestamp) UnmarshalText(b []byte) error {
-	t, err := ParseTimeString(string(b))
-	if err != nil {
-		return err
+func (ts *Timestamp) UnmarshalJSON(b []byte) error {
+	var iVal interface{}
+	err := json.Unmarshal(b, &iVal)
+	if err == nil {
+		err = ts.Scan(iVal)
 	}
-	*ts = t
-	return nil
+	return err
 }
 
 // Scan implements sql.Scanner
@@ -109,6 +109,10 @@ func (ts *Timestamp) Scan(src interface{}) error {
 
 	case int64:
 		*ts = TimestampFromUnix(src)
+		return nil
+
+	case float64:
+		*ts = TimestampFromUnix(int64(src))
 		return nil
 
 	default:

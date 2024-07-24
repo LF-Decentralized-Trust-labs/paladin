@@ -25,6 +25,7 @@ import (
 	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 )
 
@@ -35,6 +36,7 @@ func NewUnitTestPersistence(ctx context.Context) (p Persistence, cleanup func(),
 		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
 	}
 	utdbName := "ut_" + fftypes.NewUUID().String()
+	log.L(ctx).Infof("Unit test Postgres DB: %s", utdbName)
 
 	// First create the database - using the super user
 	adminDB, err := sql.Open("postgres", dbURL("postgres"))

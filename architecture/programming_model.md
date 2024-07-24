@@ -104,6 +104,7 @@ Paladin provides a modular system for plugging in the off-chain half of your pri
 
 For more information see the following architecture pages:
 
+- [UTXO State Store](./uxto_state_store.md)
 - [Distributed Transaction Manager](./transaction_manager.md)
 - [Runtime Architecture](./runtime_architecture.md)
 
