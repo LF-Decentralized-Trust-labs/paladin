@@ -63,3 +63,52 @@ func TestStopDoneCtx(t *testing.T) {
 	}()
 	tw.stop()
 }
+
+func TestFlushTimeout(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	txOp := &writeOperation{
+		id:     types.ShortID(),
+		done:   make(chan error, 1),
+		domain: "domain1",
+	}
+	ss.writer.queue(ctx, txOp)
+	closedCtx, closeCtx := context.WithCancel(ctx)
+	closeCtx()
+	err := txOp.flush(closedCtx)
+	assert.Regexp(t, "FF00154", err)
+}
+
+func TestFlushClosed(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	txOp := &writeOperation{
+		id:     types.ShortID(),
+		done:   make(chan error, 1),
+		domain: "domain1",
+	}
+	ss.writer.cancelCtx()
+	<-ss.writer.workersDone[0]
+	ss.writer.workQueues[0] = make(chan *writeOperation)
+	ss.writer.queue(ctx, txOp)
+}
+
+func TestFlushCallerClosed(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	txOp := &writeOperation{
+		id:     types.ShortID(),
+		done:   make(chan error, 1),
+		domain: "domain1",
+	}
+	ss.writer.cancelCtx()
+	<-ss.writer.workersDone[0]
+	ss.writer.bgCtx = context.Background()
+	ss.writer.workQueues[0] = make(chan *writeOperation)
+	closedCtx, closeCtx := context.WithCancel(ctx)
+	closeCtx()
+	ss.writer.queue(closedCtx, txOp)
+}

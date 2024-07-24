@@ -15,3 +15,76 @@
 // limitations under the License.
 
 package statestore
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGetSchemaNotFoundNil(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	s, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), false)
+	assert.NoError(t, err)
+	assert.Nil(t, s)
+}
+
+func TestGetSchemaNotFoundError(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), true)
+	assert.Regexp(t, "PD010106", err)
+}
+
+func TestGetSchemaInvalidType(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows(
+		[]string{"type"},
+	).AddRow("wrong"))
+
+	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), true)
+	assert.Regexp(t, "PD010103.*wrong", err)
+}
+
+func TestGetSchemaInvalidHash(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := ss.GetSchema(ctx, "domain1", "wrong", true)
+	assert.Regexp(t, "PD010100", err)
+}
+
+func TestListSchemasListIDsFail(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	mdb.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("pop"))
+
+	_, err := ss.ListSchemas(ctx, "domain1")
+	assert.Regexp(t, "pop", err)
+}
+
+func TestListSchemasGetFullSchemaFail(t *testing.T) {
+	ctx, ss, mdb, done := newDBMockStateStore(t)
+	defer done()
+
+	hash := HashIDKeccak(([]byte)("test"))
+	mdb.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"hash_l", "hash_h"}).AddRow(
+		hash.L.String(), hash.H.String(),
+	))
+	mdb.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("pop"))
+
+	_, err := ss.ListSchemas(ctx, "domain1")
+	assert.Regexp(t, "pop", err)
+}
