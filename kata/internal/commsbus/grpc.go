@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type GRPCServer interface {
@@ -130,16 +131,21 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 		replyDestinationPtr = &replyDestination
 	}
 
+	body, err := msg.GetBody().UnmarshalNew()
+	if err != nil {
+		log.L(ctx).Error("Error unmarshalling message body", err)
+		return nil, err
+	}
+
 	commsbusMessage := Message{
 		Destination:   msg.GetDestination(),
-		Body:          []byte(msg.GetBody()),
+		Body:          body,
 		ID:            msg.GetId(),
-		Type:          msg.GetType(),
 		ReplyTo:       replyDestinationPtr,
 		CorrelationID: msg.CorrelationId,
 	}
 
-	err := s.messageBroker.SendMessage(ctx, commsbusMessage)
+	err = s.messageBroker.SendMessage(ctx, commsbusMessage)
 	if err != nil {
 		log.L(ctx).Error("Error sending message", err)
 		// Handle the error
@@ -152,14 +158,18 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 
 func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Event) (*proto.PublishEventResponse, error) {
 	log.L(ctx).Info("PublishEvent")
+	body, err := event.GetBody().UnmarshalNew()
+	if err != nil {
+		log.L(ctx).Error("Error unmarshalling event body", err)
+		return nil, err
+	}
 	commsbusEvent := Event{
 		ID:    event.GetId(),
 		Topic: event.GetTopic(),
-		Body:  []byte(event.GetBody()),
-		Type:  event.GetType(),
+		Body:  body,
 	}
 
-	err := s.messageBroker.PublishEvent(ctx, commsbusEvent)
+	err = s.messageBroker.PublishEvent(ctx, commsbusEvent)
 	if err != nil {
 		log.L(ctx).Error("Error publishing event", err)
 		// Handle the error
@@ -205,14 +215,18 @@ func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream p
 			return nil
 		case msg := <-messageHandler.Channel:
 			log.L(ctx).Info("Received message from comms bus to forward to client")
+			body, err := anypb.New(msg.Body)
+			if err != nil {
+				log.L(ctx).Error("Error marshalling message body", err)
+				return err
+			}
 
-			response := &proto.Message{
+			message := &proto.Message{
 				Id:            msg.ID,
-				Type:          msg.Type,
-				Body:          string(msg.Body),
+				Body:          body,
 				CorrelationId: msg.CorrelationID,
 			}
-			err := stream.Send(response)
+			err = stream.Send(message)
 			if err != nil {
 				log.L(ctx).Error("Error sending message", err)
 			}

@@ -30,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestBroker_SendMessageOK(t *testing.T) {
@@ -53,6 +54,9 @@ func TestBroker_SendMessageOK(t *testing.T) {
 	handler, err := testBroker.Listen(ctx, "test.destination")
 	require.NoError(t, err)
 
+	testMessage := "test message body"
+	strWrapper := wrapperspb.String(testMessage)
+
 	// spin up a thread to listen for messages
 	go func() {
 		for {
@@ -60,7 +64,9 @@ func TestBroker_SendMessageOK(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case message := <-handler.Channel:
-				assert.Equal(t, "test message body", string(message.Body))
+				require.Equal(t, "google.protobuf.StringValue", string(message.Body.ProtoReflect().Descriptor().FullName()))
+				assert.Equal(t, testMessage, message.Body.(*wrapperspb.StringValue).Value)
+
 				completionChan <- nil
 				return
 			}
@@ -70,7 +76,7 @@ func TestBroker_SendMessageOK(t *testing.T) {
 	// Create a test message
 	message := Message{
 		Destination: "test.destination",
-		Body:        []byte("test message body"),
+		Body:        strWrapper,
 		ReplyTo:     nil,
 	}
 
@@ -97,10 +103,12 @@ func TestBroker_SendMessageHandlerTimeout(t *testing.T) {
 
 	//NOTE we do no spin up a thread to listen for messages so the message delivery will time out
 
+	testMessage := "test message body"
+	strWrapper := wrapperspb.String(testMessage)
 	// Create a test message
 	message := Message{
 		Destination: "test.destination",
-		Body:        []byte("test message body"),
+		Body:        strWrapper,
 		ReplyTo:     nil,
 	}
 
@@ -141,10 +149,12 @@ func TestBroker_Unlisten(t *testing.T) {
 		}
 	}()
 
+	testMessage := "test message body"
+	strWrapper := wrapperspb.String(testMessage)
 	// Create a test message
 	message := Message{
 		Destination: "test.destination",
-		Body:        []byte("test message body"),
+		Body:        strWrapper,
 		ReplyTo:     nil,
 	}
 
@@ -198,6 +208,8 @@ func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 	handler, err := testBroker.Listen(ctx, "test.destination.1")
 	require.NoError(t, err)
 
+	testMessage := "test subscribe message body"
+
 	// spin up a thread to listen for messages
 	go func() {
 		for {
@@ -205,7 +217,9 @@ func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case message := <-handler.Channel:
-				assert.Equal(t, "test subscribe message body", string(message.Body))
+				require.Equal(t, "google.protobuf.StringValue", string(message.Body.ProtoReflect().Descriptor().FullName()))
+				assert.Equal(t, testMessage, message.Body.(*wrapperspb.StringValue).Value)
+
 				completionChan <- nil
 				return
 			}
@@ -217,7 +231,7 @@ func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 
 	event := Event{
 		Topic: "test.topic",
-		Body:  []byte("test subscribe message body"),
+		Body:  wrapperspb.String(testMessage),
 	}
 	// Call the PublishEvent method
 	err = testBroker.PublishEvent(ctx, event)
@@ -261,9 +275,10 @@ func TestBroker_UnSubscribeToTopicsOK(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a test event
+	eventBody := "test event body"
 	event := Event{
 		Topic: "test.topic",
-		Body:  []byte("test event body"),
+		Body:  wrapperspb.String(eventBody),
 	}
 
 	// Call the PublishEvent method

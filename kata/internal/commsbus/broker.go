@@ -24,6 +24,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"google.golang.org/protobuf/proto"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type BrokerConfig struct {
@@ -31,17 +33,15 @@ type BrokerConfig struct {
 
 type Message struct {
 	Destination   string
-	Body          []byte
+	Body          proto.Message
 	ReplyTo       *string
 	ID            string
 	CorrelationID *string
-	Type          string
 }
 
 type Event struct {
 	Topic         string
-	Body          []byte
-	Type          string
+	Body          protoreflect.ProtoMessage
 	ID            string
 	CorrelationID *string
 }
