@@ -13,9 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- 
-package io.kaleido.kata;
-import github.com.kaleido_io.paladin.kata.Kata;
-public interface ResponseHandler {
-    void onResponse(Kata.Message response);
+syntax = "proto3";
+
+package github.com.kaleido_io.paladin.kata;
+option go_package = "pkg/proto/plugins";
+
+message CreateInstance {
+    string messageDestination = 1;
 }
