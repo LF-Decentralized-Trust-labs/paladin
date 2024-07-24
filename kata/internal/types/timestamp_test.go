@@ -74,6 +74,13 @@ func TestTimestampJSONUnmarshalFail(t *testing.T) {
 	assert.Regexp(t, "FF00136", err)
 }
 
+func TestTimestampJSONUnmarshalNumber(t *testing.T) {
+	var utTimeTest UTTimeTest
+	err := json.Unmarshal([]byte(`{"t1": 981173106}`), &utTimeTest)
+	assert.NoError(t, err)
+	assert.Equal(t, "2001-02-03T04:05:06Z", utTimeTest.T1.String())
+}
+
 func TestNilTimeConversion(t *testing.T) {
 	var ts *Timestamp
 	var epoch time.Time

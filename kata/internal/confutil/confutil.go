@@ -18,9 +18,11 @@ package confutil
 
 import (
 	"context"
+	"math"
 	"os"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
@@ -62,7 +64,28 @@ func Bool(bVal *bool, def bool) bool {
 	return *bVal
 }
 
-func Duration(sVal *string, def string) time.Duration {
+func StringNotEmpty(sVal *string, def string) string {
+	if sVal == nil || *sVal == "" {
+		return def
+	}
+	return *sVal
+}
+
+func StringOrEmpty(sVal *string, def string) string {
+	if sVal == nil {
+		return def
+	}
+	return *sVal
+}
+
+func StringSlice(sVal []string, def []string) []string {
+	if sVal == nil {
+		return def
+	}
+	return sVal
+}
+
+func DurationMin(sVal *string, min time.Duration, def string) time.Duration {
 	var dVal *time.Duration
 	if sVal != nil {
 		d, err := time.ParseDuration(*sVal)
@@ -70,11 +93,31 @@ func Duration(sVal *string, def string) time.Duration {
 			dVal = &d
 		}
 	}
-	if dVal == nil {
+	if dVal == nil || *dVal < min {
 		defDuration, _ := time.ParseDuration(def)
-		return defDuration
+		dVal = &defDuration
 	}
 	return *dVal
+}
+
+func DurationSeconds(sVal *string, min time.Duration, def string) int64 {
+	d := DurationMin(sVal, min, def)
+	return (int64)(math.Ceil(d.Seconds()))
+}
+
+func ByteSize(sVal *string, min int64, def string) int64 {
+	var iVal *int64
+	if sVal != nil {
+		i, err := units.RAMInBytes(*sVal)
+		if err == nil {
+			iVal = &i
+		}
+	}
+	if iVal == nil || *iVal < min {
+		i, _ := units.RAMInBytes(def)
+		iVal = &i
+	}
+	return *iVal
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

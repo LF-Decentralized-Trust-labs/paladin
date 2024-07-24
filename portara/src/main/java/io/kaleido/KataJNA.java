@@ -17,10 +17,6 @@ package io.kaleido;
 import com.sun.jna.Native;
 import com.sun.jna.Library;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 public class KataJNA {
 
     private Thread kataThread;
@@ -37,8 +33,8 @@ public class KataJNA {
         paladinGo = Native.load("kata", PaladinGo.class);
     }
 
-    public synchronized void start(final String socketAddress) {
-        kataThread = new Thread(() -> paladinGo.Run(socketAddress));
+    public synchronized void start(final String configFilePath) {
+        kataThread = new Thread(() -> paladinGo.Run(configFilePath));
         kataThread.start();
     }
 
