@@ -178,6 +178,18 @@ func TestStateLockingQuery(t *testing.T) {
 	// check a sub-select
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, seqQual, 3)
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, StateStatusAvailable)
+
+	// clear the sequence locks
+	err = ss.ResetSequence(ctx, "domain1", seqID)
+	assert.NoError(t, err)
+
+	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
+	checkQuery(`{}`, StateStatusAvailable, 1, 2, 4) // added 1
+	checkQuery(`{}`, StateStatusLocked)             // removed 1, 3
+	checkQuery(`{}`, StateStatusConfirmed, 1, 2, 4) // unchanged
+	checkQuery(`{}`, StateStatusUnconfirmed, 3)     // unchanged
+	checkQuery(`{}`, StateStatusSpent, 0)           // unchanged
+	checkQuery(`{}`, seqQual)                       // removed 1, 3
 }
 
 func TestStateStatusQualifierJSON(t *testing.T) {

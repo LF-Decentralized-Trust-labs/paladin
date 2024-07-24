@@ -302,7 +302,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			// locks can be removed
 			err = tx.
 				Table("state_locks").
-				Delete("sequence IN (?)", sequenceLockDeletes).
+				Delete(&State{}, "sequence IN (?)", sequenceLockDeletes).
 				Error
 		}
 		return err

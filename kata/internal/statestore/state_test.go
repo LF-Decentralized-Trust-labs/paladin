@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -59,6 +60,38 @@ func TestGetStateMissing(t *testing.T) {
 
 	_, err := ss.GetState(ctx, "domain1", HashIDKeccak(([]byte)("state1")).String(), true, false)
 	assert.Regexp(t, "PD010112", err)
+}
+
+func TestGetStateBadID(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	_, err := ss.GetState(ctx, "domain1", "bad id", true, false)
+	assert.Regexp(t, "PD010100", err)
+}
+
+func TestMarkConfirmedBadID(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	err := ss.MarkConfirmed(ctx, "domain1", "bad id", uuid.New())
+	assert.Regexp(t, "PD010100", err)
+}
+
+func TestMarkSpentBadID(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	err := ss.MarkSpent(ctx, "domain1", "bad id", uuid.New())
+	assert.Regexp(t, "PD010100", err)
+}
+
+func TestMarkLockedBadID(t *testing.T) {
+	ctx, ss, _, done := newDBMockStateStore(t)
+	defer done()
+
+	err := ss.MarkLocked(ctx, "domain1", "bad id", uuid.New(), false, false)
+	assert.Regexp(t, "PD010100", err)
 }
 
 func TestFindStatesMissingSchema(t *testing.T) {

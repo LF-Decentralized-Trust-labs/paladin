@@ -240,7 +240,7 @@ func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, 
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) ClearLocked(ctx context.Context, domainID string, sequenceID uuid.UUID) error {
+func (ss *stateStore) ResetSequence(ctx context.Context, domainID string, sequenceID uuid.UUID) error {
 	op := ss.writer.newWriteOp(domainID)
 	op.sequenceLockDeletes = []uuid.UUID{sequenceID}
 
