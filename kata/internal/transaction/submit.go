@@ -88,7 +88,7 @@ func handleMessage(ctx context.Context, msg commsbus.Message) error {
 		}
 
 	default:
-		log.L(ctx).Infof("Received unknown message type", msgType)
+		log.L(ctx).Infof("Received unknown message type %s", msgType)
 		// TODO Handle unknown message types
 	}
 	return nil
