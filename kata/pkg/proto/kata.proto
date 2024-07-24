@@ -62,11 +62,10 @@ message ListenRequest {
 
 message Message {
   string   destination = 1;
-  string   type = 2;
-  string   id = 3;
-  optional string correlationId = 4;
-  google.protobuf.Any    body = 5;
-  optional string replyTo = 6;
+  string   id = 2;
+  optional string correlationId = 3;
+  google.protobuf.Any    body = 4;
+  optional string replyTo = 5;
 }
 
 enum SEND_MESSAGE_RESULT {
@@ -109,7 +108,6 @@ message SubscribeToTopicResponse {
 
 message Event {
   string topic = 1;
-  string type = 2;
-  string id = 3;
-  google.protobuf.Any  body = 4;
+  string id = 2;
+  google.protobuf.Any  body = 3;
 }
