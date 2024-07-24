@@ -66,6 +66,8 @@ message Message {
   optional string correlationId = 3;
   google.protobuf.Any    body = 4;
   optional string replyTo = 5;
+  optional string topic = 6;   // topic and event id are only set for messages that are sent to topic subscribers when an 
+  optional string eventId = 7; // event is published to that topic
 }
 
 enum SEND_MESSAGE_RESULT {
@@ -110,4 +112,9 @@ message Event {
   string topic = 1;
   string id = 2;
   google.protobuf.Any  body = 3;
+}
+
+// published whenever a lister is registered
+message NewListenerEvent {
+  string destination = 1;
 }

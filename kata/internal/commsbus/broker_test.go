@@ -28,11 +28,67 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
+func TestBroker_ListenOK(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create 2 listeners.  The first listener subscribes for new listerer events
+	// and then they will see that the 2nd listener has been created
+
+	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	require.NoError(t, err)
+
+	// Create a channel to signal test completion
+	completionChan := make(chan error)
+
+	// and set it up to time out with errror after 5 seconds
+	go func() {
+		// Simulate a timeout by sending an error to the channel after 5 seconds
+		time.Sleep(5 * time.Second)
+		// Send an error to the response channel
+		completionChan <- fmt.Errorf("Timed out")
+	}()
+
+	listener1Destination := "test.destination.1"
+	listener1, err := testBroker.Listen(ctx, listener1Destination)
+	require.NoError(t, err)
+
+	err = testBroker.SubscribeToTopic(ctx, TOPIC_NEW_LISTENER, listener1Destination)
+	require.NoError(t, err)
+
+	listener2Destination := "test.destination.2"
+	_, err = testBroker.Listen(ctx, listener2Destination)
+	require.NoError(t, err)
+
+	var getMessageForListener1 func() *pb.NewListenerEvent
+	getMessageForListener1 = func() *pb.NewListenerEvent {
+		select {
+		case receivedEventMessage := <-listener1.Channel:
+			require.NotNil(t, receivedEventMessage.Topic)
+			assert.Equal(t, "paladin.kata.commsbus.listener.new", *receivedEventMessage.Topic)
+			newListenerEvent, ok := receivedEventMessage.Body.(*pb.NewListenerEvent)
+			require.True(t, ok)
+			//there is a chance, given timing of goroutines that listener 1 actually get the event for itself starting up
+			if newListenerEvent.Destination == listener1Destination {
+				return getMessageForListener1()
+			}
+			return newListenerEvent
+		case <-completionChan:
+			require.Fail(t, "Timed out waiting for event")
+			return nil // unreachable because above line will panic
+		}
+	}
+
+	receivedEvent := getMessageForListener1()
+	assert.Equal(t, listener2Destination, receivedEvent.Destination)
+
+}
 func TestBroker_SendMessageOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
