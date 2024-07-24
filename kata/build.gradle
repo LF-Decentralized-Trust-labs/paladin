@@ -201,7 +201,9 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task cleanCoverage(type: Delete) {
+task setupCoverage(dependsOn: tasks.protoc) {
+    inputs.files(getProject().goFiles)
+    outputs.dir('coverage')
     doLast {
         delete fileTree (project.mkdir('coverage')) {
             include "coverage.txt"
@@ -209,12 +211,6 @@ task cleanCoverage(type: Delete) {
             include "covmeta.*"
         }
     }
-}
-
-task setupCoverage(dependsOn: tasks.protoc) {
-    inputs.files(getProject().goFiles)
-    outputs.dir('coverage')
-    finalizedBy tasks.cleanCoverage
 }
 
 task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
