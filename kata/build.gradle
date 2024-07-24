@@ -235,8 +235,9 @@ task aggregateCoverage(type: Exec, dependsOn: [tasks.protoc,
         tasks.componentTestSQLite,
         // tasks.componentTestPostgres
     ]) {
-    inputs.files(getProject().fileTree("${getProject().projectDir}/coverage").matching {
-        include "**/*.out"
+    inputs.files(fileTree(project.mkdir('coverage')) {
+        include "covcounters.*"
+        include "covmeta.*"
     })
     outputs.files('coverage/coverage.txt')
     executable 'go'
