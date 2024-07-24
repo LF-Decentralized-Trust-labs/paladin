@@ -212,7 +212,10 @@ func TestRunPointToPoint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, requestId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-	assert.Equal(t, body1, resp.GetBody())
+	receivedBody1, err := resp.GetBody().UnmarshalNew()
+	require.NoError(t, err)
+	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
+	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
 
 	stopListener()
 	// Stop the server
@@ -324,14 +327,21 @@ func TestPubSub(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, eventId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-	assert.Equal(t, body1, resp.GetBody())
+
+	receivedBody1, err := resp.GetBody().UnmarshalNew()
+	require.NoError(t, err)
+	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
+	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
 
 	resp, err = streams3.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
 	assert.Equal(t, eventId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-	assert.Equal(t, body1, resp.GetBody())
+	receivedBody1, err = resp.GetBody().UnmarshalNew()
+	require.NoError(t, err)
+	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
+	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
 
 	go func() {
 		_, err = streams4.Recv()
