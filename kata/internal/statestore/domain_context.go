@@ -492,7 +492,8 @@ func (dc *domainContext) flushOp(op *writeOperation, flushed chan error, success
 	flushed <- err
 	if err == nil {
 		for _, cb := range successCallbacks {
-			go dc.run(cb)
+			callback := cb
+			go func() { _ = dc.run(callback) }()
 		}
 	}
 }

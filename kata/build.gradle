@@ -242,8 +242,8 @@ task aggregateCoverage(type: Exec, dependsOn: [tasks.protoc,
     outputs.files('coverage/coverage.txt')
     executable 'go'
     args 'tool', 'covdata', 'textfmt'
-    args '-i', './coverage'
-    args '-o', './coverage/coverage.txt'
+    args '-i', "${projectDir}/coverage"
+    args '-o', "${projectDir}/coverage/coverage.txt"
 }
 
 task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
@@ -251,7 +251,7 @@ task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
     outputs.files([])
 
     doLast {
-        def coverageOutput = ("go tool cover -func=coverage/coverage.txt").execute().text
+        def coverageOutput = ("go tool cover -func=${projectDir}/coverage/coverage.txt").execute().text
         def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
         println "Coverage is ${totalCoverage}%"
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
@@ -280,6 +280,7 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
+    dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage
     dependsOn tasks.checkCoverage
@@ -294,11 +295,15 @@ configurations {
 }
 
 tasks.register('zipProtocFiles', Zip) {  
-    from fileTree("${projectDir}").matching {
+    from fileTree("${projectDir}/pkg").matching {
         include "**/*.proto"
+    }
+    eachFile { fcd ->
+        fcd.setRelativePath(fcd.relativePath.prepend("pkg"))
     }
     archiveFileName = "proto.zip"
     destinationDirectory = file("$projectDir")
+    includeEmptyDirs = false
     dependsOn('protoc')
 }
 
