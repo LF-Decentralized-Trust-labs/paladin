@@ -56,6 +56,9 @@ Define a `go_package` option in your `.proto` file following a similar naming co
  - `option go_package = "pkg/proto/plugin";`
  - `option go_package = "pkg/proto/transport";`
 
+NOTE:  techically, any protobuf message can be sent through the commsbus and across the gRPC interface ( even primitive types can be sent if wrapped e.g. using `google.golang.org/protobuf/types/known/wrapperspb`). 
+However, following a convention as above to define and document all message types is stongly encouraged and Paladin maintainers should reject any PRs where this convention is not followed. 
+
 ## Sending messages
 #### When sending over the internal comms bus golang function call
 Construct the body as any you would for any golang object, using the go types that were genenerated from the `.proto` files and then assign that object to the `Body` field of the message.
@@ -79,7 +82,33 @@ err := p.commsBus.Broker().SendMessage(ctx, busMessage)
 The body of the message is a `google.protobuf.Any` which is a serialised encoding of the data and the type.  The way you would marshal depends on your programming language.
 
 ##### Golang
-TODO
+Construct the golang object for the mesage body using the go types that were generated from the .proto files and then use that object to construct the `github.com/kaleido-io/paladin/kata/pkg/proto.Message` by first converting it to a `google.golang.org/protobuf/types/known/anypb.Any`  e.g. ...
+
+```golang
+import (
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	"google.golang.org/protobuf/types/known/anypb"
+)
+...
+...
+submitTransaction := transactionsPB.SubmitTransactionRequest{
+		From:            "fromID",
+		ContractAddress: "contract",
+		Payload: &transactionsPB.SubmitTransactionRequest_PayloadJSON{
+			PayloadJSON: "{\"foo\":\"bar\"}",
+		},
+	}
+
+	requestId := "requestID"
+	body, err := anypb.New(&submitTransaction)
+	submitTransactionRequest := &pb.Message{
+		Destination: "kata-txn-engine",
+		Id:          requestId,
+		Body:        body,
+        ...
+	}
+```
 
 ##### Java
 Construct the java object for the message body using the java classes that were generated from the .proto files and then use that object to construct the `Kata.Message` by first `Pack`ing it into a protobuf `any`.  e.g. using the builder pattern, it would look like...
