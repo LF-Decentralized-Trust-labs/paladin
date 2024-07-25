@@ -29,6 +29,9 @@ import (
 
 func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcbackend.RPCRequest) (*rpcbackend.RPCResponse, bool) {
 	if rpcReq.ID == nil {
+		// While the JSON/RPC standard does not strictly require an ID (it strongly discourages use of a null ID),
+		// we choose to make an ID mandatory. We do not enforce the type - it can be a number, string, or even boolean.
+		// However, it cannot be null.
 		err := i18n.NewError(ctx, msgs.MsgJSONRPCMissingRequestID)
 		return rpcbackend.RPCErrorResponse(err, rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false
 	}

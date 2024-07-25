@@ -185,7 +185,7 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 	}
 
 	// Scope the query based of the qualifier
-	q = q.Where(status.whereClause(ss.p.DB()))
+	q = q.Where(status.whereClause(db))
 
 	var states []*State
 	q = q.Find(&states)

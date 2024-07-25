@@ -38,7 +38,7 @@ func (qj *QueryJSON) BuildGORM(ctx context.Context, db *gorm.DB, fieldSet FieldS
 		jsonFilter: qj,
 		fieldSet:   fieldSet,
 	}
-	return qt.traverse(gt).Result().db
+	return qt.traverse(gt).T().db
 }
 
 type gormTraverser struct {
@@ -50,7 +50,7 @@ func (t *gormTraverser) NewRoot() Traverser[*gormTraverser] {
 	return &gormTraverser{rootDB: t.rootDB, db: t.rootDB}
 }
 
-func (t *gormTraverser) Result() *gormTraverser {
+func (t *gormTraverser) T() *gormTraverser {
 	return t
 }
 
@@ -79,7 +79,7 @@ func (t *gormTraverser) And(ot *gormTraverser) Traverser[*gormTraverser] {
 }
 
 func (t *gormTraverser) BuildOr(ot ...*gormTraverser) Traverser[*gormTraverser] {
-	or := t.NewRoot().Result()
+	or := t.NewRoot().T()
 	for _, o := range ot {
 		or.db = or.db.Or(o.db)
 	}

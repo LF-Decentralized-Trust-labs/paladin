@@ -28,7 +28,7 @@ import (
 )
 
 type Traverser[T any] interface {
-	Result() T
+	T() T
 	NewRoot() Traverser[T]
 	Error() error
 	WithError(err error) Traverser[T]
@@ -275,9 +275,9 @@ func (qt *queryTraverser[T]) BuildAndFilter(t Traverser[T], jf *FilterJSON) Trav
 			if sub.Error() != nil {
 				return sub
 			}
-			ors = append(ors, sub.Result())
+			ors = append(ors, sub.T())
 		}
-		t = t.And(t.BuildOr(ors...).Result())
+		t = t.And(t.BuildOr(ors...).T())
 	}
 	return t
 }

@@ -307,7 +307,7 @@ func TestMTLSMatchFullSubject(t *testing.T) {
 		CertFile:   serverPublicKeyFile,
 		KeyFile:    serverKeyFile,
 		ClientAuth: true,
-		RequiredDNAttributes: map[string]interface{}{
+		RequiredDNAttributes: map[string]string{
 			"cn":           `[a-z]+\.example\.com`,
 			"C":            "GB",
 			"O":            "hyperledger",
@@ -357,7 +357,7 @@ func TestMTLSMismatchSubject(t *testing.T) {
 		CertFile:   serverPublicKeyFile,
 		KeyFile:    serverKeyFile,
 		ClientAuth: true,
-		RequiredDNAttributes: map[string]interface{}{
+		RequiredDNAttributes: map[string]string{
 			"cn": `right\.example\.com`,
 		},
 	}, ServerType)
@@ -390,7 +390,7 @@ func TestMTLSInvalidDNConfUnknown(t *testing.T) {
 	_, err := BuildTLSConfig(context.Background(), &Config{
 		Enabled:    true,
 		ClientAuth: true,
-		RequiredDNAttributes: map[string]interface{}{
+		RequiredDNAttributes: map[string]string{
 			"unknown": "anything",
 		},
 	}, ServerType)
@@ -398,52 +398,37 @@ func TestMTLSInvalidDNConfUnknown(t *testing.T) {
 
 }
 
-func TestMTLSInvalidDNConfBadMap(t *testing.T) {
-
-	_, err := BuildTLSConfig(context.Background(), &Config{
-		Enabled:    true,
-		ClientAuth: true,
-		RequiredDNAttributes: map[string]interface{}{
-			"cn": map[string]interface{}{
-				"some": "nestedness",
-			},
-		},
-	}, ServerType)
-	assert.Regexp(t, "PD010904", err)
-
-}
-
 func TestMTLSInvalidDNConfBadRegexp(t *testing.T) {
 	_, err := BuildTLSConfig(context.Background(), &Config{
 		Enabled:    true,
 		ClientAuth: true,
-		RequiredDNAttributes: map[string]interface{}{
+		RequiredDNAttributes: map[string]string{
 			"cn": "((((open regexp",
 		},
 	}, ServerType)
-	assert.Regexp(t, "PD010905", err)
+	assert.Regexp(t, "PD010904", err)
 }
 
 func TestMTLSDNValidatorNotVerified(t *testing.T) {
 
-	testValidator, err := buildDNValidator(context.Background(), map[string]interface{}{
+	testValidator, err := buildDNValidator(context.Background(), map[string]string{
 		"cn": "test",
 	})
 	assert.NoError(t, err)
 
 	err = testValidator(nil, nil)
-	assert.Regexp(t, "PD010906", err)
+	assert.Regexp(t, "PD010905", err)
 }
 
 func TestMTLSDNValidatorEmptyChain(t *testing.T) {
 
-	testValidator, err := buildDNValidator(context.Background(), map[string]interface{}{
+	testValidator, err := buildDNValidator(context.Background(), map[string]string{
 		"cn": "test",
 	})
 	assert.NoError(t, err)
 
 	err = testValidator(nil, [][]*x509.Certificate{{}})
-	assert.Regexp(t, "PD010906", err)
+	assert.Regexp(t, "PD010905", err)
 
 }
 
