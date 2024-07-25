@@ -7,7 +7,7 @@ and other components, whichever language they are developed in, are expected to 
  
 It allows sending messages to specific destinations or broadcasting messages to all destinations subscribed to a topic.
 
-![Comms Bus](./doc/commsbus.png) 
+![Comms Bus](./doc/comms-bus.png) 
  
 This package implements the Broker interface, which defines the methods for sending messages, publishing events,
 listening for messages, unsubscribing from topics, and listing destinations.
