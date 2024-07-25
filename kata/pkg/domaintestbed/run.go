@@ -16,9 +16,49 @@
 package domaintestbed
 
 import (
-	"encoding/json"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-func run() {
-	json.Marshal("whatever")
+type TestBed interface {
+	ToDomain(req ToDomainRequest) (res ToDomainResponse, err error)
+	FromDomainUDS() string
+}
+
+type ToDomainRequestType int
+
+const (
+	CONFIG ToDomainRequestType = iota
+	INIT
+	DEPLOY
+	PLAN
+	ASSEMBLE
+	PREPARE
+)
+
+type ToDomainRequest struct {
+	Type                ToDomainRequestType
+	ConfigureDomain     *proto.ConfigureDomainRequest
+	InitDomain          *proto.InitDomainRequest
+	PrepareDeploy       *proto.PrepareDeployTransactionRequest
+	PlanTransaction     *proto.PlanTransactionRequest
+	AssembleTransaction *proto.AssembleTransactionRequest
+	PrepareTransaction  *proto.PrepareDeployTransactionRequest
+}
+
+type ToDomainResponse struct {
+	Type                ToDomainRequestType
+	ConfigureDomain     *proto.ConfigureDomainResponse
+	InitDomain          *proto.InitDomainResponse
+	PrepareDeploy       *proto.PrepareDeployTransactionResponse
+	PlanTransaction     *proto.PlanTransactionResponse
+	AssembleTransaction *proto.AssembleTransactionResponse
+	PrepareTransaction  *proto.PrepareDeployTransactionResponse
+}
+
+// Creating a testbed starts two gRPC servers:
+// 1) For making synchronous calls to the domain
+// 2) For the domain to make synchronous calls back to the test-bed during those calls
+// The testbed implements (2)
+func NewTestBed() TestBed {
+	return nil
 }

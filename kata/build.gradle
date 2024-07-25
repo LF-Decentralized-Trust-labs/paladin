@@ -14,6 +14,7 @@
  */
 
 import org.apache.tools.ant.taskdefs.condition.Os
+import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = files(
@@ -22,8 +23,11 @@ ext {
         getProject().fileTree("componenttest").matching { include "**/*.go" },
     )
 
-    targetCoverage = 83
+    targetCoverage = 91
     maxCoverageBarGap = 1
+    coverageExcludedPackages = [
+        'github.com/kaleido-io/paladin/kata/pkg/proto'
+    ]
 }
 
 task installTools(type:Exec) {
@@ -227,7 +231,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, t
 // task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
 // }
 
-task aggregateCoverage(type: Exec, dependsOn: [tasks.protoc,
+task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
         tasks.unitTestSQLite,
         tasks.unitTestPostgres,
         tasks.componentTestSQLite,
@@ -237,11 +241,22 @@ task aggregateCoverage(type: Exec, dependsOn: [tasks.protoc,
         include "covcounters.*"
         include "covmeta.*"
     })
-    outputs.files('coverage/coverage.txt')
+    outputs.files('coverage/coverage_unfiltered.txt')
     executable 'go'
     args 'tool', 'covdata', 'textfmt'
     args '-i', "${projectDir}/coverage"
-    args '-o', "${projectDir}/coverage/coverage.txt"
+    args '-o', "${projectDir}/coverage/coverage_unfiltered.txt"
+
+}
+
+task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
+    from 'coverage/coverage_unfiltered.txt'
+    into 'coverage'
+    outputs.files('coverage/coverage.txt')
+    eachFile { fcd ->
+        fcd.setRelativePath(fcd.relativePath.replaceLastName('coverage.txt'))
+    }
+    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages)
 }
 
 task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
