@@ -137,7 +137,7 @@ func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, v
 			}
 		}
 
-		// If we have a draw after al the field returns false from less() function
+		// If we have a draw after all the fields, return false from less() function
 		return false
 	}
 
