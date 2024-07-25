@@ -66,7 +66,7 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 			Where(`"Locked"."spending" IS NOT TRUE`). // not being spent - catches null case
 			Where(db.
 				Or(`"Confirmed"."transaction" IS NOT NULL`). // confirmed by the blockchain
-				Or(`"Locked"."minting" = TRUE`),             // being minted on a sequence
+				Or(`"Locked"."creating" = TRUE`),            // being minted on a sequence
 			)
 	case StateStatusConfirmed:
 		return db.

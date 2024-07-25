@@ -17,11 +17,11 @@ import org.apache.tools.ant.taskdefs.condition.Os
 import org.apache.tools.ant.filters.LineContains
 
 ext {
-    goFiles = files(
-        getProject().fileTree("internal").matching { include "**/*.go" },
-        getProject().fileTree("pkg").matching { include "**/*.go" },
-        getProject().fileTree("componenttest").matching { include "**/*.go" },
-    )
+    goFiles = fileTree(".") {
+        include "internal/**/*.go"
+        include "pkg/**/*.go"
+        include "componenttest/**/*.go"
+    }
 
     targetCoverage = 91
     maxCoverageBarGap = 1
@@ -36,11 +36,11 @@ task installTools(type:Exec) {
     executable 'go'
     args 'install'
     inputs.files('go.mod')
-    outputs.files([
-        "${projectDir}/bin/protoc-gen-go",
-        "${projectDir}/bin/protoc-gen-go-grpc",
-        "${projectDir}/bin/golangci-lint",
-    ])
+    outputs.files(
+        "bin/protoc-gen-go",
+        "bin/protoc-gen-go-grpc",
+        "bin/golangci-lint",
+    )
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
     args 'google.golang.org/protobuf/cmd/protoc-gen-go'
@@ -50,12 +50,8 @@ task installTools(type:Exec) {
 
 task protoc(type:Exec, dependsOn: tasks.installTools) {
     workingDir '.'
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.proto"
-    })
-    outputs.files(fileTree("${projectDir}").matching {
-        include "**/*.pb.go"
-    })
+    inputs.files(fileTree(".") { include "**/*.proto" })
+    outputs.files(fileTree(".") { include "**/*.pb.go" })
     environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
     executable 'protoc'
     args "--go_out=${projectDir}"
@@ -64,12 +60,15 @@ task protoc(type:Exec, dependsOn: tasks.installTools) {
     args inputs.files
 }
 
-task clean(type:Exec) {
-    workingDir '.'
-    // This will delete anything ignored with a .gitignore
-    executable 'git'
-    args "clean"
-    args "-fdX"
+task clean(type: Delete) {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
 }
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
@@ -87,7 +86,6 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files(goFiles);
-    outputs.files([]);
     environment 'GOGC', '20'
 
     executable "${projectDir}/bin/golangci-lint"
@@ -97,7 +95,6 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     args '--timeout', '5m'
 }
 
-// Must NOT depend on clean (which would delete all deliberately ignored files like .vscode config)
 task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     workingDir '.'
 
@@ -111,7 +108,7 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     }
 
     inputs.files(goFiles)
-    outputs.files([libName, 'libkata.h'])
+    outputs.files(libName, 'libkata.h')
 
     environment("CGO_ENABLED", "1")
 
@@ -207,7 +204,7 @@ abstract class ComponentTest extends Exec {
 }
 
 task setupCoverage(dependsOn: tasks.protoc) {
-    inputs.files(getProject().goFiles)
+    inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
         delete fileTree (project.mkdir('coverage')) {
@@ -228,8 +225,6 @@ task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.go
 task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
 }
 
-// task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
-// }
 
 task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
         tasks.unitTestSQLite,
@@ -261,7 +256,6 @@ task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
 
 task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
-    outputs.files([])
 
     doLast {
         def coverageOutput = ("go tool cover -func=${projectDir}/coverage/coverage.txt").execute().text
@@ -308,7 +302,7 @@ configurations {
 }
 
 tasks.register('zipProtocFiles', Zip) {  
-    from fileTree("${projectDir}/pkg").matching {
+    from fileTree("pkg") {
         include "**/*.proto"
     }
     eachFile { fcd ->
@@ -327,5 +321,3 @@ artifacts {
 dependencies {
     libkata files(buildSharedLibrary)
 }
-
-

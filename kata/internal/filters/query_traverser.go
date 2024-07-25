@@ -75,11 +75,21 @@ type queryTraverser[T any] struct {
 	fieldSet   FieldSet
 }
 
+type sortDirection string
+
+const (
+	directionAscending  sortDirection = "ASC"
+	directionDescending sortDirection = "DESC"
+)
+
 type sortField struct {
 	fieldName string
 	field     FieldResolver
-	sql       string
-	ascending bool
+	direction sortDirection
+}
+
+func (sf *sortField) sql() string {
+	return fmt.Sprintf("%s %s", sf.field.SQLColumn(), sf.direction)
 }
 
 func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
@@ -92,17 +102,17 @@ func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
 		if err != nil {
 			return t.WithError(err)
 		}
-		t = t.Order(tSortField.sql)
+		t = t.Order(tSortField.sql())
 	}
 	return qt.BuildAndFilter(t, &jf.FilterJSON)
 }
 
 func resolveSortField(ctx context.Context, fieldSet FieldSet, fieldName string) (*sortField, error) {
-	direction := "ASC"
+	direction := directionAscending
 	startEnd := strings.SplitN(fieldName, " ", 2)
 	fieldName, isNegated := strings.CutPrefix(startEnd[0], "-")
 	if isNegated || (len(startEnd) == 2 && strings.EqualFold(startEnd[1], "desc")) {
-		direction = "DESC"
+		direction = directionDescending
 	}
 	field, err := resolveField(ctx, fieldSet, fieldName)
 	if err != nil {
@@ -111,8 +121,7 @@ func resolveSortField(ctx context.Context, fieldSet FieldSet, fieldName string) 
 	return &sortField{
 		fieldName: fieldName,
 		field:     field,
-		sql:       fmt.Sprintf("%s %s", field.SQLColumn(), direction),
-		ascending: direction == "ASC",
+		direction: direction,
 	}, nil
 }
 
