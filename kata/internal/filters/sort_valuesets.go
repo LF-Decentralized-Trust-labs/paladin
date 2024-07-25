@@ -96,7 +96,7 @@ func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, v
 				sorter.SetError(err)
 			}
 
-			if !sortField.ascending {
+			if sortField.direction == directionDescending {
 				vI, vJ = vJ, vI
 			}
 
@@ -120,8 +120,10 @@ func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, v
 					if !ok {
 						sorter.SetError(i18n.NewError(ctx, msgs.MsgFiltersTypeErrorDuringCompare, vI, vJ))
 						compare = -1
-					} else {
-						compare = (vtI - vtJ)
+					} else if vtI > vtJ {
+						compare = 1
+					} else if vtI < vtJ {
+						compare = -1
 					}
 				default:
 					// We only support a limited number of types from field resolvers as above
@@ -135,7 +137,7 @@ func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, v
 			}
 		}
 
-		// If we have a draw after al the field returns false from less() function
+		// If we have a draw after all the fields, return false from less() function
 		return false
 	}
 

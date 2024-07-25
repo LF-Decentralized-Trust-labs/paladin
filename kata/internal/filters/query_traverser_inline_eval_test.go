@@ -701,7 +701,7 @@ func TestEvalQueryLikeFail(t *testing.T) {
 	assert.Regexp(t, "PD010715", res.Error())
 
 	res = eval.NewRoot()
-	assert.False(t, res.Result().int64LikeNotSupported(1, 1))
+	assert.False(t, res.T().int64LikeNotSupported(1, 1))
 	assert.Regexp(t, "PD010714", res.Error())
 }
 
@@ -828,8 +828,8 @@ func TestEvalQueryOrRollup(t *testing.T) {
 		matches: true,
 	}
 	res := eval.NewRoot().BuildOr(
-		eval.NewRoot().WithError(fmt.Errorf("pop")).Result(),
-		eval.NewRoot().Result(),
+		eval.NewRoot().WithError(fmt.Errorf("pop")).T(),
+		eval.NewRoot().T(),
 	)
 	assert.Regexp(t, "pop", res.Error())
 
