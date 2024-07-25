@@ -76,17 +76,40 @@ busMessage := commsbus.Message{
 err := p.commsBus.Broker().SendMessage(ctx, busMessage)
 ```
 #### When sending over a gRPC stream
+The body of the message is a `google.protobuf.Any` which is a serialised encoding of the data and the type.  The way you would marshal depends on your programming language.
+
 ##### Golang
 TODO
+
 ##### Java
-TODO
+Construct the java object for the message body using the java classes that were generated from the .proto files and then use that object to construct the `Kata.Message` by first `Pack`ing it into a protobuf `any`.  e.g. using the builder pattern, it would look like...
+```java
+import github.com.kaleido_io.paladin.kata.Kata;
+import github.com.kaleido_io.paladin.kata.transaction.Transaction;
+import com.google.protobuf.Any;
+Transaction.SubmitTransactionRequest submitTransactionRequest = Transaction.SubmitTransactionRequest.newBuilder()
+                .setContractAddress(this.contractAddress)
+                .setFrom(this.from)
+                .setIdempotencyKey(this.idempotencyKey)
+                .setPayloadJSON(this.payloadJSON)
+                .build();
+Any messageBody = Any.pack(submitTransactionRequest);
+Kata.Message message = Kata.Message.newBuilder()
+        .setBody(messageBody)
+        .setId(getId())
+        .setDestination("kata-txn-engine")
+        .setReplyTo(getTransactionHandler().getDestinationName())
+        .build();
+```
+TODO: the above is not the best example because the `SubmitTransactionRequest` itself has a field named `Payload` that could be confusing here.
+
 
 
 ## Receiveing messages
 ### To determine the type of the message
 
 #### When receiveing over a gRPC stream
-The body of the message is a `google.protobuf.Any` which is a serialised encoding of the data and the type.  The way you would inspect the actual type and / or unmarshal dependinds on your programming language.
+The body of the message is a `google.protobuf.Any` which is a serialised encoding of the data and the type.  The way you would inspect the actual type and / or unmarshal depends on your programming language.
 
 The type of the message should correspond to the name of the `message` in the .proto file, qualified by the name of the `package`.  E.g. the type for a `NewListenerEvent` event from the main kata.proto file is `github.com.kaleido_io.paladin.kata.NewListenerEvent` and the type for a `PluginReadyEvent` from the `plugin.proto` file is `github.com.kaleido_io.paladin.kata.plugin.PluginReadyEvent`
 
