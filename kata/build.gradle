@@ -89,6 +89,7 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     executable "${projectDir}/bin/golangci-lint"
     args 'run'
     args '-v'
+    args '--color=always'
     args '--timeout', '5m'
 }
 
