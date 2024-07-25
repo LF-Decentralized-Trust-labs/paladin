@@ -172,7 +172,7 @@ newListenerEvent, ok := receivedEventMessage.Body.(*pb.NewListenerEvent)
 ```
 
 
-If you don't know the type, you can query it using `reflect` package
+If you don't know the type, you can query it using `reflect` package and compare it to `TypeFor` of a pointer to the targe type.
 
 ```golang
 import "reflect
@@ -189,9 +189,9 @@ import (
 )
 ...
 switch reflect.TypeOf(receivedEvent.Body){
-  case reflect.TypeFor[pluginPB.PluginReadyEvent]:
+  case reflect.TypeFor[*pluginPB.PluginReadyEvent]:
     ...
-  case reflect.TypeFor[kataPB.NewListenerEvent]:
+  case reflect.TypeFor[*kataPB.NewListenerEvent]:
     ...
 }
 
