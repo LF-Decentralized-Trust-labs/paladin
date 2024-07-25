@@ -56,6 +56,19 @@ task protoc(type:Exec, dependsOn: tasks.installTools) {
     args inputs.files
 }
 
+task clean(type: Delete) {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete files(
+        "bin/protoc-gen-go",
+        "bin/protoc-gen-go-grpc",
+        "bin/golangci-lint",
+    )
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
+}
+
 task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
@@ -71,7 +84,6 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files(goFiles);
-    outputs.files([]);
     environment 'GOGC', '20'
 
     executable "${projectDir}/bin/golangci-lint"
