@@ -344,7 +344,7 @@ func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, d
 		s.Locked = &StateLock{
 			Sequence: sequenceID,
 			State:    s.State.Hash,
-			Minting:  true,
+			Creating: true,
 			Spending: false,
 		}
 		dc.unFlushed.states = append(dc.unFlushed.states, s)

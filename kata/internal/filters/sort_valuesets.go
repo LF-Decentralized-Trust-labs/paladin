@@ -96,7 +96,7 @@ func NewValueSetSorter[T WithValueSet](ctx context.Context, fieldSet FieldSet, v
 				sorter.SetError(err)
 			}
 
-			if !sortField.ascending {
+			if sortField.direction == directionDescending {
 				vI, vJ = vJ, vI
 			}
 

@@ -142,7 +142,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		err = dsi.MarkStatesSpending(uuid.New(), schemaHash, []string{tx1states[0].Hash.String()})
 		assert.Regexp(t, "PD010118", err)
 
-		// Query the states, and notice we find the ones that are still in the process of minting
+		// Query the states, and notice we find the ones that are still in the process of creating
 		// even though they've not yet been written to the DB
 		states, err := dsi.FindAvailableStates(schemaHash, toQuery(t, `{
 			"sort": [ "amount" ]
@@ -154,7 +154,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(10), parseFakeCoin(t, states[0]).Amount.Int64())
 		assert.Equal(t, int64(75), parseFakeCoin(t, states[1]).Amount.Int64())
 		assert.Equal(t, int64(100), parseFakeCoin(t, states[2]).Amount.Int64())
-		assert.True(t, states[0].Locked.Minting)               // should be marked minting
+		assert.True(t, states[0].Locked.Creating)              // should be marked creating
 		assert.Equal(t, sequenceID, states[0].Locked.Sequence) // for the sequence we specified
 
 		// Simulate a transaction where we spend two states, and create 2 new ones
@@ -365,7 +365,7 @@ func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
 		types.RandHex(32))))
 	assert.NoError(t, err)
-	s1.Locked = &StateLock{State: s1.Hash, Sequence: uuid.New(), Minting: true}
+	s1.Locked = &StateLock{State: s1.Hash, Sequence: uuid.New(), Creating: true}
 
 	dc.flushing = &writeOperation{
 		states: []*StateWithLabels{s1},
