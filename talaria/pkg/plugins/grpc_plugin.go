@@ -32,7 +32,6 @@ import (
 	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 /*
@@ -186,7 +185,20 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 			return err
 		}
 
-		conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		outboundCertPool := x509.NewCertPool()
+		ok := outboundCertPool.AppendCertsFromPEM([]byte(routingInfo.CACertificate))
+		if !ok {
+			log.L(ctx).Errorf("Unable to append CA to the pool for outbound client connection")
+			continue
+		}
+
+		outboundTLSConfig := &tls.Config{
+			Certificates: []tls.Certificate{gtp.clientCertificate},
+			RootCAs: outboundCertPool,
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		conn, err := grpc.NewClient(routingInfo.Address, grpc.WithTransportCredentials(credentials.NewTLS(outboundTLSConfig)))
 		if err != nil {
 			log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
 		}
@@ -213,8 +225,8 @@ func (gtp *GRPCTransportPlugin) Status(ctx context.Context, _ *pluginInterfacePr
 // --------------------------------------------------------------------------------------------------------------------------
 
 func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
-	gtp.startPluginServer(ctx)
 	gtp.startInterPaladinMessageServer(ctx)
+	gtp.startPluginServer(ctx)
 }
 
 func (gtp *GRPCTransportPlugin) AddNewKnownPeer(cert RawPemCertificate) (ok bool) {

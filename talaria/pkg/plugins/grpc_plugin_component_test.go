@@ -102,6 +102,12 @@ func TestMessageSendRecieveFlowFromSingleSender(t *testing.T) {
 		}
 	}()
 
+	// Provide the CA that the client is configured with and check that the comms work
+	caCert, err := os.ReadFile(pluginCAPath)
+	assert.NoError(t, err)
+	ok := gp.AddNewKnownPeer(caCert)
+	assert.Equal(t, true, ok)
+
 	// Send a message that does will not verify over mTLS and check that the comms do not work
 	routeInfo := &GRPCRoutingInformation{
 		Address: fmt.Sprintf("localhost:%d", externalTestingPluginPort),
@@ -113,10 +119,6 @@ func TestMessageSendRecieveFlowFromSingleSender(t *testing.T) {
 		Payload: []byte("FAIL"),
 		RoutingInformation: sri,
 	})
-
-	// Provide the CA that the client is configured with and check that the comms work
-	caCert, err := os.ReadFile(pluginCAPath)
-	assert.NoError(t, err)
 
 	routeInfo = &GRPCRoutingInformation{
 		Address: fmt.Sprintf("localhost:%d", externalTestingPluginPort),
