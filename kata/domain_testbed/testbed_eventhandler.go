@@ -30,7 +30,7 @@ import (
 
 var DOMAIN_API_ERROR = string((&proto.DomainAPIError{}).ProtoReflect().Descriptor().FullName())
 var CONFIGURE_REQUEST = string((&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName())
-var CONFIGURE_RESPONSE = string((&proto.ConfigureDomainResponse{}).ProtoReflect().Descriptor().FullName())
+var INIT_DOMAIN_REQUEST = string((&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName())
 
 type inflightRequest struct {
 	req    *commsbus.Message
@@ -77,7 +77,7 @@ func (tb *testbed) clearInFlight(inFlight *inflightRequest) {
 	delete(tb.inflight, inFlight.req.ID)
 }
 
-func (tb *testbed) syncExchangeToDomain(ctx context.Context, reqType string, in, out pb.Message) error {
+func (tb *testbed) syncExchangeToDomain(ctx context.Context, in, out pb.Message) error {
 
 	jsonIn, err := protojson.Marshal(in)
 	if err != nil {
@@ -89,7 +89,7 @@ func (tb *testbed) syncExchangeToDomain(ctx context.Context, reqType string, in,
 		ReplyTo:     &tb.destFromDomain,
 		ID:          id,
 		Body:        jsonIn,
-		Type:        reqType,
+		Type:        string(in.ProtoReflect().Descriptor().FullName()),
 	}
 	inFlight := tb.addInflight(ctx, &requestMsg)
 	defer tb.clearInFlight(inFlight)

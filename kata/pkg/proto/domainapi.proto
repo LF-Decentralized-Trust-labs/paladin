@@ -20,8 +20,9 @@ option go_package = "pkg/proto";
 
 // **CONFIGURE** happens once when the domain is loaded into Paladin
 message ConfigureDomainRequest {
-    string config_yaml = 1; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
-    string chain_id = 2; // The chain_id of the underlying base ledger on which all smart contracts are deployed
+    string name = 1; // The name
+    string config_yaml = 2; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
+    int64 chain_id = 3; // The chain_id of the underlying base ledger on which all smart contracts are deployed
 }
 
 message ConfigureDomainResponse {

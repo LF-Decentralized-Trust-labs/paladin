@@ -62,16 +62,19 @@ type testbed struct {
 	destFromDomain string
 	inflight       map[string]*inflightRequest
 	inflightLock   sync.Mutex
+	domainRegistry map[string]*testbedDomain
+	domainLock     sync.Mutex
 	ready          chan struct{}
 	done           chan struct{}
 }
 
 func newTestBed() (tb *testbed) {
 	tb = &testbed{
-		sigc:     make(chan os.Signal, 1),
-		inflight: make(map[string]*inflightRequest),
-		ready:    make(chan struct{}),
-		done:     make(chan struct{}),
+		sigc:           make(chan os.Signal, 1),
+		inflight:       make(map[string]*inflightRequest),
+		domainRegistry: make(map[string]*testbedDomain),
+		ready:          make(chan struct{}),
+		done:           make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	return tb

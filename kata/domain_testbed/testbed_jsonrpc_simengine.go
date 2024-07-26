@@ -18,12 +18,9 @@ package main
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"google.golang.org/protobuf/encoding/protojson"
-	pb "google.golang.org/protobuf/proto"
 )
 
 func (tb *testbed) initRPC() error {
@@ -35,22 +32,33 @@ func (tb *testbed) initRPC() error {
 }
 
 func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod1(func(ctx context.Context,
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		name string,
 		domainConfig types.RawJSON,
-	) (types.RawJSON, error) {
-		var req proto.ConfigureDomainRequest
-		var res proto.ConfigureDomainResponse
-		req.ConfigYaml = string(domainConfig)
-		err := tb.syncExchangeToDomain(ctx, string(req.ProtoReflect().Descriptor().FullName()), &req, &res)
-		return tb.rpcProtoResponse(&res, err)
-	})
-}
+	) (bool, error) {
 
-func (tb *testbed) rpcProtoResponse(res pb.Message, err error) (types.RawJSON, error) {
-	if err != nil {
-		return nil, err
-	}
-	b, err := protojson.Marshal(res)
-	log.L(tb.ctx).Infof("JSON/RPC response: %s", b)
-	return b, err
+		// First we call configure on the domain
+		var configRes proto.ConfigureDomainResponse
+		err := tb.syncExchangeToDomain(ctx, &proto.ConfigureDomainRequest{
+			Name:       name,
+			ConfigYaml: string(domainConfig),
+			ChainId:    1122334455, // TODO: Get from Besu
+		}, &configRes)
+		if err != nil {
+			return false, err
+		}
+
+		// Then we store all the new domain in the sim registry
+		initReq, err := tb.registerDomain(ctx, name, configRes.DomainConfig)
+		if err != nil {
+			return false, err
+		}
+		var initRes proto.ConfigureDomainResponse
+		err = tb.syncExchangeToDomain(ctx, initReq, &initRes)
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	})
 }

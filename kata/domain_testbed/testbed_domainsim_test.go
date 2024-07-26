@@ -32,9 +32,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/encoding/protojson"
+	pb "google.golang.org/protobuf/proto"
 )
 
-type domainSimulatorFn func(reqJSON []byte) (string, []byte, error)
+type domainSimulatorFn func(reqJSON []byte) (pb.Message, error)
 
 type domainSimulator struct {
 	tb              *testbed
@@ -78,28 +79,26 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 			return
 		case msgToDomain := <-toDomain.Channel:
 			handler := ds.messageHandlers[msgToDomain.Type]
-			var res []byte
+			var res pb.Message
 			var err error
-			var msgType string
 			if handler == nil {
-				err = fmt.Errorf("no handler for type %s", err)
+				err = fmt.Errorf("no handler for type %s", msgToDomain.Type)
 			} else {
 				log.L(tb.ctx).Infof("Calling simulation of %s", msgToDomain.Type)
-				msgType, res, err = handler(msgToDomain.Body)
+				res, err = handler(msgToDomain.Body)
 			}
 			if err != nil {
-				errMsg := &proto.DomainAPIError{
+				res = &proto.DomainAPIError{
 					ErrorMessage: err.Error(),
 				}
-				res, _ = protojson.Marshal(errMsg)
-				msgType = DOMAIN_API_ERROR
 			}
+			resBytes, _ := protojson.Marshal(res)
 			_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
 				ID:            uuid.New().String(),
-				Type:          msgType,
+				Type:          string(res.ProtoReflect().Descriptor().FullName()),
 				CorrelationID: &msgToDomain.ID,
 				Destination:   *msgToDomain.ReplyTo,
-				Body:          res,
+				Body:          resBytes,
 			})
 		}
 	}
@@ -107,6 +106,14 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 
 func (ds *domainSimulator) waitDone() {
 	<-ds.done
+}
+
+func simRequestToProto[T any](t *testing.T, reqJSON []byte) *T {
+	protoMsg := new(T)
+	var iPM interface{} = protoMsg
+	err := protojson.Unmarshal(reqJSON, iPM.(pb.Message))
+	assert.NoError(t, err)
+	return protoMsg
 }
 
 func newSimulatorRPCClient(t *testing.T, url string) func(method string, params ...interface{}) error {
