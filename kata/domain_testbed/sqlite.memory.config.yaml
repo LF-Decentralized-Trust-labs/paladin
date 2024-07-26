@@ -1,0 +1,6 @@
+db:
+  type: sqlite
+  sqlite:
+    uri: ':memory:'
+    autoMigrate: true
+    migrationsDir: './db/migrations/sqlite'

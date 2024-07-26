@@ -62,8 +62,8 @@ import (
 )
 
 type Config struct {
-	Broker *BrokerConfig `yaml:"broker"`
-	GRPC   *GRPCConfig   `yaml:"grpc"`
+	Broker BrokerConfig `yaml:"broker"`
+	GRPC   GRPCConfig   `yaml:"grpc"`
 }
 
 type CommsBus interface {
@@ -78,13 +78,13 @@ func NewCommsBus(ctx context.Context, conf *Config) (CommsBus, error) {
 		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "commsBus")
 	}
 
-	broker, err := newBroker(ctx, conf.Broker)
+	broker, err := newBroker()
 	if err != nil {
 		log.L(ctx).Error("Failed to create broker", err)
 		return nil, err
 	}
 
-	grpcServer, err := newGRPCServer(ctx, broker, conf.GRPC)
+	grpcServer, err := newGRPCServer(ctx, broker, &conf.GRPC)
 	if err != nil {
 		log.L(ctx).Error("Failed to create grpc server", err)
 		return nil, err

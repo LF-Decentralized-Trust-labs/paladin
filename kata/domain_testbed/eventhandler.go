@@ -13,20 +13,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package kata
+package main
 
 import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 )
 
-func Stop(ctx context.Context, socketAddress string) {
-	log.L(ctx).Infof("Stop: %s", socketAddress)
-	if commsBus != nil {
-		err := commsBus.GRPCServer().Stop(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("Failed to stop GRPC server: %s", err)
+func eventHandler(ctx context.Context, fromDomain commsbus.MessageHandler) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.L(ctx).Infof("Testbed event handler shutting down")
+			return
+		case msgFromDomain := <-fromDomain.Channel:
+			handleFromDomain(ctx, msgFromDomain)
 		}
 	}
+}
+
+func handleFromDomain(ctx context.Context, msgToDomain commsbus.Message) {
+
 }
