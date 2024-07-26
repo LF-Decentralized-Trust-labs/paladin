@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -48,24 +49,29 @@ func main() {
 }
 
 type testbed struct {
-	ctx        context.Context
-	cancelCtx  context.CancelFunc
-	conf       *TestBedConfig
-	sigc       chan os.Signal
-	rpcServer  rpcserver.Server
-	stateStore statestore.StateStore
-	bus        commsbus.CommsBus
-	fromDomain commsbus.MessageHandler
-	socketFile string
-	ready      chan struct{}
-	done       chan struct{}
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	conf           *TestBedConfig
+	sigc           chan os.Signal
+	rpcServer      rpcserver.Server
+	stateStore     statestore.StateStore
+	bus            commsbus.CommsBus
+	fromDomain     commsbus.MessageHandler
+	socketFile     string
+	destToDomain   string
+	destFromDomain string
+	inflight       map[string]*inflightRequest
+	inflightLock   sync.Mutex
+	ready          chan struct{}
+	done           chan struct{}
 }
 
 func newTestBed() (tb *testbed) {
 	tb = &testbed{
-		sigc:  make(chan os.Signal, 1),
-		ready: make(chan struct{}),
-		done:  make(chan struct{}),
+		sigc:     make(chan os.Signal, 1),
+		inflight: make(map[string]*inflightRequest),
+		ready:    make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	return tb
@@ -114,6 +120,8 @@ func (tb *testbed) setupConfig(args []string) error {
 	if err != nil {
 		return err
 	}
+	tb.destFromDomain = confutil.StringNotEmpty(tb.conf.Destinations.FromDomain, "from-domain")
+	tb.destToDomain = confutil.StringNotEmpty(tb.conf.Destinations.ToDomain, "to-domain")
 	return nil
 }
 
@@ -151,10 +159,12 @@ func (tb *testbed) run() error {
 
 	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
 	tb.rpcServer, err = rpcserver.NewServer(tb.ctx, &tb.conf.RPC)
+	if err == nil {
+		err = tb.initRPC()
+	}
 	if err != nil {
 		return fmt.Errorf("RPC init failed: %s", err)
 	}
-	tb.initRPC()
 
 	go tb.listenTerm()
 

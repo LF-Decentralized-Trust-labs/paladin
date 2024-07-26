@@ -147,3 +147,7 @@ message BaseLedgerTransaction {
     string params_json = 2; // The parameters to pass to the base smart contract, in JSON format. Paladin will submit this tranaction to the base blockchain
     string signing_address = 3; // The identifier of a signing address to use to submit the transaction to the chain. Uses standard Paladin resolution of signing addresses (including dynamic allocation, if for example the transaction_id is supplied as part of the string to require a different key for each TX)
 }
+
+message DomainAPIError {
+    string error_message = 1;
+}

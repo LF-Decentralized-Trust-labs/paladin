@@ -16,20 +16,24 @@
 package main
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"fmt"
+	"testing"
+
+	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/stretchr/testify/assert"
 )
 
-type TestBedConfig struct {
-	CommsBus     commsbus.Config    `yaml:"bus"`
-	DB           persistence.Config `yaml:"db"`
-	RPC          rpcserver.Config   `yaml:"rpc"`
-	StateStore   statestore.Config  `yaml:"statestore"`
-	TempDir      *string            `yaml:"tempDir"`
-	Destinations struct {
-		ToDomain   *string `yaml:"toDomain"`
-		FromDomain *string `yaml:"fromDomain"`
-	} `yaml:"destinations"`
+// Example of how someone might use this testbed externally
+func TestE2E1(t *testing.T) {
+
+	rpcCall, done := newDomainSimulator(t, map[string]domainSimulatorFn{
+		CONFIGURE_REQUEST: func(reqJSON []byte) (string, []byte, error) {
+			return CONFIGURE_RESPONSE, nil, fmt.Errorf("POP")
+		},
+	})
+	defer done()
+
+	err := rpcCall("testbed_configureInit", types.RawJSON(`{
+	}`))
+	assert.Regexp(t, "POP", err)
 }

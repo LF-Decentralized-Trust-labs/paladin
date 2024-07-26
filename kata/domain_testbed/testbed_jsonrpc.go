@@ -18,22 +18,39 @@ package main
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"google.golang.org/protobuf/encoding/protojson"
+	pb "google.golang.org/protobuf/proto"
 )
 
-func (tb *testbed) initRPC() {
+func (tb *testbed) initRPC() error {
 	tb.rpcServer.Register(tb.stateStore.RPCModule())
 	tb.rpcServer.Register(rpcserver.NewRPCModule("testbed").
-		Add("testbed_simulateDeploy", tb.rpcTestbedSimulateTransaction()),
+		Add("testbed_configureInit", tb.rpcTestbedConfigureInit()),
 	)
+	return tb.rpcServer.Start()
 }
 
-func (tb *testbed) rpcTestbedSimulateTransaction() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod2(func(ctx context.Context,
-		domain string,
-		function abi.Entry,
-	) (string, error) {
-		return "", nil
+func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		domainConfig types.RawJSON,
+	) (types.RawJSON, error) {
+		var req proto.ConfigureDomainRequest
+		var res proto.ConfigureDomainResponse
+		req.ConfigYaml = string(domainConfig)
+		err := tb.syncExchangeToDomain(ctx, string(req.ProtoReflect().Descriptor().FullName()), &req, &res)
+		return tb.rpcProtoResponse(&res, err)
 	})
+}
+
+func (tb *testbed) rpcProtoResponse(res pb.Message, err error) (types.RawJSON, error) {
+	if err != nil {
+		return nil, err
+	}
+	b, err := protojson.Marshal(res)
+	log.L(tb.ctx).Infof("JSON/RPC response: %s", b)
+	return b, err
 }

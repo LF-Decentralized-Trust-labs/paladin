@@ -81,11 +81,6 @@ func TestCommandLineRunFail(t *testing.T) {
 	assert.Equal(t, 1, exitCode)
 }
 
-func TestStartStopOK(t *testing.T) {
-	_, _, done := newUnitTestbed(t)
-	defer done()
-}
-
 func TestBadConfig(t *testing.T) {
 	err := newTestBed().setupConfig([]string{"unittestbed", t.TempDir()})
 	assert.Error(t, err)
