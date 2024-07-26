@@ -86,7 +86,7 @@ func NewCommsBus(ctx context.Context, conf *Config) (CommsBus, error) {
 
 	grpcServer, err := newGRPCServer(ctx, broker, &conf.GRPC)
 	if err != nil {
-		log.L(ctx).Error("Failed to create grpc server", err)
+		log.L(ctx).Errorf("Failed to create grpc server: %s", err)
 		return nil, err
 	}
 

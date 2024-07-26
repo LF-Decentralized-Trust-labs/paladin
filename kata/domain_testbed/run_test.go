@@ -16,15 +16,38 @@
 package main
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"fmt"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-type TestBedConfig struct {
-	CommsBus   commsbus.Config    `yaml:"bus"`
-	DB         persistence.Config `yaml:"db"`
-	RPC        rpcserver.Config   `yaml:"rpc"`
-	StateStore statestore.Config  `yaml:"statestore"`
+func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
+
+	tb, err := newTestBed([]string{"unittestbed", "./sqlite.memory.config.yaml"})
+	assert.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
+	var serverErr error
+	go func() {
+		serverErr = tb.run()
+	}()
+	<-tb.ready
+
+	return fmt.Sprintf("http://%s", tb.rpcServer.HTTPAddr()), tb, func() {
+		select {
+		case tb.sigc <- os.Kill:
+		default:
+		}
+		<-tb.done
+		assert.NoError(t, serverErr)
+	}
+
+}
+
+func TestStartStop(t *testing.T) {
+	_, _, done := newUnitTestbed(t)
+	defer done()
 }

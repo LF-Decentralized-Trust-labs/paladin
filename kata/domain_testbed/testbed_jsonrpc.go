@@ -16,15 +16,24 @@
 package main
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"context"
+
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 )
 
-type TestBedConfig struct {
-	CommsBus   commsbus.Config    `yaml:"bus"`
-	DB         persistence.Config `yaml:"db"`
-	RPC        rpcserver.Config   `yaml:"rpc"`
-	StateStore statestore.Config  `yaml:"statestore"`
+func (tb *testbed) initRPC() {
+	tb.rpcServer.Register(tb.stateStore.RPCModule())
+	tb.rpcServer.Register(rpcserver.NewRPCModule("testbed").
+		Add("testbed_simulateDeploy", tb.rpcTestbedSimulateTransaction()),
+	)
+}
+
+func (tb *testbed) rpcTestbedSimulateTransaction() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		domain string,
+		function abi.Entry,
+	) (string, error) {
+		return "", nil
+	})
 }

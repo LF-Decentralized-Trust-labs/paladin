@@ -16,24 +16,22 @@
 package main
 
 import (
-	"context"
-
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 )
 
-func eventHandler(ctx context.Context, fromDomain commsbus.MessageHandler) {
+func (tb *testbed) eventHandler() {
 	for {
 		select {
-		case <-ctx.Done():
-			log.L(ctx).Infof("Testbed event handler shutting down")
+		case <-tb.ctx.Done():
+			log.L(tb.ctx).Infof("Testbed event handler shutting down")
 			return
-		case msgFromDomain := <-fromDomain.Channel:
-			handleFromDomain(ctx, msgFromDomain)
+		case msgFromDomain := <-tb.fromDomain.Channel:
+			tb.handleFromDomain(msgFromDomain)
 		}
 	}
 }
 
-func handleFromDomain(ctx context.Context, msgToDomain commsbus.Message) {
+func (tb *testbed) handleFromDomain(msgToDomain commsbus.Message) {
 
 }
