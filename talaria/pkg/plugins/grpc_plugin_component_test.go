@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"sync"
 	"testing"
@@ -81,12 +80,13 @@ func TestMessageSendRecieveFlowFromSingleSender(t *testing.T) {
 
 	client := pluginInterfaceProto.NewPluginInterfaceClient(conn)
 	stream, err := client.PluginMessageFlow(context.Background())
+	defer stream.CloseSend()
 	
 	assert.Nil(t, err)
 
+	messages := make(chan []byte, 10)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	messages := make(chan []byte, 10)
 	go func() {
 		for {
 			returnedMessage, err := stream.Recv()
@@ -98,7 +98,7 @@ func TestMessageSendRecieveFlowFromSingleSender(t *testing.T) {
 
 			messages <- []byte(returnedMessage.Payload)
 			wg.Done()
-			// stream.CloseSend()
+			return
 		}
 	}()
 
@@ -132,7 +132,8 @@ func TestMessageSendRecieveFlowFromSingleSender(t *testing.T) {
 	})
 
 	wg.Wait()
-	assert.NoError(t, err)
+	msg := <-messages
+	assert.Equal(t, []byte("PASS"), msg)
 }
 
 func TestSingleMessageRecieveFlowFromMultipleSenders(t *testing.T) {
@@ -155,6 +156,8 @@ func TestSingleMessageRecieveFlowFromMultipleSenders(t *testing.T) {
 	// create stream
 	client := pluginInterfaceProto.NewPluginInterfaceClient(conn)
 	stream, err := client.PluginMessageFlow(context.Background())
+	defer stream.CloseSend()
+
 	assert.Nil(t, err)
 
 	// Read back messages from the plugin
@@ -244,70 +247,6 @@ func TestSingleMessageRecieveFlowFromMultipleSenders(t *testing.T) {
 	// And if we look at the content of the message, it should be the pass message
 	msg := <- messages
 	assert.Equal(t, []byte("PASS"), msg)
-}
-
-func TestMessageFlowSingleMessage(t *testing.T) {
-	// To show messaging working from one end to another, we're going ot make the plugin make a connection
-	// to itself on localhost and then vertify that we're able to see the message coming through to the channel
-	//
-	// Essentially this test is pretending that it's Talaria
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	gp, err := getTestGRPCPlugin(ctx)
-	assert.NoError(t, err)
-
-	conn, err := grpc.NewClient(fmt.Sprintf("unix://%s", gp.SocketName), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.Nil(t, err)
-	defer conn.Close()
-
-	// create stream
-	client := pluginInterfaceProto.NewPluginInterfaceClient(conn)
-	stream, err := client.PluginMessageFlow(context.Background())
-	assert.Nil(t, err)
-
-	messages := make(chan []byte, 10)
-
-	// Start a routine for listening to messages from the plugin, store the outputs in a buffered channel
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for {
-			returnedMessage, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else {
-				assert.Nil(t, err)
-			}
-
-			messages <- []byte(returnedMessage.Payload)
-
-			// When we get 10 messages in the channel, let's exit
-			if len(messages) == 10 {
-				wg.Done()
-				return
-			}
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		for i := 0; i < 10; i++ {
-			req := &pluginInterfaceProto.PaladinMessage{
-				Payload:            []byte("Hello, World!"),
-				RoutingInformation: []byte("{\"address\":\"localhost:10001\"}"),
-			}
-			if err := stream.Send(req); err != nil {
-				log.Fatalf("can not send %v", err)
-			}
-		}
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	// Verify after the flow is complete that we have 10 messages in our buffer
-	assert.Equal(t, 10, len(messages))
 }
 
 func TestGetRegistration(t *testing.T) {
