@@ -31,16 +31,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var exitProcess = os.Exit
+
 // The domain testbed runs a comms bus, and hosts a Domain State Interface
 // It provides RPC functions to invoke the domain directly
 func main() {
-	tb, err := newTestBed(os.Args)
+	tb := newTestBed()
+	err := tb.setupConfig(os.Args)
 	if err == nil {
 		err = tb.run()
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
+		exitProcess(1)
 	}
 }
 
@@ -58,33 +61,14 @@ type testbed struct {
 	done       chan struct{}
 }
 
-func newTestBed(args []string) (tb *testbed, err error) {
+func newTestBed() (tb *testbed) {
 	tb = &testbed{
 		sigc:  make(chan os.Signal, 1),
 		ready: make(chan struct{}),
 		done:  make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
-	if tb.conf, err = tb.setupConfig(args); err != nil {
-		return nil, err
-	}
-	return tb, nil
-}
-
-func (tb *testbed) randSocket(baseDir string) (string, error) {
-	f, err := os.CreateTemp(baseDir, "testbed.paladin.*.sock")
-	if err == nil {
-		err = os.Remove(f.Name())
-	}
-	return f.Name(), err
-}
-
-func (tb *testbed) cleanupSocket() {
-	if _, err := os.Stat(tb.socketFile); err == nil {
-		if err = os.Remove(tb.socketFile); err != nil {
-			log.L(tb.ctx).Warnf("Failed to clean up %s: %s", tb.socketFile, err)
-		}
-	}
+	return tb
 }
 
 func (tb *testbed) listenTerm() {
@@ -96,41 +80,55 @@ func (tb *testbed) listenTerm() {
 func (tb *testbed) stop() {
 	log.L(tb.ctx).Infof("Testbed shutting down")
 	tb.cancelCtx()
-	if err := tb.bus.GRPCServer().Stop(tb.ctx); err != nil {
-		log.L(tb.ctx).Warnf("Failed to shut down commsbus: %s", err)
-	}
+	_ = tb.bus.GRPCServer().Stop(tb.ctx)
 }
 
-func (tb *testbed) setupConfig(args []string) (*TestBedConfig, error) {
-	var configFile string
+func (tb *testbed) tempSocketFile() (string, error) {
+	f, err := os.CreateTemp(confutil.StringOrEmpty(tb.conf.TempDir, ""), "testbed.paladin.*.sock")
+	if err != nil {
+		return "", err
+	}
+	return f.Name(), err
+}
+
+func (tb *testbed) setupConfig(args []string) error {
+	configFile := "./domain_testbed/sqlite.memory.config.yaml"
 	if len(args) >= 2 {
 		configFile = args[1]
-	} else {
-		configFile = "./domain_testbed/sqlite.memory.config.yaml"
 	}
 	configBytes, err := os.ReadFile(configFile)
-	var conf TestBedConfig
 	if err == nil {
-		err = yaml.Unmarshal(configBytes, &conf)
+		err = yaml.Unmarshal(configBytes, &tb.conf)
+	}
+	if err == nil {
+		tb.socketFile = confutil.StringOrEmpty(tb.conf.CommsBus.GRPC.SocketAddress, "")
+		if tb.socketFile == "" {
+			tb.socketFile, err = tb.tempSocketFile()
+			tb.conf.CommsBus.GRPC.SocketAddress = &tb.socketFile
+		}
+	}
+	if err == nil {
+		// Possible a file might be lying around that needs deleting
+		err = tb.cleanupOldSocket()
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
-	tb.socketFile = confutil.StringOrEmpty(conf.CommsBus.GRPC.SocketAddress, "")
-	if tb.socketFile == "" {
-		if tb.socketFile, err = tb.randSocket(""); err != nil {
-			return nil, err
+	return nil
+}
+
+func (tb *testbed) cleanupOldSocket() error {
+	if _, err := os.Stat(tb.socketFile); err == nil {
+		if err = os.Remove(tb.socketFile); err != nil {
+			return err
 		}
-		conf.CommsBus.GRPC.SocketAddress = &tb.socketFile
 	}
-	tb.cleanupSocket()
-	return &conf, nil
+	return nil
 }
 
 func (tb *testbed) run() error {
 	ready := false
 	defer func() {
-		tb.cleanupSocket()
 		close(tb.done)
 		if !ready {
 			close(tb.ready)
@@ -139,22 +137,22 @@ func (tb *testbed) run() error {
 
 	p, err := persistence.NewPersistence(tb.ctx, &tb.conf.DB)
 	if err != nil {
-		return err
+		return fmt.Errorf("Persistence init failed: %s", err)
 	}
 	defer p.Close()
 
-	if tb.bus, err = commsbus.NewCommsBus(tb.ctx, &tb.conf.CommsBus); err != nil {
-		return err
+	tb.bus, err = commsbus.NewCommsBus(tb.ctx, &tb.conf.CommsBus)
+	if err == nil {
+		tb.fromDomain, err = tb.bus.Broker().Listen(tb.ctx, "from-domain")
 	}
-
-	if tb.fromDomain, err = tb.bus.Broker().Listen(tb.ctx, "from-domain"); err != nil {
-		return err
+	if err != nil {
+		return fmt.Errorf("Comms bus init failed: %s", err)
 	}
 
 	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
 	tb.rpcServer, err = rpcserver.NewServer(tb.ctx, &tb.conf.RPC)
 	if err != nil {
-		return err
+		return fmt.Errorf("RPC init failed: %s", err)
 	}
 	tb.initRPC()
 

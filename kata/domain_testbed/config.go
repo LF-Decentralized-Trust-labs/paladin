@@ -27,4 +27,5 @@ type TestBedConfig struct {
 	DB         persistence.Config `yaml:"db"`
 	RPC        rpcserver.Config   `yaml:"rpc"`
 	StateStore statestore.Config  `yaml:"statestore"`
+	TempDir    *string            `yaml:"tempDir"`
 }
