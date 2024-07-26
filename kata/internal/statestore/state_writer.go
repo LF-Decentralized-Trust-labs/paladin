@@ -292,7 +292,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 					DoUpdates: clause.AssignmentColumns([]string{
 						"sequence",
 						"spending",
-						"minting",
+						"creating",
 					}),
 				}).
 				Create(stateLocks).

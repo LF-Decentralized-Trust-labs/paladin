@@ -124,7 +124,7 @@ func TestServeCustomTimeout(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	assert.NoError(t, err)
-	req.Header.Set("Request-Timeout", "1ns") // we extend the IETF draft standard with the ability to specify a unit
+	req.Header.Set("Request-Timeout", "1ns")
 	res, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusRequestTimeout, res.StatusCode)

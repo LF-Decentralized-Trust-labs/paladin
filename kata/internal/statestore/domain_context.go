@@ -58,20 +58,20 @@ type DomainStateInterface interface {
 
 	// MarkStatesSpending writes a lock record so the state is now locked for spending, and
 	// thus subsequent calls to FindAvailableStates will not return these states.
-	MarkStatesSpending(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
+	MarkStatesSpending(sequenceID uuid.UUID, stateIDs []string) error
 
 	// MarkStatesRead writes a lock record so the state is now locked to this sequence
 	// for reading - thus subsequent calls to FindAvailableStates will return these states
 	// with the lock record attached.
 	// That will inform them they need to join to this sequence if they wish to use those states.
-	MarkStatesRead(sequenceID uuid.UUID, schemaID string, stateIDs []string) error
+	MarkStatesRead(sequenceID uuid.UUID, stateIDs []string) error
 
-	// WriteNewStates creates new states that are locked for reading to the specified sequence from creation.
+	// CreateNewStates creates new states that are locked for reading to the specified sequence from creation.
 	// They are available immediately within the domain for return in FindAvailableStates
 	// (even before the flush)
-	WriteNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (s []*State, err error)
+	CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (s []*State, err error)
 
-	// DeleteSequence queues up removal of all lock records for a given sequence
+	// ResetSequence queues up removal of all lock records for a given sequence
 	// Note that the private data of the states themselves are not removed
 	ResetSequence(sequenceID uuid.UUID) error
 
@@ -90,6 +90,12 @@ type DomainStateInterface interface {
 	// So if supplied, the caller must not rely on it being called, and must not block holding the
 	// domain context until it is called.
 	Flush(successCallback ...DomainContextFunction) error
+}
+
+// This lets experimentation code being written in various parts of paladin do sync flushes, but
+// is split from the main interface as it's not meant to exist long term.
+type DomainStateInterfaceUT interface {
+	DomainStateInterface
 
 	// Intended only to support convenient unit testing (blocks the calling routine until the flush
 	// has completed, and returns any error synchronously)
@@ -97,14 +103,14 @@ type DomainStateInterface interface {
 }
 
 type domainContext struct {
-	ss        *stateStore
-	domainID  string
-	ctx       context.Context
-	stateLock sync.Mutex
-	latch     chan struct{}
-	unFlushed *writeOperation
-	flushing  *writeOperation
-	flushed   chan error
+	ss          *stateStore
+	domainID    string
+	ctx         context.Context
+	stateLock   sync.Mutex
+	latch       chan struct{}
+	unFlushed   *writeOperation
+	flushing    *writeOperation
+	flushResult chan error
 }
 
 func (ss *stateStore) RunInDomainContext(domainID string, fn DomainContextFunction) error {
@@ -315,7 +321,7 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	return dc.mergedUnFlushed(schema, states, query)
 }
 
-func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (states []*State, err error) {
+func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (states []*State, err error) {
 
 	schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, schemaID, true)
 	if err != nil {
@@ -344,7 +350,7 @@ func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, d
 		s.Locked = &StateLock{
 			Sequence: sequenceID,
 			State:    s.State.Hash,
-			Minting:  true,
+			Creating: true,
 			Spending: false,
 		}
 		dc.unFlushed.states = append(dc.unFlushed.states, s)
@@ -353,7 +359,7 @@ func (dc *domainContext) WriteNewStates(sequenceID uuid.UUID, schemaID string, d
 	return states, nil
 }
 
-func (dc *domainContext) MarkStatesRead(sequenceID uuid.UUID, schemaID string, stateIDs []string) (err error) {
+func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDs []string, setState func(*StateLock)) (err error) {
 	stateHashes := make([]*HashID, len(stateIDs))
 	for i, id := range stateIDs {
 		stateHashes[i], err = ParseHashID(dc.ctx, id)
@@ -371,65 +377,32 @@ func (dc *domainContext) MarkStatesRead(sequenceID uuid.UUID, schemaID string, s
 
 	// Update an existing un-flushed record, or add a new one
 	for _, hash := range stateHashes {
-		found := false
+		var lock *StateLock
 		for _, l := range dc.unFlushed.stateLocks {
 			if l.State == *hash {
 				if l.Sequence != sequenceID {
 					// This represents a failure to call ResetSequence() correctly
 					return i18n.NewError(dc.ctx, msgs.MsgStateLockConflictUnexpected, l.Sequence, sequenceID)
 				}
-				found = true
+				lock = l
+				break
 			}
 		}
-		if !found {
-			dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, &StateLock{
-				State:    *hash,
-				Sequence: sequenceID,
-			})
+		if lock == nil {
+			lock = &StateLock{State: *hash, Sequence: sequenceID}
+			dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, lock)
 		}
+		setState(lock)
 	}
 	return nil
 }
 
-func (dc *domainContext) MarkStatesSpending(sequenceID uuid.UUID, schemaID string, stateIDs []string) (err error) {
-	stateHashes := make([]*HashID, len(stateIDs))
-	for i, id := range stateIDs {
-		stateHashes[i], err = ParseHashID(dc.ctx, id)
-		if err != nil {
-			return err
-		}
-	}
+func (dc *domainContext) MarkStatesRead(sequenceID uuid.UUID, stateIDs []string) (err error) {
+	return dc.lockStates(sequenceID, stateIDs, func(*StateLock) {})
+}
 
-	// Take lock and check flush state
-	dc.stateLock.Lock()
-	defer dc.stateLock.Unlock()
-	if flushErr := dc.checkFlushCompletion(false); flushErr != nil {
-		return flushErr
-	}
-
-	// Update an existing un-flushed record, or add a new one
-	for _, hash := range stateHashes {
-		found := false
-		for _, l := range dc.unFlushed.stateLocks {
-			if l.State == *hash {
-				if l.Sequence != sequenceID {
-					// This represents a failure to call ResetSequence() correctly
-					return i18n.NewError(dc.ctx, msgs.MsgStateLockConflictUnexpected, l.Sequence, sequenceID)
-				}
-				found = true
-				// Update existing un-flushed lock record to spending
-				l.Spending = true
-			}
-		}
-		if !found {
-			dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, &StateLock{
-				State:    *hash,
-				Sequence: sequenceID,
-				Spending: true,
-			})
-		}
-	}
-	return nil
+func (dc *domainContext) MarkStatesSpending(sequenceID uuid.UUID, stateIDs []string) (err error) {
+	return dc.lockStates(sequenceID, stateIDs, func(l *StateLock) { l.Spending = true })
 }
 
 func (dc *domainContext) ResetSequence(sequenceID uuid.UUID) error {
@@ -469,11 +442,11 @@ func (dc *domainContext) Flush(successCallbacks ...DomainContextFunction) error 
 
 	// Cycle it out
 	dc.flushing = dc.unFlushed
-	dc.flushed = make(chan error, 1)
+	dc.flushResult = make(chan error, 1)
 	dc.unFlushed = dc.ss.writer.newWriteOp(dc.domainID)
 
 	// We pass the vars directly to the routine, so the routine does not need the lock
-	go dc.flushOp(dc.flushing, dc.flushed, successCallbacks...)
+	go dc.flushOp(dc.flushing, dc.flushResult, successCallbacks...)
 	return nil
 }
 
@@ -492,22 +465,23 @@ func (dc *domainContext) flushOp(op *writeOperation, flushed chan error, success
 	flushed <- err
 	if err == nil {
 		for _, cb := range successCallbacks {
-			go dc.run(cb)
+			callback := cb
+			go func() { _ = dc.run(callback) }()
 		}
 	}
 }
 
-// handleFlushError MUST be called holding the lock
+// checkFlushCompletion MUST be called holding the lock
 func (dc *domainContext) checkFlushCompletion(block bool) error {
 	if dc.flushing == nil {
 		return nil
 	}
 	var flushErr error
 	if block {
-		flushErr = <-dc.flushed
+		flushErr = <-dc.flushResult
 	} else {
 		select {
-		case flushErr = <-dc.flushed:
+		case flushErr = <-dc.flushResult:
 		default:
 			log.L(dc.ctx).Debugf("flush is still active")
 			return nil
@@ -515,7 +489,7 @@ func (dc *domainContext) checkFlushCompletion(block bool) error {
 	}
 	// If we reached here, we've popped a flush result - clear the status
 	dc.flushing = nil
-	dc.flushed = nil
+	dc.flushResult = nil
 	// If there was an error, we need to clean out the whole un-flushed state before we return it
 	if flushErr != nil {
 		dc.unFlushed = dc.ss.writer.newWriteOp(dc.domainID)

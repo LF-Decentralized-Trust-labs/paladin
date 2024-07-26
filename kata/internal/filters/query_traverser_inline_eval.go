@@ -67,7 +67,7 @@ func (qj *QueryJSON) Eval(ctx context.Context, fieldSet FieldSet, valueSet Value
 		jsonFilter: qj,
 		fieldSet:   fieldSet,
 	}
-	res := qt.traverse(eval).Result()
+	res := qt.traverse(eval).T()
 	return res.matches, res.err
 }
 
@@ -87,7 +87,7 @@ func (t *inlineEval) NewRoot() Traverser[*inlineEval] {
 	return &inlineEval{inlineEvalRoot: t.inlineEvalRoot, matches: true}
 }
 
-func (t *inlineEval) Result() *inlineEval {
+func (t *inlineEval) T() *inlineEval {
 	return t
 }
 
@@ -236,7 +236,7 @@ func (t *inlineEval) IsLessThan(e *FilterJSONKeyValue, fieldName string, field F
 			return strings.Compare(s1, s2) < 0
 		},
 		func(s1, s2 int64) bool {
-			return (s1 - s2) < 0
+			return s1 < s2
 		},
 	)
 }
@@ -247,7 +247,7 @@ func (t *inlineEval) IsLessThanOrEqual(e *FilterJSONKeyValue, fieldName string, 
 			return strings.Compare(s1, s2) <= 0
 		},
 		func(s1, s2 int64) bool {
-			return (s1 - s2) <= 0
+			return s1 <= s2
 		},
 	)
 }
@@ -258,7 +258,7 @@ func (t *inlineEval) IsGreaterThan(e *FilterJSONKeyValue, fieldName string, fiel
 			return strings.Compare(s1, s2) > 0
 		},
 		func(s1, s2 int64) bool {
-			return (s1 - s2) > 0
+			return s1 > s2
 		},
 	)
 }
@@ -269,7 +269,7 @@ func (t *inlineEval) IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName strin
 			return strings.Compare(s1, s2) >= 0
 		},
 		func(s1, s2 int64) bool {
-			return (s1 - s2) >= 0
+			return s1 >= s2
 		},
 	)
 }
@@ -281,9 +281,9 @@ func (t *inlineEval) IsIn(e *FilterJSONKeyValues, fieldName string, field FieldR
 
 	isIn := false
 	for _, v := range testValues {
-		comp := t.NewRoot().Result().isEqual(&withoutNegate, fieldName, field, v)
+		comp := t.NewRoot().T().isEqual(&withoutNegate, fieldName, field, v)
 		if comp.err != nil {
-			return t.withError(comp.Result().err)
+			return t.withError(comp.T().err)
 		}
 		if comp.matches {
 			isIn = true

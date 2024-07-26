@@ -26,14 +26,12 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestRunTransactionSubmission(t *testing.T) {
@@ -47,33 +45,31 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	testDestination := "test-destination"
 	listenerContext, stopListener := context.WithCancel(ctx)
-	streams, err := client.Listen(listenerContext, &pb.ListenRequest{
+	streams, err := client.Listen(listenerContext, &proto.ListenRequest{
 		Destination: testDestination,
 	})
 	require.NoError(t, err, "failed to call Listen")
 
-	submitTransaction := transactionsPB.SubmitTransactionRequest{
-		From:            "fromID",
-		ContractAddress: "contract",
-		Payload: &transactionsPB.SubmitTransactionRequest_PayloadJSON{
-			PayloadJSON: "{\"foo\":\"bar\"}",
-		},
+	submitTransactionJSON := `
+	{
+		"from":            "fromID",
+		"contractAddress": "contract",
+		"payloadJSON":     "{\"foo\":\"bar\"}"
 	}
-
+	`
 	requestId := "requestID"
-	body, err := anypb.New(&submitTransaction)
-	require.NoError(t, err)
-	submitTransactionRequest := &pb.Message{
+	submitTransactionRequest := &proto.Message{
 		Destination: "kata-txn-engine",
 		Id:          requestId,
-		Body:        body,
+		Type:        "SUBMIT_TRANSACTION_REQUEST",
+		Body:        submitTransactionJSON,
 		ReplyTo:     &testDestination,
 	}
 
 	sendMessageResponse, err := client.SendMessage(ctx, submitTransactionRequest)
 	require.NoError(t, err)
 	require.NotNil(t, sendMessageResponse)
-	assert.Equal(t, pb.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
+	assert.Equal(t, proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
 
 	// attempt to receive the response message
 	resp, err := streams.Recv()
@@ -85,7 +81,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }
 
 func runServiceForTesting(ctx context.Context, t *testing.T) (string, func()) {
@@ -106,7 +102,7 @@ persistence:
   sqlite:
     uri:           ":memory:"
     autoMigrate:   true
-    migrationsDir: ../../db/migrations/sqlite
+    migrationsDir: ../db/migrations/sqlite
     debugQueries:  true
 commsBus:  
   grpc:
@@ -118,7 +114,7 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go Run(ctx, configFile.Name())
+	go kata.Run(ctx, configFile.Name())
 
 	// todo do we really need to sleep here?
 	time.Sleep(time.Second * 2)
@@ -129,19 +125,19 @@ commsBus:
 
 }
 
-func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string) (pb.KataMessageServiceClient, func()) {
+func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string) (proto.KataMessageServiceClient, func()) {
 	// Create a gRPC client connection
 	conn, err := grpc.NewClient("unix:"+socketAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	// Create a new instance of the gRPC client
-	client := pb.NewKataMessageServiceClient(conn)
-	status, err := client.Status(ctx, &pb.StatusRequest{})
+	client := proto.NewKataMessageServiceClient(conn)
+	status, err := client.Status(ctx, &proto.StatusRequest{})
 
 	delay := 0
 	for !status.GetOk() {
 		time.Sleep(time.Second)
 		delay++
-		status, err = client.Status(ctx, &pb.StatusRequest{})
+		status, err = client.Status(ctx, &proto.StatusRequest{})
 		require.Less(t, delay, 2, "Server did not start after 2 seconds")
 	}
 	require.NoError(t, err)
@@ -168,13 +164,13 @@ func TestRunPointToPoint(t *testing.T) {
 
 	// client 2 listens, client 1 sends
 	listenerContext, stopListener := context.WithCancel(ctx)
-	streams2, err := client2.Listen(listenerContext, &pb.ListenRequest{
+	streams2, err := client2.Listen(listenerContext, &proto.ListenRequest{
 		Destination: client2Destination,
 	})
 	require.NoError(t, err, "failed to call Listen")
 
 	isClient2Listenting := func() bool {
-		listDestinationsResponse, err := client1.ListDestinations(ctx, &pb.ListDestinationsRequest{})
+		listDestinationsResponse, err := client1.ListDestinations(ctx, &proto.ListDestinationsRequest{})
 		require.NoError(t, err)
 		for _, connectedClient := range listDestinationsResponse.Destinations {
 			if connectedClient == client2Destination {
@@ -191,35 +187,30 @@ func TestRunPointToPoint(t *testing.T) {
 		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
 	}
 
-	body1 := wrapperspb.String("hello from client 1")
-
-	body1Any, err := anypb.New(body1)
-	require.NoError(t, err)
+	body1 := "hello from client 1"
 
 	requestId := "request001"
-	helloMessage1 := &pb.Message{
+	helloMessage1 := &proto.Message{
 		Destination: client2Destination,
 		Id:          requestId,
-		Body:        body1Any,
+		Type:        "HELLO",
+		Body:        body1,
 	}
 
 	sendMessageResponse, err := client1.SendMessage(ctx, helloMessage1)
 	require.NoError(t, err)
-	assert.Equal(t, pb.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
+	assert.Equal(t, proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_OK, sendMessageResponse.GetResult())
 
 	resp, err := streams2.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
 	assert.Equal(t, requestId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-	receivedBody1, err := resp.GetBody().UnmarshalNew()
-	require.NoError(t, err)
-	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
-	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
+	assert.Equal(t, body1, resp.GetBody())
 
 	stopListener()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -250,23 +241,23 @@ func TestPubSub(t *testing.T) {
 	// client 1 published, clients 2 and 3 subscribe 4 does not
 	listenerContext, stopListeners := context.WithCancel(ctx)
 
-	streams2, err := client2.Listen(listenerContext, &pb.ListenRequest{
+	streams2, err := client2.Listen(listenerContext, &proto.ListenRequest{
 		Destination: client2Destination,
 	})
 	require.NoError(t, err, "failed to call Listen")
 
-	streams3, err := client3.Listen(listenerContext, &pb.ListenRequest{
+	streams3, err := client3.Listen(listenerContext, &proto.ListenRequest{
 		Destination: client3Destination,
 	})
 	require.NoError(t, err, "failed to call Listen")
 
-	streams4, err := client4.Listen(listenerContext, &pb.ListenRequest{
+	streams4, err := client4.Listen(listenerContext, &proto.ListenRequest{
 		Destination: client4Destination,
 	})
 	require.NoError(t, err, "failed to call Listen")
 
 	areAllClientsListenting := func() bool {
-		listDestinationsResponse, err := client1.ListDestinations(ctx, &pb.ListDestinationsRequest{})
+		listDestinationsResponse, err := client1.ListDestinations(ctx, &proto.ListDestinationsRequest{})
 		require.NoError(t, err)
 		isClient2Listenting := false
 		isClient3Listenting := false
@@ -292,56 +283,47 @@ func TestPubSub(t *testing.T) {
 		require.Less(t, delay, 2, "Clients did not connect after 2 seconds")
 	}
 
-	subscribeResponse, err := client2.SubscribeToTopic(ctx, &pb.SubscribeToTopicRequest{
+	subscribeResponse, err := client2.SubscribeToTopic(ctx, &proto.SubscribeToTopicRequest{
 		Destination: client2Destination,
 		Topic:       testTopic,
 	})
 	require.NoError(t, err, "failed to subscribe")
-	require.Equal(t, pb.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
+	require.Equal(t, proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
 
-	subscribeResponse, err = client3.SubscribeToTopic(ctx, &pb.SubscribeToTopicRequest{
+	subscribeResponse, err = client3.SubscribeToTopic(ctx, &proto.SubscribeToTopicRequest{
 		Destination: client3Destination,
 		Topic:       testTopic,
 	})
 	require.NoError(t, err, "failed to subscribe")
-	require.Equal(t, pb.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
+	require.Equal(t, proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK, subscribeResponse.GetResult())
 
-	body1 := wrapperspb.String("hello from client 1")
-	body1Any, err := anypb.New(body1)
-	require.NoError(t, err)
-
+	body1 := "hello from client 1"
 	eventId := "event001"
 
-	helloEvent1 := &pb.Event{
+	helloEvent1 := &proto.Event{
 		Id:    eventId,
 		Topic: testTopic,
-		Body:  body1Any,
+		Type:  "HELLO",
+		Body:  body1,
 	}
 
 	publishEventResponse, err := client1.PublishEvent(ctx, helloEvent1)
 	require.NoError(t, err)
-	assert.Equal(t, pb.PUBLISH_EVENT_RESULT_PUBLISH_EVENT_OK, publishEventResponse.GetResult())
+	assert.Equal(t, proto.PUBLISH_EVENT_RESULT_PUBLISH_EVENT_OK, publishEventResponse.GetResult())
 
 	resp, err := streams2.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
-	assert.Equal(t, eventId, resp.GetEventId())
+	assert.Equal(t, eventId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-
-	receivedBody1, err := resp.GetBody().UnmarshalNew()
-	require.NoError(t, err)
-	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
-	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
+	assert.Equal(t, body1, resp.GetBody())
 
 	resp, err = streams3.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
-	assert.Equal(t, eventId, resp.GetEventId())
+	assert.Equal(t, eventId, resp.GetId())
 	assert.NotNil(t, resp.GetBody())
-	receivedBody1, err = resp.GetBody().UnmarshalNew()
-	require.NoError(t, err)
-	require.Equal(t, "google.protobuf.StringValue", string(receivedBody1.ProtoReflect().Descriptor().FullName()))
-	assert.Equal(t, body1.Value, receivedBody1.(*wrapperspb.StringValue).Value)
+	assert.Equal(t, body1, resp.GetBody())
 
 	go func() {
 		_, err = streams4.Recv()
@@ -353,5 +335,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	Stop(ctx, socketAddress)
+	kata.Stop(ctx, socketAddress)
 }

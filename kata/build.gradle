@@ -14,14 +14,20 @@
  */
 
 import org.apache.tools.ant.taskdefs.condition.Os
+import org.apache.tools.ant.filters.LineContains
 
 ext {
-    //TODO reported coverage does not seem to include component tests.  Need to investigate
-    //     (fyi don't know if this comment is still true after recent fixes to the coverage task in this
-    //       build file, or what the above commentor meant by component tests...
-    //       there's no task labelled that in this build file)
-    targetCoverage = 87
+    goFiles = fileTree(".") {
+        include "internal/**/*.go"
+        include "pkg/**/*.go"
+        include "componenttest/**/*.go"
+    }
+
+    targetCoverage = 91
     maxCoverageBarGap = 1
+    coverageExcludedPackages = [
+        'github.com/kaleido-io/paladin/kata/pkg/proto'
+    ]
 }
 
 task installTools(type:Exec) {
@@ -30,11 +36,11 @@ task installTools(type:Exec) {
     executable 'go'
     args 'install'
     inputs.files('go.mod')
-    outputs.files([
-        "${projectDir}/bin/protoc-gen-go",
-        "${projectDir}/bin/protoc-gen-go-grpc",
-        "${projectDir}/bin/golangci-lint",
-    ])
+    outputs.files(
+        "bin/protoc-gen-go",
+        "bin/protoc-gen-go-grpc",
+        "bin/golangci-lint",
+    )
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
     args 'google.golang.org/protobuf/cmd/protoc-gen-go'
@@ -44,12 +50,8 @@ task installTools(type:Exec) {
 
 task protoc(type:Exec, dependsOn: tasks.installTools) {
     workingDir '.'
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.proto"
-    })
-    outputs.files(fileTree("${projectDir}").matching {
-        include "**/*.pb.go"
-    })
+    inputs.files(fileTree(".") { include "**/*.proto" })
+    outputs.files(fileTree(".") { include "**/*.pb.go" })
     environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
     executable 'protoc'
     args "--go_out=${projectDir}"
@@ -58,44 +60,41 @@ task protoc(type:Exec, dependsOn: tasks.installTools) {
     args inputs.files
 }
 
-task clean(type:Exec) {
-    workingDir '.'
-    // This will delete anything ignored with a .gitignore
-    executable 'git'
-    args "clean"
-    args "-fdX"
+task clean(type: Delete) {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
 }
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files('go.mod')
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
+    inputs.files(goFiles)
     outputs.files('go.sum')
 
     executable 'go'
     args 'get'
 }
 
-
 task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    });
-    outputs.files([]);
+    inputs.files(goFiles);
     environment 'GOGC', '20'
 
     executable "${projectDir}/bin/golangci-lint"
     args 'run'
     args '-v'
+    args '--color=always'
     args '--timeout', '5m'
 }
 
-// Must NOT depend on clean (which would delete all deliberately ignored files like .vscode config)
 task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     workingDir '.'
 
@@ -108,10 +107,8 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
         libName = "libkata.so"
     }
 
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
-    outputs.files([libName, 'libkata.h'])
+    inputs.files(goFiles)
+    outputs.files(libName, 'libkata.h')
 
     environment("CGO_ENABLED", "1")
 
@@ -220,10 +217,6 @@ class DockerComposeDemo extends DockerCompose {
     }
 }
 
-ext.dockerCompose = { param1, param2 ->
-    // Method body here
-}
-
 task startDb(type: DockerComposeTest) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
@@ -242,51 +235,95 @@ task stopDemoDb(type: DockerComposeDemo) {
     args 'down'
 }
 
+abstract class UnitTests extends Exec {
+    {
+        inputs.files(getProject().goFiles)
+        outputs.dir('coverage')
 
-task testRunSQLite(type: Exec, dependsOn: tasks.goGet) {
-    workingDir '.'
-
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
-    outputs.files(['coverage_sqlite.txt'])
-
-    executable 'go'
-    args 'test'
-    args './internal/...'
-    args './pkg/kata/...'
-    args '-cover'
-    args '-coverprofile=coverage_sqlite.txt'
-    args '-covermode=atomic'
-    args '-timeout=30s'
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './pkg/...', './internal/...'
+        args '-cover'
+        args '-covermode=atomic'
+        args '-timeout=30s'
+        args "-test.gocoverdir=${getProject().projectDir}/coverage"
+    }
 }
 
-task testRunPostgres(type: Exec, dependsOn: [tasks.goGet, tasks.startDb]) {
-    workingDir '.'
+abstract class ComponentTest extends Exec {
+    {
+        inputs.files(getProject().goFiles)
+        outputs.dir('coverage')
 
-    inputs.files(fileTree("${projectDir}").matching {
-        include "**/*.go"
-    })
-    outputs.files(['coverage_psql.txt'])
-
-    executable 'go'
-    args 'test'
-    args './internal/...'
-    args './pkg/kata/...'
-    args '-tags', 'testdbpostgres'
-    args '-cover'
-    args '-coverprofile=coverage_psql.txt'
-    args '-covermode=atomic'
-    args '-timeout=30s'
+        workingDir '.'
+        executable 'go'
+        args 'test'
+        args './componenttest'
+        args '-cover'
+        args "-coverpkg=github.com/kaleido-io/paladin/..."
+        args '-covermode=atomic'
+        args '-timeout=30s'
+        args "-test.gocoverdir=${getProject().projectDir}/coverage"
+    }
 }
 
-task checkCoverage(dependsOn: [tasks.testRunSQLite, tasks.testRunPostgres]) {
-    inputs.files("coverage_sqlite.txt")
-    inputs.files("coverage_psql.txt")
-    outputs.files([])
+task setupCoverage(dependsOn: tasks.protoc) {
+    inputs.files(goFiles)
+    outputs.dir('coverage')
+    doLast {
+        delete fileTree (project.mkdir('coverage')) {
+            include "coverage.txt"
+            include "covcounters.*"
+            include "covmeta.*"
+        }
+    }
+}
+
+task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+}
+
+task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
+    args '-tags', "testdbpostgres"
+}
+
+task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+}
+
+
+task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
+        tasks.unitTestSQLite,
+        tasks.unitTestPostgres,
+        tasks.componentTestSQLite,
+        // tasks.componentTestPostgres
+    ]) {
+    inputs.files(fileTree(project.mkdir('coverage')) {
+        include "covcounters.*"
+        include "covmeta.*"
+    })
+    outputs.files('coverage/coverage_unfiltered.txt')
+    executable 'go'
+    args 'tool', 'covdata', 'textfmt'
+    args '-i', "${projectDir}/coverage"
+    args '-o', "${projectDir}/coverage/coverage_unfiltered.txt"
+
+}
+
+task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
+    from 'coverage/coverage_unfiltered.txt'
+    into 'coverage'
+    outputs.files('coverage/coverage.txt')
+    eachFile { fcd ->
+        fcd.setRelativePath(fcd.relativePath.replaceLastName('coverage.txt'))
+    }
+    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages)
+}
+
+task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
+    inputs.files('coverage/coverage.txt')
 
     doLast {
-        def coverageOutput = "go tool cover -func=${projectDir}/coverage_sqlite.txt -func=${projectDir}/coverage_psql.txt".execute().text
+        def coverageOutput = ("go tool cover -func=${projectDir}/coverage/coverage.txt").execute().text
         def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
         println "Coverage is ${totalCoverage}%"
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
@@ -299,20 +336,25 @@ task checkCoverage(dependsOn: [tasks.testRunSQLite, tasks.testRunPostgres]) {
     }
 }
 
-task test(dependsOn: testRunSQLite) {
-    finalizedBy checkCoverage
+task test() {
+    finalizedBy [
+        tasks.checkCoverage,
+    ]
 }
 
-task testcov(type: Exec, dependsOn: testRunSQLite) {
+task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
+    inputs.files('coverage/coverage.txt')
     workingDir '.'
     executable 'go'
     args 'tool'
     args 'cover'
-    args '-html=coverage_sqlite.txt'
+    args '-html=coverage/coverage.txt'
 }
 
 task build {
-    dependsOn tasks.testRunPostgres
+    dependsOn tasks.lint
+    dependsOn tasks.test
+    dependsOn tasks.aggregateCoverage
     dependsOn tasks.checkCoverage
 }
 
@@ -325,11 +367,15 @@ configurations {
 }
 
 tasks.register('zipProtocFiles', Zip) {  
-    from fileTree("${projectDir}").matching {
+    from fileTree("pkg") {
         include "**/*.proto"
+    }
+    eachFile { fcd ->
+        fcd.setRelativePath(fcd.relativePath.prepend("pkg"))
     }
     archiveFileName = "proto.zip"
     destinationDirectory = file("$projectDir")
+    includeEmptyDirs = false
     dependsOn('protoc')
 }
 
@@ -340,5 +386,3 @@ artifacts {
 dependencies {
     libkata files(buildSharedLibrary)
 }
-
-

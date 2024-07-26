@@ -120,10 +120,9 @@ var (
 	MsgTLSConfigFailed              = ffe("PD010901", "Failed to initialize TLS configuration")
 	MsgTLSInvalidKeyPairFiles       = ffe("PD010902", "Invalid certificate and key pair files")
 	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010903", "Unknown DN attribute '%s'")
-	MsgTLSInvalidTLSDnMatcherType   = ffe("PD010904", "Expected string value for '%s' field of requiredDNAttributes (found %T)")
-	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010905", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
-	MsgTLSInvalidTLSDnChain         = ffe("PD010906", "Cannot match subject distinguished name as cert chain is not verified")
-	MsgTLSInvalidTLSDnMismatch      = ffe("PD010907", "Certificate subject does not meet requirements")
+	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010904", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
+	MsgTLSInvalidTLSDnChain         = ffe("PD010905", "Cannot match subject distinguished name as cert chain is not verified")
+	MsgTLSInvalidTLSDnMismatch      = ffe("PD010906", "Certificate subject does not meet requirements")
 
 	// JSON/RPC PD0110XX
 	MsgJSONRPCInvalidRequest      = ffe("PD011000", "Invalid JSON/RPC request data")

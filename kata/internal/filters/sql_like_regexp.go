@@ -39,7 +39,7 @@ func sqlLikeToRegexp(likeStr string, caseInsensitive bool, escapeChar rune) (*re
 				// Clear the escape, rather than continuing it for the next char
 				clearEscape = true
 			}
-		case '.', '^', '$', '*', '+', '-', '?', '(', ')', '[', ']', '{', '}', '|':
+		case '.', '^', '$', '*', '+', '-', '?', '(', ')', '[', ']', '{', '}', '|', '\\':
 			// Escape this char in the regexp
 			buff.WriteRune('\\')
 			buff.WriteRune(c)
