@@ -35,7 +35,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			{
 				"name": "notary",
 				"type": "address"
+			},
+			{
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"name": "symbol",
+				"type": "string"
 			}
+		],
+		"outputs": [
+		    {
+				"type": "address"
+		    }
 		]
 	  }
 	]`
@@ -55,7 +68,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		    "name": "symbol",
 			"type": "string"
 		  }
-		]
+		],
+		"outputs": null
 	}`
 
 	fakeCoinStateSchema := `{
@@ -81,7 +95,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	rpcCall, done := newDomainSimulator(t, map[string]domainSimulatorFn{
 
-		CONFIGURE_REQUEST: func(reqJSON []byte) (pb.Message, error) {
+		CONFIGURE: func(reqJSON []byte) (pb.Message, error) {
 			req := simRequestToProto[proto.ConfigureDomainRequest](t, reqJSON)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
@@ -96,16 +110,34 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		INIT_DOMAIN_REQUEST: func(reqJSON []byte) (pb.Message, error) {
+		INIT_DOMAIN: func(reqJSON []byte) (pb.Message, error) {
 			req := simRequestToProto[proto.InitDomainRequest](t, reqJSON)
 			assert.Len(t, req.AbiStateSchemaIds, 1)
 			return &proto.InitDomainResponse{}, nil
+		},
+
+		PREPARE_DEPLOY: func(reqJSON []byte) (pb.Message, error) {
+			req := simRequestToProto[proto.PrepareDeployTransactionRequest](t, reqJSON)
+			assert.JSONEq(t, fakeCoinConstructorABI, req.ConstructorAbi)
+			assert.JSONEq(t, `{
+				"notary": "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
+				"name": "FakeToken1",
+				"symbol": "FT1"
+			}`, req.ConstructorParamsJson)
+			return &proto.PrepareDeployTransactionResponse{}, nil
 		},
 	})
 	defer done()
 
 	err := rpcCall("testbed_configureInit", "domain1", types.RawJSON(`{
 		"some": "config"
+	}`))
+	assert.NoError(t, err)
+
+	err = rpcCall("testbed_deploy", "domain1", types.RawJSON(`{
+		"notary": "0x6a0969a486aEFa82b3F7D7B4cEd1c4d578bf2D81",
+		"name": "FakeToken1",
+		"symbol": "FT1"
 	}`))
 	assert.NoError(t, err)
 }

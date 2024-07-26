@@ -330,12 +330,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	// - Standardize formatting of all the data elements so domains do not need to worry
 	var jsonData []byte
 	if err == nil {
-		jsonData, err = abi.NewSerializer().
-			SetFormattingMode(abi.FormatAsObjects).
-			SetIntSerializer(abi.Base10StringIntSerializer).
-			SetFloatSerializer(abi.Base10StringFloatSerializer).
-			SetByteSerializer(abi.HexByteSerializer0xPrefix).
-			SerializeJSONCtx(ctx, psd.cv)
+		jsonData, err = types.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
 	}
 	if err != nil {
 		return nil, err

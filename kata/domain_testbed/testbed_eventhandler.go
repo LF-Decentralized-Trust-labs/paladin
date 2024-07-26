@@ -29,8 +29,9 @@ import (
 )
 
 var DOMAIN_API_ERROR = string((&proto.DomainAPIError{}).ProtoReflect().Descriptor().FullName())
-var CONFIGURE_REQUEST = string((&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName())
-var INIT_DOMAIN_REQUEST = string((&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName())
+var CONFIGURE = string((&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName())
+var INIT_DOMAIN = string((&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName())
+var PREPARE_DEPLOY = string((&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName())
 
 type inflightRequest struct {
 	req    *commsbus.Message

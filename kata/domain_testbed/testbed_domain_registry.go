@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -93,4 +95,37 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	return &proto.InitDomainRequest{
 		AbiStateSchemaIds: schemaIDs,
 	}, nil
+}
+
+func (tb *testbed) validateDeploy(ctx context.Context, name string, constructorParams types.RawJSON) (*proto.PrepareDeployTransactionRequest, error) {
+	domain, err := tb.getDomain(name)
+	if err != nil {
+		return nil, err
+	}
+
+	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
+	if err != nil {
+		return nil, fmt.Errorf("invalid parameters for constructor: %s", err)
+	}
+
+	paladinTxID := uuid.New().String()
+	constructorABIJSON, _ := json.Marshal(domain.constructorABI)
+	constructorParamsJSON, _ := types.StandardABISerializer().SerializeJSONCtx(ctx, contructorValues)
+
+	return &proto.PrepareDeployTransactionRequest{
+		TransactionId:         paladinTxID,
+		ConstructorAbi:        string(constructorABIJSON),
+		ConstructorParamsJson: string(constructorParamsJSON),
+	}, nil
+}
+
+func (tb *testbed) getDomain(name string) (*testbedDomain, error) {
+	tb.domainLock.Lock()
+	defer tb.domainLock.Unlock()
+	domain := tb.domainRegistry[name]
+	if domain == nil {
+		return nil, fmt.Errorf("domain %q not found", name)
+	}
+	return domain, nil
+
 }
