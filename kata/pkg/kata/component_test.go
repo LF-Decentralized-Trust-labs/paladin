@@ -325,7 +325,7 @@ func TestPubSub(t *testing.T) {
 	resp, err := streams2.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
-	assert.Equal(t, eventId, resp.GetId())
+	assert.Equal(t, eventId, resp.GetEventId())
 	assert.NotNil(t, resp.GetBody())
 
 	receivedBody1, err := resp.GetBody().UnmarshalNew()
@@ -336,7 +336,7 @@ func TestPubSub(t *testing.T) {
 	resp, err = streams3.Recv()
 	require.NotEqual(t, err, io.EOF)
 	require.NoError(t, err)
-	assert.Equal(t, eventId, resp.GetId())
+	assert.Equal(t, eventId, resp.GetEventId())
 	assert.NotNil(t, resp.GetBody())
 	receivedBody1, err = resp.GetBody().UnmarshalNew()
 	require.NoError(t, err)
