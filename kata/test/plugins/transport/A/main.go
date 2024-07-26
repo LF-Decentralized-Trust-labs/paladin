@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
+//nolint
 package main
 
 import "C"
@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/pkg/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 	"google.golang.org/grpc"
@@ -48,10 +47,10 @@ type transportAInstance struct {
 
 var instances = make(map[string]*transportAInstance)
 
-func (t *transportAProvider) Terminate() (plugins.TransportInstance, error) {
+func (t *transportAProvider) Terminate() error {
 	t.stopListener()
 	t.grpcConnection.Close()
-	return nil, nil
+	return nil
 }
 
 func BuildInfo() string {

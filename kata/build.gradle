@@ -26,7 +26,9 @@ ext {
     targetCoverage = 91
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/kata/pkg/proto'
+        'github.com/kaleido-io/paladin/kata/pkg/proto',
+        'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
+        'github.com/kaleido-io/paladin/kata/pkg/proto/transport'
     ]
 }
 
@@ -149,39 +151,8 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
     args 'test/plugins/transport/A/main.go'
 }
 
-task buildTestPluginsSharedLibraryB(type:Exec) {
-
-    workingDir '.'
-
-    def libName;
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        libName = "transportB.dll"
-    } else if (Os.isFamily(Os.FAMILY_MAC)) {
-        libName = "transportB.so"
-    } else {
-        libName = "libtransportB.so"
-    }
-
-    dependsOn tasks.clean
-    dependsOn tasks.goGet
-    dependsOn tasks.lint
-    inputs.files(fileTree("${projectDir}").matching {
-        include "test/plugins/transport/B/*.go"
-    })
-    outputs.files([libName, 'libtransportB.h'])
-
-    environment("CGO_ENABLED", "1")
-
-    executable 'go'
-    args 'build'
-    args '-o', libName
-    args '-buildmode=plugin'
-    args 'test/plugins/transport/B/main.go'
-}
-
 task buildTestPluginsSharedLibraries {
     dependsOn tasks.buildTestPluginsSharedLibraryA
-    dependsOn tasks.buildTestPluginsSharedLibraryB
 }
 
 class DockerCompose extends Exec {
