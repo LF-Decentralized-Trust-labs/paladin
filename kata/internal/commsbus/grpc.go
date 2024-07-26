@@ -29,12 +29,19 @@ import (
 type GRPCServer interface {
 	Run(ctx context.Context) error
 	Stop(ctx context.Context) error
+	GetSocketAddress() string
 }
 
 type grpcServer struct {
-	listener net.Listener
-	server   *grpc.Server
-	done     chan error
+	listener      net.Listener
+	server        *grpc.Server
+	done          chan error
+	socketAddress string
+}
+
+// GetSocketAddress implements GRPCServer.
+func (s *grpcServer) GetSocketAddress() string {
+	return s.socketAddress
 }
 
 type GRPCConfig struct {
@@ -59,9 +66,10 @@ func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCSe
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
-		listener: l,
-		server:   s,
-		done:     make(chan error),
+		listener:      l,
+		server:        s,
+		done:          make(chan error),
+		socketAddress: socketAddress,
 	}, nil
 }
 
@@ -194,6 +202,7 @@ func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *prot
 	}, nil
 }
 
+// TODO should we implement a handshake to prevent clients from listening to arbitrary destinations?
 // Listen implements the Listen RPC method of KataService which is the main entry point for sending messages to plugins
 func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream proto.KataMessageService_ListenServer) error {
 	//TODO validate
@@ -225,7 +234,11 @@ func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream p
 				Id:            msg.ID,
 				Body:          body,
 				CorrelationId: msg.CorrelationID,
+				EventId:       msg.EventID,
+				Topic:         msg.Topic,
+				ReplyTo:       msg.ReplyTo,
 			}
+
 			err = stream.Send(message)
 			if err != nil {
 				log.L(ctx).Error("Error sending message", err)

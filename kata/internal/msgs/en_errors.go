@@ -139,4 +139,5 @@ var (
 
 	// Plugin registry PD0112XX
 	MsgPluginLoadError = ffe("PD011200", "Failed to load plugin %s with binding %s from %s")
+	MsgPluginNotFound  = ffe("PD011201", "Plugin %s not found")
 )

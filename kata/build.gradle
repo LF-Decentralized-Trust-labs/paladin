@@ -122,7 +122,8 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     args 'kata.go'
 }
 
-task buildTestPluginsSharedLibraries(type:Exec) {
+task buildTestPluginsSharedLibraryA(type:Exec) {
+
     workingDir '.'
 
     def libName;
@@ -138,7 +139,7 @@ task buildTestPluginsSharedLibraries(type:Exec) {
     dependsOn tasks.goGet
     dependsOn tasks.lint
     inputs.files(fileTree("${projectDir}").matching {
-        include "test/plugins/transport/*.go"
+        include "test/plugins/transport/A/*.go"
     })
     outputs.files([libName, 'libtransportA.h'])
 
@@ -148,8 +149,44 @@ task buildTestPluginsSharedLibraries(type:Exec) {
     args 'build'
     args '-o', libName
     args '-buildmode=plugin'
-    args 'test/plugins/transport/main.go'
+    args 'test/plugins/transport/A/main.go'
 }
+
+task buildTestPluginsSharedLibraryB(type:Exec) {
+
+    workingDir '.'
+
+    def libName;
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        libName = "transportB.dll"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        libName = "transportB.so"
+    } else {
+        libName = "libtransportB.so"
+    }
+
+    dependsOn tasks.clean
+    dependsOn tasks.goGet
+    dependsOn tasks.lint
+    inputs.files(fileTree("${projectDir}").matching {
+        include "test/plugins/transport/B/*.go"
+    })
+    outputs.files([libName, 'libtransportB.h'])
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', libName
+    args '-buildmode=plugin'
+    args 'test/plugins/transport/B/main.go'
+}
+
+task buildTestPluginsSharedLibraries {
+    dependsOn tasks.buildTestPluginsSharedLibraryA
+    dependsOn tasks.buildTestPluginsSharedLibraryB
+}
+
 class DockerCompose extends Exec {
     DockerCompose() {
         def dockerComposeV2Check = getProject().exec({
