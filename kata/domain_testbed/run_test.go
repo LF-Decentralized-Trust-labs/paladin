@@ -27,6 +27,7 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 
 	tb, err := newTestBed([]string{"unittestbed", "./sqlite.memory.config.yaml"})
 	assert.NoError(t, err)
+	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
 	if err != nil {
 		panic(err)
 	}
