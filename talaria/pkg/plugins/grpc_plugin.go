@@ -18,16 +18,20 @@ package plugins
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
-	"net"
 	"fmt"
 	"io"
+	"net"
+	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	interPaladinProto "github.com/kaleido-io/talaria/pkg/plugins/proto"
 	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -36,12 +40,12 @@ import (
 	nodes in the network. In theory, there's little stopping us connecting the gRPC transport
 	layer at Talaria directly to another Talaria, but a dedicated plugin here proves that the
 	plugin architecture not only works, but is in use.
-	
+
 	Here we implement 2 comms flows:
 
 	1. gRPC to boundary Talaria layer using unix domain sockets
 	2. gRPC over TLS to another gRPC residing on another Paladin node (potentially)
-	
+
 	It's important to note that it's possible for a transacting entity to need to send comms
 	to another transacting entity that is actually on the same node, if that's the case then
 	we still treat it as an outbound connection, but the actual call is to loopback.
@@ -50,24 +54,38 @@ import (
 type GRPCRoutingInformation struct {
 	// In theory this is an opaque object in the Registry that only this plugin knows how to
 	// use and decode, for gRPC the amount of information we need is quite minimal though
-
-	// TODO: mTLS credentials need to go here
-	Address string `json:"address"`
+	Address       string `json:"address"`
+	CACertificate string `json:"caCertificate"`
 }
+
+type RawPemCertificate []byte
 
 type GRPCTransportPlugin struct {
 	interPaladinProto.UnimplementedInterPaladinTransportServer
 	pluginInterfaceProto.UnimplementedPluginInterfaceServer
-	
-	SocketName string
-	port       int
-	messages   chan []byte
+
+	SocketName        string
+	port              int
+	messages          chan []byte
+	clientCertificate tls.Certificate
+	caPool            *x509.CertPool
+	caPoolLock        sync.Mutex
+	content           string
 
 	pluginListener       net.Listener
 	interPaladinListener net.Listener
 }
 
 // --------------------------------------------------------------------------------------------------------- Inter-Paladin Server
+
+func (gtp *GRPCTransportPlugin) generateTLSConfig() *tls.Config {
+	return &tls.Config{
+		RootCAs:      gtp.caPool,
+		ClientCAs:    gtp.caPool,
+		Certificates: []tls.Certificate{gtp.clientCertificate},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+}
 
 func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Context) {
 	log.L(ctx).Debugf("initialising connection for inbound gRPC connections %s\n", gtp.SocketName)
@@ -77,16 +95,18 @@ func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Conte
 	}
 
 	gtp.interPaladinListener = grpcLis
-	s := grpc.NewServer()
+
+	tlsConfig := gtp.generateTLSConfig()
+	s := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
 	interPaladinProto.RegisterInterPaladinTransportServer(s, gtp)
 
-	go func(){
+	go func() {
 		<-ctx.Done()
 		s.Stop()
 		grpcLis.Close()
 	}()
 
-	go func(){
+	go func() {
 		log.L(ctx).Debugf("grpc server listening at %v", grpcLis.Addr())
 		if err := s.Serve(grpcLis); err != nil {
 			log.L(ctx).Errorf("failed to serve: %v", err)
@@ -114,13 +134,13 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 	s := grpc.NewServer()
 	pluginInterfaceProto.RegisterPluginInterfaceServer(s, gtp)
 
-	go func(){
+	go func() {
 		<-ctx.Done()
 		s.Stop()
 		lis.Close()
 	}()
 
-	go func(){
+	go func() {
 		log.L(ctx).Debugf("server listening at %v", lis.Addr())
 		if err := s.Serve(lis); err != nil {
 			log.L(ctx).Errorf("failed to serve: %v", err)
@@ -130,23 +150,25 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 
 func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.PluginInterface_PluginMessageFlowServer) error {
 	ctx := server.Context()
-	
-	// TODO: This flow fundamentally means right now that sending is blocked on recieving which is not correct
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case collectedMessage := <- gtp.messages: {
-			if err := server.Send(&pluginInterfaceProto.PaladinMessage{
-				Payload: collectedMessage,
-			}); err != nil {
-				log.L(ctx).Errorf("send error %v", err)
+	go func(){
+		for {
+			select {
+			case <- ctx.Done():
+				return
+			case collectedMessage := <-gtp.messages:
+				{
+					if err := server.Send(&pluginInterfaceProto.PaladinMessage{
+						Payload: collectedMessage,
+					}); err != nil {
+						log.L(ctx).Errorf("send error %v", err)
+					}
+				}
 			}
 		}
-		default:
-		}
+	}()
 
+	for {
 		pluginReq, err := server.Recv()
 		if err == io.EOF {
 			log.L(ctx).Debugf("Shutting down Plugin listener")
@@ -178,7 +200,7 @@ func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.Pl
 		if err != nil {
 			log.L(ctx).Errorf("error sending message through gRPC: %v", err)
 		}
-	}
+	}		
 }
 
 // Actually unlikely to be needed
@@ -195,20 +217,39 @@ func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
 	gtp.startInterPaladinMessageServer(ctx)
 }
 
+func (gtp *GRPCTransportPlugin) AddNewKnownPeer(cert RawPemCertificate) (ok bool) {
+	// The reason we have to lock is because under the covers
+	// the AppendCertsFromPem adds to an array of lazy certs
+	// that get loaded and checked when a certificate is validated
+	gtp.caPoolLock.Lock()
+	defer gtp.caPoolLock.Unlock()
+	gtp.content = "Hello, World!"
+	return gtp.caPool.AppendCertsFromPEM(cert)
+}
 
 // TODO: Rip all of this out and replace it with whatever registration framework we get with kata
 func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	return PluginRegistration{
-		Name: "grpc-transport-plugin",
+		Name:           "grpc-transport-plugin",
 		SocketLocation: gtp.SocketName,
 	}
 }
 
 // TODO: Config
-func NewGRPCTransportPlugin(port int) *GRPCTransportPlugin {
+func NewGRPCTransportPlugin(ctx context.Context, port int, clientCertificate tls.Certificate) *GRPCTransportPlugin {
+	var certPool *x509.CertPool
+	var err error
+	certPool, err = x509.SystemCertPool()
+	if err != nil {
+		log.L(ctx).Warnf("Unable to get the default system cert pool, continuing with an empty cert pool.")
+		certPool = x509.NewCertPool()
+	}
+
 	return &GRPCTransportPlugin{
-		port: port,
-		SocketName: fmt.Sprintf("/tmp/%s.sock", uuid.New().String()),
+		port:              port,
+		SocketName:        fmt.Sprintf("/tmp/%s.sock", uuid.New().String()),
+		clientCertificate: clientCertificate,
+		caPool:            certPool,
 		// Buffer size needs to be configurable
 		messages: make(chan []byte, 10),
 	}

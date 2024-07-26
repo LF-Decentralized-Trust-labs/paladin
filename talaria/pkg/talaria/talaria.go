@@ -17,20 +17,21 @@ package talaria
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
-	
+
 	"github.com/hyperledger/firefly-common/pkg/log"
+	plugins "github.com/kaleido-io/talaria/pkg/plugins"
+	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
-	plugins "github.com/kaleido-io/talaria/pkg/plugins"
 )
 
 // TODO: Talaria is a plugin that speaks to other plugins, all of the code in here at the moment for
 // orchestration of those plugins should be removed and replaced by whatever framework we have in Kata
 
-// TODO: There is a fundamental problem if the context is cancelled with the in-memory sending messages 
+// TODO: There is a fundamental problem if the context is cancelled with the in-memory sending messages
 // buffer that will be lost if kept in memory. This might be a concern of the higher-level components
 // above Talaria
 
@@ -60,10 +61,10 @@ type Talaria struct {
 }
 
 // TODO: Terrible hack because no config for plugins (this will not be Talaria's concern)
-func NewTalaria(rp RegistryProvider, port int) *Talaria {
+func NewTalaria(ctx context.Context, rp RegistryProvider, port int) *Talaria {
 	transportPlugins := []plugins.TransportPlugin{}
 
-	grpcPlugin := plugins.NewGRPCTransportPlugin(port)
+	grpcPlugin := plugins.NewGRPCTransportPlugin(ctx, port, tls.Certificate{})
 	transportPlugins = append(transportPlugins, grpcPlugin)
 
 	return &Talaria{
