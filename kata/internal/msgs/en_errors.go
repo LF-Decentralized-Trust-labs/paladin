@@ -71,6 +71,7 @@ var (
 
 	// Transaction Processor PD0103XX
 	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+	MsgContextCanceled                  = ffe("PD010301", "Context canceled")
 
 	// Transaction store PD0104XX
 	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
@@ -135,4 +136,7 @@ var (
 	// Types PD0111XX
 	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
 	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
+
+	// BlockIndexer PD0112XX
+	MsgBlockIndexerInvalidFromBlock = ffe("PD011200", "Invalid from block '%s' (must be 'latest' or number)")
 )

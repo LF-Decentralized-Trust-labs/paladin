@@ -34,7 +34,7 @@ func TestPersistStateMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.PersistState(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), nil)
+	_, err := ss.PersistState(ctx, "domain1", types.HashIDKeccak(([]byte)("test")).String(), nil)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -42,7 +42,7 @@ func TestPersistStateInvalidState(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := HashIDKeccak(([]byte)("schema1"))
+	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaHash)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
@@ -58,7 +58,7 @@ func TestGetStateMissing(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.GetState(ctx, "domain1", HashIDKeccak(([]byte)("state1")).String(), true, false)
+	_, err := ss.GetState(ctx, "domain1", types.HashIDKeccak(([]byte)("state1")).String(), true, false)
 	assert.Regexp(t, "PD010112", err)
 }
 
@@ -100,7 +100,7 @@ func TestFindStatesMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.FindStates(ctx, "domain1", HashIDKeccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
+	_, err := ss.FindStates(ctx, "domain1", types.HashIDKeccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -108,7 +108,7 @@ func TestFindStatesBadQuery(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := HashIDKeccak(([]byte)("schema1"))
+	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaHash)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
@@ -131,7 +131,7 @@ func TestFindStatesFail(t *testing.T) {
 	ctx, ss, db, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := HashIDKeccak(([]byte)("schema1"))
+	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaHash)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		Schema:     &Schema{Hash: *schemaHash},

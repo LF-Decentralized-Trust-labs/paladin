@@ -100,7 +100,7 @@ func (op *writeOperation) flush(ctx context.Context) error {
 		log.L(ctx).Debugf("Flushed write operation %s (err=%v)", op.id, err)
 		return err
 	case <-ctx.Done():
-		return i18n.NewError(ctx, i18n.MsgContextCanceled)
+		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
 }
 

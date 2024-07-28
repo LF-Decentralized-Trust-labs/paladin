@@ -254,7 +254,7 @@ func TestGetSchemaInvalidJSON(t *testing.T) {
 		[]string{"type", "content"},
 	).AddRow(SchemaTypeABI, "!!! { bad json"))
 
-	_, err := ss.GetSchema(ctx, "domain1", HashIDKeccak(([]byte)("test")).String(), true)
+	_, err := ss.GetSchema(ctx, "domain1", types.HashIDKeccak(([]byte)("test")).String(), true)
 	assert.Regexp(t, "PD010113", err)
 }
 

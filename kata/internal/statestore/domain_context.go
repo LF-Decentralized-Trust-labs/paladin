@@ -142,7 +142,7 @@ func (ss *stateStore) getDomainContext(domainID string) *domainContext {
 func (dc *domainContext) takeLatch() error {
 	select {
 	case <-dc.ctx.Done():
-		return i18n.NewError(dc.ctx, i18n.MsgContextCanceled)
+		return i18n.NewError(dc.ctx, msgs.MsgContextCanceled)
 	case dc.latch <- struct{}{}:
 		return nil
 	}
@@ -360,9 +360,9 @@ func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, 
 }
 
 func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDs []string, setState func(*StateLock)) (err error) {
-	stateHashes := make([]*HashID, len(stateIDs))
+	stateHashes := make([]*types.HashID, len(stateIDs))
 	for i, id := range stateIDs {
-		stateHashes[i], err = ParseHashID(dc.ctx, id)
+		stateHashes[i], err = types.ParseHashID(dc.ctx, id)
 		if err != nil {
 			return err
 		}
