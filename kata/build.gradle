@@ -135,9 +135,6 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
         libName = "libtransportA.so"
     }
 
-    //dependsOn tasks.clean
-    //dependsOn tasks.goGet
-    //dependsOn tasks.lint
     inputs.files(fileTree("${projectDir}").matching {
         include "test/plugins/transport/A/*.go"
     })
