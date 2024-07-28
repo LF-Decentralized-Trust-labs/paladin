@@ -137,6 +137,7 @@ var (
 	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
 
 	// Plugin registry PD0112XX
-	MsgPluginLoadError = ffe("PD011200", "Failed to load plugin %s with binding %s from %s")
-	MsgPluginNotFound  = ffe("PD011201", "Plugin %s not found")
+	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
+	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
+	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
 )

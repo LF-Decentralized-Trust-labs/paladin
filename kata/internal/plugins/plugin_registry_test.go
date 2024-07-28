@@ -23,51 +23,28 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 	testUtil "github.com/kaleido-io/paladin/kata/test/util"
 )
 
-func newPluginRegistryForTesting(ctx context.Context, t *testing.T) (PluginRegistry, []ProviderConfig, commsbus.CommsBus, *commsbus.MessageHandler) {
-
+func TestNewRegistryOK(t *testing.T) {
+	//for most of the tests, we do not use this function so lets test it explicitly
+	ctx := context.Background()
 	commsBus := testUtil.NewCommsBusForTesting(ctx, t)
+	config := &Config{}
+	registry, err := NewPluginRegistry(ctx, config, commsBus)
+	assert.NoError(t, err)
+	assert.NotNil(t, registry)
+}
 
-	testDestination := "test-destination-1"
-
-	messageHandler, err := commsBus.Broker().Listen(ctx, testDestination)
-	require.NoError(t, err)
-
-	err = commsBus.Broker().SubscribeToTopic(ctx, TOPIC_PROVIDER_READY, testDestination)
-	require.NoError(t, err)
-
-	err = commsBus.Broker().SubscribeToTopic(ctx, TOPIC_INSTANCE_READY, testDestination)
-	require.NoError(t, err)
-
-	// Create a sample plugin registry with provider configs
-	providerConfigs := []ProviderConfig{
-		{
-			Name:    "transportA",
-			Type:    TRANSPORT,
-			Binding: GO_SHARED_LIBRARY,
-			//this path is relative to the package under test
-			Path: "../../transportA.so",
-		},
-	}
-	registry, err := NewPluginRegistry(ctx, &Config{
-		Providers: providerConfigs,
-	}, commsBus)
-	require.NoError(t, err)
-
-	var readyEventBody *pluginPB.PluginProviderReadyEvent
-	select {
-	case readyEvent := <-messageHandler.Channel:
-		require.Equal(t, reflect.TypeFor[*pluginPB.PluginProviderReadyEvent](), reflect.TypeOf(readyEvent.Body), "unexepected event type: "+reflect.TypeOf(readyEvent.Body).String())
-		readyEventBody = readyEvent.Body.(*pluginPB.PluginProviderReadyEvent)
-	case <-time.After(time.Second): // Timeout after 1 second
-		require.Fail(t, "Timed out waiting for message")
-	}
-	require.NotNil(t, readyEventBody)
-	return registry, providerConfigs, commsBus, &messageHandler
+func TestNewRegistryFailMissingConfig(t *testing.T) {
+	//for most of the tests, we do not use this function so lets test it explicitly
+	ctx := context.Background()
+	commsBus := testUtil.NewCommsBusForTesting(ctx, t)
+	registry, err := NewPluginRegistry(ctx, nil, commsBus)
+	assert.Error(t, err)
+	assert.Nil(t, registry)
+	assert.Contains(t, err.Error(), "PD010503")
 }
 
 func TestPluginRegistry_LoadPlugin(t *testing.T) {

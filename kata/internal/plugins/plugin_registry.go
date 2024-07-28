@@ -16,7 +16,6 @@ package plugins
 
 import (
 	"context"
-	"plugin"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/plugins/loader"
 	kataPB "github.com/kaleido-io/paladin/kata/pkg/proto"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 )
@@ -39,26 +39,19 @@ const (
 	DOMAIN    PluginType = "DOMAIN"
 )
 
-type PluginBinding string
-
-const (
-	GO_SHARED_LIBRARY PluginBinding = "GO_SHARED_LIBRARY"
-	JAVA              PluginBinding = "JAVA"
-	C_SHARED_LIBRARY  PluginBinding = "C_SHARED_LIBRARY"
-)
+type loaderConfig = loader.Config
 
 type ProviderConfig struct {
-	Name    string        `yaml:"name"`
-	Type    PluginType    `yaml:"type"`
-	Binding PluginBinding `yaml:"binding"`
-	Path    string        `yaml:"path"`
+	loaderConfig
+	Name string     `yaml:"name"`
+	Type PluginType `yaml:"type"`
 }
 
 type Provider interface {
 	GetName() string
 	GetDestination() string
 	GetType() PluginType
-	GetBinding() PluginBinding
+	GetBinding() loader.Binding
 	GetBuildInfo() string
 	GetStatus() PluginProviderStatus
 	CreateInstance(ctx context.Context, instanceName string) (Instance, error)
@@ -94,6 +87,7 @@ func (i instance) GetDestination() string {
 }
 
 type PluginRegistry interface {
+	Initialize(ctx context.Context) error
 	ListPlugins(ctx context.Context) ([]Provider, error)
 	CreateInstance(ctx context.Context, providerName string, instanceName string) (Instance, error)
 }
@@ -113,7 +107,7 @@ type loadedPlugin struct {
 	buildInfo        string
 	name             string
 	pluginType       PluginType
-	binding          PluginBinding
+	binding          loader.Binding
 	status           PluginProviderStatus
 	stopMonitoring   func()
 	providerListener string
@@ -139,7 +133,7 @@ func (lp loadedPlugin) GetType() PluginType {
 	return lp.pluginType
 }
 
-func (lp loadedPlugin) GetBinding() PluginBinding {
+func (lp loadedPlugin) GetBinding() loader.Binding {
 	return lp.binding
 }
 
@@ -151,10 +145,16 @@ type pluginRegistry struct {
 	providerConfigs []ProviderConfig
 	loadedPlugins   []*loadedPlugin
 	commsBus        commsbus.CommsBus
+	golangLoader    loader.ProviderLoader //TODO should be a map of loaders by binding
+	initialized     bool
 }
 
 // CreateInstance implements PluginRegistry.
 func (p *pluginRegistry) CreateInstance(ctx context.Context, providerName string, instanceName string) (Instance, error) {
+	if !p.initialized {
+		log.L(ctx).Error("CreateInstance caled before registry is initialized")
+		return nil, i18n.NewError(ctx, msgs.MsgPluginRegistryInternalError, "CreateInstance called before registry is initialized")
+	}
 	plugin, err := p.getPluginByName(ctx, providerName)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to get plugin for provider name %s", providerName)
@@ -216,6 +216,7 @@ func (p *pluginRegistry) ListPlugins(ctx context.Context) ([]Provider, error) {
 
 func (p *pluginRegistry) getPluginByName(ctx context.Context, name string) (*loadedPlugin, error) {
 	log.L(ctx).Debugf("Looking for plugin with name%s", name)
+
 	//TODO this is a linear search, we should probably use a map
 	for _, plugin := range p.loadedPlugins {
 		if plugin.GetName() == name {
@@ -342,80 +343,54 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 }
 
 // ListPlugins implements PluginRegistry.
-func (p *pluginRegistry) loadAllPlugins(ctx context.Context, socketAddress string) error {
+func (p *pluginRegistry) loadAllPlugins(ctx context.Context) error {
 	log.L(ctx).Info("Loading all plugins")
 	for _, providerConfig := range p.providerConfigs {
 		log.L(ctx).Infof("Loading plugin %s from %s", providerConfig.Name, providerConfig.Path)
 		switch providerConfig.Binding {
-		case GO_SHARED_LIBRARY:
-			// Load shared library
-			log.L(ctx).Info("Loading shared library")
-			plug, err := plugin.Open(providerConfig.Path)
+		case loader.GO_SHARED_LIBRARY:
+			providerBinding, err := p.golangLoader.Load(ctx, providerConfig.loaderConfig)
 			if err != nil {
-				return i18n.WrapError(ctx, err, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
+				log.L(ctx).Errorf("Failed to load plugin %s", providerConfig.Name)
+				return err
 			}
 
-			buildInfoSymbol, err := plug.Lookup("BuildInfo")
+			buildInfo, err := providerBinding.BuildInfo(ctx)
 			if err != nil {
-				log.L(ctx).Errorf("Failed to lookup BuildInfo symbol %v", err)
-				return i18n.WrapError(ctx, err, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
+				log.L(ctx).Errorf("Failed to get build info for plugin %s", providerConfig.Name)
+				return err
 			}
-			buildInfoFunc, ok := buildInfoSymbol.(func() string)
-			if !ok {
-				log.L(ctx).Infof("BuildInfo symbol is not correct signature")
-				return i18n.NewError(ctx, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
+			// add to the list before loading it because we have another thread listening for new listeners and updating the status
+			newlyLoadedPlugin := loadedPlugin{
+				buildInfo:        buildInfo,
+				name:             providerConfig.Name,
+				pluginType:       providerConfig.Type,
+				binding:          providerConfig.Binding,
+				status:           PluginProviderStatusNotReady,
+				providerListener: uuid.New().String(),
+				registry:         p,
 			}
-			buildInfo := buildInfoFunc()
+			p.loadedPlugins = append(p.loadedPlugins, &newlyLoadedPlugin)
 
-			switch providerConfig.Type {
-			case TRANSPORT:
-				initializeSymbol, err := plug.Lookup("InitializeTransportProvider")
-				if err != nil {
-					log.L(ctx).Errorf("Failed to lookup InitializeTransportProvider symbol %v", err)
-					return i18n.WrapError(ctx, err, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
-				}
-
-				initializeFunc, ok := initializeSymbol.(func(string, string) error)
-				if !ok {
-					log.L(ctx).Infof("InitializeTransportProvider symbol is not correct signature")
-					return i18n.NewError(ctx, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
-				}
-
-				// add to the list before loading it because we have another thread listening for new listeners and updating the status
-				newlyLoadedPlugin := loadedPlugin{
-					buildInfo:        buildInfo,
-					name:             providerConfig.Name,
-					pluginType:       providerConfig.Type,
-					binding:          providerConfig.Binding,
-					status:           PluginProviderStatusNotReady,
-					providerListener: uuid.New().String(),
-					registry:         p,
-				}
-				p.loadedPlugins = append(p.loadedPlugins, &newlyLoadedPlugin)
-
-				log.L(ctx).Infof("Initializing transport provider %s, destination=%s", providerConfig.Name, newlyLoadedPlugin.providerListener)
-				err = initializeFunc(socketAddress, newlyLoadedPlugin.providerListener)
-				if err != nil {
-					log.L(ctx).Errorf("Failed to initialize transport provider %v", err)
-					return i18n.WrapError(ctx, err, msgs.MsgPluginLoadError, providerConfig.Name, GO_SHARED_LIBRARY, providerConfig.Path)
-				}
-
-				stopMonitoring, err := p.monitorPlugin(ctx, providerConfig.Name)
-				if err != nil {
-					log.L(ctx).Errorf("Failed to start monitoring plugin %s", providerConfig.Name)
-				}
-				newlyLoadedPlugin.stopMonitoring = stopMonitoring
-
-			case DOMAIN:
-				log.L(ctx).Errorf("Domain plugins not implemented yet")
-			default:
-				log.L(ctx).Errorf("Unsupported plugin type %s", providerConfig.Type)
+			err = providerBinding.InitializeTransportProvider(
+				ctx,
+				p.commsBus.GRPCServer().GetSocketAddress(),
+				newlyLoadedPlugin.providerListener)
+			if err != nil {
+				log.L(ctx).Errorf("Failed to initialize transport provider for plugin %s", providerConfig.Name)
+				return err
 			}
 
-		case JAVA:
+			stopMonitoring, err := p.monitorPlugin(ctx, providerConfig.Name)
+			if err != nil {
+				log.L(ctx).Errorf("Failed to start monitoring plugin %s", providerConfig.Name)
+			}
+			newlyLoadedPlugin.stopMonitoring = stopMonitoring
+
+		case loader.JAVA:
 			//TODO: this will be a case of sending a message to Potara asking it to load the jar
 			log.L(ctx).Errorf("Java plugins not implemented yet")
-		case C_SHARED_LIBRARY:
+		case loader.C_SHARED_LIBRARY:
 			//TODO: this will be similar to GO_SHARED_LIBRARY but we will use dlopen from from the "C" golang package and
 			// we need to be super careful about memory management so that we can pass strings across the
 			log.L(ctx).Errorf("C shared library plugins not implemented yet")
@@ -454,6 +429,9 @@ func (p *pluginRegistry) monitorPlugin(ctx context.Context, providerName string)
 
 func NewPluginRegistry(ctx context.Context, conf *Config, commsBus commsbus.CommsBus) (PluginRegistry, error) {
 
+	//minimal creation code happens here.  Most of the real initialization logic happens in `Initialize`
+	//keeping this minimal allows tests to inject dependencies (e.g. mock versions of the loaders) by
+	//using a ...ForTesting version of this function
 	if conf == nil {
 		log.L(ctx).Error("Missing plugin registry config")
 		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "plugins")
@@ -461,19 +439,26 @@ func NewPluginRegistry(ctx context.Context, conf *Config, commsBus commsbus.Comm
 	p := &pluginRegistry{
 		providerConfigs: conf.Providers,
 		commsBus:        commsBus,
+		golangLoader:    loader.NewPluginLoader(ctx, "GO_SHARED_LIBRARY"),
 	}
+	return p, nil
+
+}
+
+func (p *pluginRegistry) Initialize(ctx context.Context) error {
 
 	//before loading plugins, lets make sure we will know when they start listenting for messages
 	err := p.subscribeToNewListenerEvents(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to subscribe to new listener events %v", err)
-		return nil, err
+		return err
 	}
 	//TODO should this be a separate method that gets called after the factory function is called?
-	err = p.loadAllPlugins(ctx, commsBus.GRPCServer().GetSocketAddress())
+	err = p.loadAllPlugins(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to load all plugins %v", err)
-		return nil, err
+		return err
 	}
-	return p, nil
+	p.initialized = true
+	return nil
 }

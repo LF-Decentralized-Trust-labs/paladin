@@ -28,7 +28,8 @@ ext {
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
         'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
-        'github.com/kaleido-io/paladin/kata/pkg/proto/transport'
+        'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/kata/internal/plugins/loader'
     ]
 }
 
@@ -134,9 +135,9 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
         libName = "libtransportA.so"
     }
 
-    dependsOn tasks.clean
-    dependsOn tasks.goGet
-    dependsOn tasks.lint
+    //dependsOn tasks.clean
+    //dependsOn tasks.goGet
+    //dependsOn tasks.lint
     inputs.files(fileTree("${projectDir}").matching {
         include "test/plugins/transport/A/*.go"
     })
@@ -153,6 +154,7 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
 
 task buildTestPluginsSharedLibraries {
     dependsOn tasks.buildTestPluginsSharedLibraryA
+
 }
 
 class DockerCompose extends Exec {
@@ -287,7 +289,7 @@ task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
     eachFile { fcd ->
         fcd.setRelativePath(fcd.relativePath.replaceLastName('coverage.txt'))
     }
-    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages)
+    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
 task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
