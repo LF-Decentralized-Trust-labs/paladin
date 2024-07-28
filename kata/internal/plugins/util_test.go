@@ -25,16 +25,13 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins/loader"
 	pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 	aProvider "github.com/kaleido-io/paladin/kata/test/plugins/transport/A/pkg/provider"
-	testUtil "github.com/kaleido-io/paladin/kata/test/util"
 )
 
-func newPluginRegistryForTesting(ctx context.Context, t *testing.T) (PluginRegistry, []ProviderConfig, commsbus.CommsBus, *commsbus.MessageHandler) {
+func newPluginRegistryForTesting(ctx context.Context, t *testing.T, commsBus commsbus.CommsBus) (PluginRegistry, []ProviderConfig, *commsbus.MessageHandler) {
 
 	// Creates an actual comms bus, a message handler to listen for messages and subscribes to the provider ready and instance ready topics
 	// creates a registry, with mock go lang loader to workaround the issue where the go plugin loader failes to load the shared library when run with `-cover`
 	// I tried building the lib using -cover but that did not help.
-
-	commsBus := testUtil.NewCommsBusForTesting(ctx, t)
 
 	testDestination := "test-destination-1"
 
@@ -79,7 +76,7 @@ func newPluginRegistryForTesting(ctx context.Context, t *testing.T) (PluginRegis
 		require.Fail(t, "Timed out waiting for message")
 	}
 	require.NotNil(t, readyEventBody)
-	return registry, providerConfigs, commsBus, &messageHandler
+	return registry, providerConfigs, &messageHandler
 }
 
 // functions specific to loading plugins that are built as go plugin shared libraries

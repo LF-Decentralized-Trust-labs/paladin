@@ -113,7 +113,6 @@ type loadedPlugin struct {
 	providerListener string
 	registry         *pluginRegistry
 	instances        []*instance
-	//transportProvider pluginInterface.TransportProvider
 }
 
 // GetStatus implements Plugin.
@@ -258,12 +257,12 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 	newListenersListener, err := p.commsBus.Broker().Listen(ctx, newListenersDestination)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to create new listener listener %s, %v", newListenersDestination, err)
-		return err
+		return i18n.WrapError(ctx, err, msgs.MsgPluginRegistryInternalError, "Failed to create new listener")
 	}
 	err = p.commsBus.Broker().SubscribeToTopic(ctx, commsbus.TOPIC_NEW_LISTENER, newListenersDestination)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to subscribe to new listener topic %v", err)
-		return err
+		return i18n.WrapError(ctx, err, msgs.MsgPluginRegistryInternalError, "Failed to subscribe to new listener topic")
 	}
 	go func() {
 		for newListenerEvent := range newListenersListener.Channel {
@@ -305,7 +304,7 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 				continue
 			}
 
-			log.L(ctx).Infof("No plugin found for destination %s", newListenerEventBody.Destination)
+			log.L(ctx).Debugf("No plugin found for destination %s checking if it matches an instance", newListenerEventBody.Destination)
 			//if the listener corresponds to one of the plugin instances that we have created, we should update the status
 			instance, err := p.getPluginInstanceByDestination(ctx, newListenerEventBody.Destination)
 			if err != nil {
@@ -334,7 +333,7 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 				}
 				continue
 			}
-			log.L(ctx).Infof("No plugin instance found for destination %s", newListenerEventBody.Destination)
+			log.L(ctx).Debugf("No plugin instance found for destination %s.  Ignoring.", newListenerEventBody.Destination)
 
 		}
 		log.L(ctx).Info("Stopped newListenersListener")
@@ -387,15 +386,16 @@ func (p *pluginRegistry) loadAllPlugins(ctx context.Context) error {
 			}
 			newlyLoadedPlugin.stopMonitoring = stopMonitoring
 
-		case loader.JAVA:
-			//TODO: this will be a case of sending a message to Potara asking it to load the jar
-			log.L(ctx).Errorf("Java plugins not implemented yet")
-		case loader.C_SHARED_LIBRARY:
-			//TODO: this will be similar to GO_SHARED_LIBRARY but we will use dlopen from from the "C" golang package and
-			// we need to be super careful about memory management so that we can pass strings across the
-			log.L(ctx).Errorf("C shared library plugins not implemented yet")
+		//case loader.JAVA:
+		//TODO: this will be a case of sending a message to Portara asking it to load the jar
+		//log.L(ctx).Errorf("Java plugins not implemented yet")
+		//case loader.C_SHARED_LIBRARY:
+		//TODO: this will be similar to GO_SHARED_LIBRARY but we will use dlopen from from the "C" golang package and
+		// we need to be super careful about memory management so that we can pass strings across the
+		//log.L(ctx).Errorf("C shared library plugins not implemented yet")
 		default:
 			log.L(ctx).Errorf("Unsupported plugin binding %s", providerConfig.Binding)
+			return i18n.NewError(ctx, msgs.MsgPluginBindingNotSupported, providerConfig.Binding)
 		}
 	}
 	return nil
@@ -453,7 +453,7 @@ func (p *pluginRegistry) Initialize(ctx context.Context) error {
 		log.L(ctx).Errorf("Failed to subscribe to new listener events %v", err)
 		return err
 	}
-	//TODO should this be a separate method that gets called after the factory function is called?
+
 	err = p.loadAllPlugins(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to load all plugins %v", err)
