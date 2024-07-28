@@ -23,14 +23,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
 )
@@ -62,19 +60,30 @@ func newBlockListener(ctx context.Context, conf *Config, wsConfig *RPCWSConnectC
 	if wscConf.TLSClientConfig, err = tls.BuildTLSConfig(ctx, &wsConfig.TLS, tls.ClientType); err != nil {
 		return nil, err
 	}
-	return &blockListener{
+	chainHeadCacheLen := confutil.IntMin(conf.ChainHeadCacheLen, 1, *DefaultConfig.ChainHeadCacheLen)
+	bl = &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
 		highestBlock:               0,
 		blockPollingInterval:       confutil.DurationMin(conf.BlockPollingInterval, 1*time.Millisecond, *DefaultConfig.BlockPollingInterval),
 		canonicalChain:             list.New(),
-		unstableHeadLength:         confutil.IntMin(conf.RequiredConfirmations, 0, *DefaultConfig.RequiredConfirmations),
+		unstableHeadLength:         chainHeadCacheLen,
 		blockCache:                 cache.NewCache[string, string](&conf.BlockCache, &DefaultConfig.BlockCache),
 		retry:                      retry.NewRetryIndefinite(&conf.Retry),
 		wsConn:                     rpcbackend.NewWSRPCClient(wscConf),
-		newBlocks:                  make(chan *BlockInfoJSONRPC, confutil.IntMin(conf.CommitBatchSize, 0, *DefaultConfig.CommitBatchSize)),
-	}, nil
+		newBlocks:                  make(chan *BlockInfoJSONRPC, chainHeadCacheLen),
+	}
+	return bl, nil
+}
+
+func (bl *blockListener) start() {
+	bl.listenLoopDone = make(chan struct{})
+	go bl.listenLoop()
+}
+
+func (bl *blockListener) channel() <-chan *BlockInfoJSONRPC {
+	return bl.newBlocks
 }
 
 func (bl *blockListener) newHeadsSubListener() {
@@ -96,27 +105,22 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 		// If we have a WebSocket backend, then we connect it and switch over to using it
 		// (we accept an un-locked update here to backend, as the most important routine that's
 		// querying block state is the one we're called on)
-		if bl.wsConn != nil {
-			if !wsConnected {
-				if err := bl.wsConn.Connect(bl.ctx); err != nil {
-					log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
-					return true, err
-				}
-				// if we retry subscribe, we don't want to retry connect
-				wsConnected = true
+		if !wsConnected {
+			if err := bl.wsConn.Connect(bl.ctx); err != nil {
+				log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
+				return true, err
 			}
-			if bl.newHeadsSub == nil {
-				// Once subscribed the backend will keep us subscribed over reconnect
-				sub, rpcErr := bl.wsConn.Subscribe(bl.ctx, "newHeads")
-				if rpcErr != nil {
-					return true, rpcErr.Error()
-				}
-				bl.newHeadsSub = sub
-				go bl.newHeadsSubListener()
+			// if we retry subscribe, we don't want to retry connect
+			wsConnected = true
+		}
+		if bl.newHeadsSub == nil {
+			// Once subscribed the backend will keep us subscribed over reconnect
+			sub, rpcErr := bl.wsConn.Subscribe(bl.ctx, "newHeads")
+			if rpcErr != nil {
+				return true, rpcErr.Error()
 			}
-			// Ok all JSON/RPC from this point on uses our WS Backend, thus ensuring we're
-			// sticky to the same node that the WS is connected to when we're doing queries
-			// and building our cache.
+			bl.newHeadsSub = sub
+			go bl.newHeadsSubListener()
 		}
 
 		// Now get the block height
@@ -218,15 +222,6 @@ func (bl *blockListener) listenLoop() {
 
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
-			if len(h) != 32 {
-				if len(h) < 32 {
-					log.L(bl.ctx).Errorf("Cannot index block header hash of length: %d", len(h))
-					failCount++
-					continue
-				}
-				h = h[0:32]
-			}
-
 			// Do a lookup of the block (which will then go into our cache).
 			bi, err := bl.getBlockInfoByHash(bl.ctx, h.String())
 			switch {
@@ -245,10 +240,7 @@ func (bl *blockListener) listenLoop() {
 		if notifyPos != nil {
 			// We notify for all hashes from the point of change in the chain onwards
 			for notifyPos != nil {
-				if err := bl.notifyBlock(notifyPos.Value.(*BlockInfoJSONRPC)); err != nil {
-					log.L(bl.ctx).Debugf("Block listener loop stopping")
-					return
-				}
+				bl.notifyBlock(notifyPos.Value.(*BlockInfoJSONRPC))
 				notifyPos = notifyPos.Next()
 			}
 		}
@@ -259,12 +251,11 @@ func (bl *blockListener) listenLoop() {
 	}
 }
 
-func (bl *blockListener) notifyBlock(bi *BlockInfoJSONRPC) error {
+func (bl *blockListener) notifyBlock(bi *BlockInfoJSONRPC) {
+	// Does not block if context is cancelled, we'll handle that in other processing
 	select {
 	case bl.newBlocks <- bi:
-		return nil
 	case <-bl.ctx.Done():
-		return i18n.NewError(bl.ctx, msgs.MsgContextCanceled)
 	}
 }
 
@@ -446,16 +437,8 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *BlockInfoJSONRP
 	return lastValidBlock
 }
 
-func (bl *blockListener) checkStartedLocked() {
-	if bl.listenLoopDone == nil {
-		bl.listenLoopDone = make(chan struct{})
-		go bl.listenLoop()
-	}
-}
-
 func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, bool) {
 	bl.mux.Lock()
-	bl.checkStartedLocked()
 	highestBlock := bl.highestBlock
 	bl.mux.Unlock()
 	// if not yet initialized, wait to be initialized

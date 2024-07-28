@@ -28,6 +28,7 @@ type Config struct {
 	FromBlock             types.RawJSON `yaml:"fromBlock"`
 	CommitBatchSize       *int          `yaml:"commitBatchSize"`
 	RequiredConfirmations *int          `yaml:"requiredConfirmations"`
+	ChainHeadCacheLen     *int          `yaml:"chainHeadCacheLen"`
 	BlockCache            cache.Config  `yaml:"blockCache"`
 	BlockPollingInterval  *string       `yaml:"blockPollingInterval"`
 	Retry                 retry.Config  `yaml:"retry"`
@@ -42,6 +43,7 @@ var DefaultConfig = &Config{
 	FromBlock:             types.RawJSON(`0`),
 	CommitBatchSize:       confutil.P(50),
 	RequiredConfirmations: confutil.P(0),
+	ChainHeadCacheLen:     confutil.P(50),
 	BlockPollingInterval:  confutil.P("10s"),
 	BlockCache: cache.Config{
 		Capacity: confutil.P(100),
