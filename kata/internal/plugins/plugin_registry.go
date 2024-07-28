@@ -53,7 +53,6 @@ type Provider interface {
 	GetType() PluginType
 	GetBinding() loader.Binding
 	GetBuildInfo() string
-	GetStatus() PluginProviderStatus
 	CreateInstance(ctx context.Context, instanceName string) (Instance, error)
 }
 
@@ -113,11 +112,6 @@ type loadedPlugin struct {
 	providerListener string
 	registry         *pluginRegistry
 	instances        []*instance
-}
-
-// GetStatus implements Plugin.
-func (lp loadedPlugin) GetStatus() PluginProviderStatus {
-	return lp.status
 }
 
 func (lp loadedPlugin) GetName() string {
@@ -225,28 +219,28 @@ func (p *pluginRegistry) getPluginByName(ctx context.Context, name string) (*loa
 	return nil, nil
 }
 
-func (p *pluginRegistry) getPluginByDestination(ctx context.Context, destination string) (*loadedPlugin, error) {
+func (p *pluginRegistry) getPluginByDestination(ctx context.Context, destination string) *loadedPlugin {
 	log.L(ctx).Debugf("Looking for plugin with destination %s", destination)
 	//TODO this is a linear search, we should probably use a map
 	for _, plugin := range p.loadedPlugins {
 		if plugin.GetDestination() == destination {
-			return plugin, nil
+			return plugin
 		}
 	}
-	return nil, nil
+	return nil
 }
 
-func (p *pluginRegistry) getPluginInstanceByDestination(ctx context.Context, destination string) (*instance, error) {
+func (p *pluginRegistry) getPluginInstanceByDestination(ctx context.Context, destination string) *instance {
 	log.L(ctx).Debugf("Looking for plugin instance with destination %s", destination)
 	//TODO this is a linear search, we should probably use a map
 	for _, plugin := range p.loadedPlugins {
 		for _, inst := range plugin.instances {
 			if inst.GetDestination() == destination {
-				return inst, nil
+				return inst
 			}
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error {
@@ -277,11 +271,8 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 
 			log.L(ctx).Infof("New listener started for destination %s", newListenerEventBody.Destination)
 			//if the listener corresponds to one of the plugin providers that we have loaded, we should update the status
-			plugin, err := p.getPluginByDestination(ctx, newListenerEventBody.Destination)
-			if err != nil {
-				log.L(ctx).Errorf("Failed to get plugin for destination %s", newListenerEventBody.Destination)
-				continue
-			}
+			plugin := p.getPluginByDestination(ctx, newListenerEventBody.Destination)
+
 			if plugin != nil {
 				log.L(ctx).Infof("Plugin %s is now ready", plugin.GetName())
 
@@ -306,11 +297,8 @@ func (p *pluginRegistry) subscribeToNewListenerEvents(ctx context.Context) error
 
 			log.L(ctx).Debugf("No plugin found for destination %s checking if it matches an instance", newListenerEventBody.Destination)
 			//if the listener corresponds to one of the plugin instances that we have created, we should update the status
-			instance, err := p.getPluginInstanceByDestination(ctx, newListenerEventBody.Destination)
-			if err != nil {
-				log.L(ctx).Errorf("Failed to get instance for destination %s", newListenerEventBody.Destination)
-				continue
-			}
+			instance := p.getPluginInstanceByDestination(ctx, newListenerEventBody.Destination)
+
 			if instance != nil {
 				log.L(ctx).Infof("Instance %s is now ready", instance.GetName())
 

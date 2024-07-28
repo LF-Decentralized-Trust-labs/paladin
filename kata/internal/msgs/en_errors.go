@@ -140,4 +140,5 @@ var (
 	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
 	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
 	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
+	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
 )
