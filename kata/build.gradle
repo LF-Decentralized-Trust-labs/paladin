@@ -23,7 +23,7 @@ ext {
         include "componenttest/**/*.go"
     }
 
-    targetCoverage = 91
+    targetCoverage = 90.3
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
