@@ -129,7 +129,7 @@ Output is
 Behaviour
  - for any 2 given transaction ids and statistically significant set of randomly generated state ids, when invoked for each state id, it returns one of the transaction ids for near 50% of the state IDs and the other transaction id for near 50% of the state IDs
  - Is a pure function. For same inputs, will always return the same output, even if executed multiple times on completely separate nodes in the network 
- - Is commutative over the transaction ids. If invoked with the same 2 transaction ids (and same state id) will return the same answer regarless of the order of the transaction ids
+ - Is commutative over the transaction ids. If invoked with the same 2 transaction ids (and same state id) will return the same answer regardless of the order of the transaction ids
  - Is associative.  When more than 2 transactions are contesting for the same state id, the coin toss can be invoked multiple times, taking the result of one toss as one of the inputs to the next invocation untill all transactions have been included in at least one coin toss, then the final winner will always be the same regardless of which order the transactions were included in the coin toss.  
   
 To explain these properties further.  Imagine there are 4 transactions contesting for the same state ID, lets call them `Ta`, `Tb`, `Tc` and `Td`. And lets write the coin toss between `Ta` and `Tb` for state `S` as `C(S,Ta,Tb)`
