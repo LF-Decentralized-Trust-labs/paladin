@@ -162,8 +162,32 @@ err := any.UnmarshalTo(receivedBody)
 See https://pkg.go.dev/google.golang.org/protobuf/types/known/anypb#hdr-Unmarshaling_an_Any
 
 ##### Java
-TODO
+Assuming you have registered a `StreamObserver` via the `listen` method, you will reveive a `Kata.Message` object for each message.  You can inspect the tpe of the `Body` by getting the `typeURL` and stripping everything up to the last `/` character....
+```java
+StreamObserver<Kata.Message> listener = new StreamObserver<>() {
 
+            @Override
+            public void onNext(Kata.Message message) {
+                String typeURL = message.getBody().getTypeUrl();
+                int lastSlashIndex = typeURL.lastIndexOf("/");
+                String typeName = typeURL;
+                if (lastSlashIndex != -1) {
+                    typeName = typeURL.substring(lastSlashIndex + 1);
+                }
+                if (typeName.equals(
+                        "github.com.kaleido_io.paladin.kata.plugin.LoadJavaProviderRequest")) {
+                            
+                    try {
+                        LoadJavaProviderRequest body = message.getBody().unpack(LoadJavaProviderRequest.class);
+                    }catch{
+                        ...
+                    }
+                }
+            }
+...
+...
+asyncStub.listen(ListenRequest.newBuilder().setDestination(destinationName).build(), listener);
+```
 #### When receiveing over the internal comms bus golang channel
 
 The channel is typed to carry `commsbus.Message` interface objects so you can use golang type assertion to cast anything that implements that interface
@@ -188,11 +212,19 @@ import (
   kataPB "github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 ...
-switch reflect.TypeOf(receivedEvent.Body){
-  case reflect.TypeFor[*pluginPB.PluginReadyEvent]:
+if reflect.TypeOf(receivedEvent.Body) == reflect.TypeFor[*pluginPB.PluginReadyEvent]
     ...
-  case reflect.TypeFor[*kataPB.NewListenerEvent]:
-    ...
-}
+```
 
+Or use a type switch if you want to handle multiple types
+```golang
+switch bodyType := receivedEvent.Body.(type) {
+        case *pluginPB.PluginReadyEvent:
+            ...
+        case *kataPB.NewListenerEvent:
+            ...
+        default:
+            ...
+        }
+```
 see https://pkg.go.dev/reflect#TypeOf
