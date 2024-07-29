@@ -27,7 +27,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
@@ -48,7 +47,6 @@ type blockListener struct {
 	blockPollingInterval       time.Duration
 	unstableHeadLength         int
 	canonicalChain             *list.List
-	blockCache                 cache.Cache[string, string]
 	retry                      *retry.Retry
 	newBlocks                  chan *BlockInfoJSONRPC
 }
@@ -69,7 +67,6 @@ func newBlockListener(ctx context.Context, conf *Config, wsConfig *RPCWSConnectC
 		blockPollingInterval:       confutil.DurationMin(conf.BlockPollingInterval, 1*time.Millisecond, *DefaultConfig.BlockPollingInterval),
 		canonicalChain:             list.New(),
 		unstableHeadLength:         chainHeadCacheLen,
-		blockCache:                 cache.NewCache[string, string](&conf.BlockCache, &DefaultConfig.BlockCache),
 		retry:                      retry.NewRetryIndefinite(&conf.Retry),
 		wsConn:                     rpcbackend.NewWSRPCClient(wscConf),
 		newBlocks:                  make(chan *BlockInfoJSONRPC, chainHeadCacheLen),
@@ -137,7 +134,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 	})
 }
 
-func (bl *blockListener) isNotFound(err *rpcbackend.RPCError) bool {
+func isNotFound(err *rpcbackend.RPCError) bool {
 	if err != nil && err.Error() != nil {
 		lowerCaseErr := strings.ToLower(err.Error().Error())
 		if strings.Contains(lowerCaseErr, "not found") {
@@ -151,7 +148,7 @@ func (bl *blockListener) getBlockInfoByHash(ctx context.Context, blockHash strin
 	var info BlockInfoJSONRPC
 	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByHash", blockHash, false)
 	if err != nil {
-		if bl.isNotFound(err) {
+		if isNotFound(err) {
 			return nil, nil
 		}
 		return nil, err.Error()
@@ -163,7 +160,7 @@ func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber e
 	var info BlockInfoJSONRPC
 	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByNumber", blockNumber, false)
 	if err != nil {
-		if bl.isNotFound(err) {
+		if isNotFound(err) {
 			return nil, nil
 		}
 		return nil, err.Error()
@@ -211,7 +208,7 @@ func (bl *blockListener) listenLoop() {
 		var blockHashes []ethtypes.HexBytes0xPrefix
 		rpcErr := bl.wsConn.CallRPC(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if rpcErr != nil {
-			if bl.isNotFound(rpcErr) {
+			if isNotFound(rpcErr) {
 				log.L(bl.ctx).Warnf("Block filter '%v' no longer valid. Recreating filter: %s", filter, rpcErr.Message)
 				filter = ""
 			}

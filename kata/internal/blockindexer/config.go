@@ -17,7 +17,6 @@
 package blockindexer
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
@@ -27,9 +26,9 @@ import (
 type Config struct {
 	FromBlock             types.RawJSON `yaml:"fromBlock"`
 	CommitBatchSize       *int          `yaml:"commitBatchSize"`
+	CommitBatchTimeout    *string       `yaml:"commitBatchTimeout"`
 	RequiredConfirmations *int          `yaml:"requiredConfirmations"`
 	ChainHeadCacheLen     *int          `yaml:"chainHeadCacheLen"`
-	BlockCache            cache.Config  `yaml:"blockCache"`
 	BlockPollingInterval  *string       `yaml:"blockPollingInterval"`
 	Retry                 retry.Config  `yaml:"retry"`
 }
@@ -42,10 +41,8 @@ type RPCWSConnectConfig struct {
 var DefaultConfig = &Config{
 	FromBlock:             types.RawJSON(`0`),
 	CommitBatchSize:       confutil.P(50),
+	CommitBatchTimeout:    confutil.P("100ms"),
 	RequiredConfirmations: confutil.P(0),
 	ChainHeadCacheLen:     confutil.P(50),
 	BlockPollingInterval:  confutil.P("10s"),
-	BlockCache: cache.Config{
-		Capacity: confutil.P(100),
-	},
 }
