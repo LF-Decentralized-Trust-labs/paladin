@@ -140,3 +140,4 @@ We can perform any of the following sequences of operation and will always get t
  - `C(S,(C(S,Ta,Tb)),(C(S,Tc,Td))` : 1 toss up between a and b, another toss up between c and d, then a final toss up between the 2 winners.
  - `C(S,C(S,C(S,Ta,Tb),Tc),Td)`: 1 toss up between a and b. Another toss up between c and the winner of the first toss. A third toss up between d and the winner of the second toss up.
 
+These properties are very important because the situation of `n` transactions contesting for the same state is an emerging situation and the knowledge of that situation ( which transactions are in contest) reaches different nodes in the network piecemeal, at different times and in a non deterministic order.  With the above properties, all nodes in the network will eventually reach the same answer regardless of what order each of them received the information.
