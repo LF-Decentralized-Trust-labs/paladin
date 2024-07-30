@@ -69,7 +69,6 @@ type GRPCTransportPlugin struct {
 	clientCertificate tls.Certificate
 	caPool            *x509.CertPool
 	caPoolLock        sync.Mutex
-	content           string
 
 	pluginListener       net.Listener
 	interPaladinListener net.Listener
@@ -114,7 +113,6 @@ func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Conte
 }
 
 func (gtp *GRPCTransportPlugin) SendInterPaladinMessage(ctx context.Context, in *interPaladinProto.InterPaladinMessage) (*interPaladinProto.Empty, error) {
-	// TODO: Figure out if we need to send messages here
 	log.L(ctx).Tracef("Got an external message")
 	gtp.messages <- in.Payload
 	return &interPaladinProto.Empty{}, nil
@@ -235,7 +233,6 @@ func (gtp *GRPCTransportPlugin) AddNewKnownPeer(cert RawPemCertificate) (ok bool
 	// that get loaded and checked when a certificate is validated
 	gtp.caPoolLock.Lock()
 	defer gtp.caPoolLock.Unlock()
-	gtp.content = "Hello, World!"
 	return gtp.caPool.AppendCertsFromPEM(cert)
 }
 
