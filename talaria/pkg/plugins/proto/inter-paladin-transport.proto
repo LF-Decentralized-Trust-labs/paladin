@@ -16,7 +16,7 @@
 syntax = "proto3";
 
 package protos.InterPaladinTransport;
-option go_package = "protos/InterPaladinTransport";
+option go_package = "pkg/plugins/proto";
 
 service InterPaladinTransport {
   rpc SendInterPaladinMessage(InterPaladinMessage) returns (Empty) {}

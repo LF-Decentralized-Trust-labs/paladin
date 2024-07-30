@@ -15,7 +15,10 @@
 
 package io.kaleido.kata;
 
-import paladin.kata.Kata;
+import com.google.protobuf.Any;
+
+import github.com.kaleido_io.paladin.kata.Kata;
+import github.com.kaleido_io.paladin.kata.transaction.Transaction;
 
 public class SubmitTransactionRequest extends Request {
 
@@ -40,17 +43,15 @@ public class SubmitTransactionRequest extends Request {
 
     @Override
     public Kata.Message getRequestMessage() {
-        String payloadJSON = """
-                        {
-                            "contractAddress": "%s",
-                            "from": "%s",
-                            "idempotencyKey": "%s",
-                            "payloadJSON": "%s"
-                        }
-                        """.formatted(this.contractAddress, this.from, this.idempotencyKey, this.payloadJSON);
+        
+        Transaction.SubmitTransactionRequest submitTransactionRequest = Transaction.SubmitTransactionRequest.newBuilder()
+                .setContractAddress(this.contractAddress)
+                .setFrom(this.from)
+                .setIdempotencyKey(this.idempotencyKey)
+                .setPayloadJSON(this.payloadJSON)
+                .build();
         return Kata.Message.newBuilder()
-                .setType("SUBMIT_TRANSACTION_REQUEST")
-                .setBody(payloadJSON)
+                .setBody(Any.pack(submitTransactionRequest))
                 .setId(getId())
                 .setDestination("kata-txn-engine")
                 .setReplyTo(getTransactionHandler().getDestinationName())
