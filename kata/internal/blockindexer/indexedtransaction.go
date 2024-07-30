@@ -26,12 +26,15 @@ type IndexedBlock struct {
 type IndexedTransaction struct {
 	Hash        types.HashID `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	BlockNumber int64        `json:"blockNumber"`
-	Index       int64        `json:"index"`
+	TXIndex     int64        `json:"transactionIndex"`
 }
 
 type IndexedEvent struct {
-	TransactionHash types.HashID `json:"transactionHash"      gorm:"embedded;embeddedPrefix:transaction_;"`
-	BlockNumber     int64        `json:"blockNumber"`
-	Index           int64        `json:"index"`
-	Signature       types.HashID `json:"signature"            gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
+	TransactionHash types.HashID        `json:"transactionHash"       gorm:"embedded;embeddedPrefix:transaction_;"`
+	BlockNumber     int64               `json:"blockNumber"`
+	TXIndex         int64               `json:"transactionIndex"`
+	EventIndex      int64               `json:"eventIndex"`
+	Signature       types.HashID        `json:"signature"             gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
+	Transaction     *IndexedTransaction `json:"transaction,omitempty" gorm:"foreignKey:hash_l,hash_h;references:transaction_l,transaction_h;"`
+	Block           *IndexedBlock       `json:"block,omitempty"       gorm:"foreignKey:number;references:block_number;"`
 }

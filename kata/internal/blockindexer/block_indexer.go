@@ -316,14 +316,9 @@ func (bi *blockIndexer) dispatcher(ctx context.Context) {
 
 	var batch *blockWriterBatch
 	var pendingDispatch []*BlockInfoJSONRPC
+	var timedOut bool
 	for {
-		var timeoutContext context.Context
-		var timedOut bool
-		if batch != nil {
-			timeoutContext = batch.timeoutContext
-		} else {
-			timeoutContext = ctx
-		}
+		timeoutContext := ctx
 
 		if len(pendingDispatch) == 0 && bi.nextBlock != nil {
 			pendingDispatch = nil // ensure we clear the memory if we just looped through a set with pendingDispatch[1:] below
@@ -344,6 +339,7 @@ func (bi *blockIndexer) dispatcher(ctx context.Context) {
 				batch = &blockWriterBatch{opened: time.Now()}
 				batch.timeoutContext, batch.timeoutCancel = context.WithTimeout(ctx, bi.batchTimeout)
 			}
+			timeoutContext = batch.timeoutContext
 			batch.lock.Lock()
 			blockIndex := len(batch.blocks)
 			batch.blocks = append(batch.blocks, toDispatch)
@@ -372,6 +368,7 @@ func (bi *blockIndexer) dispatcher(ctx context.Context) {
 			batch = nil
 		}
 
+		timedOut = false
 		if len(pendingDispatch) == 0 {
 			select {
 			case <-bi.dispatcherTap:
@@ -419,9 +416,9 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:        *types.NewHashIDSlice32(r.BlockHash),
+				Hash:        *types.NewHashIDSlice32(r.TransactionHash),
 				BlockNumber: int64(r.BlockNumber),
-				Index:       int64(txIndex),
+				TXIndex:     int64(txIndex),
 			})
 			for eventIndex, l := range r.Logs {
 				var topic0 types.HashID
@@ -432,7 +429,8 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 					Signature:       topic0,
 					TransactionHash: *types.NewHashIDSlice32(r.TransactionHash),
 					BlockNumber:     int64(r.BlockNumber),
-					Index:           int64(eventIndex),
+					TXIndex:         int64(txIndex),
+					EventIndex:      int64(eventIndex),
 				})
 			}
 		}
@@ -443,20 +441,20 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			if len(blocks) > 0 {
 				err = tx.
 					Table("indexed_blocks").
-					Omit("Transactions").
 					Create(blocks).
 					Error
 			}
 			if err == nil && len(transactions) > 0 {
 				err = tx.
 					Table("indexed_transactions").
-					Omit("Events").
 					Create(transactions).
 					Error
 			}
 			if err == nil && len(events) > 0 {
 				err = tx.
 					Table("indexed_events").
+					Omit("Transaction").
+					Omit("Event").
 					Create(events).
 					Error
 			}
@@ -567,4 +565,75 @@ func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint
 		return nil, err
 	}
 	return blocks[0], nil
+}
+
+func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error) {
+	hashID, err := types.ParseHashID(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	var txns []*IndexedTransaction
+	db := bi.persistence.DB()
+	err = db.
+		Table("indexed_transactions").
+		Where("hash_l = ?", hashID.L).
+		Where("hash_h = ?", hashID.H).
+		Find(&txns).
+		Error
+	if err != nil || len(txns) < 1 {
+		return nil, err
+	}
+	return txns[0], nil
+}
+
+func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockNumber int64) ([]*IndexedTransaction, error) {
+	var txns []*IndexedTransaction
+	db := bi.persistence.DB()
+	err := db.
+		Table("indexed_transactions").
+		Order("block_number").
+		Order("tx_index").
+		Where("block_number = ?", blockNumber).
+		Find(&txns).
+		Error
+	return txns, err
+}
+
+func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error) {
+	hashID, err := types.ParseHashID(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	var events []*IndexedEvent
+	db := bi.persistence.DB()
+	err = db.
+		Table("indexed_events").
+		Where("transaction_l = ?", hashID.L).
+		Where("transaction_h = ?", hashID.H).
+		Order("event_index").
+		Find(&events).
+		Error
+	return events, err
+}
+
+func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error) {
+	var events []*IndexedEvent
+	db := bi.persistence.DB()
+	q := db.Table("indexed_events").
+		Where("indexed_events.block_number > ?", lastBlock).
+		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("event_index > ?", lastIndex)).
+		Order("indexed_events.block_number").
+		Order("indexed_events.tx_index").
+		Order("event_index").
+		Limit(limit)
+	if withTransaction {
+		q = q.Joins("Transaction")
+	}
+	if withBlock {
+		q = q.Joins("Block")
+	}
+	err := q.Find(&events).Error
+	return events, err
 }

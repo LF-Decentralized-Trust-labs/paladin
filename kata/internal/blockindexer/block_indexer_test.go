@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
@@ -33,6 +34,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+)
+
+var (
+	topicA = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	topicB = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	topicC = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
 )
 
 func newTestBlockIndexer(t *testing.T) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, func()) {
@@ -65,6 +72,20 @@ func newTestBlockIndexerConf(t *testing.T, config *Config, wsConfig *RPCWSConnec
 	}
 }
 
+func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, *mockpersistence.SQLMockProvider, func()) {
+	ctx, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+
+	bi, err := newBlockIndexer(ctx, config, p.P, bl)
+	assert.NoError(t, err)
+
+	return ctx, bi, mRPC, p, done
+
+}
+
 func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
@@ -79,9 +100,9 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
 				Logs: []*LogJSONRPC{
-					{Topics: []ethtypes.HexBytes0xPrefix{
-						ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
-					}},
+					{Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
 				},
 			},
 		}
@@ -171,6 +192,26 @@ func TestBlockIndexerCatchUpToHeadFromZeroNoConfirmations(t *testing.T) {
 	}
 }
 
+func TestBlockIndexerBatchTimeoutOne(t *testing.T) {
+	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	bi.batchTimeout = 1 * time.Microsecond
+	bi.batchSize = 100
+
+	blocks, receipts := testBlockArray(1)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	bi.requiredConfirmations = 0
+	bi.Start()
+
+	for i := 0; i < len(blocks); i++ {
+		b := <-bi.utBatchNotify
+		assert.Len(t, b.blocks, 1) // We should get one block per batch
+		assert.Equal(t, blocks[i], b.blocks[0])
+	}
+}
+
 func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
@@ -190,12 +231,52 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		indexedBlock, err := bi.GetIndexedBlockByNumber(ctx, blocks[i].Number.Uint64())
 		assert.NoError(t, err)
 		assert.Equal(t, blocks[i].Hash.String(), indexedBlock.Hash.String())
+
+		// Get the transaction
+		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, receipts[blocks[i].Hash.String()][0].TransactionHash.String())
+		assert.NoError(t, err)
+		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTX.Hash.String())
+
+		// Get the events
+		txEvents, err := bi.GetTransactionEventsByHash(ctx, receipts[blocks[i].Hash.String()][0].TransactionHash.String())
+		assert.NoError(t, err)
+		assert.Len(t, txEvents, 3)
+		assert.Equal(t, topicA.String(), txEvents[0].Signature.String())
+		assert.Equal(t, topicB.String(), txEvents[1].Signature.String())
+		assert.Equal(t, topicC.String(), txEvents[2].Signature.String())
+
+		// Get the transactions per block
+		indexedTXs, err := bi.GetBlockTransactionsByNumber(ctx, int64(blocks[i].Number))
+		assert.NoError(t, err)
+		assert.Len(t, indexedTXs, 1)
+		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTXs[0].Hash.String())
 	}
 
 	// Get the first unconfirmed block
 	indexedBlock, err := bi.GetIndexedBlockByNumber(ctx, blocks[len(blocks)-bi.requiredConfirmations+1].Number.Uint64())
 	assert.NoError(t, err)
 	assert.Nil(t, indexedBlock)
+
+	// Use small pages to list all the events
+	lastBlock := int64(-1)
+	lastIndex := -1
+	for i := 0; i < 15; i += 5 {
+		page, err := bi.ListTransactionEvents(ctx, lastBlock, lastIndex, 5, true, true)
+		assert.NoError(t, err)
+		assert.Len(t, page, 5)
+		for i2 := 0; i2 < 5; i2++ {
+			// There's one transaction per block, and 3 events per transaction
+			expectedBlock := (i + i2) / 3
+			expectedIndex := (i + i2) - (expectedBlock * 3)
+			expectedReceipt := receipts[blocks[expectedBlock].Hash.String()]
+			assert.Equal(t, expectedReceipt[0].BlockHash.String(), page[i2].Block.Hash.String())
+			assert.Equal(t, int64(expectedReceipt[0].BlockNumber), page[i2].Block.Number)
+			assert.Equal(t, expectedReceipt[0].Logs[expectedIndex].Topics[0].String(), page[i2].Signature.String())
+
+			lastBlock = page[i2].BlockNumber
+			lastIndex = int(page[i2].EventIndex)
+		}
+	}
 
 }
 
@@ -544,4 +625,35 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 		FromBlock: types.RawJSON(`false`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011200", err)
+}
+
+func TestGetIndexedTransactionByHashErrors(t *testing.T) {
+
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	_, err := bi.GetIndexedTransactionByHash(ctx, "wrong")
+	assert.Regexp(t, "PD010100", err)
+
+	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnRows(sqlmock.NewRows([]string{}))
+
+	res, err := bi.GetIndexedTransactionByHash(ctx, types.RandHex(32))
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
+
+	_, err = bi.GetIndexedTransactionByHash(ctx, types.RandHex(32))
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestGetTransactionEventsByHashErrors(t *testing.T) {
+
+	ctx, bi, _, _, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	_, err := bi.GetTransactionEventsByHash(ctx, "wrong")
+	assert.Regexp(t, "PD010100", err)
+
 }
