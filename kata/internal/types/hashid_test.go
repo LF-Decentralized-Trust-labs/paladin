@@ -56,6 +56,12 @@ func TestHashIDStatic(t *testing.T) {
 	id4 := NewHashID(id2.Bytes32())
 	checkFixedOK(id4)
 
+	assert.True(t, id2.Equals(id3))
+	assert.False(t, id2.Equals(nil))
+	assert.True(t, (*HashID)(nil).Equals(nil))
+	assert.False(t, (*HashID)(nil).Equals(id2))
+	assert.True(t, (*HashID)(id2).Equals(MustParseHashID("512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")))
+
 }
 
 func TestHashIDKeccak(t *testing.T) {

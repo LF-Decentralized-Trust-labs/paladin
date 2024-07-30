@@ -74,7 +74,6 @@ func newTestBlockIndexerConf(t *testing.T, config *Config, wsConfig *RPCWSConnec
 
 func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, *mockpersistence.SQLMockProvider, func()) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
-	defer done()
 
 	p, err := mockpersistence.NewSQLMockProvider()
 	assert.NoError(t, err)
@@ -655,5 +654,73 @@ func TestGetTransactionEventsByHashErrors(t *testing.T) {
 
 	_, err := bi.GetTransactionEventsByHash(ctx, "wrong")
 	assert.Regexp(t, "PD010100", err)
+
+}
+
+func TestBlockIndexerWaitForTransaction(t *testing.T) {
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	blocks, receipts := testBlockArray(5)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	txHash := receipts[blocks[2].Hash.String()][0].TransactionHash.String()
+	gotTX := make(chan struct{})
+	go func() {
+		defer close(gotTX)
+		tx, err := bi.WaitForTransaction(ctx, txHash)
+		assert.NoError(t, err)
+		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
+		assert.Equal(t, txHash, tx.Hash.String())
+	}()
+
+	// Wait for initial query to fail
+	for len(bi.txWaiters) == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	bi.Start()
+
+	for i := 0; i < len(blocks); i++ {
+		b := <-bi.utBatchNotify
+		assert.Len(t, b.blocks, 1) // We should get one block per batch
+		assert.Equal(t, blocks[i], b.blocks[0])
+	}
+
+	<-gotTX
+
+	tx, err := bi.WaitForTransaction(ctx, txHash)
+	assert.NoError(t, err)
+	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
+	assert.Equal(t, txHash, tx.Hash.String())
+}
+
+func TestWaitForTransactionFailures(t *testing.T) {
+
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	_, err := bi.WaitForTransaction(ctx, "wrong")
+	assert.Regexp(t, "PD010100", err)
+
+	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
+
+	_, err = bi.WaitForTransaction(ctx, types.RandHex(32))
+	assert.Regexp(t, "pop", err)
+
+	fakeWaiter := &txWaiter{
+		start: time.Now(),
+		done:  make(chan *IndexedTransaction),
+	}
+
+	// Must not block
+	fakeWaiter.notify(&IndexedTransaction{})
+
+	closedCtx, cancelCtx := context.WithCancel(context.Background())
+	cancelCtx()
+
+	// Must return err on cancelled context
+	_, err = fakeWaiter.wait(closedCtx, types.ShortID())
+	assert.Regexp(t, "PD010301", err)
 
 }

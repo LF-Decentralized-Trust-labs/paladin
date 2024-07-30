@@ -41,6 +41,11 @@ type BlockIndexer interface {
 	Start()
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
+	GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error)
+	GetBlockTransactionsByNumber(ctx context.Context, blockNumber int64) ([]*IndexedTransaction, error)
+	GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error)
+	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
+	WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error)
 }
 
 // Processes blocks from a configure baseline block (0 for example), up until it
@@ -67,6 +72,8 @@ type blockIndexer struct {
 	retry                 *retry.Retry
 	batchSize             int
 	batchTimeout          time.Duration
+	txWaiters             map[string]*txWaiter
+	txWaiterLock          sync.Mutex
 	dispatcherTap         chan struct{}
 	processorDone         chan struct{}
 	dispatcherDone        chan struct{}
@@ -93,6 +100,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		retry:                 blockListener.retry,
 		batchSize:             confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:          confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
+		txWaiters:             make(map[string]*txWaiter),
 		dispatcherTap:         make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {
@@ -460,8 +468,19 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			}
 			return err
 		})
-		if err == nil && bi.utBatchNotify != nil {
-			bi.utBatchNotify <- batch
+		if err == nil {
+			if bi.utBatchNotify != nil {
+				bi.utBatchNotify <- batch
+			}
+			bi.txWaiterLock.Lock()
+			for _, w := range bi.txWaiters {
+				for _, t := range transactions {
+					if w.hash.Equals(&t.Hash) {
+						w.notify(t)
+					}
+				}
+			}
+			defer bi.txWaiterLock.Unlock()
 		}
 		return true, err
 	})
@@ -553,10 +572,70 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 	return toDispatch
 }
 
+type txWaiter struct {
+	start time.Time
+	hash  types.HashID
+	done  chan *IndexedTransaction
+}
+
+func (w *txWaiter) notify(t *IndexedTransaction) {
+	select {
+	case w.done <- t:
+	default:
+	}
+}
+
+func (w *txWaiter) wait(ctx context.Context, waiterID string) (*IndexedTransaction, error) {
+	select {
+	case tx := <-w.done:
+		log.L(ctx).Infof("TX %s received after [time=%s,waiter=%s]", w.hash, time.Since(w.start), waiterID)
+		return tx, nil
+	case <-ctx.Done():
+		log.L(ctx).Warnf("TX %s not available after [time=%s,waiter=%s]", w.hash, time.Since(w.start), waiterID)
+		return nil, i18n.NewError(ctx, msgs.MsgContextCanceled)
+	}
+}
+
+func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error) {
+	txHash, err := types.ParseHashID(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	waiterID := types.ShortID()
+	waiter := &txWaiter{
+		start: time.Now(),
+		hash:  *txHash,
+		done:  make(chan *IndexedTransaction, 1),
+	}
+	log.L(ctx).Infof("Waiting for TX [time=%s,waiter=%s]", txHash, waiterID)
+
+	bi.txWaiterLock.Lock()
+	bi.txWaiters[waiterID] = waiter
+	bi.txWaiterLock.Unlock()
+
+	tx, err := bi.GetIndexedTransactionByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if tx != nil {
+		log.L(ctx).Infof("TX %s already in DB [time=%s,waiter=%s]", txHash, time.Since(waiter.start), waiterID)
+		return tx, nil
+	}
+
+	defer func() {
+		bi.txWaiterLock.Lock()
+		delete(bi.txWaiters, waiterID)
+		bi.txWaiterLock.Unlock()
+	}()
+
+	return waiter.wait(ctx, waiterID)
+}
+
 func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error) {
 	var blocks []*IndexedBlock
 	db := bi.persistence.DB()
 	err := db.
+		WithContext(ctx).
 		Table("indexed_blocks").
 		Where("number = ?", number).
 		Find(&blocks).
@@ -572,10 +651,14 @@ func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash st
 	if err != nil {
 		return nil, err
 	}
+	return bi.getIndexedTransactionByHash(ctx, *hashID)
+}
 
+func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.HashID) (*IndexedTransaction, error) {
 	var txns []*IndexedTransaction
 	db := bi.persistence.DB()
-	err = db.
+	err := db.
+		WithContext(ctx).
 		Table("indexed_transactions").
 		Where("hash_l = ?", hashID.L).
 		Where("hash_h = ?", hashID.H).
@@ -591,6 +674,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 	var txns []*IndexedTransaction
 	db := bi.persistence.DB()
 	err := db.
+		WithContext(ctx).
 		Table("indexed_transactions").
 		Order("block_number").
 		Order("tx_index").
@@ -609,6 +693,7 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 	var events []*IndexedEvent
 	db := bi.persistence.DB()
 	err = db.
+		WithContext(ctx).
 		Table("indexed_events").
 		Where("transaction_l = ?", hashID.L).
 		Where("transaction_h = ?", hashID.H).
@@ -621,7 +706,9 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error) {
 	var events []*IndexedEvent
 	db := bi.persistence.DB()
-	q := db.Table("indexed_events").
+	q := db.
+		WithContext(ctx).
+		Table("indexed_events").
 		Where("indexed_events.block_number > ?", lastBlock).
 		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("event_index > ?", lastIndex)).
 		Order("indexed_events.block_number").
