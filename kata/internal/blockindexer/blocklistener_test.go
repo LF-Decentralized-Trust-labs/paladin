@@ -266,6 +266,8 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 	assert.True(t, failedConnectOnce)
 	assert.True(t, failedSubOnce)
 
+	bl.waitClosed()
+
 	wsDone()
 	<-svrDone
 }

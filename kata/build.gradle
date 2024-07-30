@@ -27,7 +27,10 @@ ext {
     targetCoverage = 92
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/kata/pkg/proto'
+        'github.com/kaleido-io/paladin/kata/pkg/proto',
+        'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
+        'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/kata/internal/plugins/loader'
     ]
 }
 
@@ -135,6 +138,38 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
+}
+
+task buildTestPluginsSharedLibraryA(type:Exec) {
+
+    workingDir '.'
+
+    def libName;
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        libName = "transportA.dll"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        libName = "transportA.so"
+    } else {
+        libName = "libtransportA.so"
+    }
+
+    inputs.files(fileTree("${projectDir}").matching {
+        include "test/plugins/transport/A/*.go"
+    })
+    outputs.files([libName, 'libtransportA.h'])
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', libName
+    args '-buildmode=plugin'
+    args 'test/plugins/transport/A/main.go'
+}
+
+task buildTestPluginsSharedLibraries {
+    dependsOn tasks.buildTestPluginsSharedLibraryA
+
 }
 
 class DockerCompose extends Exec {
@@ -269,7 +304,7 @@ task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
     eachFile { fcd ->
         fcd.setRelativePath(fcd.relativePath.replaceLastName('coverage.txt'))
     }
-    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages)
+    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
 task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {

@@ -16,7 +16,6 @@ package transaction
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -24,15 +23,16 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
 )
 
 var ts transactionstore.TransactionStore
 var handler commsbus.MessageHandler
 var broker commsbus.Broker
 
-const SUBMIT_TRANSACTION_REQUEST = "SUBMIT_TRANSACTION_REQUEST"
-const SUBMIT_TRANSACTION_RESPONSE = "SUBMIT_TRANSACTION_RESPONSE"
-const SUBMIT_TRANSACTION_ERROR = "SUBMIT_TRANSACTION_ERROR"
+const SUBMIT_TRANSACTION_REQUEST = "github.com.kaleido_io.paladin.kata.transaction.SubmitTransactionRequest"
+const SUBMIT_TRANSACTION_RESPONSE = "github.com.kaleido_io.paladin.kata.transaction.SubmitTransactionResponse"
+const SUBMIT_TRANSACTION_ERROR = "github.com.kaleido_io.paladin.kata.transaction.SubmitTransactionError"
 const MESSAGE_DESTINATION = "kata-txn-engine"
 
 func Init(ctx context.Context, persistence persistence.Persistence, commsBus commsbus.CommsBus) error {
@@ -53,13 +53,14 @@ func Init(ctx context.Context, persistence persistence.Persistence, commsBus com
 
 func handleMessage(ctx context.Context, msg commsbus.Message) error {
 	log.L(ctx).Infof("Received message: %s", msg.Body)
-	switch msg.Type {
+	msgType := string(msg.Body.ProtoReflect().Descriptor().FullName())
+	switch msgType {
 	case SUBMIT_TRANSACTION_REQUEST:
 		log.L(ctx).Info("Received SUBMIT_TRANSACTION_REQUEST")
 		requestId := msg.ID
-		submitTransactionRequest := msg.Body
+		submitTransactionRequest := msg.Body.(*transactionsPB.SubmitTransactionRequest)
 
-		response, err := Submit(ctx, string(submitTransactionRequest))
+		response, err := Submit(ctx, submitTransactionRequest)
 		if err != nil {
 			// Handle the error
 			log.L(ctx).Errorf("Error submitting transaction: %s", err)
@@ -68,8 +69,7 @@ func handleMessage(ctx context.Context, msg commsbus.Message) error {
 
 		if msg.ReplyTo != nil {
 			submitTransactionResponse := commsbus.Message{
-				Type:          SUBMIT_TRANSACTION_RESPONSE,
-				Body:          []byte(response),
+				Body:          response,
 				CorrelationID: &requestId,
 				Destination:   *msg.ReplyTo,
 			}
@@ -88,7 +88,7 @@ func handleMessage(ctx context.Context, msg commsbus.Message) error {
 		}
 
 	default:
-		log.L(ctx).Info("Received unkonwn message type")
+		log.L(ctx).Infof("Received unknown message type %s", msgType)
 		// TODO Handle unknown message types
 	}
 	return nil
@@ -106,64 +106,47 @@ func messageHandler(ctx context.Context) {
 	}
 }
 
-func Submit(ctx context.Context, requestJSON string) (string, error) {
-	req := struct {
-		ContractAddress string `json:"contractAddress"`
-		From            string `json:"from"`
-		IdempotencyKey  string `json:"idempotencyKey"`
-		PayloadJSON     string `json:"payloadJSON"`
-		PayloadRLP      string `json:"payloadRLP"`
-	}{}
-	err := json.Unmarshal([]byte(requestJSON), &req)
-	if err != nil {
-		return "", i18n.WrapError(ctx, err, msgs.MsgTransactionParseError)
-	}
+func Submit(ctx context.Context, request *transactionsPB.SubmitTransactionRequest) (*transactionsPB.SubmitTransactionResponse, error) {
 
-	payload := req.PayloadJSON
+	payload := request.GetPayloadJSON()
 	if payload == "" {
-		payload = req.PayloadRLP
+		payload = request.GetPayloadRLP()
 	}
 
-	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", req.ContractAddress, req.From, req.IdempotencyKey, payload)
+	log.L(ctx).Infof("Received SubmitTransactionRequest: contractAddress=%s, from=%s, idempotencyKey=%s, payload=%s", request.GetContractAddress(), request.GetFrom(), request.GetIdempotencyKey(), payload)
 
-	if payload == "" || req.From == "" || req.ContractAddress == "" {
+	if payload == "" || request.GetFrom() == "" || request.GetContractAddress() == "" {
 		missingFields := make([]string, 4)
 		if payload == "" {
 			missingFields = append(missingFields, "PayloadJSON", "PayloadRLP")
 		}
-		if req.From == "" {
+		if request.GetFrom() == "" {
 			missingFields = append(missingFields, "From")
 		}
-		if req.ContractAddress == "" {
-			missingFields = append(missingFields, "payload")
+		if request.GetContractAddress() == "" {
+			missingFields = append(missingFields, "contractAddress")
 		}
-		return "", i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
+		return nil, i18n.NewError(ctx, msgs.MsgTransactionMissingField, missingFields)
 	}
 
-	payloadJSON := req.PayloadJSON
-	payloadRLP := req.PayloadRLP
+	payloadJSON := request.GetPayloadJSON()
+	payloadRLP := request.GetPayloadRLP()
 
 	createdTransaction, err := ts.InsertTransaction(ctx, transactionstore.Transaction{
-		Contract:    req.ContractAddress,
-		From:        req.From,
+		Contract:    request.GetContractAddress(),
+		From:        request.GetFrom(),
 		PayloadJSON: &payloadJSON,
 		PayloadRLP:  &payloadRLP,
 	})
 
 	if err != nil {
 		log.L(ctx).Errorf("Failed to create transaction: %s", err)
-		return "", err
+		return nil, err
 	}
 
-	response := struct {
-		TransactionID string `json:"transactionID"`
-	}{
-		TransactionID: createdTransaction.ID.String(),
+	response := transactionsPB.SubmitTransactionResponse{
+		Id: createdTransaction.ID.String(),
 	}
 
-	responseJSON, err := json.Marshal(response)
-	if err != nil {
-		return "", i18n.WrapError(ctx, err, msgs.MsgTransactionSerializeError)
-	}
-	return string(responseJSON), nil
+	return &response, nil
 }

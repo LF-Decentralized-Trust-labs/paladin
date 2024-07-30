@@ -585,7 +585,7 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`"pending"`),
 	}, p.P, bl)
-	assert.Regexp(t, "PD011200.*pending", err)
+	assert.Regexp(t, "PD011300.*pending", err)
 
 	bi, err := newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`"latest"`),
@@ -618,12 +618,12 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`!!! bad JSON`),
 	}, p.P, bl)
-	assert.Regexp(t, "PD011200", err)
+	assert.Regexp(t, "PD011300", err)
 
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`false`),
 	}, p.P, bl)
-	assert.Regexp(t, "PD011200", err)
+	assert.Regexp(t, "PD011300", err)
 }
 
 func TestGetIndexedTransactionByHashErrors(t *testing.T) {

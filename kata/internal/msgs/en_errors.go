@@ -137,6 +137,12 @@ var (
 	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
 	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
 
-	// BlockIndexer PD0112XX
-	MsgBlockIndexerInvalidFromBlock = ffe("PD011200", "Invalid from block '%s' (must be 'latest' or number)")
+	// Plugin registry PD0112XX
+	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
+	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
+	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
+	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// BlockIndexer PD0113XX
+	MsgBlockIndexerInvalidFromBlock = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
 )

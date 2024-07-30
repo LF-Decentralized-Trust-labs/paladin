@@ -12,24 +12,21 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+//nolint
+package main
 
-syntax = "proto3";
+import "C"
+import (
+	"github.com/kaleido-io/paladin/kata/test/plugins/transport/A/pkg/provider"
+)
 
-package protos.PluginInterface;
-option go_package = "pkg/talaria/proto";
-
-service PluginInterface {
-  rpc PluginMessageFlow(stream PaladinMessage) returns (stream PaladinMessage) {}
-  rpc Status(StatusRequest) returns (PluginStatus) {}
+func BuildInfo() string {
+	return provider.BuildInfo()
 }
 
-message StatusRequest {}
-
-message PluginStatus {
-  bool ok = 1;
+// CreateInstance implements plugins.TransportProvider and starts a new gRPC listener on the given socket address with the name of the provider as destination
+func InitializeTransportProvider(socketAddress string, listenerDestination string) error {
+	return provider.InitializeTransportProvider(socketAddress, listenerDestination)
 }
 
-message PaladinMessage {
-  bytes routingInformation = 1;
-  bytes payload = 2;
-}
+func main() {}

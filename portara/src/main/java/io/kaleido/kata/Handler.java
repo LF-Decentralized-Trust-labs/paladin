@@ -26,9 +26,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDomainSocketChannel;
-import paladin.kata.Kata;
-import paladin.kata.KataMessageServiceGrpc;
-import paladin.kata.Kata.ListenRequest;
+import github.com.kaleido_io.paladin.kata.Kata;
+import github.com.kaleido_io.paladin.kata.KataMessageServiceGrpc;
+import github.com.kaleido_io.paladin.kata.Kata.ListenRequest;
 
 public class Handler {
 
@@ -37,12 +37,16 @@ public class Handler {
     private String socketAddress;
     private ManagedChannel channel;
     private CancellableContext listenerContext;
-    private String destinationName; // unique name that can be used by other kata services and plugins to send messages to this handler
+    private String destinationName; // unique name that can be used by other kata services and plugins to send
+                                    // messages to this handler
+
     public String getDestinationName() {
         return destinationName;
     }
 
-    private static final class DrainMonitor {}
+    private static final class DrainMonitor {
+    }
+
     private final DrainMonitor drainMonitor = new DrainMonitor();
 
     private ConcurrentHashMap<String, Request> inflightRequests;
@@ -73,19 +77,22 @@ public class Handler {
 
             @Override
             public void onNext(Kata.Message transactionMessage) {
+                String typeURL = transactionMessage.getBody().getTypeUrl();
                 System.out.printf("Response in Java %s [%s]\n",
                         transactionMessage.getId(),
-                        transactionMessage.getType());
-                String type = transactionMessage.getType();
-                if (type.equals("SUBMIT_TRANSACTION_RESPONSE")) {
+                        typeURL);
+                int lastSlashIndex = typeURL.lastIndexOf("/");
+                String typeName = typeURL;
+                if (lastSlashIndex != -1) {
+                    typeName = typeURL.substring(lastSlashIndex + 1);
+                }
+                if (typeName.equals(
+                        "github.com.kaleido_io.paladin.kata.transaction.SubmitTransactionResponse")) {
                     String requestId = transactionMessage.getCorrelationId();
                     Request request = inflightRequests.remove(requestId);
                     if (request != null) {
                         request.getResponseHandler().onResponse(transactionMessage);
-                        if (transactionMessage.getType() == "SUBMIT_TRANSACTION_RESPONSE") {
-                            System.err.printf("Transaction submitted %s\n",
-                                    transactionMessage.getBody());
-                        }
+                        System.err.printf("Transaction submitted %s\n", transactionMessage.getBody());
                         synchronized (drainMonitor) {
                             if (inflightRequests.isEmpty()) {
                                 drainMonitor.notifyAll();
@@ -111,7 +118,7 @@ public class Handler {
         this.listenerContext.run(() -> {
             asyncStub.listen(ListenRequest.newBuilder().setDestination(this.destinationName).build(), responseObserver);
         });
-        
+
         System.out.println("listener stopped");
 
     }
@@ -119,11 +126,12 @@ public class Handler {
     public void stop() throws InterruptedException {
         System.out.println("quiescing");
 
-        // Quiesce the server, giving a little time for in-flight requests to run to completion
+        // Quiesce the server, giving a little time for in-flight requests to run to
+        // completion
         synchronized (drainMonitor) {
-           if (!inflightRequests.isEmpty()) {
-               drainMonitor.wait(5000 /* TODO: Configurable */);
-           }
+            if (!inflightRequests.isEmpty()) {
+                drainMonitor.wait(5000 /* TODO: Configurable */);
+            }
         }
         System.out.println("stopping");
 
@@ -166,7 +174,7 @@ public class Handler {
         try {
             String requestId = request.getId();
             KataMessageServiceGrpc.KataMessageServiceBlockingStub blockingStub = KataMessageServiceGrpc
-                .newBlockingStub(channel);
+                    .newBlockingStub(channel);
             blockingStub.sendMessage(request.getRequestMessage());
             this.inflightRequests.put(requestId, request);
 
