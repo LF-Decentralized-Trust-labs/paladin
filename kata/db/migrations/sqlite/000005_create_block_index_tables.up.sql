@@ -10,10 +10,10 @@ CREATE TABLE indexed_transactions (
     "hash_h"          UUID    NOT NULL,
     "block_number"    BIGINT  NOT NULL,
     "tx_index"        BIGINT  NOT NULL,
-    PRIMARY KEY ("hash_l", "hash_h"),
+    PRIMARY KEY ("block_number", "tx_index"),
     FOREIGN KEY ("block_number") REFERENCES indexed_blocks ("number") ON DELETE CASCADE
 );
-CREATE INDEX indexed_transaction_sort ON indexed_transactions("block_number", "tx_index");
+CREATE INDEX indexed_transaction_id ON indexed_transactions("hash_l", "hash_h");
 
 CREATE TABLE indexed_events (
     "transaction_l"   UUID    NOT NULL,
