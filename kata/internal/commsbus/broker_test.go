@@ -38,10 +38,10 @@ func TestBroker_ListenOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create 2 listeners.  The first listener subscribes for new listerer events
+	// Create 2 listeners.  The first listener subscribes for new listener events
 	// and then they will see that the 2nd listener has been created
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	// Create a channel to signal test completion

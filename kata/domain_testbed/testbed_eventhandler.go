@@ -24,14 +24,13 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"google.golang.org/protobuf/encoding/protojson"
 	pb "google.golang.org/protobuf/proto"
 )
 
-var DOMAIN_API_ERROR = string((&proto.DomainAPIError{}).ProtoReflect().Descriptor().FullName())
-var CONFIGURE = string((&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName())
-var INIT_DOMAIN = string((&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName())
-var PREPARE_DEPLOY = string((&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName())
+var DOMAIN_API_ERROR = (&proto.DomainAPIError{}).ProtoReflect().Descriptor().FullName()
+var CONFIGURE = (&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName()
+var INIT_DOMAIN = (&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName()
+var PREPARE_DEPLOY = (&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 
 type inflightRequest struct {
 	req    *commsbus.Message
@@ -45,7 +44,7 @@ func (tb *testbed) addInflight(ctx context.Context, msg *commsbus.Message) *infl
 		queued: time.Now(),
 		done:   make(chan *commsbus.Message, 1),
 	}
-	log.L(ctx).Infof("--> %s [%s]", msg.ID, msg.Type)
+	log.L(ctx).Infof("--> %s [%s]", msg.ID, msg.Body.ProtoReflect().Descriptor().FullName())
 	tb.inflightLock.Lock()
 	defer tb.inflightLock.Unlock()
 	tb.inflight[msg.ID] = inFlight
@@ -78,24 +77,19 @@ func (tb *testbed) clearInFlight(inFlight *inflightRequest) {
 	delete(tb.inflight, inFlight.req.ID)
 }
 
-func (tb *testbed) syncExchangeToDomain(ctx context.Context, in, out pb.Message) error {
+func syncExchangeToDomain[I, O pb.Message](ctx context.Context, tb *testbed, in I, out *O) error {
 
-	jsonIn, err := protojson.Marshal(in)
-	if err != nil {
-		return fmt.Errorf("bad request: %s", err)
-	}
 	id := uuid.New().String()
 	requestMsg := commsbus.Message{
 		Destination: tb.destToDomain,
 		ReplyTo:     &tb.destFromDomain,
 		ID:          id,
-		Body:        jsonIn,
-		Type:        string(in.ProtoReflect().Descriptor().FullName()),
+		Body:        in,
 	}
 	inFlight := tb.addInflight(ctx, &requestMsg)
 	defer tb.clearInFlight(inFlight)
 
-	if err = tb.bus.Broker().SendMessage(ctx, requestMsg); err != nil {
+	if err := tb.bus.Broker().SendMessage(ctx, requestMsg); err != nil {
 		return fmt.Errorf("failed to send request: %s", err)
 	}
 
@@ -104,17 +98,17 @@ func (tb *testbed) syncExchangeToDomain(ctx context.Context, in, out pb.Message)
 		return err
 	}
 
-	if reply.Type == DOMAIN_API_ERROR {
-		var pbErr proto.DomainAPIError
-		err = protojson.Unmarshal(reply.Body, &pbErr)
-		if err == nil {
+	if reply.Body.ProtoReflect().Descriptor().FullName() == DOMAIN_API_ERROR {
+		pbErr, ok := reply.Body.(*proto.DomainAPIError)
+		if ok {
 			return fmt.Errorf(pbErr.ErrorMessage)
 		}
 	}
 
-	err = protojson.Unmarshal(reply.Body, out)
-	if err != nil {
-		return fmt.Errorf("bad response: %s", err)
+	var ok bool
+	*out, ok = reply.Body.(O)
+	if !ok {
+		return fmt.Errorf("bad response expected=%T actual=%T", *out, reply.Body)
 	}
 
 	return nil
@@ -127,7 +121,8 @@ func (tb *testbed) eventHandler() {
 			log.L(tb.ctx).Infof("Testbed event handler shutting down")
 			return
 		case msgFromDomain := <-tb.fromDomain.Channel:
-			log.L(tb.ctx).Infof("Testbed received %s [%s]", msgFromDomain.ID, msgFromDomain.Type)
+			msgType := msgFromDomain.Body.ProtoReflect().Descriptor().FullName()
+			log.L(tb.ctx).Infof("Testbed received %s [%s]", msgFromDomain.ID, msgType)
 			inflight := tb.getInflight(msgFromDomain.CorrelationID)
 			if inflight != nil {
 				inflight.done <- &msgFromDomain
@@ -139,19 +134,18 @@ func (tb *testbed) eventHandler() {
 }
 
 func (tb *testbed) handleRequestFromDomain(msgFromDomain commsbus.Message) {
+	msgType := msgFromDomain.Body.ProtoReflect().Descriptor().FullName()
 	var reply pb.Message
-	switch msgFromDomain.Type {
+	switch msgType {
 	default:
 		reply = &proto.DomainAPIError{
-			ErrorMessage: fmt.Sprintf("unknown request type: %s", msgFromDomain.Type),
+			ErrorMessage: fmt.Sprintf("unknown request type: %s", msgType),
 		}
 	}
-	resBytes, _ := protojson.Marshal(reply)
 	_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
 		ID:            uuid.New().String(),
-		Type:          string(reply.ProtoReflect().Descriptor().FullName()),
 		CorrelationID: &msgFromDomain.ID,
 		Destination:   *msgFromDomain.ReplyTo,
-		Body:          resBytes,
+		Body:          reply,
 	})
 }

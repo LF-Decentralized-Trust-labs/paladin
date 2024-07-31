@@ -48,8 +48,8 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 	) (bool, error) {
 
 		// First we call configure on the domain
-		var configRes proto.ConfigureDomainResponse
-		err := tb.syncExchangeToDomain(ctx, &proto.ConfigureDomainRequest{
+		var configRes *proto.ConfigureDomainResponse
+		err := syncExchangeToDomain(ctx, tb, &proto.ConfigureDomainRequest{
 			Name:       name,
 			ConfigYaml: string(domainConfig),
 			ChainId:    1122334455, // TODO: Get from Besu
@@ -63,8 +63,8 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 		if err != nil {
 			return false, err
 		}
-		var initRes proto.ConfigureDomainResponse
-		err = tb.syncExchangeToDomain(ctx, initReq, &initRes)
+		var initRes *proto.InitDomainResponse
+		err = syncExchangeToDomain(ctx, tb, initReq, &initRes)
 		if err != nil {
 			return false, err
 		}
@@ -85,8 +85,8 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		}
 
 		// Prepare the deployment transaction
-		var prepareDeployRes proto.PrepareDeployTransactionResponse
-		err = tb.syncExchangeToDomain(ctx, prepareDeployReq, &prepareDeployRes)
+		var prepareDeployRes *proto.PrepareDeployTransactionResponse
+		err = syncExchangeToDomain(ctx, tb, prepareDeployReq, &prepareDeployRes)
 		if err != nil {
 			return nil, err
 		}

@@ -31,20 +31,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/encoding/protojson"
 	pb "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type domainSimulatorFn func(reqJSON []byte) (pb.Message, error)
+type domainSimulatorFn func(iReq pb.Message) (pb.Message, error)
 
 type domainSimulator struct {
 	tb              *testbed
 	grpcClient      grpc.ClientConnInterface
-	messageHandlers map[string]domainSimulatorFn
+	messageHandlers map[protoreflect.FullName]domainSimulatorFn
 	done            chan struct{}
 }
 
-func newDomainSimulator(t *testing.T, messageHandlers map[string]domainSimulatorFn) (func(method string, params ...interface{}) error, func()) {
+func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (func(method string, params ...interface{}) error, func()) {
 
 	url, tb, done := newUnitTestbed(t)
 
@@ -78,13 +78,14 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 			log.L(tb.ctx).Infof("Domain simulator event handler shutting down")
 			return
 		case msgToDomain := <-toDomain.Channel:
-			handler := ds.messageHandlers[msgToDomain.Type]
+			msgType := msgToDomain.Body.ProtoReflect().Descriptor().FullName()
+			handler := ds.messageHandlers[msgType]
 			var res pb.Message
 			var err error
 			if handler == nil {
-				err = fmt.Errorf("no handler for type %s", msgToDomain.Type)
+				err = fmt.Errorf("no handler for type %s", msgType)
 			} else {
-				log.L(tb.ctx).Infof("Calling simulation of %s", msgToDomain.Type)
+				log.L(tb.ctx).Infof("Calling simulation of %s", msgType)
 				res, err = handler(msgToDomain.Body)
 			}
 			if err != nil {
@@ -92,13 +93,11 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 					ErrorMessage: err.Error(),
 				}
 			}
-			resBytes, _ := protojson.Marshal(res)
 			_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
 				ID:            uuid.New().String(),
-				Type:          string(res.ProtoReflect().Descriptor().FullName()),
 				CorrelationID: &msgToDomain.ID,
 				Destination:   *msgToDomain.ReplyTo,
-				Body:          resBytes,
+				Body:          res,
 			})
 		}
 	}
@@ -108,12 +107,11 @@ func (ds *domainSimulator) waitDone() {
 	<-ds.done
 }
 
-func simRequestToProto[T any](t *testing.T, reqJSON []byte) *T {
-	protoMsg := new(T)
-	var iPM interface{} = protoMsg
-	err := protojson.Unmarshal(reqJSON, iPM.(pb.Message))
-	assert.NoError(t, err)
-	return protoMsg
+func simRequestToProto[T pb.Message](t *testing.T, iReq pb.Message) T {
+	req := new(T)
+	assert.Equal(t, (*req).ProtoReflect().Descriptor().FullName(), iReq.ProtoReflect().Descriptor().FullName())
+	*req = iReq.(T)
+	return *req
 }
 
 func newSimulatorRPCClient(t *testing.T, url string) func(method string, params ...interface{}) error {

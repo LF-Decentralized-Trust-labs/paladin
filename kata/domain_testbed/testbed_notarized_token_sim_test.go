@@ -22,6 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	pb "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Example of how someone might use this testbed externally
@@ -93,10 +94,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		]
 	}`
 
-	rpcCall, done := newDomainSimulator(t, map[string]domainSimulatorFn{
+	rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
-		CONFIGURE: func(reqJSON []byte) (pb.Message, error) {
-			req := simRequestToProto[proto.ConfigureDomainRequest](t, reqJSON)
+		CONFIGURE: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
 			assert.Equal(t, int64(1122334455), req.ChainId) // fake
@@ -110,14 +111,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		INIT_DOMAIN: func(reqJSON []byte) (pb.Message, error) {
-			req := simRequestToProto[proto.InitDomainRequest](t, reqJSON)
+		INIT_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.InitDomainRequest](t, iReq)
 			assert.Len(t, req.AbiStateSchemaIds, 1)
 			return &proto.InitDomainResponse{}, nil
 		},
 
-		PREPARE_DEPLOY: func(reqJSON []byte) (pb.Message, error) {
-			req := simRequestToProto[proto.PrepareDeployTransactionRequest](t, reqJSON)
+		PREPARE_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.PrepareDeployTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.ConstructorAbi)
 			assert.JSONEq(t, `{
 				"notary": "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
