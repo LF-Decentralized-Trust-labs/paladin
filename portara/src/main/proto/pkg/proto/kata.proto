@@ -15,8 +15,9 @@
 
 syntax = "proto3";
 
-package paladin.kata;
+package github.com.kaleido_io.paladin.kata;
 option go_package = "pkg/proto";
+import "google/protobuf/any.proto";
 
 service KataMessageService {
   // Bidirectional stream to receive messages. 
@@ -41,13 +42,6 @@ service KataMessageService {
   rpc ListDestinations(ListDestinationsRequest) returns (ListDestinationsResponse) {}
 }
 
-// Not sure if we need Quiesce messages rather than relying gRPC to gracefully close the streams
-message QuiesceStreamRequest {
-}
-
-message QuiesceStreamResponse {
-}
-
 message ListDestinationsRequest {}
 
 message ListDestinationsResponse {
@@ -67,12 +61,11 @@ message ListenRequest {
 }
 
 message Message {
-  string destination = 1;
-  string type = 2;
-  string id = 3;
-  optional string correlationId = 4;
-  string body = 5;
-  optional string replyTo = 6;
+  string   destination = 1;
+  string   id = 2;
+  optional string correlationId = 3;
+  google.protobuf.Any    body = 4;
+  optional string replyTo = 5;
 }
 
 enum SEND_MESSAGE_RESULT {
@@ -115,7 +108,6 @@ message SubscribeToTopicResponse {
 
 message Event {
   string topic = 1;
-  string type = 2;
-  string id = 3;
-  string body = 4;
+  string id = 2;
+  google.protobuf.Any  body = 3;
 }

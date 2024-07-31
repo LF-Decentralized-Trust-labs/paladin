@@ -21,9 +21,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	"google.golang.org/protobuf/proto"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type BrokerConfig struct {
@@ -31,27 +35,24 @@ type BrokerConfig struct {
 
 type Message struct {
 	Destination   string
-	Body          []byte
+	Body          proto.Message
 	ReplyTo       *string
 	ID            string
 	CorrelationID *string
-	Type          string
+	Topic         *string
+	EventID       *string
 }
 
+// Event is the object that is published by the event producer but a Message is always sent to the consumer.
+// Messages send to consumers as a result of an event will have the event ID and Topic copied into the message
+// but each message, sent to each consumer will have its own unique id
+// TBC: still not 100% sure this is the right way to do it but it seems simplest for now.  Alternative would be to
+// have a separate channel for events and messages for each consumer (or maybe even a chanel per topic?)
 type Event struct {
 	Topic         string
-	Body          []byte
-	Type          string
+	Body          protoreflect.ProtoMessage
 	ID            string
 	CorrelationID *string
-}
-
-// EventMessage is a struct that wraps an event with a destination string so that it can be sent as a message
-// to a named listener.
-// TODO this is currently not used.  Should we add the event fields to the Message struct instead?
-type EventMessage struct {
-	Destination string
-	Event
 }
 
 type MessageHandler struct {
@@ -87,6 +88,9 @@ func newBroker() (Broker, error) {
 	}, nil
 }
 
+// TODO need some better way to register topic names across all components in kata
+const TOPIC_NEW_LISTENER = "paladin.kata.commsbus.listener.new"
+
 // Listen implements Broker.
 func (b *broker) Listen(ctx context.Context, destination string) (MessageHandler, error) {
 	handler := MessageHandler{
@@ -95,6 +99,22 @@ func (b *broker) Listen(ctx context.Context, destination string) (MessageHandler
 	b.destinationsLock.Lock()
 	b.destinations[destination] = handler
 	b.destinationsLock.Unlock()
+	// publish an event to advertise the new listener
+	go func() {
+		eventId := uuid.New().String()
+		eventPayload := pb.NewListenerEvent{
+			Destination: destination,
+		}
+		err := b.PublishEvent(ctx, Event{
+			Topic: TOPIC_NEW_LISTENER,
+			Body:  &eventPayload,
+			ID:    eventId,
+		})
+		if err != nil {
+			log.L(ctx).Error("Error publishing event", err)
+			//not much more we can do here until we have retries and dead letter queues
+		}
+	}()
 	return handler, nil
 }
 
@@ -164,10 +184,13 @@ func (b *broker) PublishEvent(ctx context.Context, event Event) error {
 
 	//TODO would it be better make an immutable copy of the slice here so that we can release the lock sooner?
 	for _, destination := range subscribers {
+		//each message gets a unique id
 		message := Message{
-			ID:          event.ID,
+			ID:          uuid.New().String(),
 			Destination: destination,
 			Body:        event.Body,
+			EventID:     &event.ID,
+			Topic:       &event.Topic,
 		}
 		if err := b.SendMessage(ctx, message); err != nil {
 			log.L(ctx).Error("Error sending message", err)
