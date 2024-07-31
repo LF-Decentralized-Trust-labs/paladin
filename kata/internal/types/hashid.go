@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package statestore
+package types
 
 import (
 	"context"
@@ -84,6 +84,16 @@ func (id *HashID) String() string {
 		return ""
 	}
 	return id.HexString0xPrefix()
+}
+
+func (id *HashID) Equals(id2 *HashID) bool {
+	if id == nil && id2 == nil {
+		return true
+	}
+	if id == nil || id2 == nil {
+		return false
+	}
+	return id.L == id2.L && id.H == id2.H
 }
 
 // JSON representation is lower case hex, with 0x prefix

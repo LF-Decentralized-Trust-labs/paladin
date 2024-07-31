@@ -44,7 +44,7 @@ const (
 )
 
 type Schema struct {
-	Hash       HashID          `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash       types.HashID    `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	CreatedAt  types.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
 	DomainID   string          `json:"domain"`
 	Type       SchemaType      `json:"type"`
@@ -61,7 +61,7 @@ type schemaLabelInfo struct {
 }
 
 type hashIDOnly struct {
-	HashID HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	HashID types.HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 }
 
 type SchemaCommon interface {
@@ -72,7 +72,7 @@ type SchemaCommon interface {
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
 }
 
-func schemaCacheKey(domainID string, hash *HashID) string {
+func schemaCacheKey(domainID string, hash *types.HashID) string {
 	return domainID + "/" + hash.String()
 }
 
@@ -84,14 +84,14 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s SchemaCommon) error {
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (SchemaCommon, error) {
-	schemaHash, err := ParseHashID(ctx, schemaID)
+	schemaHash, err := types.ParseHashID(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
 	return ss.getSchemaByHash(ctx, domainID, schemaHash, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *HashID, failNotFound bool) (SchemaCommon, error) {
+func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *types.HashID, failNotFound bool) (SchemaCommon, error) {
 
 	cacheKey := schemaCacheKey(domainID, schemaHash)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)

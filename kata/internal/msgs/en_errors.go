@@ -71,6 +71,7 @@ var (
 
 	// Transaction Processor PD0103XX
 	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+	MsgContextCanceled                  = ffe("PD010301", "Context canceled")
 
 	// Transaction store PD0104XX
 	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
@@ -141,4 +142,7 @@ var (
 	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
 	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// BlockIndexer PD0113XX
+	MsgBlockIndexerInvalidFromBlock = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
 )

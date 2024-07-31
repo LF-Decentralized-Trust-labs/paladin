@@ -57,6 +57,13 @@ func Int64Min(iVal *int64, min int64, def int64) int64 {
 	return *iVal
 }
 
+func Float64Min(iVal *float64, min float64, def float64) float64 {
+	if iVal == nil || *iVal < min {
+		return def
+	}
+	return *iVal
+}
+
 func Bool(bVal *bool, def bool) bool {
 	if bVal == nil {
 		return def
