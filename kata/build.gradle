@@ -205,21 +205,12 @@ class DockerComposeDemo extends DockerCompose {
     }
 }
 
-task startDb(type: DockerComposeTest) {
+task startTestInfra(type: DockerComposeTest) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
 }
 
-task startDemoDb(type: DockerComposeDemo) {
-    mustRunAfter(tasks.protoc)
-    args 'up', '-d'
-}
-
-task stopDb(type: DockerComposeTest) {
-    args 'down'
-}
-
-task stopDemoDb(type: DockerComposeDemo) {
+task stopTestInfra(type: DockerComposeTest) {
     args 'down'
 }
 
@@ -271,7 +262,7 @@ task setupCoverage(dependsOn: tasks.protoc) {
 task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
+task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startTestInfra]) {
     args '-tags', "testdbpostgres"
 }
 
