@@ -20,16 +20,20 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
+	logrus.SetLevel(logrus.TraceLevel)
 
 	tb = newTestBed()
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
@@ -40,9 +44,9 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 	if err != nil {
 		panic(err)
 	}
-	var serverErr error
+	serverErr := make(chan error)
 	go func() {
-		serverErr = tb.run()
+		serverErr <- tb.run()
 	}()
 	<-tb.ready
 
@@ -51,8 +55,12 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 		case tb.sigc <- os.Kill:
 		default:
 		}
-		<-tb.done
-		assert.NoError(t, serverErr)
+		select {
+		case err := <-serverErr:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			assert.Fail(t, "timeout on shutdown")
+		}
 	}
 
 }
@@ -138,7 +146,7 @@ func TestRunRPCError(t *testing.T) {
 				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
 			},
 		},
-		RPC: rpcserver.Config{
+		RPCServer: rpcserver.Config{
 			HTTP: rpcserver.HTTPEndpointConfig{
 				Config: httpserver.Config{
 					Port:    confutil.P(-1),
@@ -149,4 +157,35 @@ func TestRunRPCError(t *testing.T) {
 	}
 	err := tb.run()
 	assert.Regexp(t, "RPC", err)
+}
+
+func TestRunBlockIndexerError(t *testing.T) {
+	tb := newTestBed()
+	tb.conf = &TestBedConfig{
+		DB: persistence.Config{
+			Type: "sqlite",
+			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
+				URI:           ":memory:",
+				MigrationsDir: "./sqlite.memory.config.yaml",
+			}},
+		},
+		CommsBus: commsbus.Config{
+			GRPC: commsbus.GRPCConfig{
+				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
+			},
+		},
+		RPCServer: rpcserver.Config{
+			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
+			WS:   rpcserver.WSEndpointConfig{Disabled: true},
+		},
+		Blockchain: TestbedBlockchainConfig{
+			WS: rpcclient.WSConfig{
+				HTTPConfig: rpcclient.HTTPConfig{
+					URL: "!!!! wrongness",
+				},
+			},
+		},
+	}
+	err := tb.run()
+	assert.Regexp(t, "Block indexer", err)
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/mocks/rpcbackendmocks"
 	"github.com/sirupsen/logrus"
@@ -38,14 +39,14 @@ import (
 
 func newTestBlockListener(t *testing.T) (context.Context, *blockListener, *rpcbackendmocks.WebSocketRPCClient, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
-	bl, mRPC := newTestBlockListenerConf(t, ctx, &Config{}, &RPCWSConnectConfig{})
+	bl, mRPC := newTestBlockListenerConf(t, ctx, &Config{})
 	return ctx, bl, mRPC, func() {
 		cancelCtx()
 		bl.waitClosed()
 	}
 }
 
-func newTestBlockListenerConf(t *testing.T, ctx context.Context, config *Config, wsConfig *RPCWSConnectConfig) (*blockListener, *rpcbackendmocks.WebSocketRPCClient) {
+func newTestBlockListenerConf(t *testing.T, ctx context.Context, config *Config) (*blockListener, *rpcbackendmocks.WebSocketRPCClient) {
 
 	logrus.SetLevel(logrus.DebugLevel)
 
@@ -62,7 +63,8 @@ func newTestBlockListenerConf(t *testing.T, ctx context.Context, config *Config,
 	mRPC.On("UnsubscribeAll", mock.Anything).Return(nil).Maybe()
 	mRPC.On("Close", mock.Anything).Return(nil).Maybe()
 
-	bl, err := newBlockListener(ctx, config, wsConfig)
+	bl, err := newBlockListener(ctx, config, &rpcclient.WSConfig{
+		HTTPConfig: rpcclient.HTTPConfig{URL: "ws://localhost:0" /* unused per below re-wire to mRPC */}})
 	assert.NoError(t, err)
 	bl.wsConn = mRPC
 	return bl, mRPC
@@ -192,8 +194,8 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	bl, err := newBlockListener(ctx, &Config{
 		BlockPollingInterval: confutil.P("100s"), // so the test would just hang if no WS notifications
-	}, &RPCWSConnectConfig{
-		URL: url,
+	}, &rpcclient.WSConfig{
+		HTTPConfig: rpcclient.HTTPConfig{URL: url},
 	})
 	assert.NoError(t, err)
 	defer cancelCtx()

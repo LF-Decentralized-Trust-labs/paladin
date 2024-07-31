@@ -16,20 +16,30 @@
 package main
 
 import (
+	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 )
 
+type TestbedBlockchainConfig struct {
+	WS rpcclient.WSConfig `yaml:"ws"`
+}
+
+type TestbedDestinationsConfig struct {
+	ToDomain   *string `yaml:"toDomain"`
+	FromDomain *string `yaml:"fromDomain"`
+}
+
 type TestBedConfig struct {
-	CommsBus     commsbus.Config    `yaml:"bus"`
-	DB           persistence.Config `yaml:"db"`
-	RPC          rpcserver.Config   `yaml:"rpc"`
-	StateStore   statestore.Config  `yaml:"statestore"`
-	TempDir      *string            `yaml:"tempDir"`
-	Destinations struct {
-		ToDomain   *string `yaml:"toDomain"`
-		FromDomain *string `yaml:"fromDomain"`
-	} `yaml:"destinations"`
+	Blockchain   TestbedBlockchainConfig   `yaml:"blockchain"`
+	CommsBus     commsbus.Config           `yaml:"bus"`
+	DB           persistence.Config        `yaml:"db"`
+	RPCServer    rpcserver.Config          `yaml:"rpcServer"`
+	StateStore   statestore.Config         `yaml:"statestore"`
+	BlockIndexer blockindexer.Config       `yaml:"blockIndexer"`
+	TempDir      *string                   `yaml:"tempDir"`
+	Destinations TestbedDestinationsConfig `yaml:"destinations"`
 }

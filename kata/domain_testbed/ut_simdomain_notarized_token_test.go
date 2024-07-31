@@ -141,4 +141,5 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		"symbol": "FT1"
 	}`))
 	assert.NoError(t, err)
+
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"gorm.io/gorm"
 )
@@ -80,7 +81,7 @@ type blockIndexer struct {
 	utBatchNotify         chan *blockWriterBatch
 }
 
-func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *RPCWSConnectConfig, persistence persistence.Persistence) (_ BlockIndexer, err error) {
+func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WSConfig, persistence persistence.Persistence) (_ BlockIndexer, err error) {
 
 	blockListener, err := newBlockListener(ctx, config, wsConfig)
 	if err != nil {
@@ -110,6 +111,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 }
 
 func (bi *blockIndexer) Start() {
+	bi.blockListener.start()
 	bi.startOrReset()
 }
 

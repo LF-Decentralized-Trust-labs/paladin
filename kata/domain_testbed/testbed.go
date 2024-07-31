@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
@@ -55,6 +56,7 @@ type testbed struct {
 	sigc           chan os.Signal
 	rpcServer      rpcserver.Server
 	stateStore     statestore.StateStore
+	blockindexer   blockindexer.BlockIndexer
 	bus            commsbus.CommsBus
 	fromDomain     commsbus.MessageHandler
 	socketFile     string
@@ -140,6 +142,7 @@ func (tb *testbed) cleanupOldSocket() error {
 func (tb *testbed) run() error {
 	ready := false
 	defer func() {
+		tb.cancelCtx()
 		close(tb.done)
 		if !ready {
 			close(tb.ready)
@@ -161,7 +164,7 @@ func (tb *testbed) run() error {
 	}
 
 	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
-	tb.rpcServer, err = rpcserver.NewServer(tb.ctx, &tb.conf.RPC)
+	tb.rpcServer, err = rpcserver.NewServer(tb.ctx, &tb.conf.RPCServer)
 	if err == nil {
 		err = tb.initRPC()
 	}
@@ -169,7 +172,15 @@ func (tb *testbed) run() error {
 		return fmt.Errorf("RPC init failed: %s", err)
 	}
 
+	tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
+	if err != nil {
+		return fmt.Errorf("Block indexer init failed: %s", err)
+	}
+	tb.blockindexer.Start()
+
 	go tb.listenTerm()
+
+	tb.blockindexer.Stop()
 
 	ready = true
 	close(tb.ready)

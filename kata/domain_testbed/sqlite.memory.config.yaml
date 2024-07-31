@@ -4,8 +4,11 @@ db:
     uri: ':memory:'
     autoMigrate: true
     migrationsDir: './db/migrations/sqlite'
-rpc:
+rpcServer:
   http:
     port: 0
   ws:
     disabled: true
+blockchain:
+  ws:
+    url: ws://localhost:8546
