@@ -14,43 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package commsbus provides a message broker that facilitates communication between different components.
-// It allows sending messages to specific destinations or broadcasting messages to all destinations subscribed to a topic.
-// [./doc/commsbus.png]
-// This package implements the Broker interface, which defines the methods for sending messages, publishing events,
-// listening for messages, unsubscribing from topics, and listing destinations.
-//
-// The Broker interface:
-// - Listen: Listens for messages sent to a specific destination.
-// - SendMessage: Sends a message to a specific destination.
-// - SubscribeToTopic: Subscribes a destination to a specific topic.
-// - PublishEvent: Publishes an event to all destinations subscribed to a topic.
-// - Unlisten: Stops listening for messages sent to a specific destination.
-// - UnsubscribeFromTopic: Unsubscribes a destination from a specific topic.
-// - ListDestinations: Lists all destinations currently registered with the broker.
-//
-// The broker implementation in this package uses a map to store the registered destinations and their corresponding message handlers.
-// It also maintains a map of topic subscriptions to efficiently route events to the subscribed destinations.
-//
-// The BrokerConfig struct is currently empty, but it can be extended in the future to provide configuration options for the broker.
-//
-// The Message struct represents a message that can be sent to a destination. It contains information such as the destination,
-// message body, reply-to destination, ID, correlation ID, and message type.
-//
-// The Event struct represents an event that can be published to a topic. It contains information such as the topic, event body,
-// event type, ID, and correlation ID.
-//
-// The EventMessage struct is a wrapper struct that combines an event with a destination, allowing it to be sent as a message
-// to a named listener.
-//
-// The MessageHandler struct represents a message handler that can be used to receive messages sent to a specific destination.
-// It contains a channel where the messages are received.
-//
-// The broker struct is the actual implementation of the Broker interface. It manages the registered destinations, topic subscriptions,
-// and handles the sending and routing of messages and events.
-//
-// The newBroker function is a constructor function that creates a new instance of the broker.
-
 package commsbus
 
 import (
@@ -58,6 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
