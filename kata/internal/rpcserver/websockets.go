@@ -20,10 +20,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
@@ -52,16 +58,129 @@ func (s *rpcServer) wsClosed(id string) {
 	delete(s.wsConnections, id)
 }
 
-type webSocketConnection struct {
-	ctx       context.Context
-	cancelCtx context.CancelFunc
-	server    *rpcServer
+func (s *rpcServer) ethSubList() []*ethSubscription {
+	s.wsMux.Lock()
+	defer s.wsMux.Unlock()
+
+	subs := make([]*ethSubscription, 0)
+	for _, wsc := range s.wsConnections {
+		subs = append(subs, wsc.subscriptions...)
+	}
+	return subs
+}
+
+func (s *rpcServer) processSubscribe(ctx context.Context, rpcReq *rpcbackend.RPCRequest, wsc *webSocketConnection) (*rpcbackend.RPCResponse, bool) {
+	s.wsMux.Lock()
+	defer s.wsMux.Unlock()
+
+	var eventType string
+	if len(rpcReq.Params) > 0 {
+		eventType = rpcReq.Params[0].AsString()
+	}
+	if eventType == "" {
+		return rpcbackend.RPCErrorResponse(i18n.NewError(ctx, msgs.MsgJSONRPCInvalidParam, rpcReq.Method, 0, ""),
+			rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false
+	}
+	var params1 types.RawJSON
+	if len(rpcReq.Params) > 1 {
+		params1 = rpcReq.Params[1].Bytes()
+	}
+	sub := &ethSubscription{
+		c:         wsc,
+		id:        uuid.New().String(),
+		eventType: eventType,
+		params:    params1,
+	}
+	wsc.subscriptions = append(wsc.subscriptions, sub)
+
+	return &rpcbackend.RPCResponse{
+		ID:      rpcReq.ID,
+		JSONRpc: "2.0",
+		Result:  fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, sub.id)),
+	}, true
+}
+
+func (s *rpcServer) processUnsubscribe(ctx context.Context, rpcReq *rpcbackend.RPCRequest, wsc *webSocketConnection) (*rpcbackend.RPCResponse, bool) {
+	s.wsMux.Lock()
+	defer s.wsMux.Unlock()
+
+	var subID string
+	if len(rpcReq.Params) > 0 {
+		subID = rpcReq.Params[0].AsString()
+	}
+	if subID == "" {
+		return rpcbackend.RPCErrorResponse(i18n.NewError(ctx, msgs.MsgJSONRPCInvalidParam, rpcReq.Method, 0, ""),
+			rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false
+	}
+
+	// Trim the sub
+	found := false
+	var newSubs []*ethSubscription
+	for _, s := range wsc.subscriptions {
+		if s.id == subID {
+			found = true
+		} else {
+			newSubs = append(newSubs, s)
+		}
+	}
+	wsc.subscriptions = newSubs
+
+	return &rpcbackend.RPCResponse{
+		ID:      rpcReq.ID,
+		JSONRpc: "2.0",
+		Result:  fftypes.JSONAnyPtr(fmt.Sprintf("%t", found)),
+	}, true
+}
+
+func (s *rpcServer) EthPublish(eventType string, result interface{}) {
+	subs := s.ethSubList()
+	for _, s := range subs {
+		if s.eventType == eventType {
+			b, _ := json.Marshal(&ethPublication{
+				JSONRPC: "2.0",
+				Method:  "eth_subscription",
+				Params: ethPublicationParams{
+					Subscription: s.id,
+					Result:       result,
+				},
+			})
+			select {
+			case s.c.send <- b:
+			case <-s.c.closing:
+			}
+		}
+	}
+}
+
+type ethSubscription struct {
+	c         *webSocketConnection
 	id        string
-	closeMux  sync.Mutex
-	closed    bool
-	conn      *websocket.Conn
-	send      chan ([]byte)
-	closing   chan (struct{})
+	eventType string
+	params    types.RawJSON
+}
+
+type webSocketConnection struct {
+	ctx           context.Context
+	cancelCtx     context.CancelFunc
+	server        *rpcServer
+	id            string
+	closeMux      sync.Mutex
+	closed        bool
+	conn          *websocket.Conn
+	subscriptions []*ethSubscription // TODO: Decide JSON/RPC sub model
+	send          chan ([]byte)
+	closing       chan (struct{})
+}
+
+type ethPublicationParams struct {
+	Subscription string      `json:"subscription"`
+	Result       interface{} `json:"result"`
+}
+
+type ethPublication struct {
+	JSONRPC string               `json:"jsonrpc"`
+	Method  string               `json:"method"`
+	Params  ethPublicationParams `json:"params"`
 }
 
 func (c *webSocketConnection) close() {
@@ -96,7 +215,7 @@ func (c *webSocketConnection) sender() {
 }
 
 func (c *webSocketConnection) handleMessage(payload []byte) {
-	res, _ := c.server.rpcHandler(c.ctx, bytes.NewBuffer(payload))
+	res, _ := c.server.rpcHandler(c.ctx, bytes.NewBuffer(payload), c)
 	c.sendMessage(res)
 }
 
