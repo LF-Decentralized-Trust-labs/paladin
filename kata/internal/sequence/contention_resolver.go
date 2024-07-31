@@ -22,13 +22,13 @@ import (
 	"github.com/serialx/hashring"
 )
 
-func CoinToss(stateID, biddingTransaction1, biddingTransaction2 string) (string, error) {
+func ContentionResolver(stateID, biddingContentionResolver1, biddingContentionResolver2 string) (string, error) {
 
 	bidders := make([]string, 0, 1000)
-	// create 500 virtual nodes for each bidding transaction
+	// create 500 virtual nodes for each bidding ContentionResolver
 	for i := 0; i < 500; i++ {
-		bidders = append(bidders, biddingTransaction1+strconv.Itoa(i))
-		bidders = append(bidders, biddingTransaction2+strconv.Itoa(i))
+		bidders = append(bidders, biddingContentionResolver1+strconv.Itoa(i))
+		bidders = append(bidders, biddingContentionResolver2+strconv.Itoa(i))
 	}
 	ring := hashring.New(bidders)
 	winnerVirtual, _ := ring.GetNode(stateID)

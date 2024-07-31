@@ -24,8 +24,14 @@ events that the sequence allocator can publish are:
  - a transaction is moved to a different sequence
  - a new sequence is created
 
-There is a special case optimisation for transactions that lose the coin toss and the domain that assembled the transaction has declared that if it loses the coin toss then it would attempt to reassemble the transaction by spending the output of the winning transaction. 
+## Contention resolution
+The sequencing of transactions is influenced heavily by the state(s) that each transaction has been assembled to spend.  Because the assembly of transactions happens concurrently, there are cases where 2 or more transactions are assembled to spend the same state.  This situation of contention must be resolved as a pre-req to the sequence allocation algorithm.  As a result of the contention resolution, exactly one of the the contenting transactions will procede into a sequence with intent to spend that state. All other transactions are re-assembled to spend different states.
 
+## Loop avoidance
+Given that transactions can attempt to spend multiple states, there are situations possible where 2 transactions are contenting for the same 2 states.  The content resolution algorithm is sensitive to this and avoids resolving contention of one state in favour of one transaction and resolving contention of the other state in favour of the other transaction.  If this were to happen then neither transaction would procede into a sequence.  Both would be re-assembled and there would be a potential for endless loop of assemble / contention resolution.  This is a trivial example of the loop scenarios but there are also more complex, less obvious situations, involving multiple transactions, that the algrithm is designed to avoid. We will explore these scenarios in more detail later as we enumerate the test cases that define the algorithm's functional behaviour.
+
+## Deadlock avoidance
+Given that transactions can be assembled to spend states that are predicted to exist in the future, once other transactions have been confirmed on the base ledger, the algorithm is designed to avoid the situation where one transaction is assembled to spend a state that is minted by another transaction while that  other transaction is also spending a state that is assembled to be spend a state that is being minted by the first transaction.
 
 ## Test cases
 
@@ -91,7 +97,8 @@ Then one transaction is allocated to a sequence of 1 and that sequence is assign
 
 ---
 
-NOTE: there is a special case optimisation where the losing transaction may get first refusal - or at least has weighted probability to win the next coin toss - on the output of the winning transaction but we will discuss that separately.
+NOTE: there is a special case optimisation where the losing transaction may get first refusal - or at least has weighted probability to win the next contention resolver - on the output of the winning transaction but we will discuss that separately.
+
 
 ### Micro level test cases
 In order for the above macro level test cases to pass, the following micro level test cases must also pass. Each of these is written in the context of a single sequence allocator running on a single node.
@@ -108,7 +115,7 @@ Given that a state is in the claimed state on the local node
 
 When a transactionAssembled event is received from a remote node attempting to claim the same state
 
-Then a determinisitic and fair coin toss will elect one of the transactions as the `spender` of that state 
+Then a determinisitic and fair contention resolver function will elect one of the transactions as the `spender` of that state 
 
 ---
 
@@ -118,7 +125,7 @@ When a transactionEndorsed event is received
 
 Then the transaction is updated with an incremented number of endorsers and if endorsement rules are fulfilled, then the transaction is marked as `endorsed` and all of its `claimed` intput states are marked as `spending`
 
-### Properties of the coin toss function
+### Properties of the contention resolver function
 Inputs are 
  - the unique id of the state being contested
  - the unique ids of 2 transactions attempting to claim the state
@@ -130,14 +137,14 @@ Behaviour
  - for any 2 given transaction ids and statistically significant set of randomly generated state ids, when invoked for each state id, it returns one of the transaction ids for near 50% of the state IDs and the other transaction id for near 50% of the state IDs
  - Is a pure function. For same inputs, will always return the same output, even if executed multiple times on completely separate nodes in the network 
  - Is commutative over the transaction ids. If invoked with the same 2 transaction ids (and same state id) will return the same answer regardless of the order of the transaction ids
- - Is associative.  When more than 2 transactions are contesting for the same state id, the coin toss can be invoked multiple times, taking the result of one toss as one of the inputs to the next invocation untill all transactions have been included in at least one coin toss, then the final winner will always be the same regardless of which order the transactions were included in the coin toss.  
+ - Is associative.  When more than 2 transactions are contesting for the same state id, the contention resolver function can be invoked multiple times, taking the result of one invocation as one of the inputs to the next invocation untill all transactions have been included in at least one invocation, then the final winner will always be the same regardless of which order the transactions were included.  
   
-To explain these properties further.  Imagine there are 4 transactions contesting for the same state ID, lets call them `Ta`, `Tb`, `Tc` and `Td`. And lets write the coin toss between `Ta` and `Tb` for state `S` as `C(S,Ta,Tb)`
+To explain these properties further.  Imagine there are 4 transactions contesting for the same state ID, lets call them `Ta`, `Tb`, `Tc` and `Td`. And lets write the contention resolver function between `Ta` and `Tb` for a given state `R(Ta,Tb)`
   
-  `C(S,Ta,Tb) === C(S,Tb,Ta)` as per the commutative property
+  `R(Ta,Tb) === R(Tb,Ta)` as per the commutative property
   
 We can perform any of the following sequences of operation and will always get the same answer as per the associative property:   
- - `C(S,(C(S,Ta,Tb)),(C(S,Tc,Td))` : 1 toss up between a and b, another toss up between c and d, then a final toss up between the 2 winners.
- - `C(S,C(S,C(S,Ta,Tb),Tc),Td)`: 1 toss up between a and b. Another toss up between c and the winner of the first toss. A third toss up between d and the winner of the second toss up.
+ - `R(R(Ta,Tb),R(Tc,Td))` : 1 invocation between a and b, another invocation between c and d, then a final invocation between the 2 winners.
+ - `R(R(R(Ta,Tb),Tc),Td)`: 1 invocation between a and b. Another invocation between c and the winner of the first invocation. A third invocation between d and the winner of the second invocation.
 
 These properties are very important because the situation of `n` transactions contesting for the same state is an emerging situation and the knowledge of that situation ( which transactions are in contest) reaches different nodes in the network piecemeal, at different times and in a non deterministic order.  With the above properties, all nodes in the network will eventually reach the same answer regardless of what order each of them received the information.
