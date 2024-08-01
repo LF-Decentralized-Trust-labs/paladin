@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
@@ -36,15 +37,17 @@ type fakeCommsBusServer struct {
 
 	initializedOk  bool
 	listenMessages chan destination
-	recvMessages   map[destination]*proto.Message
-	messagesToSend map[destination]*proto.Message
+	recvMessages   map[destination]chan *proto.Message
+	sendMessages   map[destination]chan *proto.Message
 }
 
 func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMessageService_ListenServer) error {
 	// On a new connection to the fake server, store the registered destination and the messages it sends
-	go func(){
+	ctx := ls.Context()
+
+	go func() {
 		fcb.listenMessages <- destination(lr.Destination)
-		
+
 		for {
 			var msg *proto.Message
 			err := ls.RecvMsg(msg)
@@ -54,14 +57,29 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 			if err != nil {
 				return
 			}
-	
-			fcb.recvMessages[destination(msg.Destination)] = msg
+
+			fcb.recvMessages[destination(msg.Destination)] <- msg
+		}
+	}()
+
+	go func() {
+		messageChan := fcb.sendMessages[destination(lr.Destination)]
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-messageChan:
+				err := ls.Send(msg)
+				if err != nil {
+					return
+				}
+			}
 		}
 	}()
 
 	return nil
 }
-
 func (fcb *fakeCommsBusServer) SubscribeToTopic(context.Context, *proto.SubscribeToTopicRequest) (*proto.SubscribeToTopicResponse, error) {
 	return nil, nil
 }
@@ -84,6 +102,62 @@ func (fcb *fakeCommsBusServer) ListDestinations(context.Context, *proto.ListDest
 	return nil, nil
 }
 
+type fakeExternalServer struct{}
+
+func (fes *fakeExternalServer) QueueMessageForSend(msg *proto.Message) {}
+func (fes *fakeExternalServer) GetMessages(dest destination) (chan *proto.Message, error) {
+	return nil, nil
+}
+func (fes *fakeExternalServer) Shutdown() {}
+
+func TestCreateSingleInstance(t *testing.T) {
+	testDir := os.TempDir()
+	testingSocketLocation := path.Join(testDir, "grpctransport.sock")
+	defer os.Remove(testingSocketLocation)
+
+	commsbusListener, err := net.Listen("unix", testingSocketLocation)
+	assert.NoError(t, err)
+	s := grpc.NewServer()
+
+	fakeCommsBus := &fakeCommsBusServer{
+		initializedOk:  true,
+		listenMessages: make(chan destination, 1),
+		sendMessages:   make(map[destination]chan *proto.Message),
+	}
+
+	proto.RegisterKataMessageServiceServer(s, fakeCommsBus)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := s.Serve(commsbusListener)
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	fakeDestinationName := "heylookatmeiamanewlistener"
+
+	externalServer = &fakeExternalServer{}
+	err = InitializeTransportProvider(testingSocketLocation, fakeDestinationName)
+	defer Shutdown()
+	assert.NoError(t, err)
+
+	// Now verify that we have a message registering the listener
+	assert.Equal(t, 1, len(fakeCommsBus.listenMessages))
+	newListener := <-fakeCommsBus.listenMessages
+	assert.Equal(t, destination(destination(fakeDestinationName)), newListener)
+
+	// Cool - we have a provider that's stood up and working, let's throw a create instance at it
+	// and check it works properly
+	fakeCommsBus.sendMessages[destination(fakeDestinationName)] <- &proto.Message{
+		Destination: "somewhereelse",
+		Id: "something",
+		Body: &anypb.Any{},
+	}
+
+	s.GracefulStop()
+}
+
 func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T) {
 	// Go through the init procedure and verify that a message comes through signalling that the plugin
 	// is ready to start
@@ -97,7 +171,7 @@ func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T)
 	s := grpc.NewServer()
 
 	fakeCommsBus := &fakeCommsBusServer{
-		initializedOk: 	true,
+		initializedOk:  true,
 		listenMessages: make(chan destination, 1),
 	}
 
@@ -105,12 +179,13 @@ func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(){
+	go func() {
 		err := s.Serve(commsbusListener)
 		assert.NoError(t, err)
 		wg.Done()
 	}()
 
+	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, "heylookatmeiamanewlistener")
 	defer Shutdown()
 	assert.NoError(t, err)
@@ -137,12 +212,13 @@ func TestInitializeGRPCTransportDoesNotWorkWhenServerUnavailable(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(){
+	go func() {
 		err := s.Serve(commsbusListener)
 		assert.NoError(t, err)
 		wg.Done()
 	}()
 
+	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, "something")
 	defer Shutdown()
 	assert.Error(t, err)
@@ -165,12 +241,13 @@ func TestInitializeGRPCTransportTwiceThrowsError(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(){
+	go func() {
 		err := s.Serve(commsbusListener)
 		assert.NoError(t, err)
 		wg.Done()
 	}()
 
+	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, "something")
 	assert.NoError(t, err)
 	err = InitializeTransportProvider(testingSocketLocation, "something")
@@ -197,12 +274,13 @@ func TestInitializeGRPCTransportSimple(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(){
+	go func() {
 		err := s.Serve(commsbusListener)
 		assert.NoError(t, err)
 		wg.Done()
 	}()
 
+	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, "something")
 	assert.NoError(t, err)
 	defer Shutdown()

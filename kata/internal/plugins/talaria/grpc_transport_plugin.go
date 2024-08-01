@@ -16,16 +16,16 @@
 package grpctransport
 
 import (
-	"fmt"
 	"context"
-	"time"
+	"fmt"
 	"io"
-	
+	"time"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 )
 
@@ -38,9 +38,9 @@ type grpcTransportInstance struct {
 }
 
 type grpcTransportProvider struct {
-	stopListener   func()
-	instances      map[destination]*grpcTransportInstance
-	client         proto.KataMessageServiceClient
+	stopListener func()
+	instances    map[destination]*grpcTransportInstance
+	client       proto.KataMessageServiceClient
 
 	// TODO: Things that should be config for the plugin
 	externalListenPort                  int
@@ -50,16 +50,22 @@ type grpcTransportProvider struct {
 
 // Singleton instance of the GRPC Plugin
 var provider *grpcTransportProvider
-var externalServer *externalGRPCServer
+var externalServer ExternalServer
 
 func Shutdown() {
-	// Shut everything down and null the provider
 	if provider == nil {
 		return
 	}
 
 	provider.stopListener()
 	provider = nil
+
+	if externalServer == nil {
+		return
+	}
+
+	externalServer.Shutdown()
+	externalServer = nil
 }
 
 func BuildInfo() string {
@@ -84,21 +90,20 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 	}
 
 	client := proto.NewKataMessageServiceClient(commsbusConn)
-	
+
 	var connErr error
 	var status *proto.StatusResponse
-	for retryCount := 0; retryCount < provider.commsBusConnectionRetryLimit; retryCount++ {
+	for retryCount := 0; retryCount < 2; retryCount++ {
 		status, connErr = client.Status(ctx, &proto.StatusRequest{})
 		if status.GetOk() {
 			break
 		}
-		time.Sleep(time.Duration(provider.commsBusConnectionRetryAttemptDelay) * time.Second)
+		time.Sleep(time.Second)
 	}
 	if !status.GetOk() && connErr != nil {
-		log.L(ctx).Errorf("grpctransport: Could not form connection to the comms bus after %d retries", provider.commsBusConnectionRetryLimit)
+		log.L(ctx).Errorf("grpctransport: Could not form connection to the comms bus after %d retries", 2)
 		return connErr
 	}
-
 
 	listenerContext, stopListener := context.WithCancel(ctx)
 	messageStream, err := client.Listen(listenerContext, &proto.ListenRequest{
@@ -147,14 +152,17 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 
 	// Now bring up the external endpoint other Paladin's are going to speak to us on
 	if externalServer == nil {
-		// TODO: Move this to an interface so we can do testing more effectively
+		// Mostly put behind an interface to make stubbing for UTs easy
 		externalServer = NewExternalGRPCServer(ctx, provider.externalListenPort, 10)
 	}
 
 	provider = &grpcTransportProvider{
-		stopListener: stopListener,
-		instances:    make(map[destination]*grpcTransportInstance),
-		client:       client,
+		stopListener:                        stopListener,
+		instances:                           make(map[destination]*grpcTransportInstance),
+		client:                              client,
+		externalListenPort:                  8080,
+		commsBusConnectionRetryLimit:        2,
+		commsBusConnectionRetryAttemptDelay: 1,
 	}
 
 	return nil
@@ -188,32 +196,36 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 				return
 			}
 
-			externalServer.sendMessages <- *inboundMessage
+			externalServer.QueueMessageForSend(inboundMessage)
 		}
 	}()
 
-	go func(){
+	instanceMessageRecvChannel, err := externalServer.GetMessages(destination(createInstanceRequest.GetMessageDestination()))
+	if err != nil {
+		return err
+	}
+
+	go func() {
 		for {
 			select {
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return
-			case msg := <-externalServer.recvMessages[destination(createInstanceRequest.GetMessageDestination())]: {
-				// Need to send the message back to the comms bus so it can then be sent back to the actual destination
-				response, err := gtp.client.SendMessage(ctx, &msg)
-				if err != nil {
-					log.L(ctx).Errorf("grpctransport instance: error sending message to comms bus %v", err)
-					continue
+			case msg := <-instanceMessageRecvChannel:
+				{
+					// Need to send the message back to the comms bus so it can then be sent back to the actual destination
+					response, err := gtp.client.SendMessage(ctx, msg)
+					if err != nil {
+						log.L(ctx).Errorf("grpctransport instance: error sending message to comms bus %v", err)
+						continue
+					}
+					if response.Result == proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_FAIL {
+						log.L(ctx).Errorf("grpctransport instance: failed response when sending message to comms bus %s", *response.Reason)
+						continue
+					}
 				}
-				if response.Result == proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_FAIL {
-					log.L(ctx).Errorf("grpctransport instance: failed response when sending message to comms bus %s", *response.Reason)
-					continue
-				}
-			}
 			}
 		}
 	}()
 
 	return nil
 }
-
-
