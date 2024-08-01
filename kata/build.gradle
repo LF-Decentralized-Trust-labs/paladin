@@ -59,11 +59,21 @@ task compileTestSolidity(type:Exec) {
     executable 'npx'
     args 'hardhat'
     args 'test'
-    inputs.files(fileTree("test/solidity") {
-        include "**/*.sol"
-        include "**/*.ts"
+    inputs.files(fileTree("solidity") {
+        include "contracts/**/*.sol"
+        include "test/**/*.ts"
     })
     outputs.dir("$projectDir/test/solidity/artifacts")
+}
+
+task copyDomainSIMContractsToTestbed(type:Copy, dependsOn: compileTestSolidity) {
+    from('solidity/artifacts/contracts/testbed_sim/SIMDomain.sol') {
+        include 'SIMDomain.json'
+    }
+    from('solidity/artifacts/contracts/testbed_sim/SIMToken.sol') {
+        include 'SIMToken.json'
+    }
+    into 'domain_testbed'
 }
 
 task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
@@ -245,6 +255,10 @@ abstract class UnitTests extends Exec {
 abstract class ComponentTest extends Exec {
     {
         inputs.files(getProject().goFiles)
+        inputs.files(getProject().fileTree("domain_testbed") {
+            include "**/*.json"
+        })
+
         outputs.dir('coverage')
 
         workingDir '.'
@@ -278,7 +292,7 @@ task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.go
     args '-tags', "testdbpostgres"
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.compileTestSolidity]) {
+task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.copyDomainSIMContractsToTestbed]) {
 }
 
 

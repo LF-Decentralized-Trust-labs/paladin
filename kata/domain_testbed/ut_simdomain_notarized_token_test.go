@@ -16,8 +16,12 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
+	_ "embed"
+
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
@@ -25,34 +29,29 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+//go:embed SIMDomain.json
+var simDomainBuild []byte // comes from Hardhat build
+
+func parseBuildABI(t *testing.T, buildJSON []byte) *abi.ABI {
+	var buildParsed map[string]types.RawJSON
+	err := json.Unmarshal(buildJSON, &buildParsed)
+	assert.NoError(t, err)
+	var buildABI abi.ABI
+	err = json.Unmarshal(buildParsed["abi"], &buildABI)
+	assert.NoError(t, err)
+	return &buildABI
+}
+
+func toJSONString(t *testing.T, v interface{}) string {
+	b, err := json.Marshal(v)
+	assert.NoError(t, err)
+	return string(b)
+}
+
 // Example of how someone might use this testbed externally
 func TestDemoNotarizedCoinSelection(t *testing.T) {
 
-	fakeFactoryABI := `[
-	  {
-	    "type": "function",
-		"name": "newToken",
-		"inputs": [
-			{
-				"name": "notary",
-				"type": "address"
-			},
-			{
-				"name": "name",
-				"type": "string"
-			},
-			{
-				"name": "symbol",
-				"type": "string"
-			}
-		],
-		"outputs": [
-		    {
-				"type": "address"
-		    }
-		]
-	  }
-	]`
+	simDomainABI := parseBuildABI(t, simDomainBuild)
 
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
@@ -105,7 +104,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				DomainConfig: &proto.DomainConfig{
 					ConstructorAbiJson:     fakeCoinConstructorABI,
 					FactoryContractAddress: "0x9D4Ee5Af51AA4e61602ea2A4Fe22A3Ca5c65c027", // fake
-					FactoryContractAbiJson: fakeFactoryABI,
+					FactoryContractAbiJson: toJSONString(t, simDomainABI),
 					AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 				},
 			}, nil
@@ -125,7 +124,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				"name": "FakeToken1",
 				"symbol": "FT1"
 			}`, req.ConstructorParamsJson)
-			return &proto.PrepareDeployTransactionResponse{}, nil
+			return &proto.PrepareDeployTransactionResponse{
+				Transaction: &proto.BaseLedgerTransaction{
+					FunctionName:   "newSIMTokenNotarized",
+					ParamsJson:     `{"notary":  "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81"}`,
+					SigningAddress: "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
+				},
+			}, nil
 		},
 	})
 	defer done()

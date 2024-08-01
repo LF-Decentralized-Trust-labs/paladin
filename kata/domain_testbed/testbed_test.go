@@ -187,5 +187,5 @@ func TestRunBlockIndexerError(t *testing.T) {
 		},
 	}
 	err := tb.run()
-	assert.Regexp(t, "Block indexer", err)
+	assert.Regexp(t, "Blockchain", err)
 }

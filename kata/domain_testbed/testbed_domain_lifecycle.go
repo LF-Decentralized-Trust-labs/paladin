@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
@@ -97,11 +98,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	}, nil
 }
 
-func (tb *testbed) validateDeploy(ctx context.Context, name string, constructorParams types.RawJSON) (*proto.PrepareDeployTransactionRequest, error) {
-	domain, err := tb.getDomain(name)
-	if err != nil {
-		return nil, err
-	}
+func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*proto.PrepareDeployTransactionRequest, error) {
 
 	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
 	if err != nil {
@@ -117,6 +114,29 @@ func (tb *testbed) validateDeploy(ctx context.Context, name string, constructorP
 		ConstructorAbi:        string(constructorABIJSON),
 		ConstructorParamsJson: string(constructorParamsJSON),
 	}, nil
+}
+
+func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) (*blockindexer.IndexedTransaction, error) {
+
+	abiFunc := domain.factoryContractABI.Functions()[txInstruction.FunctionName]
+	if abiFunc == nil {
+		return nil, fmt.Errorf("function %q does not exist on base ledger ABI", txInstruction.FunctionName)
+	}
+	txPayload, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
+	if err != nil {
+		return nil, fmt.Errorf("encoding to function %q failed: %s", txInstruction.FunctionName, err)
+	}
+
+	// We do a simplistic deploy here, assuming that all will go well on the
+	// blockchain (obviously the Paladin engine does a proper TX Management at this point)
+	var txHash ethtypes.HexBytes0xPrefix
+	rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", "")
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+
+	return tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+
 }
 
 func (tb *testbed) getDomain(name string) (*testbedDomain, error) {

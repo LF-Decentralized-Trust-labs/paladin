@@ -18,7 +18,7 @@ package main
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
@@ -77,9 +77,14 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		name string,
 		constructorParams types.RawJSON,
-	) (*ethtypes.Address0xHex, error) {
+	) (*blockindexer.IndexedTransaction, error) {
 
-		prepareDeployReq, err := tb.validateDeploy(ctx, name, constructorParams)
+		domain, err := tb.getDomain(name)
+		if err != nil {
+			return nil, err
+		}
+
+		prepareDeployReq, err := tb.validateDeploy(ctx, domain, constructorParams)
 		if err != nil {
 			return nil, err
 		}
@@ -91,8 +96,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		// TODO: Now we need to deploy it to the blockchain
-
-		return nil, nil
+		// Do the deploy
+		return tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction)
 	})
 }

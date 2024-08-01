@@ -24,10 +24,12 @@ import (
 	"syscall"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"gopkg.in/yaml.v3"
@@ -57,6 +59,7 @@ type testbed struct {
 	rpcServer      rpcserver.Server
 	stateStore     statestore.StateStore
 	blockindexer   blockindexer.BlockIndexer
+	blockchainRPC  rpcbackend.WebSocketRPCClient
 	bus            commsbus.CommsBus
 	fromDomain     commsbus.MessageHandler
 	socketFile     string
@@ -172,10 +175,14 @@ func (tb *testbed) run() error {
 		return fmt.Errorf("RPC init failed: %s", err)
 	}
 
-	tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
-	if err != nil {
-		return fmt.Errorf("Block indexer init failed: %s", err)
+	rpcConf, err := rpcclient.ParseWSConfig(tb.ctx, &tb.conf.Blockchain.WS)
+	if err == nil {
+		tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
 	}
+	if err != nil {
+		return fmt.Errorf("Blockchain init failed: %s", err)
+	}
+	tb.blockchainRPC = rpcbackend.NewWSRPCClient(rpcConf)
 	tb.blockindexer.Start()
 
 	go tb.listenTerm()
