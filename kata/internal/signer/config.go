@@ -15,17 +15,45 @@
 
 package signer
 
-type Config struct {
-	Wallets []WalletConfig `yaml:"wallets"`
-}
-
-type WalletStorageType string
+type KeyStoreType string
 
 const (
-	WalletStorageTypeFilesystem = "filesystem"
+	KeyStoreTypeFilesystem KeyStoreType = "filesystem"
 )
 
-type WalletConfig struct {
-	WalletStorageType WalletStorageType `yaml:"storageType"`
-	FileSystem        FileSystemConfig  `yaml:"filesystem"`
+type Config struct {
+	KeyStore      StoreConfig         `yaml:"keyStore"`
+	KeyDerivation KeyDerivationConfig `yaml:"keyDerivation"`
+}
+
+type StoreConfig struct {
+	Type              KeyStoreType     `yaml:"type"`
+	DisableKeyLoading bool             `yaml:"disableKeyLoading"` // must be false for HD Wallet or ZKP based signing
+	FileSystem        FileSystemConfig `yaml:"filesystem"`
+}
+
+type KeyDerivationType string
+
+const (
+	// Direct uses a unique piece of key material in the storage for each key, for this signing module
+	KeyDerivationTypeDirect KeyDerivationType = "direct"
+	// Hierarchical uses a single BIP39 seed mnemonic in the storage, combined with a BIP32 wallet to derive keys
+	KeyDerivationTypeHierarchical KeyDerivationType = "hierarchical"
+)
+
+type ConfigKeyPathEntry struct {
+	Name       string            `yaml:"name"`
+	Index      uint32            `yaml:"index"`
+	Attributes map[string]string `yaml:"attributes"`
+}
+
+type KeyDerivationConfig struct {
+	Type        KeyDerivationType    `yaml:"type"`
+	SeedKeyPath []ConfigKeyPathEntry `yaml:"seedKeyHandle"`
+}
+
+var KeyDerivationDefaults = &KeyDerivationConfig{
+	SeedKeyPath: []ConfigKeyPathEntry{
+		{Name: "seed", Index: 0},
+	},
 }

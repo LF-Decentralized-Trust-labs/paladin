@@ -41,13 +41,7 @@ message SignResponse {
 
 message KeyPathSegment {
   string name = 1;
-  int64  index = 2;
-  map<string, string> attributes = 3;
-}
-
-message KeyFolder {
-  string name = 1;
-  int64  index = 2;
+  uint32 index = 2;
   map<string, string> attributes = 3;
 }
 

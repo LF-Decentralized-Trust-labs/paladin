@@ -34,14 +34,14 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
-type filesystemStorage struct {
+type filesystemStore struct {
 	cache    cache.Cache[string, keystorev3.WalletFile]
 	path     string
 	fileMode os.FileMode
 	dirMode  os.FileMode
 }
 
-func newFilesystemStorage(ctx context.Context, conf *FileSystemConfig) (fss CryptographicStorage, err error) {
+func newFilesystemStore(ctx context.Context, conf *FileSystemConfig) (fss KeyStore, err error) {
 	// Determine the path
 	var pathInfo fs.FileInfo
 	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *FileSystemDefaults.Path))
@@ -51,7 +51,7 @@ func newFilesystemStorage(ctx context.Context, conf *FileSystemConfig) (fss Cryp
 	if err != nil || !pathInfo.IsDir() {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadPathError, *FileSystemDefaults.Path)
 	}
-	return &filesystemStorage{
+	return &filesystemStore{
 		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &FileSystemDefaults.Cache),
 		fileMode: confutil.UnixFileMode(conf.FileMode, *FileSystemDefaults.FileMode),
 		dirMode:  confutil.UnixFileMode(conf.DirMode, *FileSystemDefaults.DirMode),
@@ -59,7 +59,7 @@ func newFilesystemStorage(ctx context.Context, conf *FileSystemConfig) (fss Cryp
 	}, nil
 }
 
-func (fss *filesystemStorage) validateFilePathKeyHandle(ctx context.Context, keyHandle string, forCreate bool) (absPath string, err error) {
+func (fss *filesystemStore) validateFilePathKeyHandle(ctx context.Context, keyHandle string, forCreate bool) (absPath string, err error) {
 	fullPath := fss.path
 	segments := strings.Split(keyHandle, "/")
 	for i, segment := range segments {
@@ -96,12 +96,16 @@ func (fss *filesystemStorage) validateFilePathKeyHandle(ctx context.Context, key
 
 }
 
-func (fss *filesystemStorage) createWalletFile(ctx context.Context, keyFilePath, passwordFilePath string, newKeyMaterial func() []byte) (keystorev3.WalletFile, error) {
+func (fss *filesystemStore) createWalletFile(ctx context.Context, keyFilePath, passwordFilePath string, newKeyMaterial func() ([]byte, error)) (keystorev3.WalletFile, error) {
 
+	privateKey, err := newKeyMaterial()
+	if err != nil {
+		return nil, err
+	}
 	password := types.RandHex(32)
-	wf := keystorev3.NewWalletFileCustomBytesStandard(password, newKeyMaterial())
+	wf := keystorev3.NewWalletFileCustomBytesStandard(password, privateKey)
 
-	err := os.WriteFile(passwordFilePath, []byte(password), fss.fileMode)
+	err = os.WriteFile(passwordFilePath, []byte(password), fss.fileMode)
 	if err == nil {
 		err = os.WriteFile(keyFilePath, wf.JSON(), fss.fileMode)
 	}
@@ -111,7 +115,7 @@ func (fss *filesystemStorage) createWalletFile(ctx context.Context, keyFilePath,
 	return wf, nil
 }
 
-func (fss *filesystemStorage) getOrCreateWalletFile(ctx context.Context, keyHandle string, newKeyMaterialFactory func() []byte) (keystorev3.WalletFile, error) {
+func (fss *filesystemStore) getOrCreateWalletFile(ctx context.Context, keyHandle string, newKeyMaterialFactory func() ([]byte, error)) (keystorev3.WalletFile, error) {
 
 	absPathPrefix, err := fss.validateFilePathKeyHandle(ctx, keyHandle, newKeyMaterialFactory != nil)
 	if err != nil {
@@ -146,7 +150,7 @@ func (fss *filesystemStorage) getOrCreateWalletFile(ctx context.Context, keyHand
 	return wf, err
 }
 
-func (fss *filesystemStorage) readWalletFile(ctx context.Context, keyFilePath, passwordFilePath string) (keystorev3.WalletFile, error) {
+func (fss *filesystemStore) readWalletFile(ctx context.Context, keyFilePath, passwordFilePath string) (keystorev3.WalletFile, error) {
 
 	keyData, err := os.ReadFile(keyFilePath)
 	if err != nil {
@@ -161,7 +165,7 @@ func (fss *filesystemStorage) readWalletFile(ctx context.Context, keyFilePath, p
 	return keystorev3.ReadWalletFile(keyData, passData)
 }
 
-func (fss *filesystemStorage) FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() []byte) (keyMaterial []byte, keyHandle string, err error) {
+func (fss *filesystemStore) FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error) {
 	if len(req.Path) == 0 {
 		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
 	}
@@ -181,7 +185,7 @@ func (fss *filesystemStorage) FindOrCreateLoadableKey(ctx context.Context, req *
 	return wf.PrivateKey(), keyHandle, nil
 }
 
-func (fss *filesystemStorage) LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error) {
+func (fss *filesystemStore) LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error) {
 	wf, err := fss.getOrCreateWalletFile(ctx, keyHandle, nil)
 	if err != nil {
 		return nil, err

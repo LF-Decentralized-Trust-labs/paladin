@@ -30,8 +30,8 @@ import (
 // to securely store and retrieve it using only the information contained in the returned
 // keyHandle. If the implementation finds it does not exist, it can invoke the callback function to generate
 // a new suitable random string to encrypt and store.
-type CryptographicStorage interface {
-	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() []byte) (keyMaterial []byte, keyHandle string, err error)
+type KeyStore interface {
+	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
 }
 
@@ -41,7 +41,7 @@ type CryptographicStorage interface {
 // Because an administrator might require certain wallets are ONLY used this way, there is an
 // option on all wallets to require it. In which case (even though it's always supported)
 // that wallet will reject any signing/proof-generation request that requires uses a loadable key.
-type CryptographicStorageSigner_secp256k1 interface {
+type KeyStoreSigner_secp256k1 interface {
 	FindOrCreateKey_secp256k1(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error)
 	Sign_secp256k1(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error)
 }

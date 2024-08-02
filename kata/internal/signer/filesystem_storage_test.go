@@ -17,6 +17,7 @@ package signer
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -27,19 +28,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestFilesystemStorage(t *testing.T) (context.Context, *filesystemStorage) {
+func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	ctx := context.Background()
 
-	fs, err := newFilesystemStorage(ctx, &FileSystemConfig{
+	fs, err := newFilesystemStore(ctx, &FileSystemConfig{
 		Path: confutil.P(t.TempDir()),
 	})
 	assert.NoError(t, err)
 
-	return ctx, fs.(*filesystemStorage)
+	return ctx, fs.(*filesystemStore)
 }
 
-func TestFileSystemStorageCreateSecp256k1(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
+	ctx, fs := newTestFilesystemStore(t)
 
 	key0, err := secp256k1.GenerateSecp256k1KeyPair()
 	assert.NoError(t, err)
@@ -50,7 +51,7 @@ func TestFileSystemStorageCreateSecp256k1(t *testing.T) {
 			{Name: "blue"},
 			{Name: "42"},
 		},
-	}, func() []byte { return key0.PrivateKeyBytes() })
+	}, func() ([]byte, error) { return key0.PrivateKeyBytes(), nil })
 	assert.NoError(t, err)
 
 	assert.Equal(t, keyBytes, key0.PrivateKeyBytes())
@@ -70,8 +71,8 @@ func TestFileSystemStorageCreateSecp256k1(t *testing.T) {
 
 }
 
-func TestFileSystemStorageCreateReloadMnemonic(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
+	ctx, fs := newTestFilesystemStore(t)
 
 	phrase := []byte("fame point uphold pumpkin april violin orphan cat bid upper meadow family")
 
@@ -79,7 +80,7 @@ func TestFileSystemStorageCreateReloadMnemonic(t *testing.T) {
 		Path: []*proto.KeyPathSegment{
 			{Name: "sally"},
 		},
-	}, func() []byte { return phrase })
+	}, func() ([]byte, error) { return phrase, nil })
 	assert.NoError(t, err)
 
 	assert.Equal(t, phrase, keyBytes)
@@ -99,11 +100,11 @@ func TestFileSystemStorageCreateReloadMnemonic(t *testing.T) {
 
 }
 
-func TestFileSystemStorageBadDir(t *testing.T) {
+func TestFileSystemStoreBadDir(t *testing.T) {
 
 	badPath := path.Join(t.TempDir(), "wrong")
 
-	_, err := newFilesystemStorage(context.Background(), &FileSystemConfig{
+	_, err := newFilesystemStore(context.Background(), &FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
@@ -111,14 +112,14 @@ func TestFileSystemStorageBadDir(t *testing.T) {
 	err = os.WriteFile(badPath, []byte{}, 0644)
 	assert.NoError(t, err)
 
-	_, err = newFilesystemStorage(context.Background(), &FileSystemConfig{
+	_, err = newFilesystemStore(context.Background(), &FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
 }
 
-func TestFileSystemStorageBadSegments(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+func TestFileSystemStoreBadSegments(t *testing.T) {
+	ctx, fs := newTestFilesystemStore(t)
 
 	_, _, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{}, nil)
 	assert.Regexp(t, "PD011403", err)
@@ -132,7 +133,7 @@ func TestFileSystemStorageBadSegments(t *testing.T) {
 }
 
 func TestFileSystemClashes(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "-clash"), fs.dirMode)
 	assert.NoError(t, err)
@@ -141,24 +142,29 @@ func TestFileSystemClashes(t *testing.T) {
 		Path: []*proto.KeyPathSegment{
 			{Name: "clash"},
 		},
-	}, func() []byte { return []byte("key1") })
+	}, func() ([]byte, error) { return []byte("key1"), nil })
 	assert.Regexp(t, "PD011405", err)
 
 }
 
 func TestCreateWalletFileFail(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "clash.key"), fs.dirMode)
 	assert.NoError(t, err)
 
-	_, err = fs.createWalletFile(ctx, path.Join(fs.path, "clash.key"), path.Join(fs.path, "clash.pwd"), func() []byte { return []byte{} })
+	_, err = fs.createWalletFile(ctx, path.Join(fs.path, "clash.key"), path.Join(fs.path, "clash.pwd"),
+		func() ([]byte, error) { return []byte{}, nil })
 	assert.Regexp(t, "PD011404", err)
+
+	_, err = fs.createWalletFile(ctx, path.Join(fs.path, "ok.key"), path.Join(fs.path, "ok.pwd"),
+		func() ([]byte, error) { return nil, fmt.Errorf("pop") })
+	assert.Regexp(t, "pop", err)
 
 }
 
 func TestReadWalletFileFail(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "dir.key"), fs.dirMode)
 	assert.NoError(t, err)
@@ -169,11 +175,12 @@ func TestReadWalletFileFail(t *testing.T) {
 }
 
 func TestReadPassFileFail(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	keyFilePath, passwordFilePath := path.Join(fs.path, "ok.key"), path.Join(fs.path, "fail.pass")
 
-	_, err := fs.createWalletFile(ctx, keyFilePath, passwordFilePath, func() []byte { return []byte{0x01} })
+	_, err := fs.createWalletFile(ctx, keyFilePath, passwordFilePath,
+		func() ([]byte, error) { return []byte{0x01}, nil })
 	assert.NoError(t, err)
 
 	err = os.Remove(passwordFilePath)
@@ -184,7 +191,7 @@ func TestReadPassFileFail(t *testing.T) {
 }
 
 func TestLoadKeyFail(t *testing.T) {
-	ctx, fs := newTestFilesystemStorage(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	_, err := fs.LoadKeyMaterial(ctx, "wrong")
 	assert.Regexp(t, "PD011406", err)
