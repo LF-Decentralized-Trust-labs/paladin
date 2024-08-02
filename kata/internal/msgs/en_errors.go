@@ -156,5 +156,6 @@ var (
 	MsgUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
 	MsgMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
 	MsgHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
-	MsgInvalidBIP44Identifier            = ffe("PD011413", "Invalid key handle - BIP44 key identifier expected")
+	MsgInvalidBIP44Derivation            = ffe("PD011413", "Invalid key handle - BIP44 key identifier expected (invalid derivation: '%s')")
+	MsgKeyListingNotSupported            = ffe("PD011414", "Listing keys in the key store is not supported by this signing module")
 )

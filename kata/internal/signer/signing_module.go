@@ -34,14 +34,19 @@ import (
 type SigningModule interface {
 	Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error)
 	Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error)
+	List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
 }
 
 type signingModule struct {
-	keyStoreType      KeyStoreType
-	keyStore          KeyStore
-	disableKeyLoading bool
-	keyDerivation     KeyDerivationType
-	hdKeyChain        *hdkeychain.ExtendedKey
+	keyStoreType            KeyStoreType
+	keyStore                KeyStore
+	disableKeyListing       bool
+	disableKeyLoading       bool
+	keyDerivation           KeyDerivationType
+	hdBIP44DirectResolution bool
+	hdBIP44HardenedSegments int
+	hdBIP44Prefix           string
+	hdKeyChain              *hdkeychain.ExtendedKey
 }
 
 func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err error) {
@@ -65,13 +70,15 @@ func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err
 		if config.KeyStore.DisableKeyLoading {
 			return nil, i18n.NewError(ctx, msgs.MsgHierarchicalRequiresLoading)
 		}
-		if err := sm.loadHDWalletSeed(ctx, &config.KeyDerivation); err != nil {
+		if err := sm.initHDWallet(ctx, &config.KeyDerivation); err != nil {
 			return nil, err
 		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgUnsupportedKeyStoreType, config.KeyStore.Type)
 	}
 
+	// Settings that disable behaviors, whether technically supported by the key store or not
+	sm.disableKeyListing = config.KeyStore.DisableKeyListing
 	sm.disableKeyLoading = config.KeyStore.DisableKeyLoading
 	return sm, nil
 }
@@ -100,6 +107,25 @@ func (sm *signingModule) resolveKeystoreSECP256K1(ctx context.Context, req *prot
 	}, nil
 }
 
+// We use the ethereum convention of R,S,V for compact packing (mentioned because Golang tends to prefer V,R,S)
+func compactRSV(sig *secp256k1.SignatureData) []byte {
+	signatureBytes := make([]byte, 65)
+	sig.R.FillBytes(signatureBytes[0:32])
+	sig.S.FillBytes(signatureBytes[32:64])
+	signatureBytes[64] = byte(sig.V.Int64())
+	return signatureBytes
+}
+
+func (sm *signingModule) signKeystoreSECP256K1(ctx context.Context, req *proto.SignRequest, keyStoreSigner KeyStoreSigner_secp256k1) (res *proto.SignResponse, err error) {
+	sig, err := keyStoreSigner.Sign_secp256k1(ctx, req.KeyHandle, req.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &proto.SignResponse{
+		Payload: compactRSV(sig),
+	}, nil
+}
+
 func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algorithms []string) (int, error) {
 	keyLen := 0
 	for _, algo := range algorithms {
@@ -113,6 +139,25 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 		return -1, i18n.NewError(ctx, msgs.MsgMustSpecifyAlgorithms)
 	}
 	return keyLen, nil
+}
+
+func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, req *proto.SignRequest) (res *proto.SignResponse, err error) {
+	switch strings.ToLower(req.Algorithm) {
+	case Algorithm_ECDSA_SECP256K1:
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgUnsupportedAlgoForInMemorySigning)
+	}
+	var sig *secp256k1.SignatureData
+	kp, err := secp256k1.NewSecp256k1KeyPair(privateKey)
+	if err == nil {
+		sig, err = kp.Sign(req.Payload)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &proto.SignResponse{
+		Payload: compactRSV(sig),
+	}, nil
 }
 
 func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, keyHandle string, privateKey []byte, algorithms []string) (*proto.ResolveKeyResponse, error) {
@@ -154,6 +199,7 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 			return sm.resolveKeystoreSECP256K1(ctx, req, keyStoreSigner)
 		}
 	}
+	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
 		return nil, i18n.NewError(ctx, msgs.MsgStoreRequiresKeyLoadingForAlgo, sm.keyStoreType, strings.Join(req.Algorithms, ","))
 	}
@@ -167,5 +213,30 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 }
 
 func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
-	return nil, nil
+	if sm.keyDerivation == KeyDerivationTypeHierarchical {
+		return sm.signHDWalletKey(ctx, req)
+	}
+	if req.Algorithm == Algorithm_ECDSA_SECP256K1 {
+		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
+		if ok {
+			return sm.signKeystoreSECP256K1(ctx, req, keyStoreSigner)
+		}
+	}
+	// We are going to use the key store to load/decrypt a key into our volatile memory
+	if sm.disableKeyLoading {
+		return nil, i18n.NewError(ctx, msgs.MsgStoreRequiresKeyLoadingForAlgo, sm.keyStoreType, req.Algorithm)
+	}
+	privateKey, err := sm.keyStore.LoadKeyMaterial(ctx, req.KeyHandle)
+	if err != nil {
+		return nil, err
+	}
+	return sm.signInMemory(ctx, privateKey, req)
+}
+
+func (sm *signingModule) List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
+	listableStore, isListable := sm.keyStore.(KeyStoreListable)
+	if !isListable || sm.disableKeyListing {
+		return nil, i18n.NewError(ctx, msgs.MsgKeyListingNotSupported)
+	}
+	return listableStore.ListKeys(ctx, req)
 }

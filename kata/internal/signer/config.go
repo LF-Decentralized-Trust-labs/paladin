@@ -15,6 +15,8 @@
 
 package signer
 
+import "github.com/kaleido-io/paladin/kata/internal/confutil"
+
 type KeyStoreType string
 
 const (
@@ -28,7 +30,8 @@ type Config struct {
 
 type StoreConfig struct {
 	Type              KeyStoreType     `yaml:"type"`
-	DisableKeyLoading bool             `yaml:"disableKeyLoading"` // must be false for HD Wallet or ZKP based signing
+	DisableKeyListing bool             `yaml:"disableKeyListing"`
+	DisableKeyLoading bool             `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
 	FileSystem        FileSystemConfig `yaml:"filesystem"`
 }
 
@@ -48,12 +51,20 @@ type ConfigKeyPathEntry struct {
 }
 
 type KeyDerivationConfig struct {
-	Type        KeyDerivationType    `yaml:"type"`
-	SeedKeyPath []ConfigKeyPathEntry `yaml:"seedKeyHandle"`
+	Type                  KeyDerivationType    `yaml:"type"`
+	SeedKeyPath           []ConfigKeyPathEntry `yaml:"seedKeyHandle"`
+	BIP44DirectResolution bool                 `yaml:"bip44DirectResolution"`
+	BIP44Prefix           *string              `yaml:"bip44Prefix"`
+	BIP44HardenedSegments *int                 `yaml:"bip44HardenedSegments"`
 }
 
 var KeyDerivationDefaults = &KeyDerivationConfig{
+	BIP44Prefix:           confutil.P("m/44'/60'"),
+	BIP44HardenedSegments: confutil.P(1), // in addition to the prefix, so `m/44'/60'/0'/0/0` for example with 3 segments, on top of the prefix
 	SeedKeyPath: []ConfigKeyPathEntry{
-		{Name: "seed", Index: 0},
+		{
+			Name:  "seed",
+			Index: 0,
+		},
 	},
 }

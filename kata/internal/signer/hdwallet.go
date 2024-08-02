@@ -24,6 +24,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/tyler-smith/go-bip39"
@@ -33,7 +34,10 @@ var (
 	BIP32BaseDerivationPath = []uint32{0x80000000 + 44, 0x80000000 + 60}
 )
 
-func (sm *signingModule) loadHDWalletSeed(ctx context.Context, conf *KeyDerivationConfig) (err error) {
+func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationConfig) (err error) {
+	sm.hdBIP44Prefix = confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix)
+	sm.hdBIP44DirectResolution = conf.BIP44DirectResolution
+	sm.hdBIP44HardenedSegments = confutil.IntMin(conf.BIP44HardenedSegments, 0, *KeyDerivationDefaults.BIP44HardenedSegments)
 	seedKeyPath := KeyDerivationDefaults.SeedKeyPath
 	if len(conf.SeedKeyPath) > 0 {
 		seedKeyPath = conf.SeedKeyPath
@@ -64,31 +68,58 @@ func (sm *signingModule) loadHDWalletSeed(ctx context.Context, conf *KeyDerivati
 }
 
 func (sm *signingModule) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
-	keyHandle := "m/44'/0'"
+	keyHandle := sm.hdBIP44Prefix
 	for i, s := range req.Path {
-		hardenedTag := ""
-		hardenedAttr := s.Attributes["bip32_hardened"]
-		if i == 0 && s.Attributes["bip32_root"] == "true" {
-			// Clear the BIP44 standard m/44'/0' prefix
-			// Only applies on root key/folder
-			keyHandle = "m"
+		var derivation uint32
+		hardenedFlag := ""
+		// We must only use the config to set whether direct derivation is used, otherwise it
+		// would be possible on the API to coerce two resolutions that result in the same
+		// derivation path.
+		// Paladin would catch this and error, but it would still break the application that
+		// hit the situation.
+		//
+		// So if a use case requires two different behaviors, backed by the same seed, it will be
+		// necessary to configure two signing modules with different BIP44DirectResolution settings,
+		// and different BIP44Prefix settings, but with the same Seed.
+		if sm.hdBIP44DirectResolution {
+			// We will process the NAME as a BIP44 segment spec string directly
+			numStr, isHardened := strings.CutSuffix(s.Name, "'")
+			ui64, err := strconv.ParseUint(numStr, 10, 32)
+			if err != nil {
+				return nil, i18n.NewError(ctx, msgs.MsgInvalidBIP44Derivation, s.Name)
+			}
+			if isHardened {
+				hardenedFlag = "'"
+			}
+			derivation = uint32(ui64)
+		} else {
+			// Otherwise we use the Paladin generated index as our derivation path, which is
+			// assured to be both numeric and unique.
+			//
+			// Handle whether the child keys will be placed in the hardened range (indices 2^31 through 2^32-1)
+			// or normal range (0 through 2^31-1) using a combination of our configuration and
+			// and an option that can be specified dynamically when creating the key.
+			hardenedAttr := s.Attributes["bip32_hardened"]
+			if hardenedAttr == "true" || (hardenedAttr != "false" && i < sm.hdBIP44HardenedSegments) {
+				hardenedFlag = "'"
+			}
+			derivation = s.Index
 		}
-		if i == 0 && hardenedAttr != "false" || hardenedAttr == "true" {
-			hardenedTag = "'"
-		}
-		keyHandle += fmt.Sprintf("/%d%s", s.Index, hardenedTag)
+		keyHandle += fmt.Sprintf("/%d%s", derivation, hardenedFlag)
 	}
 	privateKey, err := sm.loadHDWalletPrivateKey(ctx, keyHandle)
 	if err != nil {
 		return nil, err
 	}
+	// Once we've used key derivation, we've just got a 32byte private key in volatile memory,
+	// from the perspective of the rest of the signer module.
 	return sm.publicKeyIdentifiersForAlgorithms(ctx, keyHandle, privateKey, req.Algorithms)
 }
 
 func (sm *signingModule) loadHDWalletPrivateKey(ctx context.Context, keyHandle string) (privateKey []byte, err error) {
 	segments := strings.Split(keyHandle, "/")
 	if len(segments) < 2 || segments[0] != "m" {
-		return nil, i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyFile)
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidBIP44Derivation, keyHandle)
 	}
 	pos := sm.hdKeyChain
 	for _, s := range segments[1:] {
@@ -101,7 +132,7 @@ func (sm *signingModule) loadHDWalletPrivateKey(ctx context.Context, keyHandle s
 			pos, err = pos.Derive(uint32(derivation))
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadKeyFile)
+			return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidBIP44Derivation, s)
 		}
 	}
 	ecPrivKey, err := pos.ECPrivKey()
@@ -109,4 +140,12 @@ func (sm *signingModule) loadHDWalletPrivateKey(ctx context.Context, keyHandle s
 		privateKey = ecPrivKey.Serialize()
 	}
 	return privateKey, err
+}
+
+func (sm *signingModule) signHDWalletKey(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
+	privateKey, err := sm.loadHDWalletPrivateKey(ctx, req.KeyHandle)
+	if err != nil {
+		return nil, err
+	}
+	return sm.signInMemory(ctx, privateKey, req)
 }

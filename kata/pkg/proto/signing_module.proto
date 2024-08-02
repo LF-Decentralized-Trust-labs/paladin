@@ -31,12 +31,27 @@ message ResolveKeyResponse {
 message SignRequest {
   string key_handle = 1;
   string algorithm = 2;
-  optional bytes payload = 3;
+  bytes payload = 3;
 }
 
 message SignResponse {
-  string key_handle = 1;
-  string algorithm = 2;
+  bytes payload = 1;
+}
+
+message ListKeysRequest {
+  int32 limit = 1;
+  string after_key_handle = 2;
+}
+
+message ListKeysResponse {
+  repeated ListKeyHandleEntry items = 1;
+  bool has_more = 2;
+}
+
+message ListKeyHandleEntry {
+  string top_level_name = 1;
+  string key_handle = 2;
+  repeated PublicKeyIdentifier identifiers = 3;
 }
 
 message KeyPathSegment {
