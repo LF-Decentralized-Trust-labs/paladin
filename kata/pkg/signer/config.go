@@ -17,10 +17,9 @@ package signer
 
 import "github.com/kaleido-io/paladin/kata/internal/confutil"
 
-type KeyStoreType string
-
 const (
-	KeyStoreTypeFilesystem KeyStoreType = "filesystem"
+	KeyStoreTypeFilesystem = "filesystem" // keystorev3 based filesystem storage
+	KeyStoreTypeStatic     = "static"     // unencrypted keys in-line in the config
 )
 
 type Config struct {
@@ -29,10 +28,11 @@ type Config struct {
 }
 
 type StoreConfig struct {
-	Type              KeyStoreType     `yaml:"type"`
-	DisableKeyListing bool             `yaml:"disableKeyListing"`
-	DisableKeyLoading bool             `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
-	FileSystem        FileSystemConfig `yaml:"filesystem"`
+	Type              string                 `yaml:"type"`
+	DisableKeyListing bool                   `yaml:"disableKeyListing"`
+	DisableKeyLoading bool                   `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
+	FileSystem        FileSystemConfig       `yaml:"filesystem"`
+	Static            StaticKeyStorageConfig `yaml:"static"`
 }
 
 type KeyDerivationType string

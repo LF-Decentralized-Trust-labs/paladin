@@ -37,6 +37,11 @@ type SigningModule interface {
 	List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
 }
 
+type Extension interface {
+	// Return nil if keystore type is not known, or error if initialization fails
+	KeyStore(keystoreType string) (store KeyStore, err error)
+}
+
 type hdDerivation struct {
 	sm                    *signingModule
 	bip44DirectResolution bool
@@ -46,26 +51,61 @@ type hdDerivation struct {
 }
 
 type signingModule struct {
-	keyStoreType      KeyStoreType
 	keyStore          KeyStore
 	disableKeyListing bool
 	disableKeyLoading bool
 	hd                *hdDerivation
 }
 
-// TODO: provide a facility for a code module looking to use this as a base to extend and add a
-// unique key storage system, without rebuilding all the framework code in this module
-func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err error) {
+// We allow this same code to be used (un-modified) with set of initialization functions passed
+// in for additional keystores (and potentially other types of extension in the future).
+//
+// This "pkg/signer" go code module is the building block to build your sophisticated remote
+// signer on top of only needing to implement the specifics to your particular system.
+//
+// Note that the interface is protobuf, so you can also use this code as inspiration to build
+// your own signing module in a different language (like Java), but be aware that if you wish
+// to support ZKP proof generation based tokens you will need to consider the ability to
+// host and execute WASM code.
+//
+// At the same time, it is package inside of Paladin and runs with a default set of key storage
+// technologies (which can themselves be remote) inside the paladin runtime.
+//
+// Check out the architecture docs for more information about why the modular structure is that way,
+// and for important concepts like "key handles" (the response of this module) and
+// and "key mappings" (the lookup reference table managed in front of this module by the Paladin
+// runtime).
+//
+// The design is such that all built-in behaviors should be both:
+// 1. Easy to re-use if they are valuable with your extension
+// 2. Easy to disable in the Config object passed in, if you do not want to have them enabled
+func NewSigningModule(ctx context.Context, config *Config, extensions ...Extension) (_ SigningModule, err error) {
 	sm := &signingModule{}
 
-	switch config.KeyStore.Type {
+	keyStoreType := strings.ToLower(config.KeyStore.Type)
+	switch keyStoreType {
 	case "", KeyStoreTypeFilesystem:
-		sm.keyStoreType = KeyStoreTypeFilesystem
 		if sm.keyStore, err = newFilesystemStore(ctx, &config.KeyStore.FileSystem); err != nil {
 			return nil, err
 		}
+	case KeyStoreTypeStatic:
+		if sm.keyStore, err = newStaticKeyStore(ctx, &config.KeyStore.Static); err != nil {
+			return nil, err
+		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgUnsupportedKeyStoreType, config.KeyStore.Type)
+		for _, ext := range extensions {
+			store, err := ext.KeyStore(keyStoreType)
+			if err != nil {
+				return nil, err
+			}
+			if store != nil {
+				sm.keyStore = store
+				break
+			}
+		}
+		if sm.keyStore == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyStoreType, config.KeyStore.Type)
+		}
 	}
 
 	switch config.KeyDerivation.Type {
@@ -73,13 +113,13 @@ func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err
 	case KeyDerivationTypeHierarchical:
 		// This is fundamentally incompatible with a request to disable loading key materials into memory
 		if config.KeyStore.DisableKeyLoading {
-			return nil, i18n.NewError(ctx, msgs.MsgHierarchicalRequiresLoading)
+			return nil, i18n.NewError(ctx, msgs.MsgSigningHierarchicalRequiresLoading)
 		}
 		if err := sm.initHDWallet(ctx, &config.KeyDerivation); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgUnsupportedKeyStoreType, config.KeyStore.Type)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyStoreType, config.KeyStore.Type)
 	}
 
 	// Settings that disable behaviors, whether technically supported by the key store or not
@@ -137,11 +177,11 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 		switch strings.ToLower(algo) {
 		case Algorithm_ECDSA_SECP256K1:
 		default:
-			return -1, i18n.NewError(ctx, msgs.MsgUnsupportedAlgoForInMemorySigning)
+			return -1, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
 		}
 	}
 	if keyLen <= 0 {
-		return -1, i18n.NewError(ctx, msgs.MsgMustSpecifyAlgorithms)
+		return -1, i18n.NewError(ctx, msgs.MsgSigningMustSpecifyAlgorithms)
 	}
 	return keyLen, nil
 }
@@ -150,7 +190,7 @@ func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, re
 	switch strings.ToLower(req.Algorithm) {
 	case Algorithm_ECDSA_SECP256K1:
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgUnsupportedAlgoForInMemorySigning)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
 	}
 	var sig *secp256k1.SignatureData
 	kp, err := secp256k1.NewSecp256k1KeyPair(privateKey)
@@ -179,7 +219,7 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 				Identifier: addr.Address.String(),
 			})
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgUnsupportedAlgoForInMemorySigning)
+			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
 		}
 	}
 	return &proto.ResolveKeyResponse{
@@ -206,7 +246,7 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 	}
 	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
-		return nil, i18n.NewError(ctx, msgs.MsgStoreRequiresKeyLoadingForAlgo, sm.keyStoreType, strings.Join(req.Algorithms, ","))
+		return nil, i18n.NewError(ctx, msgs.MsgSigningStoreRequiresKeyLoadingForAlgo, strings.Join(req.Algorithms, ","))
 	}
 	privateKey, keyHandle, err := sm.keyStore.FindOrCreateLoadableKey(ctx, req, func() ([]byte, error) {
 		return sm.newKeyForAlgorithms(ctx, req.Algorithms)
@@ -229,7 +269,7 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 	}
 	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
-		return nil, i18n.NewError(ctx, msgs.MsgStoreRequiresKeyLoadingForAlgo, sm.keyStoreType, req.Algorithm)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningStoreRequiresKeyLoadingForAlgo, req.Algorithm)
 	}
 	privateKey, err := sm.keyStore.LoadKeyMaterial(ctx, req.KeyHandle)
 	if err != nil {
@@ -241,7 +281,7 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 func (sm *signingModule) List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
 	listableStore, isListable := sm.keyStore.(KeyStoreListable)
 	if !isListable || sm.disableKeyListing {
-		return nil, i18n.NewError(ctx, msgs.MsgKeyListingNotSupported)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyListingNotSupported)
 	}
 	return listableStore.ListKeys(ctx, req)
 }

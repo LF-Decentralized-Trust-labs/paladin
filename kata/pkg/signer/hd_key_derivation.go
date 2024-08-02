@@ -64,7 +64,7 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 	if len(seed) != 32 {
 		seed, err = bip39.NewSeedWithErrorChecking(string(seed), "")
 		if err != nil {
-			return i18n.NewError(ctx, msgs.MsgHDSeedMustBe32BytesOrMnemonic)
+			return i18n.NewError(ctx, msgs.MsgSigningHDSeedMustBe32BytesOrMnemonic)
 		}
 	}
 	sm.hd.hdKeyChain, err = hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
