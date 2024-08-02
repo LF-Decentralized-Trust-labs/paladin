@@ -162,4 +162,5 @@ var (
 	MsgSigningStaticKeyInvalid                  = ffe("PD011416", "Statically configured key with handle %s is invalid")
 	MsgSigningStaticBadEncoding                 = ffe("PD011417", "Statically configured key with handle %s has invalid encoding (must be one of 'none', 'hex', 'base64') '%s'")
 	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
+	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
 )

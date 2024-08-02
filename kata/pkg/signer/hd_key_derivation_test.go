@@ -137,3 +137,42 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	assert.Equal(t, addressable.Address.String(), res.Identifiers[0].Identifier)
 
 }
+
+func TestHDSigningInitFailDisabled(t *testing.T) {
+
+	ctx := context.Background()
+	_, err := NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type: KeyDerivationTypeBIP32,
+		},
+		KeyStore: StoreConfig{
+			DisableKeyLoading: true,
+			Type:              KeyStoreTypeStatic,
+		},
+	})
+	assert.Regexp(t, "PD011408", err)
+
+}
+
+func TestHDSigningInitFailBadMnemonic(t *testing.T) {
+
+	ctx := context.Background()
+	_, err := NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type: KeyDerivationTypeBIP32,
+		},
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+			Static: StaticKeyStorageConfig{
+				Keys: map[string]StaticKeyEntryConfig{
+					"seed": {
+						Encoding: "none",
+						Inline:   "wrong",
+					},
+				},
+			},
+		},
+	})
+	assert.Regexp(t, "PD011412", err)
+
+}

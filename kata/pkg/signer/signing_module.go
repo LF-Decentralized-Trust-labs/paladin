@@ -119,7 +119,7 @@ func NewSigningModule(ctx context.Context, config *Config, extensions ...Extensi
 			return nil, err
 		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyStoreType, config.KeyStore.Type)
+		return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyDerivationType, config.KeyDerivation.Type)
 	}
 
 	// Settings that disable behaviors, whether technically supported by the key store or not
@@ -176,8 +176,9 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
 		case Algorithm_ECDSA_SECP256K1:
+			keyLen = 32
 		default:
-			return -1, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
+			return -1, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, algo)
 		}
 	}
 	if keyLen <= 0 {

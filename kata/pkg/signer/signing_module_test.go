@@ -17,11 +17,14 @@ package signer
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,7 +83,7 @@ func TestExtensionInitFail(t *testing.T) {
 
 }
 
-func TestKeystoreUnknown(t *testing.T) {
+func TestKeystoreTypeUnknown(t *testing.T) {
 
 	te := &testExtension{
 		keyStore: func(keystoreType string) (store KeyStore, err error) { return nil, nil },
@@ -91,6 +94,21 @@ func TestKeystoreUnknown(t *testing.T) {
 		},
 	}, te)
 	assert.Regexp(t, "PD011407", err)
+
+}
+
+func TestKeyDerivationTypeUnknown(t *testing.T) {
+
+	ctx := context.Background()
+	_, err := NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type: "unknown",
+		},
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+		},
+	})
+	assert.Regexp(t, "PD011419", err)
 
 }
 
@@ -163,5 +181,154 @@ func TestExtensionKeyStoreListFail(t *testing.T) {
 		AfterKeyHandle: "key12345",
 	})
 	assert.Regexp(t, "pop", err)
+
+}
+
+func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
+
+	tk := &testKeyStoreAll{
+		findOrCreateKey_secp256k1: func(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error) {
+			assert.Equal(t, "key1", req.Path[0].Name)
+			return ethtypes.MustNewAddress("0x98A356e0814382587D42B62Bd97871ee59D10b69"), "0x98a356e0814382587d42b62bd97871ee59d10b69", nil
+		},
+		sign_secp256k1: func(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error) {
+			assert.Equal(t, "key1", keyHandle)
+			assert.Equal(t, "something to sign", (string)(payload))
+			return &secp256k1.SignatureData{V: big.NewInt(1), R: big.NewInt(2), S: big.NewInt(3)}, nil
+		},
+	}
+	te := &testExtension{
+		keyStore: func(keystoreType string) (store KeyStore, err error) {
+			assert.Equal(t, "ext-store", keystoreType)
+			return tk, nil
+		},
+	}
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: "ext-store",
+		},
+	}, te)
+	assert.NoError(t, err)
+
+	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path:       []*proto.KeyPathSegment{{Name: "key1"}},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "0x98a356e0814382587d42b62bd97871ee59d10b69", resResolve.Identifiers[0].Identifier)
+
+	resSign, err := sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: "key1",
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.NoError(t, err)
+	// R, S, V compact encoding
+	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000301", hex.EncodeToString(resSign.Payload))
+}
+
+func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
+
+	tk := &testKeyStoreAll{
+		findOrCreateKey_secp256k1: func(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error) {
+			return nil, "", fmt.Errorf("pop")
+		},
+	}
+	te := &testExtension{
+		keyStore: func(keystoreType string) (store KeyStore, err error) {
+			assert.Equal(t, "ext-store", keystoreType)
+			return tk, nil
+		},
+	}
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: "ext-store",
+		},
+	}, te)
+	assert.NoError(t, err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+	})
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestResolveSignWithNewKeyCreation(t *testing.T) {
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(t.TempDir()),
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, resolveRes.KeyHandle)
+	assert.Equal(t, "key1", resolveRes.KeyHandle)
+	assert.Equal(t, Algorithm_ECDSA_SECP256K1, resolveRes.Identifiers[0].Algorithm)
+	assert.NotEmpty(t, resolveRes.Identifiers[0].Identifier)
+
+	signRes, err := sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: resolveRes.KeyHandle,
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("sign me"),
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, signRes.Payload)
+
+}
+
+func TestResolveUnsupportedAlgo(t *testing.T) {
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(t.TempDir()),
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{"wrong"},
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.Regexp(t, "PD011410.*wrong", err)
+
+}
+
+func TestResolveMissingAlgo(t *testing.T) {
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(t.TempDir()),
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.Regexp(t, "PD011411", err)
 
 }
