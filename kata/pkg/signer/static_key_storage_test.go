@@ -31,12 +31,17 @@ import (
 func newTestStaticStore(t *testing.T, keys map[string]StaticKeyEntryConfig) (context.Context, *staticStore) {
 	ctx := context.Background()
 
-	fs, err := newStaticKeyStore(ctx, &StaticKeyStorageConfig{
-		Keys: keys,
+	sm, err := NewSigningModule(ctx, &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+			Static: StaticKeyStorageConfig{
+				Keys: keys,
+			},
+		},
 	})
 	assert.NoError(t, err)
 
-	return ctx, fs.(*staticStore)
+	return ctx, sm.(*signingModule).keyStore.(*staticStore)
 }
 
 func TestStaticStoreFileFileWithTrim(t *testing.T) {
@@ -104,16 +109,21 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 
 func TestStaticStoreLoadFileFail(t *testing.T) {
 
-	_, err := newStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
-			"myKey": {
-				Encoding: "none",
-				Filename: t.TempDir(),
-				Trim:     true,
+	_, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+			Static: StaticKeyStorageConfig{
+				Keys: map[string]StaticKeyEntryConfig{
+					"myKey": {
+						Encoding: "none",
+						Filename: t.TempDir(),
+						Trim:     true,
+					},
+				},
 			},
 		},
 	})
-	assert.Regexp(t, "PD011415", err)
+	assert.Regexp(t, "PD011416", err)
 
 }
 
@@ -127,7 +137,7 @@ func TestStaticStoreBadHEX(t *testing.T) {
 			},
 		},
 	})
-	assert.Regexp(t, "PD011415", err)
+	assert.Regexp(t, "PD011416", err)
 
 }
 
@@ -141,7 +151,7 @@ func TestStaticStoreBadBase64(t *testing.T) {
 			},
 		},
 	})
-	assert.Regexp(t, "PD011415", err)
+	assert.Regexp(t, "PD011416", err)
 
 }
 
@@ -156,7 +166,7 @@ func TestStaticStoreEmpty(t *testing.T) {
 			},
 		},
 	})
-	assert.Regexp(t, "PD011415", err)
+	assert.Regexp(t, "PD011416", err)
 
 }
 
@@ -170,7 +180,7 @@ func TestStaticStoreBadEncType(t *testing.T) {
 			},
 		},
 	})
-	assert.Regexp(t, "PD011416", err)
+	assert.Regexp(t, "PD011417", err)
 
 }
 
@@ -235,6 +245,6 @@ func TestStaticStoreResolveNotFound(t *testing.T) {
 			{Name: "key eleven"},
 		},
 	}, nil)
-	assert.Regexp(t, "PD011417", err)
+	assert.Regexp(t, "PD011418", err)
 
 }

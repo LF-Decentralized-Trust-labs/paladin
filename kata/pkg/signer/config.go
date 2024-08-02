@@ -41,12 +41,12 @@ const (
 	// Direct uses a unique piece of key material in the storage for each key, for this signing module
 	KeyDerivationTypeDirect KeyDerivationType = "direct"
 	// Hierarchical uses a single BIP39 seed mnemonic in the storage, combined with a BIP32 wallet to derive keys
-	KeyDerivationTypeHierarchical KeyDerivationType = "hierarchical"
+	KeyDerivationTypeBIP32 KeyDerivationType = "bip32"
 )
 
 type ConfigKeyPathEntry struct {
 	Name       string            `yaml:"name"`
-	Index      uint32            `yaml:"index"`
+	Index      uint64            `yaml:"index"`
 	Attributes map[string]string `yaml:"attributes"`
 }
 

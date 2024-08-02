@@ -74,7 +74,7 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
 	keyHandle := hd.bip44Prefix
 	for i, s := range req.Path {
-		var derivation uint32
+		var derivation uint64
 		hardenedFlag := ""
 		// We must only use the config to set whether direct derivation is used, otherwise it
 		// would be possible on the API to coerce two resolutions that result in the same
@@ -88,14 +88,14 @@ func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.Resol
 		if hd.bip44DirectResolution {
 			// We will process the NAME as a BIP44 segment spec string directly
 			numStr, isHardened := strings.CutSuffix(s.Name, "'")
-			ui64, err := strconv.ParseUint(numStr, 10, 32)
+			ui64, err := strconv.ParseUint(numStr, 10, 64) // we use 64 bits here, but loadHDWalletPrivateKey will handle an overflow
 			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgInvalidBIP44Derivation, s.Name)
+				return nil, i18n.NewError(ctx, msgs.MsgSignerBIP44DerivationInvalid, s.Name)
 			}
 			if isHardened {
 				hardenedFlag = "'"
 			}
-			derivation = uint32(ui64)
+			derivation = ui64
 		} else {
 			// Otherwise we use the Paladin generated index as our derivation path, which is
 			// assured to be both numeric and unique.
@@ -123,25 +123,29 @@ func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.Resol
 func (hd *hdDerivation) loadHDWalletPrivateKey(ctx context.Context, keyHandle string) (privateKey []byte, err error) {
 	segments := strings.Split(keyHandle, "/")
 	if len(segments) < 2 || segments[0] != "m" {
-		return nil, i18n.NewError(ctx, msgs.MsgInvalidBIP44Derivation, keyHandle)
+		return nil, i18n.NewError(ctx, msgs.MsgSignerBIP44DerivationInvalid, keyHandle)
 	}
 	pos := hd.hdKeyChain
 	for _, s := range segments[1:] {
 		number, isHardened := strings.CutSuffix(s, "'")
-		derivation, err := strconv.ParseUint(number, 10, 32)
+		derivation, err := strconv.ParseUint(number, 10, 64) // we use 64bits up until the logic below
 		if err == nil {
+			if derivation >= 0x80000000 {
+				return nil, i18n.WrapError(ctx, err, msgs.MsgSingerBIP32DerivationTooLarge, derivation)
+			}
 			if isHardened {
 				derivation += 0x80000000
 			}
 			pos, err = pos.Derive(uint32(derivation))
 		}
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidBIP44Derivation, s)
+			return nil, i18n.WrapError(ctx, err, msgs.MsgSignerBIP44DerivationInvalid, s)
 		}
 	}
 	ecPrivKey, err := pos.ECPrivKey()
 	if err == nil {
-		privateKey = ecPrivKey.Serialize()
+		pkBytes := ecPrivKey.Key.Bytes()
+		privateKey = pkBytes[:]
 	}
 	return privateKey, err
 }

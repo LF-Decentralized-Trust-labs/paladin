@@ -31,12 +31,45 @@ import (
 func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	ctx := context.Background()
 
-	fs, err := newFilesystemStore(ctx, &FileSystemConfig{
-		Path: confutil.P(t.TempDir()),
+	sm, err := NewSigningModule(ctx, &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(t.TempDir()),
+			},
+		},
 	})
 	assert.NoError(t, err)
 
-	return ctx, fs.(*filesystemStore)
+	return ctx, sm.(*signingModule).keyStore.(*filesystemStore)
+}
+
+func TestFileSystemStoreBadDir(t *testing.T) {
+
+	badPath := path.Join(t.TempDir(), "wrong")
+
+	_, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(badPath),
+			},
+		},
+	})
+	assert.Regexp(t, "PD011400", err)
+
+	err = os.WriteFile(badPath, []byte{}, 0644)
+	assert.NoError(t, err)
+
+	_, err = NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(badPath),
+			},
+		},
+	})
+	assert.Regexp(t, "PD011400", err)
 }
 
 func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
@@ -98,24 +131,6 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, phrase, keyBytes)
 
-}
-
-func TestFileSystemStoreBadDir(t *testing.T) {
-
-	badPath := path.Join(t.TempDir(), "wrong")
-
-	_, err := newFilesystemStore(context.Background(), &FileSystemConfig{
-		Path: confutil.P(badPath),
-	})
-	assert.Regexp(t, "PD011400", err)
-
-	err = os.WriteFile(badPath, []byte{}, 0644)
-	assert.NoError(t, err)
-
-	_, err = newFilesystemStore(context.Background(), &FileSystemConfig{
-		Path: confutil.P(badPath),
-	})
-	assert.Regexp(t, "PD011400", err)
 }
 
 func TestFileSystemStoreBadSegments(t *testing.T) {

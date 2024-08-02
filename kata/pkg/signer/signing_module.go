@@ -110,7 +110,7 @@ func NewSigningModule(ctx context.Context, config *Config, extensions ...Extensi
 
 	switch config.KeyDerivation.Type {
 	case "", KeyDerivationTypeDirect:
-	case KeyDerivationTypeHierarchical:
+	case KeyDerivationTypeBIP32:
 		// This is fundamentally incompatible with a request to disable loading key materials into memory
 		if config.KeyStore.DisableKeyLoading {
 			return nil, i18n.NewError(ctx, msgs.MsgSigningHierarchicalRequiresLoading)
