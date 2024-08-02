@@ -349,6 +349,12 @@ github.com/hyperledger/firefly-common v1.4.8 h1:0o1Qp1c5YzQo8nbnX+gAo9SVd2tR4Z9U
 github.com/hyperledger/firefly-common v1.4.8/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240718030252-61a5a5a32f50 h1:Udk57uqWlKqqofENgqyCJ5WJwbNAFGrh1a9gBy6KBmU=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240718030252-61a5a5a32f50/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240801213441-f61b8b0dfa00 h1:/HXwbydJnTh9W9wL+B4O/3D0SohLyLfpxY+g9iLhO2I=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240801213441-f61b8b0dfa00/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240802001553-3a98bdbaa3f8 h1:lYOy3RxZf0ExQMARz5rhSnXaaggML/kYWyYXXu0j+hM=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240802001553-3a98bdbaa3f8/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240802003044-14acc4fd76b4 h1:L9Xkoydm3PPIlB0ciIhopUMOk+slCD8y/tcxMstd1nE=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240802003044-14acc4fd76b4/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=

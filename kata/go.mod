@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.14-0.20240718030252-61a5a5a32f50
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240802003044-14acc4fd76b4
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.23.0

@@ -34,7 +34,7 @@ message SignRequest {
   optional bytes payload = 3;
 }
 
-message SignResonse {
+message SignResponse {
   string key_handle = 1;
   string algorithm = 2;
 }

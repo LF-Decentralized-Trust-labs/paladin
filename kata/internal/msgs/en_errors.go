@@ -141,4 +141,13 @@ var (
 	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
 	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// Signing module PD0114XX
+	MsgSigningModuleBadPathError   = ffe("PD011400", "Path '%s' does not exist, or it not a directory")
+	MsgSigningModuleBadKeyFile     = ffe("PD011401", "Key file '%s' does not exist")
+	MsgSigningModuleBadPassFile    = ffe("PD011402", "Password file '%s' does not exist")
+	MsgSigningModuleBadKeyHandle   = ffe("PD011403", "Invalid key handle")
+	MsgSigningModuleFSError        = ffe("PD011404", "Filesystem error")
+	MsgSigningModuleKeyHandleClash = ffe("PD011405", "Invalid key handle (clash)")
+	MsgSigningModuleKeyNotExist    = ffe("PD011406", "Key '%s' does not exist")
 )
