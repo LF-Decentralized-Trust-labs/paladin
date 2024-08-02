@@ -49,6 +49,8 @@ type signingModule struct {
 	hdKeyChain              *hdkeychain.ExtendedKey
 }
 
+// TODO: provide a facility for a code module looking to use this as a base to extend and add a
+// unique key storage system, without rebuilding all the framework code in this module
 func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err error) {
 	sm := &signingModule{}
 
