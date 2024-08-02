@@ -24,11 +24,14 @@ import (
 	"path"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,6 +47,14 @@ type fakeCommsBusServer struct {
 func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMessageService_ListenServer) error {
 	// On a new connection to the fake server, store the registered destination and the messages it sends
 	ctx := ls.Context()
+
+	if fcb.recvMessages[destination(lr.Destination)] == nil {
+		fcb.recvMessages[destination(lr.Destination)] = make(chan *proto.Message)
+	}
+
+	if fcb.sendMessages[destination(lr.Destination)] == nil {
+		fcb.sendMessages[destination(lr.Destination)] = make(chan *proto.Message)
+	}
 
 	go func() {
 		fcb.listenMessages <- destination(lr.Destination)
@@ -62,24 +73,21 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 		}
 	}()
 
-	go func() {
-		messageChan := fcb.sendMessages[destination(lr.Destination)]
+	messageChan := fcb.sendMessages[destination(lr.Destination)]
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-messageChan:
-				err := ls.Send(msg)
-				if err != nil {
-					return
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case msg := <-messageChan:
+			err := ls.Send(msg)
+			if err != nil {
+				return err
 			}
 		}
-	}()
-
-	return nil
+	}
 }
+
 func (fcb *fakeCommsBusServer) SubscribeToTopic(context.Context, *proto.SubscribeToTopicRequest) (*proto.SubscribeToTopicResponse, error) {
 	return nil, nil
 }
@@ -112,7 +120,7 @@ func (fes *fakeExternalServer) Shutdown() {}
 
 func TestCreateSingleInstance(t *testing.T) {
 	testDir := os.TempDir()
-	testingSocketLocation := path.Join(testDir, "grpctransport.sock")
+	testingSocketLocation := path.Join(testDir, fmt.Sprintf("%s.sock", uuid.New().String()))
 	defer os.Remove(testingSocketLocation)
 
 	commsbusListener, err := net.Listen("unix", testingSocketLocation)
@@ -123,6 +131,7 @@ func TestCreateSingleInstance(t *testing.T) {
 		initializedOk:  true,
 		listenMessages: make(chan destination, 1),
 		sendMessages:   make(map[destination]chan *proto.Message),
+		recvMessages:   make(map[destination]chan *proto.Message),
 	}
 
 	proto.RegisterKataMessageServiceServer(s, fakeCommsBus)
@@ -136,26 +145,60 @@ func TestCreateSingleInstance(t *testing.T) {
 	}()
 
 	fakeDestinationName := "heylookatmeiamanewlistener"
+	fakeInstanceName := "heylookatmeiamanewinstance"
 
 	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, fakeDestinationName)
-	defer Shutdown()
 	assert.NoError(t, err)
 
 	// Now verify that we have a message registering the listener
-	assert.Equal(t, 1, len(fakeCommsBus.listenMessages))
 	newListener := <-fakeCommsBus.listenMessages
 	assert.Equal(t, destination(destination(fakeDestinationName)), newListener)
 
-	// Cool - we have a provider that's stood up and working, let's throw a create instance at it
-	// and check it works properly
-	fakeCommsBus.sendMessages[destination(fakeDestinationName)] <- &proto.Message{
-		Destination: "somewhereelse",
-		Id: "something",
-		Body: &anypb.Any{},
+	createInstanceMessage := &pb.CreateInstance{
+		MessageDestination: fakeDestinationName,
+		Name:               fakeInstanceName,
 	}
 
-	s.GracefulStop()
+	body, err := anypb.New(createInstanceMessage)
+	assert.NoError(t, err)
+
+	createInstancePBMessage := &proto.Message{
+		Id:          uuid.New().String(),
+		Destination: fakeDestinationName,
+		Body:        body,
+	}
+
+	// Cool - we have a provider that's stood up and working, let's throw a create instance at it
+	// and check it works properly
+	fakeCommsBus.sendMessages[destination(fakeDestinationName)] <- createInstancePBMessage
+
+	var ciWG sync.WaitGroup
+	ciWG.Add(1)
+	instanceMade := false
+	checkInstanceMadeCtx, cancel := context.WithTimeout(context.Background(), 30000*time.Second)
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-checkInstanceMadeCtx.Done():
+				ciWG.Done()
+				return
+			default:
+			}
+
+			if provider.instances[destination(fakeInstanceName)] != nil {
+				instanceMade = true
+				ciWG.Done()
+				return
+			}
+		}
+	}()
+	ciWG.Wait()
+
+	assert.Equal(t, true, instanceMade)
+	s.Stop()
+	Shutdown()
 }
 
 func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T) {
@@ -173,6 +216,8 @@ func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T)
 	fakeCommsBus := &fakeCommsBusServer{
 		initializedOk:  true,
 		listenMessages: make(chan destination, 1),
+		sendMessages:   make(map[destination]chan *proto.Message),
+		recvMessages:   make(map[destination]chan *proto.Message),
 	}
 
 	proto.RegisterKataMessageServiceServer(s, fakeCommsBus)

@@ -123,7 +123,7 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 				log.L(ctx).Info("grpctransport: EOF received")
 				return
 			}
-			log.L(ctx).Infof("grpctransport: Received message: %s", inboundMessage.GetBody().TypeUrl)
+			log.L(ctx).Infof("grpctransport: Received message")
 			receivedBody1, err := inboundMessage.GetBody().UnmarshalNew()
 			if err != nil {
 				log.L(ctx).Errorf("grpctransport: Error unmarshalling message: %s", err)
@@ -132,7 +132,7 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 
 			switch string(receivedBody1.ProtoReflect().Descriptor().FullName()) {
 			case "github.com.kaleido_io.paladin.kata.plugin.CreateInstance":
-				log.L(ctx).Info("grpctransport: Received CreateInstanceRequest message for transport A")
+				log.L(ctx).Info("grpctransport: Received CreateInstanceRequest message")
 				createInstanceRequest := new(pluginPB.CreateInstance)
 				err := inboundMessage.GetBody().UnmarshalTo(createInstanceRequest)
 				if err != nil {
