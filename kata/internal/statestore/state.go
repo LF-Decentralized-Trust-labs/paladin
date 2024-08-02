@@ -38,6 +38,7 @@ type State struct {
 	Confirmed   *StateConfirm      `json:"confirmed,omitempty" gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 	Spent       *StateSpend        `json:"spent,omitempty"     gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	ClaimedBy   *uuid.UUID         `json:"claimedBy,omitempty" gorm:"type:uuid;"`
 }
 
 // StateWithLabels is a newly prepared state that has not yet been persisted

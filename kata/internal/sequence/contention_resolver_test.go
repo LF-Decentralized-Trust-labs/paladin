@@ -33,8 +33,8 @@ func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
 	biddingTransaction2 := uuid.New().String()
 
 	for i := 0; i < 100; i++ {
-		stateID := uuid.New().String()
-		winner, err := ContentionResolver(stateID, biddingTransaction1, biddingTransaction2)
+		stateHash := uuid.New().String()
+		winner, err := ContentionResolver(stateHash, biddingTransaction1, biddingTransaction2)
 		require.NoError(t, err)
 		assert.Contains(t, []string{biddingTransaction1, biddingTransaction2}, winner)
 		if winner == biddingTransaction1 {
@@ -53,10 +53,10 @@ func TestContentionResolver_CommutativeProperty(t *testing.T) {
 	biddingTransaction1 := uuid.New().String()
 	biddingTransaction2 := uuid.New().String()
 	for i := 0; i < 100; i++ {
-		stateID := uuid.New().String()
-		winner1, err := ContentionResolver(stateID, biddingTransaction1, biddingTransaction2)
+		stateHash := uuid.New().String()
+		winner1, err := ContentionResolver(stateHash, biddingTransaction1, biddingTransaction2)
 		require.NoError(t, err)
-		winner2, err := ContentionResolver(stateID, biddingTransaction2, biddingTransaction1)
+		winner2, err := ContentionResolver(stateHash, biddingTransaction2, biddingTransaction1)
 		require.NoError(t, err)
 		assert.Equal(t, winner1, winner2)
 	}
@@ -102,40 +102,40 @@ func TestContentionResolver_AssociativeProperty(t *testing.T) {
 		{bidders[3], bidders[2], bidders[0], bidders[1]},
 		{bidders[3], bidders[2], bidders[1], bidders[0]},
 	}
-	runWinnerStaysOn := func(draw []string, stateId string) string {
-		winner1, err := ContentionResolver(stateId, draw[0], draw[1])
+	runWinnerStaysOn := func(draw []string, stateHash string) string {
+		winner1, err := ContentionResolver(stateHash, draw[0], draw[1])
 		require.NoError(t, err)
 
-		winner2, err := ContentionResolver(stateId, winner1, draw[2])
+		winner2, err := ContentionResolver(stateHash, winner1, draw[2])
 		require.NoError(t, err)
 
-		finalWinner, err := ContentionResolver(stateId, winner2, draw[3])
+		finalWinner, err := ContentionResolver(stateHash, winner2, draw[3])
 		require.NoError(t, err)
 
 		return finalWinner
 	}
 
-	runKnockout := func(draw []string, stateId string) string {
-		winnerSF1, err := ContentionResolver(stateId, draw[0], draw[1])
+	runKnockout := func(draw []string, stateHash string) string {
+		winnerSF1, err := ContentionResolver(stateHash, draw[0], draw[1])
 		require.NoError(t, err)
-		winnerSF2, err := ContentionResolver(stateId, draw[2], draw[3])
+		winnerSF2, err := ContentionResolver(stateHash, draw[2], draw[3])
 		require.NoError(t, err)
-		finalWinner, err := ContentionResolver(stateId, winnerSF1, winnerSF2)
+		finalWinner, err := ContentionResolver(stateHash, winnerSF1, winnerSF2)
 		require.NoError(t, err)
 		return finalWinner
 	}
 
 	for i := 0; i < 10; i++ {
-		stateId := uuid.New().String()
+		stateHash := uuid.New().String()
 
-		winner1 := runKnockout(knockOutDraw1, stateId)
-		winner2 := runKnockout(knockOutDraw2, stateId)
-		winner3 := runKnockout(knockOutDraw3, stateId)
+		winner1 := runKnockout(knockOutDraw1, stateHash)
+		winner2 := runKnockout(knockOutDraw2, stateHash)
+		winner3 := runKnockout(knockOutDraw3, stateHash)
 		assert.Equal(t, winner1, winner2)
 		assert.Equal(t, winner2, winner3)
 		for _, order := range orders {
 			//for all the different combination of orders, run the winner stays on format and check that the winner is the same as that of the knockout format
-			winner := runWinnerStaysOn(order, stateId)
+			winner := runWinnerStaysOn(order, stateHash)
 			assert.Equal(t, winner, winner1)
 		}
 	}

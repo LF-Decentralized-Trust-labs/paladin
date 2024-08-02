@@ -51,6 +51,7 @@ type Transaction struct {
 	Contract    string     `gorm:"type:uuid"`
 	PayloadJSON *string    `gorm:"type:text"`
 	PayloadRLP  *string    `gorm:"type:text"`
+	NodeID      uuid.UUID  `gorm:"type:uuid"`
 }
 
 type TransactionUpdate struct { // TODO define updatable fields

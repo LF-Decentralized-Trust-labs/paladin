@@ -22,7 +22,7 @@ import (
 	"github.com/serialx/hashring"
 )
 
-func ContentionResolver(stateID, biddingContentionResolver1, biddingContentionResolver2 string) (string, error) {
+func ContentionResolver(stateHash, biddingContentionResolver1, biddingContentionResolver2 string) (string, error) {
 
 	bidders := make([]string, 0, 1000)
 	// create 500 virtual nodes for each bidding ContentionResolver
@@ -31,7 +31,7 @@ func ContentionResolver(stateID, biddingContentionResolver1, biddingContentionRe
 		bidders = append(bidders, biddingContentionResolver2+strconv.Itoa(i))
 	}
 	ring := hashring.New(bidders)
-	winnerVirtual, _ := ring.GetNode(stateID)
+	winnerVirtual, _ := ring.GetNode(stateHash)
 	winner := winnerVirtual[:36]
 	return winner, nil
 
