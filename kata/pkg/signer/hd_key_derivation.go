@@ -35,9 +35,13 @@ var (
 )
 
 func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationConfig) (err error) {
-	sm.hdBIP44Prefix = confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix)
-	sm.hdBIP44DirectResolution = conf.BIP44DirectResolution
-	sm.hdBIP44HardenedSegments = confutil.IntMin(conf.BIP44HardenedSegments, 0, *KeyDerivationDefaults.BIP44HardenedSegments)
+	sm.hd = &hdDerivation{
+		sm:                    sm,
+		bip44Prefix:           confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix),
+		bip44DirectResolution: conf.BIP44DirectResolution,
+		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *KeyDerivationDefaults.BIP44HardenedSegments),
+	}
+
 	seedKeyPath := KeyDerivationDefaults.SeedKeyPath
 	if len(conf.SeedKeyPath) > 0 {
 		seedKeyPath = conf.SeedKeyPath
@@ -63,12 +67,12 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 			return i18n.NewError(ctx, msgs.MsgHDSeedMustBe32BytesOrMnemonic)
 		}
 	}
-	sm.hdKeyChain, err = hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
+	sm.hd.hdKeyChain, err = hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	return err
 }
 
-func (sm *signingModule) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
-	keyHandle := sm.hdBIP44Prefix
+func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
+	keyHandle := hd.bip44Prefix
 	for i, s := range req.Path {
 		var derivation uint32
 		hardenedFlag := ""
@@ -81,7 +85,7 @@ func (sm *signingModule) resolveHDWalletKey(ctx context.Context, req *proto.Reso
 		// So if a use case requires two different behaviors, backed by the same seed, it will be
 		// necessary to configure two signing modules with different BIP44DirectResolution settings,
 		// and different BIP44Prefix settings, but with the same Seed.
-		if sm.hdBIP44DirectResolution {
+		if hd.bip44DirectResolution {
 			// We will process the NAME as a BIP44 segment spec string directly
 			numStr, isHardened := strings.CutSuffix(s.Name, "'")
 			ui64, err := strconv.ParseUint(numStr, 10, 32)
@@ -100,28 +104,28 @@ func (sm *signingModule) resolveHDWalletKey(ctx context.Context, req *proto.Reso
 			// or normal range (0 through 2^31-1) using a combination of our configuration and
 			// and an option that can be specified dynamically when creating the key.
 			hardenedAttr := s.Attributes["bip32_hardened"]
-			if hardenedAttr == "true" || (hardenedAttr != "false" && i < sm.hdBIP44HardenedSegments) {
+			if hardenedAttr == "true" || (hardenedAttr != "false" && i < hd.bip44HardenedSegments) {
 				hardenedFlag = "'"
 			}
 			derivation = s.Index
 		}
 		keyHandle += fmt.Sprintf("/%d%s", derivation, hardenedFlag)
 	}
-	privateKey, err := sm.loadHDWalletPrivateKey(ctx, keyHandle)
+	privateKey, err := hd.loadHDWalletPrivateKey(ctx, keyHandle)
 	if err != nil {
 		return nil, err
 	}
 	// Once we've used key derivation, we've just got a 32byte private key in volatile memory,
 	// from the perspective of the rest of the signer module.
-	return sm.publicKeyIdentifiersForAlgorithms(ctx, keyHandle, privateKey, req.Algorithms)
+	return hd.sm.publicKeyIdentifiersForAlgorithms(ctx, keyHandle, privateKey, req.Algorithms)
 }
 
-func (sm *signingModule) loadHDWalletPrivateKey(ctx context.Context, keyHandle string) (privateKey []byte, err error) {
+func (hd *hdDerivation) loadHDWalletPrivateKey(ctx context.Context, keyHandle string) (privateKey []byte, err error) {
 	segments := strings.Split(keyHandle, "/")
 	if len(segments) < 2 || segments[0] != "m" {
 		return nil, i18n.NewError(ctx, msgs.MsgInvalidBIP44Derivation, keyHandle)
 	}
-	pos := sm.hdKeyChain
+	pos := hd.hdKeyChain
 	for _, s := range segments[1:] {
 		number, isHardened := strings.CutSuffix(s, "'")
 		derivation, err := strconv.ParseUint(number, 10, 32)
@@ -142,10 +146,10 @@ func (sm *signingModule) loadHDWalletPrivateKey(ctx context.Context, keyHandle s
 	return privateKey, err
 }
 
-func (sm *signingModule) signHDWalletKey(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
-	privateKey, err := sm.loadHDWalletPrivateKey(ctx, req.KeyHandle)
+func (hd *hdDerivation) signHDWalletKey(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
+	privateKey, err := hd.loadHDWalletPrivateKey(ctx, req.KeyHandle)
 	if err != nil {
 		return nil, err
 	}
-	return sm.signInMemory(ctx, privateKey, req)
+	return hd.sm.signInMemory(ctx, privateKey, req)
 }

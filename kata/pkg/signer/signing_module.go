@@ -37,16 +37,20 @@ type SigningModule interface {
 	List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
 }
 
+type hdDerivation struct {
+	sm                    *signingModule
+	bip44DirectResolution bool
+	bip44HardenedSegments int
+	bip44Prefix           string
+	hdKeyChain            *hdkeychain.ExtendedKey
+}
+
 type signingModule struct {
-	keyStoreType            KeyStoreType
-	keyStore                KeyStore
-	disableKeyListing       bool
-	disableKeyLoading       bool
-	keyDerivation           KeyDerivationType
-	hdBIP44DirectResolution bool
-	hdBIP44HardenedSegments int
-	hdBIP44Prefix           string
-	hdKeyChain              *hdkeychain.ExtendedKey
+	keyStoreType      KeyStoreType
+	keyStore          KeyStore
+	disableKeyListing bool
+	disableKeyLoading bool
+	hd                *hdDerivation
 }
 
 // TODO: provide a facility for a code module looking to use this as a base to extend and add a
@@ -66,9 +70,8 @@ func NewSigningModule(ctx context.Context, config *Config) (_ SigningModule, err
 
 	switch config.KeyDerivation.Type {
 	case "", KeyDerivationTypeDirect:
-		sm.keyDerivation = KeyDerivationTypeDirect
 	case KeyDerivationTypeHierarchical:
-		sm.keyDerivation = KeyDerivationTypeHierarchical
+		// This is fundamentally incompatible with a request to disable loading key materials into memory
 		if config.KeyStore.DisableKeyLoading {
 			return nil, i18n.NewError(ctx, msgs.MsgHierarchicalRequiresLoading)
 		}
@@ -192,8 +195,8 @@ func (sm *signingModule) new32ByteRandom() ([]byte, error) {
 }
 
 func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
-	if sm.keyDerivation == KeyDerivationTypeHierarchical {
-		return sm.resolveHDWalletKey(ctx, req)
+	if sm.hd != nil {
+		return sm.hd.resolveHDWalletKey(ctx, req)
 	}
 	if len(req.Algorithms) == 1 && req.Algorithms[0] == Algorithm_ECDSA_SECP256K1 {
 		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
@@ -215,8 +218,8 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 }
 
 func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
-	if sm.keyDerivation == KeyDerivationTypeHierarchical {
-		return sm.signHDWalletKey(ctx, req)
+	if sm.hd != nil {
+		return sm.hd.signHDWalletKey(ctx, req)
 	}
 	if req.Algorithm == Algorithm_ECDSA_SECP256K1 {
 		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
