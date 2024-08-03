@@ -42,6 +42,10 @@ type staticStore struct {
 // Note that special characters in key names must be URL path encoded in the
 // YAML keys, and "/" characters (rather than object nesting) is used
 // in the YAML config.
+//
+// The keys themselves can be in files, so as well as very simple testing
+// with keys in-line in the config, this helps use a file based Kubernetes
+// secret for a mnemonic seed phrase for example at the root of a HD wallet.
 func newStaticKeyStore(ctx context.Context, conf *StaticKeyStorageConfig) (_ KeyStore, err error) {
 	ils := &staticStore{
 		keys: make(map[string][]byte),
