@@ -124,11 +124,12 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 				},
 			},
 		},
+		Next: "key12345",
 	}
 	tk := &testKeyStoreAll{
 		listKeys: func(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
 			assert.Equal(t, int32(10), req.Limit)
-			assert.Equal(t, "key12345", req.AfterKeyHandle)
+			assert.Equal(t, "key12345", req.Continue)
 			return testRes, nil
 		},
 	}
@@ -147,16 +148,16 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.List(context.Background(), &proto.ListKeysRequest{
-		Limit:          10,
-		AfterKeyHandle: "key12345",
+		Limit:    10,
+		Continue: "key12345",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, testRes, res)
 
 	sm.(*signingModule).disableKeyListing = true
 	_, err = sm.List(context.Background(), &proto.ListKeysRequest{
-		Limit:          10,
-		AfterKeyHandle: "key12345",
+		Limit:    10,
+		Continue: "key12345",
 	})
 	assert.Regexp(t, "PD011415", err)
 
@@ -184,8 +185,8 @@ func TestExtensionKeyStoreListFail(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = sm.List(context.Background(), &proto.ListKeysRequest{
-		Limit:          10,
-		AfterKeyHandle: "key12345",
+		Limit:    10,
+		Continue: "key12345",
 	})
 	assert.Regexp(t, "pop", err)
 

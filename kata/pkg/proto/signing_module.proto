@@ -29,23 +29,23 @@ message ResolveKeyResponse {
 }
 
 message SignRequest {
-  string key_handle = 1;
-  string algorithm = 2;
-  bytes payload = 3;
+  string key_handle = 1; // the key handle as returned by a previoius Resolve call (potentially a very long time ago)
+  string algorithm = 2; // a descriptor that Paladin documents to descbe to the signer how to process the input payload, algorithm+curve of signing, and response formatting
+  bytes payload = 3; // the input payload to process according to the algorithm
 }
 
 message SignResponse {
-  bytes payload = 1;
+  bytes payload = 1; // an set of bytes appropriate to the Paladin signing algorithm spec used
 }
 
 message ListKeysRequest {
-  int32 limit = 1;
-  string after_key_handle = 2;
+  int32 limit = 1; // the maximum number of records to return
+  string continue = 2; // the "next" string from a previous call, or empty
 }
 
 message ListKeysResponse {
-  repeated ListKeyHandleEntry items = 1;
-  bool has_more = 2;
+  repeated ListKeyHandleEntry items = 1; // any length less than the limit will cause the caller to assume there might be more records
+  string next = 2; // non empty string to support pagination when the are potentially more records
 }
 
 message ListKeyHandleEntry {

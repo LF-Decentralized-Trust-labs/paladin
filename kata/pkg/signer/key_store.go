@@ -57,7 +57,7 @@ type KeyStoreSigner_secp256k1 interface {
 // The only requirements are:
 // 1) that there is a natural order
 // 2) that there is a finite list (thus this is NOT supported by the HD Wallet derivation scheme if used in the signing module on top of a key store)
-// 3) that when presented with a previous keyHandle, the listing can continue to list keys after that point (according to the natural order)
+// 3) that when presented with the nextPtr from the last call, the listing can continue to list keys after that point (according to the natural order)
 //
 // This behavior can be explicitly disabled in the configuration for any store type.
 type KeyStoreListable interface {
