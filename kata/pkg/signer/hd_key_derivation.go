@@ -17,6 +17,7 @@ package signer
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 		})
 	}
 	// Note we don't have any way to store the resolved keyHandle, so we resolve it every time we start
-	seed, _, err := sm.keyStore.FindOrCreateLoadableKey(ctx, seedReq, sm.new32ByteRandom)
+	seed, _, err := sm.keyStore.FindOrCreateLoadableKey(ctx, seedReq, sm.new32ByteRandomSeed)
 	if err != nil {
 		return err
 	}
@@ -69,6 +70,12 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 	}
 	sm.hd.hdKeyChain, err = hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	return err
+}
+
+func (sm *signingModule) new32ByteRandomSeed() ([]byte, error) {
+	buff := make([]byte, 32)
+	_, err := rand.Read(buff)
+	return buff, err
 }
 
 func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {

@@ -66,7 +66,7 @@ func newStaticKeyStore(ctx context.Context, conf *StaticKeyStorageConfig) (_ Key
 		switch keyEntry.Encoding {
 		case StaticKeyEntryEncodingNONE:
 		case StaticKeyEntryEncodingHEX:
-			if keyData, err = hex.DecodeString(string(keyData)); err != nil {
+			if keyData, err = hex.DecodeString(strings.TrimPrefix(string(keyData), "0x")); err != nil {
 				return nil, i18n.NewError(ctx, msgs.MsgSigningStaticKeyInvalid, keyHandle)
 			}
 		case StaticKeyEntryEncodingBase64:

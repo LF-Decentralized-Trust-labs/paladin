@@ -65,6 +65,91 @@ func TestHDSigningStaticExample(t *testing.T) {
 	assert.Equal(t, "m/44'/60'/0'/0/0", res.KeyHandle)
 	assert.Equal(t, "0x6331ccb948aaf903a69d6054fd718062bd0d535c", res.Identifiers[0].Identifier)
 
+	resSign, err := sm.Sign(ctx, &proto.SignRequest{
+		KeyHandle: res.KeyHandle,
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("some data"),
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, resSign.Payload)
+
+}
+
+func TestHDSigningDirectResNoPrefix(t *testing.T) {
+
+	ctx := context.Background()
+	sm, err := NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type:                  KeyDerivationTypeBIP32,
+			BIP44Prefix:           confutil.P("m"),
+			BIP44HardenedSegments: confutil.P(0),
+			BIP44DirectResolution: true,
+		},
+		KeyStore: StoreConfig{
+			Type:       KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{Path: confutil.P(t.TempDir())},
+		},
+	})
+	assert.NoError(t, err)
+
+	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{
+				Name:  "10'",
+				Index: 0,
+			},
+			{
+				Name:  "20'",
+				Index: 0,
+			},
+			{
+				Name:  "30",
+				Index: 0,
+			},
+			{
+				Name:  "40",
+				Index: 0,
+			},
+			{
+				Name:  "50'",
+				Index: 0,
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
+
+	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{
+				Name:  "key1",
+				Index: 0,
+			},
+		},
+	})
+	assert.Regexp(t, "PD011413", err)
+
+	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{
+				Name:  "2147483648", // too big
+				Index: 0,
+			},
+		},
+	})
+	assert.Regexp(t, "PD011414", err)
+
+	_, err = sm.(*signingModule).hd.signHDWalletKey(ctx, &proto.SignRequest{
+		KeyHandle: "m/wrong",
+	})
+	assert.Regexp(t, "PD011413", err)
+
+	_, err = sm.(*signingModule).hd.loadHDWalletPrivateKey(ctx, "")
+	assert.Regexp(t, "PD011413", err)
+
 }
 
 func TestHDSigningDefaultBehaviorOK(t *testing.T) {
@@ -79,12 +164,15 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	sm, err := NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type: KeyDerivationTypeBIP32,
+			SeedKeyPath: []ConfigKeyPathEntry{
+				{Name: "custom"}, {Name: "seed"},
+			},
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeStatic,
 			Static: StaticKeyStorageConfig{
 				Keys: map[string]StaticKeyEntryConfig{
-					"seed": {
+					"custom/seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
 					},
@@ -132,9 +220,20 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	expectedKey, err := tk.ECPrivKey()
 	assert.NoError(t, err)
 	keyBytes := expectedKey.Key.Bytes()
-	addressable, err := secp256k1.NewSecp256k1KeyPair(keyBytes[:])
+	testKeyPair, err := secp256k1.NewSecp256k1KeyPair(keyBytes[:])
 	assert.NoError(t, err)
-	assert.Equal(t, addressable.Address.String(), res.Identifiers[0].Identifier)
+	assert.Equal(t, testKeyPair.Address.String(), res.Identifiers[0].Identifier)
+
+	resSign, err := sm.Sign(ctx, &proto.SignRequest{
+		KeyHandle: res.KeyHandle,
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("some data"),
+	})
+	assert.NoError(t, err)
+
+	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
+	assert.NoError(t, err)
+	assert.Equal(t, compactRSV(testSign), resSign.Payload)
 
 }
 
@@ -175,4 +274,62 @@ func TestHDSigningInitFailBadMnemonic(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011412", err)
 
+}
+
+func TestHDInitBadSeed(t *testing.T) {
+
+	ctx := context.Background()
+	entropy, err := bip39.NewEntropy(256)
+	assert.NoError(t, err)
+
+	mnemonic, err := bip39.NewMnemonic(entropy)
+	assert.NoError(t, err)
+
+	_, err = NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type: KeyDerivationTypeBIP32,
+			SeedKeyPath: []ConfigKeyPathEntry{
+				{Name: "missing"},
+			},
+		},
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+			Static: StaticKeyStorageConfig{
+				Keys: map[string]StaticKeyEntryConfig{
+					"seed": {
+						Encoding: "none",
+						Inline:   mnemonic,
+					},
+				},
+			},
+		},
+	})
+	assert.Regexp(t, "PD011418", err)
+
+}
+
+func TestHDInitGenSeed(t *testing.T) {
+
+	ctx := context.Background()
+
+	sm, err := NewSigningModule(ctx, &Config{
+		KeyDerivation: KeyDerivationConfig{
+			Type: KeyDerivationTypeBIP32,
+			SeedKeyPath: []ConfigKeyPathEntry{
+				{Name: "generate"}, {Name: "seed"},
+			},
+		},
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeFilesystem,
+			FileSystem: FileSystemConfig{
+				Path: confutil.P(t.TempDir()),
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	generatedSeed, err := sm.(*signingModule).keyStore.LoadKeyMaterial(ctx, "generate/seed")
+	assert.NoError(t, err)
+	assert.Len(t, generatedSeed, 32)
+	assert.NotEqual(t, make([]byte, 32), generatedSeed) // not zero
 }

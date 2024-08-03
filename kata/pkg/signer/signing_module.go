@@ -190,20 +190,15 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, req *proto.SignRequest) (res *proto.SignResponse, err error) {
 	switch strings.ToLower(req.Algorithm) {
 	case Algorithm_ECDSA_SECP256K1:
+		kp, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
+		sig, err := kp.SignDirect(req.Payload)
+		if err == nil {
+			return &proto.SignResponse{Payload: compactRSV(sig)}, nil
+		}
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
+		err = i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, req.Algorithm)
 	}
-	var sig *secp256k1.SignatureData
-	kp, err := secp256k1.NewSecp256k1KeyPair(privateKey)
-	if err == nil {
-		sig, err = kp.Sign(req.Payload)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &proto.SignResponse{
-		Payload: compactRSV(sig),
-	}, nil
+	return nil, err
 }
 
 func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, keyHandle string, privateKey []byte, algorithms []string) (*proto.ResolveKeyResponse, error) {
@@ -211,28 +206,19 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
 		case Algorithm_ECDSA_SECP256K1:
-			addr, err := secp256k1.NewSecp256k1KeyPair(privateKey)
-			if err != nil {
-				return nil, err
-			}
+			addr, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
 			identifiers = append(identifiers, &proto.PublicKeyIdentifier{
 				Algorithm:  Algorithm_ECDSA_SECP256K1,
 				Identifier: addr.Address.String(),
 			})
 		default:
-			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning)
+			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, algo)
 		}
 	}
 	return &proto.ResolveKeyResponse{
 		KeyHandle:   keyHandle,
 		Identifiers: identifiers,
 	}, nil
-}
-
-func (sm *signingModule) new32ByteRandom() ([]byte, error) {
-	buff := make([]byte, 32)
-	_, err := rand.Read(buff)
-	return buff, err
 }
 
 func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {

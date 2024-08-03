@@ -153,6 +153,13 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, testRes, res)
 
+	sm.(*signingModule).disableKeyListing = true
+	_, err = sm.List(context.Background(), &proto.ListKeysRequest{
+		Limit:          10,
+		AfterKeyHandle: "key12345",
+	})
+	assert.Regexp(t, "PD011415", err)
+
 }
 
 func TestExtensionKeyStoreListFail(t *testing.T) {
@@ -256,6 +263,54 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 
 }
 
+func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
+
+	tk := &testKeyStoreAll{
+		sign_secp256k1: func(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error) {
+			return nil, fmt.Errorf("pop")
+		},
+	}
+	te := &testExtension{
+		keyStore: func(keystoreType string) (store KeyStore, err error) {
+			assert.Equal(t, "ext-store", keystoreType)
+			return tk, nil
+		},
+	}
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: "ext-store",
+		},
+	}, te)
+	assert.NoError(t, err)
+
+	_, err = sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: "key1",
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestSignInMemoryFailBadKey(t *testing.T) {
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+		},
+	})
+	assert.NoError(t, err)
+
+	_, err = sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: "key1",
+		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.Regexp(t, "PD011418", err)
+
+}
+
 func TestResolveSignWithNewKeyCreation(t *testing.T) {
 
 	sm, err := NewSigningModule(context.Background(), &Config{
@@ -331,4 +386,60 @@ func TestResolveMissingAlgo(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011411", err)
 
+}
+
+func TestInMemorySignFailures(t *testing.T) {
+
+	sm, err := NewSigningModule(context.Background(), &Config{
+		KeyStore: StoreConfig{
+			Type: KeyStoreTypeStatic,
+			Static: StaticKeyStorageConfig{
+				Keys: map[string]StaticKeyEntryConfig{
+					"key1": {
+						Encoding: "hex",
+						Inline:   "0x00",
+					},
+				},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.NoError(t, err)
+
+	_, err = sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: resolveRes.KeyHandle,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.Regexp(t, "PD011410", err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{"wrong"},
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.Regexp(t, "PD011410", err)
+
+	sm.(*signingModule).disableKeyLoading = true
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Path: []*proto.KeyPathSegment{
+			{Name: "key1"},
+		},
+	})
+	assert.Regexp(t, "PD011409", err)
+
+	_, err = sm.Sign(context.Background(), &proto.SignRequest{
+		KeyHandle: resolveRes.KeyHandle,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.Regexp(t, "PD011409", err)
 }
