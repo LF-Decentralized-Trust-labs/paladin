@@ -53,7 +53,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Path: []*proto.KeyPathSegment{
 			{
 				Name:  "key1",
@@ -67,7 +67,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)
@@ -93,7 +93,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Path: []*proto.KeyPathSegment{
 			{
 				Name:  "10'",
@@ -121,7 +121,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Path: []*proto.KeyPathSegment{
 			{
 				Name:  "key1",
@@ -132,7 +132,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.Regexp(t, "PD011413", err)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Path: []*proto.KeyPathSegment{
 			{
 				Name:  "2147483648", // too big
@@ -183,7 +183,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1},
+		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Path: []*proto.KeyPathSegment{
 			{
 				Name:  "bob",
@@ -226,7 +226,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1,
+		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)

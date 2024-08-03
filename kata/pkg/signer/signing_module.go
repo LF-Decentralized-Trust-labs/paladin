@@ -147,7 +147,7 @@ func (sm *signingModule) resolveKeystoreSECP256K1(ctx context.Context, req *prot
 	return &proto.ResolveKeyResponse{
 		KeyHandle: keyHandle,
 		Identifiers: []*proto.PublicKeyIdentifier{
-			{Algorithm: Algorithm_ECDSA_SECP256K1, Identifier: addr.String()},
+			{Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: addr.String()},
 		},
 	}, nil
 }
@@ -175,7 +175,7 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 	keyLen := 0
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
-		case Algorithm_ECDSA_SECP256K1:
+		case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
 			keyLen = 32
 		default:
 			return -1, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, algo)
@@ -189,7 +189,7 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 
 func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, req *proto.SignRequest) (res *proto.SignResponse, err error) {
 	switch strings.ToLower(req.Algorithm) {
-	case Algorithm_ECDSA_SECP256K1:
+	case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
 		kp, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
 		sig, err := kp.SignDirect(req.Payload)
 		if err == nil {
@@ -205,10 +205,10 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 	var identifiers []*proto.PublicKeyIdentifier
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
-		case Algorithm_ECDSA_SECP256K1:
+		case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
 			addr, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
 			identifiers = append(identifiers, &proto.PublicKeyIdentifier{
-				Algorithm:  Algorithm_ECDSA_SECP256K1,
+				Algorithm:  Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				Identifier: addr.Address.String(),
 			})
 		default:
@@ -225,7 +225,7 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 	if sm.hd != nil {
 		return sm.hd.resolveHDWalletKey(ctx, req)
 	}
-	if len(req.Algorithms) == 1 && req.Algorithms[0] == Algorithm_ECDSA_SECP256K1 {
+	if len(req.Algorithms) == 1 && req.Algorithms[0] == Algorithm_ECDSA_SECP256K1_PLAINBYTES {
 		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
 		if ok {
 			return sm.resolveKeystoreSECP256K1(ctx, req, keyStoreSigner)
@@ -248,7 +248,7 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 	if sm.hd != nil {
 		return sm.hd.signHDWalletKey(ctx, req)
 	}
-	if req.Algorithm == Algorithm_ECDSA_SECP256K1 {
+	if req.Algorithm == Algorithm_ECDSA_SECP256K1_PLAINBYTES {
 		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
 		if ok {
 			return sm.signKeystoreSECP256K1(ctx, req, keyStoreSigner)
