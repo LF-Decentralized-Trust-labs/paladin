@@ -122,7 +122,7 @@ func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testb
 	if abiFunc == nil {
 		return nil, fmt.Errorf("function %q does not exist on base ledger ABI", txInstruction.FunctionName)
 	}
-	txPayload, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
+	_, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
 	if err != nil {
 		return nil, fmt.Errorf("encoding to function %q failed: %s", txInstruction.FunctionName, err)
 	}
