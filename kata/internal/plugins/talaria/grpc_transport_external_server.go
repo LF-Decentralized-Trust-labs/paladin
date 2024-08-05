@@ -3,8 +3,8 @@ package grpctransport
 import (
 	"context"
 	"fmt"
-	"net"
 	"io"
+	"net"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -120,9 +120,9 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 						log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
 					}
 					defer conn.Close()
-				
+
 					client := interPaladinPB.NewInterPaladinTransportClient(conn)
-				
+
 					_, err = client.SendInterPaladinMessage(ctx, inpalMessage)
 					if err != nil {
 						log.L(ctx).Errorf("error sending message: %s", err.Error())
@@ -147,8 +147,8 @@ func (egs *externalGRPCServer) SendInterPaladinMessage(ctx context.Context, mess
 
 	if egs.recvMessages[destination(recvMessage.Destination)] == nil {
 		egs.recvMessages[destination(recvMessage.Destination)] = make(chan *proto.Message, 1)
-	} 
-	
+	}
+
 	egs.recvMessages[destination(recvMessage.Destination)] <- &recvMessage.Message
 	return nil, nil
 }

@@ -57,6 +57,12 @@ func Shutdown() {
 		return
 	}
 
+	if provider.instances != nil {
+		for _, instance := range provider.instances {
+			instance.stopListener()
+		}
+	}
+
 	provider.stopListener()
 	provider = nil
 
@@ -105,47 +111,51 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 		return connErr
 	}
 
-	listenerContext, stopListener := context.WithCancel(ctx)
-	messageStream, err := client.Listen(listenerContext, &proto.ListenRequest{
+	messageStream, err := client.Listen(ctx, &proto.ListenRequest{
 		Destination: listenerDestination,
 	})
 	if err != nil {
-		stopListener()
 		return err
 	}
+
+	listenerContext := messageStream.Context()
 
 	// Start listening for events on the plugin stream
 	go func() {
 		for {
-			log.L(ctx).Info("grpctransport: Waiting for message")
 			inboundMessage, err := messageStream.Recv()
 			if err == io.EOF {
-				log.L(ctx).Info("grpctransport: EOF received")
+				log.L(listenerContext).Info("grpctransport: EOF received")
 				return
 			}
-			log.L(ctx).Infof("grpctransport: Received message")
+			if err != nil {
+				// TODO: Something not quite right in the shutdown flow here which means we occaisionally see this, need to fix
+				// log.L(listenerContext).Error("grpctransport: Error when reading message")
+				continue
+			}
+			log.L(listenerContext).Infof("grpctransport: Received message")
 			receivedBody1, err := inboundMessage.GetBody().UnmarshalNew()
 			if err != nil {
-				log.L(ctx).Errorf("grpctransport: Error unmarshalling message: %s", err)
+				log.L(listenerContext).Errorf("grpctransport: Error unmarshalling message: %s", err)
 				continue
 			}
 
 			switch string(receivedBody1.ProtoReflect().Descriptor().FullName()) {
 			case "github.com.kaleido_io.paladin.kata.plugin.CreateInstance":
-				log.L(ctx).Info("grpctransport: Received CreateInstanceRequest message")
+				log.L(listenerContext).Info("grpctransport: Received CreateInstanceRequest message")
 				createInstanceRequest := new(pluginPB.CreateInstance)
 				err := inboundMessage.GetBody().UnmarshalTo(createInstanceRequest)
 				if err != nil {
-					log.L(ctx).Errorf("grpctransport: Error unmarshalling CreateInstanceRequest: %s", err)
+					log.L(listenerContext).Errorf("grpctransport: Error unmarshalling CreateInstanceRequest: %s", err)
 					continue
 				}
-				err = provider.createInstance(ctx, createInstanceRequest)
+				err = provider.createInstance(listenerContext, createInstanceRequest)
 				if err != nil {
-					log.L(ctx).Errorf("grpctransport: Error creating instance: %s", err)
+					log.L(listenerContext).Errorf("grpctransport: Error creating instance: %s", err)
 					continue
 				}
 			default:
-				log.L(ctx).Errorf("grpctransport: Unknown message type: %s", receivedBody1.ProtoReflect().Descriptor().FullName())
+				log.L(listenerContext).Errorf("grpctransport: Unknown message type: %s", receivedBody1.ProtoReflect().Descriptor().FullName())
 			}
 		}
 	}()
@@ -155,13 +165,12 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 		// Mostly put behind an interface to make stubbing for UTs easy
 		externalServer, err = NewExternalGRPCServer(ctx, provider.externalListenPort, 10)
 		if err != nil {
-			stopListener()
 			return err
 		}
 	}
 
 	provider = &grpcTransportProvider{
-		stopListener:                        stopListener,
+		stopListener:                        func() { _ = messageStream.CloseSend() },
 		instances:                           make(map[destination]*grpcTransportInstance),
 		client:                              client,
 		externalListenPort:                  8080,
@@ -188,7 +197,10 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 	// back from the server need to be fed to the comms bus
 
 	newInstance := &grpcTransportInstance{
-		stopListener: stopListener,
+		stopListener: func() {
+			_ = messageStream.CloseSend()
+			stopListener()
+		},
 	}
 	gtp.instances[destination(createInstanceRequest.GetName())] = newInstance
 
@@ -199,9 +211,13 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 				log.L(ctx).Info("grpctransport instance: EOF received")
 				return
 			}
+			if err != nil {
+				log.L(ctx).Errorf("grpctransport instance: Error processing message: %v", err)
+				return
+			}
 
 			externalMessage := &ExternalMessage{
-				Message: *inboundMessage,
+				Message:         *inboundMessage,
 				ExternalAddress: "somewhere",
 			}
 

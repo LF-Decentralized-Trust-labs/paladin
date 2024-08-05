@@ -234,7 +234,7 @@ func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T)
 	err = InitializeTransportProvider(testingSocketLocation, "heylookatmeiamanewlistener")
 	defer Shutdown()
 	assert.NoError(t, err)
-	s.GracefulStop()
+	s.Stop()
 	wg.Wait()
 
 	// Now verify that we have a message registering the listener
@@ -281,6 +281,8 @@ func TestInitializeGRPCTransportTwiceThrowsError(t *testing.T) {
 	assert.NoError(t, err)
 	s := grpc.NewServer()
 	proto.RegisterKataMessageServiceServer(s, &fakeCommsBusServer{
+		recvMessages:  make(map[destination]chan *proto.Message),
+		sendMessages:  make(map[destination]chan *proto.Message),
 		initializedOk: true,
 	})
 
@@ -299,7 +301,8 @@ func TestInitializeGRPCTransportTwiceThrowsError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already initialized")
 	defer Shutdown()
-	s.GracefulStop()
+	s.Stop()
+	commsbusListener.Close()
 	wg.Wait()
 }
 
@@ -313,9 +316,14 @@ func TestInitializeGRPCTransportSimple(t *testing.T) {
 	commsbusListener, err := net.Listen("unix", testingSocketLocation)
 	assert.NoError(t, err)
 	s := grpc.NewServer()
-	proto.RegisterKataMessageServiceServer(s, &fakeCommsBusServer{
-		initializedOk: true,
-	})
+
+	fcbs := &fakeCommsBusServer{
+		recvMessages:   make(map[destination]chan *proto.Message, 1),
+		sendMessages:   make(map[destination]chan *proto.Message),
+		listenMessages: make(chan destination, 1),
+		initializedOk:  true,
+	}
+	proto.RegisterKataMessageServiceServer(s, fcbs)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -328,8 +336,11 @@ func TestInitializeGRPCTransportSimple(t *testing.T) {
 	externalServer = &fakeExternalServer{}
 	err = InitializeTransportProvider(testingSocketLocation, "something")
 	assert.NoError(t, err)
-	defer Shutdown()
-	s.GracefulStop()
+
+	<-fcbs.listenMessages
+
+	Shutdown()
+	s.Stop()
 	wg.Wait()
 }
 
