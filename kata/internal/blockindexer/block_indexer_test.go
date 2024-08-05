@@ -90,6 +90,12 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
 	for i := 0; i < l; i++ {
+		var contractAddress, to *ethtypes.Address0xHex
+		if i == 0 {
+			contractAddress = ethtypes.MustNewAddress(types.RandHex(20))
+		} else {
+			to = ethtypes.MustNewAddress(types.RandHex(20))
+		}
 		blocks[i] = &BlockInfoJSONRPC{
 			Number: ethtypes.HexUint64(i),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
@@ -97,6 +103,9 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 		receipts[blocks[i].Hash.String()] = []*TXReceiptJSONRPC{
 			{
 				TransactionHash: ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+				From:            ethtypes.MustNewAddress(types.RandHex(20)),
+				To:              to,
+				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
 				Logs: []*LogJSONRPC{
@@ -242,12 +251,24 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTX.Hash.String())
 
 		// Get the events
-		txEvents, err := bi.GetTransactionEventsByHash(ctx, receipts[blocks[i].Hash.String()][0].TransactionHash.String())
+		tx0 := receipts[blocks[i].Hash.String()][0]
+		txEvents, err := bi.GetTransactionEventsByHash(ctx, tx0.TransactionHash.String())
 		assert.NoError(t, err)
 		assert.Len(t, txEvents, 3)
 		assert.Equal(t, topicA.String(), txEvents[0].Signature.String())
 		assert.Equal(t, topicB.String(), txEvents[1].Signature.String())
 		assert.Equal(t, topicC.String(), txEvents[2].Signature.String())
+		if i == 0 {
+			assert.Nil(t, tx0.To)
+			assert.NotNil(t, tx0.ContractAddress)
+			assert.NotEqual(t, types.EthAddress{}, *tx0.ContractAddress)
+		} else {
+			assert.Nil(t, tx0.ContractAddress)
+			assert.NotNil(t, tx0.To)
+			assert.NotEqual(t, types.EthAddress{}, *tx0.To)
+		}
+		assert.NotNil(t, tx0.From)
+		assert.NotEqual(t, types.EthAddress{}, *tx0.From)
 
 		// Get the transactions per block
 		indexedTXs, err := bi.GetBlockTransactionsByNumber(ctx, int64(blocks[i].Number))

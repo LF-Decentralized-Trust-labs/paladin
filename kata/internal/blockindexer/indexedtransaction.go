@@ -16,7 +16,9 @@
 
 package blockindexer
 
-import "github.com/kaleido-io/paladin/kata/internal/types"
+import (
+	"github.com/kaleido-io/paladin/kata/internal/types"
+)
 
 type IndexedBlock struct {
 	Number int64        `json:"number"`
@@ -24,9 +26,12 @@ type IndexedBlock struct {
 }
 
 type IndexedTransaction struct {
-	Hash        types.HashID `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
-	BlockNumber int64        `json:"blockNumber"`
-	TXIndex     int64        `json:"transactionIndex"`
+	Hash            types.HashID      `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	BlockNumber     int64             `json:"blockNumber"`
+	TXIndex         int64             `json:"transactionIndex"`
+	From            *types.EthAddress `json:"from"`
+	To              *types.EthAddress `json:"to,omitempty"`
+	ContractAddress *types.EthAddress `json:"contractAddress,omitempty"`
 }
 
 type IndexedEvent struct {
