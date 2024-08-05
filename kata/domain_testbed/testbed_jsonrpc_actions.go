@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -39,6 +40,21 @@ func (tb *testbed) initRPC() error {
 		Add("testbed_deploy", tb.rpcTestbedDeploy()),
 	)
 	return tb.rpcServer.Start()
+}
+
+func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		from string,
+		bytecode ethtypes.HexBytes0xPrefix,
+	) (*ethtypes.Address0xHex, error) {
+
+		tx, err := tb.simpleTXEstimateSignSubmitAndWait(ctx, from, nil, bytecode)
+		if err != nil {
+			return nil, err
+		}
+
+		return true, nil
+	})
 }
 
 func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {

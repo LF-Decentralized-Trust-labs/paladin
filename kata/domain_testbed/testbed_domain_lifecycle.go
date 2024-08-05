@@ -233,7 +233,7 @@ func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testb
 	}
 
 	if len(events) != 1 {
-		return nil, fmt.Errorf("expected exactly one event from deploy function (received=%d)", len(events))
+		return nil, fmt.Errorf("expected exactly one event from deploy function TX %s (received=%d)", &tx.Hash, len(events))
 	}
 
 	return events[0], nil

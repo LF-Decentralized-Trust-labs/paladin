@@ -22,6 +22,7 @@ import (
 	_ "embed"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,16 @@ func parseBuildABI(t *testing.T, buildJSON []byte) *abi.ABI {
 	err = json.Unmarshal(buildParsed["abi"], &buildABI)
 	assert.NoError(t, err)
 	return &buildABI
+}
+
+func parseBuildBytecode(t *testing.T, buildJSON []byte) ethtypes.HexBytes0xPrefix {
+	var buildParsed map[string]types.RawJSON
+	err := json.Unmarshal(buildJSON, &buildParsed)
+	assert.NoError(t, err)
+	var byteCode ethtypes.HexBytes0xPrefix
+	err = json.Unmarshal(buildParsed["bytecode"], &byteCode)
+	assert.NoError(t, err)
+	return byteCode
 }
 
 func toJSONString(t *testing.T, v interface{}) string {
@@ -93,7 +104,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		]
 	}`
 
-	rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
+	tb.
+		rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
 		CONFIGURE: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)

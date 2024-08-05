@@ -305,11 +305,14 @@ abstract class ComponentTest extends Exec {
 
         doLast {
             def ExecResult execResult = getExecutionResult().get();
-            if(execResult.getExitValue() != 0) {
-                println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
-                println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
-                println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
-                throw new Exception("COMPONENT TEST FAILED - SEE TEST OUTPUT BEFORE LOGS");
+            def composeLogs = getProject().findProperty('composeLogs');
+            if (execResult.getExitValue() != 0) {
+                if (composeLogs == "true") {
+                    println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
+                    println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
+                }
+                throw new Exception("COMPONENT TEST FAILED");
             }
         }
     }
