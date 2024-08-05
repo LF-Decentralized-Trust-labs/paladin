@@ -98,7 +98,7 @@ func exitErrorf(msg string, args ...interface{}) {
 }
 
 func mkdir(dir string) {
-	err := os.Mkdir(dir, 0775)
+	err := os.Mkdir(dir, 0777)
 	if err != nil {
 		exitErrorf("failed to make dir %q: %s", dir, err)
 	}
@@ -122,7 +122,7 @@ func writeFileJSON(filename string, jsonable any) {
 }
 
 func writeFile(filename string, data []byte) {
-	err := os.WriteFile(filename, data, 0664)
+	err := os.WriteFile(filename, data, 0666)
 	if err != nil {
 		exitErrorf("failed to write file %q: %s", filename, err)
 	}
