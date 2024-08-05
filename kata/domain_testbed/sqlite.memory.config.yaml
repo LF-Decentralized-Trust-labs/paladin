@@ -12,7 +12,7 @@ rpcServer:
 blockchain:
   ws:
     url: ws://localhost:8546
-  initialConnectAttempts: 25
+    initialConnectAttempts: 25
 signer:
   keyDerivation:
     type: "bip32"
