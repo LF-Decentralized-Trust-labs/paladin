@@ -24,13 +24,14 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 92
+    targetCoverage = 93
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
         'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
-        'github.com/kaleido-io/paladin/kata/internal/plugins/loader'
+        'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
+        'github.com/kaleido-io/paladin/kata/domain_testbed',
     ]
 }
 
@@ -235,6 +236,7 @@ task besuBootstrapTool(type: Exec) {
     args "build"
     args "-t", "paladin/besu_bootstrap"
     args "-f", "tools/besu_bootstrap/Dockerfile"
+    args "-q"
     args "."
 }
 
