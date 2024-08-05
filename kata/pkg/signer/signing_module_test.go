@@ -444,3 +444,8 @@ func TestInMemorySignFailures(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011409", err)
 }
+
+func TestDecodeCompactRSVBadLen(t *testing.T) {
+	_, err := DecodeCompactRSV(context.Background(), make([]byte, 64))
+	assert.Regexp(t, "PD011420", err)
+}

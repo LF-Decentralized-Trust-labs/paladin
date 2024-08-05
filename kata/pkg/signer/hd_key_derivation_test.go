@@ -233,7 +233,10 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	assert.NoError(t, err)
-	assert.Equal(t, compactRSV(testSign), resSign.Payload)
+	assert.Equal(t, CompactRSV(testSign), resSign.Payload)
+	sig, err := DecodeCompactRSV(ctx, resSign.Payload)
+	assert.NoError(t, err)
+	assert.Equal(t, testSign, sig)
 
 }
 
