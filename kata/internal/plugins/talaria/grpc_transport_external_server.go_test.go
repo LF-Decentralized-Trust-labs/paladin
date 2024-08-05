@@ -26,7 +26,7 @@ var (
 	testPort        = 10002
 	testBufferSize  = 1
 	loopbackAddress = fmt.Sprintf("localhost:%d", testPort)
-	sendingAddress  = fmt.Sprintf("localhost:%d", testPort + 1)
+	sendingAddress  = fmt.Sprintf("localhost:%d", testPort+1)
 	fakeDesintation = "somewhereoverthemoon"
 )
 
@@ -48,7 +48,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start a server to recieve messages through
-	testLis, err := net.Listen("tcp", fmt.Sprintf(":%d", testPort + 1))
+	testLis, err := net.Listen("tcp", fmt.Sprintf(":%d", testPort+1))
 	assert.NoError(t, err)
 	fakeServer := &fakeExternalGRPCServer{
 		listener: testLis,
@@ -60,7 +60,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(){
+	go func() {
 		_ = s.Serve(testLis)
 		wg.Done()
 	}()
@@ -68,7 +68,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 	// Create a fake message and queue it for sending
 	fakeInternalMessage := &proto.Message{
 		Id:          "some-uuid",
-		Destination: fmt.Sprintf("localhost:%d", testPort + 1),
+		Destination: fmt.Sprintf("localhost:%d", testPort+1),
 	}
 
 	fakeMessage := &ExternalMessage{
