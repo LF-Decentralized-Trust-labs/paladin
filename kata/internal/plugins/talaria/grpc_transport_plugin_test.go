@@ -112,7 +112,7 @@ func (fcb *fakeCommsBusServer) ListDestinations(context.Context, *proto.ListDest
 
 type fakeExternalServer struct{}
 
-func (fes *fakeExternalServer) QueueMessageForSend(msg *proto.Message) {}
+func (fes *fakeExternalServer) QueueMessageForSend(msg *ExternalMessage) {}
 func (fes *fakeExternalServer) GetMessages(dest destination) (chan *proto.Message, error) {
 	return nil, nil
 }
@@ -176,7 +176,7 @@ func TestCreateSingleInstance(t *testing.T) {
 	var ciWG sync.WaitGroup
 	ciWG.Add(1)
 	instanceMade := false
-	checkInstanceMadeCtx, cancel := context.WithTimeout(context.Background(), 30000*time.Second)
+	checkInstanceMadeCtx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
 	defer cancel()
 	go func() {
 		for {
