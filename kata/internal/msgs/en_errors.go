@@ -144,5 +144,6 @@ var (
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
 
 	// BlockIndexer PD0113XX
-	MsgBlockIndexerInvalidFromBlock = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerInvalidFromBlock    = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerInvalidWebSocketURL = ffe("PD011301", "Invalid WebSocket URL: %s")
 )

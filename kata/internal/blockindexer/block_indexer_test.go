@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/mocks/rpcbackendmocks"
@@ -46,10 +47,10 @@ func newTestBlockIndexer(t *testing.T) (context.Context, *blockIndexer, *rpcback
 	return newTestBlockIndexerConf(t, &Config{
 		CommitBatchSize: confutil.P(1), // makes testing simpler
 		FromBlock:       types.RawJSON(`0`),
-	}, &RPCWSConnectConfig{})
+	})
 }
 
-func newTestBlockIndexerConf(t *testing.T, config *Config, wsConfig *RPCWSConnectConfig) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, func()) {
+func newTestBlockIndexerConf(t *testing.T, config *Config) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
@@ -57,7 +58,7 @@ func newTestBlockIndexerConf(t *testing.T, config *Config, wsConfig *RPCWSConnec
 	p, pDone, err := persistence.NewUnitTestPersistence(ctx)
 	assert.NoError(t, err)
 
-	blockListener, mRPC := newTestBlockListenerConf(t, ctx, config, wsConfig)
+	blockListener, mRPC := newTestBlockListenerConf(t, ctx, config)
 	bi, err := newBlockIndexer(ctx, config, p, blockListener)
 	assert.NoError(t, err)
 	bi.utBatchNotify = make(chan *blockWriterBatch)
@@ -149,10 +150,12 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcbackendmocks.WebSocketRPCClient, dynamic
 }
 
 func TestNewBlockIndexerBadTLS(t *testing.T) {
-	_, err := NewBlockIndexer(context.Background(), &Config{}, &RPCWSConnectConfig{
-		TLS: tls.Config{
-			Enabled: true,
-			CAFile:  t.TempDir(),
+	_, err := NewBlockIndexer(context.Background(), &Config{}, &rpcclient.WSConfig{
+		HTTPConfig: rpcclient.HTTPConfig{
+			URL: "wss://localhost:8546",
+			TLS: tls.Config{
+				CAFile: t.TempDir(),
+			},
 		},
 	}, nil)
 	assert.Regexp(t, "PD010901", err)
@@ -162,9 +165,11 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	p, err := mockpersistence.NewSQLMockProvider()
 	assert.NoError(t, err)
 
+	wsConf := &rpcclient.WSConfig{HTTPConfig: rpcclient.HTTPConfig{URL: "ws://localhost:8546"}}
+
 	cancelledCtx, cancelCtx := context.WithCancel(context.Background())
 	cancelCtx()
-	bi, err := NewBlockIndexer(cancelledCtx, &Config{}, &RPCWSConnectConfig{}, p.P)
+	bi, err := NewBlockIndexer(cancelledCtx, &Config{}, wsConf, p.P)
 	assert.NoError(t, err)
 
 	// Start will get error, but return due to cancelled context
@@ -182,7 +187,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroNoConfirmations(t *testing.T) {
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 0
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify
@@ -202,7 +207,7 @@ func TestBlockIndexerBatchTimeoutOne(t *testing.T) {
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 0
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify
@@ -219,7 +224,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 5
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks)-bi.requiredConfirmations; i++ {
 		b := <-bi.utBatchNotify
@@ -290,7 +295,7 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	bi.nextBlock = nil
 	bi.requiredConfirmations = 5
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	// Notify starting at block 5
 	for i := 5; i < len(blocks); i++ {
@@ -316,7 +321,7 @@ func TestBatching(t *testing.T) {
 
 	bi.batchSize = 5
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	// Notify starting at block 5
 	for i := 5; i < len(blocks); i++ {
@@ -347,7 +352,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 		Hash:   *types.MustParseHashID(types.RandHex(32)),
 	})
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	assert.Equal(t, ethtypes.HexUint64(12346), *bi.nextBlock)
 }
@@ -461,7 +466,7 @@ func testBlockIndexerHandleReorgInConfirmationWindow(t *testing.T, blockLenBefor
 		}
 	})
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocksAfterReorg)-bi.requiredConfirmations; i++ {
 		b := <-bi.utBatchNotify
@@ -506,7 +511,7 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 		return blocks, receipts
 	})
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks)-bi.requiredConfirmations; i++ {
 		b := <-bi.utBatchNotify
@@ -533,7 +538,7 @@ func TestBlockIndexerResetsAfterHashLookupFail(t *testing.T) {
 		return blocks, receipts
 	})
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify
@@ -553,7 +558,7 @@ func TestBlockIndexerDispatcherFallsBehindHead(t *testing.T) {
 	blocks, receipts := testBlockArray(30)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	// Notify all the blocks before we process any
 	assert.True(t, bi.blockListener.unstableHeadLength > len(blocks))
@@ -679,7 +684,7 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	bi.Start()
+	bi.startOrReset() // do not start block listener
 
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify

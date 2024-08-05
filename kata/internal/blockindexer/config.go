@@ -19,7 +19,6 @@ package blockindexer
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
-	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 )
 
@@ -31,11 +30,6 @@ type Config struct {
 	ChainHeadCacheLen     *int          `yaml:"chainHeadCacheLen"`
 	BlockPollingInterval  *string       `yaml:"blockPollingInterval"`
 	Retry                 retry.Config  `yaml:"retry"`
-}
-
-type RPCWSConnectConfig struct {
-	URL string     `yaml:"url"`
-	TLS tls.Config `yaml:"tls"`
 }
 
 var DefaultConfig = &Config{

@@ -24,12 +24,11 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
-	"github.com/kaleido-io/paladin/kata/internal/tls"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 )
 
 // blockListener has two functions:
@@ -51,18 +50,16 @@ type blockListener struct {
 	newBlocks                  chan *BlockInfoJSONRPC
 }
 
-func newBlockListener(ctx context.Context, conf *Config, wsConfig *RPCWSConnectConfig) (bl *blockListener, err error) {
-	wscConf := &wsclient.WSConfig{
-		HTTPURL: wsConfig.URL,
-	}
-	if wscConf.TLSClientConfig, err = tls.BuildTLSConfig(ctx, &wsConfig.TLS, tls.ClientType); err != nil {
+func newBlockListener(ctx context.Context, conf *Config, wsConfig *rpcclient.WSConfig) (bl *blockListener, err error) {
+	wscConf, err := rpcclient.ParseWSConfig(ctx, wsConfig)
+	if err != nil {
 		return nil, err
 	}
 	chainHeadCacheLen := confutil.IntMin(conf.ChainHeadCacheLen, 1, *DefaultConfig.ChainHeadCacheLen)
 	bl = &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		initialBlockHeightObtained: make(chan struct{}),
-		newHeadsTap:                make(chan struct{}),
+		newHeadsTap:                make(chan struct{}, 1),
 		highestBlock:               0,
 		blockPollingInterval:       confutil.DurationMin(conf.BlockPollingInterval, 1*time.Millisecond, *DefaultConfig.BlockPollingInterval),
 		canonicalChain:             list.New(),
@@ -85,12 +82,16 @@ func (bl *blockListener) channel() <-chan *BlockInfoJSONRPC {
 
 func (bl *blockListener) newHeadsSubListener() {
 	for range bl.newHeadsSub.Notifications() {
-		select {
-		case bl.newHeadsTap <- struct{}{}:
-			// Do nothing apart from tap the listener to wake up early
-			// when there's a notification to the change of the head.
-		default:
-		}
+		bl.tapNewHeads()
+	}
+}
+
+func (bl *blockListener) tapNewHeads() {
+	select {
+	case bl.newHeadsTap <- struct{}{}:
+		// Do nothing apart from tap the listener to wake up early
+		// when there's a notification to the change of the head.
+	default:
 	}
 }
 
@@ -175,6 +176,7 @@ func (bl *blockListener) listenLoop() {
 	close(bl.initialBlockHeightObtained)
 	if err != nil {
 		log.L(bl.ctx).Warnf("Block listener exiting before establishing initial block height: %s", err)
+		return
 	}
 
 	var filter string
