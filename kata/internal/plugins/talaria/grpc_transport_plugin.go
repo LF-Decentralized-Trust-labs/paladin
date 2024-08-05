@@ -153,7 +153,11 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 	// Now bring up the external endpoint other Paladin's are going to speak to us on
 	if externalServer == nil {
 		// Mostly put behind an interface to make stubbing for UTs easy
-		externalServer = NewExternalGRPCServer(ctx, provider.externalListenPort, 10)
+		externalServer, err = NewExternalGRPCServer(ctx, provider.externalListenPort, 10)
+		if err != nil {
+			stopListener()
+			return err
+		}
 	}
 
 	provider = &grpcTransportProvider{
@@ -196,7 +200,12 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 				return
 			}
 
-			externalServer.QueueMessageForSend(inboundMessage)
+			externalMessage := &ExternalMessage{
+				Message: *inboundMessage,
+				ExternalAddress: "somewhere",
+			}
+
+			externalServer.QueueMessageForSend(externalMessage)
 		}
 	}()
 
