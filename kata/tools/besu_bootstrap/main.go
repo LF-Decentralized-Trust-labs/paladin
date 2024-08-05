@@ -146,14 +146,14 @@ func chownAll(dir string) {
 		if f.IsDir() {
 			chownAll(fullPath)
 		} else {
-			err := os.Chown(fullPath, 1000, 1000)
+			err := os.Chown(fullPath, os.Getuid(), 1000)
 			if err != nil {
-				fmt.Printf("note: failed to chown(1000:1000) %s\n", fullPath)
+				fmt.Printf("note: failed to chown(%s,%d,1000): %s\n", fullPath, os.Getuid(), err)
 			}
 		}
 	}
-	err = os.Chown(dir, 1000, 1000)
+	err = os.Chown(dir, os.Getuid(), 1000)
 	if err != nil {
-		fmt.Printf("note: failed to chown(1000:1000) %s\n", dir)
+		fmt.Printf("note: failed to chown(%s,%d,1000): %s\n", dir, os.Getuid(), err)
 	}
 }
