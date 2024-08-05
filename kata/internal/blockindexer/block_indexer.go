@@ -576,7 +576,7 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 
 type txWaiter struct {
 	start time.Time
-	hash  types.HashID
+	hash  *types.HashID
 	done  chan *IndexedTransaction
 }
 
@@ -606,7 +606,7 @@ func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash string) (*I
 	waiterID := types.ShortID()
 	waiter := &txWaiter{
 		start: time.Now(),
-		hash:  *txHash,
+		hash:  txHash,
 		done:  make(chan *IndexedTransaction, 1),
 	}
 	log.L(ctx).Infof("Waiting for TX [time=%s,waiter=%s]", txHash, waiterID)
