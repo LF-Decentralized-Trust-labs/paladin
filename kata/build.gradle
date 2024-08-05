@@ -59,13 +59,13 @@ task setupSolidityNodeJS(type:Exec) {
     executable 'npm'
     args 'i'
     inputs.files([
-        "contracts/package.json",
-        "contracts/package-lock.json",
+        "solidity/package.json",
+        "solidity/package-lock.json",
     ])
     outputs.files([
-        "contracts/package-lock.json",
+        "solidity/package-lock.json",
     ])
-    outputs.dir("contracts/node_modules")
+    outputs.dir("solidity/node_modules")
 }
 
 task compileTestSolidity(type:Exec, dependsOn: tasks.setupSolidityNodeJS) {
