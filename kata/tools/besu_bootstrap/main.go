@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -137,6 +138,10 @@ func randBytes(len int) []byte {
 }
 
 func chownAll(dir string) {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		exitErrorf("failed to get abs path for dir %q: %s", dir, err)
+	}
 	fsList, err := os.ReadDir(dir)
 	if err != nil {
 		exitErrorf("failed to read dir %q: %s", dir, err)
@@ -146,14 +151,14 @@ func chownAll(dir string) {
 		if f.IsDir() {
 			chownAll(fullPath)
 		} else {
-			err := os.Chown(fullPath, os.Getuid(), 1000)
+			err := os.Chown(fullPath, -1, 1000)
 			if err != nil {
-				fmt.Printf("note: failed to chown(%s,%d,1000): %s\n", fullPath, os.Getuid(), err)
+				fmt.Printf("note: failed to chgrp(%s,1000): %s\n", fullPath, err)
 			}
 		}
 	}
-	err = os.Chown(dir, os.Getuid(), 1000)
+	err = os.Chown(dir, -1, 1000)
 	if err != nil {
-		fmt.Printf("note: failed to chown(%s,%d,1000): %s\n", dir, os.Getuid(), err)
+		fmt.Printf("note: failed to chgrp(%s,1000): %s\n", dir, err)
 	}
 }
