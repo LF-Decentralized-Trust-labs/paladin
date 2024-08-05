@@ -35,12 +35,16 @@ func main() {
 		exitErrorf("missing directory")
 	}
 	dir := os.Args[1]
+	dataDir := path.Join(dir, "data")
 	keyFile := path.Join(dir, "key")
 	keyPubFile := path.Join(dir, "key.pub")
 	genesisFile := path.Join(dir, "genesis.json")
 
 	if !fileExists(dir) {
 		mkdir(dir)
+	}
+	if !fileExists(dataDir) {
+		mkdir(dataDir)
 	}
 
 	// Check not already initialized
