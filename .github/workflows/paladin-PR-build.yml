@@ -46,7 +46,7 @@ jobs:
           check-latest: true
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build with Gradle
         run: ./gradlew -PcomposeLogs=true build
