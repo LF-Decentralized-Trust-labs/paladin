@@ -211,7 +211,7 @@ func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from s
 
 }
 
-func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) (*blockindexer.IndexedTransaction, error) {
+func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) (*blockindexer.IndexedEvent, error) {
 
 	abiFunc := domain.factoryContractABI.Functions()[txInstruction.FunctionName]
 	if abiFunc == nil {
@@ -222,8 +222,21 @@ func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testb
 		return nil, fmt.Errorf("encoding to function %q failed: %s", txInstruction.FunctionName, err)
 	}
 
-	return tb.simpleTXEstimateSignSubmitAndWait(ctx, txInstruction.SigningAddress, domain.factoryContractAddress, callData)
+	tx, err := tb.simpleTXEstimateSignSubmitAndWait(ctx, txInstruction.SigningAddress, domain.factoryContractAddress, callData)
+	if err != nil {
+		return nil, err
+	}
 
+	events, err := tb.blockindexer.GetTransactionEventsByHash(ctx, tx.Hash.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction events for deploy: %s", err)
+	}
+
+	if len(events) != 1 {
+		return nil, fmt.Errorf("expected exactly one event from deploy function (received=%d)", len(events))
+	}
+
+	return events[0], nil
 }
 
 func (tb *testbed) getDomain(name string) (*testbedDomain, error) {

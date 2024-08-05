@@ -285,7 +285,13 @@ abstract class UnitTests extends Exec {
 }
 
 abstract class ComponentTest extends Exec {
+
+
     {
+        java.text.DateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        df.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        Date startTime = new Date();
+
         inputs.files(getProject().goFiles)
         inputs.files(getProject().fileTree("domain_testbed") {
             include "**/*.json"
@@ -302,6 +308,18 @@ abstract class ComponentTest extends Exec {
         args '-covermode=atomic'
         args '-timeout=30s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
+
+        ignoreExitValue true
+
+        doLast {
+            def ExecResult execResult = getExecutionResult().get();
+            if(execResult.getExitValue() != 0) {
+                println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
+                println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
+                println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
+                throw new Exception("COMPONENT TEST FAILED - SEE TEST OUTPUT BEFORE LOGS");
+            }
+        }
     }
 }
 

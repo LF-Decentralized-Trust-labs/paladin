@@ -77,7 +77,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		name string,
 		constructorParams types.RawJSON,
-	) (*blockindexer.IndexedTransaction, error) {
+	) (*blockindexer.IndexedEvent, error) {
 
 		domain, err := tb.getDomain(name)
 		if err != nil {
