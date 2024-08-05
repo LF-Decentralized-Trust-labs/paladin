@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -209,4 +210,13 @@ func (tb *testbed) run() (err error) {
 	tb.eventHandler()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
+}
+
+func logJSON(v interface{}) string {
+	ret := ""
+	b, _ := json.Marshal(v)
+	if len(b) > 0 {
+		ret = (string)(b)
+	}
+	return ret
 }

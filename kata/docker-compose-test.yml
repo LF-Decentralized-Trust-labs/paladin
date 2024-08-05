@@ -16,6 +16,7 @@ services:
             - 8545:8545
             - 8546:8546
         command:
+            - --logging=DEBUG
             - --rpc-http-enabled
             - --rpc-http-api=ETH,QBFT,WEB3,DEBUG
             - --rpc-ws-enabled

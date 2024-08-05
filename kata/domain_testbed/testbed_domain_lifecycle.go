@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -154,42 +156,52 @@ func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from s
 
 	// Construct a simple transaction with the specified data for a permissioned zero-gas-price chain
 	tx := ethsigner.Transaction{
-		From:  json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr)), // for estimation of gas we need the from address
-		To:    to,
-		Nonce: &nonce,
-		Data:  callData,
+		From: json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr)), // for estimation of gas we need the from address
+		To:   to,
+		Data: callData,
 	}
 
 	// Estimate gas before submission
 	var gasEstimate ethtypes.HexInteger
-	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &nonce, "eth_estimateGas", tx); rpcErr != nil {
+	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
 		return nil, fmt.Errorf("eth_estimateGas failed: %+v", rpcErr)
 	}
 
 	// If that went well, so submission with twice that gas as the limit.
 	tx.GasLimit = ethtypes.NewHexInteger(new(big.Int).Mul(gasEstimate.BigInt(), big.NewInt(2)))
+	tx.Nonce = &nonce
 
 	// Sign
 	sigPayload := tx.SignaturePayloadEIP1559(tb.chainID)
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
-	txHashToSign := ethtypes.HexBytes0xPrefix(hash.Sum(nil))
 	signature, err := tb.signer.Sign(ctx, &proto.SignRequest{
 		Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		KeyHandle: resolvedKey.KeyHandle,
-		Payload:   txHashToSign,
+		Payload:   ethtypes.HexBytes0xPrefix(hash.Sum(nil)),
 	})
+	var sig *secp256k1.SignatureData
+	if err == nil {
+		sig, err = signer.DecodeCompactRSV(ctx, signature.Payload)
+	}
+	var rawTX []byte
+	if err == nil {
+		rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("signing failed with keyHandle %s (addr=%s): %s", resolvedKey.KeyHandle, fromAddr, err)
 	}
 
 	// Submit
 	var txHash ethtypes.HexBytes0xPrefix
-	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", ethtypes.HexBytes0xPrefix(signature.Payload)); rpcErr != nil {
+	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", ethtypes.HexBytes0xPrefix(rawTX)); rpcErr != nil {
+		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, rawTX, tb.chainID)
+		if err != nil {
+			log.L(ctx).Errorf("Invalid transaction build during signing: %s", err)
+		} else {
+			log.L(ctx).Errorf("Rejected TX (from=%s): %+v", addr, logJSON(decodedTX.Transaction))
+		}
 		return nil, fmt.Errorf("eth_sendRawTransaction failed: %+v", rpcErr)
-	}
-	if !txHash.Equals(txHashToSign) {
-		return nil, fmt.Errorf("eth_sendRawTransaction returned unexpected hash. expected=%s received=%s", txHash, txHashToSign)
 	}
 
 	// Wait for the TX to go through - with a time limit
