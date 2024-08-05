@@ -6,10 +6,13 @@ CREATE TABLE indexed_blocks (
 );
 
 CREATE TABLE indexed_transactions (
-    "hash_l"          UUID    NOT NULL,
-    "hash_h"          UUID    NOT NULL,
-    "block_number"    BIGINT  NOT NULL,
-    "tx_index"        BIGINT  NOT NULL,
+    "hash_l"           UUID      NOT NULL,
+    "hash_h"           UUID      NOT NULL,
+    "block_number"     BIGINT    NOT NULL,
+    "tx_index"         BIGINT    NOT NULL,
+    "from"             CHAR(40)  NOT NULL,
+    "to"               CHAR(40),
+    "contract_address" CHAR(40),
     PRIMARY KEY ("block_number", "tx_index"),
     FOREIGN KEY ("block_number") REFERENCES indexed_blocks ("number") ON DELETE CASCADE
 );

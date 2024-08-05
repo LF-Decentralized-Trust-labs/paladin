@@ -445,9 +445,12 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:        *types.NewHashIDSlice32(r.TransactionHash),
-				BlockNumber: int64(r.BlockNumber),
-				TXIndex:     int64(txIndex),
+				Hash:            *types.NewHashIDSlice32(r.TransactionHash),
+				BlockNumber:     int64(r.BlockNumber),
+				TXIndex:         int64(txIndex),
+				From:            (*types.EthAddress)(r.From),
+				To:              (*types.EthAddress)(r.To),
+				ContractAddress: (*types.EthAddress)(r.ContractAddress),
 			})
 			for eventIndex, l := range r.Logs {
 				var topic0 types.HashID
