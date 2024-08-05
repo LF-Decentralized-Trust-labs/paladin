@@ -151,7 +151,9 @@ func (bi *blockIndexer) startup(runCtx context.Context) {
 			close(bi.processorDone)
 			return
 		}
+		bi.stateLock.Lock()
 		bi.nextBlock = (*ethtypes.HexUint64)(&highestBlock)
+		bi.stateLock.Unlock()
 	}
 
 	go bi.dispatcher(runCtx)

@@ -125,12 +125,12 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcbackendmocks.WebSocketRPCClient, dynamic
 	byBlock := mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).Maybe()
 	byBlock.Run(func(args mock.Arguments) {
 		blocks, _ := dynamic(args)
-		blockReturn := args[1].(*BlockInfoJSONRPC)
+		blockReturn := args[1].(**BlockInfoJSONRPC)
 		blockNumber := int(args[3].(ethtypes.HexUint64))
 		if blockNumber >= len(blocks) {
 			byBlock.Return(&rpcbackend.RPCError{Message: "not found"})
 		} else {
-			*blockReturn = *blocks[blockNumber]
+			*blockReturn = blocks[blockNumber]
 			byBlock.Return(nil)
 		}
 	})
