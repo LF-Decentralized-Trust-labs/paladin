@@ -229,18 +229,15 @@ class DockerComposeDemo extends DockerCompose {
     }
 }
 
-task generateBesuConfig(type: Exec) {
-    inputs.files([])
-    outputs.files([
-        'test/besu/genesis.json',
-        'test/besu/key',
-        'test/besu/key.pub',
-    ])
-    executable "go"
-    args "run", "./tools/besu_bootstrap", "test/besu"
+task besuBootstrapTool(type: Exec) {
+    executable "docker"
+    args "build"
+    args "-t", "paladin/besu_bootstrap"
+    args "-f", "tools/besu_bootstrap/Dockerfile"
+    args "."
 }
 
-task startTestInfra(type: DockerComposeTest, dependsOn: generateBesuConfig) {
+task startTestInfra(type: DockerComposeTest, dependsOn: tasks.besuBootstrapTool) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
 }

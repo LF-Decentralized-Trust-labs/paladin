@@ -22,7 +22,6 @@ import (
 	"math/big"
 	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -30,6 +29,7 @@ import (
 )
 
 func main() {
+	// NOTE: To get the right permissions, this needs to run inside docker against the volume of Besu
 
 	// Validate dir is ok
 	if len(os.Args) < 2 {
@@ -89,8 +89,6 @@ func main() {
 	}
 	writeFileJSON(genesisFile, &genesis)
 
-	chownAll(dir)
-
 }
 
 var osExit = os.Exit
@@ -135,30 +133,4 @@ func randBytes(len int) []byte {
 	b := make([]byte, len)
 	_, _ = rand.Read(b)
 	return b
-}
-
-func chownAll(dir string) {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		exitErrorf("failed to get abs path for dir %q: %s", dir, err)
-	}
-	fsList, err := os.ReadDir(dir)
-	if err != nil {
-		exitErrorf("failed to read dir %q: %s", dir, err)
-	}
-	for _, f := range fsList {
-		fullPath := path.Join(dir, f.Name())
-		if f.IsDir() {
-			chownAll(fullPath)
-		} else {
-			err := os.Chown(fullPath, -1, 1000)
-			if err != nil {
-				fmt.Printf("note: failed to chgrp(%s,1000): %s\n", fullPath, err)
-			}
-		}
-	}
-	err = os.Chown(dir, -1, 1000)
-	if err != nil {
-		fmt.Printf("note: failed to chgrp(%s,1000): %s\n", dir, err)
-	}
 }
