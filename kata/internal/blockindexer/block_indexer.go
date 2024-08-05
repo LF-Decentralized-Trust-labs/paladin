@@ -127,6 +127,7 @@ func (bi *blockIndexer) startOrReset() {
 		return
 	}
 
+	// kick things off
 	bi.stateLock.Lock()
 	bi.blocksSinceCheckpoint = nil
 	bi.newHeadToAdd = nil
@@ -134,6 +135,23 @@ func (bi *blockIndexer) startOrReset() {
 	bi.dispatcherDone = make(chan struct{})
 	bi.cancelFunc = cancelFunc
 	bi.stateLock.Unlock()
+
+	go bi.startup(runCtx)
+
+}
+
+func (bi *blockIndexer) startup(runCtx context.Context) {
+
+	// Do we need the highest block height to start?
+	if bi.nextBlock == nil {
+		highestBlock, err := bi.blockListener.getHighestBlock(runCtx)
+		if err != nil {
+			close(bi.dispatcherDone)
+			close(bi.processorDone)
+			return
+		}
+		bi.nextBlock = (*ethtypes.HexUint64)(&highestBlock)
+	}
 
 	go bi.dispatcher(runCtx)
 	go bi.notificationProcessor(runCtx)
@@ -240,12 +258,6 @@ func (bi *blockIndexer) processBlockNotification(ctx context.Context, block *Blo
 
 	bi.stateLock.Lock()
 	defer bi.stateLock.Unlock()
-
-	if bi.nextBlock == nil {
-		// by definition we won't find anything in bi.blocksSinceCheckpoint below
-		latestBlock := block.Number
-		bi.nextBlock = &latestBlock
-	}
 
 	// If the block is before our checkpoint, we ignore it completely
 	if block.Number < *bi.nextBlock {

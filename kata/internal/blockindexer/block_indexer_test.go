@@ -295,7 +295,11 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	bi.nextBlock = nil
 	bi.requiredConfirmations = 5
 
-	bi.startOrReset() // do not start block listener
+	// simulate the highest block being known
+	bi.blockListener.highestBlock = 5
+	close(bi.blockListener.initialBlockHeightObtained)
+	// do not start block listener
+	bi.startOrReset()
 
 	// Notify starting at block 5
 	for i := 5; i < len(blocks); i++ {
@@ -310,6 +314,24 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 		assert.Len(t, b.blocks, 1) // We should get one block per batch
 		assert.Equal(t, blocks[i], b.blocks[0])
 	}
+}
+
+func TestBlockIndexerCancelledBeforeCurrentBlock(t *testing.T) {
+	_, bi, _, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	bi.nextBlock = nil
+	bi.dispatcherDone = make(chan struct{})
+	bi.processorDone = make(chan struct{})
+
+	// close the block listener ctx
+	closed, close := context.WithCancel(context.Background())
+	close()
+	bi.startup(closed)
+
+	<-bi.dispatcherDone
+	<-bi.processorDone
+
 }
 
 func TestBatching(t *testing.T) {

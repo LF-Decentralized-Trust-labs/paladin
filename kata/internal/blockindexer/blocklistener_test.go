@@ -83,9 +83,9 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 
 	bl.start()
 
-	h, ok := bl.getHighestBlock(ctx)
+	h, err := bl.getHighestBlock(ctx)
 	assert.Equal(t, uint64(12345), h)
-	assert.True(t, ok)
+	assert.NoError(t, err)
 	done() // Stop immediately in this case, while we're in the polling interval
 
 	<-bl.listenLoopDone
@@ -94,11 +94,24 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 
 func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 
-	ctx, bl, _, done := newTestBlockListener(t)
+	_, bl, _, done := newTestBlockListener(t)
 	done() // Stop before we start
 
-	h, ok := bl.getHighestBlock(ctx)
-	assert.False(t, ok)
+	h, err := bl.getHighestBlock(context.Background())
+	assert.Regexp(t, "PD010301", err)
+	assert.Equal(t, uint64(0), h)
+
+}
+
+func TestBlockListenerStartGettingHighestBlockClosedCtx(t *testing.T) {
+
+	_, bl, _, done := newTestBlockListener(t)
+	defer done()
+
+	closed, close := context.WithCancel(context.Background())
+	close()
+	h, err := bl.getHighestBlock(closed)
+	assert.Regexp(t, "PD010301", err)
 	assert.Equal(t, uint64(0), h)
 
 }
