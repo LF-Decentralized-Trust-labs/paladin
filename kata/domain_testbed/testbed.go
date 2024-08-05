@@ -191,10 +191,16 @@ func (tb *testbed) run() (err error) {
 	if err == nil {
 		err = tb.setupChainID()
 	}
+	var blockHeight uint64
+	if err == nil {
+		tb.blockindexer.Start()
+		blockHeight, err = tb.blockindexer.GetBlockHeight(tb.ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("Blockchain init failed: %s", err)
 	}
-	tb.blockindexer.Start()
+	defer tb.blockindexer.Stop()
+	log.L(tb.ctx).Infof("Connected to blockchain: ChainID=%d BlockHeight=%d", tb.chainID, blockHeight)
 
 	tb.signer, err = signer.NewSigningModule(tb.ctx, &tb.conf.Signer)
 	if err != nil {
@@ -202,8 +208,6 @@ func (tb *testbed) run() (err error) {
 	}
 
 	go tb.listenTerm()
-
-	tb.blockindexer.Stop()
 
 	tb.ready <- nil
 	ready = true

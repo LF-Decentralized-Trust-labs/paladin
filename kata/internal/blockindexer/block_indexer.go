@@ -347,7 +347,7 @@ func (bi *blockIndexer) dispatcher(ctx context.Context) {
 	for {
 		timeoutContext := ctx
 
-		if len(pendingDispatch) == 0 && bi.nextBlock != nil {
+		if len(pendingDispatch) == 0 {
 			pendingDispatch = nil // ensure we clear the memory if we just looped through a set with pendingDispatch[1:] below
 
 			// spin getting blocks until we it looks like we need to wait for a notification

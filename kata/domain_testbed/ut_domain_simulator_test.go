@@ -117,7 +117,7 @@ func simRequestToProto[T pb.Message](t *testing.T, iReq pb.Message) T {
 func newSimulatorRPCClient(t *testing.T, url string) func(method string, params ...interface{}) error {
 	rpcClient := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return func(method string, params ...interface{}) error {
-		ctx, cancelCtx := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancelCtx := context.WithTimeout(context.Background(), 9*time.Second)
 		defer cancelCtx()
 		var res types.RawJSON
 		err := rpcClient.CallRPC(ctx, &res, method, params...)
