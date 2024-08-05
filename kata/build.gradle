@@ -204,14 +204,8 @@ task buildTestPluginsSharedLibraries {
 
 class DockerCompose extends Exec {
     DockerCompose() {
-        def dockerComposeV2Check = getProject().exec({
-            ignoreExitValue = true
-            executable "docker"
-            args "compose", "version"
-            standardOutput = new ByteArrayOutputStream()
-            errorOutput = new ByteArrayOutputStream()
-        })
-        if (dockerComposeV2Check.getExitValue() == 0){
+        def dockerComposeV2Check = "docker compose version".execute().text
+        if (dockerComposeV2Check.contains("Docker Compose")){
             executable 'docker'
             args 'compose'
         } else {
