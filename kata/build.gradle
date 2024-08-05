@@ -222,7 +222,7 @@ class DockerCompose extends Exec {
         doLast {
             def ExecResult execResult = getExecutionResult().get();
             if(execResult.getExitValue() != 0) {
-                println "${composeCommand} -f docker-compose-test.yml logs".execute().waitForProcessOutput(System.err,System.err)
+                println "${composeCommand} -f ${getProject().projectDir}/docker-compose-test.yml logs".execute().waitForProcessOutput(System.err,System.err)
                 throw new Exception("Docker compose failed");
             }
         }
