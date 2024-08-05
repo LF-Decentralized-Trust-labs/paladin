@@ -106,6 +106,7 @@ func (ils *staticStore) FindOrCreateLoadableKey(ctx context.Context, req *proto.
 }
 
 func (ils *staticStore) LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error) {
+	log.L(ctx).Debugf("Resolving key %s", keyHandle)
 	key, ok := ils.keys[keyHandle]
 	if !ok {
 		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyCannotBeResolved)
