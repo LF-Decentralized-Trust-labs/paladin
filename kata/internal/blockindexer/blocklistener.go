@@ -23,10 +23,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 )
@@ -436,24 +438,20 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *BlockInfoJSONRP
 	return lastValidBlock
 }
 
-func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, bool) {
+func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, error) {
+	// if not yet initialized, wait to be initialized
+	select {
+	case <-bl.initialBlockHeightObtained:
+	case <-ctx.Done(): // Inform caller we timed out, or were closed
+		return 0, i18n.NewError(bl.ctx, msgs.MsgContextCanceled)
+	case <-bl.ctx.Done(): // Inform caller we timed out, or were closed
+		return 0, i18n.NewError(bl.ctx, msgs.MsgContextCanceled)
+	}
 	bl.mux.Lock()
 	highestBlock := bl.highestBlock
 	bl.mux.Unlock()
-	// if not yet initialized, wait to be initialized
-	if highestBlock <= 0 {
-		select {
-		case <-bl.initialBlockHeightObtained:
-		case <-ctx.Done():
-			// Inform caller we timed out, or were closed
-			return 0, false
-		}
-	}
-	bl.mux.Lock()
-	highestBlock = bl.highestBlock
-	bl.mux.Unlock()
-	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
-	return highestBlock, true
+	log.L(bl.ctx).Debugf("ChainHead=%d", highestBlock)
+	return highestBlock, nil
 }
 
 func (bl *blockListener) waitClosed() {
