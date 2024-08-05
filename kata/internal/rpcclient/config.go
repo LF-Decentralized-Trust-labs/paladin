@@ -53,7 +53,7 @@ type WSConfig struct {
 var DefaultWSConfig = &WSConfig{
 	ReadBufferSize:         confutil.P("16Kb"),
 	WriteBufferSize:        confutil.P("16Kb"),
-	InitialConnectAttempts: confutil.P(10),
+	InitialConnectAttempts: confutil.P(0),
 	ConnectionTimeout:      confutil.P("30s"),
 	HeartbeatInterval:      confutil.P("15s"),
 	ConnectRetry:           retry.Defaults.Config,

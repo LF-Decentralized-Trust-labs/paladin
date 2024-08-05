@@ -15,6 +15,11 @@ services:
         ports:
             - 8545:8545
             - 8546:8546
+        healthcheck:
+            test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/localhost/8545'"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
         command:
             - --logging=DEBUG
             - --rpc-http-enabled
