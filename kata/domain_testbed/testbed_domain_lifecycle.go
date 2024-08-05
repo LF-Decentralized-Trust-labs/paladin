@@ -19,14 +19,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"golang.org/x/crypto/sha3"
 )
 
 type testbedDomain struct {
@@ -116,26 +121,96 @@ func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, co
 	}, nil
 }
 
+func (tb *testbed) setupChainID() error {
+	var chainID ethtypes.HexUint64
+	if rpcErr := tb.blockchainRPC.CallRPC(tb.ctx, &chainID, "eth_chainId"); rpcErr != nil {
+		return fmt.Errorf("eth_chainId failed: %s", rpcErr.Error())
+	}
+	tb.chainID = int64(chainID.Uint64())
+	return nil
+}
+
+// We do a simplistic deploy here, assuming that all will go well on the blockchain
+// (obviously the Paladin engine does a proper TX Management at this point)
+func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (*blockindexer.IndexedTransaction, error) {
+
+	// Resolve the key (directly with the signer - we have no key manager here in the testbed)
+	resolvedKey, err := tb.signer.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Path: []*proto.KeyPathSegment{
+			{Name: from},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	fromAddr := resolvedKey.Identifiers[0].Identifier
+
+	// Trivial nonce management in the testbed - just get the current nonce for this key, from the local node mempool, for each TX
+	var nonce ethtypes.HexInteger
+	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &nonce, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
+		return nil, fmt.Errorf("eth_getTransactionCount for %s failed: %s", fromAddr, rpcErr.Error())
+	}
+
+	// Construct a simple transaction with the specified data for a permissioned zero-gas-price chain
+	tx := ethsigner.Transaction{
+		From:  json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr)), // for estimation of gas we need the from address
+		To:    to,
+		Nonce: &nonce,
+		Data:  callData,
+	}
+
+	// Estimate gas before submission
+	var gasEstimate ethtypes.HexInteger
+	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &nonce, "eth_estimateGas", tx); rpcErr != nil {
+		return nil, fmt.Errorf("eth_estimateGas failed: %+v", rpcErr)
+	}
+
+	// If that went well, so submission with twice that gas as the limit.
+	tx.GasLimit = ethtypes.NewHexInteger(new(big.Int).Mul(gasEstimate.BigInt(), big.NewInt(2)))
+
+	// Sign
+	sigPayload := tx.SignaturePayloadEIP1559(tb.chainID)
+	hash := sha3.NewLegacyKeccak256()
+	_, _ = hash.Write(sigPayload.Bytes())
+	txHashToSign := ethtypes.HexBytes0xPrefix(hash.Sum(nil))
+	signature, err := tb.signer.Sign(ctx, &proto.SignRequest{
+		Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		KeyHandle: resolvedKey.KeyHandle,
+		Payload:   txHashToSign,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("signing failed with keyHandle %s (addr=%s): %s", resolvedKey.KeyHandle, fromAddr, err)
+	}
+
+	// Submit
+	var txHash ethtypes.HexBytes0xPrefix
+	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", ethtypes.HexBytes0xPrefix(signature.Payload)); rpcErr != nil {
+		return nil, fmt.Errorf("eth_sendRawTransaction failed: %+v", rpcErr)
+	}
+	if !txHash.Equals(txHashToSign) {
+		return nil, fmt.Errorf("eth_sendRawTransaction returned unexpected hash. expected=%s received=%s", txHash, txHashToSign)
+	}
+
+	// Wait for the TX to go through - with a time limit
+	withTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelTimeout()
+	return tb.blockindexer.WaitForTransaction(withTimeout, txHash.String())
+
+}
+
 func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) (*blockindexer.IndexedTransaction, error) {
 
 	abiFunc := domain.factoryContractABI.Functions()[txInstruction.FunctionName]
 	if abiFunc == nil {
 		return nil, fmt.Errorf("function %q does not exist on base ledger ABI", txInstruction.FunctionName)
 	}
-	_, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
+	callData, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
 	if err != nil {
 		return nil, fmt.Errorf("encoding to function %q failed: %s", txInstruction.FunctionName, err)
 	}
 
-	// We do a simplistic deploy here, assuming that all will go well on the
-	// blockchain (obviously the Paladin engine does a proper TX Management at this point)
-	var txHash ethtypes.HexBytes0xPrefix
-	rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", "")
-	if rpcErr != nil {
-		return nil, rpcErr.Error()
-	}
-
-	return tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+	return tb.simpleTXEstimateSignSubmitAndWait(ctx, txInstruction.SigningAddress, domain.factoryContractAddress, callData)
 
 }
 

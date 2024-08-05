@@ -12,3 +12,15 @@ rpcServer:
 blockchain:
   ws:
     url: ws://localhost:8546
+signer:
+  keyDerivation:
+    type: "bip32"
+  keyStore:
+    type: "static"
+    static:
+      keys:
+        seed:
+          encoding: none
+          # DO NOT USE THIS MNEMONIC FOR ANYTHING APART FROM TESTBED TESTING
+          inline: lift steak taste love canvas crush oil fortune pave joy empty hedgehog radio outdoor twice
+    

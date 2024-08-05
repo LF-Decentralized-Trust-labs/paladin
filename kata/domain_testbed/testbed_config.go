@@ -22,6 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/signer"
 )
 
 type TestbedBlockchainConfig struct {
@@ -40,6 +41,7 @@ type TestBedConfig struct {
 	RPCServer    rpcserver.Config          `yaml:"rpcServer"`
 	StateStore   statestore.Config         `yaml:"statestore"`
 	BlockIndexer blockindexer.Config       `yaml:"blockIndexer"`
+	Signer       signer.Config             `yaml:"signer"`
 	TempDir      *string                   `yaml:"tempDir"`
 	Destinations TestbedDestinationsConfig `yaml:"destinations"`
 }

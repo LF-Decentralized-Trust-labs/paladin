@@ -41,20 +41,22 @@ type HTTPConfig struct {
 }
 
 type WSConfig struct {
-	HTTPConfig        `yaml:",inline"`
-	ConnectionTimeout *string      `yaml:"connectionTimeout"`
-	ConnectRetry      retry.Config `yaml:"connectRetry"`
-	ReadBufferSize    *string      `yaml:"readBufferSize"`
-	WriteBufferSize   *string      `yaml:"writeBufferSize"`
-	HeartbeatInterval *string      `yaml:"heartbeatInterval"`
+	HTTPConfig             `yaml:",inline"`
+	InitialConnectAttempts *int         `yaml:"initialConnectAttempts"`
+	ConnectionTimeout      *string      `yaml:"connectionTimeout"`
+	ConnectRetry           retry.Config `yaml:"connectRetry"`
+	ReadBufferSize         *string      `yaml:"readBufferSize"`
+	WriteBufferSize        *string      `yaml:"writeBufferSize"`
+	HeartbeatInterval      *string      `yaml:"heartbeatInterval"`
 }
 
 var DefaultWSConfig = &WSConfig{
-	ReadBufferSize:    confutil.P("16Kb"),
-	WriteBufferSize:   confutil.P("16Kb"),
-	ConnectionTimeout: confutil.P("30s"),
-	HeartbeatInterval: confutil.P("15s"),
-	ConnectRetry:      retry.Defaults.Config,
+	ReadBufferSize:         confutil.P("16Kb"),
+	WriteBufferSize:        confutil.P("16Kb"),
+	InitialConnectAttempts: confutil.P(10),
+	ConnectionTimeout:      confutil.P("30s"),
+	HeartbeatInterval:      confutil.P("15s"),
+	ConnectRetry:           retry.Defaults.Config,
 }
 
 func ParseWSConfig(ctx context.Context, config *WSConfig) (*wsclient.WSConfig, error) {
@@ -70,16 +72,17 @@ func ParseWSConfig(ctx context.Context, config *WSConfig) (*wsclient.WSConfig, e
 		return nil, err
 	}
 	return &wsclient.WSConfig{
-		WebSocketURL:      u.String(),
-		HTTPHeaders:       config.HTTPHeaders,
-		ReadBufferSize:    int(confutil.ByteSize(config.ReadBufferSize, 0, *DefaultWSConfig.ReadBufferSize)),
-		WriteBufferSize:   int(confutil.ByteSize(config.WriteBufferSize, 0, *DefaultWSConfig.WriteBufferSize)),
-		ConnectionTimeout: confutil.DurationMin(config.ConnectionTimeout, 0, *DefaultWSConfig.ConnectionTimeout),
-		InitialDelay:      confutil.DurationMin(config.ConnectRetry.InitialDelay, 0, *DefaultWSConfig.ConnectRetry.InitialDelay),
-		MaximumDelay:      confutil.DurationMin(config.ConnectRetry.MaxDelay, 0, *DefaultWSConfig.ConnectRetry.MaxDelay),
-		HeartbeatInterval: confutil.DurationMin(config.HeartbeatInterval, 0, *DefaultWSConfig.HeartbeatInterval),
-		AuthUsername:      config.Auth.Username,
-		AuthPassword:      config.Auth.Password,
-		TLSClientConfig:   tlsConfig,
+		WebSocketURL:           u.String(),
+		HTTPHeaders:            config.HTTPHeaders,
+		ReadBufferSize:         int(confutil.ByteSize(config.ReadBufferSize, 0, *DefaultWSConfig.ReadBufferSize)),
+		WriteBufferSize:        int(confutil.ByteSize(config.WriteBufferSize, 0, *DefaultWSConfig.WriteBufferSize)),
+		ConnectionTimeout:      confutil.DurationMin(config.ConnectionTimeout, 0, *DefaultWSConfig.ConnectionTimeout),
+		InitialDelay:           confutil.DurationMin(config.ConnectRetry.InitialDelay, 0, *DefaultWSConfig.ConnectRetry.InitialDelay),
+		MaximumDelay:           confutil.DurationMin(config.ConnectRetry.MaxDelay, 0, *DefaultWSConfig.ConnectRetry.MaxDelay),
+		HeartbeatInterval:      confutil.DurationMin(config.HeartbeatInterval, 0, *DefaultWSConfig.HeartbeatInterval),
+		AuthUsername:           config.Auth.Username,
+		AuthPassword:           config.Auth.Password,
+		TLSClientConfig:        tlsConfig,
+		InitialConnectAttempts: confutil.IntMin(config.InitialConnectAttempts, 0, *DefaultWSConfig.InitialConnectAttempts),
 	}, nil
 }

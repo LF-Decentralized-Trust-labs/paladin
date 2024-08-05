@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"gopkg.in/yaml.v3"
 )
 
@@ -59,7 +60,9 @@ type testbed struct {
 	rpcServer      rpcserver.Server
 	stateStore     statestore.StateStore
 	blockindexer   blockindexer.BlockIndexer
+	chainID        int64
 	blockchainRPC  rpcbackend.WebSocketRPCClient
+	signer         signer.SigningModule
 	bus            commsbus.CommsBus
 	fromDomain     commsbus.MessageHandler
 	socketFile     string
@@ -69,7 +72,7 @@ type testbed struct {
 	inflightLock   sync.Mutex
 	domainRegistry map[string]*testbedDomain
 	domainLock     sync.Mutex
-	ready          chan struct{}
+	ready          chan error
 	done           chan struct{}
 }
 
@@ -78,7 +81,7 @@ func newTestBed() (tb *testbed) {
 		sigc:           make(chan os.Signal, 1),
 		inflight:       make(map[string]*inflightRequest),
 		domainRegistry: make(map[string]*testbedDomain),
-		ready:          make(chan struct{}),
+		ready:          make(chan error, 1),
 		done:           make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
@@ -142,14 +145,15 @@ func (tb *testbed) cleanupOldSocket() error {
 	return nil
 }
 
-func (tb *testbed) run() error {
+func (tb *testbed) run() (err error) {
 	ready := false
 	defer func() {
 		tb.cancelCtx()
 		close(tb.done)
 		if !ready {
-			close(tb.ready)
+			tb.ready <- err
 		}
+		close(tb.ready)
 	}()
 
 	p, err := persistence.NewPersistence(tb.ctx, &tb.conf.DB)
@@ -177,20 +181,31 @@ func (tb *testbed) run() error {
 
 	rpcConf, err := rpcclient.ParseWSConfig(tb.ctx, &tb.conf.Blockchain.WS)
 	if err == nil {
+		tb.blockchainRPC = rpcbackend.NewWSRPCClient(rpcConf)
+		err = tb.blockchainRPC.Connect(tb.ctx)
+	}
+	if err == nil {
 		tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
+	}
+	if err == nil {
+		err = tb.setupChainID()
 	}
 	if err != nil {
 		return fmt.Errorf("Blockchain init failed: %s", err)
 	}
-	tb.blockchainRPC = rpcbackend.NewWSRPCClient(rpcConf)
 	tb.blockindexer.Start()
+
+	tb.signer, err = signer.NewSigningModule(tb.ctx, &tb.conf.Signer)
+	if err != nil {
+		return fmt.Errorf("Signer init failed: %s", err)
+	}
 
 	go tb.listenTerm()
 
 	tb.blockindexer.Stop()
 
+	tb.ready <- nil
 	ready = true
-	close(tb.ready)
 	tb.eventHandler()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err

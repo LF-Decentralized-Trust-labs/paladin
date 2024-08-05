@@ -48,7 +48,8 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 	go func() {
 		serverErr <- tb.run()
 	}()
-	<-tb.ready
+	err = <-tb.ready
+	assert.NoError(t, err)
 
 	return fmt.Sprintf("http://%s", tb.rpcServer.HTTPAddr()), tb, func() {
 		select {

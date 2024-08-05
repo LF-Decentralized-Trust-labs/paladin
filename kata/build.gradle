@@ -111,6 +111,7 @@ task clean(type: Delete) {
     delete fileTree(".") {
         include "**/*.pb.go"
     }
+    delete 'test/besu'
     delete 'coverage'
 }
 
@@ -227,7 +228,18 @@ class DockerComposeDemo extends DockerCompose {
     }
 }
 
-task startTestInfra(type: DockerComposeTest) {
+task generateBesuConfig(type: Exec) {
+    inputs.files([])
+    outputs.files([
+        'test/besu/genesis.json',
+        'test/besu/key',
+        'test/besu/key.pub',
+    ])
+    executable "go"
+    args "run", "./tools/besu_bootstrap", "test/besu"
+}
+
+task startTestInfra(type: DockerComposeTest, dependsOn: generateBesuConfig) {
     mustRunAfter(tasks.protoc)
     args 'up', '-d'
 }
@@ -292,7 +304,12 @@ task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.go
     args '-tags', "testdbpostgres"
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.copyDomainSIMContractsToTestbed]) {
+task componentTestSQLite(type: ComponentTest, dependsOn: [
+    tasks.setupCoverage,
+    tasks.goGet,
+    tasks.copyDomainSIMContractsToTestbed,
+    tasks.startTestInfra,
+]) {
 }
 
 
