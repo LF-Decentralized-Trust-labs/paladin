@@ -47,6 +47,7 @@ type BlockIndexer interface {
 	GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
 	WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error)
+	GetBlockHeight(ctx context.Context) (uint64, error)
 }
 
 // Processes blocks from a configure baseline block (0 for example), up until it
@@ -174,6 +175,10 @@ func (bi *blockIndexer) Stop() {
 	if dispatcherDone != nil {
 		<-dispatcherDone
 	}
+}
+
+func (bi *blockIndexer) GetBlockHeight(ctx context.Context) (uint64, error) {
+	return bi.blockListener.getHighestBlock(ctx)
 }
 
 func (bi *blockIndexer) setFromBlock(ctx context.Context, conf *Config) error {

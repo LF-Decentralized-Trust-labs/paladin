@@ -285,7 +285,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 }
 
 func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
-	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
 	blocks, receipts := testBlockArray(15)
@@ -300,6 +300,10 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	close(bi.blockListener.initialBlockHeightObtained)
 	// do not start block listener
 	bi.startOrReset()
+
+	bh, err := bi.GetBlockHeight(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(5), bh)
 
 	// Notify starting at block 5
 	for i := 5; i < len(blocks); i++ {
