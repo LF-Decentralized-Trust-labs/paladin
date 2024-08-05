@@ -12,6 +12,7 @@ services:
         image: hyperledger/besu:latest
         volumes:
         - ./test/besu:/var/besu:rw
+        user: 1000:1000 # have to configure our volumes for this
         ports:
             - 8545:8545
             - 8546:8546

@@ -102,6 +102,11 @@ func mkdir(dir string) {
 	if err != nil {
 		exitErrorf("failed to make dir %q: %s", dir, err)
 	}
+	_ = os.Chown(dir, 1000, 1000)
+	if err != nil {
+		fmt.Printf("note: failed to set owner 1000:1000 %q: %s\n", dir, err)
+	}
+
 }
 
 func fileExists(filename string) bool {
@@ -125,6 +130,10 @@ func writeFile(filename string, data []byte) {
 	err := os.WriteFile(filename, data, 0666)
 	if err != nil {
 		exitErrorf("failed to write file %q: %s", filename, err)
+	}
+	err = os.Chown(filename, 1000, 1000)
+	if err != nil {
+		fmt.Printf("note: failed to set owner 1000:1000 %q: %s\n", filename, err)
 	}
 }
 
