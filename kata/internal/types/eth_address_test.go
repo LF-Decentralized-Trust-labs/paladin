@@ -17,6 +17,7 @@
 package types
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -44,7 +45,7 @@ func TestEthAddress(t *testing.T) {
 
 	v2, err := a2.Value()
 	assert.NoError(t, err)
-	assert.Equal(t, a[:], v2)
+	assert.Equal(t, strings.TrimPrefix(a.String(), "0x"), v2)
 
 	a3 := &EthAddress{}
 	err = a3.Scan(([]byte)(a[:]))

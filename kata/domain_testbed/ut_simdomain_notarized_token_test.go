@@ -104,18 +104,18 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		]
 	}`
 
-	tb.
-		rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
+	var contractAddr ethtypes.Address0xHex
+	rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
 		CONFIGURE: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
-			assert.Equal(t, int64(1122334455), req.ChainId) // fake
+			assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap 1337
 			return &proto.ConfigureDomainResponse{
 				DomainConfig: &proto.DomainConfig{
 					ConstructorAbiJson:     fakeCoinConstructorABI,
-					FactoryContractAddress: "0x9D4Ee5Af51AA4e61602ea2A4Fe22A3Ca5c65c027", // fake
+					FactoryContractAddress: contractAddr.String(),
 					FactoryContractAbiJson: toJSONString(t, simDomainABI),
 					AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 				},
@@ -147,12 +147,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	})
 	defer done()
 
-	err := rpcCall("testbed_configureInit", "domain1", types.RawJSON(`{
+	err := rpcCall(&contractAddr, "testbed_deployBytecode", "domain1_admin", parseBuildBytecode(t, simDomainBuild))
+	assert.NoError(t, err)
+
+	err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
 		"some": "config"
 	}`))
 	assert.NoError(t, err)
 
-	err = rpcCall("testbed_deploy", "domain1", types.RawJSON(`{
+	err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
+		"some": "config"
+	}`))
+	assert.NoError(t, err)
+
+	err = rpcCall(types.RawJSON{}, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "0x6a0969a486aEFa82b3F7D7B4cEd1c4d578bf2D81",
 		"name": "FakeToken1",
 		"symbol": "FT1"

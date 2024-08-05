@@ -19,6 +19,7 @@ package types
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/hex"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -75,5 +76,6 @@ func (a *EthAddress) Value() (driver.Value, error) {
 	if a == nil {
 		return nil, nil
 	}
-	return (*a)[:], nil
+	// no prefix - always 40 chars
+	return hex.EncodeToString(a[:]), nil
 }

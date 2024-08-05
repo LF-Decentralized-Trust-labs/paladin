@@ -26,7 +26,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -44,7 +43,7 @@ type domainSimulator struct {
 	done            chan struct{}
 }
 
-func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (func(method string, params ...interface{}) error, func()) {
+func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (func(res interface{}, method string, params ...interface{}) error, func()) {
 
 	url, tb, done := newUnitTestbed(t)
 
@@ -114,12 +113,11 @@ func simRequestToProto[T pb.Message](t *testing.T, iReq pb.Message) T {
 	return *req
 }
 
-func newSimulatorRPCClient(t *testing.T, url string) func(method string, params ...interface{}) error {
+func newSimulatorRPCClient(t *testing.T, url string) func(res interface{}, method string, params ...interface{}) error {
 	rpcClient := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-	return func(method string, params ...interface{}) error {
+	return func(res interface{}, method string, params ...interface{}) error {
 		ctx, cancelCtx := context.WithTimeout(context.Background(), 9*time.Second)
 		defer cancelCtx()
-		var res types.RawJSON
 		err := rpcClient.CallRPC(ctx, &res, method, params...)
 		if err != nil {
 			return err.Error()

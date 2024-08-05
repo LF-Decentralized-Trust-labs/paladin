@@ -29,6 +29,9 @@ func (tb *testbed) initRPC() error {
 	tb.rpcServer.Register(tb.stateStore.RPCModule())
 	tb.rpcServer.Register(rpcserver.NewRPCModule("testbed").
 
+		// Deploy a smart contract and get the deployed address
+		Add("testbed_deployBytecode", tb.rpcDeployBytecode()).
+
 		// A simulated configure + init step in one synchronous call
 		Add("testbed_configureInit", tb.rpcTestbedConfigureInit()).
 
@@ -53,7 +56,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		return true, nil
+		return tx.ContractAddress.Address0xHex(), nil
 	})
 }
 
@@ -68,7 +71,7 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 		err := syncExchangeToDomain(ctx, tb, &proto.ConfigureDomainRequest{
 			Name:       name,
 			ConfigYaml: string(domainConfig),
-			ChainId:    1122334455, // TODO: Get from Besu
+			ChainId:    tb.chainID,
 		}, &configRes)
 		if err != nil {
 			return false, err
