@@ -151,7 +151,9 @@ func (bi *blockIndexer) startup(runCtx context.Context) {
 			close(bi.processorDone)
 			return
 		}
+		bi.stateLock.Lock()
 		bi.nextBlock = (*ethtypes.HexUint64)(&highestBlock)
+		bi.stateLock.Unlock()
 	}
 
 	go bi.dispatcher(runCtx)
@@ -347,7 +349,7 @@ func (bi *blockIndexer) dispatcher(ctx context.Context) {
 	for {
 		timeoutContext := ctx
 
-		if len(pendingDispatch) == 0 && bi.nextBlock != nil {
+		if len(pendingDispatch) == 0 {
 			pendingDispatch = nil // ensure we clear the memory if we just looped through a set with pendingDispatch[1:] below
 
 			// spin getting blocks until we it looks like we need to wait for a notification

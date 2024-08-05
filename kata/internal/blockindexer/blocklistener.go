@@ -148,7 +148,8 @@ func isNotFound(err *rpcbackend.RPCError) bool {
 }
 
 func (bl *blockListener) getBlockInfoByHash(ctx context.Context, blockHash string) (*BlockInfoJSONRPC, error) {
-	var info BlockInfoJSONRPC
+	var info *BlockInfoJSONRPC
+	log.L(ctx).Debugf("Fetching block by hash %s", blockHash)
 	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByHash", blockHash, false)
 	if err != nil {
 		if isNotFound(err) {
@@ -156,11 +157,12 @@ func (bl *blockListener) getBlockInfoByHash(ctx context.Context, blockHash strin
 		}
 		return nil, err.Error()
 	}
-	return &info, nil
+	return info, nil
 }
 
 func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber ethtypes.HexUint64) (*BlockInfoJSONRPC, error) {
-	var info BlockInfoJSONRPC
+	var info *BlockInfoJSONRPC
+	log.L(ctx).Debugf("Fetching block by number %d", blockNumber)
 	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByNumber", blockNumber, false)
 	if err != nil {
 		if isNotFound(err) {
@@ -168,7 +170,7 @@ func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber e
 		}
 		return nil, err.Error()
 	}
-	return &info, nil
+	return info, nil
 }
 
 func (bl *blockListener) listenLoop() {
