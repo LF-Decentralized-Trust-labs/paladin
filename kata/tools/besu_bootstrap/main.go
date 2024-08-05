@@ -88,6 +88,8 @@ func main() {
 	}
 	writeFileJSON(genesisFile, &genesis)
 
+	chownAll(dir)
+
 }
 
 var osExit = os.Exit
@@ -102,11 +104,6 @@ func mkdir(dir string) {
 	if err != nil {
 		exitErrorf("failed to make dir %q: %s", dir, err)
 	}
-	_ = os.Chown(dir, 1000, 1000)
-	if err != nil {
-		fmt.Printf("note: failed to set owner 1000:1000 %q: %s\n", dir, err)
-	}
-
 }
 
 func fileExists(filename string) bool {
@@ -131,14 +128,32 @@ func writeFile(filename string, data []byte) {
 	if err != nil {
 		exitErrorf("failed to write file %q: %s", filename, err)
 	}
-	err = os.Chown(filename, 1000, 1000)
-	if err != nil {
-		fmt.Printf("note: failed to set owner 1000:1000 %q: %s\n", filename, err)
-	}
 }
 
 func randBytes(len int) []byte {
 	b := make([]byte, len)
 	_, _ = rand.Read(b)
 	return b
+}
+
+func chownAll(dir string) {
+	fsList, err := os.ReadDir(dir)
+	if err != nil {
+		exitErrorf("failed to read dir %q: %s", dir, err)
+	}
+	for _, f := range fsList {
+		fullPath := path.Join(dir, f.Name())
+		if f.IsDir() {
+			chownAll(fullPath)
+		} else {
+			err := os.Chown(fullPath, 1000, 1000)
+			if err != nil {
+				fmt.Printf("note: failed to chown(1000:1000) %s\n", fullPath)
+			}
+		}
+	}
+	err = os.Chown(dir, 1000, 1000)
+	if err != nil {
+		fmt.Printf("note: failed to chown(1000:1000) %s\n", dir)
+	}
 }
