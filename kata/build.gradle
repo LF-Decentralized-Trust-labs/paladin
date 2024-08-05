@@ -65,6 +65,7 @@ task setupSolidityNodeJS(type:Exec) {
     outputs.files([
         "contracts/package-lock.json",
     ])
+    outputs.dir("contracts/node_modules")
 }
 
 task compileTestSolidity(type:Exec, dependsOn: tasks.setupSolidityNodeJS) {
@@ -76,7 +77,11 @@ task compileTestSolidity(type:Exec, dependsOn: tasks.setupSolidityNodeJS) {
         include "contracts/**/*.sol"
         include "test/**/*.ts"
     })
-    outputs.dir("$projectDir/test/solidity/artifacts")
+    outputs.dirs([
+        "solidity/artifacts",
+        "solidity/cache",
+        "solidity/typechain-types",
+    ])
 }
 
 task copyDomainSIMContractsToTestbed(type:Copy, dependsOn: compileTestSolidity) {
@@ -116,17 +121,6 @@ task protoc(type:Exec, dependsOn: tasks.makeMocks) {
     args inputs.files
 }
 
-task clean(type: Delete) {
-    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
-    delete fileTree("bin") {
-        exclude "README.md", ".gitignore"
-    }
-    delete fileTree(".") {
-        include "**/*.pb.go"
-    }
-    delete 'test/besu'
-    delete 'coverage'
-}
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
@@ -259,6 +253,19 @@ task startTestInfra(type: DockerComposeTest, dependsOn: generateBesuConfig) {
 
 task stopTestInfra(type: DockerComposeTest) {
     args 'down'
+}
+
+task clean(type: Delete, dependsOn: tasks.stopTestInfra) {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'test/besu'
+    delete 'coverage'
+    delete "solidity/artifacts"
 }
 
 abstract class UnitTests extends Exec {
