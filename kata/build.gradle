@@ -24,7 +24,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 91
+    targetCoverage = 92
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
@@ -54,7 +54,20 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task compileTestSolidity(type:Exec) {
+task setupSolidityNodeJS(type:Exec) {
+    workingDir "solidity"
+    executable 'npm'
+    args 'i'
+    inputs.files([
+        "contracts/package.json",
+        "contracts/package-lock.json",
+    ])
+    outputs.files([
+        "contracts/package-lock.json",
+    ])
+}
+
+task compileTestSolidity(type:Exec, dependsOn: tasks.setupSolidityNodeJS) {
     workingDir "solidity"
     executable 'npx'
     args 'hardhat'
