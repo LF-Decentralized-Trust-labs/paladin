@@ -10,17 +10,17 @@ services:
   besu_boostrap:
     container_name: paladin-besu-boostrap
     image: paladin/besu_bootstrap
-    user: 1000:1000
+    user: 0:0
     volumes:
-      - ./test/besu:/var/besu:rw
+      - besu_data:/var/besu:rw
     command:
       - /var/besu
   besu:
     container_name: paladin-test-besu
     image: hyperledger/besu:latest
-    user: 1000:1000
+    user: 0:0
     volumes:
-      - ./test/besu:/var/besu:rw
+      - besu_data:/var/besu:rw
     ports:
       - 8545:8545
       - 8546:8546
@@ -45,3 +45,6 @@ services:
       - --genesis-file=/var/besu/genesis.json
       - --data-path=/var/besu/data
       - --node-private-key-file=/var/besu/key
+volumes:
+  besu_data:
+    driver: local
