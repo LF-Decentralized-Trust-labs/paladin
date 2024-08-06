@@ -17,6 +17,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	_ "embed"
@@ -25,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/stretchr/testify/assert"
 	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -69,7 +71,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		"inputs": [
 		  {
 		    "name": "notary",
-			"type": "address"
+			"type": "string"
 		  },
 		  {
 		    "name": "name",
@@ -105,7 +107,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`
 
 	var contractAddr ethtypes.Address0xHex
-	rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
+	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
 		CONFIGURE: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
@@ -132,15 +134,37 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			req := simRequestToProto[*proto.InitDeployTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, `{
-				"notary": "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
+				"notary": "domain1/contract1/notary",
 				"name": "FakeToken1",
 				"symbol": "FT1"
 			}`, req.Transaction.ConstructorParamsJson)
+			return &proto.InitDeployTransactionResponse{
+				RequiredVerifiers: []*proto.ResolveVerifierRequest{
+					{
+						Lookup:    "domain1/contract1/notary",
+						Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					},
+				},
+			}, nil
+		},
+
+		PREPARE_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.PrepareDeployTransactionRequest](t, iReq)
+			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
+			assert.JSONEq(t, `{
+				"notary": "domain1/contract1/notary",
+				"name": "FakeToken1",
+				"symbol": "FT1"
+			}`, req.Transaction.ConstructorParamsJson)
+			assert.Len(t, req.Verifiers, 1)
+			assert.Equal(t, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.Verifiers[0].Algorithm)
+			assert.Equal(t, "domain1/contract1/notary", req.Verifiers[0].Lookup)
+			assert.NotEmpty(t, req.Verifiers[0].Verifier)
 			return &proto.PrepareDeployTransactionResponse{
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName:   "newSIMTokenNotarized",
-					ParamsJson:     `{"notary":  "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81"}`,
-					SigningAddress: "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
+					ParamsJson:     fmt.Sprintf(`{"notary": "%s"}`, req.Verifiers[0].Verifier),
+					SigningAddress: fmt.Sprintf("domain1/contract1/onetimekeys/%s", req.Transaction.TransactionId),
 				},
 			}, nil
 		},
@@ -161,10 +185,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = rpcCall(types.RawJSON{}, "testbed_deploy", "domain1", types.RawJSON(`{
-		"notary": "0x6a0969a486aEFa82b3F7D7B4cEd1c4d578bf2D81",
+		"notary": "domain1/contract1/notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"
 	}`))
 	assert.NoError(t, err)
 
+	keyList := types.RawJSON{}
+	err = rpcCall(&keyList, "testbed_keystoreInfo")
+	fmt.Println("Keys:")
+	fmt.Println(keyList.YAML())
+	assert.NoError(t, err)
 }

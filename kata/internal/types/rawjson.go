@@ -19,9 +19,11 @@ package types
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"gopkg.in/yaml.v3"
 )
 
 // Just like types.RawJSON, but with ability to SQL serialize to string as well
@@ -29,6 +31,36 @@ type RawJSON []byte
 
 func (m RawJSON) String() string {
 	b, _ := m.MarshalJSON()
+	return (string)(b)
+}
+
+func (m RawJSON) Pretty() string {
+	b, err := m.MarshalJSON()
+	var val interface{}
+	if err == nil {
+		err = json.Unmarshal(b, &val)
+	}
+	if err == nil {
+		b, err = json.MarshalIndent(val, "", "  ")
+	}
+	if err != nil {
+		b, _ = json.Marshal(err.Error())
+	}
+	return (string)(b)
+}
+
+func (m RawJSON) YAML() string {
+	b, err := m.MarshalJSON()
+	var val interface{}
+	if err == nil {
+		err = json.Unmarshal(b, &val)
+	}
+	if err == nil {
+		b, err = yaml.Marshal(val)
+	}
+	if err != nil {
+		b, _ = json.Marshal(err.Error())
+	}
 	return (string)(b)
 }
 

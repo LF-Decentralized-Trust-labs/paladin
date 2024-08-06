@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
@@ -40,7 +41,11 @@ func (tb *testbed) initRPC() error {
 		// Blocks until the Ethereum transaction is successfully confirmed
 		// and returns the address emitted by the factory function
 		// according to the Paladin spec
-		Add("testbed_deploy", tb.rpcTestbedDeploy()),
+		Add("testbed_deploy", tb.rpcTestbedDeploy()).
+
+		// Dumps the whole keystore (verifiers only - no private keys)
+		// in a hierarchical format
+		Add("testbed_keystoreInfo", tb.rpcKeystoreInfo()),
 	)
 	return tb.rpcServer.Start()
 }
@@ -103,19 +108,52 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		prepareDeployReq, err := tb.validateDeploy(ctx, domain, constructorParams)
+		deployTXSpec, err := tb.validateDeploy(ctx, domain, constructorParams)
 		if err != nil {
 			return nil, err
 		}
 
+		// Init the deployment transaction
+		var initDeployRes *proto.InitDeployTransactionResponse
+		err = syncExchangeToDomain(ctx, tb, &proto.InitDeployTransactionRequest{
+			Transaction: deployTXSpec,
+		}, &initDeployRes)
+		if err != nil {
+			return nil, err
+		}
+
+		// Resolve all the addresses locally in the testbed
+		prepareReq := &proto.PrepareDeployTransactionRequest{
+			Transaction: deployTXSpec,
+			Verifiers:   make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
+		}
+		for i, v := range initDeployRes.RequiredVerifiers {
+			_, verifier, err := tb.resolveKey(ctx, v.Lookup, v.Algorithm)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
+			}
+			prepareReq.Verifiers[i] = &proto.ResolvedVerifier{
+				Lookup:    v.Lookup,
+				Algorithm: v.Algorithm,
+				Verifier:  verifier,
+			}
+		}
+
 		// Prepare the deployment transaction
 		var prepareDeployRes *proto.PrepareDeployTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, prepareDeployReq, &prepareDeployRes)
+		err = syncExchangeToDomain(ctx, tb, prepareReq, &prepareDeployRes)
 		if err != nil {
 			return nil, err
 		}
 
 		// Do the deploy
 		return tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction)
+	})
+}
+
+func (tb *testbed) rpcKeystoreInfo() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod0(func(ctx context.Context,
+	) ([]*testbedKey, error) {
+		return tb.keystoreInfo(), nil
 	})
 }

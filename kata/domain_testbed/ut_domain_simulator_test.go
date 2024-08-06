@@ -43,7 +43,7 @@ type domainSimulator struct {
 	done            chan struct{}
 }
 
-func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (func(res interface{}, method string, params ...interface{}) error, func()) {
+func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (context.Context, func(res interface{}, method string, params ...interface{}) error, func()) {
 
 	url, tb, done := newUnitTestbed(t)
 
@@ -62,7 +62,7 @@ func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]
 	assert.NoError(t, err)
 
 	go ds.messageHandler(toDomain)
-	return rpcCall, func() {
+	return tb.ctx, rpcCall, func() {
 		done()
 		ds.waitDone()
 	}

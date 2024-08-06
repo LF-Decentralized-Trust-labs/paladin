@@ -105,7 +105,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	}, nil
 }
 
-func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*proto.InitDeployTransactionRequest, error) {
+func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*proto.DeployTransactionSpecification, error) {
 
 	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
 	if err != nil {
@@ -116,12 +116,10 @@ func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, co
 	constructorABIJSON, _ := json.Marshal(domain.constructorABI)
 	constructorParamsJSON, _ := types.StandardABISerializer().SerializeJSONCtx(ctx, contructorValues)
 
-	return &proto.InitDeployTransactionRequest{
-		Transaction: &proto.DeployTransactionSpecification{
-			TransactionId:         paladinTxID,
-			ConstructorAbi:        string(constructorABIJSON),
-			ConstructorParamsJson: string(constructorParamsJSON),
-		},
+	return &proto.DeployTransactionSpecification{
+		TransactionId:         paladinTxID,
+		ConstructorAbi:        string(constructorABIJSON),
+		ConstructorParamsJson: string(constructorParamsJSON),
 	}, nil
 }
 
@@ -139,16 +137,10 @@ func (tb *testbed) setupChainID() error {
 func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (*blockindexer.IndexedTransaction, error) {
 
 	// Resolve the key (directly with the signer - we have no key manager here in the testbed)
-	resolvedKey, err := tb.signer.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{Name: from},
-		},
-	})
+	keyHandle, fromAddr, err := tb.resolveKey(ctx, from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
 		return nil, err
 	}
-	fromAddr := resolvedKey.Identifiers[0].Identifier
 
 	// Trivial nonce management in the testbed - just get the current nonce for this key, from the local node mempool, for each TX
 	var nonce ethtypes.HexInteger
@@ -179,7 +171,7 @@ func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from s
 	_, _ = hash.Write(sigPayload.Bytes())
 	signature, err := tb.signer.Sign(ctx, &proto.SignRequest{
 		Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-		KeyHandle: resolvedKey.KeyHandle,
+		KeyHandle: keyHandle,
 		Payload:   ethtypes.HexBytes0xPrefix(hash.Sum(nil)),
 	})
 	var sig *secp256k1.SignatureData
@@ -191,7 +183,7 @@ func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from s
 		rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("signing failed with keyHandle %s (addr=%s): %s", resolvedKey.KeyHandle, fromAddr, err)
+		return nil, fmt.Errorf("signing failed with keyHandle %s (addr=%s): %s", keyHandle, fromAddr, err)
 	}
 
 	// Submit

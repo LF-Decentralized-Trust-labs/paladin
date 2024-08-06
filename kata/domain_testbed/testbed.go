@@ -73,6 +73,8 @@ type testbed struct {
 	inflightLock   sync.Mutex
 	domainRegistry map[string]*testbedDomain
 	domainLock     sync.Mutex
+	keyLock        sync.Mutex
+	keyMap         *testbedKeyFolder
 	ready          chan error
 	done           chan struct{}
 }
@@ -82,6 +84,7 @@ func newTestBed() (tb *testbed) {
 		sigc:           make(chan os.Signal, 1),
 		inflight:       make(map[string]*inflightRequest),
 		domainRegistry: make(map[string]*testbedDomain),
+		keyMap:         &testbedKeyFolder{},
 		ready:          make(chan error, 1),
 		done:           make(chan struct{}),
 	}

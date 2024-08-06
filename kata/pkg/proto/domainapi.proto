@@ -48,7 +48,7 @@ message InitDeployTransactionResponse {
 
 // **PREPARE DEPLOY** once the verifiers have been resolved, the deploy transaction can be prepared directly (no private state proposals or proofs)
 message PrepareDeployTransactionRequest {
-    BaseLedgerTransaction transaction = 1; // The instruction for submission to the base ledger
+    DeployTransactionSpecification transaction = 1; // The instruction for submission to the base ledger
     repeated ResolvedVerifier verifiers = 2; // The list of resovled verifiers
 }
 

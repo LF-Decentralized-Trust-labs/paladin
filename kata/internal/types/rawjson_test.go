@@ -58,7 +58,15 @@ func TestRawJSON(t *testing.T) {
 	err = (&s1.F1).Scan(([]byte)(`[ { "yet": "more" }, "things" ]`))
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.String())
+	assert.JSONEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.Pretty())
+	assert.YAMLEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.YAML())
 
 	err = (&s1.F1).Scan(42)
 	assert.Regexp(t, "PD011101", err)
+
+	pettyErr := RawJSON(`[!!!! wrong`).Pretty()
+	assert.Regexp(t, "invalid", pettyErr)
+	yamlErr := RawJSON(`[!!!! wrong`).YAML()
+	assert.Regexp(t, "invalid", yamlErr)
+
 }
