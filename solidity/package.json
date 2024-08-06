@@ -22,6 +22,9 @@
     "chai": "^4.2.0",
     "ethers": "^6.13.1",
     "hardhat": "^2.19.4",
-    "ts-node": "^10.9.2"
+    "hardhat-dependency-compiler": "^1.2.1",
+    "ts-node": "^10.9.2",
+    "zeto": "https://gitpkg.vercel.app/hyperledger-labs/zeto/solidity?main",
+    "zeto-js": "https://gitpkg.vercel.app/hyperledger-labs/zeto/zkp/js?main"
   }
 }
