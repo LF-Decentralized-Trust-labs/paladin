@@ -81,8 +81,7 @@ task protoc(type:Exec, dependsOn: tasks.makeMocks) {
     args inputs.files
 }
 
-task clean(type: Delete) {
-    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -172,57 +171,6 @@ task buildTestPluginsSharedLibraries {
 
 }
 
-class DockerCompose extends Exec {
-    DockerCompose() {
-        def dockerComposeV2Check = getProject().exec({
-            ignoreExitValue = true
-            executable "docker"
-            args "compose", "version"
-            standardOutput = new ByteArrayOutputStream()
-            errorOutput = new ByteArrayOutputStream()
-        })
-        if (dockerComposeV2Check.getExitValue() == 0){
-            executable 'docker'
-            args 'compose'
-        } else {
-            executable 'docker-compose'
-        }
-        args '-f'
-    }
-}
-
-class DockerComposeTest extends DockerCompose {
-    DockerComposeTest() {
-        def dbComposeFile = "${getProject().projectDir}/docker-compose-test.yml"
-        args dbComposeFile
-    }
-}
-
-class DockerComposeDemo extends DockerCompose {
-    DockerComposeDemo() {
-        def dbComposeFile = "${getProject().rootDir}/demo/docker-compose.yml"
-        args dbComposeFile
-    }
-}
-
-task startDb(type: DockerComposeTest) {
-    mustRunAfter(tasks.protoc)
-    args 'up', '-d'
-}
-
-task startDemoDb(type: DockerComposeDemo) {
-    mustRunAfter(tasks.protoc)
-    args 'up', '-d'
-}
-
-task stopDb(type: DockerComposeTest) {
-    args 'down'
-}
-
-task stopDemoDb(type: DockerComposeDemo) {
-    args 'down'
-}
-
 abstract class UnitTests extends Exec {
     {
         inputs.files(getProject().goFiles)
@@ -271,7 +219,7 @@ task setupCoverage(dependsOn: tasks.protoc) {
 task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startDb]) {
+task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, ':testinfra:startTestInfra']) {
     args '-tags', "testdbpostgres"
 }
 
