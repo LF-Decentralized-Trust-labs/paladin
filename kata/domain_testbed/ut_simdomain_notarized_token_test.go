@@ -24,9 +24,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -106,10 +107,57 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		]
 	}`
 
-	var contractAddr ethtypes.Address0xHex
+	// Note, here we're simulating a domain that choose to support versions of a "Transfer" function
+	// with "string" types (rather than "address") for the from/to address and to ask Paladin to do
+	// verifier resolution for these. The same domain could also support "address" type inputs/outputs
+	// in the same ABI.
+	fakeCoinTransferABI := `{
+		"type": "function",
+		"inputs": [
+		  {
+		    "name": "from",
+			"type": "address"
+		  },
+		  {
+		    "name": "to",
+			"type": "address"
+		  },
+		  {
+		    "name": "value",
+			"type": "uint256"
+		  }
+		],
+		"outputs": null
+	}`
+
+	fakeDeployPayload := `{
+		"notary": "domain1/contract1/notary",
+		"name": "FakeToken1",
+		"symbol": "FT1"
+	}`
+
+	type fakeTransferParser struct {
+		From   *string              `json:"from,omitempty"`
+		To     *string              `json:"to,omitempty"`
+		Amount *ethtypes.HexInteger `json:"amount"`
+	}
+
+	// fakeTransferMintPayload := `{
+	// 	"from": null,
+	// 	"to": "wallets/org1/aaaaaa",
+	// 	"amount": "123000000000000000000"
+	// }`
+
+	// fakeTransferPayload1 := `{
+	// 	"from": "wallets/org1/aaaaaa",
+	// 	"to": "wallets/org2/bbbbbb",
+	// 	"amount": "23000000000000000000"
+	// }`
+
+	var factoryAddr ethtypes.Address0xHex
 	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
-		CONFIGURE: func(iReq pb.Message) (pb.Message, error) {
+		CONFIGURE_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
@@ -117,7 +165,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return &proto.ConfigureDomainResponse{
 				DomainConfig: &proto.DomainConfig{
 					ConstructorAbiJson:     fakeCoinConstructorABI,
-					FactoryContractAddress: contractAddr.String(), // note this requires testbed_deployBytecode to have completed
+					FactoryContractAddress: factoryAddr.String(), // note this requires testbed_deployBytecode to have completed
 					FactoryContractAbiJson: toJSONString(t, simDomainABI),
 					AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 				},
@@ -133,11 +181,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		INIT_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitDeployTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
-			assert.JSONEq(t, `{
-				"notary": "domain1/contract1/notary",
-				"name": "FakeToken1",
-				"symbol": "FT1"
-			}`, req.Transaction.ConstructorParamsJson)
+			assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
 			return &proto.InitDeployTransactionResponse{
 				RequiredVerifiers: []*proto.ResolveVerifierRequest{
 					{
@@ -168,10 +212,44 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				},
 			}, nil
 		},
+
+		INIT_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.InitTransactionRequest](t, iReq)
+			assert.JSONEq(t, fakeCoinTransferABI, req.Transaction.FunctionAbiJson)
+			assert.Equal(t, "Transfer(string,string,uint256)", req.Transaction.FunctionSignature)
+			var inputs fakeTransferParser
+			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
+			assert.NoError(t, err)
+			assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
+			assert.False(t, inputs.From == nil && inputs.To == nil)
+			// We require ethereum addresses for the "from" and "to" addresses to actually
+			// execute the transaction. See notes above about this.
+			requiredVerifiers := []*proto.ResolveVerifierRequest{
+				{
+					Lookup:    "domain1/contract1/notary",
+					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				},
+			}
+			if inputs.From != nil {
+				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
+					Lookup:    *inputs.From,
+					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				})
+			}
+			if inputs.To != nil && (inputs.From == nil || *inputs.From != *inputs.To) {
+				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
+					Lookup:    *inputs.To,
+					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				})
+			}
+			return &proto.InitTransactionResponse{
+				RequiredVerifiers: requiredVerifiers,
+			}, nil
+		},
 	})
 	defer done()
 
-	err := rpcCall(&contractAddr, "testbed_deployBytecode", "domain1_admin", parseBuildBytecode(t, simDomainBuild))
+	err := rpcCall(&factoryAddr, "testbed_deployBytecode", "domain1_admin", parseBuildBytecode(t, simDomainBuild))
 	assert.NoError(t, err)
 
 	err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
@@ -184,12 +262,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, err)
 
-	err = rpcCall(types.RawJSON{}, "testbed_deploy", "domain1", types.RawJSON(`{
+	var deployEvent *blockindexer.IndexedEvent
+	err = rpcCall(&deployEvent, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "domain1/contract1/notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"
 	}`))
 	assert.NoError(t, err)
+
+	// err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
+	// 	From:   "wallets/org1/aaaaaa",
+	// 	To:     deployEvent.Address,
+	// 	Inputs: types.RawJSON(fakeTransferMintPayload),
+	// })
+	// assert.NoError(t, err)
 
 	keyList := types.RawJSON{}
 	err = rpcCall(&keyList, "testbed_keystoreInfo")

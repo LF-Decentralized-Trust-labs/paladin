@@ -22,8 +22,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 func (tb *testbed) initRPC() error {
@@ -36,12 +36,26 @@ func (tb *testbed) initRPC() error {
 		// A simulated configure + init step in one synchronous call
 		Add("testbed_configureInit", tb.rpcTestbedConfigureInit()).
 
-		// A performs a base ethereum transaction deploy using the
+		// Performs a base ethereum transaction deploy using the
 		// simple testbed transaction and key management.
 		// Blocks until the Ethereum transaction is successfully confirmed
 		// and returns the address emitted by the factory function
-		// according to the Paladin spec
+		// according to the Paladin spec.
+		// Domain phases invoked prior to deploy on-chain:
+		// - INIT_DEPLOY
+		// - PREPARE_DEPLOY
 		Add("testbed_deploy", tb.rpcTestbedDeploy()).
+
+		// Performs a privacy preserving smart contract invoke.
+		// Selecting the private states required for the transaction,
+		// coordinating the required endorsements/signatures,
+		// and picking a suitably anonymous signing identity to
+		// submit the transaction.
+		// Domain phases invoked prior to on-chain transaction:
+		// - INIT_TRANSACTION     (sender node)
+		// - ASSEMBLE_TRANSACTION (sender node)
+		// - PREPARE_TRANSACTION  (submitter node)
+		Add("testbed_invoke", tb.rpcTestbedInvoke()).
 
 		// Dumps the whole keystore (verifiers only - no private keys)
 		// in a hierarchical format
@@ -67,14 +81,14 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 
 func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		name string,
+		domainName string,
 		domainConfig types.RawJSON,
 	) (bool, error) {
 
 		// First we call configure on the domain
 		var configRes *proto.ConfigureDomainResponse
 		err := syncExchangeToDomain(ctx, tb, &proto.ConfigureDomainRequest{
-			Name:       name,
+			Name:       domainName,
 			ConfigYaml: string(domainConfig),
 			ChainId:    tb.chainID,
 		}, &configRes)
@@ -83,7 +97,7 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 		}
 
 		// Then we store all the new domain in the sim registry
-		initReq, err := tb.registerDomain(ctx, name, configRes.DomainConfig)
+		initReq, err := tb.registerDomain(ctx, domainName, configRes.DomainConfig)
 		if err != nil {
 			return false, err
 		}
@@ -99,11 +113,11 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 
 func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		name string,
+		domainName string,
 		constructorParams types.RawJSON,
 	) (*blockindexer.IndexedEvent, error) {
 
-		domain, err := tb.getDomain(name)
+		domain, err := tb.getDomain(domainName)
 		if err != nil {
 			return nil, err
 		}
@@ -148,6 +162,15 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Do the deploy
 		return tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction)
+	})
+}
+
+func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		invocation types.PrivateContractInvoke,
+		inputs types.RawJSON,
+	) (*blockindexer.IndexedEvent, error) {
+		return nil, fmt.Errorf("TODO")
 	})
 }
 

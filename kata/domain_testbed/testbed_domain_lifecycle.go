@@ -30,9 +30,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -43,6 +43,10 @@ type testbedDomain struct {
 	constructorABI         *abi.Entry
 	factoryContractAddress *ethtypes.Address0xHex
 	factoryContractABI     abi.ABI
+}
+
+type testbedContract struct {
+	// domain *testbedDomain
 }
 
 func (tb *testbed) registerDomain(ctx context.Context, name string, config *proto.DomainConfig) (*proto.InitDomainRequest, error) {
@@ -229,8 +233,9 @@ func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testb
 	if len(events) != 1 {
 		return nil, fmt.Errorf("expected exactly one event from deploy function TX %s (received=%d)", &tx.Hash, len(events))
 	}
+	event := events[0]
 
-	return events[0], nil
+	return event, nil
 }
 
 func (tb *testbed) getDomain(name string) (*testbedDomain, error) {

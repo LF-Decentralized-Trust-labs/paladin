@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type Uint256Field string

@@ -29,7 +29,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type abiSchema struct {

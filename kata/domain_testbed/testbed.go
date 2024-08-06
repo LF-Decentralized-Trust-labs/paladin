@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
@@ -54,39 +55,41 @@ func main() {
 }
 
 type testbed struct {
-	ctx            context.Context
-	cancelCtx      context.CancelFunc
-	conf           *TestBedConfig
-	sigc           chan os.Signal
-	rpcServer      rpcserver.Server
-	stateStore     statestore.StateStore
-	blockindexer   blockindexer.BlockIndexer
-	chainID        int64
-	blockchainRPC  rpcbackend.WebSocketRPCClient
-	signer         signer.SigningModule
-	bus            commsbus.CommsBus
-	fromDomain     commsbus.MessageHandler
-	socketFile     string
-	destToDomain   string
-	destFromDomain string
-	inflight       map[string]*inflightRequest
-	inflightLock   sync.Mutex
-	domainRegistry map[string]*testbedDomain
-	domainLock     sync.Mutex
-	keyLock        sync.Mutex
-	keyMap         *testbedKeyFolder
-	ready          chan error
-	done           chan struct{}
+	ctx             context.Context
+	cancelCtx       context.CancelFunc
+	conf            *TestBedConfig
+	sigc            chan os.Signal
+	rpcServer       rpcserver.Server
+	stateStore      statestore.StateStore
+	blockindexer    blockindexer.BlockIndexer
+	chainID         int64
+	blockchainRPC   rpcbackend.WebSocketRPCClient
+	signer          signer.SigningModule
+	bus             commsbus.CommsBus
+	fromDomain      commsbus.MessageHandler
+	socketFile      string
+	destToDomain    string
+	destFromDomain  string
+	inflight        map[string]*inflightRequest
+	inflightLock    sync.Mutex
+	domainRegistry  map[string]*testbedDomain
+	domainContracts map[ethtypes.Address0xHex]*testbedContract
+	domainLock      sync.Mutex
+	keyLock         sync.Mutex
+	keyMap          *testbedKeyFolder
+	ready           chan error
+	done            chan struct{}
 }
 
 func newTestBed() (tb *testbed) {
 	tb = &testbed{
-		sigc:           make(chan os.Signal, 1),
-		inflight:       make(map[string]*inflightRequest),
-		domainRegistry: make(map[string]*testbedDomain),
-		keyMap:         &testbedKeyFolder{},
-		ready:          make(chan error, 1),
-		done:           make(chan struct{}),
+		sigc:            make(chan os.Signal, 1),
+		inflight:        make(map[string]*inflightRequest),
+		domainRegistry:  make(map[string]*testbedDomain),
+		domainContracts: make(map[ethtypes.Address0xHex]*testbedContract),
+		keyMap:          &testbedKeyFolder{},
+		ready:           make(chan error, 1),
+		done:            make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	return tb

@@ -28,10 +28,11 @@ import (
 )
 
 var DOMAIN_API_ERROR = (&proto.DomainAPIError{}).ProtoReflect().Descriptor().FullName()
-var CONFIGURE = (&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName()
+var CONFIGURE_DOMAIN = (&proto.ConfigureDomainRequest{}).ProtoReflect().Descriptor().FullName()
 var INIT_DOMAIN = (&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullName()
 var INIT_DEPLOY = (&proto.InitDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var PREPARE_DEPLOY = (&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
+var INIT_TRANSACTION = (&proto.InitTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 
 type inflightRequest struct {
 	req    *commsbus.Message

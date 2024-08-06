@@ -25,7 +25,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
