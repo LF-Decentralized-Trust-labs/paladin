@@ -111,11 +111,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
-			assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap 1337
+			assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
 			return &proto.ConfigureDomainResponse{
 				DomainConfig: &proto.DomainConfig{
 					ConstructorAbiJson:     fakeCoinConstructorABI,
-					FactoryContractAddress: contractAddr.String(),
+					FactoryContractAddress: contractAddr.String(), // note this requires testbed_deployBytecode to have completed
 					FactoryContractAbiJson: toJSONString(t, simDomainABI),
 					AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 				},
@@ -128,14 +128,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return &proto.InitDomainResponse{}, nil
 		},
 
-		PREPARE_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.PrepareDeployTransactionRequest](t, iReq)
-			assert.JSONEq(t, fakeCoinConstructorABI, req.ConstructorAbi)
+		INIT_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.InitDeployTransactionRequest](t, iReq)
+			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, `{
 				"notary": "0x6a0969a486aefa82b3f7d7b4ced1c4d578bf2d81",
 				"name": "FakeToken1",
 				"symbol": "FT1"
-			}`, req.ConstructorParamsJson)
+			}`, req.Transaction.ConstructorParamsJson)
 			return &proto.PrepareDeployTransactionResponse{
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName:   "newSIMTokenNotarized",

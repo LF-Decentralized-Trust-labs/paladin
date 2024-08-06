@@ -105,7 +105,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	}, nil
 }
 
-func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*proto.PrepareDeployTransactionRequest, error) {
+func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*proto.InitDeployTransactionRequest, error) {
 
 	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
 	if err != nil {
@@ -116,10 +116,12 @@ func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, co
 	constructorABIJSON, _ := json.Marshal(domain.constructorABI)
 	constructorParamsJSON, _ := types.StandardABISerializer().SerializeJSONCtx(ctx, contructorValues)
 
-	return &proto.PrepareDeployTransactionRequest{
-		TransactionId:         paladinTxID,
-		ConstructorAbi:        string(constructorABIJSON),
-		ConstructorParamsJson: string(constructorParamsJSON),
+	return &proto.InitDeployTransactionRequest{
+		Transaction: &proto.DeployTransactionSpecification{
+			TransactionId:         paladinTxID,
+			ConstructorAbi:        string(constructorABIJSON),
+			ConstructorParamsJson: string(constructorParamsJSON),
+		},
 	}, nil
 }
 
