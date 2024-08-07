@@ -70,6 +70,12 @@ func newTestServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context.Context,
 	rpcServer, err := rpcserver.NewServer(ctx, rpcServerConf)
 	assert.NoError(t, err)
 
+	if mEth.eth_chainId == nil {
+		mEth.eth_chainId = func(ctx context.Context) (ethtypes.HexUint64, error) {
+			return 12345, nil
+		}
+	}
+
 	rpcServer.Register(rpcserver.NewRPCModule("eth").
 		Add("eth_chainId", rpcserver.RPCMethod0(mEth.eth_chainId)).
 		Add("eth_getTransactionCount", rpcserver.RPCMethod2(mEth.eth_getTransactionCount)).
@@ -143,11 +149,7 @@ func TestNewEthClientChainIDFail(t *testing.T) {
 }
 
 func TestResolveKeyFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
-	})
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
 	defer done()
 
 	ec.keymgr = &mockKeyManager{
@@ -166,9 +168,6 @@ func TestResolveKeyFail(t *testing.T) {
 
 func TestCallFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
 		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},
@@ -182,9 +181,6 @@ func TestCallFail(t *testing.T) {
 
 func TestGetTransactionCountFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
 		eth_getTransactionCount: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexUint64, error) {
 			return 0, fmt.Errorf("pop")
 		},
@@ -198,9 +194,6 @@ func TestGetTransactionCountFail(t *testing.T) {
 
 func TestEstimateGasFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
 		eth_getTransactionCount: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexUint64, error) {
 			return 0, nil
 		},
@@ -216,11 +209,7 @@ func TestEstimateGasFail(t *testing.T) {
 }
 
 func TestBadTXVersion(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
-	})
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
 	defer done()
 
 	_, err := ec.BuildRawTransaction(ctx, EthTXVersion("wrong"), "key1", &ethsigner.Transaction{
@@ -232,11 +221,7 @@ func TestBadTXVersion(t *testing.T) {
 }
 
 func TestSignFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
-	})
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
 	defer done()
 
 	ec.keymgr = &mockKeyManager{
@@ -258,9 +243,6 @@ func TestSignFail(t *testing.T) {
 
 func TestSendRawFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		},
 		eth_sendRawTransaction: func(ctx context.Context, hbp ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},

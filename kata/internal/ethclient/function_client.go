@@ -18,7 +18,6 @@ package ethclient
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"strconv"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -48,15 +47,21 @@ type ABIClient interface {
 }
 
 type ABIFunctionRequestBuilder interface {
+	// Builder functions
 	TXVersion(EthTXVersion) ABIFunctionRequestBuilder
 	Signer(string) ABIFunctionRequestBuilder
 	To(*ethtypes.Address0xHex) ABIFunctionRequestBuilder
-	GasLimit(*big.Int) ABIFunctionRequestBuilder
+	GasLimit(uint64) ABIFunctionRequestBuilder
 	BlockRef(blockRef BlockRef) ABIFunctionRequestBuilder
 	Block(uint64) ABIFunctionRequestBuilder
 	Input(any) ABIFunctionRequestBuilder
 	Output(any) ABIFunctionRequestBuilder
 
+	// Query functions
+	TX() *ethsigner.Transaction
+
+	// Execution functions
+	BuildCallData() (err error)
 	Call() (err error)
 	CallJSON() (jsonData []byte, err error)
 	RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error)
@@ -140,12 +145,14 @@ func (ec *ethClient) MustABIJSON(abiJson []byte) ABIClient {
 }
 
 func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ ABIFunctionClient, err error) {
+	ac := &abiFunctionClient{ec: abic.ec}
 	functionABI := abic.functions[nameOrFullSig]
 	if functionABI == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgEthClientFunctionNotFound, nameOrFullSig)
+		err = i18n.NewError(ctx, msgs.MsgEthClientFunctionNotFound, nameOrFullSig)
 	}
-	ac := &abiFunctionClient{ec: abic.ec}
-	ac.selector, err = functionABI.GenerateFunctionSelectorCtx(ctx)
+	if err == nil {
+		ac.selector, err = functionABI.GenerateFunctionSelectorCtx(ctx)
+	}
 	if err == nil {
 		ac.signature, err = functionABI.SignatureCtx(ctx)
 	}
@@ -197,8 +204,8 @@ func (ac *abiFunctionRequestBuilder) To(to *ethtypes.Address0xHex) ABIFunctionRe
 	return ac
 }
 
-func (ac *abiFunctionRequestBuilder) GasLimit(gas *big.Int) ABIFunctionRequestBuilder {
-	ac.tx.GasLimit = (*ethtypes.HexInteger)(gas)
+func (ac *abiFunctionRequestBuilder) GasLimit(gasLimit uint64) ABIFunctionRequestBuilder {
+	ac.tx.GasLimit = ethtypes.NewHexIntegerU64(gasLimit)
 	return ac
 }
 
@@ -222,6 +229,10 @@ func (ac *abiFunctionRequestBuilder) Output(output any) ABIFunctionRequestBuilde
 	return ac
 }
 
+func (ac *abiFunctionRequestBuilder) TX() *ethsigner.Transaction {
+	return &ac.tx
+}
+
 func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 	if ac.input == nil {
 		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
@@ -237,6 +248,8 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 	case string:
 		err = json.Unmarshal([]byte(input), &inputMap)
 	case []byte:
+		err = json.Unmarshal(input, &inputMap)
+	case types.RawJSON:
 		err = json.Unmarshal(input, &inputMap)
 	default:
 		var jsonInput []byte
