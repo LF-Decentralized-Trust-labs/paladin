@@ -173,8 +173,11 @@ var (
 
 	// EthClient module PD0115XX
 	MsgEthClientInvalidInput     = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
-	MsgEthClientMissingFrom      = ffe("PD011501", "Signer (from) required")
-	MsgEthClientMissingTo        = ffe("PD011502", "To required")
-	MsgEthClientMissingInput     = ffe("PD011503", "Input required")
-	MsgEthClientInvalidTXVersion = ffe("PD011504", "Invalid TX Version (%d)")
+	MsgEthClientMissingFrom      = ffe("PD011501", "Signer (from) missing")
+	MsgEthClientMissingTo        = ffe("PD011502", "To missing")
+	MsgEthClientMissingInput     = ffe("PD011503", "Input missing")
+	MsgEthClientMissingOutput    = ffe("PD011504", "Output missing")
+	MsgEthClientInvalidTXVersion = ffe("PD011505", "Invalid TX Version (%d)")
+	MsgEthClientABIJson          = ffe("PD011506", "JSON ABI parsing failed")
+	MsgEthClientFunctionNotFound = ffe("PD011507", "Function %q not found on ABI")
 )

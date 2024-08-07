@@ -17,10 +17,8 @@ package ethclient
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -99,16 +97,13 @@ type newWidgetInput struct {
 
 func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion) {
 
-	var testABI abi.ABI
-	err := json.Unmarshal(testABIJSON, &testABI)
-	assert.NoError(t, err)
-
 	widgetA := &widget{
 		ID:       *ethtypes.MustNewAddress("0xFd33700f0511AbB60FF31A8A533854dB90B0a32A"),
 		SKU:      *ethtypes.NewHexInteger64(1122334455),
 		Features: []string{"shiny", "spinny"},
 	}
 
+	var testABI ABIClient
 	var key1 string
 	ctx, ec, done := newTestClientAndServer(t, isWS, &mockEth{
 		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
@@ -129,7 +124,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion) {
 			assert.Equal(t, int64(10), tx.Nonce.Int64())
 			assert.Equal(t, int64(200000 /* 2x */), tx.GasLimit.Int64())
 
-			cv, err := testABI.Functions()["newWidget"].DecodeCallData(tx.Data)
+			cv, err := testABI.ABI().Functions()["newWidget"].DecodeCallData(tx.Data)
 			assert.NoError(t, err)
 			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
 			assert.NoError(t, err)
@@ -148,13 +143,13 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion) {
 	})
 	defer done()
 
-	_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	assert.NoError(t, err)
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
 
-	newWidget := MustWrapFunction[newWidgetInput, NONE](ctx, ec, testABI.Functions()["newWidget"])
-	txHash, err := newWidget.R(ctx).
+	testABI = ec.MustABIJSON(testABIJSON)
+	txHash, err := testABI.MustFunction("newWidget").R(ctx).
 		TXVersion(txVersion).
 		Signer("key1").
 		To(fakeContractAddr).

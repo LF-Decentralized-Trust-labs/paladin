@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -40,6 +41,9 @@ import (
 // See blockindexer package for the events side, including WaitForTransaction()
 type EthClient interface {
 	Close()
+	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
+	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
+	MustABIJSON(abiJson []byte) ABIClient
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction) (data ethtypes.HexBytes0xPrefix, err error)
 	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error)
 	SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
