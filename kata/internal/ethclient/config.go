@@ -16,12 +16,16 @@
 package ethclient
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 )
 
 type Config struct {
-	WS      rpcclient.WSConfig   `yaml:"ws"`
-	HTTP    rpcclient.HTTPConfig `yaml:"http"`
-	Indexer blockindexer.Config  `yaml:"indexer,inline"`
+	WS                rpcclient.WSConfig   `yaml:"ws"`
+	HTTP              rpcclient.HTTPConfig `yaml:"http"`
+	GasEstimateFactor *float64             `yaml:"gasEstimateFactor"`
+}
+
+var Defaults = &Config{
+	GasEstimateFactor: confutil.P(2.0),
 }

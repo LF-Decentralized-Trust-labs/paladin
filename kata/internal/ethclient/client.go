@@ -21,12 +21,15 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
@@ -37,8 +40,9 @@ import (
 // See blockindexer package for the events side, including WaitForTransaction()
 type EthClient interface {
 	Close()
-	CallContract(ctx context.Context, from *string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (data ethtypes.HexBytes0xPrefix, err error)
-	SendTransaction(ctx context.Context, from string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
+	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction) (data ethtypes.HexBytes0xPrefix, err error)
+	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error)
+	SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
 }
 
 type KeyManager interface {
@@ -47,9 +51,10 @@ type KeyManager interface {
 }
 
 type ethClient struct {
-	chainID int64
-	rpc     rpcbackend.RPC
-	keymgr  KeyManager
+	chainID           int64
+	gasEstimateFactor float64
+	rpc               rpcbackend.RPC
+	keymgr            KeyManager
 }
 
 func NewEthClient(ctx context.Context, keymgr KeyManager, conf *Config) (_ EthClient, err error) {
@@ -76,13 +81,14 @@ func NewEthClient(ctx context.Context, keymgr KeyManager, conf *Config) (_ EthCl
 	if err != nil {
 		return nil, err
 	}
-	return WrapRPCClient(ctx, keymgr, rpc)
+	return WrapRPCClient(ctx, keymgr, rpc, confutil.Float64Min(conf.GasEstimateFactor, 1.0, *Defaults.GasEstimateFactor))
 }
 
-func WrapRPCClient(ctx context.Context, keymgr KeyManager, rpc rpcbackend.RPC) (EthClient, error) {
+func WrapRPCClient(ctx context.Context, keymgr KeyManager, rpc rpcbackend.RPC, gasEstimateFactor float64) (EthClient, error) {
 	ec := &ethClient{
-		keymgr: keymgr,
-		rpc:    rpc,
+		keymgr:            keymgr,
+		rpc:               rpc,
+		gasEstimateFactor: gasEstimateFactor,
 	}
 	if err := ec.setupChainID(ctx); err != nil {
 		return nil, err
@@ -106,12 +112,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	return nil
 }
 
-func (ec *ethClient) CallContract(ctx context.Context, from *string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (data ethtypes.HexBytes0xPrefix, err error) {
-
-	tx := ethsigner.Transaction{
-		To:   to,
-		Data: callData,
-	}
+func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction) (data ethtypes.HexBytes0xPrefix, err error) {
 
 	if from != nil {
 		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
@@ -130,41 +131,48 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, to *ethtype
 
 }
 
-func (ec *ethClient) SendTransaction(ctx context.Context, from string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
-
+func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
 	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
 		return nil, err
 	}
+	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
-	var nonce ethtypes.HexInteger
-	if rpcErr := ec.rpc.CallRPC(ctx, &nonce, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
-		log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, rpcErr)
-		return nil, rpcErr.Error()
+	if tx.Nonce == nil {
+		if rpcErr := ec.rpc.CallRPC(ctx, &tx.Nonce, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
+			log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, rpcErr)
+			return nil, rpcErr.Error()
+		}
 	}
 
-	// Construct a simple transaction with the specified data for a permissioned zero-gas-price chain
-	tx := ethsigner.Transaction{
-		From: json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr)), // for estimation of gas we need the from address
-		To:   to,
-		Data: callData,
+	if tx.GasLimit == nil {
+		// Estimate gas before submission
+		var gasEstimate ethtypes.HexInteger
+		if rpcErr := ec.rpc.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
+			log.L(ctx).Errorf("eth_estimateGas failed: %+v", rpcErr)
+			return nil, rpcErr.Error()
+		}
+		// If that went well, so submission with a bump on the estimation
+		gasLimitFactored := new(big.Float).SetInt(gasEstimate.BigInt())
+		gasLimitFactored = gasLimitFactored.Mul(gasLimitFactored, big.NewFloat(ec.gasEstimateFactor))
+		gasLimit, _ := gasLimitFactored.Int(nil)
+		tx.GasLimit = ethtypes.NewHexInteger(gasLimit)
 	}
-
-	// Estimate gas before submission
-	var gasEstimate ethtypes.HexInteger
-	if rpcErr := ec.rpc.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
-		log.L(ctx).Errorf("eth_estimateGas failed: %+v", rpcErr)
-		return nil, rpcErr.Error()
-	}
-
-	// If that went well, so submission with twice that gas as the limit.
-	tx.GasLimit = ethtypes.NewHexInteger(new(big.Int).Mul(gasEstimate.BigInt(), big.NewInt(2)))
-	tx.Nonce = &nonce
 
 	// Sign
-	sigPayload := tx.SignaturePayloadEIP1559(ec.chainID)
+	var sigPayload *ethsigner.TransactionSignaturePayload
+	switch txVersion {
+	case EIP1559:
+		sigPayload = tx.SignaturePayloadEIP1559(ec.chainID)
+	case LEGACY_EIP155:
+		sigPayload = tx.SignaturePayloadLegacyEIP155(ec.chainID)
+	case LEGACY_ORIGINAL:
+		sigPayload = tx.SignaturePayloadLegacyOriginal()
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgEthClientInvalidTXVersion)
+	}
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
 	signature, err := ec.keymgr.Sign(ctx, &proto.SignRequest{
@@ -178,12 +186,23 @@ func (ec *ethClient) SendTransaction(ctx context.Context, from string, to *ethty
 	}
 	var rawTX []byte
 	if err == nil {
-		rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
+		switch txVersion {
+		case EIP1559:
+			rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
+		case LEGACY_EIP155:
+			rawTX, err = tx.FinalizeLegacyEIP155WithSignature(sigPayload, sig, ec.chainID)
+		case LEGACY_ORIGINAL:
+			rawTX, err = tx.FinalizeLegacyOriginalWithSignature(sigPayload, sig)
+		}
 	}
 	if err != nil {
 		log.L(ctx).Errorf("signing failed with keyHandle %s (addr=%s): %s", keyHandle, fromAddr, err)
 		return nil, err
 	}
+	return rawTX, nil
+}
+
+func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
 
 	// Submit
 	var txHash ethtypes.HexBytes0xPrefix

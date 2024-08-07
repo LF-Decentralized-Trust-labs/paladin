@@ -97,7 +97,7 @@ type newWidgetInput struct {
 	Widget widget `json:"widget"`
 }
 
-func TestInvokeNewWidgetWSOk(t *testing.T) {
+func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion) {
 
 	var testABI abi.ABI
 	err := json.Unmarshal(testABIJSON, &testABI)
@@ -110,7 +110,7 @@ func TestInvokeNewWidgetWSOk(t *testing.T) {
 	}
 
 	var key1 string
-	ctx, ec, done := newTestClientAndServer(t, true, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, isWS, &mockEth{
 		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
 			return 12345, nil
 		},
@@ -155,14 +155,27 @@ func TestInvokeNewWidgetWSOk(t *testing.T) {
 
 	newWidget := MustWrapFunction[newWidgetInput, NONE](ctx, ec, testABI.Functions()["newWidget"])
 	txHash, err := newWidget.R(ctx).
+		TXVersion(txVersion).
 		Signer("key1").
 		To(fakeContractAddr).
 		Input(&newWidgetInput{
 			Widget: *widgetA,
 		}).
-		Send()
+		SignAndSend()
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, txHash)
 
+}
+
+func TestInvokeNewWidgetOk_WS_EIP1559(t *testing.T) {
+	testInvokeNewWidgetOk(t, true, EIP1559)
+}
+
+func TestInvokeNewWidgetOk_HTTP_LEGACY_EIP155(t *testing.T) {
+	testInvokeNewWidgetOk(t, false, LEGACY_EIP155)
+}
+
+func TestInvokeNewWidgetOk_HTTP_LEGACY_ORIGINAL(t *testing.T) {
+	testInvokeNewWidgetOk(t, true, LEGACY_ORIGINAL)
 }

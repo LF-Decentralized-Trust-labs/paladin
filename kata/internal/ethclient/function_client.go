@@ -22,6 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -31,7 +32,16 @@ type ABIFunctionClient[IN, OUT any] interface {
 	R(ctx context.Context) ABIFunctionRequestBuilder[IN, OUT]
 }
 
+type EthTXVersion int
+
+const (
+	LEGACY_ORIGINAL EthTXVersion = 1
+	LEGACY_EIP155   EthTXVersion = 2
+	EIP1559         EthTXVersion = 3
+)
+
 type ABIFunctionRequestBuilder[IN, OUT any] interface {
+	TXVersion(EthTXVersion) ABIFunctionRequestBuilder[IN, OUT]
 	Signer(string) ABIFunctionRequestBuilder[IN, OUT]
 	To(*ethtypes.Address0xHex) ABIFunctionRequestBuilder[IN, OUT]
 	GasLimit(*big.Int) ABIFunctionRequestBuilder[IN, OUT]
@@ -39,7 +49,8 @@ type ABIFunctionRequestBuilder[IN, OUT any] interface {
 
 	Call() (data *OUT, err error)
 	CallJSON() (jsonData []byte, err error)
-	Send() (txHash ethtypes.HexBytes0xPrefix, err error)
+	RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error)
+	SignAndSend() (txHash ethtypes.HexBytes0xPrefix, err error)
 }
 
 // For typing a nil return from a ABIFunctionClient
@@ -55,11 +66,11 @@ type abiFunctionClient[IN, OUT any] struct {
 
 type abiFunctionRequestBuilder[IN, OUT any] struct {
 	*abiFunctionClient[IN, OUT]
-	ctx      context.Context
-	to       *ethtypes.Address0xHex
-	gasLimit *ethtypes.HexInteger
-	fromStr  *string
-	input    *IN
+	ctx       context.Context
+	txVersion EthTXVersion
+	tx        ethsigner.Transaction
+	fromStr   *string
+	input     *IN
 }
 
 func WrapFunction[IN, OUT any](ctx context.Context, ec EthClient, functionABI *abi.Entry) (_ ABIFunctionClient[IN, OUT], err error) {
@@ -90,9 +101,15 @@ func MustWrapFunction[IN, OUT any](ctx context.Context, ec EthClient, functionAB
 
 func (ac *abiFunctionClient[IN, OUT]) R(ctx context.Context) ABIFunctionRequestBuilder[IN, OUT] {
 	return &abiFunctionRequestBuilder[IN, OUT]{
+		txVersion:         EIP1559,
 		abiFunctionClient: ac,
 		ctx:               ctx,
 	}
+}
+
+func (ac *abiFunctionRequestBuilder[IN, OUT]) TXVersion(v EthTXVersion) ABIFunctionRequestBuilder[IN, OUT] {
+	ac.txVersion = v
+	return ac
 }
 
 func (ac *abiFunctionRequestBuilder[IN, OUT]) Signer(fromStr string) ABIFunctionRequestBuilder[IN, OUT] {
@@ -101,12 +118,12 @@ func (ac *abiFunctionRequestBuilder[IN, OUT]) Signer(fromStr string) ABIFunction
 }
 
 func (ac *abiFunctionRequestBuilder[IN, OUT]) To(to *ethtypes.Address0xHex) ABIFunctionRequestBuilder[IN, OUT] {
-	ac.to = to
+	ac.tx.To = to
 	return ac
 }
 
 func (ac *abiFunctionRequestBuilder[IN, OUT]) GasLimit(gas *big.Int) ABIFunctionRequestBuilder[IN, OUT] {
-	ac.gasLimit = (*ethtypes.HexInteger)(gas)
+	ac.tx.GasLimit = (*ethtypes.HexInteger)(gas)
 	return ac
 }
 
@@ -115,9 +132,12 @@ func (ac *abiFunctionRequestBuilder[IN, OUT]) Input(input *IN) ABIFunctionReques
 	return ac
 }
 
-func (ac *abiFunctionRequestBuilder[IN, OUT]) BuildCallData() ([]byte, error) {
+func (ac *abiFunctionRequestBuilder[IN, OUT]) BuildCallData() error {
 	if ac.input == nil {
-		return nil, i18n.NewError(ac.ctx, msgs.MsgEhtClientMissingInput)
+		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
+	}
+	if ac.tx.To == nil {
+		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingTo)
 	}
 	// Encode the call data
 	var inputMap map[string]interface{}
@@ -135,12 +155,12 @@ func (ac *abiFunctionRequestBuilder[IN, OUT]) BuildCallData() ([]byte, error) {
 		inputDataRLP, err = cv.EncodeABIDataCtx(ac.ctx)
 	}
 	if err != nil {
-		return nil, i18n.WrapError(ac.ctx, err, msgs.MsgEhtClientInvalidInput, ac.signature)
+		return i18n.WrapError(ac.ctx, err, msgs.MsgEthClientInvalidInput, ac.signature)
 	}
-	callData := make([]byte, len(ac.selector)+len(inputDataRLP))
-	copy(callData, ac.selector)
-	copy(callData[len(ac.selector):], inputDataRLP)
-	return callData, nil
+	ac.tx.Data = make([]byte, len(ac.selector)+len(inputDataRLP))
+	copy(ac.tx.Data, ac.selector)
+	copy(ac.tx.Data[len(ac.selector):], inputDataRLP)
+	return nil
 }
 
 func (ac *abiFunctionRequestBuilder[IN, OUT]) Call() (data *OUT, err error) {
@@ -155,11 +175,12 @@ func (ac *abiFunctionRequestBuilder[IN, OUT]) Call() (data *OUT, err error) {
 }
 
 func (ac *abiFunctionRequestBuilder[IN, OUT]) CallJSON() (jsonData []byte, err error) {
-	callData, err := ac.BuildCallData()
-	if err != nil {
-		return nil, err
+	if ac.tx.Data == nil {
+		if err := ac.BuildCallData(); err != nil {
+			return nil, err
+		}
 	}
-	resData, err := ac.ec.CallContract(ac.ctx, ac.fromStr, ac.to, callData)
+	resData, err := ac.ec.CallContract(ac.ctx, ac.fromStr, &ac.tx)
 	if err != nil {
 		return nil, err
 	}
@@ -170,13 +191,22 @@ func (ac *abiFunctionRequestBuilder[IN, OUT]) CallJSON() (jsonData []byte, err e
 	return jsonData, err
 }
 
-func (ac *abiFunctionRequestBuilder[IN, OUT]) Send() (txHash ethtypes.HexBytes0xPrefix, err error) {
-	callData, err := ac.BuildCallData()
+func (ac *abiFunctionRequestBuilder[IN, OUT]) RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error) {
+	if ac.tx.Data == nil {
+		if err := ac.BuildCallData(); err != nil {
+			return nil, err
+		}
+	}
+	if ac.fromStr == nil {
+		return nil, i18n.NewError(ac.ctx, msgs.MsgEthClientMissingFrom)
+	}
+	return ac.ec.BuildRawTransaction(ac.ctx, ac.txVersion, *ac.fromStr, &ac.tx)
+}
+
+func (ac *abiFunctionRequestBuilder[IN, OUT]) SignAndSend() (txHash ethtypes.HexBytes0xPrefix, err error) {
+	rawTX, err := ac.RawTransaction()
 	if err != nil {
 		return nil, err
 	}
-	if ac.fromStr == nil {
-		return nil, i18n.NewError(ac.ctx, msgs.MsgEhtClientMissingFrom)
-	}
-	return ac.ec.SendTransaction(ac.ctx, *ac.fromStr, ac.to, callData)
+	return ac.ec.SendRawTransaction(ac.ctx, rawTX)
 }

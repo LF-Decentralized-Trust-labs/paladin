@@ -172,7 +172,9 @@ var (
 	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
 
 	// EthClient module PD0115XX
-	MsgEhtClientInvalidInput = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
-	MsgEhtClientMissingFrom  = ffe("PD011501", "Signer required")
-	MsgEhtClientMissingInput = ffe("PD011502", "Input required")
+	MsgEthClientInvalidInput     = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
+	MsgEthClientMissingFrom      = ffe("PD011501", "Signer (from) required")
+	MsgEthClientMissingTo        = ffe("PD011502", "To required")
+	MsgEthClientMissingInput     = ffe("PD011503", "Input required")
+	MsgEthClientInvalidTXVersion = ffe("PD011504", "Invalid TX Version (%d)")
 )
