@@ -102,9 +102,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 	wsConnected := false
 	return bl.retry.Do(bl.ctx, func(attempt int) (retry bool, err error) {
 
-		// If we have a WebSocket backend, then we connect it and switch over to using it
-		// (we accept an un-locked update here to backend, as the most important routine that's
-		// querying block state is the one we're called on)
+		// Connect the websocket if not yet connected on this retry iteration
 		if !wsConnected {
 			if err := bl.wsConn.Connect(bl.ctx); err != nil {
 				log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
