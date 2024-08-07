@@ -17,6 +17,7 @@ package ethclient
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
@@ -64,7 +65,7 @@ var testABIJSON = ([]byte)(`[
 		],
 		"outputs": [
 			{
-				"name": "widget",
+				"name": "",
 				"type": "tuple[]",
 				"components": [
 					{
@@ -93,6 +94,11 @@ type widget struct {
 
 type newWidgetInput struct {
 	Widget widget `json:"widget"`
+}
+
+type getWidgetsOutput struct {
+	// In this example the output is anonymous, so gets converted to an index integer (better to name outputs)
+	Zero []*widget `json:"0"`
 }
 
 func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion) {
@@ -173,4 +179,105 @@ func TestInvokeNewWidgetOk_HTTP_LEGACY_EIP155(t *testing.T) {
 
 func TestInvokeNewWidgetOk_HTTP_LEGACY_ORIGINAL(t *testing.T) {
 	testInvokeNewWidgetOk(t, true, LEGACY_ORIGINAL)
+}
+
+func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) {
+
+	var testABI ABIClient
+	var key1 string
+	var err error
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) {
+			return 12345, nil
+		},
+		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
+			if withBlock {
+				assert.Equal(t, "0x3039", s)
+			} else if withBlockRef {
+				assert.Equal(t, "pending", s)
+			} else {
+				assert.Equal(t, "latest", s)
+			}
+			if withFrom {
+				assert.Equal(t, fmt.Sprintf(`"%s"`, key1), string(tx.From))
+			} else {
+				assert.Nil(t, tx.From)
+			}
+			cv, err := testABI.ABI().Functions()["getWidgets"].DecodeCallData(tx.Data)
+			assert.NoError(t, err)
+			assert.NoError(t, err)
+			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
+			assert.NoError(t, err)
+			assert.JSONEq(t, `{
+				"sku":      "1122334455"
+			}`, string(jsonData))
+
+			// Note that the client handles unnamed outputs using an index numeral
+			retJSON := ([]byte)(`{
+				"0": [
+					{
+						"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
+						"sku":      "1122334455",
+						"features": ["shiny", "spinny"]
+					}
+				]
+			}`)
+			return testABI.ABI().Functions()["getWidgets"].Outputs.EncodeABIDataJSON(retJSON)
+		},
+	})
+	defer done()
+
+	if withFrom {
+		_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+		assert.NoError(t, err)
+	}
+
+	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
+
+	testABI = ec.MustABIJSON(testABIJSON)
+	getWidgetsReq := testABI.MustFunction("getWidgets").R(ctx).
+		To(fakeContractAddr).
+		Input(`{"sku": 1122334455}`)
+	if withFrom {
+		getWidgetsReq.
+			Signer("key1")
+	}
+	if withBlock {
+		getWidgetsReq.Block(12345)
+	} else if withBlockRef {
+		getWidgetsReq.BlockRef(PENDING)
+	}
+	jsonRes, err := getWidgetsReq.CallJSON()
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{
+		"0": [
+			{
+				"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
+				"sku":      "1122334455",
+				"features": ["shiny", "spinny"]
+			}
+		]
+	}`, string(jsonRes))
+
+	var getWidgetsRes getWidgetsOutput
+	err = getWidgetsReq.
+		Output(&getWidgetsRes).
+		Call()
+
+	assert.NoError(t, err)
+	assert.Len(t, getWidgetsRes.Zero, 1)
+	assert.Equal(t, uint64(1122334455), getWidgetsRes.Zero[0].SKU.Uint64())
+
+}
+
+func TestCallGetWidgetsWithFromOk(t *testing.T) {
+	testCallGetWidgetsOk(t, true, false, false)
+}
+
+func TestCallGetWidgetsNoFromWithBlockOk(t *testing.T) {
+	testCallGetWidgetsOk(t, false, true, false)
+}
+
+func TestCallGetWidgetsFromWithBlockResOk(t *testing.T) {
+	testCallGetWidgetsOk(t, true, false, true)
 }

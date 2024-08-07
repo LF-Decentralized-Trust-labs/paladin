@@ -41,10 +41,12 @@ import (
 // See blockindexer package for the events side, including WaitForTransaction()
 type EthClient interface {
 	Close()
-	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
+	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	MustABIJSON(abiJson []byte) ABIClient
-	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction) (data ethtypes.HexBytes0xPrefix, err error)
+
+	// Below are raw functions that the ABI() above provides wrappers for
+	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error)
 	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error)
 	SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
 }
@@ -116,7 +118,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	return nil
 }
 
-func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction) (data ethtypes.HexBytes0xPrefix, err error) {
+func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error) {
 
 	if from != nil {
 		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
@@ -126,7 +128,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
 	}
 
-	if rpcErr := ec.rpc.CallRPC(ctx, &data, "eth_call", tx); rpcErr != nil {
+	if rpcErr := ec.rpc.CallRPC(ctx, &data, "eth_call", tx, block); rpcErr != nil {
 		log.L(ctx).Errorf("eth_call failed: %+v", rpcErr)
 		return nil, rpcErr.Error()
 	}

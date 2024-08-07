@@ -34,8 +34,9 @@ import (
 type mockEth struct {
 	eth_chainId             func(context.Context) (ethtypes.HexUint64, error)
 	eth_getTransactionCount func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
-	eth_estimateGas         func(ctx context.Context, b ethsigner.Transaction) (ethtypes.HexInteger, error)
+	eth_estimateGas         func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
 	eth_sendRawTransaction  func(context.Context, ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
+	eth_call                func(context.Context, ethsigner.Transaction, string) (ethtypes.HexBytes0xPrefix, error)
 }
 
 func newTestClientAndServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context.Context, ec *ethClient, done func()) {
@@ -73,7 +74,8 @@ func newTestClientAndServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context
 		Add("eth_chainId", rpcserver.RPCMethod0(mEth.eth_chainId)).
 		Add("eth_getTransactionCount", rpcserver.RPCMethod2(mEth.eth_getTransactionCount)).
 		Add("eth_estimateGas", rpcserver.RPCMethod1(mEth.eth_estimateGas)).
-		Add("eth_sendRawTransaction", rpcserver.RPCMethod1(mEth.eth_sendRawTransaction)),
+		Add("eth_sendRawTransaction", rpcserver.RPCMethod1(mEth.eth_sendRawTransaction)).
+		Add("eth_call", rpcserver.RPCMethod2(mEth.eth_call)),
 	)
 
 	kmgr, err := NewSimpleTestKeyManager(ctx, &signer.Config{

@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"strconv"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -51,6 +52,8 @@ type ABIFunctionRequestBuilder interface {
 	Signer(string) ABIFunctionRequestBuilder
 	To(*ethtypes.Address0xHex) ABIFunctionRequestBuilder
 	GasLimit(*big.Int) ABIFunctionRequestBuilder
+	BlockRef(blockRef BlockRef) ABIFunctionRequestBuilder
+	Block(uint64) ABIFunctionRequestBuilder
 	Input(any) ABIFunctionRequestBuilder
 	Output(any) ABIFunctionRequestBuilder
 
@@ -59,6 +62,16 @@ type ABIFunctionRequestBuilder interface {
 	RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error)
 	SignAndSend() (txHash ethtypes.HexBytes0xPrefix, err error)
 }
+
+type BlockRef string
+
+const (
+	LATEST    BlockRef = "latest"
+	EARLIEST  BlockRef = "earliest"
+	PENDING   BlockRef = "pending"
+	SAFE      BlockRef = "safe"
+	FINALIZED BlockRef = "finalized"
+)
 
 type abiClient struct {
 	ec        *ethClient
@@ -79,6 +92,7 @@ type abiFunctionRequestBuilder struct {
 	ctx       context.Context
 	txVersion EthTXVersion
 	tx        ethsigner.Transaction
+	block     string
 	fromStr   *string
 	input     any
 	output    any
@@ -101,6 +115,11 @@ func (ec *ethClient) ABI(ctx context.Context, a abi.ABI) (ABIClient, error) {
 			return nil, err
 		}
 		if e.Name != "" && e.IsFunction() {
+			for i, o := range e.Outputs {
+				if o.Name == "" {
+					o.Name = strconv.Itoa(i)
+				}
+			}
 			functions[e.Name] = e
 			functions[s] = e
 		}
@@ -156,9 +175,10 @@ func (abic *abiClient) ABI() abi.ABI {
 
 func (ac *abiFunctionClient) R(ctx context.Context) ABIFunctionRequestBuilder {
 	return &abiFunctionRequestBuilder{
+		ctx:               ctx,
 		txVersion:         EIP1559,
 		abiFunctionClient: ac,
-		ctx:               ctx,
+		block:             "latest",
 	}
 }
 
@@ -182,6 +202,16 @@ func (ac *abiFunctionRequestBuilder) GasLimit(gas *big.Int) ABIFunctionRequestBu
 	return ac
 }
 
+func (ac *abiFunctionRequestBuilder) BlockRef(blockRef BlockRef) ABIFunctionRequestBuilder {
+	ac.block = string(blockRef)
+	return ac
+}
+
+func (ac *abiFunctionRequestBuilder) Block(block uint64) ABIFunctionRequestBuilder {
+	ac.block = "0x" + strconv.FormatUint(block, 16)
+	return ac
+}
+
 func (ac *abiFunctionRequestBuilder) Input(input any) ABIFunctionRequestBuilder {
 	ac.input = input
 	return ac
@@ -192,7 +222,7 @@ func (ac *abiFunctionRequestBuilder) Output(output any) ABIFunctionRequestBuilde
 	return ac
 }
 
-func (ac *abiFunctionRequestBuilder) BuildCallData() error {
+func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 	if ac.input == nil {
 		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
 	}
@@ -201,10 +231,19 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() error {
 	}
 	// Encode the call data
 	var inputMap map[string]any
-	var jsonInput []byte
-	jsonInput, err := json.Marshal(ac.input)
-	if err == nil {
-		err = json.Unmarshal(jsonInput, &inputMap)
+	switch input := ac.input.(type) {
+	case map[string]any:
+		inputMap = input
+	case string:
+		err = json.Unmarshal([]byte(input), &inputMap)
+	case []byte:
+		err = json.Unmarshal(input, &inputMap)
+	default:
+		var jsonInput []byte
+		jsonInput, err = json.Marshal(ac.input)
+		if err == nil {
+			err = json.Unmarshal(jsonInput, &inputMap)
+		}
 	}
 	var cv *abi.ComponentValue
 	if err == nil {
@@ -243,7 +282,7 @@ func (ac *abiFunctionRequestBuilder) CallJSON() (jsonData []byte, err error) {
 			return nil, err
 		}
 	}
-	resData, err := ac.ec.CallContract(ac.ctx, ac.fromStr, &ac.tx)
+	resData, err := ac.ec.CallContract(ac.ctx, ac.fromStr, &ac.tx, ac.block)
 	if err != nil {
 		return nil, err
 	}
