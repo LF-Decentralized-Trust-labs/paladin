@@ -146,6 +146,7 @@ var (
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock    = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
 	MsgBlockIndexerInvalidWebSocketURL = ffe("PD011301", "Invalid WebSocket URL: %s")
+	MsgBlockIndexerInvalidHTTPURL      = ffe("PD011302", "Invalid HTTP URL: %s")
 
 	// Signing module PD0114XX
 	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it not a directory")
@@ -169,4 +170,9 @@ var (
 	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
 	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
 	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
+
+	// EthClient module PD0115XX
+	MsgEhtClientInvalidInput = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
+	MsgEhtClientMissingFrom  = ffe("PD011501", "Signer required")
+	MsgEhtClientMissingInput = ffe("PD011502", "Input required")
 )

@@ -9,7 +9,7 @@ require (
 	github.com/btcsuite/btcd v0.23.5-0.20231215221805-96c9fd8078fd
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/docker/go-units v0.5.0
-	github.com/go-resty/resty/v2 v2.13.1
+	github.com/go-resty/resty/v2 v2.14.0
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/golangci/golangci-lint v1.59.1
 	github.com/google/uuid v1.6.0
@@ -239,7 +239,7 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
