@@ -273,7 +273,7 @@ func TestDSILatch(t *testing.T) {
 
 	done()
 	err = dsi.run(func(ctx context.Context, dsi DomainStateInterface) error { return nil })
-	assert.Regexp(t, "FF00154", err)
+	assert.Regexp(t, "PD010301", err)
 
 }
 
@@ -371,7 +371,7 @@ func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
 		states: []*StateWithLabels{s1},
 		stateLocks: []*StateLock{
 			s1.Locked,
-			{State: *HashIDKeccak(([]byte)("another")), Spending: true},
+			{State: *types.HashIDKeccak(([]byte)("another")), Spending: true},
 		},
 	}
 
@@ -523,12 +523,12 @@ func TestDSIResetWithMixed(t *testing.T) {
 
 	dc := ss.getDomainContext("domain1")
 
-	state1 := HashIDKeccak(([]byte)("state1"))
+	state1 := types.HashIDKeccak(([]byte)("state1"))
 	sequenceID1 := uuid.New()
 	err := dc.MarkStatesRead(sequenceID1, []string{state1.String()})
 	assert.NoError(t, err)
 
-	state2 := HashIDKeccak(([]byte)("state2"))
+	state2 := types.HashIDKeccak(([]byte)("state2"))
 	sequenceID2 := uuid.New()
 	err = dc.MarkStatesSpending(sequenceID2, []string{state2.String()})
 	assert.NoError(t, err)
