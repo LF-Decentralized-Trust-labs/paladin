@@ -112,7 +112,8 @@ func (ec *ethClient) Close() {
 func (ec *ethClient) setupChainID(ctx context.Context) error {
 	var chainID ethtypes.HexUint64
 	if rpcErr := ec.rpc.CallRPC(ctx, &chainID, "eth_chainId"); rpcErr != nil {
-		return fmt.Errorf("eth_chainId failed: %s", rpcErr.Error())
+		log.L(ctx).Errorf("eth_chainId failed: %+v", rpcErr)
+		return i18n.WrapError(ctx, rpcErr.Error(), msgs.MsgEthChainIDFailed)
 	}
 	ec.chainID = int64(chainID.Uint64())
 	return nil
@@ -177,7 +178,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	case LEGACY_ORIGINAL:
 		sigPayload = tx.SignaturePayloadLegacyOriginal()
 	default:
-		return nil, i18n.NewError(ctx, msgs.MsgEthClientInvalidTXVersion)
+		return nil, i18n.NewError(ctx, msgs.MsgEthClientInvalidTXVersion, txVersion)
 	}
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())

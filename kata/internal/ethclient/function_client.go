@@ -33,12 +33,12 @@ type ABIFunctionClient interface {
 	R(ctx context.Context) ABIFunctionRequestBuilder
 }
 
-type EthTXVersion int
+type EthTXVersion string
 
 const (
-	LEGACY_ORIGINAL EthTXVersion = 1
-	LEGACY_EIP155   EthTXVersion = 2
-	EIP1559         EthTXVersion = 3
+	LEGACY_ORIGINAL EthTXVersion = "legacy_original"
+	LEGACY_EIP155   EthTXVersion = "legacy_eip155"
+	EIP1559         EthTXVersion = "eip1559"
 )
 
 type ABIClient interface {
