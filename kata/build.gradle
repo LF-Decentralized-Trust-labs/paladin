@@ -34,6 +34,14 @@ ext {
     ]
 }
 
+configurations {
+    solidityContracts
+}
+
+dependencies {
+    solidityContracts project(path: ":solidity", configuration: "compiledContracts")
+}
+
 task installTools(type:Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
@@ -69,7 +77,19 @@ task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
 ]) {}
 
-task protoc(type:Exec, dependsOn: tasks.makeMocks) {
+task copyTestSolidityBuild(type: Copy, dependsOn: ":solidity:test") {
+    from getProject().configurations.solidityContracts.files() {
+        include "contracts/testcontracts/**/*.json"
+        exclude "contracts/testcontracts/**/*.dbg.json"
+    }
+    eachFile { fcd ->        
+        fcd.setRelativePath(new RelativePath(true, fcd.relativePath.getLastName()))
+    }
+    includeEmptyDirs = false
+    into 'componenttest/testcontracts'
+}
+
+task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestSolidityBuild]) {
     workingDir '.'
     inputs.files(fileTree(".") { include "**/*.proto" })
     outputs.files(fileTree(".") { include "**/*.pb.go" })
@@ -89,6 +109,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
         include "**/*.pb.go"
     }
     delete 'coverage'
+    delete 'componenttest/testcontracts'
 }
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
@@ -187,9 +208,9 @@ abstract class UnitTests extends Exec {
     }
 }
 
+
 abstract class ComponentTest extends Exec {
     {
-        inputs.files(getProject().goFiles)
         outputs.dir('coverage')
 
         workingDir '.'
@@ -223,7 +244,11 @@ task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.go
     args '-tags', "testdbpostgres"
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+task componentTestSQLite(type: ComponentTest, dependsOn: [
+    tasks.setupCoverage,
+    tasks.goGet,
+    tasks.copyTestSolidityBuild,
+    ]) {
 }
 
 

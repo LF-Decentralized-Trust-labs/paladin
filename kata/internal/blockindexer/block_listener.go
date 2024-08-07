@@ -74,8 +74,12 @@ func newBlockListener(ctx context.Context, conf *Config, wsConfig *rpcclient.WSC
 }
 
 func (bl *blockListener) start() {
-	bl.listenLoopDone = make(chan struct{})
-	go bl.listenLoop()
+	bl.mux.Lock()
+	defer bl.mux.Unlock()
+	if bl.listenLoopDone == nil {
+		bl.listenLoopDone = make(chan struct{})
+		go bl.listenLoop()
+	}
 }
 
 func (bl *blockListener) channel() <-chan *BlockInfoJSONRPC {

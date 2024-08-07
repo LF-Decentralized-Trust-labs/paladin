@@ -44,6 +44,8 @@ type ABIClient interface {
 	ABI() abi.ABI
 	Function(ctx context.Context, nameOrFullSig string) (_ ABIFunctionClient, err error)
 	MustFunction(nameOrFullSig string) ABIFunctionClient
+	Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error)
+	MustConstructor(bytecode ethtypes.HexBytes0xPrefix) ABIFunctionClient
 }
 
 type ABIFunctionRequestBuilder interface {
@@ -85,11 +87,14 @@ type abiClient struct {
 }
 
 type abiFunctionClient struct {
-	ec        *ethClient
-	signature string
-	selector  []byte
-	inputs    abi.TypeComponent
-	outputs   abi.TypeComponent
+	ec          *ethClient
+	bytecode    ethtypes.HexBytes0xPrefix
+	signature   string
+	selector    []byte
+	inputCount  int
+	inputs      abi.TypeComponent
+	outputCount int
+	outputs     abi.TypeComponent
 }
 
 type abiFunctionRequestBuilder struct {
@@ -153,13 +158,32 @@ func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ AB
 	if err == nil {
 		ac.selector, err = functionABI.GenerateFunctionSelectorCtx(ctx)
 	}
-	if err == nil {
-		ac.signature, err = functionABI.SignatureCtx(ctx)
+	if err != nil {
+		return nil, err
 	}
+	return ac.functionCommon(ctx, functionABI)
+}
+
+func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error) {
+	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode}
+	functionABI := abic.abi.Constructor()
+	if functionABI == nil {
+		err = i18n.NewError(ctx, msgs.MsgEthClientFunctionNotFound, "constructor")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return ac.functionCommon(ctx, functionABI)
+}
+
+func (ac *abiFunctionClient) functionCommon(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error) {
+	ac.signature, err = functionABI.SignatureCtx(ctx)
 	if err == nil {
+		ac.inputCount = len(functionABI.Inputs)
 		ac.inputs, err = functionABI.Inputs.TypeComponentTreeCtx(ctx)
 	}
 	if err == nil {
+		ac.outputCount = len(functionABI.Outputs)
 		ac.outputs, err = functionABI.Outputs.TypeComponentTreeCtx(ctx)
 	}
 	if err != nil {
@@ -170,6 +194,14 @@ func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ AB
 
 func (abic *abiClient) MustFunction(nameOrFullSig string) ABIFunctionClient {
 	ac, err := abic.Function(context.Background(), nameOrFullSig)
+	if err != nil {
+		panic(err)
+	}
+	return ac
+}
+
+func (abic *abiClient) MustConstructor(bytecode ethtypes.HexBytes0xPrefix) ABIFunctionClient {
+	ac, err := abic.Constructor(context.Background(), bytecode)
 	if err != nil {
 		panic(err)
 	}
@@ -234,44 +266,56 @@ func (ac *abiFunctionRequestBuilder) TX() *ethsigner.Transaction {
 }
 
 func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
-	if ac.input == nil {
-		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
-	}
-	if ac.tx.To == nil {
+	if ac.tx.To != nil && ac.selector == nil {
+		return i18n.NewError(ac.ctx, msgs.MsgEthClientToWithConstructor)
+	} else if ac.tx.To == nil && ac.selector != nil {
 		return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingTo)
 	}
 	// Encode the call data
-	var inputMap map[string]any
-	switch input := ac.input.(type) {
-	case map[string]any:
-		inputMap = input
-	case string:
-		err = json.Unmarshal([]byte(input), &inputMap)
-	case []byte:
-		err = json.Unmarshal(input, &inputMap)
-	case types.RawJSON:
-		err = json.Unmarshal(input, &inputMap)
-	default:
-		var jsonInput []byte
-		jsonInput, err = json.Marshal(ac.input)
+	inputDataRLP := []byte{}
+	if ac.inputCount > 0 {
+		if ac.input == nil {
+			return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
+		}
+		var inputMap map[string]any
+		switch input := ac.input.(type) {
+		case map[string]any:
+			inputMap = input
+		case string:
+			err = json.Unmarshal([]byte(input), &inputMap)
+		case []byte:
+			err = json.Unmarshal(input, &inputMap)
+		case types.RawJSON:
+			err = json.Unmarshal(input, &inputMap)
+		default:
+			var jsonInput []byte
+			jsonInput, err = json.Marshal(ac.input)
+			if err == nil {
+				err = json.Unmarshal(jsonInput, &inputMap)
+			}
+		}
+		var cv *abi.ComponentValue
 		if err == nil {
-			err = json.Unmarshal(jsonInput, &inputMap)
+			cv, err = ac.inputs.ParseExternalCtx(ac.ctx, inputMap)
+		}
+		if err == nil {
+			inputDataRLP, err = cv.EncodeABIDataCtx(ac.ctx)
+		}
+		if err != nil {
+			return i18n.WrapError(ac.ctx, err, msgs.MsgEthClientInvalidInput, ac.signature)
 		}
 	}
-	var cv *abi.ComponentValue
-	if err == nil {
-		cv, err = ac.inputs.ParseExternalCtx(ac.ctx, inputMap)
+	if ac.selector != nil {
+		// function call
+		ac.tx.Data = make([]byte, len(ac.selector)+len(inputDataRLP))
+		copy(ac.tx.Data, ac.selector)
+		copy(ac.tx.Data[len(ac.selector):], inputDataRLP)
+	} else {
+		// constructor
+		ac.tx.Data = make([]byte, len(ac.bytecode)+len(inputDataRLP))
+		copy(ac.tx.Data, ac.bytecode)
+		copy(ac.tx.Data[len(ac.bytecode):], inputDataRLP)
 	}
-	var inputDataRLP []byte
-	if err == nil {
-		inputDataRLP, err = cv.EncodeABIDataCtx(ac.ctx)
-	}
-	if err != nil {
-		return i18n.WrapError(ac.ctx, err, msgs.MsgEthClientInvalidInput, ac.signature)
-	}
-	ac.tx.Data = make([]byte, len(ac.selector)+len(inputDataRLP))
-	copy(ac.tx.Data, ac.selector)
-	copy(ac.tx.Data[len(ac.selector):], inputDataRLP)
 	return nil
 }
 

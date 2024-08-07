@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/types"
@@ -29,6 +30,15 @@ import (
 )
 
 var testABIJSON = ([]byte)(`[
+	{
+		"type": "constructor",
+		"inputs": [
+			{
+				"name": "supplier",
+				"type": "address"
+			}
+		]
+	},
 	{
 		"name": "newWidget",
 		"type": "function",
@@ -309,11 +319,33 @@ func TestFunctionFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
 	defer done()
 	tABI := ec.MustABIJSON(testABIJSON)
-	_, err := tABI.Function(ctx, "wrong")
+	_, err := tABI.Function(ctx, "missing")
 	assert.Regexp(t, "PD011507", err)
+
+	abiFunctionWrong := &abiFunctionClient{ec: ec}
+	_, err = abiFunctionWrong.functionCommon(ctx, &abi.Entry{
+		Type: "function",
+		Name: "wrong",
+		Inputs: abi.ParameterArray{
+			{Type: "!wrong"},
+		},
+	})
+	assert.Regexp(t, "FF22025", err)
 
 	assert.Panics(t, func() {
 		_ = tABI.MustFunction("wrong")
+	})
+}
+
+func TestConstructorFail(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	defer done()
+	tABI := ec.MustABIJSON(([]byte)(`[]`))
+	_, err := tABI.Constructor(ctx, []byte{})
+	assert.Regexp(t, "PD011507", err)
+
+	assert.Panics(t, func() {
+		_ = tABI.MustConstructor([]byte{})
 	})
 }
 
@@ -358,10 +390,12 @@ func TestMissingInputs(t *testing.T) {
 	defer done()
 	getWidgets := ec.MustABIJSON(testABIJSON).MustFunction("getWidgets")
 
-	err := getWidgets.R(ctx).Call()
+	to := ethtypes.MustNewAddress("0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e")
+
+	err := getWidgets.R(ctx).To(to).Call()
 	assert.Regexp(t, "PD011504", err)
 
-	err = getWidgets.R(ctx).Output("supplied").Call()
+	err = getWidgets.R(ctx).To(to).Output("supplied").Call()
 	assert.Regexp(t, "PD011503", err)
 
 	err = getWidgets.R(ctx).Output("supplied").Input("supplied").Call()
@@ -369,6 +403,10 @@ func TestMissingInputs(t *testing.T) {
 
 	_, err = getWidgets.R(ctx).Output("supplied").Input("supplied").RawTransaction()
 	assert.Regexp(t, "PD011502", err)
+
+	err = ec.MustABIJSON(testABIJSON).MustConstructor([]byte{}).R(ctx).Output("supplied").Input("supplied").To(to).Call()
+	assert.Regexp(t, "PD011510", err)
+
 }
 
 func TestBuildCallData(t *testing.T) {
@@ -420,5 +458,56 @@ func TestBuildCallData(t *testing.T) {
 	}).BuildCallData()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
+
+}
+
+func TestInvokeConstructor(t *testing.T) {
+
+	fakeBytecode := ([]byte)(`some_bytes`)
+
+	var testABI ABIClient
+	var key1 string
+	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+		eth_getTransactionCount: func(ctx context.Context, a ethtypes.Address0xHex, block string) (ethtypes.HexUint64, error) {
+			assert.Equal(t, key1, a.String())
+			assert.Equal(t, "latest", block)
+			return 10, nil
+		},
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
+			return *ethtypes.NewHexInteger64(100000), nil
+		},
+		eth_sendRawTransaction: func(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
+			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, rawTX, 12345)
+			assert.NoError(t, err)
+			assert.Equal(t, key1, addr.String())
+			assert.Equal(t, int64(10), tx.Nonce.Int64())
+			assert.Equal(t, int64(200000 /* 2x estimate */), tx.GasLimit.Int64())
+
+			cv, err := testABI.ABI().Constructor().Inputs.DecodeABIData(tx.Data, len(fakeBytecode))
+			assert.NoError(t, err)
+			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
+			assert.NoError(t, err)
+			assert.JSONEq(t, `{
+				"supplier": "0xfb75836dc4130a9462fafd8fe96c8ee376e2f32e"
+			}`, string(jsonData))
+
+			hash := sha3.NewLegacyKeccak256()
+			_, _ = hash.Write(rawTX)
+			return hash.Sum(nil), nil
+		},
+	})
+	defer done()
+
+	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	assert.NoError(t, err)
+
+	testABI = ec.MustABIJSON(testABIJSON)
+	req := testABI.MustConstructor(fakeBytecode).R(ctx).
+		Signer("key1").
+		Input(`{"supplier": "0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e"}`)
+	txHash, err := req.SignAndSend()
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, txHash)
 
 }
