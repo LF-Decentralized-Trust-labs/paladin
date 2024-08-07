@@ -1,5 +1,6 @@
 rootProject.name = 'paladin'
 
-includeBuild 'pente'
 include 'kata'
+include 'pente'
 include 'portara'
+include 'solidity'
