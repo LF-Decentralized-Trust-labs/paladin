@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -89,5 +90,60 @@ func TestWebSocketConnectionFailureHandling(t *testing.T) {
 
 	// Give it some good data to discard
 	wsConn.sendMessage("anything")
+
+}
+
+func TestWebSocketEthSubscribeUnsubscribe(t *testing.T) {
+	url, s, done := newTestServerWebSockets(t, &Config{})
+	defer done()
+
+	client := rpcbackend.NewWSRPCClient(&wsclient.WSConfig{WebSocketURL: url, DisableReconnect: true})
+	defer client.Close()
+	err := client.Connect(context.Background())
+	assert.NoError(t, err)
+
+	var wsConn *webSocketConnection
+	before := time.Now()
+	for wsConn == nil {
+		time.Sleep(1 * time.Millisecond)
+		for _, wsConn = range s.wsConnections {
+		}
+		if time.Since(before) > 1*time.Second {
+			panic("timed out waiting for connection")
+		}
+	}
+
+	rpcErr := client.CallRPC(context.Background(), &types.RawJSON{}, "eth_subscribe")
+	assert.Regexp(t, "PD011004", rpcErr.Message)
+	rpcErr = client.CallRPC(context.Background(), &types.RawJSON{}, "eth_unsubscribe")
+	assert.Regexp(t, "PD011004", rpcErr.Message)
+
+	sub1, rpcErr := client.Subscribe(context.Background(), "myEvents", map[string]interface{}{"extra": "params"})
+	assert.Nil(t, rpcErr)
+
+	_, rpcErr = client.Subscribe(context.Background(), "otherEvents")
+	assert.Nil(t, rpcErr)
+
+	assert.Len(t, wsConn.subscriptions, 2)
+	assert.JSONEq(t, `{"extra": "params"}`, wsConn.subscriptions[0].params.String())
+
+	go s.EthPublish("myEvents", map[string]interface{}{"some": "thing"})
+
+	notification := <-sub1.Notifications()
+	assert.NotNil(t, notification)
+	assert.JSONEq(t, `{"some": "thing"}`, notification.Result.String())
+
+	rpcErr = sub1.Unsubscribe(context.Background())
+	assert.Nil(t, rpcErr)
+
+	assert.Len(t, wsConn.subscriptions, 1)
+	assert.Equal(t, "otherEvents", wsConn.subscriptions[0].eventType)
+
+	// Close the connection
+	client.Close()
+	<-wsConn.closing
+	for !wsConn.closed {
+		time.Sleep(1 * time.Microsecond)
+	}
 
 }

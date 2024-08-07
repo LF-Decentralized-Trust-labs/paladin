@@ -29,7 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader) (interface{}, bool) {
+func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketConnection) (interface{}, bool) {
 
 	b, err := io.ReadAll(r)
 	if err != nil {
@@ -52,6 +52,13 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader) (interface{}, b
 	err = json.Unmarshal(b, &rpcRequest)
 	if err != nil {
 		return s.replyRPCParseError(ctx, b, err)
+	}
+	if wsc != nil {
+		if rpcRequest.Method == "eth_subscribe" {
+			return s.processSubscribe(ctx, &rpcRequest, wsc)
+		} else if rpcRequest.Method == "eth_unsubscribe" {
+			return s.processUnsubscribe(ctx, &rpcRequest, wsc)
+		}
 	}
 	return s.processRPC(ctx, &rpcRequest)
 
