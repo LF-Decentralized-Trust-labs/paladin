@@ -149,7 +149,7 @@ var (
 	MsgBlockIndexerInvalidHTTPURL      = ffe("PD011302", "Invalid HTTP URL: %s")
 
 	// Signing module PD0114XX
-	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it not a directory")
+	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
 	MsgSigningModuleBadKeyFile                  = ffe("PD011401", "Key file '%s' does not exist")
 	MsgSigningModuleBadPassFile                 = ffe("PD011402", "Password file '%s' does not exist")
 	MsgSigningModuleBadKeyHandle                = ffe("PD011403", "Invalid key handle")
@@ -158,7 +158,7 @@ var (
 	MsgSigningModuleKeyNotExist                 = ffe("PD011406", "Key '%s' does not exist")
 	MsgSigningUnsupportedKeyStoreType           = ffe("PD011407", "Unsupported key store type: '%s'")
 	MsgSigningHierarchicalRequiresLoading       = ffe("PD011408", "Signing module has been configured to disallow in-memory key material. Hierarchical Deterministic (HD) wallet function implemented in the signing module requires in-memory key material")
-	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s with this key storage system")
+	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s")
 	MsgSigningUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
 	MsgSigningMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
 	MsgSigningHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
