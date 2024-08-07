@@ -220,7 +220,7 @@ abstract class ComponentTest extends Exec {
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/..."
         args '-covermode=atomic'
-        args '-timeout=300s'
+        args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
     }
 }
@@ -245,6 +245,7 @@ task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.go
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
+    ':testinfra:startTestInfra',
     tasks.setupCoverage,
     tasks.goGet,
     tasks.copyTestSolidityBuild,
