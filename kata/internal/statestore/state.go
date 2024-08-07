@@ -28,10 +28,10 @@ import (
 )
 
 type State struct {
-	Hash        HashID             `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash        types.HashID       `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	CreatedAt   types.Timestamp    `json:"created"             gorm:"autoCreateTime:nano"`
 	DomainID    string             `json:"domain"`
-	Schema      HashID             `json:"schema"              gorm:"embedded;embeddedPrefix:schema_;"`
+	Schema      types.HashID       `json:"schema"              gorm:"embedded;embeddedPrefix:schema_;"`
 	Data        types.RawJSON      `json:"data"`
 	Labels      []*StateLabel      `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 	Int64Labels []*StateInt64Label `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
@@ -47,13 +47,13 @@ type StateWithLabels struct {
 }
 
 type StateLabel struct {
-	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	State types.HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
 	Label string
 	Value string
 }
 
 type StateInt64Label struct {
-	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	State types.HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
 	Label string
 	Value int64
 }
@@ -86,7 +86,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
-	hash, err := ParseHashID(ctx, stateID)
+	hash, err := types.ParseHashID(ctx, stateID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	hash, err := ParseHashID(ctx, stateID)
+	hash, err := types.ParseHashID(ctx, stateID)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 }
 
 func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	hash, err := ParseHashID(ctx, stateID)
+	hash, err := types.ParseHashID(ctx, stateID)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 }
 
 func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID, creating, spending bool) error {
-	hash, err := ParseHashID(ctx, stateID)
+	hash, err := types.ParseHashID(ctx, stateID)
 	if err != nil {
 		return err
 	}

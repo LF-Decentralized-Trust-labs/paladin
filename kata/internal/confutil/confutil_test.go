@@ -41,6 +41,11 @@ func TestInt64(t *testing.T) {
 	assert.Equal(t, int64(5), Int64Min(P(int64(5)), 1, 10))
 }
 
+func TestFloat64(t *testing.T) {
+	assert.Equal(t, float64(10), Float64Min(P(float64(0)), 1, 10))
+	assert.Equal(t, float64(5), Float64Min(P(float64(5)), 1, 10))
+}
+
 func TestUnixFilePerm(t *testing.T) {
 	assert.Equal(t, fs.FileMode(0644), UnixFileMode(nil, "0644"))
 	assert.Equal(t, fs.FileMode(0644), UnixFileMode(P(""), "0644"))
@@ -253,7 +258,6 @@ func TestReadAndParseYAMLFileFailMissingFile(t *testing.T) {
 
 func TestReadAndParseYAMLFileFailDirNotFile(t *testing.T) {
 	ctx := context.Background()
-
 	err := ReadAndParseYAMLFile(ctx, t.TempDir(), P(struct{}{}))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "PD010501")
