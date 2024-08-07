@@ -180,5 +180,6 @@ var (
 	MsgEthClientInvalidTXVersion = ffe("PD011505", "Invalid TX Version (%s)")
 	MsgEthClientABIJson          = ffe("PD011506", "JSON ABI parsing failed")
 	MsgEthClientFunctionNotFound = ffe("PD011507", "Function %q not found on ABI")
-	MsgEthChainIDFailed          = ffe("PD011508", "Failed to query chain ID")
+	MsgEthClientChainIDFailed    = ffe("PD011508", "Failed to query chain ID")
+	MsgEthClientKeyMismatch      = ffe("PD011509", "Resolved %q to different key handle expected=%q received=%q")
 )

@@ -113,7 +113,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	var chainID ethtypes.HexUint64
 	if rpcErr := ec.rpc.CallRPC(ctx, &chainID, "eth_chainId"); rpcErr != nil {
 		log.L(ctx).Errorf("eth_chainId failed: %+v", rpcErr)
-		return i18n.WrapError(ctx, rpcErr.Error(), msgs.MsgEthChainIDFailed)
+		return i18n.WrapError(ctx, rpcErr.Error(), msgs.MsgEthClientChainIDFailed)
 	}
 	ec.chainID = int64(chainID.Uint64())
 	return nil

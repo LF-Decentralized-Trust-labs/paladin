@@ -17,8 +17,11 @@ package ethclient
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
@@ -38,7 +41,7 @@ func (mkm *mockKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (*p
 	return mkm.sign(ctx, req)
 }
 
-func newTestHDWalletKeyManager(t *testing.T) KeyManager {
+func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
 	kmgr, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
 		KeyDerivation: signer.KeyDerivationConfig{
 			Type: signer.KeyDerivationTypeBIP32,
@@ -56,6 +59,59 @@ func newTestHDWalletKeyManager(t *testing.T) KeyManager {
 		},
 	})
 	assert.NoError(t, err)
-	return kmgr
+	return kmgr.(*simpleKeyManager)
+}
 
+func TestSimpleKeyManagerInitFail(t *testing.T) {
+	_, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
+		KeyDerivation: signer.KeyDerivationConfig{
+			Type: signer.KeyDerivationTypeBIP32,
+		},
+		KeyStore: signer.StoreConfig{
+			Type: signer.KeyStoreTypeStatic,
+		},
+	})
+	assert.Regexp(t, "PD011418", err)
+
+}
+
+func TestGenerateIndexes(t *testing.T) {
+	kmgr := newTestHDWalletKeyManager(t)
+	for iFolder := 0; iFolder < 10; iFolder++ {
+		for iKey := 0; iKey < 10; iKey++ {
+			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, ethtypes.MustNewAddress(addr))
+			assert.Equal(t, fmt.Sprintf("m/44'/60'/0'/%d/%d", iFolder, iKey), keyHandle)
+		}
+	}
+}
+
+func TestKeyManagerResolveFail(t *testing.T) {
+
+	kmgr, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
+		KeyStore: signer.StoreConfig{
+			Type: signer.KeyStoreTypeStatic,
+		},
+	})
+	assert.NoError(t, err)
+
+	_, _, err = kmgr.ResolveKey(context.Background(), "does not exist", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	assert.Regexp(t, "PD011418", err)
+}
+
+func TestKeyManagerResolveConflict(t *testing.T) {
+
+	kmgr := newTestHDWalletKeyManager(t)
+
+	kmgr.rootFolder.Keys = map[string]*keyMapping{
+		"key1": {
+			Name:        "key1",
+			KeyHandle:   "existing",
+			Identifiers: map[string]string{},
+		},
+	}
+
+	_, _, err := kmgr.ResolveKey(context.Background(), "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	assert.Regexp(t, "PD011509", err)
 }

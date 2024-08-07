@@ -17,10 +17,11 @@ package ethclient
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 )
@@ -119,18 +120,14 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 			loc.Children++
 			loc.Keys[key.Name] = key
 		} else if resolved.KeyHandle != key.KeyHandle {
-			return "", "", fmt.Errorf("resolved %q to different key handle expected=%q received=%q", identifier, key.KeyHandle, resolved.KeyHandle)
+			return "", "", i18n.NewError(ctx, msgs.MsgEthClientKeyMismatch, identifier, key.KeyHandle, resolved.KeyHandle)
 		}
 		for _, v := range resolved.Identifiers {
 			key.Identifiers[v.Algorithm] = v.Identifier
 		}
 	}
 	// Double check we have the identifier we need
-	verifier = key.Identifiers[algorithm]
-	if verifier == "" {
-		return "", "", fmt.Errorf("key verifier not established for algorithm %s", algorithm)
-	}
-	return key.KeyHandle, verifier, nil
+	return key.KeyHandle, key.Identifiers[algorithm], nil
 }
 
 func (km *simpleKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
