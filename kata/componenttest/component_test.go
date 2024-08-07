@@ -125,6 +125,7 @@ persistence:
 eth:  
     ws:
         url: ws://localhost:8546
+        initialConnectAttempts: 25
 keys:
     keyDerivation:
       type: bip32

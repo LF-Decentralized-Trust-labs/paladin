@@ -220,7 +220,7 @@ abstract class ComponentTest extends Exec {
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/..."
         args '-covermode=atomic'
-        args '-timeout=30s'
+        args '-timeout=300s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
     }
 }
