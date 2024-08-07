@@ -33,6 +33,7 @@ type Server interface {
 	Register(module *RPCModule)
 	Start() error
 	Stop()
+	EthPublish(eventType string, result interface{}) // Note this is an `eth_` specific extension, with no ack or reliability
 	HTTPAddr() net.Addr
 	WSAddr() net.Addr
 }
@@ -97,7 +98,7 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body)
+	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
 	status := http.StatusOK

@@ -49,7 +49,6 @@ task besuBootstrapTool(type: Exec) {
     args "build"
     args "-t", "paladin/besu_bootstrap"
     args "-f", "besu_bootstrap/Dockerfile"
-    args "-q"
     args "."
 }
 
