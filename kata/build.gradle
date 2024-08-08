@@ -31,7 +31,7 @@ ext {
         'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/kata/domain_testbed',
+        'github.com/kaleido-io/paladin/kata/testbed',
     ]
 }
 
@@ -65,46 +65,6 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task setupSolidityNodeJS(type:Exec) {
-    workingDir "solidity"
-    executable 'npm'
-    args 'i'
-    inputs.files([
-        "solidity/package.json",
-        "solidity/package-lock.json",
-    ])
-    outputs.files([
-        "solidity/package-lock.json",
-    ])
-    outputs.dir("solidity/node_modules")
-}
-
-task compileTestSolidity(type:Exec, dependsOn: tasks.setupSolidityNodeJS) {
-    workingDir "solidity"
-    executable 'npx'
-    args 'hardhat'
-    args 'test'
-    inputs.files(fileTree("solidity") {
-        include "contracts/**/*.sol"
-        include "test/**/*.ts"
-    })
-    outputs.dirs([
-        "solidity/artifacts",
-        "solidity/cache",
-        "solidity/typechain-types",
-    ])
-}
-
-task copyDomainSIMContractsToTestbed(type:Copy, dependsOn: compileTestSolidity) {
-    from('solidity/artifacts/contracts/testbed_sim/SIMDomain.sol') {
-        include 'SIMDomain.json'
-    }
-    from('solidity/artifacts/contracts/testbed_sim/SIMToken.sol') {
-        include 'SIMToken.json'
-    }
-    into 'domain_testbed'
-}
-
 task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
     inputs.files('bin/mockery')
     outputs.dir('mocks/rpcbackendmocks')
@@ -126,6 +86,19 @@ task copyTestContracts(type: Copy) {
         include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
     }
     into 'componenttest/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task copyTestbedContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testbed_sim/SIMDomain.sol/SIMDomain.json'
+        include 'contracts/testbed_sim/SIMToken.sol/SIMToken.json'
+    }
+    into 'testbed/abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }
@@ -261,7 +234,7 @@ abstract class ComponentTest extends Exec {
         Date startTime = new Date();
 
         inputs.files(getProject().goFiles)
-        inputs.files(getProject().fileTree("domain_testbed") {
+        inputs.files(getProject().fileTree("testbed") {
             include "**/*.json"
         })
 
@@ -270,7 +243,7 @@ abstract class ComponentTest extends Exec {
         workingDir '.'
         executable 'go'
         args 'test'
-        args './componenttest', './domain_testbed'
+        args './componenttest', './testbed'
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/..."
         args '-covermode=atomic'
@@ -318,6 +291,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     tasks.setupCoverage,
     tasks.goGet,
     tasks.copyTestContracts,
+    tasks.copyTestbedContracts,
     ]) {
 }
 

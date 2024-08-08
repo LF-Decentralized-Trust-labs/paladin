@@ -33,7 +33,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-//go:embed SIMDomain.json
+//go:embed abis/SIMDomain.json
 var simDomainBuild []byte // comes from Hardhat build
 
 func parseBuildABI(t *testing.T, buildJSON []byte) *abi.ABI {

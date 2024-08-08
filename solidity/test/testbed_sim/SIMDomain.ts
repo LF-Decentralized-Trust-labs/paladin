@@ -36,7 +36,7 @@ describe("SIMDomain", function () {
       const simToken = SIMToken.connect(notary);
 
       const SINGLE_FUNCTION_SELECTOR = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("SIMToken()"));
-      const randBytes32 = () => hre.ethers.randomBytes(32);
+      const randBytes32 = () => "0x" + Buffer.from(hre.ethers.randomBytes(32)).toString('hex');
       const txID = randBytes32();
       const signature = randBytes32();
       const inputs = [randBytes32(), randBytes32()];
