@@ -35,7 +35,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	sm, err := NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type:                  KeyDerivationTypeBIP32,
-			BIP44Prefix:           confutil.P("m/44'/60'/0'/0"),
+			BIP44Prefix:           confutil.P(" m / 44' / 60' / 0' / 0 "), // we allow friendly spaces here
 			BIP44HardenedSegments: confutil.P(0),
 		},
 		KeyStore: StoreConfig{

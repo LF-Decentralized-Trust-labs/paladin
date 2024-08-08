@@ -36,9 +36,11 @@ var (
 )
 
 func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationConfig) (err error) {
+	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix)
+	bip44Prefix = strings.ReplaceAll(bip44Prefix, " ", "")
 	sm.hd = &hdDerivation{
 		sm:                    sm,
-		bip44Prefix:           confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix),
+		bip44Prefix:           bip44Prefix,
 		bip44DirectResolution: conf.BIP44DirectResolution,
 		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *KeyDerivationDefaults.BIP44HardenedSegments),
 	}
