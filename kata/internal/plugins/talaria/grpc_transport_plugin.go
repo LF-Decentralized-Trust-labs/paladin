@@ -163,7 +163,7 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 	// Now bring up the external endpoint other Paladin's are going to speak to us on
 	if externalServer == nil {
 		// Mostly put behind an interface to make stubbing for UTs easy
-		externalServer, err = NewExternalGRPCServer(ctx, provider.externalListenPort, 10)
+		externalServer, err = NewExternalGRPCServer(ctx, provider.externalListenPort, 10, nil, nil)
 		if err != nil {
 			return err
 		}

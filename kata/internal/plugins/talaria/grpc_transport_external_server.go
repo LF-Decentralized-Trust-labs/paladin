@@ -2,11 +2,14 @@ package grpctransport
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -18,9 +21,11 @@ import (
 type ExternalMessage struct {
 	proto.Message
 
+	// Where are we sending the message to?
 	ExternalAddress string
 
-	// TODO: mTLS certs
+	// Who signed the cert of the endpoint we're talking to?
+	CACertificate string
 }
 
 type ExternalServer interface {
@@ -32,8 +37,11 @@ type ExternalServer interface {
 type externalGRPCServer struct {
 	interPaladinPB.UnimplementedInterPaladinTransportServer
 
-	grpcListener net.Listener
-	server       *grpc.Server
+	grpcListener      net.Listener
+	server            *grpc.Server
+	clientCertificate *tls.Certificate
+	serverCertificate *tls.Certificate
+	serverCertPool    *x509.CertPool
 
 	// TODO: We probably don't want to do this, what happens when we're not consuming messages correctly?
 	recvMessages map[destination]chan *proto.Message
@@ -41,11 +49,21 @@ type externalGRPCServer struct {
 	port         int
 }
 
-func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int) (*externalGRPCServer, error) {
+func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int, serverCertificate *tls.Certificate, clientCertificate *tls.Certificate) (*externalGRPCServer, error) {
+	if clientCertificate == nil {
+		log.L(ctx).Warnf("grpcexternal: no client certificate provided, server will be unable to do mTLS")
+	}
+
+	if serverCertificate == nil {
+		log.L(ctx).Warnf("grpcexternal: no server certificate provided, server will be unable to do TLS")
+	}
+
 	server := &externalGRPCServer{
-		recvMessages: make(map[destination]chan *proto.Message, bufferSize),
-		sendMessages: make(chan *ExternalMessage, bufferSize),
-		port:         port,
+		recvMessages:      make(map[destination]chan *proto.Message, bufferSize),
+		sendMessages:      make(chan *ExternalMessage, bufferSize),
+		port:              port,
+		clientCertificate: clientCertificate,
+		serverCertificate: serverCertificate,
 	}
 
 	err := server.initializeExternalListener(ctx)
@@ -75,6 +93,32 @@ func (egs *externalGRPCServer) Shutdown() {
 }
 
 func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) error {
+	var serverTLSConfig *tls.Config
+	if egs.serverCertificate != nil {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			log.L(ctx).Errorf("grpctransport: could not get system cert pool, continuing with an empty cert pool, err: %v", err)
+			rootCAs = x509.NewCertPool()
+		}
+
+		// Done so we can live update the CAs we trust
+		egs.serverCertPool = rootCAs
+		serverTLSConfig = &tls.Config{
+			RootCAs:      egs.serverCertPool,
+			Certificates: []tls.Certificate{*egs.serverCertificate},
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    egs.serverCertPool,
+		}
+	}
+
+	var clientTLSConfig *tls.Config
+	if egs.clientCertificate != nil {
+		clientTLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{*egs.clientCertificate},
+			RootCAs:      egs.serverCertPool, // Client connections trust the same CAs as we accept on the server
+		}
+	}
+
 	externalGRPCListener, err := net.Listen("tcp", fmt.Sprintf(":%d", egs.port))
 	if err != nil {
 		log.L(ctx).Errorf("grpctransport: failed to listen for external grpc connections: %v", err)
@@ -82,11 +126,18 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 	}
 
 	egs.grpcListener = externalGRPCListener
-	s := grpc.NewServer()
+
+	var s *grpc.Server
+	if serverTLSConfig != nil {
+		s = grpc.NewServer(grpc.Creds(credentials.NewTLS(serverTLSConfig)))
+	} else {
+		s = grpc.NewServer()
+	}
+
 	egs.server = s
 	interPaladinPB.RegisterInterPaladinTransportServer(s, egs)
 
-	// Monitor new inbound messages coming in
+	// Monitor new messages coming in from the network
 	go func() {
 		log.L(ctx).Infof("grpctransport: external gRPC endpoint listening at %v", externalGRPCListener.Addr())
 		if err := s.Serve(externalGRPCListener); err != nil {
@@ -97,7 +148,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 		}
 	}()
 
-	// And also monitor the send queue
+	// Also monitor the send queue for us to send outbound messages from
 	go func() {
 		for {
 			select {
@@ -105,6 +156,11 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 				return
 			case sendMsg := <-egs.sendMessages:
 				{
+					// Need to get the client cert out of the message and put this in our pool
+					if ok := egs.serverCertPool.AppendCertsFromPEM([]byte(sendMsg.CACertificate)); !ok {
+						log.L(ctx).Errorf("grpctransport: could not append the client cert to the pool")
+					}
+
 					bytes, err := anypb.New(sendMsg)
 					if err != nil {
 						log.L(ctx).Errorf("grpctransport: could not send message")
@@ -115,9 +171,17 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 						Body: bytes,
 					}
 
-					conn, err := grpc.NewClient(sendMsg.ExternalAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-					if err != nil {
-						log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
+					var conn *grpc.ClientConn
+					if clientTLSConfig != nil {
+						conn, err = grpc.NewClient(sendMsg.ExternalAddress, grpc.WithTransportCredentials(credentials.NewTLS(clientTLSConfig)))
+						if err != nil {
+							log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
+						}
+					} else {
+						conn, err = grpc.NewClient(sendMsg.ExternalAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+						if err != nil {
+							log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
+						}
 					}
 					defer conn.Close()
 
@@ -128,7 +192,6 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 						log.L(ctx).Errorf("error sending message: %s", err.Error())
 					}
 
-					// TODO: mTLS plug point goes here
 					return
 				}
 			}
