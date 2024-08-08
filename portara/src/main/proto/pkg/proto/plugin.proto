@@ -13,25 +13,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+syntax = "proto3";
 
-import (
-	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
-)
+package github.com.kaleido_io.paladin.kata.plugin;
+option go_package = "pkg/proto/plugin";
 
-type FileSystemConfig struct {
-	Path     *string      `yaml:"path"`
-	Cache    cache.Config `yaml:"cache"`
-	FileMode *string      `yaml:"fileMode"`
-	DirMode  *string      `yaml:"dirMode"`
+message CreateInstance {
+    string name = 1;
+    string messageDestination = 2;
 }
 
-var FileSystemDefaults = &FileSystemConfig{
-	Path:     confutil.P("keystore"),
-	FileMode: confutil.P("0600"),
-	DirMode:  confutil.P("0700"),
-	Cache: cache.Config{
-		Capacity: confutil.P(100),
-	},
+// published whenever a plugin becomes ready
+message PluginProviderReadyEvent {
+  string providerName = 1;
+}
+
+// published whenever a new instance of a plugin becomes ready
+message PluginInstanceReadyEvent {
+  string providerName = 1;
+  string instanceName = 2;
 }

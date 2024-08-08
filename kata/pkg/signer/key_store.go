@@ -20,20 +20,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-rapidsnark/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
-
-// All cryptographic storage needs to support master key encryption, by which the bytes
-// can be decrypted an loaded into volatile memory for use, and then discarded.
-//
-// The implementation is not required to know how to generate or validate such data, just now
-// to securely store and retrieve it using only the information contained in the returned
-// keyHandle. If the implementation finds it does not exist, it can invoke the callback function to generate
-// a new suitable random string to encrypt and store.
-type KeyStore interface {
-	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
-	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
-}
 
 // Some cryptographic storage supports signing directly with secp256k1 curve and an ECDSA algorithm,
 // which is a core signing function used in many Paladin domains, and during base EVM signing.
@@ -44,6 +34,11 @@ type KeyStore interface {
 type KeyStoreSigner_secp256k1 interface {
 	FindOrCreateKey_secp256k1(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error)
 	Sign_secp256k1(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error)
+}
+
+type KeyStoreSigner_snark interface {
+	FindOrCreateKey_snark(ctx context.Context, req *proto.ResolveKeyRequest) (addr *babyjub.PublicKeyComp, keyHandle string, err error)
+	Prove_snark(ctx context.Context, keyHandle string, payload []byte) (*types.ZKProof, error)
 }
 
 // Some cryptographic stores are capable of listing their contents in a natural order.

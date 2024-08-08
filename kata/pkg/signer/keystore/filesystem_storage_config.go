@@ -13,23 +13,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
-type StaticKeyEntryEncoding string
-
-const (
-	StaticKeyEntryEncodingNONE   StaticKeyEntryEncoding = "none"
-	StaticKeyEntryEncodingHEX    StaticKeyEntryEncoding = "hex"
-	StaticKeyEntryEncodingBase64 StaticKeyEntryEncoding = "base64"
+import (
+	"github.com/kaleido-io/paladin/kata/internal/cache"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 )
 
-type StaticKeyEntryConfig struct {
-	Encoding StaticKeyEntryEncoding `yaml:"encoding"`
-	Filename string                 `yaml:"filename"`
-	Trim     bool                   `yaml:"trim"`
-	Inline   string                 `yaml:"inline"`
+type FileSystemConfig struct {
+	Path     *string      `yaml:"path"`
+	Cache    cache.Config `yaml:"cache"`
+	FileMode *string      `yaml:"fileMode"`
+	DirMode  *string      `yaml:"dirMode"`
 }
 
-type StaticKeyStorageConfig struct {
-	Keys map[string]StaticKeyEntryConfig `yaml:"keys"`
+var FileSystemDefaults = &FileSystemConfig{
+	Path:     confutil.P("keystore"),
+	FileMode: confutil.P("0600"),
+	DirMode:  confutil.P("0700"),
+	Cache: cache.Config{
+		Capacity: confutil.P(100),
+	},
 }

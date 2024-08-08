@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
@@ -32,43 +33,28 @@ import (
 func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	ctx := context.Background()
 
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
-				Path: confutil.P(t.TempDir()),
-			},
-		},
+	store, err := NewFilesystemStore(ctx, &FileSystemConfig{
+		Path: confutil.P(t.TempDir()),
 	})
 	assert.NoError(t, err)
 
-	return ctx, sm.(*signingModule).keyStore.(*filesystemStore)
+	return ctx, store.(*filesystemStore)
 }
 
 func TestFileSystemStoreBadDir(t *testing.T) {
 
 	badPath := path.Join(t.TempDir(), "wrong")
 
-	_, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
-				Path: confutil.P(badPath),
-			},
-		},
+	_, err := NewFilesystemStore(context.Background(), &FileSystemConfig{
+		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
 
 	err = os.WriteFile(badPath, []byte{}, 0644)
 	assert.NoError(t, err)
 
-	_, err = NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
-				Path: confutil.P(badPath),
-			},
-		},
+	_, err = NewFilesystemStore(context.Background(), &FileSystemConfig{
+		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
 }
@@ -108,6 +94,37 @@ func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
 	assert.NoError(t, err)
 	_, hasAddressProperty := jsonWallet["address"]
 	assert.False(t, hasAddressProperty)
+
+}
+
+func TestFileSystemStoreCreateBabyjubjub(t *testing.T) {
+	ctx, fs := newTestFilesystemStore(t)
+
+	privKey := babyjub.NewRandPrivKey()
+
+	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
+		Path: []*proto.KeyPathSegment{
+			{Name: "bob"},
+			{Name: "blue"},
+			{Name: "42"},
+		},
+	}, func() ([]byte, error) { return privKey[:], nil })
+	assert.NoError(t, err)
+
+	assert.Equal(t, keyBytes, privKey[:])
+	assert.Equal(t, "bob/blue/42", keyHandle)
+	cached, _ := fs.cache.Get(keyHandle)
+	assert.NotNil(t, cached)
+
+	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
+	assert.NoError(t, err)
+	assert.Equal(t, keyBytes, privKey[:])
+
+	fs.cache.Delete(keyHandle)
+
+	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
+	assert.NoError(t, err)
+	assert.Equal(t, keyBytes, privKey[:])
 
 }
 

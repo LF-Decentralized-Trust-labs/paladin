@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 	"github.com/stretchr/testify/assert"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -40,8 +41,8 @@ func TestHDSigningStaticExample(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+			Static: keystore.StaticKeyStorageConfig{
+				Keys: map[string]keystore.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -83,7 +84,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type:       KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{Path: confutil.P(t.TempDir())},
+			FileSystem: keystore.FileSystemConfig{Path: confutil.P(t.TempDir())},
 		},
 	})
 	assert.NoError(t, err)
@@ -160,8 +161,8 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+			Static: keystore.StaticKeyStorageConfig{
+				Keys: map[string]keystore.StaticKeyEntryConfig{
 					"custom/seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -253,8 +254,8 @@ func TestHDSigningInitFailBadMnemonic(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+			Static: keystore.StaticKeyStorageConfig{
+				Keys: map[string]keystore.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   "wrong",
@@ -285,8 +286,8 @@ func TestHDInitBadSeed(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+			Static: keystore.StaticKeyStorageConfig{
+				Keys: map[string]keystore.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -313,7 +314,7 @@ func TestHDInitGenSeed(t *testing.T) {
 		},
 		KeyStore: StoreConfig{
 			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
+			FileSystem: keystore.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},

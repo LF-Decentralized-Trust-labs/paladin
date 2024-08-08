@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
 import (
 	"context"
@@ -31,17 +31,12 @@ import (
 func newTestStaticStore(t *testing.T, keys map[string]StaticKeyEntryConfig) (context.Context, *staticStore) {
 	ctx := context.Background()
 
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: keys,
-			},
-		},
+	store, err := NewStaticKeyStore(ctx, &StaticKeyStorageConfig{
+		Keys: keys,
 	})
 	assert.NoError(t, err)
 
-	return ctx, sm.(*signingModule).keyStore.(*staticStore)
+	return ctx, store.(*staticStore)
 }
 
 func TestStaticStoreFileFileWithTrim(t *testing.T) {
@@ -109,17 +104,12 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 
 func TestStaticStoreLoadFileFail(t *testing.T) {
 
-	_, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
-					"myKey": {
-						Encoding: "none",
-						Filename: t.TempDir(),
-						Trim:     true,
-					},
-				},
+	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
+		Keys: map[string]StaticKeyEntryConfig{
+			"myKey": {
+				Encoding: "none",
+				Filename: t.TempDir(),
+				Trim:     true,
 			},
 		},
 	})
@@ -129,7 +119,7 @@ func TestStaticStoreLoadFileFail(t *testing.T) {
 
 func TestStaticStoreBadHEX(t *testing.T) {
 
-	_, err := newStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
 		Keys: map[string]StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "hex",
@@ -143,7 +133,7 @@ func TestStaticStoreBadHEX(t *testing.T) {
 
 func TestStaticStoreBadBase64(t *testing.T) {
 
-	_, err := newStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
 		Keys: map[string]StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "base64",
@@ -157,7 +147,7 @@ func TestStaticStoreBadBase64(t *testing.T) {
 
 func TestStaticStoreEmpty(t *testing.T) {
 
-	_, err := newStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
 		Keys: map[string]StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "none",
@@ -172,7 +162,7 @@ func TestStaticStoreEmpty(t *testing.T) {
 
 func TestStaticStoreBadEncType(t *testing.T) {
 
-	_, err := newStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
 		Keys: map[string]StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "",

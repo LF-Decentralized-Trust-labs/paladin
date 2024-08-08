@@ -18,6 +18,7 @@ package signer
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 )
 
 const (
@@ -31,11 +32,11 @@ type Config struct {
 }
 
 type StoreConfig struct {
-	Type              string                 `yaml:"type"`
-	DisableKeyListing bool                   `yaml:"disableKeyListing"`
-	DisableKeyLoading bool                   `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
-	FileSystem        FileSystemConfig       `yaml:"filesystem"`
-	Static            StaticKeyStorageConfig `yaml:"static"`
+	Type              string                          `yaml:"type"`
+	DisableKeyListing bool                            `yaml:"disableKeyListing"`
+	DisableKeyLoading bool                            `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
+	FileSystem        keystore.FileSystemConfig       `yaml:"filesystem"`
+	Static            keystore.StaticKeyStorageConfig `yaml:"static"`
 }
 
 type KeyDerivationType string

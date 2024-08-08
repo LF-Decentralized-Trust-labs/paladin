@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
 type staticStore struct {
@@ -46,7 +47,7 @@ type staticStore struct {
 // The keys themselves can be in files, so as well as very simple testing
 // with keys in-line in the config, this helps use a file based Kubernetes
 // secret for a mnemonic seed phrase for example at the root of a HD wallet.
-func newStaticKeyStore(ctx context.Context, conf *StaticKeyStorageConfig) (_ KeyStore, err error) {
+func NewStaticKeyStore(ctx context.Context, conf *StaticKeyStorageConfig) (_ api.KeyStore, err error) {
 	ils := &staticStore{
 		keys: make(map[string][]byte),
 	}

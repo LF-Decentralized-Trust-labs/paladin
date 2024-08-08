@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
 import (
 	"context"
@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
@@ -41,7 +42,7 @@ type filesystemStore struct {
 	dirMode  os.FileMode
 }
 
-func newFilesystemStore(ctx context.Context, conf *FileSystemConfig) (fss KeyStore, err error) {
+func NewFilesystemStore(ctx context.Context, conf *FileSystemConfig) (fss api.KeyStore, err error) {
 	// Determine the path
 	var pathInfo fs.FileInfo
 	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *FileSystemDefaults.Path))

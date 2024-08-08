@@ -22,10 +22,13 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 )
 
 // SigningModule provides functions for the protobuf request/reply functions from the proto interface defined
@@ -38,11 +41,6 @@ type SigningModule interface {
 	List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
 }
 
-type Extension interface {
-	// Return nil if keystore type is not known, or error if initialization fails
-	KeyStore(keystoreType string) (store KeyStore, err error)
-}
-
 type hdDerivation struct {
 	sm                    *signingModule
 	bip44DirectResolution bool
@@ -52,7 +50,7 @@ type hdDerivation struct {
 }
 
 type signingModule struct {
-	keyStore          KeyStore
+	keyStore          api.KeyStore
 	disableKeyListing bool
 	disableKeyLoading bool
 	hd                *hdDerivation
@@ -80,17 +78,17 @@ type signingModule struct {
 // The design is such that all built-in behaviors should be both:
 // 1. Easy to re-use if they are valuable with your extension
 // 2. Easy to disable in the Config object passed in, if you do not want to have them enabled
-func NewSigningModule(ctx context.Context, config *Config, extensions ...Extension) (_ SigningModule, err error) {
+func NewSigningModule(ctx context.Context, config *Config, extensions ...api.Extension) (_ SigningModule, err error) {
 	sm := &signingModule{}
 
 	keyStoreType := strings.ToLower(config.KeyStore.Type)
 	switch keyStoreType {
 	case "", KeyStoreTypeFilesystem:
-		if sm.keyStore, err = newFilesystemStore(ctx, &config.KeyStore.FileSystem); err != nil {
+		if sm.keyStore, err = keystore.NewFilesystemStore(ctx, &config.KeyStore.FileSystem); err != nil {
 			return nil, err
 		}
 	case KeyStoreTypeStatic:
-		if sm.keyStore, err = newStaticKeyStore(ctx, &config.KeyStore.Static); err != nil {
+		if sm.keyStore, err = keystore.NewStaticKeyStore(ctx, &config.KeyStore.Static); err != nil {
 			return nil, err
 		}
 	default:
@@ -153,6 +151,20 @@ func (sm *signingModule) resolveKeystoreSECP256K1(ctx context.Context, req *prot
 	}, nil
 }
 
+func (sm *signingModule) resolveKeystoreBabyjubjub(ctx context.Context, req *proto.ResolveKeyRequest, keyStoreSigner KeyStoreSigner_secp256k1) (res *proto.ResolveKeyResponse, err error) {
+
+	addr, keyHandle, err := keyStoreSigner.FindOrCreateKey_secp256k1(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &proto.ResolveKeyResponse{
+		KeyHandle: keyHandle,
+		Identifiers: []*proto.PublicKeyIdentifier{
+			{Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: addr.String()},
+		},
+	}, nil
+}
+
 // We use the ethereum convention of R,S,V for compact packing (mentioned because Golang tends to prefer V,R,S)
 func CompactRSV(sig *secp256k1.SignatureData) []byte {
 	signatureBytes := make([]byte, 65)
@@ -183,11 +195,21 @@ func (sm *signingModule) signKeystoreSECP256K1(ctx context.Context, req *proto.S
 	}, nil
 }
 
+func (sm *signingModule) signBabyjubjubKey(ctx context.Context, req *proto.SignRequest, keyStoreSigner KeyStoreSigner_snark) (res *proto.SignResponse, err error) {
+	sig, err := keyStoreSigner.Prove_snark(ctx, req.KeyHandle, req.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &proto.SignResponse{
+		Payload: CompactRSV(sig),
+	}, nil
+}
+
 func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algorithms []string) (int, error) {
 	keyLen := 0
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
-		case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
+		case Algorithm_ECDSA_SECP256K1_PLAINBYTES, Algorithm_ZKP_BABYJUBJUB_PLAINBYTES:
 			keyLen = 32
 		default:
 			return -1, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, algo)
@@ -223,6 +245,14 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 				Algorithm:  Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				Identifier: addr.Address.String(),
 			})
+		case Algorithm_ZKP_BABYJUBJUB_PLAINBYTES:
+			var privKeyBytes [32]byte
+			copy(privKeyBytes[:], privateKey)
+			keyEntry := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
+			identifiers = append(identifiers, &proto.PublicKeyIdentifier{
+				Algorithm:  Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+				Identifier: keyEntry.PublicKey.String(),
+			})
 		default:
 			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, algo)
 		}
@@ -242,6 +272,8 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 		if ok {
 			return sm.resolveKeystoreSECP256K1(ctx, req, keyStoreSigner)
 		}
+	} else if len(req.Algorithms) == 1 && req.Algorithms[0] == Algorithm_ZKP_BABYJUBJUB_PLAINBYTES {
+		// TODO: not sure if we need to do anything here? BJJ shares the same key store as secp256k1
 	}
 	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
@@ -265,6 +297,8 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 		if ok {
 			return sm.signKeystoreSECP256K1(ctx, req, keyStoreSigner)
 		}
+	} else if req.Algorithm == Algorithm_ZKP_BABYJUBJUB_PLAINBYTES {
+		// return sm.signBabyjubjubKey(ctx, req)
 	}
 	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
