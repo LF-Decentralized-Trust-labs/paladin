@@ -35,11 +35,13 @@ ext {
 }
 
 configurations {
-    solidityContracts
+    compiledContracts {
+        canBeConsumed = false
+    }
 }
 
 dependencies {
-    solidityContracts project(path: ":solidity", configuration: "compiledContracts")
+    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
 }
 
 task installTools(type:Exec) {
@@ -77,19 +79,19 @@ task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
 ]) {}
 
-task copyTestSolidityBuild(type: Copy, dependsOn: ":solidity:test") {
-    from getProject().configurations.solidityContracts.files() {
-        include "contracts/testcontracts/**/*.json"
-        exclude "contracts/testcontracts/**/*.dbg.json"
+task copyTestContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
     }
-    eachFile { fcd ->        
-        fcd.setRelativePath(new RelativePath(true, fcd.relativePath.getLastName()))
-    }
+    into 'componenttest/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
     includeEmptyDirs = false
-    into 'componenttest/testcontracts'
 }
 
-task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestSolidityBuild]) {
+task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     workingDir '.'
     inputs.files(fileTree(".") { include "**/*.proto" })
     outputs.files(fileTree(".") { include "**/*.pb.go" })
@@ -109,7 +111,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
         include "**/*.pb.go"
     }
     delete 'coverage'
-    delete 'componenttest/testcontracts'
+    delete 'componenttest/abis'
 }
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
@@ -248,7 +250,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     ':testinfra:startTestInfra',
     tasks.setupCoverage,
     tasks.goGet,
-    tasks.copyTestSolidityBuild,
+    tasks.copyTestContracts,
     ]) {
 }
 

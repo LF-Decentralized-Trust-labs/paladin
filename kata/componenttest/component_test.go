@@ -46,7 +46,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed testcontracts/SimpleStorage.json
+//go:embed abis/SimpleStorage.json
 var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
 
 func TestRunTransactionSubmission(t *testing.T) {
