@@ -146,9 +146,10 @@ var (
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock    = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
 	MsgBlockIndexerInvalidWebSocketURL = ffe("PD011301", "Invalid WebSocket URL: %s")
+	MsgBlockIndexerInvalidHTTPURL      = ffe("PD011302", "Invalid HTTP URL: %s")
 
 	// Signing module PD0114XX
-	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it not a directory")
+	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
 	MsgSigningModuleBadKeyFile                  = ffe("PD011401", "Key file '%s' does not exist")
 	MsgSigningModuleBadPassFile                 = ffe("PD011402", "Password file '%s' does not exist")
 	MsgSigningModuleBadKeyHandle                = ffe("PD011403", "Invalid key handle")
@@ -157,7 +158,7 @@ var (
 	MsgSigningModuleKeyNotExist                 = ffe("PD011406", "Key '%s' does not exist")
 	MsgSigningUnsupportedKeyStoreType           = ffe("PD011407", "Unsupported key store type: '%s'")
 	MsgSigningHierarchicalRequiresLoading       = ffe("PD011408", "Signing module has been configured to disallow in-memory key material. Hierarchical Deterministic (HD) wallet function implemented in the signing module requires in-memory key material")
-	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s with this key storage system")
+	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s")
 	MsgSigningUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
 	MsgSigningMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
 	MsgSigningHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
@@ -169,4 +170,17 @@ var (
 	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
 	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
 	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
+
+	// EthClient module PD0115XX
+	MsgEthClientInvalidInput      = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
+	MsgEthClientMissingFrom       = ffe("PD011501", "Signer (from) missing")
+	MsgEthClientMissingTo         = ffe("PD011502", "To missing")
+	MsgEthClientMissingInput      = ffe("PD011503", "Input missing")
+	MsgEthClientMissingOutput     = ffe("PD011504", "Output missing")
+	MsgEthClientInvalidTXVersion  = ffe("PD011505", "Invalid TX Version (%s)")
+	MsgEthClientABIJson           = ffe("PD011506", "JSON ABI parsing failed")
+	MsgEthClientFunctionNotFound  = ffe("PD011507", "Function %q not found on ABI")
+	MsgEthClientChainIDFailed     = ffe("PD011508", "Failed to query chain ID")
+	MsgEthClientKeyMismatch       = ffe("PD011509", "Resolved %q to different key handle expected=%q received=%q")
+	MsgEthClientToWithConstructor = ffe("PD011510", "To address cannot be specified for constructor")
 )

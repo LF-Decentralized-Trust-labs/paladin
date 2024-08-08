@@ -45,6 +45,7 @@ services:
       - --genesis-file=/var/besu/genesis.json
       - --data-path=/var/besu/data
       - --node-private-key-file=/var/besu/key
+      - --revert-reason-enabled
 volumes:
   besu_data:
     driver: local

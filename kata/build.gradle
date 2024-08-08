@@ -35,6 +35,16 @@ ext {
     ]
 }
 
+configurations {
+    compiledContracts {
+        canBeConsumed = false
+    }
+}
+
+dependencies {
+    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+}
+
 task installTools(type:Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
@@ -110,7 +120,19 @@ task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
 ]) {}
 
-task protoc(type:Exec, dependsOn: tasks.makeMocks) {
+task copyTestContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
+    }
+    into 'componenttest/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     workingDir '.'
     inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
     outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
@@ -122,6 +144,16 @@ task protoc(type:Exec, dependsOn: tasks.makeMocks) {
     args inputs.files
 }
 
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
+    delete 'componenttest/abis'
+}
 
 task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
@@ -203,65 +235,6 @@ task buildTestPluginsSharedLibraries {
 
 }
 
-class DockerCompose extends Exec {
-    DockerCompose() {
-        def String composeCommand
-        def dockerComposeV2Check = "docker compose version".execute().text
-        if (dockerComposeV2Check.contains("Docker Compose")){
-            executable 'docker'
-            args 'compose'
-            composeCommand = 'docker compose'
-        } else {
-            executable 'docker-compose'
-            composeCommand = 'docker-compose'
-        }
-        args '-f'
-        args 'docker-compose-test.yml'
-
-        ignoreExitValue true
-
-        doLast {
-            def ExecResult execResult = getExecutionResult().get();
-            if(execResult.getExitValue() != 0) {
-                println "${composeCommand} -f ${getProject().projectDir}/docker-compose-test.yml logs".execute().waitForProcessOutput(System.err,System.err)
-                throw new Exception("Docker compose failed");
-            }
-        }
-
-    }
-}
-
-task besuBootstrapTool(type: Exec) {
-    executable "docker"
-    args "build"
-    args "-t", "paladin/besu_bootstrap"
-    args "-f", "tools/besu_bootstrap/Dockerfile"
-    args "-q"
-    args "."
-}
-
-task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
-    mustRunAfter(tasks.protoc)
-    args 'up', '-d'
-}
-
-task stopTestInfra(type: DockerCompose) {
-    args 'down'
-}
-
-task clean(type: Delete, dependsOn: tasks.stopTestInfra) {
-    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
-    delete fileTree("bin") {
-        exclude "README.md", ".gitignore"
-    }
-    delete fileTree(".") {
-        include "**/*.pb.go"
-    }
-    delete 'test/besu'
-    delete 'coverage'
-    delete "solidity/artifacts"
-}
-
 abstract class UnitTests extends Exec {
     {
         inputs.files(getProject().goFiles)
@@ -277,6 +250,7 @@ abstract class UnitTests extends Exec {
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
     }
 }
+
 
 abstract class ComponentTest extends Exec {
 
@@ -300,7 +274,7 @@ abstract class ComponentTest extends Exec {
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/..."
         args '-covermode=atomic'
-        args '-timeout=30s'
+        args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
 
         ignoreExitValue true
@@ -335,16 +309,16 @@ task setupCoverage(dependsOn: tasks.protoc) {
 task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, tasks.startTestInfra]) {
+task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, ':testinfra:startTestInfra']) {
     args '-tags', "testdbpostgres"
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
+    ':testinfra:startTestInfra',
     tasks.setupCoverage,
     tasks.goGet,
-    tasks.copyDomainSIMContractsToTestbed,
-    tasks.startTestInfra,
-]) {
+    tasks.copyTestContracts,
+    ]) {
 }
 
 
