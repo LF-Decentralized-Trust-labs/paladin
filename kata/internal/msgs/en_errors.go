@@ -71,6 +71,7 @@ var (
 
 	// Transaction Processor PD0103XX
 	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+	MsgContextCanceled                  = ffe("PD010301", "Context canceled")
 
 	// Transaction store PD0104XX
 	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
@@ -141,4 +142,31 @@ var (
 	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
 	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// BlockIndexer PD0113XX
+	MsgBlockIndexerInvalidFromBlock    = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerInvalidWebSocketURL = ffe("PD011301", "Invalid WebSocket URL: %s")
+
+	// Signing module PD0114XX
+	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
+	MsgSigningModuleBadKeyFile                  = ffe("PD011401", "Key file '%s' does not exist")
+	MsgSigningModuleBadPassFile                 = ffe("PD011402", "Password file '%s' does not exist")
+	MsgSigningModuleBadKeyHandle                = ffe("PD011403", "Invalid key handle")
+	MsgSigningModuleFSError                     = ffe("PD011404", "Filesystem error")
+	MsgSigningModuleKeyHandleClash              = ffe("PD011405", "Invalid key handle (clash)")
+	MsgSigningModuleKeyNotExist                 = ffe("PD011406", "Key '%s' does not exist")
+	MsgSigningUnsupportedKeyStoreType           = ffe("PD011407", "Unsupported key store type: '%s'")
+	MsgSigningHierarchicalRequiresLoading       = ffe("PD011408", "Signing module has been configured to disallow in-memory key material. Hierarchical Deterministic (HD) wallet function implemented in the signing module requires in-memory key material")
+	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s")
+	MsgSigningUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
+	MsgSigningMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
+	MsgSigningHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
+	MsgSignerBIP44DerivationInvalid             = ffe("PD011413", "Invalid key handle - BIP44 key identifier expected (invalid derivation: '%s')")
+	MsgSingerBIP32DerivationTooLarge            = ffe("PD011414", "BIP-32 key index must be between 0 and 2^31-1 at each level in the hierarchy")
+	MsgSigningKeyListingNotSupported            = ffe("PD011415", "Listing keys in the key store is not supported by this signing module")
+	MsgSigningStaticKeyInvalid                  = ffe("PD011416", "Statically configured key with handle %s is invalid")
+	MsgSigningStaticBadEncoding                 = ffe("PD011417", "Statically configured key with handle %s has invalid encoding (must be one of 'none', 'hex', 'base64') '%s'")
+	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
+	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
+	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
 )

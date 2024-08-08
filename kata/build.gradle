@@ -21,9 +21,10 @@ ext {
         include "internal/**/*.go"
         include "pkg/**/*.go"
         include "componenttest/**/*.go"
+        include "mocks/**/*.go"
     }
 
-    targetCoverage = 90.3
+    targetCoverage = 92
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
@@ -38,20 +39,37 @@ task installTools(type:Exec) {
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
     args 'install'
-    inputs.files('go.mod')
+    inputs.files(['go.mod','go.sum'])
     outputs.files(
         "bin/protoc-gen-go",
         "bin/protoc-gen-go-grpc",
         "bin/golangci-lint",
+        "bin/mockery",
     )
     // We use go.mod for dependency version management
     // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
     args 'google.golang.org/protobuf/cmd/protoc-gen-go'
     args 'google.golang.org/grpc/cmd/protoc-gen-go-grpc'
     args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
+    args 'github.com/vektra/mockery/v2'
 }
 
-task protoc(type:Exec, dependsOn: tasks.installTools) {
+task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    outputs.dir('mocks/rpcbackendmocks')
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+    args '--all'
+    args '--outpkg', 'rpcbackendmocks'
+    args '--output', 'mocks/rpcbackendmocks'
+}
+
+task makeMocks(dependsOn: [
+    tasks.makeRPCMocks,
+]) {}
+
+task protoc(type:Exec, dependsOn: tasks.makeMocks) {
     workingDir '.'
     inputs.files(fileTree(".") { include "**/*.proto" })
     outputs.files(fileTree(".") { include "**/*.pb.go" })
