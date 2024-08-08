@@ -1,6 +1,7 @@
 go 1.22.5
 
 use (
+	./domains/noto
 	./kata
 	./talaria
 	./testinfra

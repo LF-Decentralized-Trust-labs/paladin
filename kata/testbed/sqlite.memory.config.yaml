@@ -7,13 +7,16 @@ db:
     debugQueries: true
 rpcServer:
   http:
-    port: 0
+    port: 49603
   ws:
     disabled: true
 blockchain:
   ws:
     url: ws://localhost:8546
     initialConnectAttempts: 25
+bus:
+  grpc:
+    socketAddress: /tmp/testbed.paladin.1542386773.sock
 signer:
   keyDerivation:
     type: "bip32"
