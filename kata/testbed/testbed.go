@@ -116,7 +116,7 @@ func (tb *testbed) tempSocketFile() (string, error) {
 }
 
 func (tb *testbed) setupConfig(args []string) error {
-	configFile := "./domain_testbed/sqlite.memory.config.yaml"
+	configFile := "./testbed/sqlite.memory.config.yaml"
 	if len(args) >= 2 {
 		configFile = args[1]
 	}
