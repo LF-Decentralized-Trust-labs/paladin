@@ -51,6 +51,11 @@ type EventStream struct {
 	ABI types.JSONP[abi.ABI] `json:"abi,omitempty"`
 }
 
+type EventStreamCheckpoint struct {
+	ID          uuid.UUID `json:"id"                                     gorm:"primaryKey"`
+	BlockNumber int64     `json:"blockNumber"                            gorm:"primaryKey"`
+}
+
 type EventStreamSignature struct {
 	Stream    uuid.UUID    `json:"stream"                                gorm:"primaryKey"`
 	Signature types.HashID `json:"signature"                             gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`

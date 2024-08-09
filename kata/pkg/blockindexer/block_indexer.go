@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -76,6 +77,10 @@ type blockIndexer struct {
 	batchTimeout          time.Duration
 	txWaiters             map[string]*txWaiter
 	txWaiterLock          sync.Mutex
+	eventStreams          map[uuid.UUID]*eventStream
+	eventStreamsHeadSet   map[uuid.UUID]*eventStream
+	eventStreamSignatures map[string][]*eventStream
+	eventStreamsLock      sync.Mutex
 	dispatcherTap         chan struct{}
 	processorDone         chan struct{}
 	dispatcherDone        chan struct{}
@@ -103,6 +108,9 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		batchSize:             confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:          confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
 		txWaiters:             make(map[string]*txWaiter),
+		eventStreams:          make(map[uuid.UUID]*eventStream),
+		eventStreamsHeadSet:   make(map[uuid.UUID]*eventStream),
+		eventStreamSignatures: make(map[string]bool),
 		dispatcherTap:         make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {

@@ -6,6 +6,13 @@ CREATE TABLE event_streams (
     PRIMARY KEY ("id")
 );
 
+CREATE TABLE event_stream_checkpoints (
+    "stream"          UUID    NOT NULL,
+    "block_number"    BIGINT  NOT NULL,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE
+);
+
 CREATE TABLE event_stream_signatures (
     "stream"          UUID    NOT NULL,
     "signature_l"     UUID    NOT NULL,
