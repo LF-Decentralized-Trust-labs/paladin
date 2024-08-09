@@ -17,7 +17,7 @@
 package blockindexer
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type IndexedBlock struct {

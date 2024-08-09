@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 )
 
 func newTestTransactionStore(t *testing.T) (context.Context, *transactionStore, func()) {

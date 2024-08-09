@@ -54,7 +54,7 @@ public class SimpleStorageWrappedGetSetTest {
         EVMRunner evmRunner = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
 
         // Load some bytecode for our first contract deploy
-        String resourcePath = "contracts/pente/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
+        String resourcePath = "contracts/testcontracts/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
         String hexByteCode;
         try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
             assertNotNull(is);

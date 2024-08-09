@@ -19,7 +19,7 @@ package blockindexer
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type Config struct {
