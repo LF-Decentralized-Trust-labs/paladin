@@ -13,4 +13,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-task test(dependsOn: ':kata:startTestbed') {}
+ ext {
+    testProcess = null
+ }
+
+ task startTestbed {
+    doFirst {
+        project.ext.testProcess = new ProcessBuilder()
+            .directory(project(':kata').projectDir)
+            .command("go", "run", "./testbed", "${projectDir}/testbed.config.yaml")
+            .start()
+    }
+ }
+
+ task stopTestbed {
+    doFirst {
+        project.ext.testProcess.destroy()
+    }
+ }
+
+task run(type: Exec) {
+    executable 'go'
+    args 'run'
+    args 'main.go'
+
+    dependsOn startTestbed
+    finalizedBy stopTestbed
+}

@@ -381,13 +381,6 @@ task build {
     dependsOn tasks.checkCoverage
 }
 
-task startTestbed(type: Exec) {
-    executable 'go'
-    args 'run'
-    args './testbed'
-    args 'testbed/sqlite.memory.config.yaml'
-}
-
 configurations {
     libkata
     protocFiles {
