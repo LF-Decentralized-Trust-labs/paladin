@@ -15,7 +15,10 @@
 
 package signer
 
-import "github.com/kaleido-io/paladin/kata/internal/confutil"
+import (
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
+)
 
 const (
 	KeyStoreTypeFilesystem = "filesystem" // keystorev3 based filesystem storage
@@ -45,26 +48,43 @@ const (
 )
 
 type ConfigKeyPathEntry struct {
-	Name       string            `yaml:"name"`
-	Index      uint64            `yaml:"index"`
-	Attributes map[string]string `yaml:"attributes"`
+	Name  string `yaml:"name"`
+	Index uint64 `yaml:"index"`
+}
+
+type ConfigKeyEntry struct {
+	Name       string               `yaml:"name"`
+	Index      uint64               `yaml:"index"`
+	Attributes map[string]string    `yaml:"attributes"`
+	Path       []ConfigKeyPathEntry `yaml:"path"`
 }
 
 type KeyDerivationConfig struct {
-	Type                  KeyDerivationType    `yaml:"type"`
-	SeedKeyPath           []ConfigKeyPathEntry `yaml:"seedKeyHandle"`
-	BIP44DirectResolution bool                 `yaml:"bip44DirectResolution"`
-	BIP44Prefix           *string              `yaml:"bip44Prefix"`
-	BIP44HardenedSegments *int                 `yaml:"bip44HardenedSegments"`
+	Type                  KeyDerivationType `yaml:"type"`
+	SeedKeyPath           ConfigKeyEntry    `yaml:"seedKey"`
+	BIP44DirectResolution bool              `yaml:"bip44DirectResolution"`
+	BIP44Prefix           *string           `yaml:"bip44Prefix"`
+	BIP44HardenedSegments *int              `yaml:"bip44HardenedSegments"`
 }
 
 var KeyDerivationDefaults = &KeyDerivationConfig{
 	BIP44Prefix:           confutil.P("m/44'/60'"),
 	BIP44HardenedSegments: confutil.P(1), // in addition to the prefix, so `m/44'/60'/0'/0/0` for example with 3 segments, on top of the prefix
-	SeedKeyPath: []ConfigKeyPathEntry{
-		{
-			Name:  "seed",
-			Index: 0,
-		},
-	},
+	SeedKeyPath:           ConfigKeyEntry{Name: "seed", Index: 0},
+}
+
+func (k *ConfigKeyEntry) ToKeyResolutionRequest() *proto.ResolveKeyRequest {
+	keyReq := &proto.ResolveKeyRequest{
+		Name:       k.Name,
+		Index:      k.Index,
+		Attributes: k.Attributes,
+		Path:       []*proto.ResolveKeyPathSegment{},
+	}
+	for _, p := range k.Path {
+		keyReq.Path = append(keyReq.Path, &proto.ResolveKeyPathSegment{
+			Name:  p.Name,
+			Index: p.Index,
+		})
+	}
+	return keyReq
 }
