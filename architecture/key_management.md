@@ -64,7 +64,7 @@ with a set of options on remote connectivity:
 - gRPC+Protobuf
 - Both with mutual-TLS and additional session/JWT credentials
 
-> Multiple signing-modules are supported by a single Paladin node, so ou can use a mixture
+> Multiple signing-modules are supported by a single Paladin node, so you can use a mixture
 > of embedded and remote signing modules in one node
 
 ### Direct key mapping vs. key derivation 
