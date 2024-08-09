@@ -21,7 +21,7 @@ CREATE TABLE event_stream_data (
     "event_index"     INT     NOT NULL,
     "data"            TEXT,
     PRIMARY KEY ("stream", "block_number", "tx_index", "event_index"),
-    FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE
+    FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE,
     FOREIGN KEY ("block_number", "tx_index", "event_index") REFERENCES indexed_events ("block_number", "tx_index", "event_index") ON DELETE CASCADE
 );
 
