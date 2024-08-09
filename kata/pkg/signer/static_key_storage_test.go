@@ -194,10 +194,10 @@ func TestStaticStoreResolveOK(t *testing.T) {
 	})
 
 	keyData, keyHandle, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
+		Name: "key ten",
+		Path: []*proto.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
-			{Name: "key ten"},
 		},
 	}, nil)
 	assert.NoError(t, err)
@@ -215,13 +215,12 @@ func TestStaticStoreResolveBadPath(t *testing.T) {
 		},
 	})
 
-	_, _, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{},
-	}, nil)
+	_, _, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{}, nil)
 	assert.Regexp(t, "PD011403", err)
 
 	_, _, err = store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
+		Name: "something",
+		Path: []*proto.ResolveKeyPathSegment{
 			{Name: ""},
 		},
 	}, nil)
@@ -239,10 +238,10 @@ func TestStaticStoreResolveNotFound(t *testing.T) {
 	})
 
 	_, _, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
+		Name: "key eleven",
+		Path: []*proto.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
-			{Name: "key eleven"},
 		},
 	}, nil)
 	assert.Regexp(t, "PD011418", err)

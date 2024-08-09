@@ -86,18 +86,17 @@ func newStaticKeyStore(ctx context.Context, conf *StaticKeyStorageConfig) (_ Key
 }
 
 func (ils *staticStore) FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error) {
-	if len(req.Path) == 0 {
-		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
-	}
-	for i, segment := range req.Path {
+	for _, segment := range req.Path {
 		if len(segment.Name) == 0 {
 			return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
 		}
-		if i > 0 {
-			keyHandle += "/"
-		}
 		keyHandle += url.PathEscape(segment.Name)
+		keyHandle += "/"
 	}
+	if len(req.Name) == 0 {
+		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
+	}
+	keyHandle += url.PathEscape(req.Name)
 	key, err := ils.LoadKeyMaterial(ctx, keyHandle)
 	if err != nil {
 		return nil, "", err
