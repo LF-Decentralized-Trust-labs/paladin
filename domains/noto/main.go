@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	dest        = "to-domain"
+	toDomain    = "to-domain"
 	testbedAddr = "http://127.0.0.1:49603"
 	grpcAddr    = "unix:/tmp/testbed.paladin.1542386773.sock"
 )
@@ -38,8 +38,8 @@ func runTest(ctx context.Context) error {
 	}
 	defer domain.Close()
 
-	log.Printf("Listening for gRPC messages on %s", dest)
-	err = domain.Listen(ctx, dest)
+	log.Printf("Listening for gRPC messages on %s", toDomain)
+	err = domain.Listen(ctx, toDomain)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func runTest(ctx context.Context) error {
 	rpc := rpcbackend.NewRPCClient(rest)
 
 	log.Printf("Calling testbed_configureInit")
-	var result map[string]interface{}
+	var result bool
 	rpcerr := rpc.CallRPC(ctx, &result, "testbed_configureInit", "noto", `{}`)
 	if rpcerr != nil {
 		return fmt.Errorf("fail to call JSON RPC: %v", rpcerr)
@@ -59,8 +59,7 @@ func runTest(ctx context.Context) error {
 
 func main() {
 	ctx := context.Background()
-	err := runTest(ctx)
-	if err != nil {
+	if err := runTest(ctx); err != nil {
 		log.Fatalf("%s", err)
 	}
 }

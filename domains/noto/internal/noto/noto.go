@@ -18,7 +18,6 @@ package noto
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"reflect"
 	"time"
@@ -26,13 +25,17 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type domain struct {
-	conn   *grpc.ClientConn
-	client pb.KataMessageServiceClient
-	stream pb.KataMessageService_ListenClient
-	closed chan struct{}
+	conn         *grpc.ClientConn
+	dest         *string
+	client       pb.KataMessageServiceClient
+	stream       pb.KataMessageService_ListenClient
+	stopListener context.CancelFunc
+	done         chan bool
 }
 
 func Start(ctx context.Context, addr string) (*domain, error) {
@@ -43,75 +46,102 @@ func Start(ctx context.Context, addr string) (*domain, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 
-	client := pb.NewKataMessageServiceClient(conn)
-	status, err := client.Status(ctx, &pb.StatusRequest{})
+	d := &domain{
+		conn:   conn,
+		client: pb.NewKataMessageServiceClient(conn),
+	}
+	return d, d.waitForReady(ctx)
+}
 
+func (d *domain) waitForReady(ctx context.Context) error {
+	status, err := d.client.Status(ctx, &pb.StatusRequest{})
 	delay := 0
 	for !status.GetOk() {
 		time.Sleep(time.Second)
 		delay++
-		status, err = client.Status(ctx, &pb.StatusRequest{})
 		if delay > 2 {
-			return nil, fmt.Errorf("server was not ready after 2 seconds")
+			return fmt.Errorf("server was not ready after 2 seconds")
 		}
+		status, err = d.client.Status(ctx, &pb.StatusRequest{})
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !status.GetOk() {
-		return nil, fmt.Errorf("got non OK status from server")
+		return fmt.Errorf("got non-OK status from server")
 	}
-
-	return &domain{
-		conn:   conn,
-		client: client,
-	}, nil
+	return nil
 }
 
-func (d *domain) Close() {
+func (d *domain) Close() error {
 	if d.stream != nil {
-		_ = d.stream.CloseSend()
+		if err := d.stream.CloseSend(); err != nil {
+			return err
+		}
+		d.done <- true
+		d.stopListener()
 	}
-	if d.closed != nil {
-		<-d.closed
+	if d.conn != nil {
+		if err := d.conn.Close(); err != nil {
+			return err
+		}
 	}
-	d.stream = nil
-	d.closed = nil
-	d.conn.Close()
+	return nil
 }
 
 func (d *domain) Listen(ctx context.Context, dest string) error {
+	d.dest = &dest
+	d.done = make(chan bool, 1)
+
 	var err error
-	d.stream, err = d.client.Listen(ctx, &pb.ListenRequest{Destination: dest})
+	var listenerContext context.Context
+
+	listenerContext, d.stopListener = context.WithCancel(ctx)
+	d.stream, err = d.client.Listen(listenerContext, &pb.ListenRequest{Destination: dest})
 	if err != nil {
 		return fmt.Errorf("failed to listen for domain events: %v", err)
 	}
 
-	d.closed = make(chan struct{})
 	go d.handler()
 	return nil
 }
 
+func (d *domain) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
+	body, err := anypb.New(reply)
+	if err == nil {
+		_, err = d.client.SendMessage(ctx, &pb.Message{
+			Destination:   *message.ReplyTo,
+			CorrelationId: &message.Id,
+			Body:          body,
+			ReplyTo:       d.dest,
+		})
+	}
+	return err
+}
+
 func (d *domain) handler() {
+	ctx := context.Background()
 	for {
 		in, err := d.stream.Recv()
-		if err == io.EOF {
-			close(d.closed)
+		select {
+		case <-d.done:
+			return
+		default:
+			// do nothing
+		}
+		if err != nil {
+			log.Printf("Error receiving message - terminating handler loop: %v", err)
 			return
 		}
+		err = d.handleMessage(ctx, in)
 		if err != nil {
-			log.Fatalf("Failed to receive a message: %v", err)
-		}
-		err = handleMessage(in)
-		if err != nil {
-			log.Printf("Error handling message: %s", err)
-			close(d.closed)
+			log.Printf("Error handling message - terminating handler loop: %v", err)
 			return
 		}
 	}
 }
 
-func handleMessage(message *pb.Message) error {
+func (d *domain) handleMessage(ctx context.Context, message *pb.Message) error {
 	body, err := message.Body.UnmarshalNew()
 	if err != nil {
 		return err
@@ -120,6 +150,38 @@ func handleMessage(message *pb.Message) error {
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.Printf("Configuring domain: %s", m.Name)
+		response := &pb.ConfigureDomainResponse{
+			DomainConfig: &pb.DomainConfig{
+				ConstructorAbiJson: `{
+						"inputs": [
+							{
+							"internalType": "address",
+							"name": "notary",
+							"type": "address"
+							}
+						],
+						"stateMutability": "nonpayable",
+						"type": "constructor"
+					}`,
+				FactoryContractAddress: "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c",
+				FactoryContractAbiJson: "[]",
+				AbiStateSchemasJson:    []string{},
+			},
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.InitDomainRequest:
+		log.Printf("Initializing domain: %s", m.AbiStateSchemaIds)
+		response := &pb.InitDomainResponse{}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.DomainAPIError:
+		log.Printf("Received error: %s", m.ErrorMessage)
+
 	default:
 		log.Printf("Unknown type: %s", reflect.TypeOf(m))
 	}
