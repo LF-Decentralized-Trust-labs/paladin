@@ -23,7 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"gorm.io/gorm"
 
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 )
 
 type Config struct {

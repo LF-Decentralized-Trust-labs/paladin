@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 )
