@@ -18,17 +18,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
-	"time"
-
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/domains/noto/internal/noto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -37,69 +31,18 @@ var (
 	grpcAddr    = "unix:/tmp/testbed.paladin.1542386773.sock"
 )
 
-func connectGRPC(ctx context.Context) (*grpc.ClientConn, pb.KataMessageService_ListenClient, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	conn, err := grpc.NewClient(grpcAddr, opts...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect gRPC: %v", err)
-	}
-
-	client := pb.NewKataMessageServiceClient(conn)
-	status, err := client.Status(ctx, &pb.StatusRequest{})
-
-	delay := 0
-	for !status.GetOk() {
-		time.Sleep(time.Second)
-		delay++
-		status, err = client.Status(ctx, &pb.StatusRequest{})
-		if delay > 2 {
-			return nil, nil, fmt.Errorf("server was not ready after 2 seconds")
-		}
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	if !status.GetOk() {
-		return nil, nil, fmt.Errorf("got non OK status from server")
-	}
-
-	stream, err := client.Listen(ctx, &pb.ListenRequest{Destination: dest})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to listen for domain events: %v", err)
-	}
-	return conn, stream, nil
-}
-
-func listenGRPC(stream pb.KataMessageService_ListenClient, closed chan struct{}) {
-	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			close(closed)
-			return
-		}
-		if err != nil {
-			log.Fatalf("Failed to receive a message: %v", err)
-		}
-		err = noto.HandleDomainMessage(in)
-		if err != nil {
-			log.Printf("Error handling message: %s", err)
-			close(closed)
-			return
-		}
-	}
-}
-
 func runTest(ctx context.Context) error {
-	conn, stream, err := connectGRPC(ctx)
+	domain, err := noto.Start(ctx, grpcAddr)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer domain.Close()
 
 	log.Printf("Listening for gRPC messages on %s", dest)
-	closed := make(chan struct{})
-	go listenGRPC(stream, closed)
+	err = domain.Listen(ctx, dest)
+	if err != nil {
+		return err
+	}
 
 	conf := ffresty.Config{URL: testbedAddr}
 	rest := ffresty.NewWithConfig(ctx, conf)
@@ -111,11 +54,6 @@ func runTest(ctx context.Context) error {
 	if rpcerr != nil {
 		return fmt.Errorf("fail to call JSON RPC: %v", rpcerr)
 	}
-
-	log.Printf("Closing stream")
-	_ = stream.CloseSend()
-	log.Printf("Awaiting close")
-	<-closed
 	return nil
 }
 
