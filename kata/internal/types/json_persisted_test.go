@@ -46,25 +46,15 @@ func TestJSONPValue(t *testing.T) {
 	assert.JSONEq(t, `null`, string(b))
 
 	v2 := &testStruct{
-		Parent1: JSONP[abi.ABI]{
-			v: abi.ABI{
-				{Name: "function1", Type: "function", Inputs: abi.ParameterArray{}, Outputs: abi.ParameterArray{}},
-			},
-		},
+		Parent1: *WrapJSONP(abi.ABI{
+			{Name: "function1", Type: "function", Inputs: abi.ParameterArray{}, Outputs: abi.ParameterArray{}},
+		}),
 		Parent2: JSONP[*testStructChild]{},
-		Parent3: JSONP[testStructChild]{
-			v: testStructChild{Child1: "test_parent3"},
-		},
+		Parent3: *WrapJSONP(testStructChild{Child1: "test_parent3"}),
 		Parent4: nil,
 		Parent5: &JSONP[*testStructChild]{},
-		Parent6: &JSONP[*testStructChild]{
-			v: &testStructChild{
-				Child1: "test_parent6",
-			},
-		},
-		Parent7: JSONP[int64]{
-			v: 12345,
-		},
+		Parent6: WrapJSONP(&testStructChild{Child1: "test_parent6"}),
+		Parent7: *WrapJSONP(int64(12345)),
 	}
 	b, err = json.Marshal(v2)
 	assert.NoError(t, err)

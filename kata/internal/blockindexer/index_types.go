@@ -24,11 +24,11 @@ import (
 
 type IndexedBlock struct {
 	Number int64        `json:"number"`
-	Hash   types.HashID `json:"hash"                                 gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash   types.HashID `json:"hash"                                     gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 }
 
 type IndexedTransaction struct {
-	Hash            types.HashID      `json:"hash"                   gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash            types.HashID      `json:"hash"                       gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
 	BlockNumber     int64             `json:"blockNumber"`
 	TXIndex         int64             `json:"transactionIndex"`
 	From            *types.EthAddress `json:"from"`
@@ -37,29 +37,30 @@ type IndexedTransaction struct {
 }
 
 type IndexedEvent struct {
-	TransactionHash types.HashID        `json:"transactionHash"       gorm:"embedded;embeddedPrefix:transaction_;"`
+	TransactionHash types.HashID        `json:"transactionHash"          gorm:"embedded;embeddedPrefix:transaction_;"`
 	BlockNumber     int64               `json:"blockNumber"`
 	TXIndex         int64               `json:"transactionIndex"`
 	EventIndex      int64               `json:"eventIndex"`
-	Signature       types.HashID        `json:"signature"             gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
-	Transaction     *IndexedTransaction `json:"transaction,omitempty" gorm:"foreignKey:hash_l,hash_h;references:transaction_l,transaction_h;"`
-	Block           *IndexedBlock       `json:"block,omitempty"       gorm:"foreignKey:number;references:block_number;"`
+	Signature       types.HashID        `json:"signature"                gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
+	Transaction     *IndexedTransaction `json:"transaction,omitempty"    gorm:"foreignKey:hash_l,hash_h;references:transaction_l,transaction_h;"`
+	Block           *IndexedBlock       `json:"block,omitempty"          gorm:"foreignKey:number;references:block_number;"`
 }
 
 type EventStream struct {
-	ID  uuid.UUID            `json:"id"`
+	ID  uuid.UUID            `json:"id"                                  gorm:"primaryKey"`
 	ABI types.JSONP[abi.ABI] `json:"abi,omitempty"`
 }
 
 type EventStreamSignature struct {
-	Stream    uuid.UUID    `json:"stream"`
-	Signature types.HashID `json:"signature"                          gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
+	Stream    uuid.UUID    `json:"stream"                                gorm:"primaryKey"`
+	Signature types.HashID `json:"signature"                             gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
 }
 
 type EventStreamData struct {
-	Stream      uuid.UUID     `json:"stream"`
-	BlockNumber int64         `json:"blockNumber"`
-	TXIndex     int64         `json:"transactionIndex"`
-	EventIndex  int64         `json:"eventIndex"`
-	Data        types.RawJSON `json:"data"`
+	Stream      uuid.UUID        `json:"stream"                          gorm:"primaryKey"`
+	BlockNumber int64            `json:"blockNumber"                     gorm:"primaryKey"`
+	TXIndex     int64            `json:"transactionIndex"                gorm:"primaryKey"`
+	EventIndex  int64            `json:"eventIndex"                      gorm:"primaryKey"`
+	Address     types.EthAddress `json:"address"`
+	Data        types.RawJSON    `json:"data"`
 }

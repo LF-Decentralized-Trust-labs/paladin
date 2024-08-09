@@ -26,8 +26,13 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
+// JSONP is a persistence wrapper for any type, which will serialize it to the DB and restore it in JSON with minimal fuss
 type JSONP[T any] struct {
 	v T
+}
+
+func WrapJSONP[T any](v T) *JSONP[T] {
+	return &JSONP[T]{v: v}
 }
 
 func (p *JSONP[T]) V() T {
