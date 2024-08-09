@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 

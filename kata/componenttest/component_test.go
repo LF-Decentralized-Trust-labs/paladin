@@ -30,9 +30,9 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
-	"github.com/kaleido-io/paladin/kata/internal/ethclient"
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"

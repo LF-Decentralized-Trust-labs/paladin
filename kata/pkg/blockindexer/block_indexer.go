@@ -34,7 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/retry"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"gorm.io/gorm"
 )
 
