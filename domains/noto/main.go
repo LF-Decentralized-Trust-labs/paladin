@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -31,8 +32,12 @@ var (
 	grpcAddr    = "unix:/tmp/testbed.paladin.1542386773.sock"
 )
 
+var domainConfig = noto.Config{
+	FactoryAddress: "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c",
+}
+
 func runTest(ctx context.Context) error {
-	domain, err := noto.Start(ctx, grpcAddr)
+	domain, err := noto.New(ctx, grpcAddr)
 	if err != nil {
 		return err
 	}
@@ -48,9 +53,12 @@ func runTest(ctx context.Context) error {
 	rest := ffresty.NewWithConfig(ctx, conf)
 	rpc := rpcbackend.NewRPCClient(rest)
 
-	log.L(ctx).Infof("Calling testbed_configureInit")
 	var result bool
-	rpcerr := rpc.CallRPC(ctx, &result, "testbed_configureInit", "noto", `{}`)
+	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	log.L(ctx).Infof("Calling testbed_configureInit")
+	rpcerr := rpc.CallRPC(callCtx, &result, "testbed_configureInit", "noto", domainConfig)
 	if rpcerr != nil {
 		return fmt.Errorf("fail to call JSON RPC: %v", rpcerr)
 	}

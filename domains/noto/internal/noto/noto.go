@@ -27,9 +27,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"gopkg.in/yaml.v2"
 )
 
-type domain struct {
+type Config struct {
+	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
+}
+
+type Noto struct {
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
@@ -38,7 +43,18 @@ type domain struct {
 	done         chan bool
 }
 
-func Start(ctx context.Context, addr string) (*domain, error) {
+var constructorAbi = `{
+	"type": "constructor",
+	"inputs": [
+		{
+			"internalType": "address",
+			"name": "notary",
+			"type": "address"
+		}
+	]
+}`
+
+func New(ctx context.Context, addr string) (*Noto, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err := grpc.NewClient(addr, opts...)
@@ -46,14 +62,14 @@ func Start(ctx context.Context, addr string) (*domain, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 
-	d := &domain{
+	d := &Noto{
 		conn:   conn,
 		client: pb.NewKataMessageServiceClient(conn),
 	}
 	return d, d.waitForReady(ctx)
 }
 
-func (d *domain) waitForReady(ctx context.Context) error {
+func (d *Noto) waitForReady(ctx context.Context) error {
 	status, err := d.client.Status(ctx, &pb.StatusRequest{})
 	delay := 0
 	for !status.GetOk() {
@@ -73,7 +89,7 @@ func (d *domain) waitForReady(ctx context.Context) error {
 	return nil
 }
 
-func (d *domain) Close() error {
+func (d *Noto) Close() error {
 	if d.stream != nil {
 		if err := d.stream.CloseSend(); err != nil {
 			return err
@@ -89,7 +105,7 @@ func (d *domain) Close() error {
 	return nil
 }
 
-func (d *domain) Listen(ctx context.Context, dest string) error {
+func (d *Noto) Listen(ctx context.Context, dest string) error {
 	d.dest = &dest
 	d.done = make(chan bool, 1)
 
@@ -106,7 +122,7 @@ func (d *domain) Listen(ctx context.Context, dest string) error {
 	return nil
 }
 
-func (d *domain) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
+func (d *Noto) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
 	body, err := anypb.New(reply)
 	if err == nil {
 		_, err = d.client.SendMessage(ctx, &pb.Message{
@@ -119,7 +135,7 @@ func (d *domain) sendReply(ctx context.Context, message *pb.Message, reply proto
 	return err
 }
 
-func (d *domain) handler(ctx context.Context) {
+func (d *Noto) handler(ctx context.Context) {
 	handlerCtx := log.WithLogField(ctx, "role", "handler")
 	for {
 		in, err := d.stream.Recv()
@@ -141,7 +157,7 @@ func (d *domain) handler(ctx context.Context) {
 	}
 }
 
-func (d *domain) handleMessage(ctx context.Context, message *pb.Message) error {
+func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	body, err := message.Body.UnmarshalNew()
 	if err != nil {
 		return err
@@ -150,21 +166,18 @@ func (d *domain) handleMessage(ctx context.Context, message *pb.Message) error {
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Configuring domain: %s", m.Name)
+
+		var config Config
+		err := yaml.Unmarshal([]byte(m.ConfigYaml), &config)
+		if err != nil {
+			return err
+		}
+
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
-				ConstructorAbiJson: `{
-						"inputs": [
-							{
-							"internalType": "address",
-							"name": "notary",
-							"type": "address"
-							}
-						],
-						"stateMutability": "nonpayable",
-						"type": "constructor"
-					}`,
-				FactoryContractAddress: "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c",
+				FactoryContractAddress: config.FactoryAddress,
 				FactoryContractAbiJson: "[]",
+				ConstructorAbiJson:     constructorAbi,
 				AbiStateSchemasJson:    []string{},
 			},
 		}
