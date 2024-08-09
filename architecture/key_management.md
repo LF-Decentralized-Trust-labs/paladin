@@ -93,7 +93,7 @@ This means that either of the following result in the same outcome:
    and the `key mapping` is stored in Paladin.
 2. A set of existing keys have been created by an administrator in the key storage system,
    and Paladin is instructed to `discover` all of these keys. Multiple `key mappings` are created
-   in the Paladin database, each referring to a separate key it the key store.
+   in the Paladin database, each referring to a separate key in the key store.
 
 > Both in-memory and in-key-store signing are possible with direct key mapping, depending
 > on the capabilities of the backing key storage HSM/SSM.
