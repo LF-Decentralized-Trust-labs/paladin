@@ -105,7 +105,7 @@ Here there is a many:1 relationship between a resolved `key mapping` for a key, 
 
 This single seed is used to build a near-infinite supply of unique keys, structured
 in a hierarchy of parent/child keys that can be deterministically retrieved in a very
-efficient manor.
+efficient manner.
 
 This is commonly referred to as a Hierarchical Deterministic (HD) wallet.
 
