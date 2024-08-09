@@ -18,10 +18,10 @@ package noto
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/log"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -102,7 +102,7 @@ func (d *domain) Listen(ctx context.Context, dest string) error {
 		return fmt.Errorf("failed to listen for domain events: %v", err)
 	}
 
-	go d.handler()
+	go d.handler(ctx)
 	return nil
 }
 
@@ -119,8 +119,8 @@ func (d *domain) sendReply(ctx context.Context, message *pb.Message, reply proto
 	return err
 }
 
-func (d *domain) handler() {
-	ctx := context.Background()
+func (d *domain) handler(ctx context.Context) {
+	handlerCtx := log.WithLogField(ctx, "role", "handler")
 	for {
 		in, err := d.stream.Recv()
 		select {
@@ -130,12 +130,12 @@ func (d *domain) handler() {
 			// do nothing
 		}
 		if err != nil {
-			log.Printf("Error receiving message - terminating handler loop: %v", err)
+			log.L(handlerCtx).Errorf("Error receiving message - terminating handler loop: %v", err)
 			return
 		}
-		err = d.handleMessage(ctx, in)
+		err = d.handleMessage(handlerCtx, in)
 		if err != nil {
-			log.Printf("Error handling message - terminating handler loop: %v", err)
+			log.L(handlerCtx).Errorf("Error handling message - terminating handler loop: %v", err)
 			return
 		}
 	}
@@ -149,7 +149,7 @@ func (d *domain) handleMessage(ctx context.Context, message *pb.Message) error {
 
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
-		log.Printf("Configuring domain: %s", m.Name)
+		log.L(ctx).Infof("Configuring domain: %s", m.Name)
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
 				ConstructorAbiJson: `{
@@ -173,17 +173,17 @@ func (d *domain) handleMessage(ctx context.Context, message *pb.Message) error {
 		}
 
 	case *pb.InitDomainRequest:
-		log.Printf("Initializing domain: %s", m.AbiStateSchemaIds)
+		log.L(ctx).Infof("Initializing domain: %s", m.AbiStateSchemaIds)
 		response := &pb.InitDomainResponse{}
 		if err := d.sendReply(ctx, message, response); err != nil {
 			return err
 		}
 
 	case *pb.DomainAPIError:
-		log.Printf("Received error: %s", m.ErrorMessage)
+		log.L(ctx).Errorf("Received error: %s", m.ErrorMessage)
 
 	default:
-		log.Printf("Unknown type: %s", reflect.TypeOf(m))
+		log.L(ctx).Errorf("Unknown type: %s", reflect.TypeOf(m))
 	}
 
 	return nil

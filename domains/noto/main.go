@@ -18,9 +18,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/domains/noto/internal/noto"
 )
@@ -38,7 +38,7 @@ func runTest(ctx context.Context) error {
 	}
 	defer domain.Close()
 
-	log.Printf("Listening for gRPC messages on %s", toDomain)
+	log.L(ctx).Infof("Listening for gRPC messages on %s", toDomain)
 	err = domain.Listen(ctx, toDomain)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func runTest(ctx context.Context) error {
 	rest := ffresty.NewWithConfig(ctx, conf)
 	rpc := rpcbackend.NewRPCClient(rest)
 
-	log.Printf("Calling testbed_configureInit")
+	log.L(ctx).Infof("Calling testbed_configureInit")
 	var result bool
 	rpcerr := rpc.CallRPC(ctx, &result, "testbed_configureInit", "noto", `{}`)
 	if rpcerr != nil {
@@ -60,6 +60,6 @@ func runTest(ctx context.Context) error {
 func main() {
 	ctx := context.Background()
 	if err := runTest(ctx); err != nil {
-		log.Fatalf("%s", err)
+		log.L(ctx).Fatalf("%s", err)
 	}
 }
