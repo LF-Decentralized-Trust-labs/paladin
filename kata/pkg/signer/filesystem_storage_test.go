@@ -17,6 +17,7 @@ package signer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -98,6 +99,15 @@ func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
 	assert.NoError(t, err)
 	assert.Equal(t, keyBytes, key0.PrivateKeyBytes())
+
+	// Check the JSON doesn't contain an address
+	var jsonWallet map[string]interface{}
+	b, err := os.ReadFile(path.Join(fs.path, "_bob", "_blue", "-42.key"))
+	assert.NoError(t, err)
+	err = json.Unmarshal(b, &jsonWallet)
+	assert.NoError(t, err)
+	_, hasAddressProperty := jsonWallet["address"]
+	assert.False(t, hasAddressProperty)
 
 }
 

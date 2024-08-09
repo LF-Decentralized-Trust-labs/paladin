@@ -50,3 +50,29 @@ func TestWSConfigBadTLS(t *testing.T) {
 	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}}})
 	assert.Regexp(t, "PD010901", err)
 }
+
+func TestHTTPonfigOK(t *testing.T) {
+	ctx := context.Background()
+	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "http://localhost:8545"})
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:8545", r.BaseURL)
+}
+
+func TestHTTPConfigTLSOK(t *testing.T) {
+	ctx := context.Background()
+	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545"})
+	assert.NoError(t, err)
+	assert.Equal(t, "https://localhost:8545", r.BaseURL)
+}
+
+func TestHTTPConfigBadURL(t *testing.T) {
+	ctx := context.Background()
+	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "wss://localhost:8545"})
+	assert.Regexp(t, "PD011302", err)
+}
+
+func TestHTTPConfigBadTLS(t *testing.T) {
+	ctx := context.Background()
+	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}})
+	assert.Regexp(t, "PD010901", err)
+}

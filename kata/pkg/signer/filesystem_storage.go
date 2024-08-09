@@ -30,8 +30,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type filesystemStore struct {
@@ -105,6 +105,16 @@ func (fss *filesystemStore) createWalletFile(ctx context.Context, keyFilePath, p
 	}
 	password := types.RandHex(32)
 	wf := keystorev3.NewWalletFileCustomBytesStandard(password, privateKey)
+
+	// Address is not part of the V3 standard, per
+	// https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition#alterations-from-version-1
+	//
+	// It's also very misleading in Paladin, as there's no assurance the private key material we're storing in the file
+	// will be used for SECP256K1 cryptography (BabyJubJub being an example) - or even that it's 32bytes in length
+	// (BIP39 mnemonics being a simple example).
+	//
+	// So we use the feature from https://github.com/hyperledger/firefly-signer/pull/70 to remove it entirely
+	wf.Metadata()["address"] = nil
 
 	err = os.WriteFile(passwordFilePath, []byte(password), fss.fileMode)
 	if err == nil {
