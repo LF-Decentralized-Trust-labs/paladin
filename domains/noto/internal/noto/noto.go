@@ -17,11 +17,15 @@ package noto
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -30,17 +34,30 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//go:embed abis/NotoFactory.json
+var notoFactoryJSON []byte // From "gradle copySolidity"
+
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
 }
 
+type SolidityBuild struct {
+	ABI      abi.ABI                   `json:"abi"`
+	Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
+}
+
 type Noto struct {
+	Factory      SolidityBuild
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
 	stream       pb.KataMessageService_ListenClient
 	stopListener context.CancelFunc
 	done         chan bool
+}
+
+type NotoConstructor struct {
+	Notary string `json:"notary"`
 }
 
 var constructorAbi = `{
@@ -62,11 +79,23 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 
+	factory, err := loadABI()
+	if err != nil {
+		return nil, err
+	}
+
 	d := &Noto{
-		conn:   conn,
-		client: pb.NewKataMessageServiceClient(conn),
+		conn:    conn,
+		client:  pb.NewKataMessageServiceClient(conn),
+		Factory: factory,
 	}
 	return d, d.waitForReady(ctx)
+}
+
+func loadABI() (SolidityBuild, error) {
+	var notoFactoryBuild SolidityBuild
+	err := json.Unmarshal(notoFactoryJSON, &notoFactoryBuild)
+	return notoFactoryBuild, err
 }
 
 func (d *Noto) waitForReady(ctx context.Context) error {
@@ -165,7 +194,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
-		log.L(ctx).Infof("Configuring domain: %s", m.Name)
+		log.L(ctx).Infof("Received ConfigureDomainRequest")
 
 		var config Config
 		err := yaml.Unmarshal([]byte(m.ConfigYaml), &config)
@@ -173,10 +202,15 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 			return err
 		}
 
+		factoryJSON, err := json.Marshal(d.Factory.ABI)
+		if err != nil {
+			return err
+		}
+
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
 				FactoryContractAddress: config.FactoryAddress,
-				FactoryContractAbiJson: "[]",
+				FactoryContractAbiJson: string(factoryJSON),
 				ConstructorAbiJson:     constructorAbi,
 				AbiStateSchemasJson:    []string{},
 			},
@@ -186,8 +220,46 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		}
 
 	case *pb.InitDomainRequest:
-		log.L(ctx).Infof("Initializing domain: %s", m.AbiStateSchemaIds)
+		log.L(ctx).Infof("Received InitDomainRequest")
 		response := &pb.InitDomainResponse{}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.InitDeployTransactionRequest:
+		log.L(ctx).Infof("Received InitDeployTransactionRequest")
+
+		var params NotoConstructor
+		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
+		if err != nil {
+			return err
+		}
+		log.L(ctx).Infof("Deployment parameters: %+v", params)
+
+		response := &pb.InitDeployTransactionResponse{
+			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.PrepareDeployTransactionRequest:
+		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
+
+		var params NotoConstructor
+		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
+		if err != nil {
+			return err
+		}
+		log.L(ctx).Infof("Deployment parameters: %+v", params)
+
+		response := &pb.PrepareDeployTransactionResponse{
+			Transaction: &pb.BaseLedgerTransaction{
+				FunctionName:   "deploy",
+				ParamsJson:     `{"notary": "` + params.Notary + `"}`,
+				SigningAddress: params.Notary,
+			},
+		}
 		if err := d.sendReply(ctx, message, response); err != nil {
 			return err
 		}

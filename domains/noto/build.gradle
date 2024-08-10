@@ -13,30 +13,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- ext {
+ext {
     testProcess = null
- }
+}
 
- task startTestbed {
+configurations {
+    compiledContracts {
+        canBeConsumed = false
+    }
+}
+
+dependencies {
+    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+}
+
+task copySolidity(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
+    }
+    into 'internal/noto/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task startTestbed {
     doFirst {
         project.ext.testProcess = new ProcessBuilder()
             .directory(project(':kata').projectDir)
             .command("go", "run", "./testbed", "${projectDir}/testbed.config.yaml")
             .start()
     }
- }
+}
 
- task stopTestbed {
+task stopTestbed {
     doFirst {
         project.ext.testProcess.destroy()
     }
- }
+}
 
-task run(type: Exec) {
+task test(type: Exec) {
     executable 'go'
     args 'run'
     args 'main.go'
 
+    dependsOn ':kata:build' // TODO: is there a better way?
+    dependsOn copySolidity
     dependsOn startTestbed
     finalizedBy stopTestbed
 }
+
+task build(dependsOn: test) {}

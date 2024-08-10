@@ -30,11 +30,8 @@ var (
 	toDomain    = "to-domain"
 	testbedAddr = "http://127.0.0.1:49603"
 	grpcAddr    = "unix:/tmp/testbed.paladin.1542386773.sock"
+	account1    = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
 )
-
-var domainConfig = noto.Config{
-	FactoryAddress: "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c",
-}
 
 func runTest(ctx context.Context) error {
 	domain, err := noto.New(ctx, grpcAddr)
@@ -53,14 +50,33 @@ func runTest(ctx context.Context) error {
 	rest := ffresty.NewWithConfig(ctx, conf)
 	rpc := rpcbackend.NewRPCClient(rest)
 
-	var result bool
+	var addressResult string
+	var boolResult bool
+	var objResult interface{}
+
 	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	log.L(ctx).Infof("Calling testbed_configureInit")
-	rpcerr := rpc.CallRPC(callCtx, &result, "testbed_configureInit", "noto", domainConfig)
+	log.L(ctx).Infof("Calling testbed_deployBytecode")
+	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode", account1, domain.Factory.Bytecode.String())
 	if rpcerr != nil {
-		return fmt.Errorf("fail to call JSON RPC: %v", rpcerr)
+		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
+	}
+	log.L(ctx).Infof("Deployed to %s", addressResult)
+
+	log.L(ctx).Infof("Calling testbed_configureInit")
+	domainConfig := noto.Config{FactoryAddress: addressResult}
+	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_configureInit", "noto", domainConfig)
+	if rpcerr != nil {
+		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
+	}
+
+	log.L(ctx).Infof("Calling testbed_deploy")
+	rpcerr = rpc.CallRPC(callCtx, &objResult, "testbed_deploy", "noto", &noto.NotoConstructor{
+		Notary: account1,
+	})
+	if rpcerr != nil {
+		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
 	}
 	return nil
 }
