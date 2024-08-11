@@ -79,6 +79,8 @@ func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockI
 	p, err := mockpersistence.NewSQLMockProvider()
 	assert.NoError(t, err)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
+
 	bi, err := newBlockIndexer(ctx, config, p.P, bl)
 	assert.NoError(t, err)
 
@@ -100,18 +102,19 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 			Number: ethtypes.HexUint64(i),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
 		}
+		txHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
 		receipts[blocks[i].Hash.String()] = []*TXReceiptJSONRPC{
 			{
-				TransactionHash: ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+				TransactionHash: txHash,
 				From:            ethtypes.MustNewAddress(types.RandHex(20)),
 				To:              to,
 				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
 				Logs: []*LogJSONRPC{
-					{Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
 				},
 			},
 		}
@@ -174,6 +177,8 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	p, err := mockpersistence.NewSQLMockProvider()
 	assert.NoError(t, err)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
+
 	wsConf := &rpcclient.WSConfig{HTTPConfig: rpcclient.HTTPConfig{URL: "ws://localhost:8546"}}
 
 	cancelledCtx, cancelCtx := context.WithCancel(context.Background())
@@ -182,7 +187,8 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start will get error, but return due to cancelled context
-	bi.Start()
+	err = bi.Start()
+	assert.NoError(t, err)
 	assert.Nil(t, bi.(*blockIndexer).processorDone)
 
 	assert.NoError(t, p.Mock.ExpectationsWereMet())
@@ -634,44 +640,52 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 	p, err := mockpersistence.NewSQLMockProvider()
 	assert.NoError(t, err)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`"pending"`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300.*pending", err)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err := newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`"latest"`),
 	}, p.P, bl)
 	assert.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`null`),
 	}, p.P, bl)
 	assert.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{}, p.P, bl)
 	assert.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`123`),
 	}, p.P, bl)
 	assert.NoError(t, err)
 	assert.Equal(t, ethtypes.HexUint64(123), *bi.fromBlock)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`"0x7b"`),
 	}, p.P, bl)
 	assert.NoError(t, err)
 	assert.Equal(t, ethtypes.HexUint64(123), *bi.fromBlock)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`!!! bad JSON`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300", err)
 
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
 		FromBlock: types.RawJSON(`false`),
 	}, p.P, bl)

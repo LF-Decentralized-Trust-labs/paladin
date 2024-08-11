@@ -17,6 +17,8 @@
 package types
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"testing"
 
@@ -76,7 +78,8 @@ func TestJSONPValue(t *testing.T) {
 		"parent7": 12345
 	}`, string(b))
 
-	sqlV2P1, err := v2.Parent1.Value()
+	var v1P1Valuer driver.Valuer = &v2.Parent1
+	sqlV2P1, err := v1P1Valuer.Value()
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[{
 		"type": "function",
@@ -116,7 +119,8 @@ func TestJSONPScan(t *testing.T) {
 	}
 
 	var v1 JSONP[*testStruct]
-	err := v1.Scan(`{"child1": "hello"}`)
+	var v1Scanner sql.Scanner = &v1
+	err := v1Scanner.Scan(`{"child1": "hello"}`)
 	assert.NoError(t, err)
 	assert.Equal(t, v1.V(), &testStruct{Child1: "hello"})
 

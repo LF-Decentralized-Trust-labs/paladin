@@ -16,7 +16,14 @@
 
 package types
 
-import "github.com/hyperledger/firefly-signer/pkg/abi"
+import (
+	"context"
+	"strings"
+
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+)
 
 // The serializer we should use in all places that go from ABI validated data,
 // back down to JSON that might be:
@@ -29,4 +36,66 @@ func StandardABISerializer() *abi.Serializer {
 		SetIntSerializer(abi.Base10StringIntSerializer).
 		SetFloatSerializer(abi.Base10StringFloatSerializer).
 		SetByteSerializer(abi.HexByteSerializer0xPrefix)
+}
+
+// Validates that two ABIs contains exactly the same entires
+// - Includes names of types
+// - Includes indexing and other modifiers
+// - Allows any order of entries
+func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType) error {
+	byDefsA, err := ABIBySolDefinition(ctx, a)
+	if err != nil {
+		return err
+	}
+	byDefsB, err := ABIBySolDefinition(ctx, b)
+	if err != nil {
+		return err
+	}
+	for sig, a := range byDefsA {
+		mustMatch := len(subMatch) == 0
+		for _, t := range subMatch {
+			if a.Type == t {
+				mustMatch = true
+				break
+			}
+		}
+		if mustMatch {
+			if _, inB := byDefsB[sig]; !inB {
+				return i18n.NewError(ctx, msgs.MsgABIDefNotInBothStructs, sig)
+			}
+		}
+	}
+	for sig, b := range byDefsB {
+		mustMatch := len(subMatch) == 0
+		for _, t := range subMatch {
+			if b.Type == t {
+				mustMatch = true
+				break
+			}
+		}
+		if mustMatch {
+			if _, inA := byDefsA[sig]; !inA {
+				return i18n.NewError(ctx, msgs.MsgABIDefNotInBothStructs, sig)
+			}
+		}
+	}
+	return nil
+}
+
+func ABIBySolDefinition(ctx context.Context, a abi.ABI) (map[string]*abi.Entry, error) {
+	byDefs := make(map[string]*abi.Entry)
+	for _, e := range a {
+		solDef, childStructs, err := e.SolidityDefCtx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		buff := new(strings.Builder)
+		buff.WriteString(solDef)
+		for _, e := range childStructs {
+			buff.WriteRune('|')
+			buff.WriteString(e)
+		}
+		byDefs[buff.String()] = e
+	}
+	return byDefs, nil
 }

@@ -87,28 +87,80 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	return nil
 }
 
+func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *EventStream) error {
+	def.Type = EventStreamTypeInternal.Enum()
+
+	// Find if one exists - as we need to check it matches, and get its uuid
+	var existing []*EventStream
+	err := bi.persistence.DB().
+		Table("event_streams").
+		Where("type = ?", def.Type).
+		Where("name = ?", def.Name).
+		WithContext(ctx).
+		Find(&existing).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(existing) > 0 {
+		// The event definitions in both events must be identical
+		// We do not support changing the ABI after creation
+		if err := types.ABIsMustMatch(ctx, existing[0].ABI, def.ABI); err != nil {
+			return err
+		}
+		def.ID = existing[0].ID
+		// Update in the DB so we store the latest config
+		err := bi.persistence.DB().
+			Table("event_streams").
+			Where("type = ?", def.Type).
+			Where("name = ?", def.Name).
+			WithContext(ctx).
+			Update("config", def.Config).
+			Error
+		if err != nil {
+			return err
+		}
+	} else {
+		// Otherwise we're just recreating
+		err := bi.persistence.DB().
+			Table("event_streams").
+			WithContext(ctx).
+			Create(def).
+			Error
+		if err != nil {
+			return err
+		}
+	}
+
+	// We call init here
+	// TODO: Full stop/start lifecycle
+	return bi.initEventStream(ctx, def)
+
+}
+
 func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) error {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
-	if _, alreadyInit := bi.eventStreams[definition.ID]; alreadyInit {
-		return i18n.NewError(ctx, msgs.MsgBlockIndexerESAlreadyInit)
+	if existing := bi.eventStreams[definition.ID]; existing != nil {
+		// If we're already initialized, the only thing that can be changed is the config.
+		// Caller is responsible for ensuring we're stopped at this point
+		existing.definition.Config = definition.Config
+		return nil
 	}
 
 	es := &eventStream{
-		bi:             bi,
-		definition:     definition,
-		eventABIs:      []*abi.Entry{},
-		signatures:     []types.HashID{},
-		blocks:         make(chan *eventStreamBlock, eventStreamQueueLength),
-		dispatch:       make(chan *EventWithData, eventStreamBatchSize),
-		detectorDone:   make(chan struct{}),
-		dispatcherDone: make(chan struct{}),
+		bi:         bi,
+		definition: definition,
+		eventABIs:  []*abi.Entry{},
+		signatures: []types.HashID{},
+		blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
+		dispatch:   make(chan *EventWithData, eventStreamBatchSize),
 	}
-	es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 
 	// Calculate all the signatures we require
-	for _, abiEntry := range definition.ABI.V() {
+	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
 			sigStr, err := abiEntry.SignatureCtx(ctx)
 			if err != nil {
@@ -140,13 +192,34 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return nil
 }
 
+func (bi *blockIndexer) startEventStreams() {
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+	for _, es := range bi.eventStreams {
+		es.start()
+	}
+}
+
 func (es *eventStream) start() {
-	go es.detector()
-	go es.dispatcher()
+	if es.detectorDone == nil && es.dispatcherDone == nil {
+		es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(es.bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
+		es.detectorDone = make(chan struct{})
+		es.dispatcherDone = make(chan struct{})
+		go es.detector()
+		go es.dispatcher()
+	}
 }
 
 func (es *eventStream) stop() {
-	es.cancelCtx()
+	if es.cancelCtx != nil {
+		es.cancelCtx()
+	}
+	if es.detectorDone != nil {
+		<-es.detectorDone
+	}
+	if es.dispatcherDone != nil {
+		<-es.dispatcherDone
+	}
 }
 
 func (es *eventStream) processCheckpoint() (int64, error) {

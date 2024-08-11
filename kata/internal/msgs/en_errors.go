@@ -134,9 +134,10 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
-	MsgEnumValueInvalid  = ffe("PD011102", "Value must be one of %s")
+	MsgTypesUnmarshalNil      = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail          = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgEnumValueInvalid       = ffe("PD011102", "Value must be one of %s")
+	MsgABIDefNotInBothStructs = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
 
 	// Plugin registry PD0112XX
 	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
@@ -148,7 +149,7 @@ var (
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
 	MsgBlockIndexerInvalidWebSocketURL      = ffe("PD011301", "Invalid WebSocket URL: %s")
 	MsgBlockIndexerInvalidHTTPURL           = ffe("PD011302", "Invalid HTTP URL: %s")
-	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed: %s")
+	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed")
 	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
 	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
 

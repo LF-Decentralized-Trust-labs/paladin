@@ -26,6 +26,7 @@ import (
 )
 
 type EnumStringOptions interface {
+	~string
 	Default() string
 	Options() []string
 }

@@ -29,19 +29,28 @@ type EventStreamConfig struct {
 
 type EventStreamType string
 
+const (
+	EventStreamTypeInternal EventStreamType = "internal" // a core Paladin component, such as the state confirmation engine
+)
+
 func (est EventStreamType) Options() []string {
 	return []string{
-		"internal", // a core Paladin component, such as the state confirmation engine
+		string(EventStreamTypeInternal),
 	}
 }
-func (es EventStreamType) Default() string { return "internal" }
+func (est EventStreamType) Default() string { return string(EventStreamTypeInternal) }
+func (est EventStreamType) Enum() types.Enum[EventStreamType] {
+	return types.Enum[EventStreamType](est)
+}
 
 type EventStream struct {
-	ID     uuid.UUID                      `json:"id"                     gorm:"primaryKey"`
-	Name   string                         `json:"name"`
-	Type   types.Enum[EventStreamType]    `json:"type"`
-	Config types.JSONP[EventStreamConfig] `json:"config"`
-	ABI    types.JSONP[abi.ABI]           `json:"abi,omitempty"` // immutable (event delivery behavior would be too undefined with mutability)
+	ID        uuid.UUID                   `json:"id"                     gorm:"primaryKey"`
+	Name      string                      `json:"name"`
+	CreatedAt types.Timestamp             `json:"created"                gorm:"autoCreateTime:nano"`
+	UpdatedAt types.Timestamp             `json:"updated"                gorm:"autoUpdateTime:nano"`
+	Type      types.Enum[EventStreamType] `json:"type"`
+	Config    *EventStreamConfig          `json:"config"                 gorm:"serializer:json"`
+	ABI       abi.ABI                     `json:"abi,omitempty"          gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 }
 
 type EventStreamCheckpoint struct {

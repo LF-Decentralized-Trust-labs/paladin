@@ -40,7 +40,7 @@ import (
 )
 
 type BlockIndexer interface {
-	Start()
+	Start(internalStreams ...*EventStream) error
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error)
@@ -116,12 +116,24 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 	if err := bi.setFromBlock(ctx, config); err != nil {
 		return nil, err
 	}
+	if err := bi.loadEventStreams(ctx); err != nil {
+		return nil, err
+	}
 	return bi, nil
 }
 
-func (bi *blockIndexer) Start() {
+func (bi *blockIndexer) Start(internalStreams ...*EventStream) error {
+	// Internal event streams can be instated before we start the listener itself
+	// (so even on first startup they function as if they were there before the indexer loads)
+	for _, esDefinition := range internalStreams {
+		if err := bi.upsertInternalEventStream(bi.parentCtxForReset, esDefinition); err != nil {
+			return err
+		}
+	}
 	bi.blockListener.start()
 	bi.startOrReset()
+	bi.startEventStreams()
+	return nil
 }
 
 func (bi *blockIndexer) startOrReset() {
@@ -175,6 +187,12 @@ func (bi *blockIndexer) Stop() {
 	dispatcherDone := bi.dispatcherDone
 	cancelCtx := bi.cancelFunc
 	bi.stateLock.Unlock()
+
+	bi.eventStreamsLock.Lock()
+	for _, es := range bi.eventStreams {
+		es.stop()
+	}
+	bi.eventStreamsLock.Unlock()
 
 	if cancelCtx != nil {
 		cancelCtx()
