@@ -136,6 +136,7 @@ var (
 	// Types PD0111XX
 	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
 	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgEnumValueInvalid  = ffe("PD011102", "Value must be one of %s")
 
 	// Plugin registry PD0112XX
 	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")

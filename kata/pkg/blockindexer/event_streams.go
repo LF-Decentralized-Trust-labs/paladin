@@ -26,7 +26,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"gorm.io/gorm"
 )
+
+type EventStreamCallback func(ctx context.Context, tx gorm.DB, batch []*EventWithData) error
 
 type eventStream struct {
 	ctx            context.Context
@@ -37,6 +40,7 @@ type eventStream struct {
 	signaturesH    []uuid.UUID
 	signaturesL    []uuid.UUID
 	eventABIs      []*abi.Entry
+	callback       EventStreamCallback
 	blocks         chan *eventStreamBlock
 	dispatch       chan *EventWithData
 	detectorDone   chan struct{}
@@ -280,7 +284,7 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 
 	// Because we're in catch up here, we have to query the chain ourselves for the receipts.
 	// That's done by transaction (not by event) - so we've got to group
-	var byTxID map[string][]*EventWithData
+	byTxID := make(map[string][]*EventWithData)
 	for _, event := range page {
 		byTxID[event.TransactionHash.String()] = append(byTxID[event.TransactionHash.String()], &EventWithData{
 			Stream:       es.definition.ID,

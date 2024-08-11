@@ -1,8 +1,12 @@
 CREATE TABLE event_streams (
     "id"              UUID    NOT NULL,
+    "type"            TEXT    NOT NULL,
+    "name"            TEXT    NOT NULL,
+    "config"          TEXT    NOT NULL,
     "abi"             TEXT    NOT NULL,
     PRIMARY KEY ("id")
 );
+CREATE UNIQUE INDEX event_stream_name ON event_streams("type","name");
 
 CREATE TABLE event_stream_checkpoints (
     "stream"          UUID    NOT NULL,
@@ -11,10 +15,3 @@ CREATE TABLE event_stream_checkpoints (
     FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE
 );
 
-CREATE TABLE event_stream_signatures (
-    "stream"          UUID    NOT NULL,
-    "signature_l"     UUID    NOT NULL,
-    "signature_h"     UUID    NOT NULL,
-    PRIMARY KEY ("stream", "signature_l", "signature_h"),
-    FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE
-);
