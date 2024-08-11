@@ -40,6 +40,8 @@ func TestEnumValue(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "option1", sqlV1)
 
+	assert.Equal(t, TestEnum("OPTION1"), v1.V())
+
 	var v2 Enum[TestEnum] = "option4"
 	_, err = v2.Value()
 	assert.Regexp(t, "PD011102", err)

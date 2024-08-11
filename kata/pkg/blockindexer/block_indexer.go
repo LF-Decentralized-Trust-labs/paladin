@@ -40,7 +40,7 @@ import (
 )
 
 type BlockIndexer interface {
-	Start(internalStreams ...*EventStream) error
+	Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error)
@@ -61,30 +61,31 @@ type BlockIndexer interface {
 // This implementation is thus deliberately simple assuming that when instability is found
 // in the notifications it can simply wipe out its view and start again.
 type blockIndexer struct {
-	parentCtxForReset     context.Context
-	cancelFunc            func()
-	persistence           persistence.Persistence
-	blockListener         *blockListener
-	wsConn                rpcbackend.WebSocketRPCClient
-	stateLock             sync.Mutex
-	fromBlock             *ethtypes.HexUint64
-	nextBlock             *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
-	blocksSinceCheckpoint []*BlockInfoJSONRPC
-	newHeadToAdd          []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
-	requiredConfirmations int
-	retry                 *retry.Retry
-	batchSize             int
-	batchTimeout          time.Duration
-	txWaiters             map[string]*txWaiter
-	txWaiterLock          sync.Mutex
-	eventStreams          map[uuid.UUID]*eventStream
-	eventStreamsHeadSet   map[uuid.UUID]*eventStream
-	eventStreamSignatures map[string][]*eventStream
-	eventStreamsLock      sync.Mutex
-	dispatcherTap         chan struct{}
-	processorDone         chan struct{}
-	dispatcherDone        chan struct{}
-	utBatchNotify         chan *blockWriterBatch
+	parentCtxForReset      context.Context
+	cancelFunc             func()
+	persistence            persistence.Persistence
+	blockListener          *blockListener
+	wsConn                 rpcbackend.WebSocketRPCClient
+	stateLock              sync.Mutex
+	fromBlock              *ethtypes.HexUint64
+	nextBlock              *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
+	blocksSinceCheckpoint  []*BlockInfoJSONRPC
+	newHeadToAdd           []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
+	requiredConfirmations  int
+	retry                  *retry.Retry
+	batchSize              int
+	batchTimeout           time.Duration
+	txWaiters              map[string]*txWaiter
+	txWaiterLock           sync.Mutex
+	eventStreamsInternalCB InternalStreamCallback
+	eventStreams           map[uuid.UUID]*eventStream
+	eventStreamsHeadSet    map[uuid.UUID]*eventStream
+	eventStreamSignatures  map[string][]*eventStream
+	eventStreamsLock       sync.Mutex
+	dispatcherTap          chan struct{}
+	processorDone          chan struct{}
+	dispatcherDone         chan struct{}
+	utBatchNotify          chan *blockWriterBatch
 }
 
 func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WSConfig, persistence persistence.Persistence) (_ BlockIndexer, err error) {
@@ -122,7 +123,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 	return bi, nil
 }
 
-func (bi *blockIndexer) Start(internalStreams ...*EventStream) error {
+func (bi *blockIndexer) Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error {
 	// Internal event streams can be instated before we start the listener itself
 	// (so even on first startup they function as if they were there before the indexer loads)
 	for _, esDefinition := range internalStreams {
@@ -132,7 +133,7 @@ func (bi *blockIndexer) Start(internalStreams ...*EventStream) error {
 	}
 	bi.blockListener.start()
 	bi.startOrReset()
-	bi.startEventStreams()
+	bi.startEventStreams(internalCallback)
 	return nil
 }
 

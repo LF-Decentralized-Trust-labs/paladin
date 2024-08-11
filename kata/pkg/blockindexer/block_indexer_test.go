@@ -187,7 +187,7 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start will get error, but return due to cancelled context
-	err = bi.Start()
+	err = bi.Start(nil)
 	assert.NoError(t, err)
 	assert.Nil(t, bi.(*blockIndexer).processorDone)
 

@@ -19,12 +19,18 @@ package blockindexer
 import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type EventStreamConfig struct {
-	BatchSize    *int64  `json:"batchSize,omitempty"`
+	BatchSize    *int    `json:"batchSize,omitempty"`
 	BatchTimeout *string `json:"batchTimeout,omitempty"`
+}
+
+var EventStreamDefaults = &EventStreamConfig{
+	BatchSize:    confutil.P(50),
+	BatchTimeout: confutil.P("75ms"),
 }
 
 type EventStreamType string
@@ -54,8 +60,8 @@ type EventStream struct {
 }
 
 type EventStreamCheckpoint struct {
-	ID          uuid.UUID `json:"id"                                     gorm:"primaryKey"`
-	BlockNumber int64     `json:"blockNumber"                            gorm:"primaryKey"`
+	Stream      uuid.UUID `json:"id"                                     gorm:"primaryKey"`
+	BlockNumber int64     `json:"blockNumber"`
 }
 
 type EventStreamSignature struct {
@@ -64,8 +70,14 @@ type EventStreamSignature struct {
 }
 
 type EventWithData struct {
-	Stream uuid.UUID `json:"stream"`
 	*IndexedEvent
 	Address types.EthAddress `json:"address"`
 	Data    types.RawJSON    `json:"data"`
+}
+
+type EventDeliveryBatch struct {
+	StreamID   uuid.UUID        `json:"streamId"`
+	StreamName string           `json:"streamName"`
+	BatchID    uuid.UUID        `json:"batchId"`
+	Events     []*EventWithData `json:"events"`
 }

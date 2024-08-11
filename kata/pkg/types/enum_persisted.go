@@ -34,6 +34,10 @@ type EnumStringOptions interface {
 // Enum is a persistence wrapper for an enum with a set of options
 type Enum[O EnumStringOptions] string
 
+func (p Enum[O]) V() O {
+	return O(p)
+}
+
 // Case insensitive validation, with default, returning a string value
 func (p Enum[O]) Validate() (string, error) {
 	validator := (*new(O))

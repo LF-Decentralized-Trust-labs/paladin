@@ -18,18 +18,21 @@ package blockindexer
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-type EventStreamCallback func(ctx context.Context, tx gorm.DB, batch []*EventWithData) error
+type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error
 
 type eventStream struct {
 	ctx            context.Context
@@ -40,7 +43,8 @@ type eventStream struct {
 	signaturesH    []uuid.UUID
 	signaturesL    []uuid.UUID
 	eventABIs      []*abi.Entry
-	callback       EventStreamCallback
+	batchSize      int
+	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
 	dispatch       chan *EventWithData
 	detectorDone   chan struct{}
@@ -48,8 +52,10 @@ type eventStream struct {
 }
 
 type eventBatch struct {
-	id     string
-	events []*EventWithData
+	EventDeliveryBatch
+	opened         time.Time
+	timeoutContext context.Context
+	timeoutCancel  context.CancelFunc
 }
 
 const (
@@ -143,21 +149,25 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
-	if existing := bi.eventStreams[definition.ID]; existing != nil {
+	es := bi.eventStreams[definition.ID]
+	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the config.
 		// Caller is responsible for ensuring we're stopped at this point
-		existing.definition.Config = definition.Config
-		return nil
+		es.definition.Config = definition.Config
+	} else {
+		es = &eventStream{
+			bi:         bi,
+			definition: definition,
+			eventABIs:  []*abi.Entry{},
+			signatures: []types.HashID{},
+			blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
+			dispatch:   make(chan *EventWithData, eventStreamBatchSize),
+		}
 	}
 
-	es := &eventStream{
-		bi:         bi,
-		definition: definition,
-		eventABIs:  []*abi.Entry{},
-		signatures: []types.HashID{},
-		blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
-		dispatch:   make(chan *EventWithData, eventStreamBatchSize),
-	}
+	// Set the batch config
+	es.batchSize = confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
+	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
 
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
@@ -192,9 +202,10 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	return nil
 }
 
-func (bi *blockIndexer) startEventStreams() {
+func (bi *blockIndexer) startEventStreams(internalCallback InternalStreamCallback) {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
+	bi.eventStreamsInternalCB = internalCallback
 	for _, es := range bi.eventStreams {
 		es.start()
 	}
@@ -300,7 +311,6 @@ func (es *eventStream) detector() {
 func (es *eventStream) processNotifiedBlock(block *eventStreamBlock) {
 	for _, l := range block.events {
 		event := &EventWithData{
-			Stream:       es.definition.ID,
 			IndexedEvent: es.bi.logToIndexedEvent(l),
 		}
 		es.matchLog(l, event)
@@ -320,6 +330,82 @@ func (es *eventStream) sendToDispatcher(event *EventWithData) {
 
 func (es *eventStream) dispatcher() {
 	defer close(es.dispatcherDone)
+	l := log.L(es.ctx)
+	var batch *eventBatch
+	for {
+		var timeoutContext context.Context
+		var timedOut bool
+		if batch != nil {
+			timeoutContext = batch.timeoutContext
+		} else {
+			timeoutContext = es.ctx
+		}
+		select {
+		case event := <-es.dispatch:
+			if batch == nil {
+				batch = &eventBatch{
+					EventDeliveryBatch: EventDeliveryBatch{
+						StreamID:   es.definition.ID,
+						StreamName: es.definition.Name,
+						BatchID:    uuid.New(),
+					},
+					opened: time.Now(),
+				}
+				batch.timeoutContext, batch.timeoutCancel = context.WithTimeout(es.ctx, es.batchTimeout)
+			}
+			batch.Events = append(batch.Events, event)
+			l.Debugf("Added event %d/%d/%d to batch %s (len=%d)", event.BlockNumber, event.TXIndex, event.EventIndex, batch.BatchID, len(batch.Events))
+		case <-timeoutContext.Done():
+			timedOut = true
+			select {
+			case <-es.ctx.Done():
+				l.Debugf("event stream dispatcher ending")
+				return
+			default:
+			}
+		}
+
+		if batch != nil && (timedOut || (len(batch.Events) >= es.batchSize)) {
+			batch.timeoutCancel()
+			l.Debugf("Running batch %s (len=%d,timeout=%t,age=%dms)", batch.BatchID, len(batch.Events), timedOut, time.Since(batch.opened).Milliseconds())
+			es.runBatch(batch)
+			batch = nil
+		}
+
+	}
+}
+
+func (es *eventStream) runBatch(batch *eventBatch) {
+
+	if es.definition.Type.V() != EventStreamTypeInternal {
+		panic("non internal streams not yet implemented")
+	}
+
+	// We start a database transaction, run the callback function
+	_ = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
+		return true, es.bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
+			err := es.bi.eventStreamsInternalCB(es.ctx, tx, &batch.EventDeliveryBatch)
+			if err != nil {
+				return err
+			}
+			// commit the checkpoint
+			return tx.
+				Table("event_stream_checkpoints").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{{Name: "stream"}},
+					DoUpdates: clause.AssignmentColumns([]string{
+						"block_number",
+					}),
+				}).
+				Create(&EventStreamCheckpoint{
+					Stream:      es.definition.ID,
+					BlockNumber: batch.Events[len(batch.Events)-1].BlockNumber,
+				}).
+				WithContext(es.ctx).
+				Error
+		})
+	})
+
 }
 
 func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, err error) {
@@ -360,7 +446,6 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 	byTxID := make(map[string][]*EventWithData)
 	for _, event := range page {
 		byTxID[event.TransactionHash.String()] = append(byTxID[event.TransactionHash.String()], &EventWithData{
-			Stream:       es.definition.ID,
 			IndexedEvent: event,
 			// Leave Address and Data as that's what we'll fill in, if it works
 		})
