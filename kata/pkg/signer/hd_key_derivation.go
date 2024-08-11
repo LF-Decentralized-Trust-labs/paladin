@@ -35,28 +35,26 @@ var (
 	BIP32BaseDerivationPath = []uint32{0x80000000 + 44, 0x80000000 + 60}
 )
 
+type hdWalletPathEntry struct {
+	Name  string
+	Index uint64
+}
+
 func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationConfig) (err error) {
+	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix)
+	bip44Prefix = strings.ReplaceAll(bip44Prefix, " ", "")
 	sm.hd = &hdDerivation{
 		sm:                    sm,
-		bip44Prefix:           confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix),
+		bip44Prefix:           bip44Prefix,
 		bip44DirectResolution: conf.BIP44DirectResolution,
 		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *KeyDerivationDefaults.BIP44HardenedSegments),
 	}
-
 	seedKeyPath := KeyDerivationDefaults.SeedKeyPath
-	if len(conf.SeedKeyPath) > 0 {
+	if conf.SeedKeyPath.Name != "" {
 		seedKeyPath = conf.SeedKeyPath
 	}
-	seedReq := &proto.ResolveKeyRequest{}
-	for _, p := range seedKeyPath {
-		seedReq.Path = append(seedReq.Path, &proto.KeyPathSegment{
-			Name:       p.Name,
-			Index:      p.Index,
-			Attributes: p.Attributes,
-		})
-	}
 	// Note we don't have any way to store the resolved keyHandle, so we resolve it every time we start
-	seed, _, err := sm.keyStore.FindOrCreateLoadableKey(ctx, seedReq, sm.new32ByteRandomSeed)
+	seed, _, err := sm.keyStore.FindOrCreateLoadableKey(ctx, seedKeyPath.ToKeyResolutionRequest(), sm.new32ByteRandomSeed)
 	if err != nil {
 		return err
 	}
@@ -78,9 +76,21 @@ func (sm *signingModule) new32ByteRandomSeed() ([]byte, error) {
 	return buff, err
 }
 
+func (hd *hdDerivation) flatPathList(req *proto.ResolveKeyRequest) []hdWalletPathEntry {
+	ret := make([]hdWalletPathEntry, len(req.Path)+1)
+	for i, p := range req.Path {
+		ret[i] = hdWalletPathEntry{Name: p.Name, Index: p.Index}
+	}
+	ret[len(req.Path)] = hdWalletPathEntry{
+		Name:  req.Name,
+		Index: req.Index,
+	}
+	return ret
+}
+
 func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
 	keyHandle := hd.bip44Prefix
-	for i, s := range req.Path {
+	for i, s := range hd.flatPathList(req) {
 		var derivation uint64
 		hardenedFlag := ""
 		// We must only use the config to set whether direct derivation is used, otherwise it
@@ -110,8 +120,7 @@ func (hd *hdDerivation) resolveHDWalletKey(ctx context.Context, req *proto.Resol
 			// Handle whether the child keys will be placed in the hardened range (indices 2^31 through 2^32-1)
 			// or normal range (0 through 2^31-1) using a combination of our configuration and
 			// and an option that can be specified dynamically when creating the key.
-			hardenedAttr := s.Attributes["bip32_hardened"]
-			if hardenedAttr == "true" || (hardenedAttr != "false" && i < hd.bip44HardenedSegments) {
+			if i < hd.bip44HardenedSegments {
 				hardenedFlag = "'"
 			}
 			derivation = s.Index

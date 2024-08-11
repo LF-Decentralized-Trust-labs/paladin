@@ -35,7 +35,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	sm, err := NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type:                  KeyDerivationTypeBIP32,
-			BIP44Prefix:           confutil.P("m/44'/60'/0'/0"),
+			BIP44Prefix:           confutil.P(" m / 44' / 60' / 0' / 0 "), // we allow friendly spaces here
 			BIP44HardenedSegments: confutil.P(0),
 		},
 		KeyStore: StoreConfig{
@@ -54,12 +54,8 @@ func TestHDSigningStaticExample(t *testing.T) {
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{
-				Name:  "key1",
-				Index: 0,
-			},
-		},
+		Name:       "key1",
+		Index:      0,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "m/44'/60'/0'/0/0", res.KeyHandle)
@@ -94,7 +90,9 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
+		Name:       "50'",
+		Index:      0,
+		Path: []*proto.ResolveKeyPathSegment{
 			{
 				Name:  "10'",
 				Index: 0,
@@ -111,10 +109,6 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 				Name:  "40",
 				Index: 0,
 			},
-			{
-				Name:  "50'",
-				Index: 0,
-			},
 		},
 	})
 	assert.NoError(t, err)
@@ -122,23 +116,15 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{
-				Name:  "key1",
-				Index: 0,
-			},
-		},
+		Name:       "key1",
+		Index:      0,
 	})
 	assert.Regexp(t, "PD011413", err)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{
-				Name:  "2147483648", // too big
-				Index: 0,
-			},
-		},
+		Name:       "2147483648", // too big
+		Index:      0,
 	})
 	assert.Regexp(t, "PD011414", err)
 
@@ -164,8 +150,12 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	sm, err := NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: []ConfigKeyPathEntry{
-				{Name: "custom"}, {Name: "seed"},
+			SeedKeyPath: ConfigKeyEntry{
+				Name:  "seed",
+				Index: 0,
+				Path: []ConfigKeyPathEntry{
+					{Name: "custom", Index: 0},
+				},
 			},
 		},
 		KeyStore: StoreConfig{
@@ -184,7 +174,9 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
+		Name:       "E82D5A3F-D154-4C5B-A297-F8D49528DA73",
+		Index:      0x7FFFFFFF, // largest possible - not in hardened range
+		Path: []*proto.ResolveKeyPathSegment{
 			{
 				Name:  "bob",
 				Index: 0x7FFFFFFF, // largest possible - will be pushed to hardened range (default config)
@@ -192,10 +184,6 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 			{
 				Name:  "single-use",
 				Index: 3,
-			},
-			{
-				Name:  "E82D5A3F-D154-4C5B-A297-F8D49528DA73",
-				Index: 0x7FFFFFFF, // largest possible - not in hardened range
 			},
 		},
 	})
@@ -291,8 +279,8 @@ func TestHDInitBadSeed(t *testing.T) {
 	_, err = NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: []ConfigKeyPathEntry{
-				{Name: "missing"},
+			SeedKeyPath: ConfigKeyEntry{
+				Name: "missing",
 			},
 		},
 		KeyStore: StoreConfig{
@@ -318,8 +306,9 @@ func TestHDInitGenSeed(t *testing.T) {
 	sm, err := NewSigningModule(ctx, &Config{
 		KeyDerivation: KeyDerivationConfig{
 			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: []ConfigKeyPathEntry{
-				{Name: "generate"}, {Name: "seed"},
+			SeedKeyPath: ConfigKeyEntry{
+				Name: "seed",
+				Path: []ConfigKeyPathEntry{{Name: "generate"}},
 			},
 		},
 		KeyStore: StoreConfig{

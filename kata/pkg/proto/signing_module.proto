@@ -19,8 +19,11 @@ package github.com.kaleido_io.paladin.kata;
 option go_package = "pkg/proto";
 
 message ResolveKeyRequest {
-  repeated string algorithms = 1;
-  repeated KeyPathSegment path = 2;
+  string name = 1; // a name assured to be unique at this path
+  uint64 index = 2; // a unique index managed by the key manager assured to be unique at this path. Used for key derivation (BIP32). Should not be used for direct mapping.
+  map<string, string> attributes = 3;
+  repeated ResolveKeyPathSegment path = 4;
+  repeated string algorithms = 5;
 }
 
 message ResolveKeyResponse {
@@ -44,20 +47,26 @@ message ListKeysRequest {
 }
 
 message ListKeysResponse {
-  repeated ListKeyHandleEntry items = 1; // any length less than the limit will cause the caller to assume there might be more records
+  repeated ListKeyEntry items = 1; // any length less than the limit will cause the caller to assume there might be more records
   string next = 2; // non empty string to support pagination when the are potentially more records
 }
 
-message ListKeyHandleEntry {
-  string top_level_name = 1;
-  string key_handle = 2;
-  repeated PublicKeyIdentifier identifiers = 3;
+message ResolveKeyPathSegment {
+  string name = 1; // the name of the path segment (folder)
+  uint64 index = 2; // a unique index managed by the key manager assured to be unique at this level in the path. Used for key derivation (BIP32). Should not be used for direct mapping.
 }
 
-message KeyPathSegment {
+message ListKeyEntry {
   string name = 1;
-  uint64 index = 2;
+  string key_handle = 2;
   map<string, string> attributes = 3;
+  repeated ListKeyPathSegment path = 4;
+  repeated PublicKeyIdentifier identifiers = 5;
+}
+
+// The only discoverable item for a path segment is the name, but it is an object for future extensibility
+message ListKeyPathSegment {
+  string name = 1;
 }
 
 message PublicKeyIdentifier {

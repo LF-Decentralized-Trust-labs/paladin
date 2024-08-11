@@ -80,11 +80,8 @@ func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
 	assert.NoError(t, err)
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
-			{Name: "bob"},
-			{Name: "blue"},
-			{Name: "42"},
-		},
+		Name: "42",
+		Path: []*proto.ResolveKeyPathSegment{{Name: "bob"}, {Name: "blue"}},
 	}, func() ([]byte, error) { return key0.PrivateKeyBytes(), nil })
 	assert.NoError(t, err)
 
@@ -120,9 +117,7 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 	phrase := []byte("fame point uphold pumpkin april violin orphan cat bid upper meadow family")
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
-			{Name: "sally"},
-		},
+		Name: "sally",
 	}, func() ([]byte, error) { return phrase, nil })
 	assert.NoError(t, err)
 
@@ -150,8 +145,8 @@ func TestFileSystemStoreBadSegments(t *testing.T) {
 	assert.Regexp(t, "PD011403", err)
 
 	_, _, err = fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
-			{Name: ""},
+		Path: []*proto.ResolveKeyPathSegment{
+			{},
 		},
 	}, nil)
 	assert.Regexp(t, "PD011403", err)
@@ -164,9 +159,7 @@ func TestFileSystemClashes(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, _, err = fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
-			{Name: "clash"},
-		},
+		Name: "clash",
 	}, func() ([]byte, error) { return []byte("key1"), nil })
 	assert.Regexp(t, "PD011405", err)
 

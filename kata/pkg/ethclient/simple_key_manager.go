@@ -65,7 +65,10 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 	km.lock.Lock()
 	defer km.lock.Unlock()
 
-	resolvePath := []*proto.KeyPathSegment{}
+	resolveRequest := &proto.ResolveKeyRequest{
+		Attributes: make(map[string]string),
+		Algorithms: []string{algorithm},
+	}
 	loc := km.rootFolder
 	segments := strings.Split(identifier, "/")
 	for i := 0; i < len(segments)-1; i++ {
@@ -83,10 +86,9 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 			loc.Children++ // increment for folders optimistically (and keys pessimistically below)
 		}
 		loc = folder
-		resolvePath = append(resolvePath, &proto.KeyPathSegment{
-			Name:       folder.Name,
-			Index:      folder.Index,
-			Attributes: make(map[string]string), // none in teseced
+		resolveRequest.Path = append(resolveRequest.Path, &proto.ResolveKeyPathSegment{
+			Name:  folder.Name,
+			Index: folder.Index,
 		})
 	}
 	keyName := segments[len(segments)-1]
@@ -96,15 +98,9 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 	key := loc.Keys[keyName]
 	if key == nil || key.Identifiers[algorithm] == "" {
 		// resolve either a new key, or a new identifier for an existing key
-		resolvePath = append(resolvePath, &proto.KeyPathSegment{
-			Name:       keyName,
-			Index:      loc.Children,
-			Attributes: make(map[string]string), // none in teseced
-		})
-		resolved, err := km.signer.Resolve(ctx, &proto.ResolveKeyRequest{
-			Algorithms: []string{algorithm},
-			Path:       resolvePath,
-		})
+		resolveRequest.Name = keyName
+		resolveRequest.Index = loc.Children
+		resolved, err := km.signer.Resolve(ctx, resolveRequest)
 		if err != nil {
 			return "", "", err
 		}
