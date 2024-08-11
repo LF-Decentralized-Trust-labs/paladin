@@ -60,6 +60,7 @@ func newFilesystemStore(ctx context.Context, conf *FileSystemConfig) (fss KeySto
 }
 
 func (fss *filesystemStore) validateFilePathKeyHandle(ctx context.Context, keyHandle string, forCreate bool) (absPath string, err error) {
+
 	fullPath := fss.path
 	segments := strings.Split(keyHandle, "/")
 	for i, segment := range segments {
@@ -176,18 +177,17 @@ func (fss *filesystemStore) readWalletFile(ctx context.Context, keyFilePath, pas
 }
 
 func (fss *filesystemStore) FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error) {
-	if len(req.Path) == 0 {
-		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
-	}
-	for i, segment := range req.Path {
+	for _, segment := range req.Path {
 		if len(segment.Name) == 0 {
 			return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
 		}
-		if i > 0 {
-			keyHandle += "/"
-		}
 		keyHandle += url.PathEscape(segment.Name)
+		keyHandle += "/"
 	}
+	if len(req.Name) == 0 {
+		return nil, "", i18n.NewError(ctx, msgs.MsgSigningModuleBadKeyHandle)
+	}
+	keyHandle += url.PathEscape(req.Name)
 	wf, err := fss.getOrCreateWalletFile(ctx, keyHandle, newKeyMaterial)
 	if err != nil {
 		return nil, "", err

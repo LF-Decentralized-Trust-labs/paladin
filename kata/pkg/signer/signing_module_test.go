@@ -115,10 +115,10 @@ func TestKeyDerivationTypeUnknown(t *testing.T) {
 func TestExtensionKeyStoreListOK(t *testing.T) {
 
 	testRes := &proto.ListKeysResponse{
-		Items: []*proto.ListKeyHandleEntry{
+		Items: []*proto.ListKeyEntry{
 			{
-				TopLevelName: "key 23456",
-				KeyHandle:    "key23456",
+				Name:      "key 23456",
+				KeyHandle: "key23456",
 				Identifiers: []*proto.PublicKeyIdentifier{
 					{Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
 				},
@@ -196,7 +196,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 
 	tk := &testKeyStoreAll{
 		findOrCreateKey_secp256k1: func(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error) {
-			assert.Equal(t, "key1", req.Path[0].Name)
+			assert.Equal(t, "key1", req.Name)
 			return ethtypes.MustNewAddress("0x98A356e0814382587D42B62Bd97871ee59D10b69"), "0x98a356e0814382587d42b62bd97871ee59d10b69", nil
 		},
 		sign_secp256k1: func(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error) {
@@ -221,7 +221,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 
 	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path:       []*proto.KeyPathSegment{{Name: "key1"}},
+		Name:       "key1",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "0x98a356e0814382587d42b62bd97871ee59d10b69", resResolve.Identifiers[0].Identifier)
@@ -326,9 +326,7 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name:       "key1",
 	})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, resolveRes.KeyHandle)
@@ -360,9 +358,7 @@ func TestResolveUnsupportedAlgo(t *testing.T) {
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{"wrong"},
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011410.*wrong", err)
 
@@ -381,9 +377,7 @@ func TestResolveMissingAlgo(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name: "key1",
 	})
 	assert.Regexp(t, "PD011411", err)
 
@@ -408,9 +402,7 @@ func TestInMemorySignFailures(t *testing.T) {
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name:       "key1",
 	})
 	assert.NoError(t, err)
 
@@ -422,9 +414,7 @@ func TestInMemorySignFailures(t *testing.T) {
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{"wrong"},
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011410", err)
 
@@ -432,9 +422,7 @@ func TestInMemorySignFailures(t *testing.T) {
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
-		Path: []*proto.KeyPathSegment{
-			{Name: "key1"},
-		},
+		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011409", err)
 
