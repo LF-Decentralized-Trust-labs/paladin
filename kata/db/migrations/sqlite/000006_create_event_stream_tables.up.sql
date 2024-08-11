@@ -18,14 +18,3 @@ CREATE TABLE event_stream_signatures (
     PRIMARY KEY ("stream", "signature_l", "signature_h"),
     FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE
 );
-
-CREATE TABLE event_stream_data (
-    "stream"          UUID    NOT NULL,
-    "block_number"    BIGINT  NOT NULL,
-    "tx_index"        INT     NOT NULL,
-    "event_index"     INT     NOT NULL,
-    "data"            TEXT,
-    PRIMARY KEY ("stream", "block_number", "tx_index", "event_index"),
-    FOREIGN KEY ("stream") REFERENCES event_streams ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("block_number", "tx_index", "event_index") REFERENCES indexed_events ("block_number", "tx_index", "event_index") ON DELETE CASCADE
-);

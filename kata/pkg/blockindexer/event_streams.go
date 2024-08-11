@@ -18,31 +18,40 @@ package blockindexer
 
 import (
 	"context"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type eventStream struct {
-	ctx         context.Context
-	cancelCtx   context.CancelFunc
-	bi          *blockIndexer
-	definition  *EventStream
-	signatures  []types.HashID
-	signaturesH []uuid.UUID
-	signaturesL []uuid.UUID
-	blocks      chan *eventStreamBlock
-	done        chan struct{}
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	bi             *blockIndexer
+	definition     *EventStream
+	signatures     []types.HashID
+	signaturesH    []uuid.UUID
+	signaturesL    []uuid.UUID
+	eventABIs      []*abi.Entry
+	blocks         chan *eventStreamBlock
+	dispatch       chan *EventWithData
+	detectorDone   chan struct{}
+	dispatcherDone chan struct{}
+}
+
+type eventBatch struct {
+	id     string
+	events []*EventWithData
 }
 
 const (
 	eventStreamQueryPageSize = 100
 	eventStreamQueueLength   = 100
+	eventStreamBatchSize     = 50
 )
 
 // event streams get notified of every confirmed block to process the data in that block,
@@ -83,12 +92,16 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	}
 
 	es := &eventStream{
-		bi:         bi,
-		definition: definition,
-		signatures: []types.HashID{},
-		blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
-		done:       make(chan struct{}),
+		bi:             bi,
+		definition:     definition,
+		eventABIs:      []*abi.Entry{},
+		signatures:     []types.HashID{},
+		blocks:         make(chan *eventStreamBlock, eventStreamQueueLength),
+		dispatch:       make(chan *EventWithData, eventStreamBatchSize),
+		detectorDone:   make(chan struct{}),
+		dispatcherDone: make(chan struct{}),
 	}
+	es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI.V() {
@@ -106,6 +119,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 				}
 			}
 			if !dup {
+				es.eventABIs = append(es.eventABIs, abiEntry)
 				es.signatures = append(es.signatures, *sig)
 				es.signaturesL = append(es.signaturesL, sig.L)
 				es.signaturesH = append(es.signaturesH, sig.H)
@@ -119,11 +133,16 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	for _, s := range es.signatures {
 		bi.eventStreamSignatures[s.String()] = append(bi.eventStreamSignatures[s.String()], es)
 	}
-
-	// start our main routine
-	es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(bi.parentCtxForReset, "eventstream", definition.ID.String()))
-	go es.run()
 	return nil
+}
+
+func (es *eventStream) start() {
+	go es.detector()
+	go es.dispatcher()
+}
+
+func (es *eventStream) stop() {
+	es.cancelCtx()
 }
 
 func (es *eventStream) processCheckpoint() (int64, error) {
@@ -146,26 +165,87 @@ func (es *eventStream) processCheckpoint() (int64, error) {
 	return baseBlock, nil
 }
 
-func (es *eventStream) run() {
-	defer close(es.done)
+func (es *eventStream) detector() {
+	defer close(es.detectorDone)
 
+	// This routine reads the checkpoint on startup, and maintains its view in memory,
+	// but never writes it back.
+	// The checkpoint is updated on the dispatcher after each batch is confirmed downstream.
 	checkpointBlock, err := es.processCheckpoint()
 	if err != nil {
 		log.L(es.ctx).Debugf("exiting before retrieving checkpoint")
 		return
 	}
 
-	lastChainHeadView := int64(-1)
-	atHead := false
+	var catchUpToBlock *eventStreamBlock
 	for {
-		if !atHead {
+		// we wait to be told about a block from the chain, to see whether that is a block that
+		// slots directly after our checkpoint. Under normal operation when we're caught up
+		// this should be the case.
+		// It's only if we fall more than the channel length behind the head that we
+		// need to enter catchup mode until we make it back again
+		if catchUpToBlock == nil {
+			select {
+			case block := <-es.blocks:
+				if block.blockNumber <= uint64(checkpointBlock) {
+					log.L(es.ctx).Debugf("notified of block %d at or behind checkpoint %d", block.blockNumber, checkpointBlock)
+					continue
+				}
+				if block.blockNumber == uint64(checkpointBlock)+1 {
+					// Happy place
+					checkpointBlock = int64(block.blockNumber)
+					es.processNotifiedBlock(block)
+				} else {
+					// Entering catchup - defer processing of this block until catchup complete,
+					// and we won't pick up anything else off the channel until then
+					catchUpToBlock = block
+				}
+			case <-es.ctx.Done():
+				log.L(es.ctx).Debugf("exiting")
+			}
+		} else {
 			// Get a page of events from the DB
+			caughtUp, err := es.getCatchupEventPage(checkpointBlock, int64(catchUpToBlock.blockNumber))
+			if err != nil {
+				log.L(es.ctx).Debugf("exiting during catchup phase")
+				return
+			}
+			if caughtUp {
+				// Process the deferred notified block, and back to normal operation
+				checkpointBlock = int64(catchUpToBlock.blockNumber)
+				es.processNotifiedBlock(catchUpToBlock)
+				catchUpToBlock = nil
+			}
 		}
-
 	}
 }
 
-func (es *eventStream) getCatchupEventPage(baseBlock int64, lastChainHeadView int64) (caughtUp bool, _ []*EventStreamData, err error) {
+func (es *eventStream) processNotifiedBlock(block *eventStreamBlock) {
+	for _, l := range block.events {
+		event := &EventWithData{
+			Stream:       es.definition.ID,
+			IndexedEvent: es.bi.logToIndexedEvent(l),
+		}
+		es.matchLog(l, event)
+		if event.Data != nil {
+			es.sendToDispatcher(event)
+		}
+	}
+}
+
+func (es *eventStream) sendToDispatcher(event *EventWithData) {
+	log.L(es.ctx).Debugf("passing event to dispatcher %d/%d/%d (tx=%s,address=%s)", event.BlockNumber, event.TXIndex, event.EventIndex, event.TransactionHash, event.Address)
+	select {
+	case es.dispatch <- event:
+	case <-es.ctx.Done():
+	}
+}
+
+func (es *eventStream) dispatcher() {
+	defer close(es.dispatcherDone)
+}
+
+func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, err error) {
 
 	// We query up to the head of the chain as currently indexed, with a limit on the events
 	// we return for enrichment/processing.
@@ -178,31 +258,33 @@ func (es *eventStream) getCatchupEventPage(baseBlock int64, lastChainHeadView in
 	// That also means we can do an efficient IN query on the sig H/L
 	var page []*IndexedEvent
 	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		query := es.bi.persistence.DB().
+		return true, es.bi.persistence.DB().
 			Table("indexed_events").
 			Where("signature_l IN (?)", es.signaturesL).
 			Where("signature_h IN (?)", es.signaturesH).
-			Where("block_number > ?", baseBlock).
-			Limit(eventStreamQueueLength)
-		if lastChainHeadView >= 0 {
-			query = query.Where("block_number <= ?", lastChainHeadView)
-		}
-		return true, query.Find(&page).Error
+			Where("block_number > ?", checkpointBlock).
+			Where("block_number < ?", catchUpToBlockNumber).
+			Limit(eventStreamQueueLength).
+			Find(&page).
+			Error
 	})
-	if err != nil || len(page) == 0 {
-		// context cancelled, or nothing to report - we're caught up
-		return true, nil, err
+	if err != nil {
+		// context cancelled
+		return false, err
 	}
+	if len(page) == 0 {
+		// nothing to report - we're caught up
+		return true, nil
+	}
+	caughtUp = (len(page) == eventStreamQueueLength)
 
 	// Because we're in catch up here, we have to query the chain ourselves for the receipts.
 	// That's done by transaction (not by event) - so we've got to group
-	var byTxID map[string][]*EventStreamData
+	var byTxID map[string][]*EventWithData
 	for _, event := range page {
-		byTxID[event.TransactionHash.String()] = append(byTxID[event.TransactionHash.String()], &EventStreamData{
-			Stream:      es.definition.ID,
-			BlockNumber: event.BlockNumber,
-			TXIndex:     event.TXIndex,
-			EventIndex:  event.EventIndex,
+		byTxID[event.TransactionHash.String()] = append(byTxID[event.TransactionHash.String()], &EventWithData{
+			Stream:       es.definition.ID,
+			IndexedEvent: event,
 			// Leave Address and Data as that's what we'll fill in, if it works
 		})
 	}
@@ -214,20 +296,47 @@ func (es *eventStream) getCatchupEventPage(baseBlock int64, lastChainHeadView in
 	// to be rebuilt. This would be a very significant event in a production network.
 	//
 	// In early phase dev, it's just about consistently resetting both your chain and your index.
-	wg := new(sync.WaitGroup)
+	enrichments := make(chan error)
 	for tx, _events := range byTxID {
-		wg.Add(1)
 		events := _events // not safe to pass loop pointer
-		go es.queryTransactionEvents(tx, events)
+		go es.queryTransactionEvents(tx, events, enrichments)
 	}
-	wg.Wait()
+	// Collect all the results
+	for range byTxID {
+		txErr := <-enrichments
+		if txErr != nil && err == nil {
+			err = txErr
+		}
+	}
+	if err != nil {
+		// context cancelled
+		return false, err
+	}
+
+	// Now reconstruct the final set in the original order, but only where we
+	// successfully extracted the event data
+	for _, origEntry := range page {
+		eventsForTX := byTxID[origEntry.TransactionHash.String()]
+		for _, event := range eventsForTX {
+			if event.EventIndex == origEntry.EventIndex && event.Data != nil {
+				// Dispatch this event
+				es.sendToDispatcher(event)
+			}
+		}
+	}
+	return caughtUp, nil
 
 }
 
-func (es *eventStream) queryTransactionEvents(tx string, events []*EventStreamData) {
+func (es *eventStream) queryTransactionEvents(tx string, events []*EventWithData, done chan error) {
+	var err error
+	defer func() {
+		done <- err
+	}()
 
+	// Get the TX receipt with all the logs
 	var receipt *TXReceiptJSONRPC
-	es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
+	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		log.L(es.ctx).Debugf("Fetching transaction receipt by hash %s", tx)
 		rpcErr := es.bi.wsConn.CallRPC(es.ctx, &receipt, "eth_getTransactionReceipt", tx)
 		if rpcErr != nil {
@@ -238,5 +347,39 @@ func (es *eventStream) queryTransactionEvents(tx string, events []*EventStreamDa
 		}
 		return false, nil
 	})
+	if err != nil {
+		return
+	}
 
+	// Spin through the logs to find the corresponding result entries
+	for _, l := range receipt.Logs {
+		for _, e := range events {
+			if ethtypes.HexUint64(e.EventIndex) == l.LogIndex {
+				es.matchLog(l, e)
+			}
+		}
+	}
+}
+
+func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
+	// This is one that matches our signature, but we need to check it against our ABI list.
+	// We stop at the first entry that parses it, and it's perfectly fine and expected that
+	// none will (because Eth signatures are not precise enough to distinguish events -
+	// particularly the "indexed" settings on parameters)
+	for _, abiEntry := range es.eventABIs {
+		cv, err := abiEntry.DecodeEventDataCtx(es.ctx, in.Topics, in.Data)
+		if err == nil {
+			out.Data, err = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
+		}
+		if err == nil {
+			log.L(es.ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
+			out.Data, _ = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
+			if in.Address != nil {
+				out.Address = types.EthAddress(*in.Address)
+			}
+			return
+		} else {
+			log.L(es.ctx).Tracef("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
+		}
+	}
 }

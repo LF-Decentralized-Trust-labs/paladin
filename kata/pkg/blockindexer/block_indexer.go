@@ -110,7 +110,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		txWaiters:             make(map[string]*txWaiter),
 		eventStreams:          make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:   make(map[uuid.UUID]*eventStream),
-		eventStreamSignatures: make(map[string]bool),
+		eventStreamSignatures: make(map[string][]*eventStream),
 		dispatcherTap:         make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {
@@ -440,6 +440,20 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 	})
 }
 
+func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
+	var topic0 types.HashID
+	if len(l.Topics) > 0 {
+		topic0 = *types.NewHashIDSlice32(l.Topics[0])
+	}
+	return &IndexedEvent{
+		Signature:       topic0,
+		TransactionHash: *types.NewHashIDSlice32(l.TransactionHash),
+		BlockNumber:     int64(l.BlockNumber),
+		TXIndex:         int64(l.TransactionIndex),
+		EventIndex:      int64(l.LogIndex),
+	}
+}
+
 func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch) {
 
 	var blocks []*IndexedBlock
@@ -460,18 +474,8 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 				To:              (*types.EthAddress)(r.To),
 				ContractAddress: (*types.EthAddress)(r.ContractAddress),
 			})
-			for eventIndex, l := range r.Logs {
-				var topic0 types.HashID
-				if len(l.Topics) > 0 {
-					topic0 = *types.NewHashIDSlice32(l.Topics[0])
-				}
-				events = append(events, &IndexedEvent{
-					Signature:       topic0,
-					TransactionHash: *types.NewHashIDSlice32(r.TransactionHash),
-					BlockNumber:     int64(r.BlockNumber),
-					TXIndex:         int64(txIndex),
-					EventIndex:      int64(eventIndex),
-				})
+			for _, l := range r.Logs {
+				events = append(events, bi.logToIndexedEvent(l))
 			}
 		}
 	}

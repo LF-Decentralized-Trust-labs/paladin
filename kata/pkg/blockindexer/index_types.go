@@ -61,11 +61,9 @@ type EventStreamSignature struct {
 	Signature types.HashID `json:"signature"                             gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
 }
 
-type EventStreamData struct {
-	Stream      uuid.UUID        `json:"stream"                          gorm:"primaryKey"`
-	BlockNumber int64            `json:"blockNumber"                     gorm:"primaryKey"`
-	TXIndex     int64            `json:"transactionIndex"                gorm:"primaryKey"`
-	EventIndex  int64            `json:"eventIndex"                      gorm:"primaryKey"`
-	Address     types.EthAddress `json:"address"`
-	Data        types.RawJSON    `json:"data"`
+type EventWithData struct {
+	Stream uuid.UUID `json:"stream"`
+	*IndexedEvent
+	Address types.EthAddress `json:"address"`
+	Data    types.RawJSON    `json:"data"`
 }
