@@ -49,7 +49,7 @@ func (p Enum[O]) Validate() (string, error) {
 			return o, nil
 		}
 	}
-	return "", i18n.NewError(context.Background(), msgs.MsgEnumValueInvalid, strings.Join(validator.Options(), ","))
+	return "", i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(validator.Options(), ","))
 }
 
 // SQL valuer returns a string, and only allows the possible values

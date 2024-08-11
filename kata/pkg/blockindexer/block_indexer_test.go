@@ -16,6 +16,7 @@ package blockindexer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
@@ -37,11 +39,65 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var testEventABIJSON = ([]byte)(`[
+    {
+      "type": "event",
+      "name": "EventA",
+      "inputs": []
+    },
+    {
+      "type": "event",
+      "name": "EventB",
+      "inputs": [
+        {
+          "name": "intParam1",
+          "type": "uint256"
+        },
+        {
+          "name": "strParam2",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "EventC",
+      "inputs": [
+        {
+          "name": "structParam1",
+          "type": "tuple",
+          "internalType": "struct Test.Struct1",
+          "components": [
+            {
+              "name": "strField",
+              "type": "string"
+            },
+            {
+              "name": "intArrayField",
+              "type": "int64[]"
+            }
+          ]
+        }
+      ]
+    }
+]`)
+
+var testABI = testParseABI(testEventABIJSON)
+
 var (
-	topicA = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	topicB = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	topicC = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	topicA = testABI[0].SignatureHashBytes()
+	topicB = testABI[1].SignatureHashBytes()
+	topicC = testABI[2].SignatureHashBytes()
 )
+
+func testParseABI(abiJSON []byte) abi.ABI {
+	var a abi.ABI
+	err := json.Unmarshal(abiJSON, &a)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
 
 func newTestBlockIndexer(t *testing.T) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, func()) {
 	return newTestBlockIndexerConf(t, &Config{
@@ -88,7 +144,7 @@ func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockI
 
 }
 
-func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
+func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
 	for i := 0; i < l; i++ {
@@ -103,6 +159,18 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 			Hash:   ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
 		}
 		txHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+		eventBData, err := testABI[1].Inputs.EncodeABIDataValues(map[string]interface{}{
+			"intParam1": i + 1000000,
+			"strParam2": fmt.Sprintf("event_b_in_block_%d", i),
+		})
+		assert.NoError(t, err)
+		eventCData, err := testABI[2].Inputs.EncodeABIDataValues(map[string]interface{}{
+			"structParam1": map[string]interface{}{
+				"strField":      fmt.Sprintf("event_c_in_block_%d", i),
+				"intArrayField": []int{i + 1000, i + 2000, i + 3000, i + 4000, i + 5000},
+			},
+		})
+		assert.NoError(t, err)
 		receipts[blocks[i].Hash.String()] = []*TXReceiptJSONRPC{
 			{
 				TransactionHash: txHash,
@@ -113,8 +181,8 @@ func testBlockArray(l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)
 				BlockHash:       blocks[i].Hash,
 				Logs: []*LogJSONRPC{
 					{BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventBData},
+					{BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventCData},
 				},
 			},
 		}
@@ -198,7 +266,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroNoConfirmations(t *testing.T) {
 	_, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(10)
+	blocks, receipts := testBlockArray(t, 10)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 0
@@ -218,7 +286,7 @@ func TestBlockIndexerBatchTimeoutOne(t *testing.T) {
 	bi.batchTimeout = 1 * time.Microsecond
 	bi.batchSize = 100
 
-	blocks, receipts := testBlockArray(1)
+	blocks, receipts := testBlockArray(t, 1)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 0
@@ -235,7 +303,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(15)
+	blocks, receipts := testBlockArray(t, 15)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.requiredConfirmations = 5
@@ -315,7 +383,7 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(15)
+	blocks, receipts := testBlockArray(t, 15)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.fromBlock = nil
@@ -369,7 +437,7 @@ func TestBatching(t *testing.T) {
 	_, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(10)
+	blocks, receipts := testBlockArray(t, 10)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.batchSize = 5
@@ -397,7 +465,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 	_, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(15)
+	blocks, receipts := testBlockArray(t, 15)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.persistence.DB().Table("indexed_blocks").Create(&IndexedBlock{
@@ -474,8 +542,8 @@ func testBlockIndexerHandleReorgInConfirmationWindow(t *testing.T, blockLenBefor
 
 	bi.requiredConfirmations = reqConf
 
-	blocksBeforeReorg, receipts := testBlockArray(blockLenBeforeReorg)
-	blocksAfterReorg, receiptsAfterReorg := testBlockArray(blockLenBeforeReorg + overlap)
+	blocksBeforeReorg, receipts := testBlockArray(t, blockLenBeforeReorg)
+	blocksAfterReorg, receiptsAfterReorg := testBlockArray(t, blockLenBeforeReorg+overlap)
 	dangerArea := len(blocksAfterReorg) - overlap
 	for i := 0; i < len(blocksAfterReorg); i++ {
 		receipts[blocksAfterReorg[i].Hash.String()] = receiptsAfterReorg[blocksAfterReorg[i].Hash.String()]
@@ -545,7 +613,7 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 
 	bi.requiredConfirmations = 5
 
-	blocks, receipts := testBlockArray(50)
+	blocks, receipts := testBlockArray(t, 50)
 
 	randBlock := &BlockInfoJSONRPC{
 		Number:     3,
@@ -577,7 +645,7 @@ func TestBlockIndexerResetsAfterHashLookupFail(t *testing.T) {
 	_, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(5)
+	blocks, receipts := testBlockArray(t, 5)
 
 	sentFail := false
 	mockBlocksRPCCallsDynamic(mRPC, func(args mock.Arguments) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
@@ -608,7 +676,7 @@ func TestBlockIndexerDispatcherFallsBehindHead(t *testing.T) {
 
 	bi.requiredConfirmations = 5
 
-	blocks, receipts := testBlockArray(30)
+	blocks, receipts := testBlockArray(t, 30)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	bi.startOrReset() // do not start block listener
@@ -727,7 +795,7 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	blocks, receipts := testBlockArray(5)
+	blocks, receipts := testBlockArray(t, 5)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
 	txHash := receipts[blocks[2].Hash.String()][0].TransactionHash.String()

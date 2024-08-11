@@ -80,7 +80,6 @@ type blockIndexer struct {
 	eventStreamsInternalCB InternalStreamCallback
 	eventStreams           map[uuid.UUID]*eventStream
 	eventStreamsHeadSet    map[uuid.UUID]*eventStream
-	eventStreamSignatures  map[string][]*eventStream
 	eventStreamsLock       sync.Mutex
 	dispatcherTap          chan struct{}
 	processorDone          chan struct{}
@@ -111,7 +110,6 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		txWaiters:             make(map[string]*txWaiter),
 		eventStreams:          make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:   make(map[uuid.UUID]*eventStream),
-		eventStreamSignatures: make(map[string][]*eventStream),
 		dispatcherTap:         make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {
@@ -499,7 +497,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		}
 	}
 
-	_ = bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
+	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
 		err = bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
 			if len(blocks) > 0 {
 				err = tx.
@@ -539,6 +537,43 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		}
 		return true, err
 	})
+	if err == nil {
+		bi.notifyEventStreams(ctx, batch)
+	}
+}
+
+func (bi *blockIndexer) notifyEventStreams(ctx context.Context, batch *blockWriterBatch) {
+	// Every event stream gets notified about every block, but only the
+	// logs that are applicable to it
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+	for _, es := range bi.eventStreams {
+		for iBlk, blk := range batch.blocks {
+			blockNotification := &eventStreamBlock{
+				blockNumber: blk.Number.Uint64(),
+			}
+			for _, r := range batch.receipts[iBlk] {
+				for _, l := range r.Logs {
+					if len(l.Topics) > 0 {
+						logSig := l.Topics[0].String()
+						if _, isMatch := es.signatures[logSig]; isMatch {
+							// This is a log the event stream needs
+							blockNotification.events = append(blockNotification.events, l)
+						}
+					}
+				}
+			}
+			// Best effort dispatch here - it's the Event Stream's responsibility
+			// to keep up to date. If it falls behind, it will catch back up
+			// using the database and the node.
+			select {
+			case es.blocks <- blockNotification:
+				log.L(ctx).Debugf("dispatched block %d (%d signature matched events) to ES %s",
+					blockNotification.blockNumber, len(blockNotification.events), es.definition.ID)
+			default:
+			}
+		}
+	}
 }
 
 // MUST be called under lock

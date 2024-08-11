@@ -39,23 +39,29 @@ type eventStream struct {
 	cancelCtx      context.CancelFunc
 	bi             *blockIndexer
 	definition     *EventStream
-	signatures     []types.HashID
+	signatures     map[string]bool
 	signaturesH    []uuid.UUID
 	signaturesL    []uuid.UUID
 	eventABIs      []*abi.Entry
 	batchSize      int
 	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
-	dispatch       chan *EventWithData
+	dispatch       chan *eventDispatch
 	detectorDone   chan struct{}
 	dispatcherDone chan struct{}
 }
 
 type eventBatch struct {
 	EventDeliveryBatch
-	opened         time.Time
-	timeoutContext context.Context
-	timeoutCancel  context.CancelFunc
+	checkpointAfterBatch int64
+	opened               time.Time
+	timeoutContext       context.Context
+	timeoutCancel        context.CancelFunc
+}
+
+type eventDispatch struct {
+	event       *EventWithData
+	lastInBlock bool
 }
 
 const (
@@ -129,6 +135,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 		}
 	} else {
 		// Otherwise we're just recreating
+		def.ID = uuid.New()
 		err := bi.persistence.DB().
 			Table("event_streams").
 			WithContext(ctx).
@@ -149,6 +156,10 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
+	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, definition.Name, "name"); err != nil {
+		return err
+	}
+
 	es := bi.eventStreams[definition.ID]
 	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the config.
@@ -159,9 +170,9 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 			bi:         bi,
 			definition: definition,
 			eventABIs:  []*abi.Entry{},
-			signatures: []types.HashID{},
+			signatures: make(map[string]bool),
 			blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
-			dispatch:   make(chan *EventWithData, eventStreamBatchSize),
+			dispatch:   make(chan *eventDispatch, eventStreamBatchSize),
 		}
 	}
 
@@ -172,21 +183,12 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
-			sigStr, err := abiEntry.SignatureCtx(ctx)
-			if err != nil {
-				return err
-			}
-			sig := types.MustParseHashID(sigStr)
-			dup := false
-			for _, existing := range es.signatures {
-				if existing.Equals(sig) {
-					dup = true
-					break
-				}
-			}
-			if !dup {
-				es.eventABIs = append(es.eventABIs, abiEntry)
-				es.signatures = append(es.signatures, *sig)
+			sig := abiEntry.SignatureHashBytes()
+			sigStr := sig.String()
+			es.eventABIs = append(es.eventABIs, abiEntry)
+			if _, dup := es.signatures[sigStr]; !dup {
+				es.signatures[sigStr] = true
+				sig := types.NewHashIDSlice32(sig)
 				es.signaturesL = append(es.signaturesL, sig.L)
 				es.signaturesH = append(es.signaturesH, sig.H)
 			}
@@ -195,10 +197,6 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 	// ok - all looks good, put ourselves in the blockindexer list
 	bi.eventStreams[definition.ID] = es
-	// and register ourselves against all the signatures we care about
-	for _, s := range es.signatures {
-		bi.eventStreamSignatures[s.String()] = append(bi.eventStreamSignatures[s.String()], es)
-	}
 	return nil
 }
 
@@ -238,7 +236,7 @@ func (es *eventStream) processCheckpoint() (int64, error) {
 	err := es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		return true, es.bi.persistence.DB().
 			Table("event_stream_checkpoints").
-			Where("id = ?", es.definition.ID).
+			Where("stream = ?", es.definition.ID).
 			Find(&checkpoints).
 			Error
 	})
@@ -275,14 +273,14 @@ func (es *eventStream) detector() {
 		if catchUpToBlock == nil {
 			select {
 			case block := <-es.blocks:
-				if block.blockNumber <= uint64(checkpointBlock) {
+				if int64(block.blockNumber) <= checkpointBlock {
 					log.L(es.ctx).Debugf("notified of block %d at or behind checkpoint %d", block.blockNumber, checkpointBlock)
 					continue
 				}
-				if block.blockNumber == uint64(checkpointBlock)+1 {
+				if block.blockNumber == uint64(checkpointBlock+1) {
 					// Happy place
 					checkpointBlock = int64(block.blockNumber)
-					es.processNotifiedBlock(block)
+					es.processNotifiedBlock(block, true)
 				} else {
 					// Entering catchup - defer processing of this block until catchup complete,
 					// and we won't pick up anything else off the channel until then
@@ -290,6 +288,7 @@ func (es *eventStream) detector() {
 				}
 			case <-es.ctx.Done():
 				log.L(es.ctx).Debugf("exiting")
+				return
 			}
 		} else {
 			// Get a page of events from the DB
@@ -300,30 +299,33 @@ func (es *eventStream) detector() {
 			}
 			if caughtUp {
 				// Process the deferred notified block, and back to normal operation
-				checkpointBlock = int64(catchUpToBlock.blockNumber)
-				es.processNotifiedBlock(catchUpToBlock)
+				checkpointBlock = int64(catchUpToBlock.blockNumber - 1)
+				es.processNotifiedBlock(catchUpToBlock, true)
 				catchUpToBlock = nil
 			}
 		}
 	}
 }
 
-func (es *eventStream) processNotifiedBlock(block *eventStreamBlock) {
-	for _, l := range block.events {
+func (es *eventStream) processNotifiedBlock(block *eventStreamBlock, fullBlock bool) {
+	for i, l := range block.events {
 		event := &EventWithData{
 			IndexedEvent: es.bi.logToIndexedEvent(l),
 		}
 		es.matchLog(l, event)
+		// Only dispatch events that were completed by the validation against our ABI
 		if event.Data != nil {
-			es.sendToDispatcher(event)
+			es.sendToDispatcher(event,
+				// Can only move checkpoint past this block once we know we've processed the last one
+				fullBlock && i == (len(block.events)-1))
 		}
 	}
 }
 
-func (es *eventStream) sendToDispatcher(event *EventWithData) {
-	log.L(es.ctx).Debugf("passing event to dispatcher %d/%d/%d (tx=%s,address=%s)", event.BlockNumber, event.TXIndex, event.EventIndex, event.TransactionHash, event.Address)
+func (es *eventStream) sendToDispatcher(event *EventWithData, lastInBlock bool) {
+	log.L(es.ctx).Debugf("passing event to dispatcher %d/%d/%d (tx=%s,address=%s)", event.BlockNumber, event.TXIndex, event.EventIndex, event.TransactionHash, &event.Address)
 	select {
-	case es.dispatch <- event:
+	case es.dispatch <- &eventDispatch{event, lastInBlock}:
 	case <-es.ctx.Done():
 	}
 }
@@ -341,7 +343,7 @@ func (es *eventStream) dispatcher() {
 			timeoutContext = es.ctx
 		}
 		select {
-		case event := <-es.dispatch:
+		case d := <-es.dispatch:
 			if batch == nil {
 				batch = &eventBatch{
 					EventDeliveryBatch: EventDeliveryBatch{
@@ -352,6 +354,14 @@ func (es *eventStream) dispatcher() {
 					opened: time.Now(),
 				}
 				batch.timeoutContext, batch.timeoutCancel = context.WithTimeout(es.ctx, es.batchTimeout)
+			}
+			event := d.event
+			if d.lastInBlock {
+				// We know we can move our checkpoint now to this block, as we've processed the last event in it
+				batch.checkpointAfterBatch = d.event.BlockNumber
+			} else if d.event.BlockNumber > 0 {
+				// Otherwise we have to set our checkpoint one behind
+				batch.checkpointAfterBatch = d.event.BlockNumber - 1
 			}
 			batch.Events = append(batch.Events, event)
 			l.Debugf("Added event %d/%d/%d to batch %s (len=%d)", event.BlockNumber, event.TXIndex, event.EventIndex, batch.BatchID, len(batch.Events))
@@ -368,21 +378,24 @@ func (es *eventStream) dispatcher() {
 		if batch != nil && (timedOut || (len(batch.Events) >= es.batchSize)) {
 			batch.timeoutCancel()
 			l.Debugf("Running batch %s (len=%d,timeout=%t,age=%dms)", batch.BatchID, len(batch.Events), timedOut, time.Since(batch.opened).Milliseconds())
-			es.runBatch(batch)
+			if err := es.runBatch(batch); err != nil {
+				l.Debugf("event stream dispatcher ending (during dispatch)")
+				return
+			}
 			batch = nil
 		}
 
 	}
 }
 
-func (es *eventStream) runBatch(batch *eventBatch) {
+func (es *eventStream) runBatch(batch *eventBatch) error {
 
 	if es.definition.Type.V() != EventStreamTypeInternal {
 		panic("non internal streams not yet implemented")
 	}
 
 	// We start a database transaction, run the callback function
-	_ = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
+	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		return true, es.bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
 			err := es.bi.eventStreamsInternalCB(es.ctx, tx, &batch.EventDeliveryBatch)
 			if err != nil {
@@ -399,7 +412,7 @@ func (es *eventStream) runBatch(batch *eventBatch) {
 				}).
 				Create(&EventStreamCheckpoint{
 					Stream:      es.definition.ID,
-					BlockNumber: batch.Events[len(batch.Events)-1].BlockNumber,
+					BlockNumber: int64(batch.checkpointAfterBatch),
 				}).
 				WithContext(es.ctx).
 				Error
@@ -477,12 +490,15 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 
 	// Now reconstruct the final set in the original order, but only where we
 	// successfully extracted the event data
-	for _, origEntry := range page {
+	for iPage, origEntry := range page {
 		eventsForTX := byTxID[origEntry.TransactionHash.String()]
-		for _, event := range eventsForTX {
+		for iEvent, event := range eventsForTX {
 			if event.EventIndex == origEntry.EventIndex && event.Data != nil {
-				// Dispatch this event
-				es.sendToDispatcher(event)
+				// can only update our checkpoint to the block itself (vs. one before)
+				// when we are caught up, and dispatching the last block
+				lastInBlock := caughtUp && (iPage == len(page)-1) && (iEvent == len(eventsForTX)-1)
+				// Dispatch this event.
+				es.sendToDispatcher(event, lastInBlock)
 			}
 		}
 	}
@@ -541,7 +557,7 @@ func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
 			}
 			return
 		} else {
-			log.L(es.ctx).Tracef("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
+			log.L(es.ctx).Debugf("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
 		}
 	}
 }

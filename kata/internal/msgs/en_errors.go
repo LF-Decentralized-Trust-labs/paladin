@@ -134,10 +134,11 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil      = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail          = ffe("PD011101", "Unable to scan type %T into type %T")
-	MsgEnumValueInvalid       = ffe("PD011102", "Value must be one of %s")
-	MsgABIDefNotInBothStructs = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesUnmarshalNil                    = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                        = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid                = ffe("PD011102", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs          = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidName64SafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-64 characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric")
 
 	// Plugin registry PD0112XX
 	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")

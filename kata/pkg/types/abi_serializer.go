@@ -61,7 +61,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inB := byDefsB[sig]; !inB {
-				return i18n.NewError(ctx, msgs.MsgABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 		}
 	}
@@ -75,7 +75,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inA := byDefsA[sig]; !inA {
-				return i18n.NewError(ctx, msgs.MsgABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 		}
 	}
