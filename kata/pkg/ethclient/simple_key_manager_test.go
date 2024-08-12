@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,14 +43,14 @@ func (mkm *mockKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (*p
 }
 
 func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
-	kmgr, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
-		KeyDerivation: signer.KeyDerivationConfig{
-			Type: signer.KeyDerivationTypeBIP32,
+	kmgr, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
 		},
-		KeyStore: signer.StoreConfig{
-			Type: signer.KeyStoreTypeStatic,
-			Static: signer.StaticKeyStorageConfig{
-				Keys: map[string]signer.StaticKeyEntryConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: &api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",
 						Inline:   types.RandHex(32),
@@ -63,12 +64,12 @@ func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
 }
 
 func TestSimpleKeyManagerInitFail(t *testing.T) {
-	_, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
-		KeyDerivation: signer.KeyDerivationConfig{
-			Type: signer.KeyDerivationTypeBIP32,
+	_, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
 		},
-		KeyStore: signer.StoreConfig{
-			Type: signer.KeyStoreTypeStatic,
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
 		},
 	})
 	assert.Regexp(t, "PD011418", err)
@@ -89,9 +90,9 @@ func TestGenerateIndexes(t *testing.T) {
 
 func TestKeyManagerResolveFail(t *testing.T) {
 
-	kmgr, err := NewSimpleTestKeyManager(context.Background(), &signer.Config{
-		KeyStore: signer.StoreConfig{
-			Type: signer.KeyStoreTypeStatic,
+	kmgr, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
 		},
 	})
 	assert.NoError(t, err)

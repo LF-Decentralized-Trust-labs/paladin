@@ -41,8 +41,8 @@ type hdWalletPathEntry struct {
 	Index uint64
 }
 
-func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationConfig) (err error) {
-	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *KeyDerivationDefaults.BIP44Prefix)
+func (sm *signingModule) initHDWallet(ctx context.Context, conf *api.KeyDerivationConfig) (err error) {
+	bip44Prefix := confutil.StringNotEmpty(conf.BIP44Prefix, *api.KeyDerivationDefaults.BIP44Prefix)
 	bip44Prefix = strings.ReplaceAll(bip44Prefix, " ", "")
 	sm.hd = &hdDerivation{
 		sm:                    sm,
@@ -50,7 +50,7 @@ func (sm *signingModule) initHDWallet(ctx context.Context, conf *KeyDerivationCo
 		bip44DirectResolution: conf.BIP44DirectResolution,
 		bip44HardenedSegments: confutil.IntMin(conf.BIP44HardenedSegments, 0, *api.KeyDerivationDefaults.BIP44HardenedSegments),
 	}
-	seedKeyPath := KeyDerivationDefaults.SeedKeyPath
+	seedKeyPath := api.KeyDerivationDefaults.SeedKeyPath
 	if conf.SeedKeyPath.Name != "" {
 		seedKeyPath = conf.SeedKeyPath
 	}

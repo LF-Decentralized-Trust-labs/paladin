@@ -24,11 +24,8 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-<<<<<<< HEAD
-	"github.com/kaleido-io/paladin/kata/pkg/types"
-=======
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
->>>>>>> efce160 (Draft impl of a ZKP signer)
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 

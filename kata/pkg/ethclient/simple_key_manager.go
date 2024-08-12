@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
 type simpleKeyManager struct {
@@ -50,7 +51,7 @@ type keyMapping struct {
 // Super simple in-memory placeholder for Key Manager, which wraps a single signer, and does not
 // have any persistence of the folders and key mappings that are created.
 // TODO: Supersede with full key manager once it is in place
-func NewSimpleTestKeyManager(ctx context.Context, signerConfig *signer.Config) (KeyManager, error) {
+func NewSimpleTestKeyManager(ctx context.Context, signerConfig *api.Config) (KeyManager, error) {
 	signer, err := signer.NewSigningModule(ctx, signerConfig)
 	if err != nil {
 		return nil, err

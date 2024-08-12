@@ -104,7 +104,7 @@ func TestFileSystemStoreCreateBabyjubjub(t *testing.T) {
 	privKey := babyjub.NewRandPrivKey()
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
-		Path: []*proto.KeyPathSegment{
+		Path: []*proto.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
 			{Name: "42"},

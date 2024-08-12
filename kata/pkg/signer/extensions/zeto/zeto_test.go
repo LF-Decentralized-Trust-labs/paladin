@@ -29,12 +29,12 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/types"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/proto/zeto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -89,7 +89,7 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 	key0 := babyjub.NewRandPrivKey()
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
 			{Name: "42"},
@@ -160,7 +160,7 @@ func TestZetoKeystoreExtension(t *testing.T) {
 	key0 := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
 
 	req := pb.ResolveKeyRequest{
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
 		},
@@ -187,7 +187,7 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	bob := NewKeypair()
 
 	_, aliceKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "alice"},
 			{Name: "blueKey"},
 		},
@@ -195,7 +195,7 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, bobKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "redKey"},
 		},
@@ -218,7 +218,7 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	_, err = sm.Resolve(ctx, &pb.ResolveKeyRequest{
 		MustExist:  true,
 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
 		},
@@ -228,7 +228,7 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	resp, err := sm.Resolve(ctx, &pb.ResolveKeyRequest{
 		MustExist:  true,
 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
-		Path: []*pb.KeyPathSegment{
+		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "alice"},
 			{Name: "blueKey"},
 		},
