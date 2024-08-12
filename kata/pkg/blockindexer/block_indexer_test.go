@@ -276,7 +276,7 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	cancelCtx()
 
 	// Start will get error, but return due to cancelled context
-	err = bi.Start(nil)
+	err = bi.Start()
 	assert.NoError(t, err)
 	assert.Nil(t, bi.(*blockIndexer).processorDone)
 

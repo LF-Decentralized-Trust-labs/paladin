@@ -154,6 +154,7 @@ var (
 	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
 	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
 	MsgBlockIndexerInvalidEventStreamType   = ffe("PD011306", "Unsupported event stream type: %s")
+	MsgBlockMissingHandler                  = ffe("PD011307", "Handler not registered for stream")
 
 	// Signing module PD0114XX
 	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")

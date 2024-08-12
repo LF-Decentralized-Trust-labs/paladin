@@ -65,34 +65,37 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 
 	eventCollector := make(chan *EventWithData)
 
-	// Do a full start now with an internal block listener
+	// Do a full start now with an internal event listener
 	var esID string
-	err := bi.Start(func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
-		if esID == "" {
-			esID = batch.StreamID.String()
-		} else {
-			assert.Equal(t, esID, batch.StreamID.String())
-		}
-		assert.Equal(t, "unit_test", batch.StreamName)
-		assert.Greater(t, len(batch.Events), 0)
-		assert.LessOrEqual(t, len(batch.Events), 3)
-		for _, e := range batch.Events {
-			select {
-			case eventCollector <- e:
-			case <-ctx.Done():
+	err := bi.Start(&InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+			if esID == "" {
+				esID = batch.StreamID.String()
+			} else {
+				assert.Equal(t, esID, batch.StreamID.String())
 			}
-		}
-		return nil
-	}, &EventStream{
-		Name: "unit_test",
-		Config: types.WrapJSONP(EventStreamConfig{
-			BatchSize:    confutil.P(3),
-			BatchTimeout: confutil.P("5ms"),
-		}),
-		// Listen to two out of three event types
-		ABI: abi.ABI{
-			testABI[1],
-			testABI[2],
+			assert.Equal(t, "unit_test", batch.StreamName)
+			assert.Greater(t, len(batch.Events), 0)
+			assert.LessOrEqual(t, len(batch.Events), 3)
+			for _, e := range batch.Events {
+				select {
+				case eventCollector <- e:
+				case <-ctx.Done():
+				}
+			}
+			return nil
+		},
+		Definition: &EventStream{
+			Name: "unit_test",
+			Config: types.WrapJSONP(EventStreamConfig{
+				BatchSize:    confutil.P(3),
+				BatchTimeout: confutil.P("5ms"),
+			}),
+			// Listen to two out of three event types
+			ABI: abi.ABI{
+				testABI[1],
+				testABI[2],
+			},
 		},
 	})
 	assert.NoError(t, err)
@@ -152,7 +155,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	}
 
 	// Do a full start now without a block listener, and wait for the ut notification of all the blocks
-	err := bi.Start(handler)
+	err := bi.Start()
 	assert.NoError(t, err)
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify
@@ -173,7 +176,10 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 			testABI[2],
 		},
 	}
-	es, err := bi.upsertInternalEventStream(ctx, internalESConfig)
+	es, err := bi.upsertInternalEventStream(ctx, &InternalEventStream{
+		Definition: internalESConfig,
+		Handler:    handler,
+	})
 	assert.NoError(t, err)
 
 	// And start it
@@ -207,7 +213,10 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 		FromBlock:       types.RawJSON(`0`),
 	}, bi.persistence, bi.blockListener)
 	assert.NoError(t, err)
-	err = bi.Start(handler, internalESConfig)
+	err = bi.Start(&InternalEventStream{
+		Definition: internalESConfig,
+		Handler:    handler,
+	})
 	assert.NoError(t, err)
 
 	// Check it's back to the checkpoint we expect
@@ -230,7 +239,7 @@ func TestStartBadInternalEventStream(t *testing.T) {
 	_, bi, _, blDone := newTestBlockIndexer(t)
 	defer blDone()
 
-	err := bi.Start(nil, &EventStream{})
+	err := bi.Start(&InternalEventStream{})
 	assert.Regexp(t, "PD011106", err)
 
 }
@@ -282,8 +291,10 @@ func TestUpsertInternalEventQueryExistingStreamFail(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnError(fmt.Errorf("pop"))
 
-	err := bi.Start(nil, &EventStream{
-		Name: "testing",
+	err := bi.Start(&InternalEventStream{
+		Definition: &EventStream{
+			Name: "testing",
+		},
 	})
 	assert.Regexp(t, "pop", err)
 }
@@ -296,8 +307,10 @@ func TestUpsertInternalEventStreamMismatchExisting(t *testing.T) {
 		[]string{"id", "abi"},
 	).AddRow(uuid.New().String(), testEventABIJSON))
 
-	err := bi.Start(nil, &EventStream{
-		Name: "testing",
+	err := bi.Start(&InternalEventStream{
+		Definition: &EventStream{
+			Name: "testing",
+		},
 	})
 	assert.Regexp(t, "PD011103", err)
 
@@ -315,9 +328,11 @@ func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
 	p.Mock.ExpectExec("UPDATE.*config").WillReturnError(fmt.Errorf("pop"))
 	p.Mock.ExpectRollback()
 
-	err := bi.Start(nil, &EventStream{
-		Name: "testing",
-		ABI:  testParseABI(testEventABIJSON),
+	err := bi.Start(&InternalEventStream{
+		Definition: &EventStream{
+			Name: "testing",
+			ABI:  testParseABI(testEventABIJSON),
+		},
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -335,9 +350,11 @@ func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
 	p.Mock.ExpectExec("INSERT.*config").WillReturnError(fmt.Errorf("pop"))
 	p.Mock.ExpectRollback()
 
-	err := bi.Start(nil, &EventStream{
-		Name: "testing",
-		ABI:  testParseABI(testEventABIJSON),
+	err := bi.Start(&InternalEventStream{
+		Definition: &EventStream{
+			Name: "testing",
+			ABI:  testParseABI(testEventABIJSON),
+		},
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -491,10 +508,6 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 	p.Mock.ExpectRollback()
 
 	called := false
-	bi.eventStreamsInternalCB = func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
-		called = true
-		return fmt.Errorf("pop")
-	}
 
 	bi.retry.UTSetMaxAttempts(1)
 	es := &eventStream{
@@ -510,6 +523,10 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 		batchTimeout:   1 * time.Microsecond, // but not going to wait
 		dispatch:       make(chan *eventDispatch),
 		dispatcherDone: make(chan struct{}),
+		handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+			called = true
+			return fmt.Errorf("pop")
+		},
 	}
 	go func() {
 		assert.NotPanics(t, func() { es.dispatcher() })
@@ -526,7 +543,7 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 	assert.True(t, called)
 }
 
-func TestDispatcherDispatchBadTypeClosed(t *testing.T) {
+func TestDispatcherRunLateHandler(t *testing.T) {
 	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
 
@@ -534,10 +551,6 @@ func TestDispatcherDispatchBadTypeClosed(t *testing.T) {
 	p.Mock.ExpectRollback()
 
 	called := false
-	bi.eventStreamsInternalCB = func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
-		called = true
-		return fmt.Errorf("pop")
-	}
 
 	bi.retry.UTSetMaxAttempts(1)
 	es := &eventStream{
@@ -553,7 +566,55 @@ func TestDispatcherDispatchBadTypeClosed(t *testing.T) {
 		batchTimeout:   1 * time.Microsecond, // but not going to wait
 		dispatch:       make(chan *eventDispatch),
 		dispatcherDone: make(chan struct{}),
+		detectorDone:   make(chan struct{}),
+		waitForHandler: make(chan struct{}),
 	}
+	go func() {
+		assert.NotPanics(t, func() { es.run() })
+	}()
+
+	time.Sleep(1 * time.Millisecond)
+	es.attachHandler(func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+		called = true
+		return fmt.Errorf("pop")
+	})
+
+	es.dispatch <- &eventDispatch{
+		event: &EventWithData{
+			IndexedEvent: &IndexedEvent{},
+		},
+	}
+
+	<-es.dispatcherDone
+
+	assert.True(t, called)
+}
+
+func TestDispatcherRunMissingHandler(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectRollback()
+
+	bi.retry.UTSetMaxAttempts(1)
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID:   uuid.New(),
+			Type: types.Enum[EventStreamType]("wrong"),
+			ABI:  testABI,
+		},
+		eventABIs:      testABI,
+		batchSize:      2,                    // aim for two
+		batchTimeout:   1 * time.Microsecond, // but not going to wait
+		dispatch:       make(chan *eventDispatch),
+		dispatcherDone: make(chan struct{}),
+		waitForHandler: make(chan struct{}),
+	}
+	close(es.waitForHandler)
+
 	go func() {
 		assert.NotPanics(t, func() { es.dispatcher() })
 	}()
@@ -565,8 +626,22 @@ func TestDispatcherDispatchBadTypeClosed(t *testing.T) {
 	}
 
 	<-es.dispatcherDone
+}
 
-	assert.False(t, called)
+func TestDispatcherCloseBeforeHandler(t *testing.T) {
+	ctx, bi, _, _, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	cancelledCtx, cancelCtx := context.WithCancel(ctx)
+	cancelCtx()
+	es := &eventStream{
+		bi:             bi,
+		ctx:            cancelledCtx,
+		waitForHandler: make(chan struct{}),
+		detectorDone:   make(chan struct{}),
+		dispatcherDone: make(chan struct{}),
+	}
+	es.run()
 }
 
 func TestProcessCatchupEventPageFailRPC(t *testing.T) {

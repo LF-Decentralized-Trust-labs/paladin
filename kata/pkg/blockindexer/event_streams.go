@@ -18,6 +18,7 @@ package blockindexer
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,8 +33,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error
-
 type eventStream struct {
 	ctx            context.Context
 	cancelCtx      context.CancelFunc
@@ -47,6 +46,9 @@ type eventStream struct {
 	batchTimeout   time.Duration
 	blocks         chan *eventStreamBlock
 	dispatch       chan *eventDispatch
+	handlerLock    sync.Mutex
+	waitForHandler chan struct{}
+	handler        InternalStreamCallback
 	detectorDone   chan struct{}
 	dispatcherDone chan struct{}
 }
@@ -92,14 +94,20 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	return nil
 }
 
-func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *EventStream) (*eventStream, error) {
-	def.Type = EventStreamTypeInternal.Enum()
+func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *InternalEventStream) (*eventStream, error) {
 
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
-		return nil, err
+	// Defensive coding against panics
+	def := ies.Definition
+	if def == nil {
+		def = &EventStream{}
 	}
 	if def.Config == nil {
 		def.Config = types.WrapJSONP(EventStreamConfig{})
+	}
+
+	// Validate the name
+	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
+		return nil, err
 	}
 
 	// Find if one exists - as we need to check it matches, and get its uuid
@@ -148,8 +156,22 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 
 	// We call init here
 	// TODO: Full stop/start lifecycle
-	return bi.initEventStream(def), nil
+	es := bi.initEventStream(def)
 
+	// Register the internal handler against the new or existing stream
+	es.attachHandler(ies.Handler)
+
+	return es, nil
+}
+
+func (es *eventStream) attachHandler(handler InternalStreamCallback) {
+	es.handlerLock.Lock()
+	prevHandler := es.handler
+	es.handler = handler
+	if prevHandler == nil {
+		close(es.waitForHandler)
+	}
+	es.handlerLock.Unlock()
 }
 
 func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
@@ -164,12 +186,13 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 		es.definition.Config = definition.Config
 	} else {
 		es = &eventStream{
-			bi:         bi,
-			definition: definition,
-			eventABIs:  []*abi.Entry{},
-			signatures: make(map[string]bool),
-			blocks:     make(chan *eventStreamBlock, bi.esBlockDispatchQueueLength),
-			dispatch:   make(chan *eventDispatch, batchSize),
+			bi:             bi,
+			definition:     definition,
+			eventABIs:      []*abi.Entry{},
+			signatures:     make(map[string]bool),
+			blocks:         make(chan *eventStreamBlock, bi.esBlockDispatchQueueLength),
+			dispatch:       make(chan *eventDispatch, batchSize),
+			waitForHandler: make(chan struct{}),
 		}
 	}
 
@@ -197,10 +220,9 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	return es
 }
 
-func (bi *blockIndexer) startEventStreams(internalCallback InternalStreamCallback) {
+func (bi *blockIndexer) startEventStreams() {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
-	bi.eventStreamsInternalCB = internalCallback
 	for _, es := range bi.eventStreams {
 		es.start()
 	}
@@ -211,9 +233,24 @@ func (es *eventStream) start() {
 		es.ctx, es.cancelCtx = context.WithCancel(log.WithLogField(es.bi.parentCtxForReset, "eventstream", es.definition.ID.String()))
 		es.detectorDone = make(chan struct{})
 		es.dispatcherDone = make(chan struct{})
-		go es.detector()
-		go es.dispatcher()
+		es.run()
 	}
+}
+
+func (es *eventStream) run() {
+
+	select {
+	case <-es.waitForHandler:
+	case <-es.ctx.Done():
+		log.L(es.ctx).Debugf("stopping before event handler registered")
+		close(es.detectorDone)
+		close(es.dispatcherDone)
+		return
+	}
+
+	go es.detector()
+	go es.dispatcher()
+
 }
 
 func (es *eventStream) stop() {
@@ -373,6 +410,7 @@ func (es *eventStream) sendToDispatcher(event *EventWithData, lastInBlock bool) 
 
 func (es *eventStream) dispatcher() {
 	defer close(es.dispatcherDone)
+
 	l := log.L(es.ctx)
 	var batch *eventBatch
 	for {
@@ -431,16 +469,18 @@ func (es *eventStream) dispatcher() {
 
 func (es *eventStream) runBatch(batch *eventBatch) error {
 
-	if es.definition.Type.V() != EventStreamTypeInternal {
-		// Only support internal currently - others if they reach here (which they shouldn't) will\
-		// spin in retry dispatch (so the checkpoint won't move forwards)
-		return i18n.NewError(es.ctx, msgs.MsgBlockIndexerInvalidEventStreamType, es.definition.Type.V())
-	}
-
 	// We start a database transaction, run the callback function
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		return true, es.bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
-			err := es.bi.eventStreamsInternalCB(es.ctx, tx, &batch.EventDeliveryBatch)
+
+			es.handlerLock.Lock()
+			handler := es.handler
+			es.handlerLock.Unlock()
+
+			if handler == nil {
+				return i18n.NewError(es.ctx, msgs.MsgBlockMissingHandler)
+			}
+			err := handler(es.ctx, tx, &batch.EventDeliveryBatch)
 			if err != nil {
 				return err
 			}

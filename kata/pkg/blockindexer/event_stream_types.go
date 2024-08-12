@@ -17,10 +17,13 @@
 package blockindexer
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"gorm.io/gorm"
 )
 
 type EventStreamConfig struct {
@@ -80,4 +83,11 @@ type EventDeliveryBatch struct {
 	StreamName string           `json:"streamName"`
 	BatchID    uuid.UUID        `json:"batchId"`
 	Events     []*EventWithData `json:"events"`
+}
+
+type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error
+
+type InternalEventStream struct {
+	Definition *EventStream
+	Handler    InternalStreamCallback
 }
