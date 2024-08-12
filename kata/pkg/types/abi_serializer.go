@@ -18,7 +18,6 @@ package types
 
 import (
 	"context"
-	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -85,17 +84,11 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 func ABIBySolDefinition(ctx context.Context, a abi.ABI) (map[string]*abi.Entry, error) {
 	byDefs := make(map[string]*abi.Entry)
 	for _, e := range a {
-		solDef, childStructs, err := e.SolidityDefCtx(ctx)
+		solDef, err := e.SolidityStringCtx(ctx)
 		if err != nil {
 			return nil, err
 		}
-		buff := new(strings.Builder)
-		buff.WriteString(solDef)
-		for _, e := range childStructs {
-			buff.WriteRune('|')
-			buff.WriteString(e)
-		}
-		byDefs[buff.String()] = e
+		byDefs[solDef] = e
 	}
 	return byDefs, nil
 }

@@ -131,17 +131,19 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domainName string,
 		constructorParams types.RawJSON,
-	) (*blockindexer.IndexedEvent, error) {
+	) (*ethtypes.Address0xHex, error) {
 
-		domain, err := tb.getDomain(domainName)
+		domain, err := tb.getDomainByName(domainName)
 		if err != nil {
 			return nil, err
 		}
 
-		deployTXSpec, err := tb.validateDeploy(ctx, domain, constructorParams)
+		txID, deployTXSpec, err := tb.validateDeploy(ctx, domain, constructorParams)
 		if err != nil {
 			return nil, err
 		}
+		waiter := domain.txWaiter(ctx, *txID)
+		defer waiter.cancel()
 
 		// Init the deployment transaction
 		var initDeployRes *proto.InitDeployTransactionResponse
@@ -176,8 +178,18 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		// Do the deploy
-		return tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction)
+		// Do the deploy - we wait for the transaction here to cover revert failures
+		if err := tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction); err != nil {
+			return nil, err
+		}
+
+		// Rather than just inspecting the TX - we wait for the domain to index the event, such that
+		// we know it's in the map by the time we return.
+		psc, err := waiter.wait(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return psc.address, nil
 	})
 }
 

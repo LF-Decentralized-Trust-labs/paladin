@@ -3,6 +3,11 @@ pragma solidity ^0.8.24;
 
 interface IPaladinContract_V0 {
 
+    event PaladinNewSmartContract_V0(
+        bytes32 indexed txId,
+        address indexed domain
+    );
+
     event PaladinPrivateTransaction_V0(
         bytes32   indexed id,
         bytes32[] inputs,

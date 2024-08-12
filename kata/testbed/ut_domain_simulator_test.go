@@ -122,7 +122,7 @@ func newSimulatorRPCClient(t *testing.T, url string) func(res interface{}, metho
 		if err != nil {
 			return err.Error()
 		}
-		t.Logf("%s: %s", method, res)
+		t.Logf("%s: %v", method, res)
 		return nil
 	}
 }

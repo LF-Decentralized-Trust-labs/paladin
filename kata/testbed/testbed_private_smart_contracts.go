@@ -20,5 +20,5 @@ import "github.com/hyperledger/firefly-signer/pkg/ethtypes"
 type testbedPrivateSmartContract struct {
 	tb      *testbed
 	domain  *testbedDomain
-	address ethtypes.Address0xHex
+	address *ethtypes.Address0xHex
 }

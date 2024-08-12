@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
@@ -33,6 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,38 +56,40 @@ func main() {
 }
 
 type testbed struct {
-	ctx             context.Context
-	cancelCtx       context.CancelFunc
-	conf            *TestBedConfig
-	sigc            chan os.Signal
-	rpcServer       rpcserver.Server
-	stateStore      statestore.StateStore
-	blockindexer    blockindexer.BlockIndexer
-	keyMgr          ethclient.KeyManager
-	ethClient       ethclient.EthClient
-	signer          signer.SigningModule
-	bus             commsbus.CommsBus
-	fromDomain      commsbus.MessageHandler
-	socketFile      string
-	destToDomain    string
-	destFromDomain  string
-	inflight        map[string]*inflightRequest
-	inflightLock    sync.Mutex
-	domainRegistry  map[string]*testbedDomain
-	domainContracts map[ethtypes.Address0xHex]*testbedPrivateSmartContract
-	domainLock      sync.Mutex
-	ready           chan error
-	done            chan struct{}
+	ctx              context.Context
+	cancelCtx        context.CancelFunc
+	conf             *TestBedConfig
+	sigc             chan os.Signal
+	rpcServer        rpcserver.Server
+	stateStore       statestore.StateStore
+	blockindexer     blockindexer.BlockIndexer
+	keyMgr           ethclient.KeyManager
+	ethClient        ethclient.EthClient
+	signer           signer.SigningModule
+	bus              commsbus.CommsBus
+	fromDomain       commsbus.MessageHandler
+	socketFile       string
+	destToDomain     string
+	destFromDomain   string
+	inflight         map[string]*inflightRequest
+	inflightLock     sync.Mutex
+	domainsByName    map[string]*testbedDomain
+	domainsByAddress map[ethtypes.Address0xHex]*testbedDomain
+	domainContracts  map[ethtypes.Address0xHex]*testbedPrivateSmartContract
+	domainLock       sync.Mutex
+	ready            chan error
+	done             chan struct{}
 }
 
 func newTestBed() (tb *testbed) {
 	tb = &testbed{
-		sigc:            make(chan os.Signal, 1),
-		inflight:        make(map[string]*inflightRequest),
-		domainRegistry:  make(map[string]*testbedDomain),
-		domainContracts: make(map[ethtypes.Address0xHex]*testbedPrivateSmartContract),
-		ready:           make(chan error, 1),
-		done:            make(chan struct{}),
+		sigc:             make(chan os.Signal, 1),
+		inflight:         make(map[string]*inflightRequest),
+		domainsByName:    make(map[string]*testbedDomain),
+		domainsByAddress: make(map[ethtypes.Address0xHex]*testbedDomain),
+		domainContracts:  make(map[ethtypes.Address0xHex]*testbedPrivateSmartContract),
+		ready:            make(chan error, 1),
+		done:             make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	return tb
@@ -190,7 +195,9 @@ func (tb *testbed) run() (err error) {
 	}
 	var blockHeight uint64
 	if err == nil {
-		err = tb.blockindexer.Start(tb.chainEventHandler, tb.eventStreams()...)
+		err = tb.blockindexer.Start(
+			tb.domainEventStream(),
+		)
 	}
 	if err == nil {
 		blockHeight, err = tb.blockindexer.GetBlockHeight(tb.ctx)
@@ -213,4 +220,42 @@ func (tb *testbed) run() (err error) {
 	tb.eventHandler()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
+}
+
+func mustParseBuildABI(buildJSON []byte) abi.ABI {
+	var buildParsed map[string]types.RawJSON
+	var buildABI abi.ABI
+	err := json.Unmarshal(buildJSON, &buildParsed)
+	if err == nil {
+		err = json.Unmarshal(buildParsed["abi"], &buildABI)
+	}
+	if err != nil {
+		panic(err)
+	}
+	return buildABI
+}
+
+func mustParseBuildBytecode(buildJSON []byte) ethtypes.HexBytes0xPrefix {
+	var buildParsed map[string]types.RawJSON
+	var byteCode ethtypes.HexBytes0xPrefix
+	err := json.Unmarshal(buildJSON, &buildParsed)
+	if err == nil {
+		err = json.Unmarshal(buildParsed["bytecode"], &byteCode)
+	}
+	if err != nil {
+		panic(err)
+	}
+	return byteCode
+}
+
+func mustEventSignatureHash(a abi.ABI, eventName string) ethtypes.HexBytes0xPrefix {
+	ev := a.Events()[eventName]
+	if ev == nil {
+		panic("missing event " + eventName)
+	}
+	sig, err := ev.SignatureHash()
+	if err != nil {
+		panic(err)
+	}
+	return sig
 }

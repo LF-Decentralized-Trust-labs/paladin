@@ -22,9 +22,7 @@ import (
 
 	_ "embed"
 
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -36,26 +34,6 @@ import (
 //go:embed abis/SIMDomain.json
 var simDomainBuild []byte // comes from Hardhat build
 
-func parseBuildABI(t *testing.T, buildJSON []byte) *abi.ABI {
-	var buildParsed map[string]types.RawJSON
-	err := json.Unmarshal(buildJSON, &buildParsed)
-	assert.NoError(t, err)
-	var buildABI abi.ABI
-	err = json.Unmarshal(buildParsed["abi"], &buildABI)
-	assert.NoError(t, err)
-	return &buildABI
-}
-
-func parseBuildBytecode(t *testing.T, buildJSON []byte) ethtypes.HexBytes0xPrefix {
-	var buildParsed map[string]types.RawJSON
-	err := json.Unmarshal(buildJSON, &buildParsed)
-	assert.NoError(t, err)
-	var byteCode ethtypes.HexBytes0xPrefix
-	err = json.Unmarshal(buildParsed["bytecode"], &byteCode)
-	assert.NoError(t, err)
-	return byteCode
-}
-
 func toJSONString(t *testing.T, v interface{}) string {
 	b, err := json.Marshal(v)
 	assert.NoError(t, err)
@@ -65,7 +43,7 @@ func toJSONString(t *testing.T, v interface{}) string {
 // Example of how someone might use this testbed externally
 func TestDemoNotarizedCoinSelection(t *testing.T) {
 
-	simDomainABI := parseBuildABI(t, simDomainBuild)
+	simDomainABI := mustParseBuildABI(simDomainBuild)
 
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
@@ -206,8 +184,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.NotEmpty(t, req.Verifiers[0].Verifier)
 			return &proto.PrepareDeployTransactionResponse{
 				Transaction: &proto.BaseLedgerTransaction{
-					FunctionName:   "newSIMTokenNotarized",
-					ParamsJson:     fmt.Sprintf(`{"notary": "%s"}`, req.Verifiers[0].Verifier),
+					FunctionName: "newSIMTokenNotarized",
+					ParamsJson: fmt.Sprintf(`{
+						"txId": "%s",
+						"notary": "%s"
+					}`, req.Transaction.TransactionId, req.Verifiers[0].Verifier),
 					SigningAddress: fmt.Sprintf("domain1/contract1/onetimekeys/%s", req.Transaction.TransactionId),
 				},
 			}, nil
@@ -250,7 +231,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	defer done()
 
 	err := rpcCall(&factoryAddr, "testbed_deployBytecode", "domain1_admin",
-		parseBuildABI(t, simDomainBuild), parseBuildBytecode(t, simDomainBuild),
+		mustParseBuildABI(simDomainBuild), mustParseBuildBytecode(simDomainBuild),
 		types.RawJSON(`{}`)) // no params on constructor
 	assert.NoError(t, err)
 
@@ -264,8 +245,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, err)
 
-	var deployEvent *blockindexer.IndexedEvent
-	err = rpcCall(&deployEvent, "testbed_deploy", "domain1", types.RawJSON(`{
+	var contractAddr *ethtypes.Address0xHex
+	err = rpcCall(&contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "domain1/contract1/notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"

@@ -2,19 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {SIMToken} from "./SIMToken.sol";
-import {IPaladinDomain_V0} from "../interfaces/IPaladinDomain.sol";
 
 // SIMDomain is an un-optimized, simplistic test tool that is used in the unit tests of the test bed
 // PLEASE REFER TO ZETO, NOTO AND PENTE FOR REAL EXAMPLES OF ACTUAL IMPLEMENTED DOMAINS
-contract SIMDomain is IPaladinDomain_V0 {
+contract SIMDomain {
     
     function newSIMTokenNotarized(
+        bytes32 txId,
         address notary
     ) public {
-
-        SIMToken simToken = new SIMToken(notary);
-        
-        emit PaladinNewSmartContract_V0(address(simToken));
+        // Simply constructs the new contract - which will emit an event
+        new SIMToken(txId, address(this), notary);        
     }
     
 }
