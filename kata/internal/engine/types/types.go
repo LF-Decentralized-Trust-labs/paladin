@@ -75,13 +75,20 @@ type IdentityResolver interface {
 type StageFoundationService interface {
 	IdentityResolver() IdentityResolver
 	DependencyChecker() DependencyChecker
+	Sequencer() Sequencer
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
+}
+
+type Sequencer interface {
+	// GetLatestAssembleRoundForTx will find the sequence the transaction is in and what's the latest assemble round for that sequence
+	GetLatestAssembleRoundForTx(ctx context.Context, txID string) (assembleRound int64)
 }
 
 type PaladinStageFoundationService struct {
 	dependencyChecker   DependencyChecker
 	stateStore          statestore.StateStore
 	nodeAndWalletLookUp IdentityResolver
+	sequencer           Sequencer
 }
 
 func (psfs *PaladinStageFoundationService) DependencyChecker() DependencyChecker {
@@ -94,6 +101,10 @@ func (psfs *PaladinStageFoundationService) StateStore() statestore.StateStore {
 
 func (psfs *PaladinStageFoundationService) IdentityResolver() IdentityResolver {
 	return psfs.nodeAndWalletLookUp
+}
+
+func (psfs *PaladinStageFoundationService) Sequencer() Sequencer {
+	return psfs.sequencer
 }
 
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,

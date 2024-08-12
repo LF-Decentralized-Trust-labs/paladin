@@ -21,30 +21,25 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
-type DispatchAddress string
-
-type TxSubmissionOutput struct {
-	ErrorMessage  string
-	TransactionID string
+type ConfirmResult struct {
 }
 
-type DispatchStage struct{}
+type ConfirmStage struct{}
 
-func (ds *DispatchStage) Name() string {
+func (cs *ConfirmStage) Name() string {
 	return "dispatch"
 }
 
-func (ds *DispatchStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (cs *ConfirmStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+	txsToCheck := tsg.GetPreReqTransactions(ctx)
 	if tsg.GetDispatchAddress(ctx) == "" {
 		// no dispatch address selected yet, continue to assign one
 		return nil
 	}
-	txsToCheck := tsg.GetPreReqTransactions(ctx)
 	preReqsPending := sfs.DependencyChecker().PreReqsMatchCondition(ctx, txsToCheck, func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool) {
 		if preReqTx.GetDispatchAddress(ctx) != tsg.GetDispatchAddress(ctx) { // the pre-req tx is managed by a different address - no matter which node
 			if preReqTx.GetConfirmedTxHash(ctx) != "" {
@@ -66,11 +61,11 @@ func (ds *DispatchStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg trans
 	return nil
 }
 
-func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+func (cs *ConfirmStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
 	unprocessedStageEvents = []*types.StageEvent{}
 	nextStep = types.NextStepWait
 	for _, se := range stageEvents {
-		if string(se.Stage) == ds.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
+		if string(se.Stage) == cs.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
 				case DispatchAddress:
@@ -101,7 +96,7 @@ func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore
 	return
 }
 
-func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (cs *ConfirmStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
 	if tsg.GetDispatchTxPayload(ctx) != "" && sfs.IdentityResolver().IsCurrentNode(tsg.GetDispatchNode(ctx)) && tsg.GetDispatchTxID(ctx) == "" {
 		// NOTE: we will use transaction payload hash as idempotency key, so it's retry safe
 		return true
@@ -109,9 +104,9 @@ func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 	return false
 }
 
-func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
-	if ds.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), ds.Name())
+func (cs *ConfirmStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
+	if cs.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), cs.Name())
 	}
 
 	if tsg.GetDispatchAddress(ctx) == "" {
@@ -125,5 +120,5 @@ func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore
 		return TxSubmissionOutput{}, nil
 	}
 
-	return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorActionFailed, tsg.GetTxID(ctx), ds.Name())
+	return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorActionFailed, tsg.GetTxID(ctx), cs.Name())
 }

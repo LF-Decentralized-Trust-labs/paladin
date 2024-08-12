@@ -32,9 +32,14 @@ type Config struct {
 type TxStateGetters interface {
 	GetContract(ctx context.Context) string
 	GetTxID(ctx context.Context) string
+	GetDomainID(ctx context.Context) string
+	GetSchemaID(ctx context.Context) string
 
 	GetDispatchTxPayload(ctx context.Context) string
 
+	GetAssembledRound(ctx context.Context) int64
+
+	GetSequencePreReqTransactions(ctx context.Context) []string
 	GetPreReqTransactions(ctx context.Context) []string
 	GetDispatchAddress(ctx context.Context) string
 	GetDispatchNode(ctx context.Context) string
@@ -53,14 +58,18 @@ type TxStateManager interface {
 
 type Transaction struct {
 	gorm.Model
-	ID          uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
-	From        string     `gorm:"type:text"`
-	SequenceID  *uuid.UUID `gorm:"type:uuid"`
-	Contract    string     `gorm:"type:uuid"`
-	PayloadJSON *string    `gorm:"type:text"`
-	PayloadRLP  *string    `gorm:"type:text"`
+	ID             uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
+	From           string     `gorm:"type:text"`
+	SequenceID     *uuid.UUID `gorm:"type:uuid"`
+	DomainID       string
+	SchemaID       string
+	AssembledRound int64   `gorm:"type:int"`
+	Contract       string  `gorm:"type:uuid"`
+	PayloadJSON    *string `gorm:"type:text"`
+	PayloadRLP     *string `gorm:"type:text"`
 
 	PreReqTxs         []string `gorm:"type:text[]; serializer:json"`
+	SystemPreReqTxs   []string `gorm:"type:text[]; serializer:json"`
 	DispatchNode      string   `gorm:"type:text"`
 	DispatchAddress   string   `gorm:"type:text"`
 	DispatchTxID      string   `gorm:"type:text"`
@@ -98,9 +107,20 @@ func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *Transaction
 func (t *Transaction) GetContract(ctx context.Context) string {
 	return t.Contract
 }
+func (t *Transaction) GetDomainID(ctx context.Context) string {
+	return t.DomainID
+}
+
+func (t *Transaction) GetSchemaID(ctx context.Context) string {
+	return t.SchemaID
+}
 
 func (t *Transaction) GetTxID(ctx context.Context) string {
 	return t.ID.String()
+}
+
+func (t *Transaction) GetAssembledRound(ctx context.Context) int64 {
+	return t.AssembledRound
 }
 
 func (t *Transaction) GetDispatchAddress(ctx context.Context) string {
@@ -124,7 +144,12 @@ func (t *Transaction) GetConfirmedTxHash(ctx context.Context) string {
 }
 
 func (t *Transaction) GetPreReqTransactions(ctx context.Context) []string {
-	return t.PreReqTxs
+	allDeps := t.PreReqTxs[:]
+	return append(allDeps, t.SystemPreReqTxs...)
+}
+
+func (t *Transaction) GetSequencePreReqTransactions(ctx context.Context) []string {
+	return t.SystemPreReqTxs
 }
 
 type TransactionStore interface {

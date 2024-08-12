@@ -7,6 +7,7 @@ CREATE TABLE transactions (
   contract                  TEXT            NOT NULL,
   "from"                    TEXT            NOT NULL,
   sequence_id               UUID,
+  assembled_round           BIGINT,
   payload_json              TEXT,
   payload_rlp               TEXT,
   pre_req_txs               TEXT,
