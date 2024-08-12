@@ -39,10 +39,6 @@ type testbedDomain struct {
 	factoryContractABI     abi.ABI
 }
 
-type testbedContract struct {
-	// domain *testbedDomain
-}
-
 func (tb *testbed) registerDomain(ctx context.Context, name string, config *proto.DomainConfig) (*proto.InitDomainRequest, error) {
 
 	abiSchemas := make([]*abi.Parameter, len(config.AbiStateSchemasJson))
@@ -51,7 +47,10 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 			return nil, fmt.Errorf("bad ABI state schema %d: %s", i, err)
 		}
 	}
-	domain := &testbedDomain{tb: tb, name: name}
+	domain := &testbedDomain{
+		tb:   tb,
+		name: name,
+	}
 
 	err := json.Unmarshal(([]byte)(config.ConstructorAbiJson), &domain.constructorABI)
 	if err != nil {
