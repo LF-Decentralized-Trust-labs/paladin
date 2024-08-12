@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -180,9 +181,9 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
 				Logs: []*LogJSONRPC{
-					{BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventBData},
-					{BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventCData},
+					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
+					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventBData},
+					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventCData},
 				},
 			},
 		}
@@ -270,9 +271,9 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	wsConf := &rpcclient.WSConfig{HTTPConfig: rpcclient.HTTPConfig{URL: "ws://localhost:8546"}}
 
 	cancelledCtx, cancelCtx := context.WithCancel(context.Background())
-	cancelCtx()
 	bi, err := NewBlockIndexer(cancelledCtx, &Config{}, wsConf, p.P)
 	assert.NoError(t, err)
+	cancelCtx()
 
 	// Start will get error, but return due to cancelled context
 	err = bi.Start(nil)
@@ -778,6 +779,22 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 		FromBlock: types.RawJSON(`false`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300", err)
+}
+
+func TestBlockIndexerBadStream(t *testing.T) {
+	ctx, bl, _, done := newTestBlockListener(t)
+	defer done()
+
+	p, err := mockpersistence.NewSQLMockProvider()
+	assert.NoError(t, err)
+
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{
+		"id", "abi",
+	}).AddRow(
+		uuid.New().String(), `!!!bad JSON`,
+	))
+	_, err = newBlockIndexer(ctx, &Config{}, p.P, bl)
+	assert.Regexp(t, "PD011303", err)
 }
 
 func TestGetIndexedTransactionByHashErrors(t *testing.T) {

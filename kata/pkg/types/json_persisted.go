@@ -63,7 +63,7 @@ func IsNil(v interface{}) bool {
 
 func (p *JSONP[T]) Value() (driver.Value, error) {
 	// Ensure null goes to a null value in the DB (not the string "null")
-	if IsNil(p.v) {
+	if p == nil || IsNil(p.v) {
 		return nil, nil
 	}
 	return json.Marshal(p.v)

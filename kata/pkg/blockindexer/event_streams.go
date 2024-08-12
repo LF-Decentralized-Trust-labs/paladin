@@ -79,6 +79,7 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	var eventStreams []*EventStream
 	err := bi.persistence.DB().
 		Table("event_streams").
+		WithContext(ctx).
 		Find(&eventStreams).
 		Error
 	if err != nil {
@@ -86,15 +87,17 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	}
 
 	for _, esDefinition := range eventStreams {
-		if _, err = bi.initEventStream(ctx, esDefinition); err != nil {
-			return err
-		}
+		bi.initEventStream(esDefinition)
 	}
 	return nil
 }
 
 func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *EventStream) (*eventStream, error) {
 	def.Type = EventStreamTypeInternal.Enum()
+
+	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
+		return nil, err
+	}
 
 	// Find if one exists - as we need to check it matches, and get its uuid
 	var existing []*EventStream
@@ -142,17 +145,13 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 
 	// We call init here
 	// TODO: Full stop/start lifecycle
-	return bi.initEventStream(ctx, def)
+	return bi.initEventStream(def), nil
 
 }
 
-func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) (*eventStream, error) {
+func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
-
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, definition.Name, "name"); err != nil {
-		return nil, err
-	}
 
 	es := bi.eventStreams[definition.ID]
 	batchSize := confutil.IntMin(definition.Config.V().BatchSize, 1, *EventStreamDefaults.BatchSize)
@@ -192,7 +191,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 	// ok - all looks good, put ourselves in the blockindexer list
 	bi.eventStreams[definition.ID] = es
-	return es, nil
+	return es
 }
 
 func (bi *blockIndexer) startEventStreams(internalCallback InternalStreamCallback) {
@@ -338,6 +337,7 @@ func (es *eventStream) detector() {
 					catchUpToBlock = nil
 				} else {
 					// We've now started
+					checkpointBlock = *startupBlock
 					startupBlock = nil
 				}
 			}
@@ -429,7 +429,9 @@ func (es *eventStream) dispatcher() {
 func (es *eventStream) runBatch(batch *eventBatch) error {
 
 	if es.definition.Type.V() != EventStreamTypeInternal {
-		panic("non internal streams not yet implemented")
+		// Only support internal currently - others if they reach here (which they shouldn't) will\
+		// spin in retry dispatch (so the checkpoint won't move forwards)
+		return i18n.NewError(es.ctx, msgs.MsgBlockIndexerInvalidEventStreamType, es.definition.Type.V())
 	}
 
 	// We start a database transaction, run the callback function

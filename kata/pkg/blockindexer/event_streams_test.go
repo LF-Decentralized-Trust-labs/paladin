@@ -22,10 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/mocks/rpcbackendmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -219,4 +222,378 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 		panic("redelivery")
 	case <-time.After(5 * time.Millisecond):
 	}
+}
+
+func TestStartBadInternalEventStream(t *testing.T) {
+
+	// This test uses a real DB, includes the full block indexer, but simulates the blockchain.
+	_, bi, _, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	err := bi.Start(nil, &EventStream{})
+	assert.Regexp(t, "PD011106", err)
+
+}
+
+func TestTestNotifyEventStreamDoesNotBlock(t *testing.T) {
+
+	// This test uses a real DB, includes the full block indexer, but simulates the blockchain.
+	ctx, bi, _, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	bi.eventStreams[uuid.New()] = &eventStream{
+		signatures: map[string]bool{
+			topicA.String(): true,
+		},
+		blocks: make(chan *eventStreamBlock),
+	}
+
+	blockHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	txHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	bi.notifyEventStreams(ctx, &blockWriterBatch{
+		blocks: []*BlockInfoJSONRPC{
+			{
+				Number: 12345,
+				Hash:   blockHash,
+			},
+		},
+		receipts: [][]*TXReceiptJSONRPC{
+			{
+				{
+					Logs: []*LogJSONRPC{
+						{
+							BlockNumber:      12345,
+							BlockHash:        blockHash,
+							TransactionHash:  txHash,
+							TransactionIndex: 0,
+							Topics:           []ethtypes.HexBytes0xPrefix{topicA},
+						},
+					},
+				},
+			},
+		},
+	})
+
+}
+
+func TestUpsertInternalEventQueryExistingStreamFail(t *testing.T) {
+	_, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnError(fmt.Errorf("pop"))
+
+	err := bi.Start(nil, &EventStream{
+		Name: "testing",
+	})
+	assert.Regexp(t, "pop", err)
+}
+
+func TestUpsertInternalEventStreamMismatchExisting(t *testing.T) {
+	_, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "abi"},
+	).AddRow(uuid.New().String(), testEventABIJSON))
+
+	err := bi.Start(nil, &EventStream{
+		Name: "testing",
+	})
+	assert.Regexp(t, "PD011103", err)
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
+	_, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "abi"},
+	).AddRow(uuid.New().String(), testEventABIJSON))
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectExec("UPDATE.*config").WillReturnError(fmt.Errorf("pop"))
+	p.Mock.ExpectRollback()
+
+	err := bi.Start(nil, &EventStream{
+		Name: "testing",
+		ABI:  testParseABI(testEventABIJSON),
+	})
+	assert.Regexp(t, "pop", err)
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
+	_, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "abi"},
+	))
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectExec("INSERT.*config").WillReturnError(fmt.Errorf("pop"))
+	p.Mock.ExpectRollback()
+
+	err := bi.Start(nil, &EventStream{
+		Name: "testing",
+		ABI:  testParseABI(testEventABIJSON),
+	})
+	assert.Regexp(t, "pop", err)
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestProcessCheckpointFail(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	bi.retry.UTSetMaxAttempts(1)
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnError(fmt.Errorf("pop"))
+
+	es := &eventStream{
+		bi:           bi,
+		ctx:          ctx,
+		definition:   &EventStream{ID: uuid.New()},
+		detectorDone: make(chan struct{}),
+	}
+	es.detector()
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestGetHighestIndexedBlockFail(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	bi.retry.UTSetMaxAttempts(1)
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(p.Mock.NewRows([]string{}))
+	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnError(fmt.Errorf("pop"))
+
+	es := &eventStream{
+		bi:           bi,
+		ctx:          ctx,
+		definition:   &EventStream{ID: uuid.New()},
+		detectorDone: make(chan struct{}),
+	}
+	es.detector()
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestReturnToCatchupAfterStart(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(p.Mock.NewRows([]string{}))
+	// Start on block 5
+	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnRows(p.Mock.NewRows([]string{
+		"number",
+	}).AddRow(
+		5,
+	))
+	// We'll query from 5
+	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnRows(p.Mock.NewRows([]string{}))
+	// Then after notify notify go back to get block 10, causing us to hunt the gap
+	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnRows(p.Mock.NewRows([]string{}))
+
+	cancellableCtx, cancelCtx := context.WithCancel(ctx)
+	es := &eventStream{
+		bi:  bi,
+		ctx: cancellableCtx,
+		definition: &EventStream{
+			ID:  uuid.New(),
+			ABI: testABI,
+		},
+		eventABIs:    testABI,
+		blocks:       make(chan *eventStreamBlock),
+		dispatch:     make(chan *eventDispatch),
+		detectorDone: make(chan struct{}),
+	}
+	go func() {
+		assert.NotPanics(t, func() { es.detector() })
+	}()
+
+	// This will be ignored as behind our head
+	es.blocks <- &eventStreamBlock{blockNumber: 5}
+
+	// notify block ten
+	es.blocks <- &eventStreamBlock{
+		blockNumber: 10,
+		events: []*LogJSONRPC{
+			{
+				BlockHash:        ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+				TransactionHash:  ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+				BlockNumber:      10,
+				TransactionIndex: 0,
+				LogIndex:         0,
+				Topics:           []ethtypes.HexBytes0xPrefix{topicA /* this one has no data */},
+			},
+		},
+	}
+	d := <-es.dispatch
+	assert.Equal(t, int64(10), d.event.BlockNumber)
+
+	cancelCtx()
+	<-es.detectorDone
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestExitInCatchupPhase(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	bi.retry.UTSetMaxAttempts(1)
+	p.Mock.ExpectQuery("SELECT.*event_stream_checkpoints").WillReturnRows(p.Mock.NewRows([]string{}))
+	p.Mock.ExpectQuery("SELECT.*indexed_blocks").WillReturnRows(p.Mock.
+		NewRows([]string{"number"}).AddRow(5))
+	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnError(fmt.Errorf("pop"))
+
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID:  uuid.New(),
+			ABI: testABI,
+		},
+		eventABIs:    testABI,
+		blocks:       make(chan *eventStreamBlock),
+		detectorDone: make(chan struct{}),
+	}
+	go func() {
+		assert.NotPanics(t, func() { es.detector() })
+	}()
+	<-es.detectorDone
+
+	assert.NoError(t, p.Mock.ExpectationsWereMet())
+}
+
+func TestSendToDispatcherClosedNoBlock(t *testing.T) {
+	ctx, bi, _, _, done := newMockBlockIndexer(t, &Config{})
+	done()
+
+	es := &eventStream{
+		bi:       bi,
+		ctx:      ctx,
+		dispatch: make(chan *eventDispatch),
+	}
+	es.sendToDispatcher(&EventWithData{
+		IndexedEvent: &IndexedEvent{},
+	}, false)
+}
+
+func TestDispatcherDispatchClosed(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectRollback()
+
+	called := false
+	bi.eventStreamsInternalCB = func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+		called = true
+		return fmt.Errorf("pop")
+	}
+
+	bi.retry.UTSetMaxAttempts(1)
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID:   uuid.New(),
+			Type: EventStreamTypeInternal.Enum(),
+			ABI:  testABI,
+		},
+		eventABIs:      testABI,
+		batchSize:      2,                    // aim for two
+		batchTimeout:   1 * time.Microsecond, // but not going to wait
+		dispatch:       make(chan *eventDispatch),
+		dispatcherDone: make(chan struct{}),
+	}
+	go func() {
+		assert.NotPanics(t, func() { es.dispatcher() })
+	}()
+
+	es.dispatch <- &eventDispatch{
+		event: &EventWithData{
+			IndexedEvent: &IndexedEvent{},
+		},
+	}
+
+	<-es.dispatcherDone
+
+	assert.True(t, called)
+}
+
+func TestDispatcherDispatchBadTypeClosed(t *testing.T) {
+	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	p.Mock.ExpectBegin()
+	p.Mock.ExpectRollback()
+
+	called := false
+	bi.eventStreamsInternalCB = func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+		called = true
+		return fmt.Errorf("pop")
+	}
+
+	bi.retry.UTSetMaxAttempts(1)
+	es := &eventStream{
+		bi:  bi,
+		ctx: ctx,
+		definition: &EventStream{
+			ID:   uuid.New(),
+			Type: types.Enum[EventStreamType]("wrong"),
+			ABI:  testABI,
+		},
+		eventABIs:      testABI,
+		batchSize:      2,                    // aim for two
+		batchTimeout:   1 * time.Microsecond, // but not going to wait
+		dispatch:       make(chan *eventDispatch),
+		dispatcherDone: make(chan struct{}),
+	}
+	go func() {
+		assert.NotPanics(t, func() { es.dispatcher() })
+	}()
+
+	es.dispatch <- &eventDispatch{
+		event: &EventWithData{
+			IndexedEvent: &IndexedEvent{},
+		},
+	}
+
+	<-es.dispatcherDone
+
+	assert.False(t, called)
+}
+
+func TestProcessCatchupEventPageFailRPC(t *testing.T) {
+	ctx, bi, mRPC, p, done := newMockBlockIndexer(t, &Config{})
+	defer done()
+
+	txHash := types.MustParseHashID(types.RandHex(32))
+
+	bi.retry.UTSetMaxAttempts(2)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).
+		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, msgs.MsgContextCanceled)).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).
+		Return(nil) // but still not found
+
+	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnRows(
+		sqlmock.NewRows([]string{
+			"transaction_l", "transaction_h",
+		}).AddRow(txHash.L, txHash.H),
+	)
+
+	es := &eventStream{
+		bi:         bi,
+		ctx:        ctx,
+		definition: &EventStream{ID: uuid.New(), ABI: testABI},
+		eventABIs:  testABI,
+	}
+
+	_, err := es.processCatchupEventPage(0, 10000)
+	assert.Regexp(t, "PD011305", err)
 }
