@@ -19,6 +19,8 @@ require (
 	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14-0.20240808203923-05bef7cbb843
 	github.com/iden3/go-iden3-crypto v0.0.16
+	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
+	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
 	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -36,6 +38,8 @@ require (
 	gorm.io/gorm v1.25.11
 
 )
+
+require github.com/iden3/wasmer-go v0.0.1 // indirect
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
@@ -126,6 +130,8 @@ require (
 	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
+	github.com/iden3/go-rapidsnark/prover v0.0.10
+	github.com/iden3/go-rapidsnark/types v0.0.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/yaml v0.2.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -244,7 +250,7 @@ require (
 	golang.org/x/term v0.23.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240808171019-573a1156607a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -254,3 +260,5 @@ require (
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20221223090309-7455f1af531d // indirect
 )
+
+replace github.com/hyperledger-labs/zeto/go-sdk => ../../../workspace.zkp/confidential-utxo/go-sdk/

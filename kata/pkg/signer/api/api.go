@@ -35,5 +35,5 @@ type KeyStore interface {
 
 type Extension interface {
 	// Return nil if keystore type is not known, or error if initialization fails
-	KeyStore(keystoreType string) (store KeyStore, err error)
+	KeyStore(ctx context.Context, config *StoreConfig) (store KeyStore, err error)
 }

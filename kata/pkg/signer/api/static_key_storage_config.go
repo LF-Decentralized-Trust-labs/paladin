@@ -13,22 +13,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package extensions
+package api
 
-import (
-	"context"
+type StaticKeyEntryEncoding string
 
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-rapidsnark/types"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+const (
+	StaticKeyEntryEncodingNONE   StaticKeyEntryEncoding = "none"
+	StaticKeyEntryEncodingHEX    StaticKeyEntryEncoding = "hex"
+	StaticKeyEntryEncodingBase64 StaticKeyEntryEncoding = "base64"
 )
 
-type zetoKeystoreSigner struct{}
-
-func (ks *zetoKeystoreSigner) FindOrCreateKey_snark(ctx context.Context, req *proto.ResolveKeyRequest) (addr *babyjub.PublicKeyComp, keyHandle string, err error) {
-	return nil, "", nil
+type StaticKeyEntryConfig struct {
+	Encoding StaticKeyEntryEncoding `yaml:"encoding"`
+	Filename string                 `yaml:"filename"`
+	Trim     bool                   `yaml:"trim"`
+	Inline   string                 `yaml:"inline"`
 }
 
-func (ks *zetoKeystoreSigner) Prove_snark(ctx context.Context, keyHandle string, payload []byte) (*types.ZKProof, string, error) {
-	return nil, "", nil
+type StaticKeyStorageConfig struct {
+	Keys map[string]StaticKeyEntryConfig `yaml:"keys"`
 }

@@ -27,13 +27,14 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
 )
 
 func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	ctx := context.Background()
 
-	store, err := NewFilesystemStore(ctx, &FileSystemConfig{
+	store, err := NewFilesystemStore(ctx, &api.FileSystemConfig{
 		Path: confutil.P(t.TempDir()),
 	})
 	assert.NoError(t, err)
@@ -45,7 +46,7 @@ func TestFileSystemStoreBadDir(t *testing.T) {
 
 	badPath := path.Join(t.TempDir(), "wrong")
 
-	_, err := NewFilesystemStore(context.Background(), &FileSystemConfig{
+	_, err := NewFilesystemStore(context.Background(), &api.FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
@@ -53,7 +54,7 @@ func TestFileSystemStoreBadDir(t *testing.T) {
 	err = os.WriteFile(badPath, []byte{}, 0644)
 	assert.NoError(t, err)
 
-	_, err = NewFilesystemStore(context.Background(), &FileSystemConfig{
+	_, err = NewFilesystemStore(context.Background(), &api.FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)

@@ -24,14 +24,18 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+<<<<<<< HEAD
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+=======
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+>>>>>>> efce160 (Draft impl of a ZKP signer)
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestStaticStore(t *testing.T, keys map[string]StaticKeyEntryConfig) (context.Context, *staticStore) {
+func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) (context.Context, *staticStore) {
 	ctx := context.Background()
 
-	store, err := NewStaticKeyStore(ctx, &StaticKeyStorageConfig{
+	store, err := NewStaticKeyStore(ctx, &api.StaticKeyStorageConfig{
 		Keys: keys,
 	})
 	assert.NoError(t, err)
@@ -46,7 +50,7 @@ func TestStaticStoreFileFileWithTrim(t *testing.T) {
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
 	assert.NoError(t, err)
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
 			Encoding: "none",
 			Filename: keyFile,
@@ -67,7 +71,7 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 	err := os.WriteFile(keyFile, []byte(keyData), 0644)
 	assert.NoError(t, err)
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
 			Encoding: "hex",
 			Filename: keyFile,
@@ -89,7 +93,7 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 	assert.NoError(t, err)
 	b64KeyData := base64.StdEncoding.EncodeToString(keyData)
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
 			Encoding: "base64",
 			Inline:   b64KeyData,
@@ -104,8 +108,8 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 
 func TestStaticStoreLoadFileFail(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
+	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "none",
 				Filename: t.TempDir(),
@@ -119,8 +123,8 @@ func TestStaticStoreLoadFileFail(t *testing.T) {
 
 func TestStaticStoreBadHEX(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
+	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "hex",
 				Inline:   "not hex",
@@ -133,8 +137,8 @@ func TestStaticStoreBadHEX(t *testing.T) {
 
 func TestStaticStoreBadBase64(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
+	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "base64",
 				Inline:   "!$$**~~",
@@ -147,8 +151,8 @@ func TestStaticStoreBadBase64(t *testing.T) {
 
 func TestStaticStoreEmpty(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
+	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "none",
 				Trim:     true,
@@ -162,8 +166,8 @@ func TestStaticStoreEmpty(t *testing.T) {
 
 func TestStaticStoreBadEncType(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &StaticKeyStorageConfig{
-		Keys: map[string]StaticKeyEntryConfig{
+	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "",
 				Inline:   "anything",
@@ -176,7 +180,7 @@ func TestStaticStoreBadEncType(t *testing.T) {
 
 func TestStaticStoreResolveOK(t *testing.T) {
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"my/shiny/key%20ten": {
 			Encoding: "none",
 			Inline:   "my key",
@@ -198,7 +202,7 @@ func TestStaticStoreResolveOK(t *testing.T) {
 
 func TestStaticStoreResolveBadPath(t *testing.T) {
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"my/shiny/key%20ten": {
 			Encoding: "none",
 			Inline:   "my key",
@@ -220,7 +224,7 @@ func TestStaticStoreResolveBadPath(t *testing.T) {
 
 func TestStaticStoreResolveNotFound(t *testing.T) {
 
-	ctx, store := newTestStaticStore(t, map[string]StaticKeyEntryConfig{
+	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"my/shiny/key%20ten": {
 			Encoding: "none",
 			Inline:   "my key",

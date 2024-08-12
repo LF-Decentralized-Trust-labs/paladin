@@ -13,25 +13,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package keystore
+syntax = "proto3";
 
-import (
-	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
-)
+package github.com.kaleido_io.paladin.kata.zeto;
+option go_package = "pkg/proto/zeto";
 
-type FileSystemConfig struct {
-	Path     *string      `yaml:"path"`
-	Cache    cache.Config `yaml:"cache"`
-	FileMode *string      `yaml:"fileMode"`
-	DirMode  *string      `yaml:"dirMode"`
+message ProvingRequest {
+  string circuitId = 1;
+  ProvingRequestCommon common = 2;
+  bytes extras = 3;
 }
 
-var FileSystemDefaults = &FileSystemConfig{
-	Path:     confutil.P("keystore"),
-	FileMode: confutil.P("0600"),
-	DirMode:  confutil.P("0700"),
-	Cache: cache.Config{
-		Capacity: confutil.P(100),
-	},
+message ProvingRequestCommon {
+  repeated string inputCommitments = 2;
+  repeated uint64 inputValues = 3;
+  repeated string inputSalts = 4;
+  string inputOwner = 5;
+  repeated uint64 outputValues = 6;
+  repeated string outputOwners = 7;
 }

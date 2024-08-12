@@ -13,23 +13,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package keystore
+package extensions
 
-type StaticKeyEntryEncoding string
+import (
+	"context"
 
-const (
-	StaticKeyEntryEncodingNONE   StaticKeyEntryEncoding = "none"
-	StaticKeyEntryEncodingHEX    StaticKeyEntryEncoding = "hex"
-	StaticKeyEntryEncodingBase64 StaticKeyEntryEncoding = "base64"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
-type StaticKeyEntryConfig struct {
-	Encoding StaticKeyEntryEncoding `yaml:"encoding"`
-	Filename string                 `yaml:"filename"`
-	Trim     bool                   `yaml:"trim"`
-	Inline   string                 `yaml:"inline"`
+const ZkpKeyStoreSigner = "zkp"
+
+type zkpExt struct{}
+
+func NewZkpSignerExtension() api.Extension {
+	return &zkpExt{}
 }
 
-type StaticKeyStorageConfig struct {
-	Keys map[string]StaticKeyEntryConfig `yaml:"keys"`
+func (z *zkpExt) KeyStore(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+	if config.Type != ZkpKeyStoreSigner {
+		return nil, nil
+	}
+
+	kss, err := NewZetoKeystoreSigner(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return kss, nil
 }

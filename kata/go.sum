@@ -388,8 +388,6 @@ github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSo
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU=
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
-github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240807203223-dabe628a7222 h1:54pH0EVEWxOPUPZObZDz0Vae+hkeG4Eql1fp0mrZLlA=
-github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240807203223-dabe628a7222/go.mod h1:Zilf5uOw+syiksOttXGjiqda+2ewCiDa4zAxJxFIuII=
 github.com/hyperledger/firefly-common v1.4.8 h1:0o1Qp1c5YzQo8nbnX+gAo9SVd2tR4Z9U2t8Y4zEzyaA=
 github.com/hyperledger/firefly-common v1.4.8/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240808203923-05bef7cbb843 h1:D+HoB2ccpjztCj5veV3pePppuuvJRr92eHF+2Iq7yQU=
@@ -399,8 +397,16 @@ github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/iden3/go-iden3-crypto v0.0.16 h1:zN867xiz6HgErXVIV/6WyteGcOukE9gybYTorBMEdsk=
 github.com/iden3/go-iden3-crypto v0.0.16/go.mod h1:dLpM4vEPJ3nDHzhWFXDjzkn1qHoBeOT/3UEhXsEsP3E=
-github.com/iden3/go-rapidsnark/types v0.0.3 h1:f0s1Qdut1qHe1O67+m+xUVRBPwSXnq5j0xSrBi0jqM4=
-github.com/iden3/go-rapidsnark/types v0.0.3/go.mod h1:ApgcaUxKIgSRA6fAeFxK7p+lgXXfG4oA2HN5DhFlfF4=
+github.com/iden3/go-rapidsnark/prover v0.0.10 h1:NvOfRPpex/k646UsqOcUy7a7uVl17t4ok9kWvpQg4+k=
+github.com/iden3/go-rapidsnark/prover v0.0.10/go.mod h1:wgDsmKOGCuWGtgVtuW9ARWNguNr4NJAIyg2G7+uTax0=
+github.com/iden3/go-rapidsnark/types v0.0.2 h1:CjJSrlbWchHzuMRdxSYrEh7n/akP+Z2PLNbwT5yBmQY=
+github.com/iden3/go-rapidsnark/types v0.0.2/go.mod h1:ApgcaUxKIgSRA6fAeFxK7p+lgXXfG4oA2HN5DhFlfF4=
+github.com/iden3/go-rapidsnark/witness/v2 v2.0.0 h1:mkY6VDfwKVJc83QGKmwVXY2LYepidPrFAxskrjr8UCs=
+github.com/iden3/go-rapidsnark/witness/v2 v2.0.0/go.mod h1:3JRjqUfW1hgI9hzLDO0v8z/DUkR0ZUehhYLlnIfRxnA=
+github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e h1:lqrevdLsG1k8ieaxgUQccf3unf73m3zmkHJ3oIdld90=
+github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e/go.mod h1:WUtPVKXrhfZHJXavwId2+8J/fKMHQ92N0MZDxt8sfEA=
+github.com/iden3/wasmer-go v0.0.1 h1:TZKh8Se8B/73PvWrcu+FTU9L1k5XYAmtFbioj7l0Uog=
+github.com/iden3/wasmer-go v0.0.1/go.mod h1:ZnZBAO012M7o+Q1INXLRIxKQgEcH2FuwL0Iga8A4ufg=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/invopop/yaml v0.2.0 h1:7zky/qH+O0DwAyoobXUqvVBwgBFRxKoQ/3FjcVpjTMY=
@@ -1117,6 +1123,8 @@ google.golang.org/genproto v0.0.0-20200804131852-c06518451d9c/go.mod h1:FWY/as6D
 google.golang.org/genproto v0.0.0-20200825200019-8632dd797987/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240808171019-573a1156607a h1:EKiZZXueP9/T68B8Nl0GAx9cjbQnCId0yP3qPMgaaHs=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240808171019-573a1156607a/go.mod h1:Ue6ibwXGpU+dqIcODieyLOcgj7z8+IcskoNIgZxtrFY=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988 h1:V71AcdLZr2p8dC9dbOIMCpqi4EmRl8wUwnJzXXLmbmc=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988/go.mod h1:Ue6ibwXGpU+dqIcODieyLOcgj7z8+IcskoNIgZxtrFY=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.20.1/go.mod h1:10oTOabMzJvdu6/UiuZezV6QK5dSlG84ov/aaiqXj38=
 google.golang.org/grpc v1.21.1/go.mod h1:oYelfM1adQP15Ek0mdvEgi9Df8B9CZIaU1084ijfRaM=

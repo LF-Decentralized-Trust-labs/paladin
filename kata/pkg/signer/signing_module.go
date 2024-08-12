@@ -78,22 +78,22 @@ type signingModule struct {
 // The design is such that all built-in behaviors should be both:
 // 1. Easy to re-use if they are valuable with your extension
 // 2. Easy to disable in the Config object passed in, if you do not want to have them enabled
-func NewSigningModule(ctx context.Context, config *Config, extensions ...api.Extension) (_ SigningModule, err error) {
+func NewSigningModule(ctx context.Context, config *api.Config, extensions ...api.Extension) (_ SigningModule, err error) {
 	sm := &signingModule{}
 
 	keyStoreType := strings.ToLower(config.KeyStore.Type)
 	switch keyStoreType {
-	case "", KeyStoreTypeFilesystem:
-		if sm.keyStore, err = keystore.NewFilesystemStore(ctx, &config.KeyStore.FileSystem); err != nil {
+	case "", api.KeyStoreTypeFilesystem:
+		if sm.keyStore, err = keystore.NewFilesystemStore(ctx, config.KeyStore.FileSystem); err != nil {
 			return nil, err
 		}
-	case KeyStoreTypeStatic:
-		if sm.keyStore, err = keystore.NewStaticKeyStore(ctx, &config.KeyStore.Static); err != nil {
+	case api.KeyStoreTypeStatic:
+		if sm.keyStore, err = keystore.NewStaticKeyStore(ctx, config.KeyStore.Static); err != nil {
 			return nil, err
 		}
 	default:
 		for _, ext := range extensions {
-			store, err := ext.KeyStore(keyStoreType)
+			store, err := ext.KeyStore(ctx, &config.KeyStore)
 			if err != nil {
 				return nil, err
 			}
@@ -108,8 +108,8 @@ func NewSigningModule(ctx context.Context, config *Config, extensions ...api.Ext
 	}
 
 	switch config.KeyDerivation.Type {
-	case "", KeyDerivationTypeDirect:
-	case KeyDerivationTypeBIP32:
+	case "", api.KeyDerivationTypeDirect:
+	case api.KeyDerivationTypeBIP32:
 		// This is fundamentally incompatible with a request to disable loading key materials into memory
 		if config.KeyStore.DisableKeyLoading {
 			return nil, i18n.NewError(ctx, msgs.MsgSigningHierarchicalRequiresLoading)
@@ -196,12 +196,12 @@ func (sm *signingModule) signKeystoreSECP256K1(ctx context.Context, req *proto.S
 }
 
 func (sm *signingModule) signBabyjubjubKey(ctx context.Context, req *proto.SignRequest, keyStoreSigner KeyStoreSigner_snark) (res *proto.SignResponse, err error) {
-	sig, err := keyStoreSigner.Prove_snark(ctx, req.KeyHandle, req.Payload)
+	_, err = keyStoreSigner.Prove_snark(ctx, req.KeyHandle, req.Payload)
 	if err != nil {
 		return nil, err
 	}
 	return &proto.SignResponse{
-		Payload: CompactRSV(sig),
+		Payload: []byte("TODO"),
 	}, nil
 }
 
@@ -279,9 +279,13 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 	if sm.disableKeyLoading {
 		return nil, i18n.NewError(ctx, msgs.MsgSigningStoreRequiresKeyLoadingForAlgo, strings.Join(req.Algorithms, ","))
 	}
-	privateKey, keyHandle, err := sm.keyStore.FindOrCreateLoadableKey(ctx, req, func() ([]byte, error) {
-		return sm.newKeyForAlgorithms(ctx, req.Algorithms)
-	})
+	var newKeyFunc func() ([]byte, error)
+	if !req.MustExist {
+		newKeyFunc = func() ([]byte, error) {
+			return sm.newKeyForAlgorithms(ctx, req.Algorithms)
+		}
+	}
+	privateKey, keyHandle, err := sm.keyStore.FindOrCreateLoadableKey(ctx, req, newKeyFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +302,10 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 			return sm.signKeystoreSECP256K1(ctx, req, keyStoreSigner)
 		}
 	} else if req.Algorithm == Algorithm_ZKP_BABYJUBJUB_PLAINBYTES {
-		// return sm.signBabyjubjubKey(ctx, req)
+		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_snark)
+		if ok {
+			return sm.signBabyjubjubKey(ctx, req, keyStoreSigner)
+		}
 	}
 	// We are going to use the key store to load/decrypt a key into our volatile memory
 	if sm.disableKeyLoading {
