@@ -98,6 +98,9 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
 		return nil, err
 	}
+	if def.Config == nil {
+		def.Config = types.WrapJSONP(EventStreamConfig{})
+	}
 
 	// Find if one exists - as we need to check it matches, and get its uuid
 	var existing []*EventStream
@@ -332,8 +335,8 @@ func (es *eventStream) detector() {
 			if caughtUp {
 				if startupBlock == nil {
 					// Process the deferred notified block, and back to normal operation
-					checkpointBlock = int64(catchUpToBlock.blockNumber - 1)
 					es.processNotifiedBlock(catchUpToBlock, true)
+					checkpointBlock = int64(catchUpToBlock.blockNumber)
 					catchUpToBlock = nil
 				} else {
 					// We've now started
