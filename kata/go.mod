@@ -15,7 +15,7 @@ require (
 	github.com/golangci/golangci-lint v1.55.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240807203223-dabe628a7222
+	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915
 	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14-0.20240808203923-05bef7cbb843
 	github.com/iden3/go-iden3-crypto v0.0.16
@@ -260,5 +260,3 @@ require (
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20221223090309-7455f1af531d // indirect
 )
-
-replace github.com/hyperledger-labs/zeto/go-sdk => ../../../workspace.zkp/confidential-utxo/go-sdk/

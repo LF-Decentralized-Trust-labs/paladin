@@ -581,6 +581,11 @@ github.com/hashicorp/hcl/v2 v2.18.1/go.mod h1:ThLC89FV4p9MPW804KVbe/cEXoQ8NZEh+J
 github.com/hashicorp/serf v0.10.1 h1:Z1H2J60yRKvfDYAOZLd2MU0ND4AH/WDz7xYHDWQsIPY=
 github.com/hashicorp/serf v0.10.1/go.mod h1:yL2t6BqATOLGc5HF7qbFkTfXoPIY0WZdWHfEvMqbG+4=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240807203223-dabe628a7222 h1:54pH0EVEWxOPUPZObZDz0Vae+hkeG4Eql1fp0mrZLlA=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812155740-7a6a9ab5b4bd h1:QjhDFwZ+7Vwdmr9S6Hb4AR8izzD47ykX6iWSQ8Phql0=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812155740-7a6a9ab5b4bd/go.mod h1:Zilf5uOw+syiksOttXGjiqda+2ewCiDa4zAxJxFIuII=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915 h1:QIiSMgnbWcOGTYPuB/psz4UG/LiCglPHn9QtuRo63jE=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915/go.mod h1:5QXncuG69tskksWX4hLBsISsshM8NudzJKTIc3WUENw=
 github.com/hyperledger/firefly-common v1.4.6/go.mod h1:jkErZdQmC9fsAJZQO427tURdwB9iiW+NMUZSqS3eBIE=
 github.com/hyperledger/firefly-evmconnect v1.3.14/go.mod h1:9mH5RlpPB14fJVWLwWJFSK2EyiihyQlzuDVfpxHyKWA=
 github.com/iancoleman/strcase v0.3.0 h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=
