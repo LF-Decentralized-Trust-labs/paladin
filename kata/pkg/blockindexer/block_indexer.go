@@ -125,7 +125,7 @@ func (bi *blockIndexer) Start(internalCallback InternalStreamCallback, internalS
 	// Internal event streams can be instated before we start the listener itself
 	// (so even on first startup they function as if they were there before the indexer loads)
 	for _, esDefinition := range internalStreams {
-		if err := bi.upsertInternalEventStream(bi.parentCtxForReset, esDefinition); err != nil {
+		if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, esDefinition); err != nil {
 			return err
 		}
 	}
@@ -463,11 +463,11 @@ func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
 		topic0 = *types.NewHashIDSlice32(l.Topics[0])
 	}
 	return &IndexedEvent{
-		Signature:       topic0,
-		TransactionHash: *types.NewHashIDSlice32(l.TransactionHash),
-		BlockNumber:     int64(l.BlockNumber),
-		TXIndex:         int64(l.TransactionIndex),
-		EventIndex:      int64(l.LogIndex),
+		Signature:        topic0,
+		TransactionHash:  *types.NewHashIDSlice32(l.TransactionHash),
+		BlockNumber:      int64(l.BlockNumber),
+		TransactionIndex: int64(l.TransactionIndex),
+		LogIndex:         int64(l.LogIndex),
 	}
 }
 
@@ -484,12 +484,12 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:            *types.NewHashIDSlice32(r.TransactionHash),
-				BlockNumber:     int64(r.BlockNumber),
-				TXIndex:         int64(txIndex),
-				From:            (*types.EthAddress)(r.From),
-				To:              (*types.EthAddress)(r.To),
-				ContractAddress: (*types.EthAddress)(r.ContractAddress),
+				Hash:             *types.NewHashIDSlice32(r.TransactionHash),
+				BlockNumber:      int64(r.BlockNumber),
+				TransactionIndex: int64(txIndex),
+				From:             (*types.EthAddress)(r.From),
+				To:               (*types.EthAddress)(r.To),
+				ContractAddress:  (*types.EthAddress)(r.ContractAddress),
 			})
 			for _, l := range r.Logs {
 				events = append(events, bi.logToIndexedEvent(l))
@@ -767,7 +767,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 		WithContext(ctx).
 		Table("indexed_transactions").
 		Order("block_number").
-		Order("tx_index").
+		Order("transaction_index").
 		Where("block_number = ?", blockNumber).
 		Find(&txns).
 		Error
@@ -787,7 +787,7 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 		Table("indexed_events").
 		Where("transaction_l = ?", hashID.L).
 		Where("transaction_h = ?", hashID.H).
-		Order("event_index").
+		Order("log_index").
 		Find(&events).
 		Error
 	return events, err
@@ -800,10 +800,10 @@ func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int
 		WithContext(ctx).
 		Table("indexed_events").
 		Where("indexed_events.block_number > ?", lastBlock).
-		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("event_index > ?", lastIndex)).
+		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("indexed_events.log_index > ?", lastIndex)).
 		Order("indexed_events.block_number").
-		Order("indexed_events.tx_index").
-		Order("event_index").
+		Order("indexed_events.transaction_index").
+		Order("indexed_events.log_index").
 		Limit(limit)
 	if withTransaction {
 		q = q.Joins("Transaction")

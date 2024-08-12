@@ -92,14 +92,14 @@ func (bi *blockIndexer) loadEventStreams(ctx context.Context) error {
 	}
 
 	for _, esDefinition := range eventStreams {
-		if err = bi.initEventStream(ctx, esDefinition); err != nil {
+		if _, err = bi.initEventStream(ctx, esDefinition); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *EventStream) error {
+func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *EventStream) (*eventStream, error) {
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Find if one exists - as we need to check it matches, and get its uuid
@@ -112,14 +112,14 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 		Find(&existing).
 		Error
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(existing) > 0 {
 		// The event definitions in both events must be identical
 		// We do not support changing the ABI after creation
 		if err := types.ABIsMustMatch(ctx, existing[0].ABI, def.ABI); err != nil {
-			return err
+			return nil, err
 		}
 		def.ID = existing[0].ID
 		// Update in the DB so we store the latest config
@@ -131,7 +131,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 			Update("config", def.Config).
 			Error
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		// Otherwise we're just recreating
@@ -142,7 +142,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 			Create(def).
 			Error
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -152,12 +152,12 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, def *Even
 
 }
 
-func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) error {
+func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventStream) (*eventStream, error) {
 	bi.eventStreamsLock.Lock()
 	defer bi.eventStreamsLock.Unlock()
 
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, definition.Name, "name"); err != nil {
-		return err
+		return nil, err
 	}
 
 	es := bi.eventStreams[definition.ID]
@@ -197,7 +197,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 	// ok - all looks good, put ourselves in the blockindexer list
 	bi.eventStreams[definition.ID] = es
-	return nil
+	return es, nil
 }
 
 func (bi *blockIndexer) startEventStreams(internalCallback InternalStreamCallback) {
@@ -237,6 +237,7 @@ func (es *eventStream) processCheckpoint() (int64, error) {
 		return true, es.bi.persistence.DB().
 			Table("event_stream_checkpoints").
 			Where("stream = ?", es.definition.ID).
+			WithContext(es.ctx).
 			Find(&checkpoints).
 			Error
 	})
@@ -251,6 +252,27 @@ func (es *eventStream) processCheckpoint() (int64, error) {
 	return baseBlock, nil
 }
 
+func (bi *blockIndexer) getHighestIndexedBlock(ctx context.Context) (*int64, error) {
+	var blocks []*IndexedBlock
+	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
+		return true, bi.persistence.DB().
+			Table("indexed_blocks").
+			Order("number DESC").
+			Limit(1).
+			WithContext(ctx).
+			Find(&blocks).
+			Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(blocks) == 0 {
+		return nil, nil
+	}
+	highestIndexedBlock := blocks[0].Number
+	return &highestIndexedBlock, nil
+}
+
 func (es *eventStream) detector() {
 	defer close(es.detectorDone)
 
@@ -263,6 +285,16 @@ func (es *eventStream) detector() {
 		return
 	}
 
+	// Find the highest block of the chain that's been persisted so far on startup,
+	// so we don't need to wait for a block to be mined (which feasibly might be
+	// mine-on-demand) to kick off our catchup.
+	// Note startupBlock might be nil, and that's fine
+	startupBlock, err := es.bi.getHighestIndexedBlock(es.ctx)
+	if err != nil {
+		log.L(es.ctx).Debugf("exiting before retrieving highest block")
+		return
+	}
+
 	var catchUpToBlock *eventStreamBlock
 	for {
 		// we wait to be told about a block from the chain, to see whether that is a block that
@@ -270,7 +302,7 @@ func (es *eventStream) detector() {
 		// this should be the case.
 		// It's only if we fall more than the channel length behind the head that we
 		// need to enter catchup mode until we make it back again
-		if catchUpToBlock == nil {
+		if startupBlock == nil && catchUpToBlock == nil {
 			select {
 			case block := <-es.blocks:
 				if int64(block.blockNumber) <= checkpointBlock {
@@ -292,16 +324,27 @@ func (es *eventStream) detector() {
 			}
 		} else {
 			// Get a page of events from the DB
-			caughtUp, err := es.getCatchupEventPage(checkpointBlock, int64(catchUpToBlock.blockNumber))
+			var catchUpToBlockNumber int64
+			if startupBlock != nil {
+				catchUpToBlockNumber = *startupBlock + 1
+			} else {
+				catchUpToBlockNumber = int64(catchUpToBlock.blockNumber)
+			}
+			caughtUp, err := es.processCatchupEventPage(checkpointBlock, catchUpToBlockNumber)
 			if err != nil {
 				log.L(es.ctx).Debugf("exiting during catchup phase")
 				return
 			}
 			if caughtUp {
-				// Process the deferred notified block, and back to normal operation
-				checkpointBlock = int64(catchUpToBlock.blockNumber - 1)
-				es.processNotifiedBlock(catchUpToBlock, true)
-				catchUpToBlock = nil
+				if startupBlock == nil {
+					// Process the deferred notified block, and back to normal operation
+					checkpointBlock = int64(catchUpToBlock.blockNumber - 1)
+					es.processNotifiedBlock(catchUpToBlock, true)
+					catchUpToBlock = nil
+				} else {
+					// We've now started
+					startupBlock = nil
+				}
 			}
 		}
 	}
@@ -323,7 +366,7 @@ func (es *eventStream) processNotifiedBlock(block *eventStreamBlock, fullBlock b
 }
 
 func (es *eventStream) sendToDispatcher(event *EventWithData, lastInBlock bool) {
-	log.L(es.ctx).Debugf("passing event to dispatcher %d/%d/%d (tx=%s,address=%s)", event.BlockNumber, event.TXIndex, event.EventIndex, event.TransactionHash, &event.Address)
+	log.L(es.ctx).Debugf("passing event to dispatcher %d/%d/%d (tx=%s,address=%s)", event.BlockNumber, event.TransactionIndex, event.LogIndex, event.TransactionHash, &event.Address)
 	select {
 	case es.dispatch <- &eventDispatch{event, lastInBlock}:
 	case <-es.ctx.Done():
@@ -364,7 +407,7 @@ func (es *eventStream) dispatcher() {
 				batch.checkpointAfterBatch = d.event.BlockNumber - 1
 			}
 			batch.Events = append(batch.Events, event)
-			l.Debugf("Added event %d/%d/%d to batch %s (len=%d)", event.BlockNumber, event.TXIndex, event.EventIndex, batch.BatchID, len(batch.Events))
+			l.Debugf("Added event %d/%d/%d to batch %s (len=%d)", event.BlockNumber, event.TransactionIndex, event.LogIndex, batch.BatchID, len(batch.Events))
 		case <-timeoutContext.Done():
 			timedOut = true
 			select {
@@ -421,7 +464,7 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 
 }
 
-func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, err error) {
+func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, err error) {
 
 	// We query up to the head of the chain as currently indexed, with a limit on the events
 	// we return for enrichment/processing.
@@ -440,6 +483,7 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 			Where("signature_h IN (?)", es.signaturesH).
 			Where("block_number > ?", checkpointBlock).
 			Where("block_number < ?", catchUpToBlockNumber).
+			Order("block_number").Order("transaction_index").Order("log_index").
 			Limit(eventStreamQueueLength).
 			Find(&page).
 			Error
@@ -452,7 +496,7 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 		// nothing to report - we're caught up
 		return true, nil
 	}
-	caughtUp = (len(page) == eventStreamQueueLength)
+	caughtUp = (len(page) < eventStreamQueueLength)
 
 	// Because we're in catch up here, we have to query the chain ourselves for the receipts.
 	// That's done by transaction (not by event) - so we've got to group
@@ -472,9 +516,9 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 	//
 	// In early phase dev, it's just about consistently resetting both your chain and your index.
 	enrichments := make(chan error)
-	for tx, _events := range byTxID {
+	for txStr, _events := range byTxID {
 		events := _events // not safe to pass loop pointer
-		go es.queryTransactionEvents(tx, events, enrichments)
+		go es.queryTransactionEvents(ethtypes.MustNewHexBytes0xPrefix(txStr), events, enrichments)
 	}
 	// Collect all the results
 	for range byTxID {
@@ -493,7 +537,7 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 	for iPage, origEntry := range page {
 		eventsForTX := byTxID[origEntry.TransactionHash.String()]
 		for iEvent, event := range eventsForTX {
-			if event.EventIndex == origEntry.EventIndex && event.Data != nil {
+			if event.LogIndex == origEntry.LogIndex && event.Data != nil {
 				// can only update our checkpoint to the block itself (vs. one before)
 				// when we are caught up, and dispatching the last block
 				lastInBlock := caughtUp && (iPage == len(page)-1) && (iEvent == len(eventsForTX)-1)
@@ -506,7 +550,7 @@ func (es *eventStream) getCatchupEventPage(checkpointBlock int64, catchUpToBlock
 
 }
 
-func (es *eventStream) queryTransactionEvents(tx string, events []*EventWithData, done chan error) {
+func (es *eventStream) queryTransactionEvents(tx ethtypes.HexBytes0xPrefix, events []*EventWithData, done chan error) {
 	var err error
 	defer func() {
 		done <- err
@@ -532,7 +576,7 @@ func (es *eventStream) queryTransactionEvents(tx string, events []*EventWithData
 	// Spin through the logs to find the corresponding result entries
 	for _, l := range receipt.Logs {
 		for _, e := range events {
-			if ethtypes.HexUint64(e.EventIndex) == l.LogIndex {
+			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
 				es.matchLog(l, e)
 			}
 		}

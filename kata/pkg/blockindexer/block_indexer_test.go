@@ -227,6 +227,26 @@ func mockBlocksRPCCallsDynamic(mRPC *rpcbackendmocks.WebSocketRPCClient, dynamic
 			blockReceipts.Return(nil)
 		}
 	})
+
+	txReceipt := mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).Maybe()
+	txReceipt.Run(func(args mock.Arguments) {
+		_, receipts := dynamic(args)
+		blockReturn := args[1].(**TXReceiptJSONRPC)
+		txHash := args[3].(ethtypes.HexBytes0xPrefix)
+		for _, receipts := range receipts {
+			for _, r := range receipts {
+				if txHash.String() == r.TransactionHash.String() {
+					*blockReturn = r
+					break
+				}
+			}
+		}
+		if *blockReturn == nil {
+			txReceipt.Return(&rpcbackend.RPCError{Message: "not found"})
+		} else {
+			txReceipt.Return(nil)
+		}
+	})
 }
 
 func TestNewBlockIndexerBadTLS(t *testing.T) {
@@ -373,7 +393,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 			assert.Equal(t, expectedReceipt[0].Logs[expectedIndex].Topics[0].String(), page[i2].Signature.String())
 
 			lastBlock = page[i2].BlockNumber
-			lastIndex = int(page[i2].EventIndex)
+			lastIndex = int(page[i2].LogIndex)
 		}
 	}
 
