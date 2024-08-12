@@ -40,7 +40,7 @@ import (
 )
 
 type BlockIndexer interface {
-	Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error
+	Start(internalStreams ...*InternalEventStream) error
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error)
@@ -77,7 +77,6 @@ type blockIndexer struct {
 	batchTimeout               time.Duration
 	txWaiters                  map[string]*txWaiter
 	txWaiterLock               sync.Mutex
-	eventStreamsInternalCB     InternalStreamCallback
 	eventStreams               map[uuid.UUID]*eventStream
 	eventStreamsHeadSet        map[uuid.UUID]*eventStream
 	eventStreamsLock           sync.Mutex
@@ -125,17 +124,17 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 	return bi, nil
 }
 
-func (bi *blockIndexer) Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error {
+func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 	// Internal event streams can be instated before we start the listener itself
 	// (so even on first startup they function as if they were there before the indexer loads)
-	for _, esDefinition := range internalStreams {
-		if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, esDefinition); err != nil {
+	for _, ies := range internalStreams {
+		if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, ies); err != nil {
 			return err
 		}
 	}
 	bi.blockListener.start()
 	bi.startOrReset()
-	bi.startEventStreams(internalCallback)
+	bi.startEventStreams()
 	return nil
 }
 

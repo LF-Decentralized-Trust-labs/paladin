@@ -161,19 +161,22 @@ keys:
 	assert.NoError(t, err)
 
 	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
-	err = indexer.Start(func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
-		// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
-		for _, e := range batch.Events {
-			select {
-			case eventStreamEvents <- e:
-			default:
-				assert.Fail(t, "more than expected number of events received")
+	err = indexer.Start(&blockindexer.InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
+			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
+			for _, e := range batch.Events {
+				select {
+				case eventStreamEvents <- e:
+				default:
+					assert.Fail(t, "more than expected number of events received")
+				}
 			}
-		}
-		return nil
-	}, &blockindexer.EventStream{
-		Name: "unittest",
-		ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
+			return nil
+		},
+		Definition: &blockindexer.EventStream{
+			Name: "unittest",
+			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
+		},
 	})
 	assert.NoError(t, err)
 	defer indexer.Stop()
