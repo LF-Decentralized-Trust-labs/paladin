@@ -1,17 +1,17 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
- * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+* Copyright © 2024 Kaleido, Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+* the License. You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+* an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+* specific language governing permissions and limitations under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
+*/
 
 package grpctransport
 
@@ -148,7 +148,7 @@ func TestCreateSingleInstance(t *testing.T) {
 	fakeInstanceName := "heylookatmeiamanewinstance"
 
 	externalServer = &fakeExternalServer{}
-	err = InitializeTransportProvider(testingSocketLocation, fakeDestinationName)
+	err = InitializeTransportProvider(testingSocketLocation, fakeDestinationName, nil)
 	assert.NoError(t, err)
 
 	// Now verify that we have a message registering the listener
@@ -231,7 +231,7 @@ func TestInitializeGRPCTransportSendsStartListeningEventToCommsBus(t *testing.T)
 	}()
 
 	externalServer = &fakeExternalServer{}
-	err = InitializeTransportProvider(testingSocketLocation, "heylookatmeiamanewlistener")
+	err = InitializeTransportProvider(testingSocketLocation, "heylookatmeiamanewlistener", nil)
 	defer Shutdown()
 	assert.NoError(t, err)
 	s.Stop()
@@ -264,8 +264,7 @@ func TestInitializeGRPCTransportDoesNotWorkWhenServerUnavailable(t *testing.T) {
 	}()
 
 	externalServer = &fakeExternalServer{}
-	err = InitializeTransportProvider(testingSocketLocation, "something")
-	defer Shutdown()
+	err = InitializeTransportProvider(testingSocketLocation, "something", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bangbangbang")
 	s.GracefulStop()
@@ -295,9 +294,9 @@ func TestInitializeGRPCTransportTwiceThrowsError(t *testing.T) {
 	}()
 
 	externalServer = &fakeExternalServer{}
-	err = InitializeTransportProvider(testingSocketLocation, "something")
+	err = InitializeTransportProvider(testingSocketLocation, "something", nil)
 	assert.NoError(t, err)
-	err = InitializeTransportProvider(testingSocketLocation, "something")
+	err = InitializeTransportProvider(testingSocketLocation, "something", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already initialized")
 	defer Shutdown()
@@ -334,7 +333,7 @@ func TestInitializeGRPCTransportSimple(t *testing.T) {
 	}()
 
 	externalServer = &fakeExternalServer{}
-	err = InitializeTransportProvider(testingSocketLocation, "something")
+	err = InitializeTransportProvider(testingSocketLocation, "something", nil)
 	assert.NoError(t, err)
 
 	<-fcbs.listenMessages

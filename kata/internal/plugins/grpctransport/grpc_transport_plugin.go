@@ -1,22 +1,23 @@
 /*
- * Copyright © 2024 Kaleido, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
- * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- * SPDX-License-Identifier: Apache-2.0
+* Copyright © 2024 Kaleido, Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+* the License. You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+* an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+* specific language governing permissions and limitations under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
  */
 
 package grpctransport
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"time"
@@ -41,11 +42,15 @@ type grpcTransportProvider struct {
 	stopListener func()
 	instances    map[destination]*grpcTransportInstance
 	client       proto.KataMessageServiceClient
+	config       GRPCTransportConfig
+}
 
-	// TODO: Things that should be config for the plugin
-	externalListenPort                  int
-	commsBusConnectionRetryLimit        int
-	commsBusConnectionRetryAttemptDelay int
+type GRPCTransportConfig struct {
+	ClientCertificate                   *tls.Certificate
+	ServerCertificate                   *tls.Certificate
+	ExternalListenPort                  int
+	CommsBusConnectionRetryLimit        int
+	CommsBusConnectionRetryAttemptDelay int
 }
 
 // Singleton instance of the GRPC Plugin
@@ -81,12 +86,18 @@ func BuildInfo() string {
 	return ProviderName
 }
 
-func InitializeTransportProvider(socketAddress string, listenerDestination string) error {
+func InitializeTransportProvider(socketAddress string, listenerDestination string, config *GRPCTransportConfig) error {
 	ctx := context.Background()
 	log.L(ctx).Info("grpctransport.InitializeTransportProvider")
 
 	if provider != nil {
 		return fmt.Errorf("gRPC transport provider already initialized")
+	}
+
+	if config == nil {
+		config = &GRPCTransportConfig{
+			ExternalListenPort: 8080,
+		}
 	}
 
 	// Create a gRPC client connection to the comms bus
@@ -163,19 +174,17 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 	// Now bring up the external endpoint other Paladin's are going to speak to us on
 	if externalServer == nil {
 		// Mostly put behind an interface to make stubbing for UTs easy
-		externalServer, err = NewExternalGRPCServer(ctx, provider.externalListenPort, 10, nil, nil)
+		externalServer, err = NewExternalGRPCServer(ctx, config.ExternalListenPort, 10, config.ServerCertificate, config.ClientCertificate)
 		if err != nil {
 			return err
 		}
 	}
 
 	provider = &grpcTransportProvider{
-		stopListener:                        func() { _ = messageStream.CloseSend() },
-		instances:                           make(map[destination]*grpcTransportInstance),
-		client:                              client,
-		externalListenPort:                  8080,
-		commsBusConnectionRetryLimit:        2,
-		commsBusConnectionRetryAttemptDelay: 1,
+		stopListener: func() { _ = messageStream.CloseSend() },
+		instances:    make(map[destination]*grpcTransportInstance),
+		client:       client,
+		config:       *config,
 	}
 
 	return nil
@@ -186,7 +195,7 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 
 	listenerContext, stopListener := context.WithCancel(ctx)
 	messageStream, err := gtp.client.Listen(listenerContext, &proto.ListenRequest{
-		Destination: createInstanceRequest.GetMessageDestination(),
+		Destination: createInstanceRequest.GetName(),
 	})
 	if err != nil {
 		stopListener()
@@ -218,7 +227,7 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 
 			externalMessage := &ExternalMessage{
 				Message:         *inboundMessage,
-				ExternalAddress: "somewhere",
+				ExternalAddress: "somewhere", // TODO: Plug point for registry
 			}
 
 			externalServer.QueueMessageForSend(externalMessage)
