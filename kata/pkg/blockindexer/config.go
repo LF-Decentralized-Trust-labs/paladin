@@ -23,13 +23,24 @@ import (
 )
 
 type Config struct {
-	FromBlock             types.RawJSON `yaml:"fromBlock"`
-	CommitBatchSize       *int          `yaml:"commitBatchSize"`
-	CommitBatchTimeout    *string       `yaml:"commitBatchTimeout"`
-	RequiredConfirmations *int          `yaml:"requiredConfirmations"`
-	ChainHeadCacheLen     *int          `yaml:"chainHeadCacheLen"`
-	BlockPollingInterval  *string       `yaml:"blockPollingInterval"`
-	Retry                 retry.Config  `yaml:"retry"`
+	FromBlock             types.RawJSON      `yaml:"fromBlock"`
+	CommitBatchSize       *int               `yaml:"commitBatchSize"`
+	CommitBatchTimeout    *string            `yaml:"commitBatchTimeout"`
+	RequiredConfirmations *int               `yaml:"requiredConfirmations"`
+	ChainHeadCacheLen     *int               `yaml:"chainHeadCacheLen"`
+	BlockPollingInterval  *string            `yaml:"blockPollingInterval"`
+	EventStreams          EventStreamsConfig `yaml:"eventStreams"`
+	Retry                 retry.Config       `yaml:"retry"`
+}
+
+type EventStreamsConfig struct {
+	BlockDispatchQueueLength *int `yaml:"blockDispatchQueueLength"`
+	CatchUpQueryPageSize     *int `yaml:"catchupQueryPageSize"`
+}
+
+var DefaultEventStreamsConfig = &EventStreamsConfig{
+	BlockDispatchQueueLength: confutil.P(100),
+	CatchUpQueryPageSize:     confutil.P(100),
 }
 
 var DefaultConfig = &Config{

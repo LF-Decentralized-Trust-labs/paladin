@@ -82,3 +82,18 @@ func TestRetryLimited(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 	assert.Equal(t, 5, callCount)
 }
+
+func TestRetryUTLimited(t *testing.T) {
+	r := NewRetryIndefinite(&Config{
+		InitialDelay: confutil.P("1ms"),
+		MaxDelay:     confutil.P("1ms"),
+	})
+	r.UTSetMaxAttempts(5)
+	callCount := 0
+	err := r.Do(context.Background(), func(i int) (retry bool, err error) {
+		callCount = i
+		return true, fmt.Errorf("pop")
+	})
+	assert.Regexp(t, "pop", err)
+	assert.Equal(t, 5, callCount)
+}

@@ -134,8 +134,11 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesUnmarshalNil                    = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                        = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid                = ffe("PD011102", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs          = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidName64SafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-64 characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric")
 
 	// Plugin registry PD0112XX
 	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
@@ -144,9 +147,13 @@ var (
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
 
 	// BlockIndexer PD0113XX
-	MsgBlockIndexerInvalidFromBlock    = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
-	MsgBlockIndexerInvalidWebSocketURL = ffe("PD011301", "Invalid WebSocket URL: %s")
-	MsgBlockIndexerInvalidHTTPURL      = ffe("PD011302", "Invalid HTTP URL: %s")
+	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerInvalidWebSocketURL      = ffe("PD011301", "Invalid WebSocket URL: %s")
+	MsgBlockIndexerInvalidHTTPURL           = ffe("PD011302", "Invalid HTTP URL: %s")
+	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed")
+	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
+	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
+	MsgBlockIndexerInvalidEventStreamType   = ffe("PD011306", "Unsupported event stream type: %s")
 
 	// Signing module PD0114XX
 	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")

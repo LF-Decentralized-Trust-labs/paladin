@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -39,7 +40,7 @@ import (
 )
 
 type BlockIndexer interface {
-	Start()
+	Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
 	GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error)
@@ -60,26 +61,32 @@ type BlockIndexer interface {
 // This implementation is thus deliberately simple assuming that when instability is found
 // in the notifications it can simply wipe out its view and start again.
 type blockIndexer struct {
-	parentCtxForReset     context.Context
-	cancelFunc            func()
-	persistence           persistence.Persistence
-	blockListener         *blockListener
-	wsConn                rpcbackend.WebSocketRPCClient
-	stateLock             sync.Mutex
-	fromBlock             *ethtypes.HexUint64
-	nextBlock             *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
-	blocksSinceCheckpoint []*BlockInfoJSONRPC
-	newHeadToAdd          []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
-	requiredConfirmations int
-	retry                 *retry.Retry
-	batchSize             int
-	batchTimeout          time.Duration
-	txWaiters             map[string]*txWaiter
-	txWaiterLock          sync.Mutex
-	dispatcherTap         chan struct{}
-	processorDone         chan struct{}
-	dispatcherDone        chan struct{}
-	utBatchNotify         chan *blockWriterBatch
+	parentCtxForReset          context.Context
+	cancelFunc                 func()
+	persistence                persistence.Persistence
+	blockListener              *blockListener
+	wsConn                     rpcbackend.WebSocketRPCClient
+	stateLock                  sync.Mutex
+	fromBlock                  *ethtypes.HexUint64
+	nextBlock                  *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
+	blocksSinceCheckpoint      []*BlockInfoJSONRPC
+	newHeadToAdd               []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
+	requiredConfirmations      int
+	retry                      *retry.Retry
+	batchSize                  int
+	batchTimeout               time.Duration
+	txWaiters                  map[string]*txWaiter
+	txWaiterLock               sync.Mutex
+	eventStreamsInternalCB     InternalStreamCallback
+	eventStreams               map[uuid.UUID]*eventStream
+	eventStreamsHeadSet        map[uuid.UUID]*eventStream
+	eventStreamsLock           sync.Mutex
+	esBlockDispatchQueueLength int
+	esCatchUpQueryPageSize     int
+	dispatcherTap              chan struct{}
+	processorDone              chan struct{}
+	dispatcherDone             chan struct{}
+	utBatchNotify              chan *blockWriterBatch
 }
 
 func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WSConfig, persistence persistence.Persistence) (_ BlockIndexer, err error) {
@@ -94,26 +101,42 @@ func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WS
 
 func newBlockIndexer(ctx context.Context, config *Config, persistence persistence.Persistence, blockListener *blockListener) (bi *blockIndexer, err error) {
 	bi = &blockIndexer{
-		parentCtxForReset:     ctx, // stored for startOrResetProcessing
-		persistence:           persistence,
-		wsConn:                blockListener.wsConn,
-		blockListener:         blockListener,
-		requiredConfirmations: confutil.IntMin(config.RequiredConfirmations, 0, *DefaultConfig.RequiredConfirmations),
-		retry:                 blockListener.retry,
-		batchSize:             confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
-		batchTimeout:          confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
-		txWaiters:             make(map[string]*txWaiter),
-		dispatcherTap:         make(chan struct{}, 1),
+		parentCtxForReset:          ctx, // stored for startOrResetProcessing
+		persistence:                persistence,
+		wsConn:                     blockListener.wsConn,
+		blockListener:              blockListener,
+		requiredConfirmations:      confutil.IntMin(config.RequiredConfirmations, 0, *DefaultConfig.RequiredConfirmations),
+		retry:                      blockListener.retry,
+		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
+		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
+		txWaiters:                  make(map[string]*txWaiter),
+		eventStreams:               make(map[uuid.UUID]*eventStream),
+		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
+		esBlockDispatchQueueLength: confutil.IntMin(config.EventStreams.BlockDispatchQueueLength, 0, *DefaultEventStreamsConfig.BlockDispatchQueueLength),
+		esCatchUpQueryPageSize:     confutil.IntMin(config.EventStreams.CatchUpQueryPageSize, 0, *DefaultEventStreamsConfig.CatchUpQueryPageSize),
+		dispatcherTap:              make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {
+		return nil, err
+	}
+	if err := bi.loadEventStreams(ctx); err != nil {
 		return nil, err
 	}
 	return bi, nil
 }
 
-func (bi *blockIndexer) Start() {
+func (bi *blockIndexer) Start(internalCallback InternalStreamCallback, internalStreams ...*EventStream) error {
+	// Internal event streams can be instated before we start the listener itself
+	// (so even on first startup they function as if they were there before the indexer loads)
+	for _, esDefinition := range internalStreams {
+		if _, err := bi.upsertInternalEventStream(bi.parentCtxForReset, esDefinition); err != nil {
+			return err
+		}
+	}
 	bi.blockListener.start()
 	bi.startOrReset()
+	bi.startEventStreams(internalCallback)
+	return nil
 }
 
 func (bi *blockIndexer) startOrReset() {
@@ -167,6 +190,12 @@ func (bi *blockIndexer) Stop() {
 	dispatcherDone := bi.dispatcherDone
 	cancelCtx := bi.cancelFunc
 	bi.stateLock.Unlock()
+
+	bi.eventStreamsLock.Lock()
+	for _, es := range bi.eventStreams {
+		es.stop()
+	}
+	bi.eventStreamsLock.Unlock()
 
 	if cancelCtx != nil {
 		cancelCtx()
@@ -432,6 +461,20 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 	})
 }
 
+func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
+	var topic0 types.HashID
+	if len(l.Topics) > 0 {
+		topic0 = *types.NewHashIDSlice32(l.Topics[0])
+	}
+	return &IndexedEvent{
+		Signature:        topic0,
+		TransactionHash:  *types.NewHashIDSlice32(l.TransactionHash),
+		BlockNumber:      int64(l.BlockNumber),
+		TransactionIndex: int64(l.TransactionIndex),
+		LogIndex:         int64(l.LogIndex),
+	}
+}
+
 func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch) {
 
 	var blocks []*IndexedBlock
@@ -445,30 +488,20 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:            *types.NewHashIDSlice32(r.TransactionHash),
-				BlockNumber:     int64(r.BlockNumber),
-				TXIndex:         int64(txIndex),
-				From:            (*types.EthAddress)(r.From),
-				To:              (*types.EthAddress)(r.To),
-				ContractAddress: (*types.EthAddress)(r.ContractAddress),
+				Hash:             *types.NewHashIDSlice32(r.TransactionHash),
+				BlockNumber:      int64(r.BlockNumber),
+				TransactionIndex: int64(txIndex),
+				From:             (*types.EthAddress)(r.From),
+				To:               (*types.EthAddress)(r.To),
+				ContractAddress:  (*types.EthAddress)(r.ContractAddress),
 			})
-			for eventIndex, l := range r.Logs {
-				var topic0 types.HashID
-				if len(l.Topics) > 0 {
-					topic0 = *types.NewHashIDSlice32(l.Topics[0])
-				}
-				events = append(events, &IndexedEvent{
-					Signature:       topic0,
-					TransactionHash: *types.NewHashIDSlice32(r.TransactionHash),
-					BlockNumber:     int64(r.BlockNumber),
-					TXIndex:         int64(txIndex),
-					EventIndex:      int64(eventIndex),
-				})
+			for _, l := range r.Logs {
+				events = append(events, bi.logToIndexedEvent(l))
 			}
 		}
 	}
 
-	_ = bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
+	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
 		err = bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
 			if len(blocks) > 0 {
 				err = tx.
@@ -508,6 +541,43 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		}
 		return true, err
 	})
+	if err == nil {
+		bi.notifyEventStreams(ctx, batch)
+	}
+}
+
+func (bi *blockIndexer) notifyEventStreams(ctx context.Context, batch *blockWriterBatch) {
+	// Every event stream gets notified about every block, but only the
+	// logs that are applicable to it
+	bi.eventStreamsLock.Lock()
+	defer bi.eventStreamsLock.Unlock()
+	for _, es := range bi.eventStreams {
+		for iBlk, blk := range batch.blocks {
+			blockNotification := &eventStreamBlock{
+				blockNumber: blk.Number.Uint64(),
+			}
+			for _, r := range batch.receipts[iBlk] {
+				for _, l := range r.Logs {
+					if len(l.Topics) > 0 {
+						logSig := l.Topics[0].String()
+						if _, isMatch := es.signatures[logSig]; isMatch {
+							// This is a log the event stream needs
+							blockNotification.events = append(blockNotification.events, l)
+						}
+					}
+				}
+			}
+			// Best effort dispatch here - it's the Event Stream's responsibility
+			// to keep up to date. If it falls behind, it will catch back up
+			// using the database and the node.
+			select {
+			case es.blocks <- blockNotification:
+				log.L(ctx).Debugf("dispatched block %d (%d signature matched events) to ES %s",
+					blockNotification.blockNumber, len(blockNotification.events), es.definition.ID)
+			default:
+			}
+		}
+	}
 }
 
 // MUST be called under lock
@@ -701,7 +771,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 		WithContext(ctx).
 		Table("indexed_transactions").
 		Order("block_number").
-		Order("tx_index").
+		Order("transaction_index").
 		Where("block_number = ?", blockNumber).
 		Find(&txns).
 		Error
@@ -721,7 +791,7 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 		Table("indexed_events").
 		Where("transaction_l = ?", hashID.L).
 		Where("transaction_h = ?", hashID.H).
-		Order("event_index").
+		Order("log_index").
 		Find(&events).
 		Error
 	return events, err
@@ -734,10 +804,10 @@ func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int
 		WithContext(ctx).
 		Table("indexed_events").
 		Where("indexed_events.block_number > ?", lastBlock).
-		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("event_index > ?", lastIndex)).
+		Or(db.Where("indexed_events.block_number = ?", lastBlock).Where("indexed_events.log_index > ?", lastIndex)).
 		Order("indexed_events.block_number").
-		Order("indexed_events.tx_index").
-		Order("event_index").
+		Order("indexed_events.transaction_index").
+		Order("indexed_events.log_index").
 		Limit(limit)
 	if withTransaction {
 		q = q.Joins("Transaction")

@@ -87,3 +87,8 @@ func (r *Retry) WaitDelay(ctx context.Context, failureCount int) error {
 	}
 	return nil
 }
+
+// SetMaxAttempts is useful for unit tests
+func (r *Retry) UTSetMaxAttempts(maxAttempts int) {
+	r.maxAttempts = maxAttempts
+}
