@@ -19,21 +19,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
-	"golang.org/x/crypto/sha3"
 )
 
 type testbedDomain struct {
@@ -127,102 +121,29 @@ func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, co
 	}, nil
 }
 
-func (tb *testbed) setupChainID() error {
-	var chainID ethtypes.HexUint64
-	if rpcErr := tb.blockchainRPC.CallRPC(tb.ctx, &chainID, "eth_chainId"); rpcErr != nil {
-		return fmt.Errorf("eth_chainId failed: %s", rpcErr.Error())
-	}
-	tb.chainID = int64(chainID.Uint64())
-	return nil
-}
-
-// We do a simplistic deploy here, assuming that all will go well on the blockchain
-// (obviously the Paladin engine does a proper TX Management at this point)
-func (tb *testbed) simpleTXEstimateSignSubmitAndWait(ctx context.Context, from string, to *ethtypes.Address0xHex, callData ethtypes.HexBytes0xPrefix) (*blockindexer.IndexedTransaction, error) {
-
-	// Resolve the key (directly with the signer - we have no key manager here in the testbed)
-	keyHandle, fromAddr, err := tb.resolveKey(ctx, from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
-	if err != nil {
-		return nil, err
-	}
-
-	// Trivial nonce management in the testbed - just get the current nonce for this key, from the local node mempool, for each TX
-	var nonce ethtypes.HexInteger
-	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &nonce, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
-		return nil, fmt.Errorf("eth_getTransactionCount for %s failed: %s", fromAddr, rpcErr.Error())
-	}
-
-	// Construct a simple transaction with the specified data for a permissioned zero-gas-price chain
-	tx := ethsigner.Transaction{
-		From: json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr)), // for estimation of gas we need the from address
-		To:   to,
-		Data: callData,
-	}
-
-	// Estimate gas before submission
-	var gasEstimate ethtypes.HexInteger
-	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
-		return nil, fmt.Errorf("eth_estimateGas failed: %+v", rpcErr)
-	}
-
-	// If that went well, so submission with twice that gas as the limit.
-	tx.GasLimit = ethtypes.NewHexInteger(new(big.Int).Mul(gasEstimate.BigInt(), big.NewInt(2)))
-	tx.Nonce = &nonce
-
-	// Sign
-	sigPayload := tx.SignaturePayloadEIP1559(tb.chainID)
-	hash := sha3.NewLegacyKeccak256()
-	_, _ = hash.Write(sigPayload.Bytes())
-	signature, err := tb.signer.Sign(ctx, &proto.SignRequest{
-		Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-		KeyHandle: keyHandle,
-		Payload:   ethtypes.HexBytes0xPrefix(hash.Sum(nil)),
-	})
-	var sig *secp256k1.SignatureData
-	if err == nil {
-		sig, err = signer.DecodeCompactRSV(ctx, signature.Payload)
-	}
-	var rawTX []byte
-	if err == nil {
-		rawTX, err = tx.FinalizeEIP1559WithSignature(sigPayload, sig)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("signing failed with keyHandle %s (addr=%s): %s", keyHandle, fromAddr, err)
-	}
-
-	// Submit
-	var txHash ethtypes.HexBytes0xPrefix
-	if rpcErr := tb.blockchainRPC.CallRPC(ctx, &txHash, "eth_sendRawTransaction", ethtypes.HexBytes0xPrefix(rawTX)); rpcErr != nil {
-		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, rawTX, tb.chainID)
-		if err != nil {
-			log.L(ctx).Errorf("Invalid transaction build during signing: %s", err)
-		} else {
-			log.L(ctx).Errorf("Rejected TX (from=%s): %+v", addr, logJSON(decodedTX.Transaction))
-		}
-		return nil, fmt.Errorf("eth_sendRawTransaction failed: %+v", rpcErr)
-	}
-
-	// Wait for the TX to go through - with a time limit
-	withTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
-	defer cancelTimeout()
-	return tb.blockindexer.WaitForTransaction(withTimeout, txHash.String())
-
-}
-
 func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) (*blockindexer.IndexedEvent, error) {
 
-	abiFunc := domain.factoryContractABI.Functions()[txInstruction.FunctionName]
-	if abiFunc == nil {
-		return nil, fmt.Errorf("function %q does not exist on base ledger ABI", txInstruction.FunctionName)
+	var abiFunc ethclient.ABIFunctionClient
+	abiClient, err := tb.ethClient.ABI(ctx, domain.factoryContractABI)
+	if err == nil {
+		abiFunc, err = abiClient.Function(ctx, txInstruction.FunctionName)
 	}
-	callData, err := abiFunc.EncodeCallDataJSONCtx(ctx, []byte(txInstruction.ParamsJson))
 	if err != nil {
-		return nil, fmt.Errorf("encoding to function %q failed: %s", txInstruction.FunctionName, err)
+		return nil, fmt.Errorf("function %q does not exist on base ledger ABI: %s", txInstruction.FunctionName, err)
 	}
 
-	tx, err := tb.simpleTXEstimateSignSubmitAndWait(ctx, txInstruction.SigningAddress, domain.factoryContractAddress, callData)
+	// Send the transaction
+	var tx *blockindexer.IndexedTransaction
+	txHash, err := abiFunc.R(ctx).
+		Signer(txInstruction.SigningAddress).
+		To(domain.factoryContractAddress).
+		Input(txInstruction.ParamsJson).
+		SignAndSend()
+	if err == nil {
+		tx, err = tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send base ledger transaction: %s", err)
 	}
 
 	events, err := tb.blockindexer.GetTransactionEventsByHash(ctx, tx.Hash.String())

@@ -44,6 +44,7 @@ type EthClient interface {
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	MustABIJSON(abiJson []byte) ABIClient
+	ChainID() int64
 
 	// Below are raw functions that the ABI() above provides wrappers for
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error)
@@ -107,6 +108,10 @@ func (ec *ethClient) Close() {
 	if isWS {
 		wsRPC.Close()
 	}
+}
+
+func (ec *ethClient) ChainID() int64 {
+	return ec.chainID
 }
 
 func (ec *ethClient) setupChainID(ctx context.Context) error {

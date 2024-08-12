@@ -19,9 +19,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
@@ -55,24 +57,38 @@ func (tb *testbed) initRPC() error {
 		// - INIT_TRANSACTION     (sender node)
 		// - ASSEMBLE_TRANSACTION (sender node)
 		// - PREPARE_TRANSACTION  (submitter node)
-		Add("testbed_invoke", tb.rpcTestbedInvoke()).
-
-		// Dumps the whole keystore (verifiers only - no private keys)
-		// in a hierarchical format
-		Add("testbed_keystoreInfo", tb.rpcKeystoreInfo()),
+		Add("testbed_invoke", tb.rpcTestbedInvoke()),
 	)
 	return tb.rpcServer.Start()
 }
 
 func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod2(func(ctx context.Context,
+	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
+		abi abi.ABI,
 		bytecode ethtypes.HexBytes0xPrefix,
+		params types.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
-		tx, err := tb.simpleTXEstimateSignSubmitAndWait(ctx, from, nil, bytecode)
+		var constructor ethclient.ABIFunctionClient
+		abic, err := tb.ethClient.ABI(ctx, abi)
+		if err == nil {
+			constructor, err = abic.Constructor(ctx, bytecode)
+		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to build client for constructor: %s", err)
+		}
+
+		var tx *blockindexer.IndexedTransaction
+		txHash, err := constructor.R(ctx).
+			Signer(from).
+			Input(params).
+			SignAndSend()
+		if err == nil {
+			tx, err = tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to send transaction: %s", err)
 		}
 
 		return tx.ContractAddress.Address0xHex(), nil
@@ -90,7 +106,7 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 		err := syncExchangeToDomain(ctx, tb, &proto.ConfigureDomainRequest{
 			Name:       domainName,
 			ConfigYaml: string(domainConfig),
-			ChainId:    tb.chainID,
+			ChainId:    tb.ethClient.ChainID(),
 		}, &configRes)
 		if err != nil {
 			return false, err
@@ -142,7 +158,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			Verifiers:   make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
 		}
 		for i, v := range initDeployRes.RequiredVerifiers {
-			_, verifier, err := tb.resolveKey(ctx, v.Lookup, v.Algorithm)
+			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
@@ -171,12 +187,5 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		inputs types.RawJSON,
 	) (*blockindexer.IndexedEvent, error) {
 		return nil, fmt.Errorf("TODO")
-	})
-}
-
-func (tb *testbed) rpcKeystoreInfo() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod0(func(ctx context.Context,
-	) ([]*testbedKey, error) {
-		return tb.keystoreInfo(), nil
 	})
 }

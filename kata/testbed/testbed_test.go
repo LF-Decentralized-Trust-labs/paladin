@@ -25,9 +25,10 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -179,7 +180,7 @@ func TestRunBlockIndexerError(t *testing.T) {
 			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
 			WS:   rpcserver.WSEndpointConfig{Disabled: true},
 		},
-		Blockchain: TestbedBlockchainConfig{
+		Blockchain: ethclient.Config{
 			WS: rpcclient.WSConfig{
 				HTTPConfig: rpcclient.HTTPConfig{
 					URL: "!!!! wrongness",

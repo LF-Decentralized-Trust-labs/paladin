@@ -16,18 +16,14 @@
 package main
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 )
-
-type TestbedBlockchainConfig struct {
-	WS rpcclient.WSConfig `yaml:"ws"`
-}
 
 type TestbedDestinationsConfig struct {
 	ToDomain   *string `yaml:"toDomain"`
@@ -35,7 +31,7 @@ type TestbedDestinationsConfig struct {
 }
 
 type TestBedConfig struct {
-	Blockchain   TestbedBlockchainConfig   `yaml:"blockchain"`
+	Blockchain   ethclient.Config          `yaml:"blockchain"`
 	CommsBus     commsbus.Config           `yaml:"bus"`
 	DB           persistence.Config        `yaml:"db"`
 	RPCServer    rpcserver.Config          `yaml:"rpcServer"`

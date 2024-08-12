@@ -17,7 +17,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -26,14 +25,13 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"gopkg.in/yaml.v3"
 )
@@ -62,8 +60,8 @@ type testbed struct {
 	rpcServer       rpcserver.Server
 	stateStore      statestore.StateStore
 	blockindexer    blockindexer.BlockIndexer
-	chainID         int64
-	blockchainRPC   rpcbackend.WebSocketRPCClient
+	keyMgr          ethclient.KeyManager
+	ethClient       ethclient.EthClient
 	signer          signer.SigningModule
 	bus             commsbus.CommsBus
 	fromDomain      commsbus.MessageHandler
@@ -75,8 +73,6 @@ type testbed struct {
 	domainRegistry  map[string]*testbedDomain
 	domainContracts map[ethtypes.Address0xHex]*testbedContract
 	domainLock      sync.Mutex
-	keyLock         sync.Mutex
-	keyMap          *testbedKeyFolder
 	ready           chan error
 	done            chan struct{}
 }
@@ -87,7 +83,6 @@ func newTestBed() (tb *testbed) {
 		inflight:        make(map[string]*inflightRequest),
 		domainRegistry:  make(map[string]*testbedDomain),
 		domainContracts: make(map[ethtypes.Address0xHex]*testbedContract),
-		keyMap:          &testbedKeyFolder{},
 		ready:           make(chan error, 1),
 		done:            make(chan struct{}),
 	}
@@ -186,27 +181,25 @@ func (tb *testbed) run() (err error) {
 		return fmt.Errorf("RPC init failed: %s", err)
 	}
 
-	rpcConf, err := rpcclient.ParseWSConfig(tb.ctx, &tb.conf.Blockchain.WS)
+	tb.keyMgr, err = ethclient.NewSimpleTestKeyManager(tb.ctx, &tb.conf.Signer)
 	if err == nil {
-		tb.blockchainRPC = rpcbackend.NewWSRPCClient(rpcConf)
-		err = tb.blockchainRPC.Connect(tb.ctx)
+		tb.ethClient, err = ethclient.NewEthClient(tb.ctx, tb.keyMgr, &tb.conf.Blockchain)
 	}
 	if err == nil {
 		tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
 	}
-	if err == nil {
-		err = tb.setupChainID()
-	}
 	var blockHeight uint64
 	if err == nil {
-		tb.blockindexer.Start()
+		err = tb.blockindexer.Start(tb.chainEventHandler, tb.eventStreams()...)
+	}
+	if err == nil {
 		blockHeight, err = tb.blockindexer.GetBlockHeight(tb.ctx)
 	}
 	if err != nil {
 		return fmt.Errorf("Blockchain init failed: %s", err)
 	}
 	defer tb.blockindexer.Stop()
-	log.L(tb.ctx).Infof("Connected to blockchain: ChainID=%d BlockHeight=%d", tb.chainID, blockHeight)
+	log.L(tb.ctx).Infof("Connected to blockchain: ChainID=%d BlockHeight=%d", tb.ethClient.ChainID(), blockHeight)
 
 	tb.signer, err = signer.NewSigningModule(tb.ctx, &tb.conf.Signer)
 	if err != nil {
@@ -220,13 +213,4 @@ func (tb *testbed) run() (err error) {
 	tb.eventHandler()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
-}
-
-func logJSON(v interface{}) string {
-	ret := ""
-	b, _ := json.Marshal(v)
-	if len(b) > 0 {
-		ret = (string)(b)
-	}
-	return ret
 }

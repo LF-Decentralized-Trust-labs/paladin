@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -249,7 +249,9 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	})
 	defer done()
 
-	err := rpcCall(&factoryAddr, "testbed_deployBytecode", "domain1_admin", parseBuildBytecode(t, simDomainBuild))
+	err := rpcCall(&factoryAddr, "testbed_deployBytecode", "domain1_admin",
+		parseBuildABI(t, simDomainBuild), parseBuildBytecode(t, simDomainBuild),
+		types.RawJSON(`{}`)) // no params on constructor
 	assert.NoError(t, err)
 
 	err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
@@ -277,9 +279,4 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	// })
 	// assert.NoError(t, err)
 
-	keyList := types.RawJSON{}
-	err = rpcCall(&keyList, "testbed_keystoreInfo")
-	fmt.Println("Keys:")
-	fmt.Println(keyList.YAML())
-	assert.NoError(t, err)
 }
