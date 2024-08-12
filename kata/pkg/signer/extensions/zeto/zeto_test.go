@@ -89,10 +89,10 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 	key0 := babyjub.NewRandPrivKey()
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
+		Name: "42",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
-			{Name: "42"},
 		},
 	}, func() ([]byte, error) { return key0[:], nil })
 	assert.NoError(t, err)
@@ -160,6 +160,7 @@ func TestZetoKeystoreExtension(t *testing.T) {
 	key0 := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
 
 	req := pb.ResolveKeyRequest{
+		Name: "42",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
 			{Name: "blue"},
@@ -187,17 +188,17 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	bob := NewKeypair()
 
 	_, aliceKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
+		Name: "blueKey",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "alice"},
-			{Name: "blueKey"},
 		},
 	}, func() ([]byte, error) { return alice.PrivateKey[:], nil })
 	assert.NoError(t, err)
 
 	_, bobKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
+		Name: "redKey",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
-			{Name: "redKey"},
 		},
 	}, func() ([]byte, error) { return bob.PrivateKey[:], nil })
 	assert.NoError(t, err)
@@ -218,9 +219,9 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	_, err = sm.Resolve(ctx, &pb.ResolveKeyRequest{
 		MustExist:  true,
 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "blue",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "bob"},
-			{Name: "blue"},
 		},
 	})
 	assert.EqualError(t, err, "PD011406: Key 'bob/blue' does not exist")
@@ -228,9 +229,9 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	resp, err := sm.Resolve(ctx, &pb.ResolveKeyRequest{
 		MustExist:  true,
 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "blueKey",
 		Path: []*pb.ResolveKeyPathSegment{
 			{Name: "alice"},
-			{Name: "blueKey"},
 		},
 	})
 	assert.NoError(t, err)
