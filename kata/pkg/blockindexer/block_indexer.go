@@ -61,30 +61,32 @@ type BlockIndexer interface {
 // This implementation is thus deliberately simple assuming that when instability is found
 // in the notifications it can simply wipe out its view and start again.
 type blockIndexer struct {
-	parentCtxForReset      context.Context
-	cancelFunc             func()
-	persistence            persistence.Persistence
-	blockListener          *blockListener
-	wsConn                 rpcbackend.WebSocketRPCClient
-	stateLock              sync.Mutex
-	fromBlock              *ethtypes.HexUint64
-	nextBlock              *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
-	blocksSinceCheckpoint  []*BlockInfoJSONRPC
-	newHeadToAdd           []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
-	requiredConfirmations  int
-	retry                  *retry.Retry
-	batchSize              int
-	batchTimeout           time.Duration
-	txWaiters              map[string]*txWaiter
-	txWaiterLock           sync.Mutex
-	eventStreamsInternalCB InternalStreamCallback
-	eventStreams           map[uuid.UUID]*eventStream
-	eventStreamsHeadSet    map[uuid.UUID]*eventStream
-	eventStreamsLock       sync.Mutex
-	dispatcherTap          chan struct{}
-	processorDone          chan struct{}
-	dispatcherDone         chan struct{}
-	utBatchNotify          chan *blockWriterBatch
+	parentCtxForReset          context.Context
+	cancelFunc                 func()
+	persistence                persistence.Persistence
+	blockListener              *blockListener
+	wsConn                     rpcbackend.WebSocketRPCClient
+	stateLock                  sync.Mutex
+	fromBlock                  *ethtypes.HexUint64
+	nextBlock                  *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
+	blocksSinceCheckpoint      []*BlockInfoJSONRPC
+	newHeadToAdd               []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
+	requiredConfirmations      int
+	retry                      *retry.Retry
+	batchSize                  int
+	batchTimeout               time.Duration
+	txWaiters                  map[string]*txWaiter
+	txWaiterLock               sync.Mutex
+	eventStreamsInternalCB     InternalStreamCallback
+	eventStreams               map[uuid.UUID]*eventStream
+	eventStreamsHeadSet        map[uuid.UUID]*eventStream
+	eventStreamsLock           sync.Mutex
+	esBlockDispatchQueueLength int
+	esCatchUpQueryPageSize     int
+	dispatcherTap              chan struct{}
+	processorDone              chan struct{}
+	dispatcherDone             chan struct{}
+	utBatchNotify              chan *blockWriterBatch
 }
 
 func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WSConfig, persistence persistence.Persistence) (_ BlockIndexer, err error) {
@@ -99,18 +101,20 @@ func NewBlockIndexer(ctx context.Context, config *Config, wsConfig *rpcclient.WS
 
 func newBlockIndexer(ctx context.Context, config *Config, persistence persistence.Persistence, blockListener *blockListener) (bi *blockIndexer, err error) {
 	bi = &blockIndexer{
-		parentCtxForReset:     ctx, // stored for startOrResetProcessing
-		persistence:           persistence,
-		wsConn:                blockListener.wsConn,
-		blockListener:         blockListener,
-		requiredConfirmations: confutil.IntMin(config.RequiredConfirmations, 0, *DefaultConfig.RequiredConfirmations),
-		retry:                 blockListener.retry,
-		batchSize:             confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
-		batchTimeout:          confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
-		txWaiters:             make(map[string]*txWaiter),
-		eventStreams:          make(map[uuid.UUID]*eventStream),
-		eventStreamsHeadSet:   make(map[uuid.UUID]*eventStream),
-		dispatcherTap:         make(chan struct{}, 1),
+		parentCtxForReset:          ctx, // stored for startOrResetProcessing
+		persistence:                persistence,
+		wsConn:                     blockListener.wsConn,
+		blockListener:              blockListener,
+		requiredConfirmations:      confutil.IntMin(config.RequiredConfirmations, 0, *DefaultConfig.RequiredConfirmations),
+		retry:                      blockListener.retry,
+		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
+		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
+		txWaiters:                  make(map[string]*txWaiter),
+		eventStreams:               make(map[uuid.UUID]*eventStream),
+		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
+		esBlockDispatchQueueLength: confutil.IntMin(config.EventStreams.BlockDispatchQueueLength, 0, *DefaultEventStreamsConfig.BlockDispatchQueueLength),
+		esCatchUpQueryPageSize:     confutil.IntMin(config.EventStreams.CatchUpQueryPageSize, 0, *DefaultEventStreamsConfig.CatchUpQueryPageSize),
+		dispatcherTap:              make(chan struct{}, 1),
 	}
 	if err := bi.setFromBlock(ctx, config); err != nil {
 		return nil, err

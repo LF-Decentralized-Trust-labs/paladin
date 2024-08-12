@@ -64,12 +64,6 @@ type eventDispatch struct {
 	lastInBlock bool
 }
 
-const (
-	eventStreamQueryPageSize = 100
-	eventStreamQueueLength   = 100
-	eventStreamBatchSize     = 50
-)
-
 // event streams get notified of every confirmed block to process the data in that block,
 // or simply update their checkpoint. They might fall behind and need to to query the
 // database to catch up.
@@ -161,6 +155,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	}
 
 	es := bi.eventStreams[definition.ID]
+	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
 	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the config.
 		// Caller is responsible for ensuring we're stopped at this point
@@ -171,13 +166,13 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 			definition: definition,
 			eventABIs:  []*abi.Entry{},
 			signatures: make(map[string]bool),
-			blocks:     make(chan *eventStreamBlock, eventStreamQueueLength),
-			dispatch:   make(chan *eventDispatch, eventStreamBatchSize),
+			blocks:     make(chan *eventStreamBlock, bi.esBlockDispatchQueueLength),
+			dispatch:   make(chan *eventDispatch, batchSize),
 		}
 	}
 
 	// Set the batch config
-	es.batchSize = confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
+	es.batchSize = batchSize
 	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
 
 	// Calculate all the signatures we require
@@ -475,6 +470,7 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 	// We're only interested in the signatures in our ABI, but we'll still have to check
 	// they match as signatures in ethereum are not precise (due to the "indexed" flag not being included)
 	// That also means we can do an efficient IN query on the sig H/L
+	pageSize := es.bi.esCatchUpQueryPageSize
 	var page []*IndexedEvent
 	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		return true, es.bi.persistence.DB().
@@ -484,7 +480,7 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 			Where("block_number > ?", checkpointBlock).
 			Where("block_number < ?", catchUpToBlockNumber).
 			Order("block_number").Order("transaction_index").Order("log_index").
-			Limit(eventStreamQueueLength).
+			Limit(pageSize).
 			Find(&page).
 			Error
 	})
@@ -496,7 +492,7 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 		// nothing to report - we're caught up
 		return true, nil
 	}
-	caughtUp = (len(page) < eventStreamQueueLength)
+	caughtUp = (len(page) < pageSize)
 
 	// Because we're in catch up here, we have to query the chain ourselves for the receipts.
 	// That's done by transaction (not by event) - so we've got to group
