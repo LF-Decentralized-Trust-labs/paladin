@@ -155,7 +155,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 	}
 
 	es := bi.eventStreams[definition.ID]
-	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
+	batchSize := confutil.IntMin(definition.Config.V().BatchSize, 1, *EventStreamDefaults.BatchSize)
 	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the config.
 		// Caller is responsible for ensuring we're stopped at this point
@@ -173,7 +173,7 @@ func (bi *blockIndexer) initEventStream(ctx context.Context, definition *EventSt
 
 	// Set the batch config
 	es.batchSize = batchSize
-	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
+	es.batchTimeout = confutil.DurationMin(definition.Config.V().BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
 
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {

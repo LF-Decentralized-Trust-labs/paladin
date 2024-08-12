@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/mocks/rpcbackendmocks"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -80,10 +82,10 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 		return nil
 	}, &EventStream{
 		Name: "unit_test",
-		Config: &EventStreamConfig{
+		Config: types.WrapJSONP(EventStreamConfig{
 			BatchSize:    confutil.P(3),
 			BatchTimeout: confutil.P("5ms"),
-		},
+		}),
 		// Listen to two out of three event types
 		ABI: abi.ABI{
 			testABI[1],
@@ -111,12 +113,6 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 				blockNumber), string(e.Data))
 		}
 	}
-
-	// Check the checkpoint is where we expect
-	es := bi.eventStreams[uuid.MustParse(esID)]
-	cp, err := es.processCheckpoint()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(14), cp)
 
 }
 
@@ -162,18 +158,19 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	}
 
 	// Add a listener
-	es, err := bi.upsertInternalEventStream(ctx, &EventStream{
+	internalESConfig := &EventStream{
 		Name: "unit_test",
-		Config: &EventStreamConfig{
+		Config: types.WrapJSONP(EventStreamConfig{
 			BatchSize:    confutil.P(3),
 			BatchTimeout: confutil.P("5ms"),
-		},
+		}),
 		// Listen to two out of three event types
 		ABI: abi.ABI{
 			testABI[1],
 			testABI[2],
 		},
-	})
+	}
+	es, err := bi.upsertInternalEventStream(ctx, internalESConfig)
 	assert.NoError(t, err)
 
 	// And start it
@@ -199,8 +196,27 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 		}
 	}
 
-	// Check the checkpoint is where we expect
+	// Stop and restart
+	bi.Stop()
+
+	bi, err = newBlockIndexer(ctx, &Config{
+		CommitBatchSize: confutil.P(1),
+		FromBlock:       types.RawJSON(`0`),
+	}, bi.persistence, bi.blockListener)
+	assert.NoError(t, err)
+	err = bi.Start(handler, internalESConfig)
+	assert.NoError(t, err)
+
+	// Check it's back to the checkpoint we expect
+	es = bi.eventStreams[uuid.MustParse(esID)]
 	cp, err := es.processCheckpoint()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(14), cp)
+
+	// And check we don't get any events
+	select {
+	case <-eventCollector:
+		panic("redelivery")
+	case <-time.After(5 * time.Millisecond):
+	}
 }

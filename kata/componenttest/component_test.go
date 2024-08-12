@@ -145,7 +145,8 @@ keys:
 
 	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{}, &testConfig.Eth.WS, p)
 	assert.NoError(t, err)
-	indexer.Start()
+	err = indexer.Start(nil)
+	assert.NoError(t, err)
 	defer indexer.Stop()
 
 	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Keys)
@@ -153,7 +154,6 @@ keys:
 
 	ethClient, err := ethclient.NewEthClient(ctx, keyMgr, &testConfig.Eth)
 	assert.NoError(t, err)
-	indexer.Start()
 	defer ethClient.Close()
 
 	type solBuild struct {
