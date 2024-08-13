@@ -58,7 +58,7 @@ type EventStream struct {
 	Created types.Timestamp                       `json:"created"        gorm:"autoCreateTime:nano"`
 	Updated types.Timestamp                       `json:"updated"        gorm:"autoUpdateTime:nano"`
 	Type    types.Enum[EventStreamType]           `json:"type"`
-	Config  *types.EncodedJSON[EventStreamConfig] `json:"config"         gorm:"serializer:json"`
+	Config  *types.EncodedJSON[EventStreamConfig] `json:"config"`
 	ABI     abi.ABI                               `json:"abi,omitempty"  gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 }
 
