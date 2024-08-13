@@ -87,10 +87,10 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
-			Config: types.WrapEncodedJSON(EventStreamConfig{
+			Config: EventStreamConfig{
 				BatchSize:    confutil.P(3),
 				BatchTimeout: confutil.P("5ms"),
-			}),
+			},
 			// Listen to two out of three event types
 			ABI: abi.ABI{
 				testABI[1],
@@ -166,10 +166,10 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	// Add a listener
 	internalESConfig := &EventStream{
 		Name: "unit_test",
-		Config: types.WrapEncodedJSON(EventStreamConfig{
+		Config: EventStreamConfig{
 			BatchSize:    confutil.P(3),
 			BatchTimeout: confutil.P("5ms"),
-		}),
+		},
 		// Listen to two out of three event types
 		ABI: abi.ABI{
 			testABI[1],
@@ -332,6 +332,9 @@ func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
 		Definition: &EventStream{
 			Name: "testing",
 			ABI:  testParseABI(testEventABIJSON),
+			Config: EventStreamConfig{
+				BatchSize: confutil.P(12345),
+			},
 		},
 	})
 	assert.Regexp(t, "pop", err)

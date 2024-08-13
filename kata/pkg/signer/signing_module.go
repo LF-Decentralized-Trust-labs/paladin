@@ -202,7 +202,7 @@ func (sm *signingModule) getKeyLenForInMemorySigning(ctx context.Context, algori
 func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, req *proto.SignRequest) (res *proto.SignResponse, err error) {
 	switch strings.ToLower(req.Algorithm) {
 	case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
-		kp, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
+		kp := secp256k1.KeyPairFromBytes(privateKey)
 		sig, err := kp.SignDirect(req.Payload)
 		if err == nil {
 			return &proto.SignResponse{Payload: CompactRSV(sig)}, nil
@@ -218,7 +218,7 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
 		case Algorithm_ECDSA_SECP256K1_PLAINBYTES:
-			addr, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
+			addr := secp256k1.KeyPairFromBytes(privateKey)
 			identifiers = append(identifiers, &proto.PublicKeyIdentifier{
 				Algorithm:  Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				Identifier: addr.Address.String(),
