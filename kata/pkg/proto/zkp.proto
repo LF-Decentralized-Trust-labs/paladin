@@ -13,30 +13,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package extensions
+syntax = "proto3";
 
-import (
-	"context"
+package github.com.kaleido_io.paladin.kata.zkp;
+option go_package = "pkg/proto";
 
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-)
-
-const ZkpKeyStoreSigner = "zkp"
-
-type zkpExt struct{}
-
-func NewZkpSignerExtension() api.Extension {
-	return &zkpExt{}
+message ProvingRequest {
+  string circuitId = 1;
+  ProvingRequestCommon common = 2;
+  bytes extras = 3;
 }
 
-func (z *zkpExt) KeyStore(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
-	if config.Type != ZkpKeyStoreSigner {
-		return nil, nil
-	}
+message ProvingRequestCommon {
+  repeated string inputCommitments = 1;
+  repeated uint64 inputValues = 2;
+  repeated string inputSalts = 3;
+  string inputOwner = 4;
+  repeated uint64 outputValues = 5;
+  repeated string outputOwners = 6;
+}
 
-	kss, err := NewZetoKeystoreSigner(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-	return kss, nil
+message SnarkProof {
+ 	repeated string  A = 1;
+	repeated B_Item B = 2;
+	repeated string  C = 3;
+	string Protocol = 4;
+}
+
+message B_Item {
+  repeated string items = 1;
 }

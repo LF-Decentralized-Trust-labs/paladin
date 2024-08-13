@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -122,7 +123,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error) {
 
 	if from != nil {
-		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +141,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 
 func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
-	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +184,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
 	signature, err := ec.keymgr.Sign(ctx, &proto.SignRequest{
-		Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		KeyHandle: keyHandle,
 		Payload:   ethtypes.HexBytes0xPrefix(hash.Sum(nil)),
 	})

@@ -121,7 +121,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 				Name:      "key 23456",
 				KeyHandle: "key23456",
 				Identifiers: []*proto.PublicKeyIdentifier{
-					{Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
+					{Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
 				},
 			},
 		},
@@ -221,7 +221,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 	assert.NoError(t, err)
 
 	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -229,7 +229,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 
 	resSign, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.NoError(t, err)
@@ -259,7 +259,7 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -288,7 +288,7 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "pop", err)
@@ -306,7 +306,7 @@ func TestSignInMemoryFailBadKey(t *testing.T) {
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "PD011418", err)
@@ -326,18 +326,18 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, resolveRes.KeyHandle)
 	assert.Equal(t, "key1", resolveRes.KeyHandle)
-	assert.Equal(t, Algorithm_ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
+	assert.Equal(t, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
 	assert.NotEmpty(t, resolveRes.Identifiers[0].Identifier)
 
 	signRes, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: resolveRes.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("sign me"),
 	})
 	assert.NoError(t, err)
@@ -402,7 +402,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -422,7 +422,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	sm.(*signingModule).disableKeyLoading = true
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011409", err)
@@ -438,3 +438,138 @@ func TestDecodeCompactRSVBadLen(t *testing.T) {
 	_, err := DecodeCompactRSV(context.Background(), make([]byte, 64))
 	assert.Regexp(t, "PD011420", err)
 }
+
+// func TestZetoKeystoreExtension(t *testing.T) {
+// 	ctx := context.Background()
+// 	zke := NewZkpSignerExtension()
+// 	ks, err := zke.KeyStore(ctx, &api.StoreConfig{
+// 		Type: ZkpKeyStoreSigner,
+// 		FileSystem: api.FileSystemConfig{
+// 			Path: confutil.P(t.TempDir()),
+// 		},
+// 		SnarkProver: api.SnarkProverConfig{
+// 			CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
+// 			ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
+// 		},
+// 	})
+// 	assert.NoError(t, err)
+
+// 	keyHex := "627d15ca47363fb118997679bc8941d1ae16a034dc8ae96c938e3997e3d6ca98"
+// 	keyBytes, _ := hex.DecodeString(keyHex)
+// 	privKeyBytes := [32]byte{}
+// 	copy(privKeyBytes[:], keyBytes)
+// 	key0 := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
+
+// 	req := pb.ResolveKeyRequest{
+// 		Name: "42",
+// 		Path: []*pb.ResolveKeyPathSegment{
+// 			{Name: "bob"},
+// 			{Name: "blue"},
+// 		},
+// 	}
+// 	newKeyFunc := func() ([]byte, error) { return key0.PrivateKey[:], nil }
+// 	_, keyHandle, err := ks.FindOrCreateLoadableKey(context.Background(), &req, newKeyFunc)
+// 	assert.NoError(t, err)
+// 	_, err = ks.LoadKeyMaterial(context.Background(), keyHandle)
+// 	assert.NoError(t, err)
+// }
+
+// func TestZetoKeystoreExtensionMissingKeystoreConfig(t *testing.T) {
+// 	ctx := context.Background()
+// 	zke := NewZkpSignerExtension()
+// 	_, err := zke.KeyStore(ctx, &api.StoreConfig{Type: ZkpKeyStoreSigner})
+// 	assert.EqualError(t, err, "key store config is required")
+// }
+
+// func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
+// 	ctx, fs, dir := newTestFilesystemStore(t)
+
+// 	// // create a BJJ key in the filesystem store
+// 	alice := NewKeypair()
+// 	bob := NewKeypair()
+
+// 	_, aliceKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
+// 		Name: "blueKey",
+// 		Path: []*pb.ResolveKeyPathSegment{
+// 			{Name: "alice"},
+// 		},
+// 	}, func() ([]byte, error) { return alice.PrivateKey[:], nil })
+// 	assert.NoError(t, err)
+
+// 	_, bobKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
+// 		Name: "redKey",
+// 		Path: []*pb.ResolveKeyPathSegment{
+// 			{Name: "bob"},
+// 		},
+// 	}, func() ([]byte, error) { return bob.PrivateKey[:], nil })
+// 	assert.NoError(t, err)
+
+// 	sm, err := signer.NewSigningModule(ctx, &api.Config{
+// 		KeyStore: api.StoreConfig{
+// 			Type:       ZkpKeyStoreSigner,
+// 			FileSystem: api.FileSystemConfig{Path: confutil.P(dir)},
+// 			SnarkProver: api.SnarkProverConfig{
+// 				CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
+// 				ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
+// 			},
+// 		},
+// 	}, NewZkpSignerExtension())
+// 	assert.NoError(t, err)
+// 	assert.NotZero(t, sm)
+
+// 	_, err = sm.Resolve(ctx, &pb.ResolveKeyRequest{
+// 		MustExist:  true,
+// 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+// 		Name:       "blue",
+// 		Path: []*pb.ResolveKeyPathSegment{
+// 			{Name: "bob"},
+// 		},
+// 	})
+// 	assert.EqualError(t, err, "PD011406: Key 'bob/blue' does not exist")
+
+// 	resp, err := sm.Resolve(ctx, &pb.ResolveKeyRequest{
+// 		MustExist:  true,
+// 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+// 		Name:       "blueKey",
+// 		Path: []*pb.ResolveKeyPathSegment{
+// 			{Name: "alice"},
+// 		},
+// 	})
+// 	assert.NoError(t, err)
+// 	assert.Equal(t, 2, len(resp.Identifiers))
+
+// 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
+// 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
+
+// 	salt1 := utxo.NewSalt()
+// 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
+// 	salt2 := utxo.NewSalt()
+// 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
+// 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
+
+// 	inputValueInts := []uint64{inputValues[0].Uint64(), inputValues[1].Uint64()}
+// 	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
+// 	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
+
+// 	req := zeto.ProvingRequest{
+// 		CircuitId: "anon",
+// 		Common: &zeto.ProvingRequestCommon{
+// 			InputCommitments: inputCommitments,
+// 			InputValues:      inputValueInts,
+// 			InputSalts:       inputSalts,
+// 			InputOwner:       aliceKeyHandle,
+// 			OutputValues:     outputValueInts,
+// 			OutputOwners:     []string{aliceKeyHandle, bobKeyHandle},
+// 		},
+// 	}
+// 	payload, err := proto.Marshal(&req)
+// 	assert.NoError(t, err)
+
+// 	resSign, err := sm.Sign(ctx, &pb.SignRequest{
+// 		KeyHandle: resp.KeyHandle,
+// 		Algorithm: signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+// 		Payload:   payload,
+// 	})
+// 	assert.NoError(t, err)
+// 	assert.NotZero(t, resSign.Payload)
+// }

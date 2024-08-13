@@ -39,7 +39,10 @@ require (
 
 )
 
-require github.com/iden3/wasmer-go v0.0.1 // indirect
+require (
+	github.com/hyperledger-labs/zeto v0.0.0-20240813171240-d5020be9614a // indirect
+	github.com/iden3/wasmer-go v0.0.1 // indirect
+)
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect

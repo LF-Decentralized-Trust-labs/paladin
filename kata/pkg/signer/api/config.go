@@ -36,7 +36,7 @@ type StoreConfig struct {
 	DisableKeyLoading bool                   `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
 	FileSystem        FileSystemConfig       `yaml:"filesystem"`
 	Static            StaticKeyStorageConfig `yaml:"static"`
-	ZkpProver         ZkpProverConfig        `yaml:"zkpProver"`
+	SnarkProver       SnarkProverConfig      `yaml:"snarkProver"`
 }
 
 type KeyDerivationType string
@@ -88,9 +88,4 @@ func (k *ConfigKeyEntry) ToKeyResolutionRequest() *proto.ResolveKeyRequest {
 		})
 	}
 	return keyReq
-}
-
-type ZkpProverConfig struct {
-	CircuitsDir    string `yaml:"circuitsDir"`
-	ProvingKeysDir string `yaml:"provingKeysDir"`
 }

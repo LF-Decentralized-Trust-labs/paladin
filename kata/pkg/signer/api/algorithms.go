@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package api
 
 // TODO: More work on algorithm taxonomy. These could become very dynamic strings,
 // as we specify complex dynamic payloads for ZKP proof generation

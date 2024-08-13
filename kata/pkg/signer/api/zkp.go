@@ -13,22 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-syntax = "proto3";
+package api
 
-package github.com.kaleido_io.paladin.kata.zeto;
-option go_package = "pkg/proto/zeto";
-
-message ProvingRequest {
-  string circuitId = 1;
-  ProvingRequestCommon common = 2;
-  bytes extras = 3;
-}
-
-message ProvingRequestCommon {
-  repeated string inputCommitments = 2;
-  repeated uint64 inputValues = 3;
-  repeated string inputSalts = 4;
-  string inputOwner = 5;
-  repeated uint64 outputValues = 6;
-  repeated string outputOwners = 7;
+// StaticKeyEntryConfig is the configuration for a ZK prover
+// based on SNARK, which typically takes a circuit and proving key
+type SnarkProverConfig struct {
+	CircuitsDir    string `yaml:"circuitsDir"`
+	ProvingKeysDir string `yaml:"provingKeysDir"`
 }

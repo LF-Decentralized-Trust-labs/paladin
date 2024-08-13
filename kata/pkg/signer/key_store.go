@@ -20,8 +20,6 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-rapidsnark/types"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -34,11 +32,6 @@ import (
 type KeyStoreSigner_secp256k1 interface {
 	FindOrCreateKey_secp256k1(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error)
 	Sign_secp256k1(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error)
-}
-
-type KeyStoreSigner_snark interface {
-	FindOrCreateKey_snark(ctx context.Context, req *proto.ResolveKeyRequest) (addr *babyjub.PublicKeyComp, keyHandle string, err error)
-	Prove_snark(ctx context.Context, keyHandle string, payload []byte) (*types.ZKProof, error)
 }
 
 // Some cryptographic stores are capable of listing their contents in a natural order.

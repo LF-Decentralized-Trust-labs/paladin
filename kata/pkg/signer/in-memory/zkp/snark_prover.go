@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package extensions
+package zkp
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
@@ -30,82 +31,51 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/proto/zeto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 	"google.golang.org/protobuf/proto"
 )
 
-// zetoKeystoreSigner implements both the api.Keystore and KeyStoreSigner_snark
-// interfaces for the Zeto domain.
-type zetoKeystoreSigner struct {
-	keyStore         api.KeyStore
-	zkpProverConfig  api.ZkpProverConfig
+// snarkProver encapsulates the logic for generating SNARK proofs
+type snarkProver struct {
+	zkpProverConfig  api.SnarkProverConfig
 	circuitsCache    cache.Cache[string, witness.Calculator]
 	provingKeysCache cache.Cache[string, []byte]
 }
 
-func NewZetoKeystoreSigner(ctx context.Context, config *api.StoreConfig) (*zetoKeystoreSigner, error) {
-	// TODO: get the key store config from the Paladin config
-	var keyStore api.KeyStore
-	if config.FileSystem.Path != nil {
-		if ks, err := keystore.NewFilesystemStore(ctx, config.FileSystem); err != nil {
-			return nil, err
-		} else {
-			keyStore = ks
-		}
-	} else if config.Static.Keys != nil {
-		if ks, err := keystore.NewStaticKeyStore(ctx, config.Static); err != nil {
-			return nil, err
-		} else {
-			keyStore = ks
-		}
-	} else {
-		return nil, errors.New("key store config is required")
+func Register(ctx context.Context, config *api.StoreConfig, registry map[string]api.InMemorySigner) error {
+	// skip registration is no ZKP prover config is provided
+	if config.SnarkProver.CircuitsDir == "" || config.SnarkProver.ProvingKeysDir == "" {
+		log.L(ctx).Info("zkp prover not configured, skip registering as an in-memory signer")
+		return nil
 	}
 
-	if config.ZkpProver.CircuitsDir == "" {
-		return nil, errors.New("zkp prover circuits directory config is required")
-	} else if config.ZkpProver.ProvingKeysDir == "" {
-		return nil, errors.New("zkp prover proving keys directory config is required")
+	signer, err := NewSnarkProver(ctx, config)
+	if err != nil {
+		return err
 	}
+	registry[api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES] = signer
+	return nil
+}
 
+func NewSnarkProver(ctx context.Context, config *api.StoreConfig) (*snarkProver, error) {
 	cacheConfig := cache.Config{
-		Capacity: confutil.P(100),
+		Capacity: confutil.P(5),
 	}
-	return &zetoKeystoreSigner{
-		keyStore:         keyStore,
-		zkpProverConfig:  config.ZkpProver,
+	return &snarkProver{
+		zkpProverConfig:  config.SnarkProver,
 		circuitsCache:    cache.NewCache[string, witness.Calculator](&cacheConfig, &cacheConfig),
 		provingKeysCache: cache.NewCache[string, []byte](&cacheConfig, &cacheConfig),
 	}, nil
 }
 
-func (ks *zetoKeystoreSigner) FindOrCreateLoadableKey(ctx context.Context, req *pb.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error) {
-	return ks.keyStore.FindOrCreateLoadableKey(ctx, req, newKeyMaterial)
-}
-
-func (ks *zetoKeystoreSigner) LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error) {
-	return ks.keyStore.LoadKeyMaterial(ctx, keyHandle)
-}
-
-func (ks *zetoKeystoreSigner) FindOrCreateKey_snark(ctx context.Context, req *pb.ResolveKeyRequest) (addr *babyjub.PublicKeyComp, keyHandle string, err error) {
-	return nil, "", nil
-}
-
-func (ks *zetoKeystoreSigner) Prove_snark(ctx context.Context, keyHandle string, payload []byte) (*types.ZKProof, error) {
-	bytes, err := ks.keyStore.LoadKeyMaterial(ctx, keyHandle)
-	if err != nil {
-		return nil, err
-	}
-
+func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.SignRequest) (*pb.SignResponse, error) {
 	keyBytes := [32]byte{}
-	copy(keyBytes[:], bytes)
+	copy(keyBytes[:], privateKey)
 	keyEntry := key.NewKeyEntryFromPrivateKeyBytes(keyBytes)
 
-	inputs := zeto.ProvingRequest{}
+	inputs := pb.ProvingRequest{}
 	// Unmarshal payload into inputs
-	err = proto.Unmarshal(payload, &inputs)
+	err := proto.Unmarshal(req.Payload, &inputs)
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +116,18 @@ func (ks *zetoKeystoreSigner) Prove_snark(ctx context.Context, keyHandle string,
 	if err != nil {
 		return nil, err
 	}
-	return proof, nil
+
+	proofBytes, err := serializeProof(proof)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.SignResponse{
+		Payload: proofBytes,
+	}, nil
 }
 
-func validateInputs(inputs *zeto.ProvingRequestCommon) error {
+func validateInputs(inputs *pb.ProvingRequestCommon) error {
 	if inputs.InputCommitments == nil || len(inputs.InputCommitments) == 0 {
 		return errors.New("input commitments are required")
 	}
@@ -174,7 +152,21 @@ func validateInputs(inputs *zeto.ProvingRequestCommon) error {
 	return nil
 }
 
-func calculateWitness_anon(commonInputs *zeto.ProvingRequestCommon, keyEntry *core.KeyEntry, circuit witness.Calculator) ([]byte, error) {
+func serializeProof(proof *types.ZKProof) ([]byte, error) {
+	snark := pb.SnarkProof{}
+	snark.A = proof.Proof.A
+	snark.B = make([]*pb.B_Item, len(proof.Proof.B))
+	for _, p := range proof.Proof.B {
+		bItems := pb.B_Item{}
+		bItems.Items = p
+		snark.B = append(snark.B, &bItems)
+	}
+	snark.C = proof.Proof.C
+
+	return proto.Marshal(&snark)
+}
+
+func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core.KeyEntry, circuit witness.Calculator) ([]byte, error) {
 	// construct the output UTXOs based on the values and owner public keys
 	outputCommitments := make([]*big.Int, len(commonInputs.OutputValues))
 	outputSalts := make([]*big.Int, len(commonInputs.OutputValues))

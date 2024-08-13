@@ -23,7 +23,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +79,7 @@ func TestGenerateIndexes(t *testing.T) {
 	kmgr := newTestHDWalletKeyManager(t)
 	for iFolder := 0; iFolder < 10; iFolder++ {
 		for iKey := 0; iKey < 10; iKey++ {
-			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 			assert.NoError(t, err)
 			assert.NotEmpty(t, ethtypes.MustNewAddress(addr))
 			assert.Equal(t, fmt.Sprintf("m/44'/60'/0'/%d/%d", iFolder, iKey), keyHandle)
@@ -97,7 +96,7 @@ func TestKeyManagerResolveFail(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	_, _, err = kmgr.ResolveKey(context.Background(), "does not exist", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, _, err = kmgr.ResolveKey(context.Background(), "does not exist", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	assert.Regexp(t, "PD011418", err)
 }
 
@@ -113,6 +112,6 @@ func TestKeyManagerResolveConflict(t *testing.T) {
 		},
 	}
 
-	_, _, err := kmgr.ResolveKey(context.Background(), "key1", signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, _, err := kmgr.ResolveKey(context.Background(), "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	assert.Regexp(t, "PD011509", err)
 }
