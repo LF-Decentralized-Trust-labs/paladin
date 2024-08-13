@@ -49,7 +49,7 @@ func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",

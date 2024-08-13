@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
-func loadCircuit(circuitName string, config *api.ZkpProverConfig) (witness.Calculator, []byte, error) {
+func loadCircuit(circuitName string, config api.ZkpProverConfig) (witness.Calculator, []byte, error) {
 	if config.CircuitsDir == "" {
 		return nil, []byte{}, fmt.Errorf("CIRCUITS_ROOT not set")
 	}

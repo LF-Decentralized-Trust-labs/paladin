@@ -32,7 +32,7 @@ import (
 func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) (context.Context, *staticStore) {
 	ctx := context.Background()
 
-	store, err := NewStaticKeyStore(ctx, &api.StaticKeyStorageConfig{
+	store, err := NewStaticKeyStore(ctx, api.StaticKeyStorageConfig{
 		Keys: keys,
 	})
 	assert.NoError(t, err)
@@ -105,7 +105,7 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 
 func TestStaticStoreLoadFileFail(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), api.StaticKeyStorageConfig{
 		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "none",
@@ -120,7 +120,7 @@ func TestStaticStoreLoadFileFail(t *testing.T) {
 
 func TestStaticStoreBadHEX(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), api.StaticKeyStorageConfig{
 		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "hex",
@@ -134,7 +134,7 @@ func TestStaticStoreBadHEX(t *testing.T) {
 
 func TestStaticStoreBadBase64(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), api.StaticKeyStorageConfig{
 		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "base64",
@@ -148,7 +148,7 @@ func TestStaticStoreBadBase64(t *testing.T) {
 
 func TestStaticStoreEmpty(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), api.StaticKeyStorageConfig{
 		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "none",
@@ -163,7 +163,7 @@ func TestStaticStoreEmpty(t *testing.T) {
 
 func TestStaticStoreBadEncType(t *testing.T) {
 
-	_, err := NewStaticKeyStore(context.Background(), &api.StaticKeyStorageConfig{
+	_, err := NewStaticKeyStore(context.Background(), api.StaticKeyStorageConfig{
 		Keys: map[string]api.StaticKeyEntryConfig{
 			"myKey": {
 				Encoding: "",

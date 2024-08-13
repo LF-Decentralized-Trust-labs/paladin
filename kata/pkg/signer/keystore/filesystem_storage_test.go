@@ -34,7 +34,7 @@ import (
 func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	ctx := context.Background()
 
-	store, err := NewFilesystemStore(ctx, &api.FileSystemConfig{
+	store, err := NewFilesystemStore(ctx, api.FileSystemConfig{
 		Path: confutil.P(t.TempDir()),
 	})
 	assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestFileSystemStoreBadDir(t *testing.T) {
 
 	badPath := path.Join(t.TempDir(), "wrong")
 
-	_, err := NewFilesystemStore(context.Background(), &api.FileSystemConfig{
+	_, err := NewFilesystemStore(context.Background(), api.FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)
@@ -54,7 +54,7 @@ func TestFileSystemStoreBadDir(t *testing.T) {
 	err = os.WriteFile(badPath, []byte{}, 0644)
 	assert.NoError(t, err)
 
-	_, err = NewFilesystemStore(context.Background(), &api.FileSystemConfig{
+	_, err = NewFilesystemStore(context.Background(), api.FileSystemConfig{
 		Path: confutil.P(badPath),
 	})
 	assert.Regexp(t, "PD011400", err)

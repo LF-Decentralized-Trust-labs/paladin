@@ -318,7 +318,7 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 	sm, err := NewSigningModule(context.Background(), &api.Config{
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeFilesystem,
-			FileSystem: &api.FileSystemConfig{
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -350,7 +350,7 @@ func TestResolveUnsupportedAlgo(t *testing.T) {
 	sm, err := NewSigningModule(context.Background(), &api.Config{
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeFilesystem,
-			FileSystem: &api.FileSystemConfig{
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -370,7 +370,7 @@ func TestResolveMissingAlgo(t *testing.T) {
 	sm, err := NewSigningModule(context.Background(), &api.Config{
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeFilesystem,
-			FileSystem: &api.FileSystemConfig{
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -389,7 +389,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	sm, err := NewSigningModule(context.Background(), &api.Config{
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"key1": {
 						Encoding: "hex",

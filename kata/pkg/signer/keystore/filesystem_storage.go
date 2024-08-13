@@ -42,7 +42,7 @@ type filesystemStore struct {
 	dirMode  os.FileMode
 }
 
-func NewFilesystemStore(ctx context.Context, conf *api.FileSystemConfig) (fss api.KeyStore, err error) {
+func NewFilesystemStore(ctx context.Context, conf api.FileSystemConfig) (fss api.KeyStore, err error) {
 	// Determine the path
 	var pathInfo fs.FileInfo
 	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *api.FileSystemDefaults.Path))

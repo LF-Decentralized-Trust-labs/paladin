@@ -40,7 +40,7 @@ import (
 // interfaces for the Zeto domain.
 type zetoKeystoreSigner struct {
 	keyStore         api.KeyStore
-	zkpProverConfig  *api.ZkpProverConfig
+	zkpProverConfig  api.ZkpProverConfig
 	circuitsCache    cache.Cache[string, witness.Calculator]
 	provingKeysCache cache.Cache[string, []byte]
 }
@@ -48,13 +48,13 @@ type zetoKeystoreSigner struct {
 func NewZetoKeystoreSigner(ctx context.Context, config *api.StoreConfig) (*zetoKeystoreSigner, error) {
 	// TODO: get the key store config from the Paladin config
 	var keyStore api.KeyStore
-	if config.FileSystem != nil {
+	if config.FileSystem.Path != nil {
 		if ks, err := keystore.NewFilesystemStore(ctx, config.FileSystem); err != nil {
 			return nil, err
 		} else {
 			keyStore = ks
 		}
-	} else if config.Static != nil {
+	} else if config.Static.Keys != nil {
 		if ks, err := keystore.NewStaticKeyStore(ctx, config.Static); err != nil {
 			return nil, err
 		} else {
@@ -64,9 +64,7 @@ func NewZetoKeystoreSigner(ctx context.Context, config *api.StoreConfig) (*zetoK
 		return nil, errors.New("key store config is required")
 	}
 
-	if config.ZkpProver == nil {
-		return nil, errors.New("zkp prover config is required")
-	} else if config.ZkpProver.CircuitsDir == "" {
+	if config.ZkpProver.CircuitsDir == "" {
 		return nil, errors.New("zkp prover circuits directory config is required")
 	} else if config.ZkpProver.ProvingKeysDir == "" {
 		return nil, errors.New("zkp prover proving keys directory config is required")

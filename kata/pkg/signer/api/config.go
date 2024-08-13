@@ -31,12 +31,12 @@ type Config struct {
 }
 
 type StoreConfig struct {
-	Type              string                  `yaml:"type"`
-	DisableKeyListing bool                    `yaml:"disableKeyListing"`
-	DisableKeyLoading bool                    `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
-	FileSystem        *FileSystemConfig       `yaml:"filesystem"`
-	Static            *StaticKeyStorageConfig `yaml:"static"`
-	ZkpProver         *ZkpProverConfig        `yaml:"zkpProver"`
+	Type              string                 `yaml:"type"`
+	DisableKeyListing bool                   `yaml:"disableKeyListing"`
+	DisableKeyLoading bool                   `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
+	FileSystem        FileSystemConfig       `yaml:"filesystem"`
+	Static            StaticKeyStorageConfig `yaml:"static"`
+	ZkpProver         ZkpProverConfig        `yaml:"zkpProver"`
 }
 
 type KeyDerivationType string

@@ -64,7 +64,7 @@ func newTestFilesystemStore(t *testing.T) (context.Context, api.KeyStore, string
 	ctx := context.Background()
 
 	dirPath := t.TempDir()
-	store, err := keystore.NewFilesystemStore(ctx, &api.FileSystemConfig{
+	store, err := keystore.NewFilesystemStore(ctx, api.FileSystemConfig{
 		Path: confutil.P(dirPath),
 	})
 	assert.NoError(t, err)
@@ -75,7 +75,7 @@ func newTestFilesystemStore(t *testing.T) (context.Context, api.KeyStore, string
 func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) (context.Context, api.KeyStore) {
 	ctx := context.Background()
 
-	store, err := keystore.NewStaticKeyStore(ctx, &api.StaticKeyStorageConfig{
+	store, err := keystore.NewStaticKeyStore(ctx, api.StaticKeyStorageConfig{
 		Keys: keys,
 	})
 	assert.NoError(t, err)
@@ -143,10 +143,10 @@ func TestZetoKeystoreExtension(t *testing.T) {
 	zke := NewZkpSignerExtension()
 	ks, err := zke.KeyStore(ctx, &api.StoreConfig{
 		Type: ZkpKeyStoreSigner,
-		FileSystem: &api.FileSystemConfig{
+		FileSystem: api.FileSystemConfig{
 			Path: confutil.P(t.TempDir()),
 		},
-		ZkpProver: &api.ZkpProverConfig{
+		ZkpProver: api.ZkpProverConfig{
 			CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
 			ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
 		},
@@ -206,8 +206,8 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	sm, err := signer.NewSigningModule(ctx, &api.Config{
 		KeyStore: api.StoreConfig{
 			Type:       ZkpKeyStoreSigner,
-			FileSystem: &api.FileSystemConfig{Path: confutil.P(dir)},
-			ZkpProver: &api.ZkpProverConfig{
+			FileSystem: api.FileSystemConfig{Path: confutil.P(dir)},
+			ZkpProver: api.ZkpProverConfig{
 				CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
 				ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
 			},

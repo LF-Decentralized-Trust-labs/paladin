@@ -41,7 +41,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
@@ -84,7 +84,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type:       api.KeyStoreTypeFilesystem,
-			FileSystem: &api.FileSystemConfig{Path: confutil.P(t.TempDir())},
+			FileSystem: api.FileSystemConfig{Path: confutil.P(t.TempDir())},
 		},
 	})
 	assert.NoError(t, err)
@@ -161,7 +161,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"custom/seed": {
 						Encoding: "none",
@@ -254,7 +254,7 @@ func TestHDSigningInitFailBadMnemonic(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
@@ -286,7 +286,7 @@ func TestHDInitBadSeed(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeStatic,
-			Static: &api.StaticKeyStorageConfig{
+			Static: api.StaticKeyStorageConfig{
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
@@ -314,7 +314,7 @@ func TestHDInitGenSeed(t *testing.T) {
 		},
 		KeyStore: api.StoreConfig{
 			Type: api.KeyStoreTypeFilesystem,
-			FileSystem: &api.FileSystemConfig{
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},

@@ -47,7 +47,7 @@ type staticStore struct {
 // The keys themselves can be in files, so as well as very simple testing
 // with keys in-line in the config, this helps use a file based Kubernetes
 // secret for a mnemonic seed phrase for example at the root of a HD wallet.
-func NewStaticKeyStore(ctx context.Context, conf *api.StaticKeyStorageConfig) (_ api.KeyStore, err error) {
+func NewStaticKeyStore(ctx context.Context, conf api.StaticKeyStorageConfig) (_ api.KeyStore, err error) {
 	ils := &staticStore{
 		keys: make(map[string][]byte),
 	}
