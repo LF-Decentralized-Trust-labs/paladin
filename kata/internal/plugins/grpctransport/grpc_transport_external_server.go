@@ -121,9 +121,9 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 		egs.serverCertPool = rootCAs
 		serverTLSConfig = &tls.Config{
 			RootCAs:      egs.serverCertPool,
+			ClientCAs:    egs.serverCertPool,
 			Certificates: []tls.Certificate{*egs.serverCertificate},
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-			ClientCAs:    egs.serverCertPool,
 		}
 	}
 
@@ -133,6 +133,15 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 			Certificates: []tls.Certificate{*egs.clientCertificate},
 			RootCAs:      egs.serverCertPool, // Client connections trust the same CAs as we accept on the server
 		}
+	}
+
+	serverTLSConfig.GetConfigForClient = func(chi *tls.ClientHelloInfo) (*tls.Config, error) {
+		return &tls.Config{
+			RootCAs:      egs.serverCertPool,
+			ClientCAs:    egs.serverCertPool,
+			Certificates: []tls.Certificate{*egs.serverCertificate},
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+		}, nil
 	}
 
 	externalGRPCListener, err := net.Listen("tcp", fmt.Sprintf(":%d", egs.port))
