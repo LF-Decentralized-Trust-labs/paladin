@@ -26,28 +26,28 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-// JSONP is a persistence wrapper for any type, which will serialize it to the DB and restore it in JSON with minimal fuss
-type JSONP[T any] struct {
+// EncodedJSON is a persistence wrapper for any type, which will serialize it to the DB and restore it in JSON with minimal fuss
+type EncodedJSON[T any] struct {
 	v T
 }
 
-func WrapJSONP[T any](v T) *JSONP[T] {
-	return &JSONP[T]{v: v}
+func WrapEncodedJSON[T any](v T) *EncodedJSON[T] {
+	return &EncodedJSON[T]{v: v}
 }
 
-func (p *JSONP[T]) V() T {
+func (p *EncodedJSON[T]) V() T {
 	if p == nil {
-		return JSONP[T]{}.v
+		return EncodedJSON[T]{}.v
 	}
 	return p.v
 }
 
-func (p *JSONP[T]) MarshalJSON() ([]byte, error) {
+func (p *EncodedJSON[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.v)
 }
 
-func (p *JSONP[T]) UnmarshalJSON(data []byte) error {
-	*p = JSONP[T]{}
+func (p *EncodedJSON[T]) UnmarshalJSON(data []byte) error {
+	*p = EncodedJSON[T]{}
 	return json.Unmarshal(data, &p.v)
 }
 
@@ -61,7 +61,7 @@ func IsNil(v interface{}) bool {
 	return false
 }
 
-func (p *JSONP[T]) Value() (driver.Value, error) {
+func (p *EncodedJSON[T]) Value() (driver.Value, error) {
 	// Ensure null goes to a null value in the DB (not the string "null")
 	if p == nil || IsNil(p.v) {
 		return nil, nil
@@ -69,8 +69,8 @@ func (p *JSONP[T]) Value() (driver.Value, error) {
 	return json.Marshal(p.v)
 }
 
-func (p *JSONP[T]) Scan(src interface{}) error {
-	*p = JSONP[T]{}
+func (p *EncodedJSON[T]) Scan(src interface{}) error {
+	*p = EncodedJSON[T]{}
 	var b []byte
 	switch s := src.(type) {
 	case string:

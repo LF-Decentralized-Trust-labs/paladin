@@ -53,13 +53,13 @@ func (est EventStreamType) Enum() types.Enum[EventStreamType] {
 }
 
 type EventStream struct {
-	ID      uuid.UUID                       `json:"id"                       gorm:"primaryKey"`
-	Name    string                          `json:"name"`
-	Created types.Timestamp                 `json:"created"                  gorm:"autoCreateTime:nano"`
-	Updated types.Timestamp                 `json:"updated"                  gorm:"autoUpdateTime:nano"`
-	Type    types.Enum[EventStreamType]     `json:"type"`
-	Config  *types.JSONP[EventStreamConfig] `json:"config"                   gorm:"serializer:json"`
-	ABI     abi.ABI                         `json:"abi,omitempty"            gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
+	ID      uuid.UUID                             `json:"id"             gorm:"primaryKey"`
+	Name    string                                `json:"name"`
+	Created types.Timestamp                       `json:"created"        gorm:"autoCreateTime:nano"`
+	Updated types.Timestamp                       `json:"updated"        gorm:"autoUpdateTime:nano"`
+	Type    types.Enum[EventStreamType]           `json:"type"`
+	Config  *types.EncodedJSON[EventStreamConfig] `json:"config"         gorm:"serializer:json"`
+	ABI     abi.ABI                               `json:"abi,omitempty"  gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 }
 
 type EventStreamCheckpoint struct {

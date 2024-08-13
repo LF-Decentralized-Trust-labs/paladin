@@ -102,7 +102,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 		def = &EventStream{}
 	}
 	if def.Config == nil {
-		def.Config = types.WrapJSONP(EventStreamConfig{})
+		def.Config = types.WrapEncodedJSON(EventStreamConfig{})
 	}
 
 	// Validate the name

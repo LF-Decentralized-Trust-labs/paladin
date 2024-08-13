@@ -26,37 +26,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestJSONPValue(t *testing.T) {
+func TestEncodedJSONValue(t *testing.T) {
 
 	type testStructChild struct {
 		Child1 string `json:"child1"`
 	}
 
 	type testStruct struct {
-		Parent1 JSONP[abi.ABI]           `json:"parent1"`
-		Parent2 JSONP[*testStructChild]  `json:"parent2"`
-		Parent3 JSONP[testStructChild]   `json:"parent3"`
-		Parent4 *JSONP[testStructChild]  `json:"parent4,omitempty"`
-		Parent5 *JSONP[*testStructChild] `json:"parent5"`
-		Parent6 *JSONP[*testStructChild] `json:"parent6"`
-		Parent7 JSONP[int64]             `json:"parent7"`
+		Parent1 EncodedJSON[abi.ABI]           `json:"parent1"`
+		Parent2 EncodedJSON[*testStructChild]  `json:"parent2"`
+		Parent3 EncodedJSON[testStructChild]   `json:"parent3"`
+		Parent4 *EncodedJSON[testStructChild]  `json:"parent4,omitempty"`
+		Parent5 *EncodedJSON[*testStructChild] `json:"parent5"`
+		Parent6 *EncodedJSON[*testStructChild] `json:"parent6"`
+		Parent7 EncodedJSON[int64]             `json:"parent7"`
 	}
 
-	var v1 *JSONP[abi.ABI]
+	var v1 *EncodedJSON[abi.ABI]
 	b, err := json.Marshal(v1)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `null`, string(b))
 
 	v2 := &testStruct{
-		Parent1: *WrapJSONP(abi.ABI{
+		Parent1: *WrapEncodedJSON(abi.ABI{
 			{Name: "function1", Type: "function", Inputs: abi.ParameterArray{}, Outputs: abi.ParameterArray{}},
 		}),
-		Parent2: JSONP[*testStructChild]{},
-		Parent3: *WrapJSONP(testStructChild{Child1: "test_parent3"}),
+		Parent2: EncodedJSON[*testStructChild]{},
+		Parent3: *WrapEncodedJSON(testStructChild{Child1: "test_parent3"}),
 		Parent4: nil,
-		Parent5: &JSONP[*testStructChild]{},
-		Parent6: WrapJSONP(&testStructChild{Child1: "test_parent6"}),
-		Parent7: *WrapJSONP(int64(12345)),
+		Parent5: &EncodedJSON[*testStructChild]{},
+		Parent6: WrapEncodedJSON(&testStructChild{Child1: "test_parent6"}),
+		Parent7: *WrapEncodedJSON(int64(12345)),
 	}
 	b, err = json.Marshal(v2)
 	assert.NoError(t, err)
@@ -112,34 +112,34 @@ func TestJSONPValue(t *testing.T) {
 	assert.Equal(t, v2.Parent7.V(), v3.Parent7.V())
 }
 
-func TestJSONPScan(t *testing.T) {
+func TestEncodedJSONScan(t *testing.T) {
 
 	type testStruct struct {
 		Child1 string `json:"child1"`
 	}
 
-	var v1 JSONP[*testStruct]
+	var v1 EncodedJSON[*testStruct]
 	var v1Scanner sql.Scanner = &v1
 	err := v1Scanner.Scan(`{"child1": "hello"}`)
 	assert.NoError(t, err)
 	assert.Equal(t, v1.V(), &testStruct{Child1: "hello"})
 
-	var v2 JSONP[*testStruct]
+	var v2 EncodedJSON[*testStruct]
 	err = v2.Scan(([]byte)(`{"child1": "hello"}`))
 	assert.NoError(t, err)
 	assert.Equal(t, v2.V(), &testStruct{Child1: "hello"})
 
-	var v3 JSONP[*testStruct]
+	var v3 EncodedJSON[*testStruct]
 	err = v3.Scan(nil)
 	assert.NoError(t, err)
 	assert.Nil(t, v3.V())
 
-	v4 := &JSONP[*testStruct]{}
+	v4 := &EncodedJSON[*testStruct]{}
 	err = v4.Scan(nil)
 	assert.NoError(t, err)
 	assert.Nil(t, v4.V())
 
-	v5 := &JSONP[*testStruct]{}
+	v5 := &EncodedJSON[*testStruct]{}
 	err = v5.Scan(false)
 	assert.Regexp(t, "PD011101", err)
 }

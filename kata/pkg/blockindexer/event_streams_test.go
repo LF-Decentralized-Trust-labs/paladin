@@ -87,7 +87,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
-			Config: types.WrapJSONP(EventStreamConfig{
+			Config: types.WrapEncodedJSON(EventStreamConfig{
 				BatchSize:    confutil.P(3),
 				BatchTimeout: confutil.P("5ms"),
 			}),
@@ -166,7 +166,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	// Add a listener
 	internalESConfig := &EventStream{
 		Name: "unit_test",
-		Config: types.WrapJSONP(EventStreamConfig{
+		Config: types.WrapEncodedJSON(EventStreamConfig{
 			BatchSize:    confutil.P(3),
 			BatchTimeout: confutil.P("5ms"),
 		}),
