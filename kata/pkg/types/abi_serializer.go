@@ -84,11 +84,11 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 func ABIBySolDefinition(ctx context.Context, a abi.ABI) (map[string]*abi.Entry, error) {
 	byDefs := make(map[string]*abi.Entry)
 	for _, e := range a {
-		solDef, err := e.SolidityStringCtx(ctx)
+		solString, err := e.SolidityStringCtx(ctx)
 		if err != nil {
 			return nil, err
 		}
-		byDefs[solDef] = e
+		byDefs[solString] = e
 	}
 	return byDefs, nil
 }

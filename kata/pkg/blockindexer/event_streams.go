@@ -101,9 +101,6 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	if def == nil {
 		def = &EventStream{}
 	}
-	if def.Config == nil {
-		def.Config = types.WrapJSONP(EventStreamConfig{})
-	}
 
 	// Validate the name
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
@@ -136,7 +133,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 			Where("type = ?", def.Type).
 			Where("name = ?", def.Name).
 			WithContext(ctx).
-			Update("config", def.Config).
+			Updates(&EventStream{Config: def.Config}).
 			Error
 		if err != nil {
 			return nil, err
@@ -179,7 +176,7 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	defer bi.eventStreamsLock.Unlock()
 
 	es := bi.eventStreams[definition.ID]
-	batchSize := confutil.IntMin(definition.Config.V().BatchSize, 1, *EventStreamDefaults.BatchSize)
+	batchSize := confutil.IntMin(definition.Config.BatchSize, 1, *EventStreamDefaults.BatchSize)
 	if es != nil {
 		// If we're already initialized, the only thing that can be changed is the config.
 		// Caller is responsible for ensuring we're stopped at this point
@@ -198,7 +195,7 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 
 	// Set the batch config
 	es.batchSize = batchSize
-	es.batchTimeout = confutil.DurationMin(definition.Config.V().BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
+	es.batchTimeout = confutil.DurationMin(definition.Config.BatchTimeout, 0, *EventStreamDefaults.BatchTimeout)
 
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
