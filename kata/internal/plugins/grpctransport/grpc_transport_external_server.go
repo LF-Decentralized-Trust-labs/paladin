@@ -11,7 +11,7 @@
 * specific language governing permissions and limitations under the License.
 *
 * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 
 package grpctransport
 
@@ -29,8 +29,9 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
-	"google.golang.org/protobuf/types/known/anypb"
+	grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 )
 
 type ExternalMessage struct {
@@ -44,8 +45,8 @@ type ExternalMessage struct {
 }
 
 type ExternalServer interface {
-	QueueMessageForSend(msg *ExternalMessage)
-	GetMessages(dest destination) (chan *proto.Message, error)
+	QueueMessageForSend(msg *proto.ExternalMessage)
+	GetMessages(dest destination) chan *proto.Message
 	Shutdown()
 }
 
@@ -60,7 +61,7 @@ type externalGRPCServer struct {
 
 	// TODO: We probably don't want to do this, what happens when we're not consuming messages correctly?
 	recvMessages map[destination]chan *proto.Message
-	sendMessages chan *ExternalMessage
+	sendMessages chan *proto.ExternalMessage
 	port         int
 }
 
@@ -75,7 +76,7 @@ func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int, server
 
 	server := &externalGRPCServer{
 		recvMessages:      make(map[destination]chan *proto.Message, bufferSize),
-		sendMessages:      make(chan *ExternalMessage, bufferSize),
+		sendMessages:      make(chan *proto.ExternalMessage, bufferSize),
 		port:              port,
 		clientCertificate: clientCertificate,
 		serverCertificate: serverCertificate,
@@ -90,16 +91,16 @@ func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int, server
 	return server, nil
 }
 
-func (egs *externalGRPCServer) QueueMessageForSend(msg *ExternalMessage) {
+func (egs *externalGRPCServer) QueueMessageForSend(msg *proto.ExternalMessage) {
 	egs.sendMessages <- msg
 }
 
-func (egs *externalGRPCServer) GetMessages(dest destination) (chan *proto.Message, error) {
+func (egs *externalGRPCServer) GetMessages(dest destination) chan *proto.Message {
 	if egs.recvMessages[dest] == nil {
-		return nil, fmt.Errorf("could not find entries for the provided destination")
+		egs.recvMessages[dest] = make(chan *proto.Message, 1) // TODO: Change this
 	}
 
-	return egs.recvMessages[dest], nil
+	return egs.recvMessages[dest]
 }
 
 func (egs *externalGRPCServer) Shutdown() {
@@ -171,29 +172,31 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 				return
 			case sendMsg := <-egs.sendMessages:
 				{
-					// Need to get the client cert out of the message and put this in our pool
-					if ok := egs.serverCertPool.AppendCertsFromPEM([]byte(sendMsg.CACertificate)); !ok {
-						log.L(ctx).Errorf("grpctransport: could not append the client cert to the pool")
-					}
-
-					bytes, err := anypb.New(sendMsg)
+					// Unmarshal the transport information
+					ti := &grpctransportpb.GRPCTransportInformation{}
+					err := sendMsg.GetTransportInformation().UnmarshalTo(ti)
 					if err != nil {
-						log.L(ctx).Errorf("grpctransport: could not send message")
+						log.L(ctx).Errorf("grpctransport: could not unmarshal transport information")
 						continue
 					}
 
+					// Need to get the client cert out of the message and put this in our pool
+					if ok := egs.serverCertPool.AppendCertsFromPEM([]byte(ti.CaCertificate)); !ok {
+						log.L(ctx).Errorf("grpctransport: could not append the client cert to the pool")
+					}
+
 					inpalMessage := &interPaladinPB.InterPaladinMessage{
-						Body: bytes,
+						Body: sendMsg.Body,
 					}
 
 					var conn *grpc.ClientConn
 					if clientTLSConfig != nil {
-						conn, err = grpc.NewClient(sendMsg.ExternalAddress, grpc.WithTransportCredentials(credentials.NewTLS(clientTLSConfig)))
+						conn, err = grpc.NewClient(ti.Address, grpc.WithTransportCredentials(credentials.NewTLS(clientTLSConfig)))
 						if err != nil {
 							log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
 						}
 					} else {
-						conn, err = grpc.NewClient(sendMsg.ExternalAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+						conn, err = grpc.NewClient(ti.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 						if err != nil {
 							log.L(ctx).Errorf("Failed to establish a client, err: %s", err)
 						}

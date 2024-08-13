@@ -112,9 +112,9 @@ func (fcb *fakeCommsBusServer) ListDestinations(context.Context, *proto.ListDest
 
 type fakeExternalServer struct{}
 
-func (fes *fakeExternalServer) QueueMessageForSend(msg *ExternalMessage) {}
-func (fes *fakeExternalServer) GetMessages(dest destination) (chan *proto.Message, error) {
-	return nil, nil
+func (fes *fakeExternalServer) QueueMessageForSend(msg *proto.ExternalMessage) {}
+func (fes *fakeExternalServer) GetMessages(dest destination) chan *proto.Message {
+	return nil
 }
 func (fes *fakeExternalServer) Shutdown() {}
 

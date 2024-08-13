@@ -225,19 +225,18 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 				return
 			}
 
-			externalMessage := &ExternalMessage{
-				Message:         *inboundMessage,
-				ExternalAddress: "somewhere", // TODO: Plug point for registry
+			externMessage := &proto.ExternalMessage{}
+			err = inboundMessage.Body.UnmarshalTo(externMessage)
+			if err != nil {
+				log.L(ctx).Errorf("grpctransport instance: Could not unmarshal message: %v", err)
+				continue
 			}
 
-			externalServer.QueueMessageForSend(externalMessage)
+			externalServer.QueueMessageForSend(externMessage)
 		}
 	}()
 
-	instanceMessageRecvChannel, err := externalServer.GetMessages(destination(createInstanceRequest.GetMessageDestination()))
-	if err != nil {
-		return err
-	}
+	instanceMessageRecvChannel := externalServer.GetMessages(destination(createInstanceRequest.GetMessageDestination()))
 
 	go func() {
 		for {

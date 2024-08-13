@@ -32,21 +32,24 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport"
+	grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
+	transaction "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
 )
 
 type fakeCommsBusServer struct {
 	proto.UnimplementedKataMessageServiceServer
 
-	initializedOk  bool
-	listenMessages chan string
-	recvMessages   map[string]chan *proto.Message
-	sendMessages   map[string]chan *proto.Message
+	initializedOk             bool
+	listenMessages            chan string
+	recvMessages              map[string]chan *proto.Message
+	sendMessages              map[string]chan *proto.Message
+	enrichInterPaladinMessage func(*proto.Message) *proto.Message
 }
 
 func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMessageService_ListenServer) error {
@@ -61,6 +64,7 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 		fcb.sendMessages[lr.Destination] = make(chan *proto.Message)
 	}
 
+	// Messages coming back from the plugin
 	go func() {
 		fcb.listenMessages <- lr.Destination
 
@@ -78,14 +82,15 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 		}
 	}()
 
+	// Messages being sent to the plugin
 	messageChan := fcb.sendMessages[lr.Destination]
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case msg := <-messageChan:
-			err := ls.Send(msg)
+			enrichedMessage := fcb.enrichInterPaladinMessage(msg)
+			err := ls.Send(enrichedMessage)
 			if err != nil {
 				return err
 			}
@@ -117,11 +122,19 @@ func (fcb *fakeCommsBusServer) ListDestinations(context.Context, *proto.ListDest
 type fakeExternalGRPCServer struct {
 	interPaladinPB.UnimplementedInterPaladinTransportServer
 
-	listener net.Listener
+	listener     net.Listener
+	recvMessages chan *proto.Message
 }
 
 func (fegs *fakeExternalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *interPaladinPB.InterPaladinMessage) (*interPaladinPB.InterPaladinMessage, error) {
-	fegs.listener.Close()
+	recvMessage := &proto.Message{}
+	err := message.GetBody().UnmarshalTo(recvMessage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fegs.recvMessages <- recvMessage
 	return nil, nil
 }
 
@@ -157,6 +170,9 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	}
 	proto.RegisterKataMessageServiceServer(commsBusServer, fakeCommsBus)
 
+	// For now we don't want to do an enriching
+	fakeCommsBus.enrichInterPaladinMessage = func(m *proto.Message) *proto.Message { return m }
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -176,11 +192,9 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Certs for the faked Paladin
-	// fakePaladinCACert, err := os.ReadFile("../../../test/ca2/ca.crt")
-	// assert.NoError(t, err)
-	// fakePaladinServerCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client1.crt", "../../../test/ca2/clients/client1.key")
-	// assert.NoError(t, err)
-	fakePaladinClientCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client2.crt", "../../../test/ca2/clients/client2.key")
+	fakePaladinCACert, err := os.ReadFile("../../../test/ca2/ca.crt")
+	assert.NoError(t, err)
+	fakePaladinServerCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client1.crt", "../../../test/ca2/clients/client1.key")
 	assert.NoError(t, err)
 
 	// ---------------------------------------------------------------------------- GRPC Transport Provider
@@ -231,10 +245,12 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	// Need to make another Paladin node that this one can talk to, we fake up its implementation, but comms to it are
 	// going to be done over TCP on localhost (so the certs need to have localhost in their SANs)
 
-	fakePaladinListener, err := net.Listen("tcp", fmt.Sprintf(":%d", providerPort + 1))
+	fakeAddress := fmt.Sprintf(":%d", providerPort+1)
+	fakePaladinListener, err := net.Listen("tcp", fakeAddress)
 	assert.NoError(t, err)
 	fakeServer := &fakeExternalGRPCServer{
-		listener: fakePaladinListener,
+		listener:     fakePaladinListener,
+		recvMessages: make(chan *proto.Message, 1),
 	}
 
 	certPool := x509.NewCertPool()
@@ -242,7 +258,7 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	assert.Equal(t, true, ok)
 
 	fakePaladinServer := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{fakePaladinClientCert},
+		Certificates: []tls.Certificate{fakePaladinServerCert},
 		RootCAs:      certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    certPool,
@@ -252,7 +268,7 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	// Start the fake server
 	var fakeServerWg sync.WaitGroup
 	fakeServerWg.Add(1)
-	go func(){
+	go func() {
 		_ = fakePaladinServer.Serve(fakePaladinListener)
 		fakeServerWg.Done()
 	}()
@@ -271,5 +287,51 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 
 	// ---------------------------------------------------------------------------- Send a messsage through the Comms bus
 
-	// TODO: Setup is done, start sending messages
+	// I am a domain on the system wanting to send a message to one of the other Paladin's that I know about
+	fakePayload := &transaction.SubmitTransactionError{
+		Id:     uuid.NewString(),
+		Reason: "There is no real reason, we just need to show something can be sent through the whole flow",
+	}
+	pbBody, err := anypb.New(fakePayload)
+	assert.NoError(t, err)
+	messageToCommsBus := &proto.Message{
+		Id:          uuid.NewString(),
+		Body:        pbBody,
+		Destination: newTransportInstanceName,
+	}
+
+	fakeCommsBus.enrichInterPaladinMessage = func(m *proto.Message) *proto.Message {
+		// This implementation of this is part of the comms bus which handles speaking to the registry to find out more
+		// information about where we're sending a payload, but for now we're going to fake it up.
+
+		mAny, err := anypb.New(m)
+		assert.NoError(t, err)
+
+		// Interpaladin Transport Information
+		ipWrapper := &grpctransportpb.GRPCTransportInformation{
+			Address:       fakeAddress,
+			CaCertificate: string(fakePaladinCACert),
+		}
+		ipWrapperAny, err := anypb.New(ipWrapper)
+		assert.NoError(t, err)
+
+		externMessage := &proto.ExternalMessage{
+			TransportInformation: ipWrapperAny,
+			Body: mAny,
+		}
+		externMessageAny, err := anypb.New(externMessage)
+		assert.NoError(t, err)
+
+		return &proto.Message{
+			Body:        externMessageAny,
+			Id:          m.Id,
+			Destination: newTransportInstanceName, // Now send to the instance
+		}
+	}
+
+	// Send the message to the comms bus
+	fakeCommsBus.sendMessages[newTransportInstanceName] <- messageToCommsBus
+
+	// Wait for the message to come through to our fake Paladin
+	<-fakeServer.recvMessages
 }

@@ -60,6 +60,11 @@ message ListenRequest {
   string destination = 1;
 }
 
+message ExternalMessage {
+  google.protobuf.Any transportInformation = 1;
+  google.protobuf.Any body = 2;
+}
+
 message Message {
   string   destination = 1;
   string   id = 2;
