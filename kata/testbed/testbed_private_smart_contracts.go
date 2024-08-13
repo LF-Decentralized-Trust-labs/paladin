@@ -34,6 +34,10 @@ type testbedPrivateSmartContract struct {
 
 func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invocation *types.PrivateContractInvoke) (*uuid.UUID, *proto.TransactionSpecification, error) {
 
+	if invocation.From == "" {
+		return nil, nil, fmt.Errorf("no from address specified for transaction")
+	}
+
 	functionABI := &invocation.Function
 
 	confirmedBlockHeight, err := psc.tb.blockindexer.GetConfirmedBlockHeight(ctx)
@@ -52,6 +56,7 @@ func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invo
 	txID := uuid.New()
 	return &txID, &proto.TransactionSpecification{
 		TransactionId:      uuidToHexBytes32(txID).String(),
+		From:               invocation.From,
 		FunctionAbiJson:    string(functionABIJSON),
 		FunctionSignature:  functionABI.String(),
 		FunctionParamsJson: string(functionParamsJSON),

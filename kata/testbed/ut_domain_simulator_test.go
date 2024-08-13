@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -34,13 +36,19 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type domainSimulatorFn func(iReq pb.Message) (pb.Message, error)
+type domainSimulatorFn func(callbacks simCallbacks, iReq pb.Message) (pb.Message, error)
 
 type domainSimulator struct {
 	tb              *testbed
 	grpcClient      grpc.ClientConnInterface
 	messageHandlers map[protoreflect.FullName]domainSimulatorFn
 	done            chan struct{}
+}
+
+// simCallbacks let UT simulation domains make gRPC calls with request/response semantics
+// back to the testbed as if they were real domains.
+type simCallbacks interface {
+	FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*proto.StoredState, err error)
 }
 
 func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (context.Context, func(res interface{}, method string, params ...interface{}) error, func()) {
@@ -78,28 +86,57 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 			return
 		case msgToDomain := <-toDomain.Channel:
 			msgType := msgToDomain.Body.ProtoReflect().Descriptor().FullName()
-			handler := ds.messageHandlers[msgType]
-			var res pb.Message
-			var err error
-			if handler == nil {
-				err = fmt.Errorf("no handler for type %s", msgType)
-			} else {
-				log.L(tb.ctx).Infof("Calling simulation of %s", msgType)
-				res, err = handler(msgToDomain.Body)
+			log.L(tb.ctx).Infof("Domain simulator received received %s [%s]", msgToDomain.ID, msgType)
+			inflight := tb.getInflight(msgToDomain.CorrelationID)
+			if inflight != nil {
+				inflight.done <- &msgToDomain
+			} else if msgToDomain.ReplyTo != nil {
+				// Need to get off this routine to handle it
+				go ds.handleRequestToDomain(msgType, msgToDomain)
 			}
-			if err != nil {
-				res = &proto.DomainAPIError{
-					ErrorMessage: err.Error(),
-				}
-			}
-			_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
-				ID:            uuid.New().String(),
-				CorrelationID: &msgToDomain.ID,
-				Destination:   *msgToDomain.ReplyTo,
-				Body:          res,
-			})
 		}
 	}
+}
+
+func (ds *domainSimulator) handleRequestToDomain(msgType protoreflect.FullName, msgToDomain commsbus.Message) {
+	tb := ds.tb
+	handler := ds.messageHandlers[msgType]
+	var res pb.Message
+	var err error
+	if handler == nil {
+		err = fmt.Errorf("no handler for type %s", msgType)
+	} else {
+		log.L(tb.ctx).Infof("Calling simulation of %s", msgType)
+		res, err = handler(ds, msgToDomain.Body)
+	}
+	if err != nil {
+		res = &proto.DomainAPIError{
+			ErrorMessage: err.Error(),
+		}
+	}
+	_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
+		ID:            uuid.New().String(),
+		CorrelationID: &msgToDomain.ID,
+		Destination:   *msgToDomain.ReplyTo,
+		Body:          res,
+	})
+}
+
+func (ds *domainSimulator) FindAvailableStates(schemaID string, query *filters.QueryJSON) ([]*proto.StoredState, error) {
+	var res *proto.FindAvailableStatesResponse
+	qs, err := json.Marshal(query)
+	if err == nil {
+		tb := ds.tb
+		req := &proto.FindAvailableStatesRequest{
+			SchemaId:  schemaID,
+			QueryJson: string(qs),
+		}
+		err = syncExchange(tb.ctx, tb, tb.destFromDomain, tb.destToDomain, req, &res)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return res.States, err
 }
 
 func (ds *domainSimulator) waitDone() {

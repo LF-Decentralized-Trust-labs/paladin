@@ -19,11 +19,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 
 	_ "embed"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -126,23 +129,76 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		Amount *ethtypes.HexInteger `json:"amount"`
 	}
 
+	type fakeCoinParser struct {
+		Salt   ethtypes.HexBytes0xPrefix `json:"salt"`
+		Owner  ethtypes.Address0xHex     `json:"owner"`
+		Amount *ethtypes.HexInteger      `json:"amount"`
+	}
+
 	fakeTransferMintPayload := `{
 		"from": "",
 		"to": "wallets/org1/aaaaaa",
 		"amount": "123000000000000000000"
 	}`
 
-	// fakeTransferPayload1 := `{
-	// 	"from": "wallets/org1/aaaaaa",
-	// 	"to": "wallets/org2/bbbbbb",
-	// 	"amount": "23000000000000000000"
-	// }`
+	fakeTransferPayload1 := `{
+		"from": "wallets/org1/aaaaaa",
+		"to": "wallets/org2/bbbbbb",
+		"amount": "23000000000000000000"
+	}`
 
 	var factoryAddr ethtypes.Address0xHex
 	var fakeCoinSchemaID string
+
+	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]string, *big.Int, error) {
+		var lastStateTimestamp int64
+		total := big.NewInt(0)
+		stateIDs := []string{}
+		for {
+			// Simple oldest coin first algo
+			query := &filters.QueryJSON{
+				Limit: confutil.P(10),
+				Sort:  []string{".created"},
+				FilterJSON: filters.FilterJSON{
+					FilterJSONOps: filters.FilterJSONOps{
+						Eq: []*filters.FilterJSONKeyValue{
+							{FilterJSONBase: filters.FilterJSONBase{Field: "owner"}, Value: types.RawJSON(fmt.Sprintf(`"%s"`, fromAddr))},
+						},
+					},
+				},
+			}
+			if lastStateTimestamp > 0 {
+				query.GT = []*filters.FilterJSONKeyValue{
+					{FilterJSONBase: filters.FilterJSONBase{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
+				}
+			}
+			states, err := sc.FindAvailableStates(fakeCoinSchemaID, query)
+			if err != nil {
+				return nil, nil, err
+			}
+			if len(states) == 0 {
+				return nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
+			}
+			for _, state := range states {
+				lastStateTimestamp = state.StoredAt
+				// Note: More sophisticated coin selection might prefer states that aren't locked to a sequence
+				var coin fakeCoinParser
+				if err := json.Unmarshal([]byte(state.DataJson), &coin); err != nil {
+					return nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+				}
+				total = total.Add(total, coin.Amount.BigInt())
+				stateIDs = append(stateIDs, state.HashId)
+				if total.Cmp(amount) >= 0 {
+					// We've got what we need - return how much over we are
+					return stateIDs, new(big.Int).Sub(amount, total), nil
+				}
+			}
+		}
+	}
+
 	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
-		CONFIGURE_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
+		CONFIGURE_DOMAIN: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
@@ -158,7 +214,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		INIT_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
+		INIT_DOMAIN: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitDomainRequest](t, iReq)
 			assert.Len(t, req.AbiStateSchemas, 1)
 			fakeCoinSchemaID = req.AbiStateSchemas[0].Id
@@ -166,7 +222,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return &proto.InitDomainResponse{}, nil
 		},
 
-		INIT_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
+		INIT_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitDeployTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
@@ -180,7 +236,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		PREPARE_DEPLOY: func(iReq pb.Message) (pb.Message, error) {
+		PREPARE_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.PrepareDeployTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, `{
@@ -204,7 +260,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		INIT_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+		INIT_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinTransferABI, req.Transaction.FunctionAbiJson)
 			assert.Equal(t, "transfer(string,string,uint256)", req.Transaction.FunctionSignature)
@@ -237,7 +293,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		ASSEMBLE_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+		ASSEMBLE_TRANSACTION: func(sc simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.AssembleTransactionRequest](t, iReq)
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
@@ -254,10 +310,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					toAddr = ethtypes.MustNewAddress(v.Verifier)
 				}
 			}
-			spentStateIds := []string{}
-			// if inputs.From != nil {
-			// 	// TODO: State loading
-			// }
+			coinsToSpend := []string{}
+			if inputs.From != "" {
+				coinsToSpend, toKeep, err = fakeCoinSelection(sc, fromAddr, amount)
+				if err != nil {
+					return nil, err
+				}
+			}
 			newStates := []*proto.StateData{}
 			if fromAddr != nil && toKeep.Sign() > 0 {
 				// Generate a state to keep for ourselves
@@ -283,7 +342,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}
 			return &proto.AssembleTransactionResponse{
 				AssembledTransaction: &proto.AssembledTransaction{
-					SpentStateIds: spentStateIds,
+					SpentStateIds: coinsToSpend,
 					NewStates:     newStates,
 				},
 				AssemblyResult: proto.AssemblyResult_OK,
@@ -293,12 +352,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						AttestationType: proto.AttestationType_SIGN,
 						Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 						Payload:         types.RandBytes(32), // TODO: eip712StatesWithSalt(newStates),
+						Parties: []string{
+							req.Transaction.From,
+						},
 					},
 				},
 			}, nil
 		},
 
-		PREPARE_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+		PREPARE_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.PrepareTransactionRequest](t, iReq)
 			var signerSignature ethtypes.HexBytes0xPrefix
 			for _, att := range req.AttestationResult {
@@ -350,6 +412,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		To:       types.EthAddress(contractAddr),
 		Function: *mustParseABIEntry(fakeCoinTransferABI),
 		Inputs:   types.RawJSON(fakeTransferMintPayload),
+	})
+	assert.NoError(t, err)
+
+	err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     "wallets/org1/aaaaaa",
+		To:       types.EthAddress(contractAddr),
+		Function: *mustParseABIEntry(fakeCoinTransferABI),
+		Inputs:   types.RawJSON(fakeTransferPayload1),
 	})
 	assert.NoError(t, err)
 

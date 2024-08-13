@@ -34,7 +34,7 @@ import (
 )
 
 func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
-	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetLevel(logrus.DebugLevel)
 
 	tb = newTestBed()
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})

@@ -81,12 +81,12 @@ func (tb *testbed) clearInFlight(inFlight *inflightRequest) {
 	delete(tb.inflight, inFlight.req.ID)
 }
 
-func syncExchangeToDomain[I, O pb.Message](ctx context.Context, tb *testbed, in I, out *O) error {
+func syncExchange[I, O pb.Message](ctx context.Context, tb *testbed, to, from string, in I, out *O) error {
 
 	id := uuid.New().String()
 	requestMsg := commsbus.Message{
-		Destination: tb.destToDomain,
-		ReplyTo:     &tb.destFromDomain,
+		Destination: to,
+		ReplyTo:     &from,
 		ID:          id,
 		Body:        in,
 	}
@@ -130,8 +130,9 @@ func (tb *testbed) eventHandler() {
 			inflight := tb.getInflight(msgFromDomain.CorrelationID)
 			if inflight != nil {
 				inflight.done <- &msgFromDomain
-			} else {
-				tb.handleRequestFromDomain(msgFromDomain)
+			} else if msgFromDomain.ReplyTo != nil {
+				// Need to get off this routine to handle it
+				go tb.handleRequestFromDomain(msgFromDomain)
 			}
 		}
 	}

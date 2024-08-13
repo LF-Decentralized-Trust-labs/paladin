@@ -103,7 +103,7 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 
 		// First we call configure on the domain
 		var configRes *proto.ConfigureDomainResponse
-		err := syncExchangeToDomain(ctx, tb, &proto.ConfigureDomainRequest{
+		err := syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.ConfigureDomainRequest{
 			Name:       domainName,
 			ConfigYaml: string(domainConfig),
 			ChainId:    tb.ethClient.ChainID(),
@@ -118,7 +118,7 @@ func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
 			return false, err
 		}
 		var initRes *proto.InitDomainResponse
-		err = syncExchangeToDomain(ctx, tb, initReq, &initRes)
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, initReq, &initRes)
 		if err != nil {
 			return false, err
 		}
@@ -147,7 +147,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Init the deployment transaction
 		var initDeployRes *proto.InitDeployTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, &proto.InitDeployTransactionRequest{
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitDeployTransactionRequest{
 			Transaction: deployTXSpec,
 		}, &initDeployRes)
 		if err != nil {
@@ -173,7 +173,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Prepare the deployment transaction
 		var prepareDeployRes *proto.PrepareDeployTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, prepareReq, &prepareDeployRes)
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, prepareReq, &prepareDeployRes)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +221,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		// - validate the transaction ABI is understood by the contract
 		// - get an initial list of verifiers that need to be resolved
 		var initTXRes *proto.InitTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, &proto.InitTransactionRequest{
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitTransactionRequest{
 			Transaction: txSpec,
 		}, &initTXRes)
 		if err != nil {
@@ -247,7 +247,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 		// Now call assemble
 		var assembleTXRes *proto.AssembleTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, assembleReq, &assembleTXRes)
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, assembleReq, &assembleTXRes)
 		if err != nil {
 			return false, err
 		}
@@ -286,7 +286,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			AttestationResult: attestations,
 		}
 		var prepareTXRes *proto.PrepareTransactionResponse
-		err = syncExchangeToDomain(ctx, tb, prepareTXReq, &prepareTXRes)
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, prepareTXReq, &prepareTXRes)
 		if err != nil {
 			return false, err
 		}
