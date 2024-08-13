@@ -178,7 +178,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn:tasks.goGet) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts]) {
     workingDir '.'
 
     inputs.dir("testbed")

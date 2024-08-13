@@ -31,7 +31,8 @@ message ConfigureDomainResponse {
 
 // **INIT** happens once when the domain is loaded into Paladin, after the result of ConfigureDomain has been processed
 message InitDomainRequest {
-    repeated StateSchema abi_state_schemas = 1; // The deterministically hashed identifiers of the same array of schemas provied to Paladin in the DomainConfig
+    string domain_uuid = 1; // A runtime instance UUID of this domain, that it must supply on all requests
+    repeated StateSchema abi_state_schemas = 2; // The deterministically hashed identifiers of the same array of schemas provied to Paladin in the DomainConfig
 }
 
 message InitDomainResponse {    

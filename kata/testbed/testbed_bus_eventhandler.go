@@ -17,12 +17,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/kata/internal/filters"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	pb "google.golang.org/protobuf/proto"
 )
@@ -35,6 +39,8 @@ var PREPARE_DEPLOY = (&proto.PrepareDeployTransactionRequest{}).ProtoReflect().D
 var INIT_TRANSACTION = (&proto.InitTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var ASSEMBLE_TRANSACTION = (&proto.AssembleTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var PREPARE_TRANSACTION = (&proto.PrepareTransactionRequest{}).ProtoReflect().Descriptor().FullName()
+
+var FIND_AVAILABLE_STATES = (&proto.FindAvailableStatesRequest{}).ProtoReflect().Descriptor().FullName()
 
 type inflightRequest struct {
 	req    *commsbus.Message
@@ -139,18 +145,77 @@ func (tb *testbed) eventHandler() {
 }
 
 func (tb *testbed) handleRequestFromDomain(msgFromDomain commsbus.Message) {
-	msgType := msgFromDomain.Body.ProtoReflect().Descriptor().FullName()
 	var reply pb.Message
+	var err error
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			log.L(tb.ctx).Errorf(string(debug.Stack()))
+			reply = &proto.DomainAPIError{
+				ErrorMessage: fmt.Sprintf("panic: %s", recovered),
+			}
+		} else if err != nil {
+			reply = &proto.DomainAPIError{
+				ErrorMessage: err.Error(),
+			}
+		}
+		_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
+			ID:            uuid.New().String(),
+			CorrelationID: &msgFromDomain.ID,
+			Destination:   *msgFromDomain.ReplyTo,
+			Body:          reply,
+		})
+	}()
+
+	msgType := msgFromDomain.Body.ProtoReflect().Descriptor().FullName()
 	switch msgType {
+	case FIND_AVAILABLE_STATES:
+		reply, err = tb.findAvailableStates(msgFromDomain.Body.(*proto.FindAvailableStatesRequest))
 	default:
-		reply = &proto.DomainAPIError{
-			ErrorMessage: fmt.Sprintf("unknown request type: %s", msgType),
+		err = fmt.Errorf("unknown request type: %s", msgType)
+	}
+}
+
+func (tb *testbed) findAvailableStates(req *proto.FindAvailableStatesRequest) (*proto.FindAvailableStatesResponse, error) {
+
+	domain := tb.getDomainByUUID(req.DomainUuid)
+	if domain == nil {
+		return nil, fmt.Errorf("domain with runtime instance UUID %q not found", req.DomainUuid)
+	}
+
+	var query filters.QueryJSON
+	err := json.Unmarshal([]byte(req.QueryJson), &query)
+	if err != nil {
+		return nil, fmt.Errorf("invalid query JSON: %s", err)
+	}
+
+	var states []*statestore.State
+	err = tb.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+		states, err = dsi.FindAvailableStates(req.SchemaId, &query)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	pbStates := make([]*proto.StoredState, len(states))
+	for i, s := range states {
+		pbStates[i] = &proto.StoredState{
+			HashId:   s.Hash.String(),
+			SchemaId: s.Schema.String(),
+			StoredAt: s.CreatedAt.UnixNano(),
+			DataJson: string(s.Data),
+		}
+		if s.Locked != nil {
+			pbStates[i].Lock = &proto.StateLock{
+				Sequence: s.Locked.Sequence.String(),
+				Creating: s.Locked.Creating,
+				Spending: s.Locked.Spending,
+			}
 		}
 	}
-	_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
-		ID:            uuid.New().String(),
-		CorrelationID: &msgFromDomain.ID,
-		Destination:   *msgFromDomain.ReplyTo,
-		Body:          reply,
-	})
+	return &proto.FindAvailableStatesResponse{
+		States: pbStates,
+	}, nil
+
 }

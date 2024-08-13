@@ -24,6 +24,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -73,6 +74,7 @@ type testbed struct {
 	destFromDomain   string
 	inflight         map[string]*inflightRequest
 	inflightLock     sync.Mutex
+	domainsByUUID    map[uuid.UUID]*testbedDomain
 	domainsByName    map[string]*testbedDomain
 	domainsByAddress map[ethtypes.Address0xHex]*testbedDomain
 	domainContracts  map[ethtypes.Address0xHex]*testbedPrivateSmartContract
@@ -85,6 +87,7 @@ func newTestBed() (tb *testbed) {
 	tb = &testbed{
 		sigc:             make(chan os.Signal, 1),
 		inflight:         make(map[string]*inflightRequest),
+		domainsByUUID:    make(map[uuid.UUID]*testbedDomain),
 		domainsByName:    make(map[string]*testbedDomain),
 		domainsByAddress: make(map[ethtypes.Address0xHex]*testbedDomain),
 		domainContracts:  make(map[ethtypes.Address0xHex]*testbedPrivateSmartContract),

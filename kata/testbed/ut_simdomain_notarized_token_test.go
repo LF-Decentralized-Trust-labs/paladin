@@ -149,6 +149,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	var factoryAddr ethtypes.Address0xHex
 	var fakeCoinSchemaID string
+	var domainUUID string
 
 	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]string, *big.Int, error) {
 		var lastStateTimestamp int64
@@ -172,7 +173,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					{FilterJSONBase: filters.FilterJSONBase{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
 				}
 			}
-			states, err := sc.FindAvailableStates(fakeCoinSchemaID, query)
+			states, err := sc.FindAvailableStates(domainUUID, fakeCoinSchemaID, query)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -199,7 +200,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
 		CONFIGURE_DOMAIN: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.ConfigureDomainRequest](t, iReq)
+			req := iReq.(*proto.ConfigureDomainRequest)
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
 			assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
@@ -215,15 +216,16 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		INIT_DOMAIN: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.InitDomainRequest](t, iReq)
+			req := iReq.(*proto.InitDomainRequest)
 			assert.Len(t, req.AbiStateSchemas, 1)
 			fakeCoinSchemaID = req.AbiStateSchemas[0].Id
 			assert.Equal(t, "type=FakeCoin(bytes32 salt,address owner,uint256 amount),labels=[owner,amount]", req.AbiStateSchemas[0].Signature)
+			domainUUID = req.DomainUuid
 			return &proto.InitDomainResponse{}, nil
 		},
 
 		INIT_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.InitDeployTransactionRequest](t, iReq)
+			req := iReq.(*proto.InitDeployTransactionRequest)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
 			return &proto.InitDeployTransactionResponse{
@@ -237,7 +239,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		PREPARE_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.PrepareDeployTransactionRequest](t, iReq)
+			req := iReq.(*proto.PrepareDeployTransactionRequest)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, `{
 				"notary": "domain1/contract1/notary",
@@ -261,7 +263,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		INIT_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.InitTransactionRequest](t, iReq)
+			req := iReq.(*proto.InitTransactionRequest)
 			assert.JSONEq(t, fakeCoinTransferABI, req.Transaction.FunctionAbiJson)
 			assert.Equal(t, "transfer(string,string,uint256)", req.Transaction.FunctionSignature)
 			var inputs fakeTransferParser
@@ -294,7 +296,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		ASSEMBLE_TRANSACTION: func(sc simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.AssembleTransactionRequest](t, iReq)
+			req := iReq.(*proto.AssembleTransactionRequest)
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
 			assert.NoError(t, err)
@@ -361,7 +363,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		PREPARE_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := simRequestToProto[*proto.PrepareTransactionRequest](t, iReq)
+			req := iReq.(*proto.PrepareTransactionRequest)
 			var signerSignature ethtypes.HexBytes0xPrefix
 			for _, att := range req.AttestationResult {
 				if att.AttestationType == proto.AttestationType_SIGN && att.Name == "sender" {

@@ -19,8 +19,9 @@ package paladin.kata;
 option go_package = "pkg/proto";
 
 message FindAvailableStatesRequest {
-    string schema_id = 1; // The ID of the schema
-    string query_json = 2; // The query specification in JSON
+    string domain_uuid = 1; // The runtime instance UUID of the domain (not the name)
+    string schema_id = 2; // The ID of the schema
+    string query_json = 3; // The query specification in JSON
 }
 
 message StoredState {

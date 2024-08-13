@@ -43,6 +43,7 @@ var iPaladinNewSmartContract_V0_Signature = mustEventSignatureHash(iPaladinContr
 type testbedDomain struct {
 	*transactionWaitUtils[*testbedPrivateSmartContract]
 	tb                     *testbed
+	instanceUUID           uuid.UUID
 	name                   string
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
@@ -63,6 +64,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	domain := &testbedDomain{
 		transactionWaitUtils: newTransactionWaitUtils[*testbedPrivateSmartContract](),
 		tb:                   tb,
+		instanceUUID:         uuid.New(),
 		name:                 name,
 		schemasByID:          make(map[string]statestore.Schema),
 		schemasBySignature:   make(map[string]statestore.Schema),
@@ -124,8 +126,10 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	tb.domainsByName[name] = domain
+	tb.domainsByUUID[domain.instanceUUID] = domain
 	tb.domainsByAddress[*domain.factoryContractAddress] = domain
 	return &proto.InitDomainRequest{
+		DomainUuid:      domain.instanceUUID.String(),
 		AbiStateSchemas: schemasProto,
 	}, nil
 }
@@ -345,6 +349,16 @@ func (tb *testbed) getDomainByAddress(addr *ethtypes.Address0xHex) *testbedDomai
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	return tb.domainsByAddress[*addr]
+}
+
+func (tb *testbed) getDomainByUUID(uuidStr string) (domain *testbedDomain) {
+	tb.domainLock.Lock()
+	defer tb.domainLock.Unlock()
+	id, err := uuid.Parse(uuidStr)
+	if err == nil {
+		domain = tb.domainsByUUID[id]
+	}
+	return domain
 }
 
 func (tb *testbed) getDomainContract(addr *ethtypes.Address0xHex) *testbedPrivateSmartContract {

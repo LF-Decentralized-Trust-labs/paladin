@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -48,7 +49,7 @@ type domainSimulator struct {
 // simCallbacks let UT simulation domains make gRPC calls with request/response semantics
 // back to the testbed as if they were real domains.
 type simCallbacks interface {
-	FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*proto.StoredState, err error)
+	FindAvailableStates(domainUUID, schemaID string, query *filters.QueryJSON) (s []*proto.StoredState, err error)
 }
 
 func newDomainSimulator(t *testing.T, messageHandlers map[protoreflect.FullName]domainSimulatorFn) (context.Context, func(res interface{}, method string, params ...interface{}) error, func()) {
@@ -99,37 +100,46 @@ func (ds *domainSimulator) messageHandler(toDomain commsbus.MessageHandler) {
 }
 
 func (ds *domainSimulator) handleRequestToDomain(msgType protoreflect.FullName, msgToDomain commsbus.Message) {
-	tb := ds.tb
-	handler := ds.messageHandlers[msgType]
-	var res pb.Message
 	var err error
+	var res pb.Message
+	tb := ds.tb
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			log.L(tb.ctx).Errorf(string(debug.Stack()))
+			res = &proto.DomainAPIError{
+				ErrorMessage: fmt.Sprintf("panic: %s", recovered),
+			}
+		} else if err != nil {
+			res = &proto.DomainAPIError{
+				ErrorMessage: err.Error(),
+			}
+		}
+		_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
+			ID:            uuid.New().String(),
+			CorrelationID: &msgToDomain.ID,
+			Destination:   *msgToDomain.ReplyTo,
+			Body:          res,
+		})
+	}()
+	handler := ds.messageHandlers[msgType]
 	if handler == nil {
 		err = fmt.Errorf("no handler for type %s", msgType)
 	} else {
 		log.L(tb.ctx).Infof("Calling simulation of %s", msgType)
 		res, err = handler(ds, msgToDomain.Body)
 	}
-	if err != nil {
-		res = &proto.DomainAPIError{
-			ErrorMessage: err.Error(),
-		}
-	}
-	_ = tb.bus.Broker().SendMessage(tb.ctx, commsbus.Message{
-		ID:            uuid.New().String(),
-		CorrelationID: &msgToDomain.ID,
-		Destination:   *msgToDomain.ReplyTo,
-		Body:          res,
-	})
 }
 
-func (ds *domainSimulator) FindAvailableStates(schemaID string, query *filters.QueryJSON) ([]*proto.StoredState, error) {
+func (ds *domainSimulator) FindAvailableStates(domainUUID, schemaID string, query *filters.QueryJSON) ([]*proto.StoredState, error) {
 	var res *proto.FindAvailableStatesResponse
 	qs, err := json.Marshal(query)
 	if err == nil {
 		tb := ds.tb
 		req := &proto.FindAvailableStatesRequest{
-			SchemaId:  schemaID,
-			QueryJson: string(qs),
+			DomainUuid: domainUUID,
+			SchemaId:   schemaID,
+			QueryJson:  string(qs),
 		}
 		err = syncExchange(tb.ctx, tb, tb.destFromDomain, tb.destToDomain, req, &res)
 	}
@@ -141,13 +151,6 @@ func (ds *domainSimulator) FindAvailableStates(schemaID string, query *filters.Q
 
 func (ds *domainSimulator) waitDone() {
 	<-ds.done
-}
-
-func simRequestToProto[T pb.Message](t *testing.T, iReq pb.Message) T {
-	req := new(T)
-	assert.Equal(t, (*req).ProtoReflect().Descriptor().FullName(), iReq.ProtoReflect().Descriptor().FullName())
-	*req = iReq.(T)
-	return *req
 }
 
 func newSimulatorRPCClient(t *testing.T, url string) func(res interface{}, method string, params ...interface{}) error {
