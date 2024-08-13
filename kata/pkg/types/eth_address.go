@@ -32,7 +32,7 @@ func (a *EthAddress) Address0xHex() *ethtypes.Address0xHex {
 	return (*ethtypes.Address0xHex)(a)
 }
 
-func (a *EthAddress) String() string {
+func (a EthAddress) String() string {
 	return a.Address0xHex().String()
 }
 

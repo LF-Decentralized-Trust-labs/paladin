@@ -18,13 +18,12 @@ package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 )
 
 // Specification for the invocation of a private smart contract
 type PrivateContractInvoke struct {
-	From     string                `json:"from"`               // the authorizing identity for this transaction
-	To       ethtypes.Address0xHex `json:"to"`                 // the private smart contract to invoke (must already have been deployed and indexed)
-	Function abi.Entry             `json:"function,omitempty"` // ABI definition of the function to invoke
-	Inputs   RawJSON               `json:"inputs,omitempty"`   // JSON encoded inputs - which will be validated against the function spec
+	From     string     `json:"from"`               // the authorizing identity for this transaction
+	To       EthAddress `json:"to"`                 // the private smart contract to invoke (must already have been deployed and indexed)
+	Function abi.Entry  `json:"function,omitempty"` // ABI definition of the function to invoke
+	Inputs   RawJSON    `json:"inputs,omitempty"`   // JSON encoded inputs - which will be validated against the function spec
 }

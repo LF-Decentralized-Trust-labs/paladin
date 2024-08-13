@@ -120,11 +120,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		Amount *ethtypes.HexInteger `json:"amount"`
 	}
 
-	// fakeTransferMintPayload := `{
-	// 	"from": null,
-	// 	"to": "wallets/org1/aaaaaa",
-	// 	"amount": "123000000000000000000"
-	// }`
+	fakeTransferMintPayload := `{
+		"from": null,
+		"to": "wallets/org1/aaaaaa",
+		"amount": "123000000000000000000"
+	}`
 
 	// fakeTransferPayload1 := `{
 	// 	"from": "wallets/org1/aaaaaa",
@@ -178,17 +178,17 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				"name": "FakeToken1",
 				"symbol": "FT1"
 			}`, req.Transaction.ConstructorParamsJson)
-			assert.Len(t, req.Verifiers, 1)
-			assert.Equal(t, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.Verifiers[0].Algorithm)
-			assert.Equal(t, "domain1/contract1/notary", req.Verifiers[0].Lookup)
-			assert.NotEmpty(t, req.Verifiers[0].Verifier)
+			assert.Len(t, req.ResolvedVerifiers, 1)
+			assert.Equal(t, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
+			assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
+			assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 			return &proto.PrepareDeployTransactionResponse{
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName: "newSIMTokenNotarized",
 					ParamsJson: fmt.Sprintf(`{
 						"txId": "%s",
 						"notary": "%s"
-					}`, req.Transaction.TransactionId, req.Verifiers[0].Verifier),
+					}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier),
 					SigningAddress: fmt.Sprintf("domain1/contract1/onetimekeys/%s", req.Transaction.TransactionId),
 				},
 			}, nil
@@ -245,7 +245,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, err)
 
-	var contractAddr *ethtypes.Address0xHex
+	var contractAddr ethtypes.Address0xHex
 	err = rpcCall(&contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "domain1/contract1/notary",
 		"name": "FakeToken1",
@@ -253,11 +253,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, err)
 
-	// err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
-	// 	From:   "wallets/org1/aaaaaa",
-	// 	To:     deployEvent.Address,
-	// 	Inputs: types.RawJSON(fakeTransferMintPayload),
-	// })
-	// assert.NoError(t, err)
+	err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
+		From:   "wallets/org1/aaaaaa",
+		To:     types.EthAddress(contractAddr),
+		Inputs: types.RawJSON(fakeTransferMintPayload),
+	})
+	assert.NoError(t, err)
 
 }

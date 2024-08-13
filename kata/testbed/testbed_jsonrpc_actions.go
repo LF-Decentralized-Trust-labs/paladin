@@ -138,7 +138,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		txID, deployTXSpec, err := tb.validateDeploy(ctx, domain, constructorParams)
+		txID, deployTXSpec, err := domain.validateDeploy(ctx, constructorParams)
 		if err != nil {
 			return nil, err
 		}
@@ -156,15 +156,15 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Resolve all the addresses locally in the testbed
 		prepareReq := &proto.PrepareDeployTransactionRequest{
-			Transaction: deployTXSpec,
-			Verifiers:   make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
+			Transaction:       deployTXSpec,
+			ResolvedVerifiers: make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
 		}
 		for i, v := range initDeployRes.RequiredVerifiers {
 			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
-			prepareReq.Verifiers[i] = &proto.ResolvedVerifier{
+			prepareReq.ResolvedVerifiers[i] = &proto.ResolvedVerifier{
 				Lookup:    v.Lookup,
 				Algorithm: v.Algorithm,
 				Verifier:  verifier,
@@ -198,6 +198,64 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		invocation types.PrivateContractInvoke,
 		inputs types.RawJSON,
 	) (*blockindexer.IndexedEvent, error) {
-		return nil, fmt.Errorf("TODO")
+
+		psc := tb.getDomainContract(invocation.To.Address0xHex())
+		if psc == nil {
+			return nil, fmt.Errorf("smart contract %s unknown", &invocation.To)
+		}
+
+		txID, txSpec, err := psc.validateInvoke(ctx, &invocation)
+		if err != nil {
+			return nil, err
+		}
+		waiter := psc.domain.txWaiter(ctx, *txID)
+		defer waiter.cancel()
+
+		// First we call init on the smart contract to:
+		// - validate the transaction ABI is understood by the contract
+		// - get an initial list of verifiers that need to be resolved
+		var initTXRes *proto.InitTransactionResponse
+		err = syncExchangeToDomain(ctx, tb, &proto.InitTransactionRequest{
+			Transaction: txSpec,
+		}, &initTXRes)
+		if err != nil {
+			return nil, err
+		}
+
+		// Gather the addresses - in the testbed we assume these all to be local
+		assembleReq := &proto.AssembleTransactionRequest{
+			Transaction:       txSpec,
+			ResolvedVerifiers: make([]*proto.ResolvedVerifier, len(initTXRes.RequiredVerifiers)),
+		}
+		for i, v := range initTXRes.RequiredVerifiers {
+			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
+			}
+			assembleReq.ResolvedVerifiers[i] = &proto.ResolvedVerifier{
+				Lookup:    v.Lookup,
+				Algorithm: v.Algorithm,
+				Verifier:  verifier,
+			}
+		}
+
+		// Now call assemble
+		var assembleTXRes *proto.AssembleTransactionResponse
+		err = syncExchangeToDomain(ctx, tb, assembleReq, &assembleTXRes)
+		if err != nil {
+			return nil, err
+		}
+
+		// The testbed only handles the OK result
+		switch assembleTXRes.AssemblyResult {
+		case proto.AssemblyResult_OK:
+		default:
+			return nil, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
+		}
+
+		// TODO: gather signatures and endorsements
+		// For now, shortcut to....
+
+		// Prepare the transaction
 	})
 }

@@ -180,7 +180,7 @@ func bytes32ToUUID(bytes ethtypes.HexBytes0xPrefix) uuid.UUID {
 	return id
 }
 
-func (tb *testbed) validateDeploy(ctx context.Context, domain *testbedDomain, constructorParams types.RawJSON) (*uuid.UUID, *proto.DeployTransactionSpecification, error) {
+func (domain *testbedDomain) validateDeploy(ctx context.Context, constructorParams types.RawJSON) (*uuid.UUID, *proto.DeployTransactionSpecification, error) {
 
 	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
 	if err != nil {
@@ -239,4 +239,10 @@ func (tb *testbed) getDomainByAddress(addr *ethtypes.Address0xHex) *testbedDomai
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	return tb.domainsByAddress[*addr]
+}
+
+func (tb *testbed) getDomainContract(addr *ethtypes.Address0xHex) *testbedPrivateSmartContract {
+	tb.domainLock.Lock()
+	defer tb.domainLock.Unlock()
+	return tb.domainContracts[*addr]
 }

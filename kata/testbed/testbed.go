@@ -200,7 +200,7 @@ func (tb *testbed) run() (err error) {
 		)
 	}
 	if err == nil {
-		blockHeight, err = tb.blockindexer.GetBlockHeight(tb.ctx)
+		blockHeight, err = tb.blockindexer.GetBlockListenerHeight(tb.ctx)
 	}
 	if err != nil {
 		return fmt.Errorf("Blockchain init failed: %s", err)

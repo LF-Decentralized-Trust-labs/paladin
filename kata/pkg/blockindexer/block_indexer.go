@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,7 +49,8 @@ type BlockIndexer interface {
 	GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
 	WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error)
-	GetBlockHeight(ctx context.Context) (uint64, error)
+	GetBlockListenerHeight(ctx context.Context) (highest uint64, err error)
+	GetConfirmedBlockHeight(ctx context.Context) (confirmed uint64, err error)
 }
 
 // Processes blocks from a configure baseline block (0 for example), up until it
@@ -69,6 +71,7 @@ type blockIndexer struct {
 	stateLock                  sync.Mutex
 	fromBlock                  *ethtypes.HexUint64
 	nextBlock                  *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
+	highestConfirmedBlock      int64               // set after we persist blocks
 	blocksSinceCheckpoint      []*BlockInfoJSONRPC
 	newHeadToAdd               []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
 	requiredConfirmations      int
@@ -108,6 +111,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		retry:                      blockListener.retry,
 		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
+		highestConfirmedBlock:      -1,
 		txWaiters:                  make(map[string]*txWaiter),
 		eventStreams:               make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
@@ -207,7 +211,15 @@ func (bi *blockIndexer) Stop() {
 	}
 }
 
-func (bi *blockIndexer) GetBlockHeight(ctx context.Context) (uint64, error) {
+func (bi *blockIndexer) GetConfirmedBlockHeight(ctx context.Context) (highest uint64, err error) {
+	highestConfirmedBlock := atomic.LoadInt64(&bi.highestConfirmedBlock)
+	if highestConfirmedBlock < 0 {
+		return 0, i18n.NewError(ctx, msgs.MsgBlockIndexerNoBlocksIndexed)
+	}
+	return uint64(highestConfirmedBlock), nil
+}
+
+func (bi *blockIndexer) GetBlockListenerHeight(ctx context.Context) (confirmed uint64, err error) {
 	return bi.blockListener.getHighestBlock(ctx)
 }
 
@@ -264,6 +276,7 @@ func (bi *blockIndexer) restoreCheckpoint() error {
 	case len(blocks) > 0:
 		nextBlock := ethtypes.HexUint64(blocks[0].Number + 1)
 		bi.nextBlock = &nextBlock
+		atomic.StoreInt64(&bi.highestConfirmedBlock, blocks[0].Number)
 	default:
 		bi.nextBlock = bi.fromBlock
 	}
@@ -479,8 +492,10 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 	var blocks []*IndexedBlock
 	var transactions []*IndexedTransaction
 	var events []*IndexedEvent
+	newHighestBlock := int64(-1)
 
 	for i, block := range batch.blocks {
+		newHighestBlock = int64(block.Number)
 		blocks = append(blocks, &IndexedBlock{
 			Number: int64(block.Number),
 			Hash:   *types.NewHashIDSlice32(block.Hash),
@@ -524,24 +539,27 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			}
 			return err
 		})
-		if err == nil {
-			if bi.utBatchNotify != nil {
-				bi.utBatchNotify <- batch
-			}
-			bi.txWaiterLock.Lock()
-			for _, w := range bi.txWaiters {
-				for _, t := range transactions {
-					if w.hash.Equals(&t.Hash) {
-						w.notify(t)
-					}
-				}
-			}
-			defer bi.txWaiterLock.Unlock()
-		}
 		return true, err
 	})
 	if err == nil {
 		bi.notifyEventStreams(ctx, batch)
+	}
+	if newHighestBlock >= 0 {
+		atomic.StoreInt64(&bi.highestConfirmedBlock, newHighestBlock)
+	}
+	if err == nil {
+		if bi.utBatchNotify != nil {
+			bi.utBatchNotify <- batch
+		}
+		bi.txWaiterLock.Lock()
+		for _, w := range bi.txWaiters {
+			for _, t := range transactions {
+				if w.hash.Equals(&t.Hash) {
+					w.notify(t)
+				}
+			}
+		}
+		defer bi.txWaiterLock.Unlock()
 	}
 }
 

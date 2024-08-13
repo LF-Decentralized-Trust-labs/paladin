@@ -414,10 +414,14 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	// simulate the highest block being known
 	bi.blockListener.highestBlock = 5
 	close(bi.blockListener.initialBlockHeightObtained)
+
+	_, err := bi.GetConfirmedBlockHeight(ctx)
+	assert.Regexp(t, "PD011308", err)
+
 	// do not start block listener
 	bi.startOrReset()
 
-	bh, err := bi.GetBlockHeight(ctx)
+	bh, err := bi.GetBlockListenerHeight(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5), bh)
 
@@ -434,6 +438,10 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 		assert.Len(t, b.blocks, 1) // We should get one block per batch
 		assert.Equal(t, blocks[i], b.blocks[0])
 	}
+
+	ch, err := bi.GetConfirmedBlockHeight(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(9), ch)
 }
 
 func TestBlockIndexerCancelledBeforeCurrentBlock(t *testing.T) {

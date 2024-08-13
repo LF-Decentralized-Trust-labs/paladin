@@ -15,10 +15,46 @@
 
 package main
 
-import "github.com/hyperledger/firefly-signer/pkg/ethtypes"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+)
 
 type testbedPrivateSmartContract struct {
 	tb      *testbed
 	domain  *testbedDomain
 	address *ethtypes.Address0xHex
+}
+
+func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invocation *types.PrivateContractInvoke) (*uuid.UUID, *proto.TransactionSpecification, error) {
+
+	functionABI := &invocation.Function
+
+	confirmedBlockHeight, err := psc.tb.blockindexer.GetConfirmedBlockHeight(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	functionParams, err := functionABI.Inputs.ParseJSONCtx(ctx, invocation.Inputs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid parameters for constructor: %s", err)
+	}
+
+	functionABIJSON, _ := json.Marshal(functionABI)
+	functionParamsJSON, _ := types.StandardABISerializer().SerializeJSONCtx(ctx, functionParams)
+
+	txID := uuid.New()
+	return &txID, &proto.TransactionSpecification{
+		TransactionId:      uuidToHexBytes32(txID).String(),
+		FunctionAbiJson:    string(functionABIJSON),
+		FunctionSignature:  functionABI.SignatureHashBytes().String(),
+		FunctionParamsJson: string(functionParamsJSON),
+		BaseBlock:          int64(confirmedBlockHeight),
+	}, nil
 }
