@@ -18,6 +18,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
 	_ "embed"
@@ -34,6 +35,9 @@ import (
 //go:embed abis/SIMDomain.json
 var simDomainBuild []byte // comes from Hardhat build
 
+//go:embed abis/SIMToken.json
+var simTokenBuild []byte // comes from Hardhat build
+
 func toJSONString(t *testing.T, v interface{}) string {
 	b, err := json.Marshal(v)
 	assert.NoError(t, err)
@@ -44,6 +48,7 @@ func toJSONString(t *testing.T, v interface{}) string {
 func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	simDomainABI := mustParseBuildABI(simDomainBuild)
+	simTokenABI := mustParseBuildABI(simTokenBuild)
 
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
@@ -133,6 +138,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	// }`
 
 	var factoryAddr ethtypes.Address0xHex
+	var fakeCoinSchemaID string
 	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
 
 		CONFIGURE_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
@@ -145,6 +151,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					ConstructorAbiJson:     fakeCoinConstructorABI,
 					FactoryContractAddress: factoryAddr.String(), // note this requires testbed_deployBytecode to have completed
 					FactoryContractAbiJson: toJSONString(t, simDomainABI),
+					PrivateContractAbiJson: toJSONString(t, simTokenABI),
 					AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 				},
 			}, nil
@@ -153,6 +160,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		INIT_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitDomainRequest](t, iReq)
 			assert.Len(t, req.AbiStateSchemaIds, 1)
+			fakeCoinSchemaID = req.AbiStateSchemaIds[0]
 			return &proto.InitDomainResponse{}, nil
 		},
 
@@ -202,7 +210,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
 			assert.NoError(t, err)
 			assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
-			assert.False(t, inputs.From == nil && inputs.To == nil)
 			// We require ethereum addresses for the "from" and "to" addresses to actually
 			// execute the transaction. See notes above about this.
 			requiredVerifiers := []*proto.ResolveVerifierRequest{
@@ -225,6 +232,67 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}
 			return &proto.InitTransactionResponse{
 				RequiredVerifiers: requiredVerifiers,
+			}, nil
+		},
+
+		ASSEMBLE_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.AssembleTransactionRequest](t, iReq)
+			var inputs fakeTransferParser
+			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
+			assert.NoError(t, err)
+			amount := inputs.Amount.BigInt()
+			toKeep := new(big.Int)
+			var fromAddr *ethtypes.Address0xHex
+			var toAddr *ethtypes.Address0xHex
+			for _, v := range req.ResolvedVerifiers {
+				if inputs.From != nil && v.Lookup == *inputs.From {
+					fromAddr = ethtypes.MustNewAddress(v.Verifier)
+				}
+				if inputs.To != nil && v.Lookup == *inputs.To {
+					toAddr = ethtypes.MustNewAddress(v.Verifier)
+				}
+			}
+			spentStateIds := []string{}
+			// if inputs.From != nil {
+			// 	// TODO: State loading
+			// }
+			newStates := []*proto.StateData{}
+			if fromAddr != nil && toKeep.Sign() > 0 {
+				// Generate a state to keep for ourselves
+				newStates = append(newStates, &proto.StateData{
+					SchemaId: fakeCoinSchemaID,
+					StateDataJson: fmt.Sprintf(`{
+					   "salt": "%s",
+					   "owner": "%s",
+					   "amount": "%s"
+					}`, types.RandHex(32), fromAddr, toKeep.Text(10)),
+				})
+			}
+			if toAddr != nil && amount.Sign() > 0 {
+				// Generate the coin to transfer
+				newStates = append(newStates, &proto.StateData{
+					SchemaId: fakeCoinSchemaID,
+					StateDataJson: fmt.Sprintf(`{
+					   "salt": "%s",
+					   "owner": "%s",
+					   "amount": "%s"
+					}`, types.RandHex(32), toAddr, amount.Text(10)),
+				})
+			}
+			return &proto.AssembleTransactionResponse{
+				AssembledTransaction: &proto.AssembledTransaction{
+					SpentStateIds: spentStateIds,
+					NewStates:     newStates,
+				},
+				AssemblyResult: proto.AssemblyResult_OK,
+				AttestationPlan: []*proto.AttestationRequest{
+					{
+						Name:            "sign",
+						AttestationType: proto.AttestationType_SIGN,
+						Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Payload:         types.RandBytes(32), // TODO: eip712StatesWithSalt(newStates),
+					},
+				},
 			}, nil
 		},
 	})
@@ -254,9 +322,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
-		From:   "wallets/org1/aaaaaa",
-		To:     types.EthAddress(contractAddr),
-		Inputs: types.RawJSON(fakeTransferMintPayload),
+		From:     "wallets/org1/aaaaaa",
+		To:       types.EthAddress(contractAddr),
+		Function: *mustParseABIEntry(fakeCoinTransferABI),
+		Inputs:   types.RawJSON(fakeTransferMintPayload),
 	})
 	assert.NoError(t, err)
 

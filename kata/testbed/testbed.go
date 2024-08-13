@@ -248,6 +248,15 @@ func mustParseBuildBytecode(buildJSON []byte) ethtypes.HexBytes0xPrefix {
 	return byteCode
 }
 
+func mustParseABIEntry(abiEntryJSON string) *abi.Entry {
+	var abiEntry abi.Entry
+	err := json.Unmarshal([]byte(abiEntryJSON), &abiEntry)
+	if err != nil {
+		panic(err)
+	}
+	return &abiEntry
+}
+
 func mustEventSignatureHash(a abi.ABI, eventName string) ethtypes.HexBytes0xPrefix {
 	ev := a.Events()[eventName]
 	if ev == nil {

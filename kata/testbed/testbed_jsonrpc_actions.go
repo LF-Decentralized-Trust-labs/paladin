@@ -179,7 +179,14 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		}
 
 		// Do the deploy - we wait for the transaction here to cover revert failures
-		if err := tb.deployPrivateSmartContract(ctx, domain, prepareDeployRes.Transaction); err != nil {
+		if prepareDeployRes.Deploy != nil && prepareDeployRes.Transaction == nil {
+			err = tb.execBaseLedgerDeployTransaction(ctx, domain.factoryContractABI, prepareDeployRes.Deploy)
+		} else if prepareDeployRes.Transaction != nil && prepareDeployRes.Deploy == nil {
+			err = tb.execBaseLedgerTransaction(ctx, domain.factoryContractABI, domain.factoryContractAddress, prepareDeployRes.Transaction)
+		} else {
+			err = fmt.Errorf("must return a transaction to invoke, or a transaction to deploy")
+		}
+		if err != nil {
 			return nil, err
 		}
 
@@ -194,19 +201,18 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 }
 
 func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod2(func(ctx context.Context,
+	return rpcserver.RPCMethod1(func(ctx context.Context,
 		invocation types.PrivateContractInvoke,
-		inputs types.RawJSON,
-	) (*blockindexer.IndexedEvent, error) {
+	) (bool, error) {
 
 		psc := tb.getDomainContract(invocation.To.Address0xHex())
 		if psc == nil {
-			return nil, fmt.Errorf("smart contract %s unknown", &invocation.To)
+			return false, fmt.Errorf("smart contract %s unknown", &invocation.To)
 		}
 
 		txID, txSpec, err := psc.validateInvoke(ctx, &invocation)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 		waiter := psc.domain.txWaiter(ctx, *txID)
 		defer waiter.cancel()
@@ -219,7 +225,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			Transaction: txSpec,
 		}, &initTXRes)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 
 		// Gather the addresses - in the testbed we assume these all to be local
@@ -230,7 +236,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		for i, v := range initTXRes.RequiredVerifiers {
 			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
+				return false, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
 			assembleReq.ResolvedVerifiers[i] = &proto.ResolvedVerifier{
 				Lookup:    v.Lookup,
@@ -243,19 +249,37 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		var assembleTXRes *proto.AssembleTransactionResponse
 		err = syncExchangeToDomain(ctx, tb, assembleReq, &assembleTXRes)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 
 		// The testbed only handles the OK result
 		switch assembleTXRes.AssemblyResult {
 		case proto.AssemblyResult_OK:
 		default:
-			return nil, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
+			return false, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
 		}
 
 		// TODO: gather signatures and endorsements
 		// For now, shortcut to....
 
 		// Prepare the transaction
+		prepareTXReq := &proto.PrepareTransactionRequest{
+			AssembledTransaction: assembleTXRes.AssembledTransaction,
+			AttestationResult:    []*proto.AttestationDetail{}, // TODO
+
+		}
+		var prepareTXRes *proto.PrepareTransactionResponse
+		err = syncExchangeToDomain(ctx, tb, prepareTXReq, &prepareTXRes)
+		if err != nil {
+			return false, err
+		}
+
+		err = tb.execBaseLedgerTransaction(ctx, psc.domain.privateContractABI, psc.address, prepareTXRes.Transaction)
+		if err != nil {
+			return false, err
+		}
+
+		// TODO: state confirmation by TXID
+		return true, nil
 	})
 }

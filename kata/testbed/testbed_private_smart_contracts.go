@@ -43,7 +43,7 @@ func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invo
 
 	functionParams, err := functionABI.Inputs.ParseJSONCtx(ctx, invocation.Inputs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid parameters for constructor: %s", err)
+		return nil, nil, fmt.Errorf("invalid parameters for function %s: %s", functionABI.SolString(), err)
 	}
 
 	functionABIJSON, _ := json.Marshal(functionABI)

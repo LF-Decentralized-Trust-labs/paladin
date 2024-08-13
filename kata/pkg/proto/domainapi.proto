@@ -53,7 +53,8 @@ message PrepareDeployTransactionRequest {
 }
 
 message PrepareDeployTransactionResponse {
-    BaseLedgerTransaction transaction = 1; // The instruction for submission to the base ledger
+    optional BaseLedgerTransaction transaction = 1; // The instruction for a tranaction to submit to the base ledger
+    optional BaseLedgerDeployTransaction deploy = 2; // The instruction for deploy request to submit to the base ledger
 }
 
 // **INIT** step for a business transaction happens in-line with the tranaction being accepted by Paladin from the application. Should verify the transaction is a valid request and build a list of required verifiers, but not resolve whether sufficient states exist to execute the transaction.
@@ -80,7 +81,7 @@ message AssembleTransactionResponse {
 
 // **PREPARE** step for a transaction 
 message PrepareTransactionRequest {
-    AssembleTransactionResponse assembled_transaction = 1; // The assembled transaction, that went into the attestation phase
+    AssembledTransaction assembled_transaction = 1; // The assembled transaction, that went into the attestation phase
     repeated AttestationDetail attestation_result = 2; // Any parties from the attestation_plan that required resolution
 }
 
@@ -92,7 +93,8 @@ message DomainConfig {
     string constructor_abi_json = 1; // Each domain can have a single constructor signature, that all deploy requests from callers must adhere to
     string factory_contract_address = 2;  // The address of the factory smart contract to invoke when the user requests deployment of a new private smart contract in this domain
     string factory_contract_abi_json = 3; // The ABI of the factory function the domain will translate the constructor_abi_json inputs into (the function MUST emit the Paladin defined event)
-    repeated string abi_state_schemas_json = 4; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
+    string private_contract_abi_json = 4; // The ABI of the base ledger private smart contract that is deployed for each instance (via the factory, or via direct bytecode deployment)
+    repeated string abi_state_schemas_json = 5; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
 }
 
 message DeployTransactionSpecification {
@@ -138,10 +140,10 @@ enum AttestationType {
 
 message AttestationRequest {
     string name = 1; // Allows correlation of attestation requests, to attestation results in the domain code
-    string attestation_type = 2; // The type of attestation, which instructs the Paladin engine how to coordinate and submit it
+    AttestationType attestation_type = 2; // The type of attestation, which instructs the Paladin engine how to coordinate and submit it
     string algorithm = 3; // An algorithm string to pass to the proof/siging technology to instruct it's operation
     bool resolve_verifier = 4; // Whether the verfier for this party must be known to the assembler, in order to assemble the transaction
-    string payload = 5; // A payload (encoded to string) in a format that the proof/signing technology is expecting for the given algorithm string
+    bytes payload = 5; // A payload (encoded to string) in a format that the proof/signing technology is expecting for the given algorithm string
     repeated string parties = 6; // The recipient for this attestation request (might be local to the Paladin node, or remote)
     optional int32 threshold = 7; // The minimum number of parties that must produce the attestation to proceed from the assemble to the prepare stage (default is the number of parties)
 }
@@ -165,7 +167,13 @@ message AttestationDetail {
 
 message BaseLedgerTransaction {
     string function_name = 1; // The name of the function to invoke on the base smart contract, based on processing the user's constructor parameters in the private smart contract layer
-    string params_json = 2; // The parameters to pass to the base smart contract, in JSON format. Paladin will submit this tranaction to the base blockchain
+    string params_json = 2; // The parameters to pass to the base smart contract function, in JSON format. Paladin will submit this tranaction to the base blockchain
+    string signing_address = 3; // The identifier of a signing address to use to submit the transaction to the chain. Uses standard Paladin resolution of signing addresses (including dynamic allocation, if for example the transaction_id is supplied as part of the string to require a different key for each TX)
+}
+
+message BaseLedgerDeployTransaction {
+    bytes bytecode = 1; // The contract bytecode
+    string params_json = 2; // The parameters to pass to the base smart contract constructor, in JSON format. Paladin will submit this tranaction to the base blockchain
     string signing_address = 3; // The identifier of a signing address to use to submit the transaction to the chain. Uses standard Paladin resolution of signing addresses (including dynamic allocation, if for example the transaction_id is supplied as part of the string to require a different key for each TX)
 }
 

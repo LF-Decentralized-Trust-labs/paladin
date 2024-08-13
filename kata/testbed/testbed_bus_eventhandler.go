@@ -33,6 +33,7 @@ var INIT_DOMAIN = (&proto.InitDomainRequest{}).ProtoReflect().Descriptor().FullN
 var INIT_DEPLOY = (&proto.InitDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var PREPARE_DEPLOY = (&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var INIT_TRANSACTION = (&proto.InitTransactionRequest{}).ProtoReflect().Descriptor().FullName()
+var ASSEMBLE_TRANSACTION = (&proto.AssembleTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 
 type inflightRequest struct {
 	req    *commsbus.Message

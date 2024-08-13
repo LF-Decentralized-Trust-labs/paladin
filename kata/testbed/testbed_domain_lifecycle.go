@@ -48,6 +48,7 @@ type testbedDomain struct {
 	constructorABI         *abi.Entry
 	factoryContractAddress *ethtypes.Address0xHex
 	factoryContractABI     abi.ABI
+	privateContractABI     abi.ABI
 }
 
 func (tb *testbed) registerDomain(ctx context.Context, name string, config *proto.DomainConfig) (*proto.InitDomainRequest, error) {
@@ -74,6 +75,10 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 
 	if err := json.Unmarshal(([]byte)(config.FactoryContractAbiJson), &domain.factoryContractABI); err != nil {
 		return nil, fmt.Errorf("bad factory contract ABI: %s", err)
+	}
+
+	if err := json.Unmarshal(([]byte)(config.PrivateContractAbiJson), &domain.privateContractABI); err != nil {
+		return nil, fmt.Errorf("bad private contract ABI: %s", err)
 	}
 
 	domain.factoryContractAddress, err = ethtypes.NewAddress(config.FactoryContractAddress)
@@ -198,10 +203,35 @@ func (domain *testbedDomain) validateDeploy(ctx context.Context, constructorPara
 	}, nil
 }
 
-func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testbedDomain, txInstruction *proto.BaseLedgerTransaction) error {
+func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.ABI, txInstruction *proto.BaseLedgerDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
-	abiClient, err := tb.ethClient.ABI(ctx, domain.factoryContractABI)
+	abiClient, err := tb.ethClient.ABI(ctx, abi)
+	if err == nil {
+		abiFunc, err = abiClient.Constructor(ctx, txInstruction.Bytecode)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to process ABI constructor: %s", err)
+	}
+
+	// Send the transaction
+	txHash, err := abiFunc.R(ctx).
+		Signer(txInstruction.SigningAddress).
+		Input(txInstruction.ParamsJson).
+		SignAndSend()
+	if err == nil {
+		_, err = tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+	}
+	if err != nil {
+		return fmt.Errorf("failed to send base deploy ledger transaction: %s", err)
+	}
+	return nil
+}
+
+func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, to *ethtypes.Address0xHex, txInstruction *proto.BaseLedgerTransaction) error {
+
+	var abiFunc ethclient.ABIFunctionClient
+	abiClient, err := tb.ethClient.ABI(ctx, abi)
 	if err == nil {
 		abiFunc, err = abiClient.Function(ctx, txInstruction.FunctionName)
 	}
@@ -212,7 +242,7 @@ func (tb *testbed) deployPrivateSmartContract(ctx context.Context, domain *testb
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
 		Signer(txInstruction.SigningAddress).
-		To(domain.factoryContractAddress).
+		To(to).
 		Input(txInstruction.ParamsJson).
 		SignAndSend()
 	if err == nil {
