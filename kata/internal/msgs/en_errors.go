@@ -179,6 +179,7 @@ var (
 	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
 	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
 	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
+	MsgSigningKeyCannotBeEmpty                  = ffe("PD011421", "Cannot resolve a signing key for the empty string")
 
 	// EthClient module PD0115XX
 	MsgEthClientInvalidInput      = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")

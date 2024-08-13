@@ -40,6 +40,11 @@ type State struct {
 	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
 }
 
+type NewState struct {
+	SchemaID string
+	Data     types.RawJSON
+}
+
 // StateWithLabels is a newly prepared state that has not yet been persisted
 type StateWithLabels struct {
 	*State
@@ -136,7 +141,7 @@ func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 	return nil
 }
 
-func (ss *stateStore) labelSetFor(schema SchemaCommon) *trackingLabelSet {
+func (ss *stateStore) labelSetFor(schema Schema) *trackingLabelSet {
 	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
 	for _, fi := range schema.LabelInfo() {
 		tls.labels[fi.label] = fi
@@ -149,7 +154,7 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 	return s, err
 }
 
-func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (schema SchemaCommon, s []*State, err error) {
+func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (schema Schema, s []*State, err error) {
 	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, nil, err

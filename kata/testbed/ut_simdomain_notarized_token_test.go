@@ -96,17 +96,18 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	// in the same ABI.
 	fakeCoinTransferABI := `{
 		"type": "function",
+		"name": "transfer",
 		"inputs": [
 		  {
 		    "name": "from",
-			"type": "address"
+			"type": "string"
 		  },
 		  {
 		    "name": "to",
-			"type": "address"
+			"type": "string"
 		  },
 		  {
-		    "name": "value",
+		    "name": "amount",
 			"type": "uint256"
 		  }
 		],
@@ -120,13 +121,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`
 
 	type fakeTransferParser struct {
-		From   *string              `json:"from,omitempty"`
-		To     *string              `json:"to,omitempty"`
+		From   string               `json:"from,omitempty"`
+		To     string               `json:"to,omitempty"`
 		Amount *ethtypes.HexInteger `json:"amount"`
 	}
 
 	fakeTransferMintPayload := `{
-		"from": null,
+		"from": "",
 		"to": "wallets/org1/aaaaaa",
 		"amount": "123000000000000000000"
 	}`
@@ -159,8 +160,9 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 		INIT_DOMAIN: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitDomainRequest](t, iReq)
-			assert.Len(t, req.AbiStateSchemaIds, 1)
-			fakeCoinSchemaID = req.AbiStateSchemaIds[0]
+			assert.Len(t, req.AbiStateSchemas, 1)
+			fakeCoinSchemaID = req.AbiStateSchemas[0].Id
+			assert.Equal(t, "type=FakeCoin(bytes32 salt,address owner,uint256 amount),labels=[owner,amount]", req.AbiStateSchemas[0].Signature)
 			return &proto.InitDomainResponse{}, nil
 		},
 
@@ -205,7 +207,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		INIT_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
 			req := simRequestToProto[*proto.InitTransactionRequest](t, iReq)
 			assert.JSONEq(t, fakeCoinTransferABI, req.Transaction.FunctionAbiJson)
-			assert.Equal(t, "Transfer(string,string,uint256)", req.Transaction.FunctionSignature)
+			assert.Equal(t, "transfer(string,string,uint256)", req.Transaction.FunctionSignature)
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
 			assert.NoError(t, err)
@@ -218,15 +220,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				},
 			}
-			if inputs.From != nil {
+			if inputs.From != "" {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
-					Lookup:    *inputs.From,
+					Lookup:    inputs.From,
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
-			if inputs.To != nil && (inputs.From == nil || *inputs.From != *inputs.To) {
+			if inputs.To != "" && (inputs.From == "" || inputs.From != inputs.To) {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
-					Lookup:    *inputs.To,
+					Lookup:    inputs.To,
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
@@ -245,10 +247,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			var fromAddr *ethtypes.Address0xHex
 			var toAddr *ethtypes.Address0xHex
 			for _, v := range req.ResolvedVerifiers {
-				if inputs.From != nil && v.Lookup == *inputs.From {
+				if inputs.From != "" && v.Lookup == inputs.From {
 					fromAddr = ethtypes.MustNewAddress(v.Verifier)
 				}
-				if inputs.To != nil && v.Lookup == *inputs.To {
+				if inputs.To != "" && v.Lookup == inputs.To {
 					toAddr = ethtypes.MustNewAddress(v.Verifier)
 				}
 			}
@@ -287,11 +289,33 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				AssemblyResult: proto.AssemblyResult_OK,
 				AttestationPlan: []*proto.AttestationRequest{
 					{
-						Name:            "sign",
+						Name:            "sender",
 						AttestationType: proto.AttestationType_SIGN,
 						Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 						Payload:         types.RandBytes(32), // TODO: eip712StatesWithSalt(newStates),
 					},
+				},
+			}, nil
+		},
+
+		PREPARE_TRANSACTION: func(iReq pb.Message) (pb.Message, error) {
+			req := simRequestToProto[*proto.PrepareTransactionRequest](t, iReq)
+			var signerSignature ethtypes.HexBytes0xPrefix
+			for _, att := range req.AttestationResult {
+				if att.AttestationType == proto.AttestationType_SIGN && att.Name == "sender" {
+					signerSignature = att.Payload
+				}
+			}
+			return &proto.PrepareTransactionResponse{
+				Transaction: &proto.BaseLedgerTransaction{
+					FunctionName: "executeNotarized",
+					ParamsJson: toJSONString(t, map[string]interface{}{
+						"txId":      req.Transaction.TransactionId,
+						"inputs":    req.Transaction.SpentStateIds,
+						"outputs":   req.Transaction.NewStateIds,
+						"signature": signerSignature,
+					}),
+					SigningAddress: "domain1/contract1/notary",
 				},
 			}, nil
 		},

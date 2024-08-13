@@ -33,7 +33,7 @@ import (
 )
 
 type abiSchema struct {
-	*Schema
+	*SchemaPersisted
 	tc          abi.TypeComponent
 	definition  *abi.Parameter
 	primaryType string
@@ -43,7 +43,7 @@ type abiSchema struct {
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			DomainID: domainID,
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
@@ -56,10 +56,10 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		err = as.typedDataV4Setup(ctx, true)
 	}
 	if err == nil {
-		as.Signature, err = as.FullSignature(ctx)
+		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.Hash = *types.HashIDKeccak([]byte(as.Signature))
+		as.Hash = *types.HashIDKeccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -67,9 +67,9 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 	return as, nil
 }
 
-func newABISchemaFromDB(ctx context.Context, persisted *Schema) (*abiSchema, error) {
+func newABISchemaFromDB(ctx context.Context, persisted *SchemaPersisted) (*abiSchema, error) {
 	as := &abiSchema{
-		Schema: persisted,
+		SchemaPersisted: persisted,
 	}
 	err := json.Unmarshal(persisted.Definition, &as.definition)
 	if err != nil {
@@ -86,8 +86,16 @@ func (as *abiSchema) Type() SchemaType {
 	return SchemaTypeABI
 }
 
-func (as *abiSchema) Persisted() *Schema {
-	return as.Schema
+func (as *abiSchema) ID() string {
+	return as.SchemaPersisted.Hash.String()
+}
+
+func (as *abiSchema) Signature() string {
+	return as.SchemaPersisted.Signature
+}
+
+func (as *abiSchema) Persisted() *SchemaPersisted {
+	return as.SchemaPersisted
 }
 
 func (as *abiSchema) LabelInfo() []*schemaLabelInfo {

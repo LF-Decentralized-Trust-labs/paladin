@@ -263,7 +263,7 @@ func TestRestoreABISchemaInvalidType(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := newABISchemaFromDB(ctx, &Schema{
+	_, err := newABISchemaFromDB(ctx, &SchemaPersisted{
 		Definition: types.RawJSON(`{}`),
 	})
 	assert.Regexp(t, "PD010114", err)
@@ -275,7 +275,7 @@ func TestRestoreABISchemaInvalidTypeTree(t *testing.T) {
 	ctx, _, _, done := newDBMockStateStore(t)
 	defer done()
 
-	_, err := newABISchemaFromDB(ctx, &Schema{
+	_, err := newABISchemaFromDB(ctx, &SchemaPersisted{
 		Definition: types.RawJSON(`{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`),
 	})
 	assert.Regexp(t, "FF22025.*wrong", err)
@@ -401,7 +401,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -439,7 +439,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -484,7 +484,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -507,7 +507,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -532,7 +532,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -557,7 +557,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -582,7 +582,7 @@ func TestABISchemaMapLabelResolverBadType(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{
@@ -604,7 +604,7 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 	defer done()
 
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			Labels: []string{"field1"},
 		},
 		definition: &abi.Parameter{

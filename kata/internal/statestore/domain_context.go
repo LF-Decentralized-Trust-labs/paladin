@@ -46,7 +46,7 @@ type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) e
 type DomainStateInterface interface {
 
 	// EnsureABISchema is expected to be called on startup with all schemas required for operation of the domain
-	EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error)
+	EnsureABISchemas(defs []*abi.Parameter) ([]Schema, error)
 
 	// FindAvailableStates is the main query function, only returning states that are available.
 	// Note this does not lock these states in any way, you must call that afterwards as:
@@ -69,7 +69,7 @@ type DomainStateInterface interface {
 	// CreateNewStates creates new states that are locked for reading to the specified sequence from creation.
 	// They are available immediately within the domain for return in FindAvailableStates
 	// (even before the flush)
-	CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (s []*State, err error)
+	CreateNewStates(sequenceID uuid.UUID, states []*NewState) (s []*State, err error)
 
 	// ResetSequence queues up removal of all lock records for a given sequence
 	// Note that the private data of the states themselves are not removed
@@ -162,16 +162,18 @@ func (dc *domainContext) run(fn func(ctx context.Context, dsi DomainStateInterfa
 	return fn(dc.ctx, dc)
 }
 
-func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error) {
+func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]Schema, error) {
 
 	// Validate all the schemas
-	prepared := make([]*Schema, len(defs))
+	prepared := make([]Schema, len(defs))
+	toFlush := make([]*SchemaPersisted, len(defs))
 	for i, def := range defs {
 		s, err := newABISchema(dc.ctx, dc.domainID, def)
 		if err != nil {
 			return nil, err
 		}
-		prepared[i] = s.Schema
+		prepared[i] = s
+		toFlush[i] = s.SchemaPersisted
 	}
 
 	// Take lock and check flush state
@@ -182,7 +184,7 @@ func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, err
 	}
 
 	// Add them to the unflushed state
-	dc.unFlushed.schemas = append(dc.unFlushed.schemas, prepared...)
+	dc.unFlushed.schemas = append(dc.unFlushed.schemas, toFlush...)
 	return prepared, nil
 }
 
@@ -210,7 +212,7 @@ func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
 	return spendLocks, nil
 }
 
-func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
+func (dc *domainContext) mergedUnFlushed(schema Schema, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
 	if flushErr := dc.checkFlushCompletion(false); flushErr != nil {
@@ -259,7 +261,7 @@ func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, q
 	return states, nil
 }
 
-func (dc *domainContext) mergeInMemoryMatches(schema SchemaCommon, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
+func (dc *domainContext) mergeInMemoryMatches(schema Schema, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
 
 	// Reconstitute the labels for all the loaded states into the front of an aggregate list
 	fullList := make([]*StateWithLabels, len(states), len(states)+len(extras))
@@ -321,17 +323,17 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	return dc.mergedUnFlushed(schema, states, query)
 }
 
-func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (states []*State, err error) {
+func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, newStates []*NewState) (states []*State, err error) {
 
-	schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, schemaID, true)
-	if err != nil {
-		return nil, err
-	}
+	states = make([]*State, len(newStates))
+	withValues := make([]*StateWithLabels, len(newStates))
+	for i, ns := range newStates {
+		schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, ns.SchemaID, true)
+		if err != nil {
+			return nil, err
+		}
 
-	states = make([]*State, len(data))
-	withValues := make([]*StateWithLabels, len(data))
-	for i, d := range data {
-		withValues[i], err = schema.ProcessState(dc.ctx, d)
+		withValues[i], err = schema.ProcessState(dc.ctx, ns.Data)
 		if err != nil {
 			return nil, err
 		}

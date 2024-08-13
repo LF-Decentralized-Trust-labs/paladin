@@ -154,7 +154,7 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
+task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     workingDir '.'
 
     def libName;
@@ -176,6 +176,20 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
+}
+
+task buildTestbed(type:Exec, dependsOn:tasks.goGet) {
+    workingDir '.'
+
+    inputs.dir("testbed")
+    outputs.dir("bin")
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', 'bin/'
+    args './testbed'
 }
 
 task buildTestPluginsSharedLibraryA(type:Exec) {
@@ -359,6 +373,7 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
+    dependsOn tasks.buildTestbed
     dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage

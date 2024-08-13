@@ -44,7 +44,8 @@ type testbedDomain struct {
 	*transactionWaitUtils[*testbedPrivateSmartContract]
 	tb                     *testbed
 	name                   string
-	schemas                []*statestore.Schema
+	schemasBySignature     map[string]statestore.Schema
+	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry
 	factoryContractAddress *ethtypes.Address0xHex
 	factoryContractABI     abi.ABI
@@ -63,6 +64,8 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 		transactionWaitUtils: newTransactionWaitUtils[*testbedPrivateSmartContract](),
 		tb:                   tb,
 		name:                 name,
+		schemasByID:          make(map[string]statestore.Schema),
+		schemasBySignature:   make(map[string]statestore.Schema),
 	}
 
 	err := json.Unmarshal(([]byte)(config.ConstructorAbiJson), &domain.constructorABI)
@@ -87,8 +90,9 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	}
 
 	flushed := make(chan struct{})
+	var schemas []statestore.Schema
 	err = tb.stateStore.RunInDomainContext(name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
-		domain.schemas, err = dsi.EnsureABISchemas(abiSchemas)
+		schemas, err = dsi.EnsureABISchemas(abiSchemas)
 		if err == nil {
 			err = dsi.Flush(func(ctx context.Context, dsi statestore.DomainStateInterface) error {
 				close(flushed)
@@ -106,9 +110,15 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 		return nil, fmt.Errorf("flush timed out")
 	}
 
-	schemaIDs := make([]string, len(domain.schemas))
-	for i, s := range domain.schemas {
-		schemaIDs[i] = s.Signature
+	schemasProto := make([]*proto.StateSchema, len(schemas))
+	for i, s := range schemas {
+		schemaID := s.ID()
+		domain.schemasByID[schemaID] = s
+		domain.schemasBySignature[s.Signature()] = s
+		schemasProto[i] = &proto.StateSchema{
+			Id:        schemaID,
+			Signature: s.Signature(),
+		}
 	}
 
 	tb.domainLock.Lock()
@@ -116,7 +126,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	tb.domainsByName[name] = domain
 	tb.domainsByAddress[*domain.factoryContractAddress] = domain
 	return &proto.InitDomainRequest{
-		AbiStateSchemaIds: schemaIDs,
+		AbiStateSchemas: schemasProto,
 	}, nil
 }
 
@@ -262,6 +272,72 @@ func (tb *testbed) getDomainByName(name string) (*testbedDomain, error) {
 		return nil, fmt.Errorf("domain %q not found", name)
 	}
 	return domain, nil
+
+}
+
+func (tb *testbed) gatherSignatures(ctx context.Context, requests []*proto.AttestationRequest) ([]*proto.AttestationResult, error) {
+	attestations := []*proto.AttestationResult{}
+	for _, ar := range requests {
+		if ar.AttestationType == proto.AttestationType_SIGN {
+			for _, partyName := range ar.Parties {
+				keyHandle, verifier, err := tb.keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
+				if err != nil {
+					return nil, fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
+				}
+				signaturePayload, err := tb.keyMgr.Sign(ctx, &proto.SignRequest{
+					KeyHandle: keyHandle,
+					Algorithm: ar.Algorithm,
+					Payload:   ar.Payload,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
+				}
+				attestations = append(attestations, &proto.AttestationResult{
+					Name:            ar.Name,
+					AttestationType: ar.AttestationType,
+					Verifier: &proto.ResolvedVerifier{
+						Lookup:    partyName,
+						Algorithm: ar.Algorithm,
+						Verifier:  verifier,
+					},
+					Payload: signaturePayload.Payload,
+				})
+			}
+		}
+	}
+	return attestations, nil
+}
+
+func (domain *testbedDomain) validateAndWriteStates(newStates []*proto.StateData) ([]string, error) {
+
+	newStatesToWrite := make([]*statestore.NewState, len(newStates))
+	for i, s := range newStates {
+		schema := domain.schemasByID[s.SchemaId]
+		if schema == nil {
+			schema = domain.schemasBySignature[s.SchemaId]
+		}
+		if schema == nil {
+			return nil, fmt.Errorf("unknown schema %s", s.SchemaId)
+		}
+		newStatesToWrite[i] = &statestore.NewState{
+			SchemaID: schema.ID(),
+			Data:     types.RawJSON(s.StateDataJson),
+		}
+	}
+
+	var states []*statestore.State
+	err := domain.tb.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+		states, err = dsi.CreateNewStates(uuid.New() /* TODO: Work out testbed simulation of sequence */, newStatesToWrite)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	newStateIDs := make([]string, len(states))
+	for i, ws := range states {
+		newStateIDs[i] = ws.Hash.String()
+	}
+	return newStateIDs, nil
 
 }
 

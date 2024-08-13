@@ -43,7 +43,7 @@ type writeOperation struct {
 	stateSpends         []*StateSpend
 	stateLocks          []*StateLock
 	sequenceLockDeletes []uuid.UUID
-	schemas             []*Schema
+	schemas             []*SchemaPersisted
 }
 
 type stateWriter struct {
@@ -188,7 +188,7 @@ func (sw *stateWriter) worker(i int) {
 func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 
 	// Build lists of things to insert (we are insert only)
-	var schemas []*Schema
+	var schemas []*SchemaPersisted
 	var states []*State
 	var labels []*StateLabel
 	var int64Labels []*StateInt64Label

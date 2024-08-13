@@ -76,7 +76,7 @@ func TestStateFlushAsync(t *testing.T) {
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
 		assert.Len(t, schemas, 1)
-		schemaHash := schemas[0].Hash.String()
+		schemaHash := schemas[0].Persisted().Hash.String()
 		return dsi.Flush(func(ctx context.Context, dsi DomainStateInterface) error {
 			schemaHashReceiver <- schemaHash
 			return nil
@@ -93,8 +93,11 @@ func TestStateFlushAsync(t *testing.T) {
 
 	// Run a 2nd handler that depends on that schema being available
 	err = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
-		states, err := dsi.CreateNewStates(uuid.New(), schemaHash, []types.RawJSON{
-			types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, types.RandHex(32))),
+		states, err := dsi.CreateNewStates(uuid.New(), []*NewState{
+			{
+				SchemaID: schemaHash,
+				Data:     types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, types.RandHex(32))),
+			},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, states, 1)
@@ -117,17 +120,17 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
 		assert.Len(t, schemas, 1)
-		schemaHash = schemas[0].Hash.String()
+		schemaHash = schemas[0].ID()
 
 		// Flush as ABI schemas only available after a flush
 		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
 		assert.NoError(t, err)
 
 		// Store some states
-		tx1states, err := dsi.CreateNewStates(sequenceID, schemaHash, []types.RawJSON{
-			types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))),
-			types.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))),
-			types.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))),
+		tx1states, err := dsi.CreateNewStates(sequenceID, []*NewState{
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, tx1states, 3)
@@ -163,9 +166,9 @@ func TestStateContextMintSpendMint(t *testing.T) {
 			states[1].Hash.String(), // 75
 		})
 		assert.NoError(t, err)
-		tx2states, err := dsi.CreateNewStates(sequenceID, schemaHash, []types.RawJSON{
-			types.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))),
-			types.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))),
+		tx2states, err := dsi.CreateNewStates(sequenceID, []*NewState{
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, tx2states, 2)
@@ -214,9 +217,9 @@ func TestStateContextMintSpendMint(t *testing.T) {
 			states[0].Hash.String(), // 50
 		})
 		assert.NoError(t, err)
-		tx3states, err := dsi.CreateNewStates(sequenceID, schemaHash, []types.RawJSON{
-			types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))),
-			types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))),
+		tx3states, err := dsi.CreateNewStates(sequenceID, []*NewState{
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
+			{SchemaID: schemaHash, Data: types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, tx3states, 2)
@@ -305,7 +308,6 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
-		schemaHash := schemas[0].Hash.String()
 		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
 		assert.NoError(t, err)
 
@@ -320,13 +322,13 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
-		schema, err := ss.getSchemaByHash(ctx, "domain1", &schemas[0].Hash, true)
+		schema, err := ss.getSchemaByHash(ctx, "domain1", types.MustParseHashID(schemas[0].ID()), true)
 		assert.NoError(t, err)
 		_, err = dc.mergedUnFlushed(schema, nil, nil)
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
-		_, err = dsi.CreateNewStates(uuid.New(), schemaHash, nil)
+		_, err = dsi.CreateNewStates(uuid.New(), nil)
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
@@ -474,7 +476,8 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
-		schemaHash := schemas[0].Hash.String()
+		schemaHash := schemas[0].ID()
+		assert.Equal(t, "type=FakeCoin(bytes32 salt,address owner,uint256 amount),labels=[owner,amount]", schemas[0].Signature())
 		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
 		assert.NoError(t, err)
 
@@ -485,8 +488,8 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 			`{"sort":["wrong"]}`))
 		assert.Regexp(t, "PD010700", err)
 
-		_, err = dsi.CreateNewStates(uuid.New(), schemaHash, []types.RawJSON{
-			types.RawJSON(`"wrong"`),
+		_, err = dsi.CreateNewStates(uuid.New(), []*NewState{
+			{SchemaID: schemaHash, Data: types.RawJSON(`"wrong"`)},
 		})
 		assert.Regexp(t, "FF22038", err)
 
@@ -502,7 +505,9 @@ func TestDSIBadIDs(t *testing.T) {
 
 	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
-		_, err := dsi.CreateNewStates(uuid.New(), "wrong", nil)
+		_, err := dsi.CreateNewStates(uuid.New(), []*NewState{
+			{SchemaID: "wrong"},
+		})
 		assert.Regexp(t, "PD010100", err)
 
 		err = dsi.MarkStatesRead(uuid.New(), []string{"wrong"})

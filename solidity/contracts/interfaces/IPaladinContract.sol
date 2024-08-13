@@ -15,6 +15,8 @@ interface IPaladinContract_V0 {
         bytes     data
     );
 
+    // TODO: Reconcile if we need this standard function or not - or if domain off-chain code
+    //       can simply construct the transactions directly
     function paladinExecute_V0(bytes32 txId, bytes32 fnSelector, bytes calldata payload) external;
 
 }

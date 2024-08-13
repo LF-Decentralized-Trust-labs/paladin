@@ -38,4 +38,8 @@ contract SIMToken is IPaladinContract_V0 {
             abi.decode(payload, (bytes32, bytes32[], bytes32[]));
         emit PaladinPrivateTransaction_V0(txId, inputs, outputs, abi.encodePacked(signature));
     }
+
+    function executeNotarized(bytes32 txId, bytes32[] calldata inputs, bytes32[] calldata outputs, bytes calldata signature) public onlyNotary {
+        emit PaladinPrivateTransaction_V0(txId, inputs, outputs, abi.encodePacked(signature));
+    }
 }

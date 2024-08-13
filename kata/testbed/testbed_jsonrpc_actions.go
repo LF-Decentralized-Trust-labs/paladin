@@ -259,14 +259,31 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			return false, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
 		}
 
-		// TODO: gather signatures and endorsements
+		// Validate and write the states
+		newStateIDs, err := psc.domain.validateAndWriteStates(assembleTXRes.AssembledTransaction.NewStates)
+		if err != nil {
+			return false, err
+		}
+
+		// Gather signatures
+		attestations := []*proto.AttestationResult{}
+		signatures, err := tb.gatherSignatures(ctx, assembleTXRes.AttestationPlan)
+		if err != nil {
+			return false, err
+		}
+		attestations = append(attestations, signatures...)
+
+		// TODO: gather endorsements
 		// For now, shortcut to....
 
 		// Prepare the transaction
 		prepareTXReq := &proto.PrepareTransactionRequest{
-			AssembledTransaction: assembleTXRes.AssembledTransaction,
-			AttestationResult:    []*proto.AttestationDetail{}, // TODO
-
+			Transaction: &proto.FinalizedTransaction{
+				TransactionId: txSpec.TransactionId,
+				SpentStateIds: assembleTXRes.AssembledTransaction.SpentStateIds,
+				NewStateIds:   newStateIDs,
+			},
+			AttestationResult: attestations,
 		}
 		var prepareTXRes *proto.PrepareTransactionResponse
 		err = syncExchangeToDomain(ctx, tb, prepareTXReq, &prepareTXRes)

@@ -234,6 +234,9 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 }
 
 func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
+	if len(req.Name) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyCannotBeEmpty)
+	}
 	if sm.hd != nil {
 		return sm.hd.resolveHDWalletKey(ctx, req)
 	}

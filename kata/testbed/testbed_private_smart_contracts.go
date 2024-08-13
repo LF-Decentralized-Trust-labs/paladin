@@ -53,7 +53,7 @@ func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invo
 	return &txID, &proto.TransactionSpecification{
 		TransactionId:      uuidToHexBytes32(txID).String(),
 		FunctionAbiJson:    string(functionABIJSON),
-		FunctionSignature:  functionABI.SignatureHashBytes().String(),
+		FunctionSignature:  functionABI.String(),
 		FunctionParamsJson: string(functionParamsJSON),
 		BaseBlock:          int64(confirmedBlockHeight),
 	}, nil

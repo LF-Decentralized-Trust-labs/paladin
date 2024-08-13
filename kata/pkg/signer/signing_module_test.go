@@ -258,9 +258,13 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Name:       "key1",
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 	})
 	assert.Regexp(t, "pop", err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{})
+	assert.Regexp(t, "PD011421", err)
 
 }
 
