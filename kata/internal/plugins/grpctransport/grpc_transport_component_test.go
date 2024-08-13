@@ -21,7 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
+	// "io"
 	"net"
 	"os"
 	"path"
@@ -64,23 +64,23 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 		fcb.sendMessages[lr.Destination] = make(chan *proto.Message)
 	}
 
-	// Messages coming back from the plugin
-	go func() {
-		fcb.listenMessages <- lr.Destination
+	// Register that we have a new destination
+	fcb.listenMessages <- lr.Destination
+	// go func() {
 
-		for {
-			var msg *proto.Message
-			err := ls.RecvMsg(msg)
-			if err == io.EOF {
-				return
-			}
-			if err != nil {
-				return
-			}
+	// 	for {
+	// 		var msg *proto.Message
+	// 		err := ls.RecvMsg(msg)
+	// 		if err == io.EOF {
+	// 			return
+	// 		}
+	// 		if err != nil {
+	// 			return
+	// 		}
 
-			fcb.recvMessages[msg.Destination] <- msg
-		}
-	}()
+	// 		fcb.recvMessages[msg.Destination] <- msg
+	// 	}
+	// }()
 
 	// Messages being sent to the plugin
 	messageChan := fcb.sendMessages[lr.Destination]
@@ -100,7 +100,13 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 func (fcb *fakeCommsBusServer) SubscribeToTopic(context.Context, *proto.SubscribeToTopicRequest) (*proto.SubscribeToTopicResponse, error) {
 	return nil, nil
 }
-func (fcb *fakeCommsBusServer) SendMessage(context.Context, *proto.Message) (*proto.SendMessageResponse, error) {
+func (fcb *fakeCommsBusServer) SendMessage(ctx context.Context, msg *proto.Message) (*proto.SendMessageResponse, error) {
+	// This gets called when we have a message come into the Paladin from a node who's CA we trust
+	if fcb.recvMessages[msg.Destination] == nil {
+		fcb.recvMessages[msg.Destination] = make(chan *proto.Message, 1)
+	}
+
+	fcb.recvMessages[msg.Destination] <- msg
 	return nil, nil
 }
 func (fcb *fakeCommsBusServer) PublishEvent(context.Context, *proto.Event) (*proto.PublishEventResponse, error) {
@@ -139,6 +145,8 @@ func (fegs *fakeExternalGRPCServer) SendInterPaladinMessage(ctx context.Context,
 }
 
 func TestGRPCTransportEndToEnd(t *testing.T) {
+	ctx := context.Background()
+
 	/*
 
 		This test:
@@ -196,11 +204,14 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	assert.NoError(t, err)
 	fakePaladinServerCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client1.crt", "../../../test/ca2/clients/client1.key")
 	assert.NoError(t, err)
+	fakePaladinClientCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client2.crt", "../../../test/ca2/clients/client2.key")
+	assert.NoError(t, err)
 
 	// ---------------------------------------------------------------------------- GRPC Transport Provider
 
 	providerDestinationName := uuid.New().String()
 	providerPort := 8080
+	realAddress := fmt.Sprintf("localhost:%d", providerPort)
 
 	// Need this to be an mTLS enabled so need to do the config now
 	config := &grpctransport.GRPCTransportConfig{
@@ -281,16 +292,15 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 		that are all prepped to do mTLS. We now run through a few messaging flows:
 
 			- Sending a message from the comms bus a Paladin with valid configuration
-			- Sending a message form the comms bus a Paladin where the certs don't work
+			- Recieving a message from the internet feeds it all the way up and out of the comms bus
 
 	*/
 
-	// ---------------------------------------------------------------------------- Send a messsage through the Comms bus
+	// ---------------------------------------------------------------------------- Send a messsage through the Comms bus with valid configuration
 
-	// I am a domain on the system wanting to send a message to one of the other Paladin's that I know about
 	fakePayload := &transaction.SubmitTransactionError{
 		Id:     uuid.NewString(),
-		Reason: "There is no real reason, we just need to show something can be sent through the whole flow",
+		Reason: "somedummypayload",
 	}
 	pbBody, err := anypb.New(fakePayload)
 	assert.NoError(t, err)
@@ -317,7 +327,7 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 
 		externMessage := &proto.ExternalMessage{
 			TransportInformation: ipWrapperAny,
-			Body: mAny,
+			Body:                 mAny,
 		}
 		externMessageAny, err := anypb.New(externMessage)
 		assert.NoError(t, err)
@@ -332,6 +342,54 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	// Send the message to the comms bus
 	fakeCommsBus.sendMessages[newTransportInstanceName] <- messageToCommsBus
 
-	// Wait for the message to come through to our fake Paladin
-	<-fakeServer.recvMessages
+	// Wait for the message to come back and then verify it is the same as the original payload
+	recvMessage := <-fakeServer.recvMessages
+
+	submitTransactionErrObj := &transaction.SubmitTransactionError{}
+	err = recvMessage.Body.UnmarshalTo(submitTransactionErrObj)
+	assert.NoError(t, err)
+	assert.Equal(t, "somedummypayload", submitTransactionErrObj.Reason)
+
+	// ---------------------------------------------------------------------------- Send a message into the Paladin from some node that we know
+
+	fakeInboundPayload := &transaction.SubmitTransactionError{
+		Id:     uuid.NewString(),
+		Reason: "someinboundpayload",
+	}
+	fakeInboundPayloadPb, err := anypb.New(fakeInboundPayload)
+	assert.NoError(t, err)
+	inboundMessage := &proto.Message{
+		Id:          uuid.NewString(),
+		Body:        fakeInboundPayloadPb,
+		Destination: newTransportInstanceName,
+	}
+	inboundMessagePb, err := anypb.New(inboundMessage)
+	assert.NoError(t, err)
+	interPaladinMessage := &interPaladinPB.InterPaladinMessage{
+		Body: inboundMessagePb,
+	}
+
+	// After the first test, we know that the Paladin should trust the CA of our client cert, so make a request direct
+	// to the gRPC external server presenting the client cert from that CA
+	realPaladinCertPool := x509.NewCertPool()
+	ok = certPool.AppendCertsFromPEM(realPaladinCACert)
+	assert.Equal(t, true, ok)
+
+	fakeClientTLSConfig := &tls.Config{
+		Certificates: []tls.Certificate{fakePaladinClientCert},
+		RootCAs:      realPaladinCertPool,
+	}
+
+	conn, err := grpc.NewClient(realAddress, grpc.WithTransportCredentials(credentials.NewTLS(fakeClientTLSConfig)))
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	client := interPaladinPB.NewInterPaladinTransportClient(conn)
+
+	// SEND IT!
+	_, err = client.SendInterPaladinMessage(ctx, interPaladinMessage)
+	assert.NoError(t, err)
+
+	// Check that we got the messsage back from the plugin in the comms bus
+	<-fakeCommsBus.recvMessages[newTransportInstanceName]
 }
