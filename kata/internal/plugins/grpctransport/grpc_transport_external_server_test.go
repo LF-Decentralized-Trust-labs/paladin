@@ -11,7 +11,7 @@
 * specific language governing permissions and limitations under the License.
 *
 * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 
 package grpctransport
 
@@ -25,14 +25,16 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
-	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
+	"github.com/stretchr/testify/assert"
+
+	grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
 
@@ -113,11 +115,19 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 		Id:          "some-uuid",
 		Destination: fmt.Sprintf("localhost:%d", testPort+1),
 	}
+	fakeInternalMessagePb, err := anypb.New(fakeInternalMessage)
+	assert.NoError(t, err)
 
-	fakeMessage := &ExternalMessage{
-		Message:         *fakeInternalMessage,
-		ExternalAddress: sendingAddress,
-		CACertificate:   string(server2CaCertificate),
+	transportInformation := &grpctransportpb.GRPCTransportInformation{
+		Address:       sendingAddress,
+		CaCertificate: string(server2CaCertificate),
+	}
+	transportInformationPb, err := anypb.New(transportInformation)
+	assert.NoError(t, err)
+
+	fakeMessage := &proto.ExternalMessage{
+		Body: fakeInternalMessagePb,
+		TransportInformation: transportInformationPb,
 	}
 
 	server.QueueMessageForSend(fakeMessage)
@@ -150,15 +160,22 @@ func TestOutboundMessageFlow(t *testing.T) {
 		wg.Done()
 	}()
 
-	// Create a fake message and queue it for sending
 	fakeInternalMessage := &proto.Message{
 		Id:          "some-uuid",
 		Destination: fmt.Sprintf("localhost:%d", testPort+1),
 	}
+	fakeInternalMessagePb, err := anypb.New(fakeInternalMessage)
+	assert.NoError(t, err)
 
-	fakeMessage := &ExternalMessage{
-		Message:         *fakeInternalMessage,
-		ExternalAddress: sendingAddress,
+	transportInformation := &grpctransportpb.GRPCTransportInformation{
+		Address:       sendingAddress,
+	}
+	transportInformationPb, err := anypb.New(transportInformation)
+	assert.NoError(t, err)
+
+	fakeMessage := &proto.ExternalMessage{
+		Body: fakeInternalMessagePb,
+		TransportInformation: transportInformationPb,
 	}
 
 	server.QueueMessageForSend(fakeMessage)
@@ -201,7 +218,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 		Destination: fakeDesintation,
 	}
 
-	fakeMessage := &ExternalMessage{
+	fakeMessage := &ExternalMessage{ // TODO: Why is this not broken?
 		Message:         *fakeInternalMessage,
 		ExternalAddress: loopbackAddress,
 		CACertificate:   string(caCertificate), // This is actually redundant for this specific test
@@ -219,8 +236,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	recvMessageFlow, err := server.GetMessages(destination(fakeDesintation))
-	assert.NoError(t, err)
+	recvMessageFlow := server.GetMessages(destination(fakeDesintation))
 
 	msg := <-recvMessageFlow
 	assert.NotNil(t, msg)
@@ -243,7 +259,7 @@ func TestInboundMessageFlow(t *testing.T) {
 		Destination: fakeDesintation,
 	}
 
-	fakeMessage := &ExternalMessage{
+	fakeMessage := &ExternalMessage{ // TODO: Why is this not broken?
 		Message:         *fakeInternalMessage,
 		ExternalAddress: loopbackAddress,
 	}
@@ -256,8 +272,7 @@ func TestInboundMessageFlow(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	recvMessageFlow, err := server.GetMessages(destination(fakeDesintation))
-	assert.NoError(t, err)
+	recvMessageFlow := server.GetMessages(destination(fakeDesintation))
 
 	msg := <-recvMessageFlow
 	assert.NotNil(t, msg)
