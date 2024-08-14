@@ -32,9 +32,11 @@ func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
 	biddingTransaction1 := uuid.New().String()
 	biddingTransaction2 := uuid.New().String()
 
+	resolver := NewContentionResolver()
+
 	for i := 0; i < 100; i++ {
 		stateHash := uuid.New().String()
-		winner, err := ContentionResolver(stateHash, biddingTransaction1, biddingTransaction2)
+		winner, err := resolver.Resolve(stateHash, biddingTransaction1, biddingTransaction2)
 		require.NoError(t, err)
 		assert.Contains(t, []string{biddingTransaction1, biddingTransaction2}, winner)
 		if winner == biddingTransaction1 {
@@ -52,11 +54,13 @@ func TestContentionResolver_CommutativeProperty(t *testing.T) {
 	// then iterate over 100 random state ids and check that it is always the case that the winner is the same regardless of the order of invocation
 	biddingTransaction1 := uuid.New().String()
 	biddingTransaction2 := uuid.New().String()
+	resolver := NewContentionResolver()
+
 	for i := 0; i < 100; i++ {
 		stateHash := uuid.New().String()
-		winner1, err := ContentionResolver(stateHash, biddingTransaction1, biddingTransaction2)
+		winner1, err := resolver.Resolve(stateHash, biddingTransaction1, biddingTransaction2)
 		require.NoError(t, err)
-		winner2, err := ContentionResolver(stateHash, biddingTransaction2, biddingTransaction1)
+		winner2, err := resolver.Resolve(stateHash, biddingTransaction2, biddingTransaction1)
 		require.NoError(t, err)
 		assert.Equal(t, winner1, winner2)
 	}
@@ -67,6 +71,8 @@ func TestContentionResolver_AssociativeProperty(t *testing.T) {
 	// then iterate over 10 random state ids and for each one, run each permutation of ordering of invocations and check that
 	// there are 2 types of permutation a) the knockout tournament format (semi finals -> final) and b) the winner stays on format
 	// the final winners are always the same and that there is a fair distribution of winners.
+	resolver := NewContentionResolver()
+
 	bidders := make([]string, 4)
 	for i := 0; i < 4; i++ {
 		bidders[i] = uuid.New().String()
@@ -103,24 +109,24 @@ func TestContentionResolver_AssociativeProperty(t *testing.T) {
 		{bidders[3], bidders[2], bidders[1], bidders[0]},
 	}
 	runWinnerStaysOn := func(draw []string, stateHash string) string {
-		winner1, err := ContentionResolver(stateHash, draw[0], draw[1])
+		winner1, err := resolver.Resolve(stateHash, draw[0], draw[1])
 		require.NoError(t, err)
 
-		winner2, err := ContentionResolver(stateHash, winner1, draw[2])
+		winner2, err := resolver.Resolve(stateHash, winner1, draw[2])
 		require.NoError(t, err)
 
-		finalWinner, err := ContentionResolver(stateHash, winner2, draw[3])
+		finalWinner, err := resolver.Resolve(stateHash, winner2, draw[3])
 		require.NoError(t, err)
 
 		return finalWinner
 	}
 
 	runKnockout := func(draw []string, stateHash string) string {
-		winnerSF1, err := ContentionResolver(stateHash, draw[0], draw[1])
+		winnerSF1, err := resolver.Resolve(stateHash, draw[0], draw[1])
 		require.NoError(t, err)
-		winnerSF2, err := ContentionResolver(stateHash, draw[2], draw[3])
+		winnerSF2, err := resolver.Resolve(stateHash, draw[2], draw[3])
 		require.NoError(t, err)
-		finalWinner, err := ContentionResolver(stateHash, winnerSF1, winnerSF2)
+		finalWinner, err := resolver.Resolve(stateHash, winnerSF1, winnerSF2)
 		require.NoError(t, err)
 		return finalWinner
 	}
