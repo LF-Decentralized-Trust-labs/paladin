@@ -312,7 +312,45 @@ func (tb *testbed) gatherSignatures(ctx context.Context, requests []*proto.Attes
 	return attestations, nil
 }
 
-func (domain *testbedDomain) validateAndWriteStates(newStates []*proto.StateData) ([]string, error) {
+func (tb *testbed) gatherEndorsements(ctx context.Context, txSpec *proto.TransactionSpecification, assembleRes *proto.AssembleTransactionResponse) ([]*proto.AttestationResult, error) {
+
+	// We have to gather all the states for the endorsement
+
+	// attestations := []*proto.AttestationResult{}
+	// for _, ar := range requests {
+	// 	if ar.AttestationType == proto.AttestationType_SIGN {
+	// 		for _, partyName := range ar.Parties {
+	// 			keyHandle, verifier, err := tb.keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
+	// 			if err != nil {
+	// 				return nil, fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
+	// 			}
+	// 			signaturePayload, err := tb.keyMgr.Sign(ctx, &proto.SignRequest{
+	// 				KeyHandle: keyHandle,
+	// 				Algorithm: ar.Algorithm,
+	// 				Payload:   ar.Payload,
+	// 			})
+	// 			if err != nil {
+	// 				return nil, fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
+	// 			}
+	// 			attestations = append(attestations, &proto.AttestationResult{
+	// 				Name:            ar.Name,
+	// 				AttestationType: ar.AttestationType,
+	// 				Verifier: &proto.ResolvedVerifier{
+	// 					Lookup:    partyName,
+	// 					Algorithm: ar.Algorithm,
+	// 					Verifier:  verifier,
+	// 				},
+	// 				Payload: signaturePayload.Payload,
+	// 			})
+	// 		}
+	// 	}
+	// }
+	// return attestations, nil
+
+	return nil, nil
+}
+
+func (domain *testbedDomain) validateAndWriteStates(newStates []*proto.NewState) ([]string, error) {
 
 	newStatesToWrite := make([]*statestore.NewState, len(newStates))
 	for i, s := range newStates {

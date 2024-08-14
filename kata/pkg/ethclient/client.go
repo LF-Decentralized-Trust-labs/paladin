@@ -194,7 +194,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	})
 	var sig *secp256k1.SignatureData
 	if err == nil {
-		sig, err = signer.DecodeCompactRSV(ctx, signature.Payload)
+		sig, err = secp256k1.DecodeCompactRSV(ctx, signature.Payload)
 	}
 	var rawTX []byte
 	if err == nil {

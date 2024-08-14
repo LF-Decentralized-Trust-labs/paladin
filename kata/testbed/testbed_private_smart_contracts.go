@@ -57,6 +57,7 @@ func (psc *testbedPrivateSmartContract) validateInvoke(ctx context.Context, invo
 	return &txID, &proto.TransactionSpecification{
 		TransactionId:      uuidToHexBytes32(txID).String(),
 		From:               invocation.From,
+		ContractAddress:    psc.address.String(),
 		FunctionAbiJson:    string(functionABIJSON),
 		FunctionSignature:  functionABI.String(),
 		FunctionParamsJson: string(functionParamsJSON),

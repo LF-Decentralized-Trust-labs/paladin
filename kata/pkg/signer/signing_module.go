@@ -18,7 +18,6 @@ package signer
 import (
 	"context"
 	"crypto/rand"
-	"math/big"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
@@ -153,33 +152,13 @@ func (sm *signingModule) resolveKeystoreSECP256K1(ctx context.Context, req *prot
 	}, nil
 }
 
-// We use the ethereum convention of R,S,V for compact packing (mentioned because Golang tends to prefer V,R,S)
-func CompactRSV(sig *secp256k1.SignatureData) []byte {
-	signatureBytes := make([]byte, 65)
-	sig.R.FillBytes(signatureBytes[0:32])
-	sig.S.FillBytes(signatureBytes[32:64])
-	signatureBytes[64] = byte(sig.V.Int64())
-	return signatureBytes
-}
-
-func DecodeCompactRSV(ctx context.Context, compactRSV []byte) (*secp256k1.SignatureData, error) {
-	if len(compactRSV) != 65 {
-		return nil, i18n.NewError(ctx, msgs.MsgSigningInvalidCompactRSV, len(compactRSV))
-	}
-	var sig secp256k1.SignatureData
-	sig.R = new(big.Int).SetBytes(compactRSV[0:32])
-	sig.S = new(big.Int).SetBytes(compactRSV[32:64])
-	sig.V = new(big.Int).SetBytes(compactRSV[64:65])
-	return &sig, nil
-}
-
 func (sm *signingModule) signKeystoreSECP256K1(ctx context.Context, req *proto.SignRequest, keyStoreSigner KeyStoreSigner_secp256k1) (res *proto.SignResponse, err error) {
 	sig, err := keyStoreSigner.Sign_secp256k1(ctx, req.KeyHandle, req.Payload)
 	if err != nil {
 		return nil, err
 	}
 	return &proto.SignResponse{
-		Payload: CompactRSV(sig),
+		Payload: sig.CompactRSV(),
 	}, nil
 }
 
@@ -205,7 +184,7 @@ func (sm *signingModule) signInMemory(ctx context.Context, privateKey []byte, re
 		kp := secp256k1.KeyPairFromBytes(privateKey)
 		sig, err := kp.SignDirect(req.Payload)
 		if err == nil {
-			return &proto.SignResponse{Payload: CompactRSV(sig)}, nil
+			return &proto.SignResponse{Payload: sig.CompactRSV()}, nil
 		}
 	default:
 		err = i18n.NewError(ctx, msgs.MsgSigningUnsupportedAlgoForInMemorySigning, req.Algorithm)

@@ -16,6 +16,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -24,7 +25,9 @@ import (
 
 	_ "embed"
 
+	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
@@ -150,10 +153,12 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	var factoryAddr ethtypes.Address0xHex
 	var fakeCoinSchemaID string
 	var domainUUID string
+	var chainID int64
 
-	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]string, *big.Int, error) {
+	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]*fakeCoinParser, []string, *big.Int, error) {
 		var lastStateTimestamp int64
 		total := big.NewInt(0)
+		coins := []*fakeCoinParser{}
 		stateIDs := []string{}
 		for {
 			// Simple oldest coin first algo
@@ -175,26 +180,103 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}
 			states, err := sc.FindAvailableStates(domainUUID, fakeCoinSchemaID, query)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if len(states) == 0 {
-				return nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
+				return nil, nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
 			}
 			for _, state := range states {
 				lastStateTimestamp = state.StoredAt
 				// Note: More sophisticated coin selection might prefer states that aren't locked to a sequence
 				var coin fakeCoinParser
 				if err := json.Unmarshal([]byte(state.DataJson), &coin); err != nil {
-					return nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+					return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
 				}
 				total = total.Add(total, coin.Amount.BigInt())
 				stateIDs = append(stateIDs, state.HashId)
+				coins = append(coins, &coin)
 				if total.Cmp(amount) >= 0 {
 					// We've got what we need - return how much over we are
-					return stateIDs, new(big.Int).Sub(amount, total), nil
+					return coins, stateIDs, new(big.Int).Sub(amount, total), nil
 				}
 			}
 		}
+	}
+
+	validateTransferTransactionInput := func(tx *proto.TransactionSpecification) (*ethtypes.Address0xHex, *fakeTransferParser) {
+		assert.JSONEq(t, fakeCoinTransferABI, tx.FunctionAbiJson)
+		assert.Equal(t, "transfer(string,string,uint256)", tx.FunctionSignature)
+		var inputs fakeTransferParser
+		err := json.Unmarshal([]byte(tx.FunctionParamsJson), &inputs)
+		assert.NoError(t, err)
+		assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
+		contractAddr, err := ethtypes.NewAddress(tx.ContractAddress)
+		assert.NoError(t, err)
+		return contractAddr, &inputs
+	}
+
+	extractTransferVerifiers := func(txInputs *fakeTransferParser, verifiers []*proto.ResolvedVerifier) (fromAddr, toAddr *ethtypes.Address0xHex) {
+		for _, v := range verifiers {
+			if txInputs.From != "" && v.Lookup == txInputs.From {
+				fromAddr = ethtypes.MustNewAddress(v.Verifier)
+			}
+			if txInputs.To != "" && v.Lookup == txInputs.To {
+				toAddr = ethtypes.MustNewAddress(v.Verifier)
+			}
+		}
+		assert.True(t, txInputs.From == "" || (fromAddr != nil && *fromAddr != ethtypes.Address0xHex{}))
+		assert.True(t, txInputs.To == "" || (toAddr != nil && *toAddr != ethtypes.Address0xHex{}))
+		return
+	}
+
+	typedDataV4TransferWithSalts := func(contract *ethtypes.Address0xHex, inputs, outputs []*fakeCoinParser) (ethtypes.HexBytes0xPrefix, error) {
+		typeSet := eip712.TypeSet{
+			"FakeTransfer": {
+				{Name: "inputs", Type: "Coin[]"},
+				{Name: "outputs", Type: "Coin[]"},
+			},
+			"Coin": {
+				{Name: "salt", Type: "bytes32"},
+				{Name: "owner", Type: "address"},
+				{Name: "amount", Type: "uint256"},
+			},
+			eip712.EIP712Domain: {
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
+		}
+		messageInputs := make([]interface{}, len(inputs))
+		for i, input := range inputs {
+			messageInputs[i] = map[string]interface{}{
+				"salt":   input.Salt.String(),
+				"owner":  input.Owner.String(),
+				"amount": input.Amount.String(),
+			}
+		}
+		messageOutputs := make([]interface{}, len(outputs))
+		for i, output := range outputs {
+			messageOutputs[i] = map[string]interface{}{
+				"salt":   output.Salt.String(),
+				"owner":  output.Owner.String(),
+				"amount": output.Amount.String(),
+			}
+		}
+		return eip712.EncodeTypedDataV4(context.Background(), &eip712.TypedData{
+			Types:       typeSet,
+			PrimaryType: "FakeTransfer",
+			Domain: map[string]interface{}{
+				"name":              "FakeTransfer",
+				"version":           "0.0.1",
+				"chainId":           chainID,
+				"verifyingContract": contract,
+			},
+			Message: map[string]interface{}{
+				"inputs":  messageInputs,
+				"outputs": messageOutputs,
+			},
+		})
 	}
 
 	_, rpcCall, done := newDomainSimulator(t, map[protoreflect.FullName]domainSimulatorFn{
@@ -204,6 +286,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.Equal(t, "domain1", req.Name)
 			assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
 			assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
+			chainID = req.ChainId
 			return &proto.ConfigureDomainResponse{
 				DomainConfig: &proto.DomainConfig{
 					ConstructorAbiJson:     fakeCoinConstructorABI,
@@ -264,12 +347,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 		INIT_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := iReq.(*proto.InitTransactionRequest)
-			assert.JSONEq(t, fakeCoinTransferABI, req.Transaction.FunctionAbiJson)
-			assert.Equal(t, "transfer(string,string,uint256)", req.Transaction.FunctionSignature)
-			var inputs fakeTransferParser
-			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
-			assert.NoError(t, err)
-			assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
+			_, txInputs := validateTransferTransactionInput(req.Transaction)
 			// We require ethereum addresses for the "from" and "to" addresses to actually
 			// execute the transaction. See notes above about this.
 			requiredVerifiers := []*proto.ResolveVerifierRequest{
@@ -278,15 +356,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				},
 			}
-			if inputs.From != "" {
+			if txInputs.From != "" {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
-					Lookup:    inputs.From,
+					Lookup:    txInputs.From,
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
-			if inputs.To != "" && (inputs.From == "" || inputs.From != inputs.To) {
+			if txInputs.To != "" && (txInputs.From == "" || txInputs.From != txInputs.To) {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
-					Lookup:    inputs.To,
+					Lookup:    txInputs.To,
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
@@ -295,70 +373,133 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}, nil
 		},
 
-		ASSEMBLE_TRANSACTION: func(sc simCallbacks, iReq pb.Message) (pb.Message, error) {
+		ASSEMBLE_TRANSACTION: func(sc simCallbacks, iReq pb.Message) (_ pb.Message, err error) {
 			req := iReq.(*proto.AssembleTransactionRequest)
-			var inputs fakeTransferParser
-			err := json.Unmarshal([]byte(req.Transaction.FunctionParamsJson), &inputs)
-			assert.NoError(t, err)
-			amount := inputs.Amount.BigInt()
+			contractAddr, txInputs := validateTransferTransactionInput(req.Transaction)
+			fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
+			amount := txInputs.Amount.BigInt()
 			toKeep := new(big.Int)
-			var fromAddr *ethtypes.Address0xHex
-			var toAddr *ethtypes.Address0xHex
-			for _, v := range req.ResolvedVerifiers {
-				if inputs.From != "" && v.Lookup == inputs.From {
-					fromAddr = ethtypes.MustNewAddress(v.Verifier)
-				}
-				if inputs.To != "" && v.Lookup == inputs.To {
-					toAddr = ethtypes.MustNewAddress(v.Verifier)
-				}
-			}
-			coinsToSpend := []string{}
-			if inputs.From != "" {
-				coinsToSpend, toKeep, err = fakeCoinSelection(sc, fromAddr, amount)
+			coinsToSpend := []*fakeCoinParser{}
+			stateIDsToSpend := []string{}
+			if txInputs.From != "" {
+				coinsToSpend, stateIDsToSpend, toKeep, err = fakeCoinSelection(sc, fromAddr, amount)
 				if err != nil {
 					return nil, err
 				}
 			}
-			newStates := []*proto.StateData{}
+			newStates := []*proto.NewState{}
+			newCoins := []*fakeCoinParser{}
 			if fromAddr != nil && toKeep.Sign() > 0 {
 				// Generate a state to keep for ourselves
-				newStates = append(newStates, &proto.StateData{
-					SchemaId: fakeCoinSchemaID,
-					StateDataJson: fmt.Sprintf(`{
-					   "salt": "%s",
-					   "owner": "%s",
-					   "amount": "%s"
-					}`, types.RandHex(32), fromAddr, toKeep.Text(10)),
+				coin := fakeCoinParser{
+					Salt:   types.RandBytes(32),
+					Owner:  *fromAddr,
+					Amount: (*ethtypes.HexInteger)(toKeep),
+				}
+				newCoins = append(newCoins, &coin)
+				newStates = append(newStates, &proto.NewState{
+					SchemaId:      fakeCoinSchemaID,
+					StateDataJson: toJSONString(t, &coin),
 				})
 			}
 			if toAddr != nil && amount.Sign() > 0 {
 				// Generate the coin to transfer
-				newStates = append(newStates, &proto.StateData{
-					SchemaId: fakeCoinSchemaID,
-					StateDataJson: fmt.Sprintf(`{
-					   "salt": "%s",
-					   "owner": "%s",
-					   "amount": "%s"
-					}`, types.RandHex(32), toAddr, amount.Text(10)),
+				coin := fakeCoinParser{
+					Salt:   types.RandBytes(32),
+					Owner:  *toAddr,
+					Amount: (*ethtypes.HexInteger)(amount),
+				}
+				newCoins = append(newCoins, &coin)
+				newStates = append(newStates, &proto.NewState{
+					SchemaId:      fakeCoinSchemaID,
+					StateDataJson: toJSONString(t, &coin),
 				})
 			}
+			eip712Payload, err := typedDataV4TransferWithSalts(contractAddr, coinsToSpend, newCoins)
+			assert.NoError(t, err)
 			return &proto.AssembleTransactionResponse{
 				AssembledTransaction: &proto.AssembledTransaction{
-					SpentStateIds: coinsToSpend,
+					SpentStateIds: stateIDsToSpend,
 					NewStates:     newStates,
 				},
-				AssemblyResult: proto.AssemblyResult_OK,
+				AssemblyResult: proto.AssembleTransactionResponse_OK,
 				AttestationPlan: []*proto.AttestationRequest{
 					{
 						Name:            "sender",
 						AttestationType: proto.AttestationType_SIGN,
 						Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-						Payload:         types.RandBytes(32), // TODO: eip712StatesWithSalt(newStates),
+						Payload:         eip712Payload,
 						Parties: []string{
 							req.Transaction.From,
 						},
 					},
 				},
+			}, nil
+		},
+
+		ENDORSE_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
+			req := iReq.(*proto.EndorseTransactionRequest)
+			contractAddr, txInputs := validateTransferTransactionInput(req.Transaction)
+			fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
+
+			inCoins := make([]*fakeCoinParser, len(req.Inputs))
+			for i, input := range req.Inputs {
+				assert.Equal(t, fakeCoinSchemaID, input.SchemaId)
+				if err := json.Unmarshal([]byte(input.StateDataJson), &inCoins[i]); err != nil {
+					return nil, fmt.Errorf("invalid input[%d] (%s): %s", i, input.HashId, err)
+				}
+			}
+			outCoins := make([]*fakeCoinParser, len(req.Outputs))
+			for i, output := range req.Outputs {
+				assert.Equal(t, fakeCoinSchemaID, output.SchemaId)
+				if err := json.Unmarshal([]byte(output.StateDataJson), &outCoins[i]); err != nil {
+					return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.HashId, err)
+				}
+			}
+
+			// Recover the signature
+			signaturePayload, err := typedDataV4TransferWithSalts(contractAddr, inCoins, outCoins)
+			assert.NoError(t, err)
+			var signerVerification *proto.AttestationResult
+			for _, ar := range req.AttestationResult {
+				if ar.AttestationType == proto.AttestationType_SIGN &&
+					ar.Name == "sender" &&
+					ar.Verifier.Algorithm == signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
+					signerVerification = ar
+					break
+				}
+			}
+			assert.NotNil(t, signerVerification)
+			sig, err := secp256k1.DecodeCompactRSV(context.Background(), signerVerification.Payload)
+			assert.NoError(t, err)
+			signerAddr, err := sig.RecoverDirect(signaturePayload, chainID)
+			assert.NoError(t, err)
+
+			// There would need to be minting/spending rules here - we just check the signature
+			assert.Equal(t, signerAddr.String(), signerVerification.Verifier.Verifier)
+
+			// Check the math
+			if fromAddr != nil && toAddr != nil {
+				inTotal := big.NewInt(0)
+				for _, c := range inCoins {
+					inTotal = inTotal.Add(inTotal, c.Amount.BigInt())
+				}
+				outTotal := big.NewInt(0)
+				for _, c := range outCoins {
+					outTotal = outTotal.Add(outTotal, c.Amount.BigInt())
+				}
+				assert.True(t, inTotal.Cmp(outTotal) == 0)
+			} else {
+				if fromAddr == nil {
+					assert.Len(t, inCoins, 0)
+				}
+				if toAddr == nil {
+					assert.Len(t, outCoins, 0)
+				}
+			}
+
+			return &proto.EndorseTransactionResponse{
+				EndorsementResult: proto.EndorseTransactionResponse_OK,
 			}, nil
 		},
 

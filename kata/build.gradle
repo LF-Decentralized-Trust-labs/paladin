@@ -181,6 +181,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
 task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts]) {
     workingDir '.'
 
+    inputs.files(goFiles)
     inputs.dir("testbed")
     outputs.dir("bin")
 

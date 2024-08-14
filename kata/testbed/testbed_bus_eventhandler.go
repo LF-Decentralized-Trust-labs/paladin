@@ -38,6 +38,7 @@ var INIT_DEPLOY = (&proto.InitDeployTransactionRequest{}).ProtoReflect().Descrip
 var PREPARE_DEPLOY = (&proto.PrepareDeployTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var INIT_TRANSACTION = (&proto.InitTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var ASSEMBLE_TRANSACTION = (&proto.AssembleTransactionRequest{}).ProtoReflect().Descriptor().FullName()
+var ENDORSE_TRANSACTION = (&proto.EndorseTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 var PREPARE_TRANSACTION = (&proto.PrepareTransactionRequest{}).ProtoReflect().Descriptor().FullName()
 
 var FIND_AVAILABLE_STATES = (&proto.FindAvailableStatesRequest{}).ProtoReflect().Descriptor().FullName()

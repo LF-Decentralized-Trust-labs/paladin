@@ -254,7 +254,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 		// The testbed only handles the OK result
 		switch assembleTXRes.AssemblyResult {
-		case proto.AssemblyResult_OK:
+		case proto.AssembleTransactionResponse_OK:
 		default:
 			return false, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
 		}
@@ -273,8 +273,12 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 		attestations = append(attestations, signatures...)
 
-		// TODO: gather endorsements
-		// For now, shortcut to....
+		// Gather endorsements
+		endorsements, err := tb.gatherEndorsements(ctx, txSpec, assembleTXRes)
+		if err != nil {
+			return false, err
+		}
+		attestations = append(attestations, endorsements...)
 
 		// Prepare the transaction
 		prepareTXReq := &proto.PrepareTransactionRequest{
