@@ -50,3 +50,45 @@ func TestLoadCircuit(t *testing.T) {
 	assert.Nil(t, circuit)
 	assert.Equal(t, []byte{}, provingKey)
 }
+
+func TestLoadCircuitFail(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
+	assert.NoError(t, err)
+	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), mockWASMModule(), 0644)
+	assert.NoError(t, err)
+
+	config := api.SnarkProverConfig{}
+	_, _, err = loadCircuit("test", config)
+	assert.EqualError(t, err, "CIRCUITS_ROOT not set")
+
+	config.CircuitsDir = tmpDir
+	_, _, err = loadCircuit("test", config)
+	assert.EqualError(t, err, "PROVING_KEYS_ROOT not set")
+}
+
+func TestLoadCircuitFailRead(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := api.SnarkProverConfig{}
+	config.CircuitsDir = tmpDir
+	config.ProvingKeysDir = tmpDir
+
+	_, _, err := loadCircuit("test", config)
+	assert.ErrorContains(t, err, "test.wasm: no such file or directory")
+}
+
+func TestLoadCircuitFailReadZKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
+	assert.NoError(t, err)
+	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), mockWASMModule(), 0644)
+	assert.NoError(t, err)
+
+	config := api.SnarkProverConfig{}
+	config.CircuitsDir = tmpDir
+	config.ProvingKeysDir = tmpDir
+
+	_, _, err = loadCircuit("test", config)
+	assert.ErrorContains(t, err, "test.zkey: no such file or directory")
+}

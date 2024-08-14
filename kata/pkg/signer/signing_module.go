@@ -212,7 +212,7 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 	for _, algo := range algorithms {
 		switch strings.ToLower(algo) {
 		case api.Algorithm_ECDSA_SECP256K1_PLAINBYTES:
-			addr, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
+			addr := secp256k1.KeyPairFromBytes(privateKey)
 			identifiers = append(identifiers, &proto.PublicKeyIdentifier{
 				Algorithm:  api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				Identifier: addr.Address.String(),

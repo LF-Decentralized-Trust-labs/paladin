@@ -30,3 +30,8 @@ func TestEncodeDecode(t *testing.T) {
 	assert.Equal(t, pubKey.X, pubKey2.X)
 	assert.Equal(t, pubKey.Y, pubKey2.Y)
 }
+
+func TestDecodeFail(t *testing.T) {
+	_, err := DecodePublicKey("bad")
+	assert.Error(t, err)
+}

@@ -32,7 +32,7 @@ func Register(registry map[string]api.InMemorySigner) {
 }
 
 func (s *sepc256k1Signer) Sign(ctx context.Context, privateKey []byte, req *proto.SignRequest) (*proto.SignResponse, error) {
-	kp, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
+	kp := secp256k1.KeyPairFromBytes(privateKey)
 	sig, err := kp.SignDirect(req.Payload)
 	if err == nil {
 		return &proto.SignResponse{Payload: common.CompactRSV(sig)}, nil

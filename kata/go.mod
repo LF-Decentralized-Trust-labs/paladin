@@ -17,7 +17,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915
 	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.14-0.20240808203923-05bef7cbb843
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240812205501-7e256d7bc276
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
@@ -39,10 +39,7 @@ require (
 
 )
 
-require (
-	github.com/hyperledger-labs/zeto v0.0.0-20240813171240-d5020be9614a // indirect
-	github.com/iden3/wasmer-go v0.0.1 // indirect
-)
+require github.com/iden3/wasmer-go v0.0.1 // indirect
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
