@@ -25,6 +25,7 @@ import (
 
 	_ "embed"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
@@ -150,6 +151,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		"amount": "23000000000000000000"
 	}`
 
+	contractDataABI := &abi.ParameterArray{
+		{Name: "notaryLocator", Type: "string"},
+	}
+
+	type fakeCoinConfigParser struct {
+		NotaryLocator string `json:"notaryLocator"`
+	}
+
 	var factoryAddr ethtypes.Address0xHex
 	var fakeCoinSchemaID string
 	var domainUUID string
@@ -206,7 +215,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		}
 	}
 
-	validateTransferTransactionInput := func(tx *proto.TransactionSpecification) (*ethtypes.Address0xHex, *fakeTransferParser) {
+	validateTransferTransactionInput := func(tx *proto.TransactionSpecification) (*ethtypes.Address0xHex, string, *fakeTransferParser) {
 		assert.JSONEq(t, fakeCoinTransferABI, tx.FunctionAbiJson)
 		assert.Equal(t, "transfer(string,string,uint256)", tx.FunctionSignature)
 		var inputs fakeTransferParser
@@ -215,7 +224,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
 		contractAddr, err := ethtypes.NewAddress(tx.ContractAddress)
 		assert.NoError(t, err)
-		return contractAddr, &inputs
+		configValues, err := contractDataABI.DecodeABIData(tx.ContractConfig, 0)
+		assert.NoError(t, err)
+		configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
+		assert.NoError(t, err)
+		var config fakeCoinConfigParser
+		err = json.Unmarshal(configJSON, &config)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, config.NotaryLocator)
+		return contractAddr, config.NotaryLocator, &inputs
 	}
 
 	extractTransferVerifiers := func(txInputs *fakeTransferParser, verifiers []*proto.ResolvedVerifier) (fromAddr, toAddr *ethtypes.Address0xHex) {
@@ -342,7 +359,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					FunctionName: "newSIMTokenNotarized",
 					ParamsJson: fmt.Sprintf(`{
 						"txId": "%s",
-						"notary": "%s"
+						"notary": "%s",
+						"notaryLocator": "domain1/contract1/notary"
 					}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier),
 				},
 			}, nil
@@ -350,12 +368,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 		INIT_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := iReq.(*proto.InitTransactionRequest)
-			_, txInputs := validateTransferTransactionInput(req.Transaction)
+			_, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
+
 			// We require ethereum addresses for the "from" and "to" addresses to actually
 			// execute the transaction. See notes above about this.
 			requiredVerifiers := []*proto.ResolveVerifierRequest{
 				{
-					Lookup:    "domain1/contract1/notary",
+					Lookup:    notaryLocator,
 					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				},
 			}
@@ -378,7 +397,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 		ASSEMBLE_TRANSACTION: func(sc simCallbacks, iReq pb.Message) (_ pb.Message, err error) {
 			req := iReq.(*proto.AssembleTransactionRequest)
-			contractAddr, txInputs := validateTransferTransactionInput(req.Transaction)
+			contractAddr, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
 			fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
 			amount := txInputs.Amount.BigInt()
 			toKeep := new(big.Int)
@@ -436,14 +455,22 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 							req.Transaction.From,
 						},
 					},
+					{
+						Name:            "notary",
+						AttestationType: proto.AttestationType_ENDORSE,
+						Parties: []string{
+							notaryLocator,
+						},
+					},
 				},
 			}, nil
 		},
 
 		ENDORSE_TRANSACTION: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
 			req := iReq.(*proto.EndorseTransactionRequest)
-			contractAddr, txInputs := validateTransferTransactionInput(req.Transaction)
+			contractAddr, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
 			fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
+			assert.Equal(t, req.EndorsementVerifier.Lookup, notaryLocator)
 
 			inCoins := make([]*fakeCoinParser, len(req.Inputs))
 			for i, input := range req.Inputs {

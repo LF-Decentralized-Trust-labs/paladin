@@ -40,6 +40,12 @@ var iPaladinContractABIJSON []byte
 var iPaladinContractABI = mustParseBuildABI(iPaladinContractABIJSON)
 var iPaladinNewSmartContract_V0_Signature = mustEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 
+type iPaladinNewSmartContract_V0_Type struct {
+	Domain *ethtypes.Address0xHex    `json:"domain"`
+	TXID   ethtypes.HexBytes0xPrefix `json:"txId"`
+	Data   ethtypes.HexBytes0xPrefix `json:"data"`
+}
+
 type tbDomain struct {
 	*transactionWaitUtils[*tbPrivateSmartContract]
 	tb                     *testbed
@@ -98,7 +104,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	}
 	if config.BaseLedgerSubmitConfig.SubmitMode == proto.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS {
 		if config.BaseLedgerSubmitConfig.OneTimeUsePrefix == "" {
-			config.BaseLedgerSubmitConfig.OneTimeUsePrefix = fmt.Sprintf("domain/%s/tx/")
+			config.BaseLedgerSubmitConfig.OneTimeUsePrefix = fmt.Sprintf("domain/%s/tx/", domain.name)
 		}
 	}
 
@@ -156,16 +162,12 @@ func (tb *testbed) domainEventStream() *blockindexer.InternalEventStream {
 }
 
 func (tb *testbed) handleNewSmartContract(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
-	type iPaladinNewSmartContract_V0_Type struct {
-		Domain *ethtypes.Address0xHex    `json:"domain"`
-		TXID   ethtypes.HexBytes0xPrefix `json:"txId"`
-	}
 	for _, e := range batch.Events {
 		if iPaladinNewSmartContract_V0_Signature.Equals(e.Signature.Bytes()) {
 			var eventParsed iPaladinNewSmartContract_V0_Type
 			err := json.Unmarshal(e.Data, &eventParsed)
 			if err == nil {
-				err = tb.addDomainContractFromEvent(ctx, &e.Address, eventParsed.Domain, bytes32ToUUID(eventParsed.TXID))
+				err = tb.addDomainContractFromEvent(ctx, &e.Address, &eventParsed)
 			}
 			if err != nil {
 				return fmt.Errorf("failed to parse event: %s", err)
@@ -175,10 +177,10 @@ func (tb *testbed) handleNewSmartContract(ctx context.Context, tx *gorm.DB, batc
 	return nil
 }
 
-func (tb *testbed) addDomainContractFromEvent(ctx context.Context, emitter *types.EthAddress, domainAddr *ethtypes.Address0xHex, txID uuid.UUID) error {
-	domain := tb.getDomainByAddress(domainAddr)
+func (tb *testbed) addDomainContractFromEvent(ctx context.Context, emitter *types.EthAddress, eventParsed *iPaladinNewSmartContract_V0_Type) error {
+	domain := tb.getDomainByAddress(eventParsed.Domain)
 	if domain == nil {
-		log.L(ctx).Warnf("Received paladin smart contract notification for unknown domain: %s", domainAddr)
+		log.L(ctx).Warnf("Received paladin smart contract notification for unknown domain: %s", eventParsed.Domain)
 		return nil
 	}
 
@@ -190,10 +192,11 @@ func (tb *testbed) addDomainContractFromEvent(ctx context.Context, emitter *type
 		newContract := &tbPrivateSmartContract{
 			tb:      tb,
 			domain:  domain,
+			data:    eventParsed.Data,
 			address: emitter.Address0xHex(),
 		}
 		tb.domainContracts[*emitter.Address0xHex()] = newContract
-		domain.notifyTX(ctx, txID, newContract)
+		domain.notifyTX(ctx, bytes32ToUUID(eventParsed.TXID), newContract)
 	}
 	return nil
 }

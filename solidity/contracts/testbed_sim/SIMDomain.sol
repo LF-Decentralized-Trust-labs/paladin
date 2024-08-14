@@ -9,10 +9,11 @@ contract SIMDomain {
     
     function newSIMTokenNotarized(
         bytes32 txId,
-        address notary
+        address notary,
+        string calldata notaryLocator
     ) public {
         // Simply constructs the new contract - which will emit an event
-        new SIMToken(txId, address(this), notary);        
+        new SIMToken(txId, address(this), notary, notaryLocator);
     }
     
 }

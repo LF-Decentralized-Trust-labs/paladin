@@ -290,7 +290,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d", len(inputStates), len(newStates), len(signatures), len(endorsements))
 
 		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
-		signer, err := psc.determineSubmitterIdentity(ctx, txSpec, endorserSubmitConstraint, endorsements)
+		signer, err := psc.determineSubmitterIdentity(txSpec, endorserSubmitConstraint, endorsements)
 		if err != nil {
 			return false, err
 		}

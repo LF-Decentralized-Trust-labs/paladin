@@ -26,10 +26,10 @@ contract SIMToken is IPaladinContract_V0 {
         _;
     }
     
-    constructor(bytes32 txId, address domain, address notary) {
+    constructor(bytes32 txId, address domain, address notary, string memory notaryLocator) {
         _notary = notary;
 
-        emit PaladinNewSmartContract_V0(txId, domain, abi.encodePacked(notary));
+        emit PaladinNewSmartContract_V0(txId, domain, abi.encode(notaryLocator));
     }
 
     function paladinExecute_V0(bytes32 txId, bytes32 fnSelector, bytes calldata payload) public onlyNotary {

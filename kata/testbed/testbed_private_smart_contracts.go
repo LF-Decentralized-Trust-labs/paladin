@@ -30,6 +30,7 @@ import (
 
 type tbPrivateSmartContract struct {
 	tb      *testbed
+	data    ethtypes.HexBytes0xPrefix
 	domain  *tbDomain
 	address *ethtypes.Address0xHex
 }
@@ -60,6 +61,7 @@ func (psc *tbPrivateSmartContract) validateInvoke(ctx context.Context, invocatio
 		TransactionId:      uuidToHexBytes32(txID).String(),
 		From:               invocation.From,
 		ContractAddress:    psc.address.String(),
+		ContractConfig:     psc.data,
 		FunctionAbiJson:    string(functionABIJSON),
 		FunctionSignature:  functionABI.String(),
 		FunctionParamsJson: string(functionParamsJSON),
@@ -245,7 +247,7 @@ func (psc *tbPrivateSmartContract) gatherEndorsements(ctx context.Context,
 	return endorserSubmitConstraint, inputStates, attestations, nil
 }
 
-func (psc *tbPrivateSmartContract) determineSubmitterIdentity(ctx context.Context, txSpec *proto.TransactionSpecification, endorserSubmitConstraint string, endorsements []*proto.AttestationResult) (string, error) {
+func (psc *tbPrivateSmartContract) determineSubmitterIdentity(txSpec *proto.TransactionSpecification, endorserSubmitConstraint string, endorsements []*proto.AttestationResult) (string, error) {
 	if endorserSubmitConstraint != "" {
 		return endorserSubmitConstraint, nil
 	}
