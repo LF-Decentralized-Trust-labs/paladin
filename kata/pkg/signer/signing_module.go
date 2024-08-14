@@ -253,13 +253,9 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 	if sm.disableKeyLoading {
 		return nil, i18n.NewError(ctx, msgs.MsgSigningStoreRequiresKeyLoadingForAlgo, strings.Join(req.Algorithms, ","))
 	}
-	var newKeyFunc func() ([]byte, error)
-	if !req.MustExist {
-		newKeyFunc = func() ([]byte, error) {
-			return sm.newKeyForAlgorithms(ctx, req.Algorithms)
-		}
-	}
-	privateKey, keyHandle, err := sm.keyStore.FindOrCreateLoadableKey(ctx, req, newKeyFunc)
+	privateKey, keyHandle, err := sm.keyStore.FindOrCreateLoadableKey(ctx, req, func() ([]byte, error) {
+		return sm.newKeyForAlgorithms(ctx, req.Algorithms)
+	})
 	if err != nil {
 		return nil, err
 	}

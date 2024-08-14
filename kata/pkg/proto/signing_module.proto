@@ -19,12 +19,11 @@ package github.com.kaleido_io.paladin.kata;
 option go_package = "pkg/proto";
 
 message ResolveKeyRequest {
-  bool mustExist = 1;
-  string name = 2; // a name assured to be unique at this path
-  uint64 index = 3; // a unique index managed by the key manager assured to be unique at this path. Used for key derivation (BIP32). Should not be used for direct mapping.
-  map<string, string> attributes = 4;
-  repeated ResolveKeyPathSegment path = 5;
-  repeated string algorithms = 6;
+  string name = 1; // a name assured to be unique at this path
+  uint64 index = 2; // a unique index managed by the key manager assured to be unique at this path. Used for key derivation (BIP32). Should not be used for direct mapping.
+  map<string, string> attributes = 3;
+  repeated ResolveKeyPathSegment path = 4;
+  repeated string algorithms = 5;
 }
 
 message ResolveKeyResponse {
