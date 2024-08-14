@@ -110,6 +110,7 @@ var (
 	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010716", "Field does not support LIKE comparison (%T)")
 	MsgFiltersTypeErrorDuringCompare      = ffe("PD010717", "Mismatched types during compare t1=%T t2=%T")
 	MsgFiltersMissingSortField            = ffe("PD010718", "Must specify at least one sort field")
+	MsgFiltersValueInvalidHexBytes32      = ffe("PD010719", "Failed to parse value as 32 byte hex string (parsedBytes=%d)")
 
 	// HTTPServer PD0108XX
 	MsgHTTPServerStartFailed        = ffe("PD010800", "Failed to start server on '%s'")

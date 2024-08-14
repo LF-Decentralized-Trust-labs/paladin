@@ -74,10 +74,10 @@ func TestRPC(t *testing.T) {
 	assert.Nil(t, rpcErr)
 	assert.Len(t, schemas, 1)
 	assert.Equal(t, SchemaTypeABI, schemas[0].Type)
-	assert.Equal(t, "0x3612029bf239cbed1e27548e9211ecfe72496dfec4183fd3ea79a3a54eb126be", schemas[0].Hash.String())
+	assert.Equal(t, "0x3612029bf239cbed1e27548e9211ecfe72496dfec4183fd3ea79a3a54eb126be", schemas[0].ID.String())
 
 	var state *State
-	rpcErr = c.CallRPC(ctx, &state, "pstate_storeState", "domain1", schemas[0].Hash, types.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &state, "pstate_storeState", "domain1", schemas[0].ID, types.RawJSON(`{
 	    "salt": "fd2724ce91a859e24c228e50ae17b9443454514edce9a64437c208b0184d8910",
 		"size": 10,
 		"color": "blue",
@@ -85,12 +85,12 @@ func TestRPC(t *testing.T) {
 	}`))
 	jsonTestLog(t, "pstate_storeState", state)
 	assert.Nil(t, rpcErr)
-	assert.Equal(t, schemas[0].Hash, state.Schema)
+	assert.Equal(t, schemas[0].ID, state.Schema)
 	assert.Equal(t, "domain1", state.DomainID)
-	assert.Equal(t, "0x30e278bca8d876cdceb24520b0ebe736a64a9cb8019157f40fa5b03f083f824d", state.Hash.String())
+	assert.Equal(t, "0x30e278bca8d876cdceb24520b0ebe736a64a9cb8019157f40fa5b03f083f824d", state.ID.String())
 
 	var states []*State
-	rpcErr = c.CallRPC(ctx, &states, "pstate_queryStates", "domain1", schemas[0].Hash, types.RawJSON(`{
+	rpcErr = c.CallRPC(ctx, &states, "pstate_queryStates", "domain1", schemas[0].ID, types.RawJSON(`{
 		"eq": [{
 		  "field": "color",
 		  "value": "blue"

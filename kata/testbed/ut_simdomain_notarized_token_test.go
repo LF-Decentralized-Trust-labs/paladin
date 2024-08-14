@@ -458,6 +458,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					{
 						Name:            "notary",
 						AttestationType: proto.AttestationType_ENDORSE,
+						// we expect an endorsement is of the form ENDORSER_SUBMIT - so we need an eth signing key to exist
+						Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 						Parties: []string{
 							notaryLocator,
 						},

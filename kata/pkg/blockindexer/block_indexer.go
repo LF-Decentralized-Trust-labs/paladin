@@ -474,13 +474,13 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 }
 
 func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
-	var topic0 types.HashID
+	var topic0 types.Bytes32
 	if len(l.Topics) > 0 {
-		topic0 = *types.NewHashIDSlice32(l.Topics[0])
+		topic0 = *types.NewBytes32FromSlice(l.Topics[0])
 	}
 	return &IndexedEvent{
 		Signature:        topic0,
-		TransactionHash:  *types.NewHashIDSlice32(l.TransactionHash),
+		TransactionHash:  *types.NewBytes32FromSlice(l.TransactionHash),
 		BlockNumber:      int64(l.BlockNumber),
 		TransactionIndex: int64(l.TransactionIndex),
 		LogIndex:         int64(l.LogIndex),
@@ -498,11 +498,11 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		newHighestBlock = int64(block.Number)
 		blocks = append(blocks, &IndexedBlock{
 			Number: int64(block.Number),
-			Hash:   *types.NewHashIDSlice32(block.Hash),
+			Hash:   *types.NewBytes32FromSlice(block.Hash),
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:             *types.NewHashIDSlice32(r.TransactionHash),
+				Hash:             *types.NewBytes32FromSlice(r.TransactionHash),
 				BlockNumber:      int64(r.BlockNumber),
 				TransactionIndex: int64(txIndex),
 				From:             (*types.EthAddress)(r.From),
@@ -686,7 +686,7 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 
 type txWaiter struct {
 	start time.Time
-	hash  *types.HashID
+	hash  *types.Bytes32
 	done  chan *IndexedTransaction
 }
 
@@ -709,7 +709,7 @@ func (w *txWaiter) wait(ctx context.Context, waiterID string) (*IndexedTransacti
 }
 
 func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	txHash, err := types.ParseHashID(ctx, hash)
+	txHash, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -759,21 +759,20 @@ func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint
 }
 
 func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	hashID, err := types.ParseHashID(ctx, hash)
+	hashID, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
 	return bi.getIndexedTransactionByHash(ctx, *hashID)
 }
 
-func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.HashID) (*IndexedTransaction, error) {
+func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.Bytes32) (*IndexedTransaction, error) {
 	var txns []*IndexedTransaction
 	db := bi.persistence.DB()
 	err := db.
 		WithContext(ctx).
 		Table("indexed_transactions").
-		Where("hash_l = ?", hashID.L).
-		Where("hash_h = ?", hashID.H).
+		Where("hash = ?", hashID).
 		Find(&txns).
 		Error
 	if err != nil || len(txns) < 1 {
@@ -797,7 +796,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 }
 
 func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error) {
-	hashID, err := types.ParseHashID(ctx, hash)
+	hashID, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -807,8 +806,7 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 	err = db.
 		WithContext(ctx).
 		Table("indexed_events").
-		Where("transaction_l = ?", hashID.L).
-		Where("transaction_h = ?", hashID.H).
+		Where("transaction_hash = ?", hashID).
 		Order("log_index").
 		Find(&events).
 		Error

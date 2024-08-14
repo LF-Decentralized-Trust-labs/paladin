@@ -499,7 +499,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 
 	bi.persistence.DB().Table("indexed_blocks").Create(&IndexedBlock{
 		Number: 12345,
-		Hash:   *types.MustParseHashID(types.RandHex(32)),
+		Hash:   *types.MustParseBytes32(types.RandHex(32)),
 	})
 
 	bi.startOrReset() // do not start block listener

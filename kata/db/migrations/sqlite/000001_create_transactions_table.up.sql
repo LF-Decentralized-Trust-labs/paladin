@@ -3,10 +3,10 @@ CREATE TABLE transactions (
   updated_at                TIMESTAMP       NOT NULL,
   deleted_at                TIMESTAMP,
   id                        UUID            NOT NULL,
-  contract                  TEXT            NOT NULL,
-  "from"                    TEXT            NOT NULL,
+  contract                  VARCHAR         NOT NULL,
+  "from"                    VARCHAR         NOT NULL,
   sequence_id               UUID,
-  payload_json              TEXT,
-  payload_rlp               TEXT
+  payload_json              VARCHAR,
+  payload_rlp               VARCHAR
 );
 

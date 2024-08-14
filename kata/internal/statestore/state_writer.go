@@ -226,7 +226,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("schemas").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					Columns:   []clause.Column{{Name: "id"}},
 					DoNothing: true, // immutable
 				}).
 				Create(schemas).
@@ -236,7 +236,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("states").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					Columns:   []clause.Column{{Name: "id"}},
 					DoNothing: true, // immutable
 				}).
 				Omit("Labels", "Int64Labels", "Confirmed", "Spent", "Locked"). // we do this ourselves below
@@ -247,7 +247,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_confirms").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns:   []clause.Column{{Name: "state"}},
 					DoNothing: true, // immutable
 				}).
 				Create(stateConfirms).
@@ -257,7 +257,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_labels").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					Columns:   []clause.Column{{Name: "state"}, {Name: "label"}},
 					DoNothing: true, // immutable
 				}).
 				Create(labels).
@@ -267,7 +267,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_int64_labels").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					Columns:   []clause.Column{{Name: "state"}, {Name: "label"}},
 					DoNothing: true, // immutable
 				}).
 				Create(int64Labels).
@@ -277,7 +277,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_spends").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns:   []clause.Column{{Name: "state"}},
 					DoNothing: true, // immutable
 				}).
 				Create(stateSpends).
@@ -287,7 +287,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_locks").
 				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns: []clause.Column{{Name: "state"}},
 					// locks can move to another sequence
 					DoUpdates: clause.AssignmentColumns([]string{
 						"sequence",

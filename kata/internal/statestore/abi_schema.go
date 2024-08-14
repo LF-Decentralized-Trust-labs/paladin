@@ -59,7 +59,7 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.Hash = *types.HashIDKeccak([]byte(as.SchemaPersisted.Signature))
+		as.ID = *types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -86,8 +86,8 @@ func (as *abiSchema) Type() SchemaType {
 	return SchemaTypeABI
 }
 
-func (as *abiSchema) ID() string {
-	return as.SchemaPersisted.Hash.String()
+func (as *abiSchema) IDString() string {
+	return as.SchemaPersisted.ID.String()
 }
 
 func (as *abiSchema) Signature() string {
@@ -344,7 +344,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 		return nil, err
 	}
 
-	hashID := *types.NewHashIDSlice32(hash)
+	hashID := *types.NewBytes32FromSlice(hash)
 	for i := range psd.labels {
 		psd.labels[i].State = hashID
 	}
@@ -353,9 +353,9 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	}
 	return &StateWithLabels{
 		State: &State{
-			Hash:        hashID,
+			ID:          hashID,
 			DomainID:    as.DomainID,
-			Schema:      as.Hash,
+			Schema:      as.ID,
 			Data:        jsonData,
 			Labels:      psd.labels,
 			Int64Labels: psd.int64Labels,

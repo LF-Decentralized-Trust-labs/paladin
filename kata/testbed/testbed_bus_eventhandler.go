@@ -202,7 +202,7 @@ func (tb *testbed) findAvailableStates(req *proto.FindAvailableStatesRequest) (*
 	pbStates := make([]*proto.StoredState, len(states))
 	for i, s := range states {
 		pbStates[i] = &proto.StoredState{
-			HashId:   s.Hash.String(),
+			HashId:   s.ID.String(),
 			SchemaId: s.Schema.String(),
 			StoredAt: s.CreatedAt.UnixNano(),
 			DataJson: string(s.Data),

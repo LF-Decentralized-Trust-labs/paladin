@@ -34,7 +34,7 @@ func TestPersistStateMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.PersistState(ctx, "domain1", types.HashIDKeccak(([]byte)("test")).String(), nil)
+	_, err := ss.PersistState(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), nil)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -42,13 +42,13 @@ func TestPersistStateInvalidState(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
-	cacheKey := schemaCacheKey("domain1", schemaHash)
+	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
 	})
 
-	_, err := ss.PersistState(ctx, "domain1", schemaHash.String(), nil)
+	_, err := ss.PersistState(ctx, "domain1", schemaID.String(), nil)
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -58,7 +58,7 @@ func TestGetStateMissing(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.GetState(ctx, "domain1", types.HashIDKeccak(([]byte)("state1")).String(), true, false)
+	_, err := ss.GetState(ctx, "domain1", types.Bytes32Keccak(([]byte)("state1")).String(), true, false)
 	assert.Regexp(t, "PD010112", err)
 }
 
@@ -100,7 +100,7 @@ func TestFindStatesMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.FindStates(ctx, "domain1", types.HashIDKeccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
+	_, err := ss.FindStates(ctx, "domain1", types.Bytes32Keccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -108,13 +108,13 @@ func TestFindStatesBadQuery(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
-	cacheKey := schemaCacheKey("domain1", schemaHash)
+	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
 	})
 
-	_, err := ss.FindStates(ctx, "domain1", schemaHash.String(), &filters.QueryJSON{
+	_, err := ss.FindStates(ctx, "domain1", schemaID.String(), &filters.QueryJSON{
 		Statements: filters.Statements{
 			Ops: filters.Ops{
 				Equal: []*filters.OpSingleVal{
@@ -131,16 +131,16 @@ func TestFindStatesFail(t *testing.T) {
 	ctx, ss, db, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaHash := types.HashIDKeccak(([]byte)("schema1"))
-	cacheKey := schemaCacheKey("domain1", schemaHash)
+	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
-		SchemaPersisted: &SchemaPersisted{Hash: *schemaHash},
+		SchemaPersisted: &SchemaPersisted{ID: *schemaID},
 		definition:      &abi.Parameter{},
 	})
 
 	db.ExpectQuery("SELECT.*created_at").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := ss.FindStates(ctx, "domain1", schemaHash.String(), &filters.QueryJSON{
+	_, err := ss.FindStates(ctx, "domain1", schemaID.String(), &filters.QueryJSON{
 		Statements: filters.Statements{
 			Ops: filters.Ops{
 				GreaterThan: []*filters.OpSingleVal{

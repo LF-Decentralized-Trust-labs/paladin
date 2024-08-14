@@ -44,7 +44,7 @@ const (
 )
 
 type SchemaPersisted struct {
-	Hash       types.HashID    `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	ID         types.Bytes32   `json:"id"          gorm:"primaryKey"`
 	CreatedAt  types.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
 	DomainID   string          `json:"domain"`
 	Type       SchemaType      `json:"type"`
@@ -60,13 +60,13 @@ type schemaLabelInfo struct {
 	resolver      filters.FieldResolver
 }
 
-type hashIDOnly struct {
-	HashID types.HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+type idOnly struct {
+	ID types.Bytes32 `gorm:"primaryKey"`
 }
 
 type Schema interface {
 	Type() SchemaType
-	ID() string
+	IDString() string
 	Signature() string
 	Persisted() *SchemaPersisted
 	LabelInfo() []*schemaLabelInfo
@@ -74,8 +74,8 @@ type Schema interface {
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
 }
 
-func schemaCacheKey(domainID string, hash *types.HashID) string {
-	return domainID + "/" + hash.String()
+func schemaCacheKey(domainID string, id *types.Bytes32) string {
+	return domainID + "/" + id.String()
 }
 
 func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
@@ -86,16 +86,16 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (Schema, error) {
-	schemaHash, err := types.ParseHashID(ctx, schemaID)
+	id, err := types.ParseBytes32(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
-	return ss.getSchemaByHash(ctx, domainID, schemaHash, failNotFound)
+	return ss.getSchemaByID(ctx, domainID, id, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *types.HashID, failNotFound bool) (Schema, error) {
+func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID *types.Bytes32, failNotFound bool) (Schema, error) {
 
-	cacheKey := schemaCacheKey(domainID, schemaHash)
+	cacheKey := schemaCacheKey(domainID, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
 	if cached {
 		return s, nil
@@ -105,14 +105,13 @@ func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, sche
 	err := ss.p.DB().
 		Table("schemas").
 		Where("domain_id = ?", domainID).
-		Where("hash_l = ?", schemaHash.L.String()).
-		Where("hash_h = ?", schemaHash.H.String()).
+		Where("id = ?", schemaID).
 		Limit(1).
 		Find(&results).
 		Error
 	if err != nil || len(results) == 0 {
 		if err == nil && failNotFound {
-			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, schemaHash)
+			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, schemaID)
 		}
 		return s, err
 	}
@@ -132,10 +131,10 @@ func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, sche
 }
 
 func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results []Schema, err error) {
-	var ids []*hashIDOnly
+	var ids []*idOnly
 	err = ss.p.DB().
 		Table("schemas").
-		Select("hash_l", "hash_h").
+		Select("id").
 		Where("domain_id = ?", domainID).
 		Find(&ids).
 		Error
@@ -144,7 +143,7 @@ func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results
 	}
 	results = make([]Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByHash(ctx, domainID, &id.HashID, true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, domainID, &id.ID, true); err != nil {
 			return nil, err
 		}
 	}

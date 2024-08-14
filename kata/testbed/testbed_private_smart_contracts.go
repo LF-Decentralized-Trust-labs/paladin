@@ -108,7 +108,7 @@ func (psc *tbPrivateSmartContract) restoreStateOrder(originalList []*proto.State
 	for i, sr := range originalList {
 		found := false
 		for _, s := range queriedStates {
-			if s.Schema.String() == sr.SchemaId && s.Hash.String() == sr.HashId {
+			if s.Schema.String() == sr.SchemaId && s.ID.String() == sr.HashId {
 				orderedList[i] = s
 				found = true
 				break
@@ -125,7 +125,7 @@ func (psc *tbPrivateSmartContract) toEndorsableList(states []*statestore.State) 
 	endorsableList := make([]*proto.EndorsableState, len(states))
 	for i, input := range states {
 		endorsableList[i] = &proto.EndorsableState{
-			HashId:        input.Hash.String(),
+			HashId:        input.ID.String(),
 			SchemaId:      input.Schema.String(),
 			StateDataJson: string(input.Data),
 		}
@@ -160,7 +160,7 @@ func (psc *tbPrivateSmartContract) gatherEndorsements(ctx context.Context,
 				Statements: filters.Statements{
 					Ops: filters.Ops{
 						In: []*filters.OpMultiVal{
-							{Op: filters.Op{Field: "id"}, Values: stateIDs},
+							{Op: filters.Op{Field: "hash"}, Values: stateIDs},
 						},
 					},
 				},
@@ -182,7 +182,7 @@ func (psc *tbPrivateSmartContract) gatherEndorsements(ctx context.Context,
 	attestations := []*proto.AttestationResult{}
 	tb := psc.tb
 	for _, ar := range attestationRequests {
-		if ar.AttestationType == proto.AttestationType_SIGN {
+		if ar.AttestationType == proto.AttestationType_ENDORSE {
 			for _, partyName := range ar.Parties {
 				// Look up the endorser
 				keyHandle, verifier, err := tb.keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
@@ -296,7 +296,7 @@ func (psc *tbPrivateSmartContract) validateAndWriteStates(seq uuid.UUID, newStat
 	for i, ws := range states {
 		newStateIDs[i] = &proto.StateRef{
 			SchemaId: ws.Schema.String(),
-			HashId:   ws.Hash.String(),
+			HashId:   ws.ID.String(),
 		}
 	}
 	return states, newStateIDs, nil

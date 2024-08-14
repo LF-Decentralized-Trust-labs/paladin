@@ -651,7 +651,7 @@ func TestProcessCatchupEventPageFailRPC(t *testing.T) {
 	ctx, bi, mRPC, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
 
-	txHash := types.MustParseHashID(types.RandHex(32))
+	txHash := types.MustParseBytes32(types.RandHex(32))
 
 	bi.retry.UTSetMaxAttempts(2)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).
@@ -661,8 +661,8 @@ func TestProcessCatchupEventPageFailRPC(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnRows(
 		sqlmock.NewRows([]string{
-			"transaction_l", "transaction_h",
-		}).AddRow(txHash.L, txHash.H),
+			"transaction_hash",
+		}).AddRow(txHash),
 	)
 
 	es := &eventStream{

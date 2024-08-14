@@ -24,9 +24,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHashIDStatic(t *testing.T) {
+func TestBytes32Static(t *testing.T) {
 
-	var id1 *HashID
+	var id1 *Bytes32
 	assert.Equal(t, "", id1.String())
 	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", id1.HexString0xPrefix())
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", id1.HexString())
@@ -34,53 +34,50 @@ func TestHashIDStatic(t *testing.T) {
 	assert.True(t, id1.IsZero()) // nil returns true for isZero (as Bytes32 would give zero)
 
 	ctx := context.Background()
-	_, err := ParseHashID(ctx, "0xfeedbeef")
-	assert.Regexp(t, "PD010101.*32.*4", err)
+	_, err := ParseBytes32(ctx, "0xfeedbeef")
+	assert.Regexp(t, "PD010719.*32.*4", err)
 
 	assert.Panics(t, func() {
-		MustParseHashID("wrong")
+		MustParseBytes32("wrong")
 	})
 
-	checkFixedOK := func(id *HashID) {
+	checkFixedOK := func(id *Bytes32) {
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.String())
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString0xPrefix())
 		assert.Equal(t, "512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString())
 	}
 
-	id2 := MustParseHashID("0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")
+	id2 := MustParseBytes32("0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")
 	checkFixedOK(id2)
 
-	id3 := NewHashIDSlice32(id2.Bytes())
+	id3 := NewBytes32FromSlice(id2.Bytes())
 	checkFixedOK(id3)
-
-	id4 := NewHashID(id2.Bytes32())
-	checkFixedOK(id4)
 
 	assert.True(t, id2.Equals(id3))
 	assert.False(t, id2.Equals(nil))
-	assert.True(t, (*HashID)(nil).Equals(nil))
-	assert.False(t, (*HashID)(nil).Equals(id2))
-	assert.True(t, (*HashID)(id2).Equals(MustParseHashID("512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")))
+	assert.True(t, (*Bytes32)(nil).Equals(nil))
+	assert.False(t, (*Bytes32)(nil).Equals(id2))
+	assert.True(t, (*Bytes32)(id2).Equals(MustParseBytes32("512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")))
 
 }
 
-func TestHashIDKeccak(t *testing.T) {
+func TestBytes32Keccak(t *testing.T) {
 
-	id1 := HashIDKeccak(([]byte)("hello world"))
+	id1 := Bytes32Keccak(([]byte)("hello world"))
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", id1.HexString())
 
 }
 
-func TestHashIDMarshalingJSON(t *testing.T) {
+func TestBytes32MarshalingJSON(t *testing.T) {
 
 	type myStruct struct {
-		ID1 *HashID `json:"id1"`
-		ID2 *HashID `json:"id2,omitempty"`
-		ID3 *HashID `json:"id3"`
-		ID4 *HashID `json:"id4"`
-		ID5 HashID  `json:"id5"`
-		ID6 HashID  `json:"id6"`
-		ID7 HashID  `json:"id7"`
+		ID1 *Bytes32 `json:"id1"`
+		ID2 *Bytes32 `json:"id2,omitempty"`
+		ID3 *Bytes32 `json:"id3"`
+		ID4 *Bytes32 `json:"id4"`
+		ID5 Bytes32  `json:"id5"`
+		ID6 Bytes32  `json:"id6"`
+		ID7 Bytes32  `json:"id7"`
 	}
 
 	inJSON := ([]byte)(`{
@@ -116,5 +113,45 @@ func TestHashIDMarshalingJSON(t *testing.T) {
 
 	err = json.Unmarshal(([]byte)(`{"id1":"wrong"}`), &s1)
 	assert.Regexp(t, "PD010100", err)
+
+}
+
+func TestBytes32ScanValue(t *testing.T) {
+
+	v, err := MustParseBytes32("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD").Value()
+	assert.NoError(t, err)
+	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", v)
+
+	scanner := &Bytes32{}
+	err = scanner.Scan(([]byte)("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD"))
+	assert.NoError(t, err)
+	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
+
+	scanner = &Bytes32{}
+	err = scanner.Scan(MustParseBytes32("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD").Bytes())
+	assert.NoError(t, err)
+	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
+
+	scanner = &Bytes32{}
+	err = scanner.Scan("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")
+	assert.NoError(t, err)
+	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
+
+	scanner = &Bytes32{}
+	err = scanner.Scan("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")
+	assert.NoError(t, err)
+	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
+
+	err = scanner.Scan("0xfeedbeef")
+	assert.Regexp(t, "PD010719.*4", err)
+
+	err = scanner.Scan([]byte{0xfe, 0xed, 0xbe, 0xef})
+	assert.Regexp(t, "PD010719.*4", err)
+
+	err = scanner.Scan([]byte("0xWRONG!85A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD"))
+	assert.Regexp(t, "PD010100", err)
+
+	err = scanner.Scan(false)
+	assert.Regexp(t, "PD011101", err)
 
 }
