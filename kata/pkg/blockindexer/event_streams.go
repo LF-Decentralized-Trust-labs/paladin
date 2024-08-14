@@ -139,7 +139,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 			return nil, err
 		}
 	} else {
-		// Otherwise we're just recreating
+		// Otherwise we're just creating
 		def.ID = uuid.New()
 		err := bi.persistence.DB().
 			Table("event_streams").
@@ -633,7 +633,6 @@ func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
 		}
 		if err == nil {
 			log.L(es.ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
-			out.Data, _ = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
 			if in.Address != nil {
 				out.Address = types.EthAddress(*in.Address)
 			}

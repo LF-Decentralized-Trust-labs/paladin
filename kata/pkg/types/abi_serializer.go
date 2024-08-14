@@ -62,6 +62,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 			if _, inB := byDefsB[sig]; !inB {
 				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
+			delete(byDefsB, sig)
 		}
 	}
 	for sig, b := range byDefsB {

@@ -541,6 +541,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		return true, err
 	})
 	if err == nil {
+		// Context was cancelled exiting retry - no notification in that case
 		bi.notifyEventStreams(ctx, batch)
 	}
 }

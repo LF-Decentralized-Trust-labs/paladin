@@ -190,6 +190,10 @@ func TestABIsMustMatchExtra(t *testing.T) {
 	assert.Regexp(t, "PD011103.*extraFunction", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
 	assert.Regexp(t, "PD011103.*extraFunction", err)
+	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Function)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Function)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
 
 	// Is ok for a sub-match on just the events (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
