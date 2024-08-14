@@ -19,6 +19,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
@@ -180,9 +182,9 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Do the deploy - we wait for the transaction here to cover revert failures
 		if prepareDeployRes.Deploy != nil && prepareDeployRes.Transaction == nil {
-			err = tb.execBaseLedgerDeployTransaction(ctx, domain.factoryContractABI, prepareDeployRes.Deploy)
+			err = tb.execBaseLedgerDeployTransaction(ctx, domain.factoryContractABI, prepareDeployRes.SigningAddress, prepareDeployRes.Deploy)
 		} else if prepareDeployRes.Transaction != nil && prepareDeployRes.Deploy == nil {
-			err = tb.execBaseLedgerTransaction(ctx, domain.factoryContractABI, domain.factoryContractAddress, prepareDeployRes.Transaction)
+			err = tb.execBaseLedgerTransaction(ctx, domain.factoryContractABI, domain.factoryContractAddress, prepareDeployRes.SigningAddress, prepareDeployRes.Transaction)
 		} else {
 			err = fmt.Errorf("must return a transaction to invoke, or a transaction to deploy")
 		}
@@ -204,6 +206,9 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		invocation types.PrivateContractInvoke,
 	) (bool, error) {
+
+		/// TODO: Work out testbed simulation of sequence
+		seq := uuid.New()
 
 		psc := tb.getDomainContract(invocation.To.Address0xHex())
 		if psc == nil {
@@ -260,32 +265,42 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 
 		// Validate and write the states
-		newStateIDs, err := psc.domain.validateAndWriteStates(assembleTXRes.AssembledTransaction.NewStates)
+		spentStateRefs := assembleTXRes.AssembledTransaction.SpentStates
+		newStates, newStateRefs, err := psc.validateAndWriteStates(seq, assembleTXRes.AssembledTransaction.NewStates)
 		if err != nil {
 			return false, err
 		}
 
 		// Gather signatures
 		attestations := []*proto.AttestationResult{}
-		signatures, err := tb.gatherSignatures(ctx, assembleTXRes.AttestationPlan)
+		signatures, err := psc.gatherSignatures(ctx, assembleTXRes.AttestationPlan)
 		if err != nil {
 			return false, err
 		}
 		attestations = append(attestations, signatures...)
 
-		// Gather endorsements
-		endorsements, err := tb.gatherEndorsements(ctx, txSpec, assembleTXRes)
+		// Gather endorsements - now logically this would be a distributed activity across nodes
+		endorserSubmitConstraint, inputStates, endorsements, err :=
+			psc.gatherEndorsements(ctx, txSpec, signatures, spentStateRefs, newStates, assembleReq.ResolvedVerifiers, assembleTXRes.AttestationPlan)
 		if err != nil {
 			return false, err
 		}
 		attestations = append(attestations, endorsements...)
 
+		log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d", len(inputStates), len(newStates), len(signatures), len(endorsements))
+
+		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
+		signer, err := psc.determineSubmitterIdentity(ctx, txSpec, endorserSubmitConstraint, endorsements)
+		if err != nil {
+			return false, err
+		}
+
 		// Prepare the transaction
 		prepareTXReq := &proto.PrepareTransactionRequest{
 			Transaction: &proto.FinalizedTransaction{
 				TransactionId: txSpec.TransactionId,
-				SpentStateIds: assembleTXRes.AssembledTransaction.SpentStateIds,
-				NewStateIds:   newStateIDs,
+				SpentStates:   spentStateRefs,
+				NewStates:     newStateRefs,
 			},
 			AttestationResult: attestations,
 		}
@@ -295,7 +310,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			return false, err
 		}
 
-		err = tb.execBaseLedgerTransaction(ctx, psc.domain.privateContractABI, psc.address, prepareTXRes.Transaction)
+		err = tb.execBaseLedgerTransaction(ctx, psc.domain.privateContractABI, psc.address, signer, prepareTXRes.Transaction)
 		if err != nil {
 			return false, err
 		}

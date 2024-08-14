@@ -155,27 +155,27 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	var domainUUID string
 	var chainID int64
 
-	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]*fakeCoinParser, []string, *big.Int, error) {
+	fakeCoinSelection := func(sc simCallbacks, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]*fakeCoinParser, []*proto.StateRef, *big.Int, error) {
 		var lastStateTimestamp int64
 		total := big.NewInt(0)
 		coins := []*fakeCoinParser{}
-		stateIDs := []string{}
+		stateRefs := []*proto.StateRef{}
 		for {
 			// Simple oldest coin first algo
 			query := &filters.QueryJSON{
 				Limit: confutil.P(10),
 				Sort:  []string{".created"},
-				FilterJSON: filters.FilterJSON{
-					FilterJSONOps: filters.FilterJSONOps{
-						Eq: []*filters.FilterJSONKeyValue{
-							{FilterJSONBase: filters.FilterJSONBase{Field: "owner"}, Value: types.RawJSON(fmt.Sprintf(`"%s"`, fromAddr))},
+				Statements: filters.Statements{
+					Ops: filters.Ops{
+						Eq: []*filters.OpSingleVal{
+							{Op: filters.Op{Field: "owner"}, Value: types.JSONString(fromAddr.String())},
 						},
 					},
 				},
 			}
 			if lastStateTimestamp > 0 {
-				query.GT = []*filters.FilterJSONKeyValue{
-					{FilterJSONBase: filters.FilterJSONBase{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
+				query.GT = []*filters.OpSingleVal{
+					{Op: filters.Op{Field: ".created"}, Value: types.RawJSON(strconv.FormatInt(lastStateTimestamp, 10))},
 				}
 			}
 			states, err := sc.FindAvailableStates(domainUUID, fakeCoinSchemaID, query)
@@ -193,11 +193,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
 				}
 				total = total.Add(total, coin.Amount.BigInt())
-				stateIDs = append(stateIDs, state.HashId)
+				stateRefs = append(stateRefs, &proto.StateRef{
+					HashId:   state.HashId,
+					SchemaId: state.SchemaId,
+				})
 				coins = append(coins, &coin)
 				if total.Cmp(amount) >= 0 {
 					// We've got what we need - return how much over we are
-					return coins, stateIDs, new(big.Int).Sub(amount, total), nil
+					return coins, stateRefs, new(big.Int).Sub(amount, total), nil
 				}
 			}
 		}
@@ -334,13 +337,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
 			assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 			return &proto.PrepareDeployTransactionResponse{
+				SigningAddress: fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId),
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName: "newSIMTokenNotarized",
 					ParamsJson: fmt.Sprintf(`{
 						"txId": "%s",
 						"notary": "%s"
 					}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier),
-					SigningAddress: fmt.Sprintf("domain1/contract1/onetimekeys/%s", req.Transaction.TransactionId),
 				},
 			}, nil
 		},
@@ -380,9 +383,9 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			amount := txInputs.Amount.BigInt()
 			toKeep := new(big.Int)
 			coinsToSpend := []*fakeCoinParser{}
-			stateIDsToSpend := []string{}
+			stateRefsToSpend := []*proto.StateRef{}
 			if txInputs.From != "" {
-				coinsToSpend, stateIDsToSpend, toKeep, err = fakeCoinSelection(sc, fromAddr, amount)
+				coinsToSpend, stateRefsToSpend, toKeep, err = fakeCoinSelection(sc, fromAddr, amount)
 				if err != nil {
 					return nil, err
 				}
@@ -419,8 +422,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.NoError(t, err)
 			return &proto.AssembleTransactionResponse{
 				AssembledTransaction: &proto.AssembledTransaction{
-					SpentStateIds: stateIDsToSpend,
-					NewStates:     newStates,
+					SpentStates: stateRefsToSpend,
+					NewStates:   newStates,
 				},
 				AssemblyResult: proto.AssembleTransactionResponse_OK,
 				AttestationPlan: []*proto.AttestationRequest{
@@ -461,7 +464,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			signaturePayload, err := typedDataV4TransferWithSalts(contractAddr, inCoins, outCoins)
 			assert.NoError(t, err)
 			var signerVerification *proto.AttestationResult
-			for _, ar := range req.AttestationResult {
+			for _, ar := range req.Signatures {
 				if ar.AttestationType == proto.AttestationType_SIGN &&
 					ar.Name == "sender" &&
 					ar.Verifier.Algorithm == signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
@@ -499,7 +502,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			}
 
 			return &proto.EndorseTransactionResponse{
-				EndorsementResult: proto.EndorseTransactionResponse_OK,
+				EndorsementResult: proto.EndorseTransactionResponse_ENDORSER_SUBMIT,
 			}, nil
 		},
 
@@ -511,16 +514,23 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					signerSignature = att.Payload
 				}
 			}
+			spentStateIds := make([]string, len(req.Transaction.SpentStates))
+			for i, s := range req.Transaction.SpentStates {
+				spentStateIds[i] = s.HashId
+			}
+			newStateIds := make([]string, len(req.Transaction.NewStates))
+			for i, s := range req.Transaction.NewStates {
+				newStateIds[i] = s.HashId
+			}
 			return &proto.PrepareTransactionResponse{
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName: "executeNotarized",
 					ParamsJson: toJSONString(t, map[string]interface{}{
 						"txId":      req.Transaction.TransactionId,
-						"inputs":    req.Transaction.SpentStateIds,
-						"outputs":   req.Transaction.NewStateIds,
+						"inputs":    spentStateIds,
+						"outputs":   newStateIds,
 						"signature": signerSignature,
 					}),
-					SigningAddress: "domain1/contract1/notary",
 				},
 			}, nil
 		},

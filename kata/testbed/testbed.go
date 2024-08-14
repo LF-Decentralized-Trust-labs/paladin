@@ -74,10 +74,10 @@ type testbed struct {
 	destFromDomain   string
 	inflight         map[string]*inflightRequest
 	inflightLock     sync.Mutex
-	domainsByUUID    map[uuid.UUID]*testbedDomain
-	domainsByName    map[string]*testbedDomain
-	domainsByAddress map[ethtypes.Address0xHex]*testbedDomain
-	domainContracts  map[ethtypes.Address0xHex]*testbedPrivateSmartContract
+	domainsByUUID    map[uuid.UUID]*tbDomain
+	domainsByName    map[string]*tbDomain
+	domainsByAddress map[ethtypes.Address0xHex]*tbDomain
+	domainContracts  map[ethtypes.Address0xHex]*tbPrivateSmartContract
 	domainLock       sync.Mutex
 	ready            chan error
 	done             chan struct{}
@@ -87,10 +87,10 @@ func newTestBed() (tb *testbed) {
 	tb = &testbed{
 		sigc:             make(chan os.Signal, 1),
 		inflight:         make(map[string]*inflightRequest),
-		domainsByUUID:    make(map[uuid.UUID]*testbedDomain),
-		domainsByName:    make(map[string]*testbedDomain),
-		domainsByAddress: make(map[ethtypes.Address0xHex]*testbedDomain),
-		domainContracts:  make(map[ethtypes.Address0xHex]*testbedPrivateSmartContract),
+		domainsByUUID:    make(map[uuid.UUID]*tbDomain),
+		domainsByName:    make(map[string]*tbDomain),
+		domainsByAddress: make(map[ethtypes.Address0xHex]*tbDomain),
+		domainContracts:  make(map[ethtypes.Address0xHex]*tbPrivateSmartContract),
 		ready:            make(chan error, 1),
 		done:             make(chan struct{}),
 	}

@@ -69,4 +69,18 @@ func TestRawJSON(t *testing.T) {
 	yamlErr := RawJSON(`[!!!! wrong`).YAML()
 	assert.Regexp(t, "invalid", yamlErr)
 
+	assert.Equal(t, `This is a test with "quotes" of 'various' types`, JSONString(`This is a test with "quotes" of 'various' types`).StringValue())
+
+	// check using json.Number we don't lose precision on StringValue
+	assert.Equal(t, "123456789.123456789", RawJSON("123456789.123456789").StringValue())
+	assert.Equal(t, "100000001.000000001", RawJSON("100000001.000000001").StringValue())
+
+	// Nil is empty string for StringValue
+	assert.Equal(t, "", RawJSON("null").StringValue())
+	assert.Equal(t, "", RawJSON(nil).StringValue())
+
+	// Others are JSON
+	assert.JSONEq(t, `{"some":"thing"}`, RawJSON(`{"some":"thing"}`).StringValue())
+	assert.JSONEq(t, `[{"some":"thing"}]`, RawJSON(`[{"some":"thing"}]`).StringValue())
+
 }

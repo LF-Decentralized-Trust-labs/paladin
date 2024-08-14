@@ -5,7 +5,8 @@ interface IPaladinContract_V0 {
 
     event PaladinNewSmartContract_V0(
         bytes32 indexed txId,
-        address indexed domain
+        address indexed domain,
+        bytes   data
     );
 
     event PaladinPrivateTransaction_V0(

@@ -29,9 +29,34 @@ import (
 // Just like types.RawJSON, but with ability to SQL serialize to string as well
 type RawJSON []byte
 
+func JSONString(s string) RawJSON {
+	b, _ := json.Marshal(s)
+	return b
+}
+
 func (m RawJSON) String() string {
 	b, _ := m.MarshalJSON()
 	return (string)(b)
+}
+
+func (m RawJSON) StringValue() string {
+	if m == nil {
+		return ""
+	}
+	var v any
+	_ = json.Unmarshal(m, &v)
+	switch v := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case float64:
+		var n json.Number
+		_ = json.Unmarshal(m, &n)
+		return n.String()
+	default:
+		return m.String()
+	}
 }
 
 func (m RawJSON) Pretty() string {

@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -131,7 +132,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 		if err != nil {
 			return nil, err
 		}
-		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
+		tx.From = json.RawMessage(types.JSONString(fromAddr))
 	}
 
 	if rpcErr := ec.rpc.CallRPC(ctx, &data, "eth_call", tx, block); rpcErr != nil {
@@ -149,7 +150,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	if err != nil {
 		return nil, err
 	}
-	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
+	tx.From = json.RawMessage(types.JSONString(fromAddr))
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
 	if tx.Nonce == nil {

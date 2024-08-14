@@ -115,10 +115,10 @@ func TestFindStatesBadQuery(t *testing.T) {
 	})
 
 	_, err := ss.FindStates(ctx, "domain1", schemaHash.String(), &filters.QueryJSON{
-		FilterJSON: filters.FilterJSON{
-			FilterJSONOps: filters.FilterJSONOps{
-				Equal: []*filters.FilterJSONKeyValue{
-					{FilterJSONBase: filters.FilterJSONBase{Field: "wrong"}},
+		Statements: filters.Statements{
+			Ops: filters.Ops{
+				Equal: []*filters.OpSingleVal{
+					{Op: filters.Op{Field: "wrong"}},
 				},
 			},
 		},
@@ -141,10 +141,10 @@ func TestFindStatesFail(t *testing.T) {
 	db.ExpectQuery("SELECT.*created_at").WillReturnError(fmt.Errorf("pop"))
 
 	_, err := ss.FindStates(ctx, "domain1", schemaHash.String(), &filters.QueryJSON{
-		FilterJSON: filters.FilterJSON{
-			FilterJSONOps: filters.FilterJSONOps{
-				GreaterThan: []*filters.FilterJSONKeyValue{
-					{FilterJSONBase: filters.FilterJSONBase{
+		Statements: filters.Statements{
+			Ops: filters.Ops{
+				GreaterThan: []*filters.OpSingleVal{
+					{Op: filters.Op{
 						Field: ".created",
 					}, Value: types.RawJSON(fmt.Sprintf("%d", time.Now().UnixNano()))},
 				},

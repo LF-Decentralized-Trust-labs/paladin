@@ -40,10 +40,11 @@ var iPaladinContractABIJSON []byte
 var iPaladinContractABI = mustParseBuildABI(iPaladinContractABIJSON)
 var iPaladinNewSmartContract_V0_Signature = mustEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 
-type testbedDomain struct {
-	*transactionWaitUtils[*testbedPrivateSmartContract]
+type tbDomain struct {
+	*transactionWaitUtils[*tbPrivateSmartContract]
 	tb                     *testbed
 	instanceUUID           uuid.UUID
+	config                 *proto.DomainConfig
 	name                   string
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
@@ -61,10 +62,11 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 			return nil, fmt.Errorf("bad ABI state schema %d: %s", i, err)
 		}
 	}
-	domain := &testbedDomain{
-		transactionWaitUtils: newTransactionWaitUtils[*testbedPrivateSmartContract](),
+	domain := &tbDomain{
+		transactionWaitUtils: newTransactionWaitUtils[*tbPrivateSmartContract](),
 		tb:                   tb,
 		instanceUUID:         uuid.New(),
+		config:               config,
 		name:                 name,
 		schemasByID:          make(map[string]statestore.Schema),
 		schemasBySignature:   make(map[string]statestore.Schema),
@@ -89,6 +91,15 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 	domain.factoryContractAddress, err = ethtypes.NewAddress(config.FactoryContractAddress)
 	if err != nil {
 		return nil, fmt.Errorf("bad factory contract address: %s", err)
+	}
+
+	if config.BaseLedgerSubmitConfig == nil {
+		config.BaseLedgerSubmitConfig = &proto.BaseLedgerSubmitConfig{}
+	}
+	if config.BaseLedgerSubmitConfig.SubmitMode == proto.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS {
+		if config.BaseLedgerSubmitConfig.OneTimeUsePrefix == "" {
+			config.BaseLedgerSubmitConfig.OneTimeUsePrefix = fmt.Sprintf("domain/%s/tx/")
+		}
 	}
 
 	flushed := make(chan struct{})
@@ -176,7 +187,7 @@ func (tb *testbed) addDomainContractFromEvent(ctx context.Context, emitter *type
 	// 1) The domain to be written in any form - does not need to be a factory, but can be
 	// 2) The created contract's globally unique ID to be trusted, because it is address of the emitter of the event (not data in the event)
 	if tb.domainContracts[*emitter.Address0xHex()] == nil {
-		newContract := &testbedPrivateSmartContract{
+		newContract := &tbPrivateSmartContract{
 			tb:      tb,
 			domain:  domain,
 			address: emitter.Address0xHex(),
@@ -199,7 +210,7 @@ func bytes32ToUUID(bytes ethtypes.HexBytes0xPrefix) uuid.UUID {
 	return id
 }
 
-func (domain *testbedDomain) validateDeploy(ctx context.Context, constructorParams types.RawJSON) (*uuid.UUID, *proto.DeployTransactionSpecification, error) {
+func (domain *tbDomain) validateDeploy(ctx context.Context, constructorParams types.RawJSON) (*uuid.UUID, *proto.DeployTransactionSpecification, error) {
 
 	contructorValues, err := domain.constructorABI.Inputs.ParseJSONCtx(ctx, constructorParams)
 	if err != nil {
@@ -217,7 +228,7 @@ func (domain *testbedDomain) validateDeploy(ctx context.Context, constructorPara
 	}, nil
 }
 
-func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.ABI, txInstruction *proto.BaseLedgerDeployTransaction) error {
+func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.ABI, signer string, txInstruction *proto.BaseLedgerDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
 	abiClient, err := tb.ethClient.ABI(ctx, abi)
@@ -230,7 +241,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.
 
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
-		Signer(txInstruction.SigningAddress).
+		Signer(signer).
 		Input(txInstruction.ParamsJson).
 		SignAndSend()
 	if err == nil {
@@ -242,7 +253,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.
 	return nil
 }
 
-func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, to *ethtypes.Address0xHex, txInstruction *proto.BaseLedgerTransaction) error {
+func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, to *ethtypes.Address0xHex, signer string, txInstruction *proto.BaseLedgerTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
 	abiClient, err := tb.ethClient.ABI(ctx, abi)
@@ -255,7 +266,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, t
 
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
-		Signer(txInstruction.SigningAddress).
+		Signer(signer).
 		To(to).
 		Input(txInstruction.ParamsJson).
 		SignAndSend()
@@ -268,7 +279,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, t
 	return nil
 }
 
-func (tb *testbed) getDomainByName(name string) (*testbedDomain, error) {
+func (tb *testbed) getDomainByName(name string) (*tbDomain, error) {
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	domain := tb.domainsByName[name]
@@ -279,117 +290,13 @@ func (tb *testbed) getDomainByName(name string) (*testbedDomain, error) {
 
 }
 
-func (tb *testbed) gatherSignatures(ctx context.Context, requests []*proto.AttestationRequest) ([]*proto.AttestationResult, error) {
-	attestations := []*proto.AttestationResult{}
-	for _, ar := range requests {
-		if ar.AttestationType == proto.AttestationType_SIGN {
-			for _, partyName := range ar.Parties {
-				keyHandle, verifier, err := tb.keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
-				if err != nil {
-					return nil, fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
-				}
-				signaturePayload, err := tb.keyMgr.Sign(ctx, &proto.SignRequest{
-					KeyHandle: keyHandle,
-					Algorithm: ar.Algorithm,
-					Payload:   ar.Payload,
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
-				}
-				attestations = append(attestations, &proto.AttestationResult{
-					Name:            ar.Name,
-					AttestationType: ar.AttestationType,
-					Verifier: &proto.ResolvedVerifier{
-						Lookup:    partyName,
-						Algorithm: ar.Algorithm,
-						Verifier:  verifier,
-					},
-					Payload: signaturePayload.Payload,
-				})
-			}
-		}
-	}
-	return attestations, nil
-}
-
-func (tb *testbed) gatherEndorsements(ctx context.Context, txSpec *proto.TransactionSpecification, assembleRes *proto.AssembleTransactionResponse) ([]*proto.AttestationResult, error) {
-
-	// We have to gather all the states for the endorsement
-
-	// attestations := []*proto.AttestationResult{}
-	// for _, ar := range requests {
-	// 	if ar.AttestationType == proto.AttestationType_SIGN {
-	// 		for _, partyName := range ar.Parties {
-	// 			keyHandle, verifier, err := tb.keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
-	// 			if err != nil {
-	// 				return nil, fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
-	// 			}
-	// 			signaturePayload, err := tb.keyMgr.Sign(ctx, &proto.SignRequest{
-	// 				KeyHandle: keyHandle,
-	// 				Algorithm: ar.Algorithm,
-	// 				Payload:   ar.Payload,
-	// 			})
-	// 			if err != nil {
-	// 				return nil, fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
-	// 			}
-	// 			attestations = append(attestations, &proto.AttestationResult{
-	// 				Name:            ar.Name,
-	// 				AttestationType: ar.AttestationType,
-	// 				Verifier: &proto.ResolvedVerifier{
-	// 					Lookup:    partyName,
-	// 					Algorithm: ar.Algorithm,
-	// 					Verifier:  verifier,
-	// 				},
-	// 				Payload: signaturePayload.Payload,
-	// 			})
-	// 		}
-	// 	}
-	// }
-	// return attestations, nil
-
-	return nil, nil
-}
-
-func (domain *testbedDomain) validateAndWriteStates(newStates []*proto.NewState) ([]string, error) {
-
-	newStatesToWrite := make([]*statestore.NewState, len(newStates))
-	for i, s := range newStates {
-		schema := domain.schemasByID[s.SchemaId]
-		if schema == nil {
-			schema = domain.schemasBySignature[s.SchemaId]
-		}
-		if schema == nil {
-			return nil, fmt.Errorf("unknown schema %s", s.SchemaId)
-		}
-		newStatesToWrite[i] = &statestore.NewState{
-			SchemaID: schema.ID(),
-			Data:     types.RawJSON(s.StateDataJson),
-		}
-	}
-
-	var states []*statestore.State
-	err := domain.tb.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
-		states, err = dsi.CreateNewStates(uuid.New() /* TODO: Work out testbed simulation of sequence */, newStatesToWrite)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	newStateIDs := make([]string, len(states))
-	for i, ws := range states {
-		newStateIDs[i] = ws.Hash.String()
-	}
-	return newStateIDs, nil
-
-}
-
-func (tb *testbed) getDomainByAddress(addr *ethtypes.Address0xHex) *testbedDomain {
+func (tb *testbed) getDomainByAddress(addr *ethtypes.Address0xHex) *tbDomain {
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	return tb.domainsByAddress[*addr]
 }
 
-func (tb *testbed) getDomainByUUID(uuidStr string) (domain *testbedDomain) {
+func (tb *testbed) getDomainByUUID(uuidStr string) (domain *tbDomain) {
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	id, err := uuid.Parse(uuidStr)
@@ -399,7 +306,7 @@ func (tb *testbed) getDomainByUUID(uuidStr string) (domain *testbedDomain) {
 	return domain
 }
 
-func (tb *testbed) getDomainContract(addr *ethtypes.Address0xHex) *testbedPrivateSmartContract {
+func (tb *testbed) getDomainContract(addr *ethtypes.Address0xHex) *tbPrivateSmartContract {
 	tb.domainLock.Lock()
 	defer tb.domainLock.Unlock()
 	return tb.domainContracts[*addr]

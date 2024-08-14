@@ -18,7 +18,6 @@ package filters
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -38,7 +37,7 @@ func TestInt64Field(t *testing.T) {
 
 	// Too big to fit (by 1)
 	tooBig := new(big.Int).Add(big.NewInt(9223372036854775807), big.NewInt(1))
-	_, err = Int64Field("test").SQLValue(ctx, (types.RawJSON)(fmt.Sprintf(`"%s"`, tooBig)))
+	_, err = Int64Field("test").SQLValue(ctx, types.JSONString(tooBig.String()))
 	assert.Regexp(t, "PD010703", err)
 
 	// We handle bool -> Int64 conversion

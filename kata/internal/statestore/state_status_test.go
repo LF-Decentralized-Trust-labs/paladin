@@ -198,7 +198,7 @@ func TestStateStatusQualifierJSON(t *testing.T) {
 	assert.Regexp(t, "PD010117", err)
 
 	u := uuid.New().String()
-	err = json.Unmarshal(([]byte)(fmt.Sprintf(`"%s"`, u)), &q)
+	err = json.Unmarshal(types.JSONString(u), &q)
 	assert.NoError(t, err)
 	assert.Equal(t, u, (string)(q))
 }

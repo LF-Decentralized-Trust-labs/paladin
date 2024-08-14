@@ -211,7 +211,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 				assert.Equal(t, "latest", s)
 			}
 			if withFrom {
-				assert.Equal(t, fmt.Sprintf(`"%s"`, key1), string(tx.From))
+				assert.Equal(t, types.JSONString(key1), string(tx.From))
 			} else {
 				assert.Nil(t, tx.From)
 			}

@@ -32,6 +32,7 @@ describe("SIMDomain", function () {
       expect(deployEvent?.name).to.equal('PaladinNewSmartContract_V0');
       expect(deployEvent?.args.toObject()["txId"]).to.equal(deployTxId);
       expect(deployEvent?.args.toObject()["domain"]).to.equal(await simDomain.getAddress());
+      expect(deployEvent?.args.toObject()["data"]).to.equal(notary.address.toLowerCase());
       const deployedAddr = factoryTX!.logs[0].address;
       
       // Now we have the token - create a client for it using the notary address
