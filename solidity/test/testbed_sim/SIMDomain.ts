@@ -19,8 +19,8 @@ describe("SIMDomain", function () {
 
   describe("Factory", function () {
     it("should deploy a new smart contract and emit an event", async function () {
-      const abiCoder = hre.ethers.AbiCoder.defaultAbiCoder();
       const { simDomain, notary } = await loadFixture(simDomainSetup);
+      const abiCoder = hre.ethers.AbiCoder.defaultAbiCoder();
       
       // Invoke the factory function to create the actual SIMToken
       const SIMTokenFactory = await hre.ethers.getContractFactory("SIMToken");
