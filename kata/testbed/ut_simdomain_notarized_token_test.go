@@ -209,7 +209,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				coins = append(coins, &coin)
 				if total.Cmp(amount) >= 0 {
 					// We've got what we need - return how much over we are
-					return coins, stateRefs, new(big.Int).Sub(amount, total), nil
+					return coins, stateRefs, new(big.Int).Sub(total, amount), nil
 				}
 			}
 		}
