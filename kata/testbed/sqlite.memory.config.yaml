@@ -4,6 +4,7 @@ db:
     uri: ':memory:'
     autoMigrate: true
     migrationsDir: './db/migrations/sqlite'
+    debugQueries: true
 rpcServer:
   http:
     port: 0

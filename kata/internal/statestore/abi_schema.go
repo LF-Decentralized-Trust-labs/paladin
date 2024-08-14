@@ -351,16 +351,18 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	for i := range psd.int64Labels {
 		psd.int64Labels[i].State = hashID
 	}
+	now := types.TimestampNow()
 	return &StateWithLabels{
 		State: &State{
 			ID:          hashID,
+			CreatedAt:   now,
 			DomainID:    as.DomainID,
 			Schema:      as.ID,
 			Data:        jsonData,
 			Labels:      psd.labels,
 			Int64Labels: psd.int64Labels,
 		},
-		LabelValues: psd.labelValues,
+		LabelValues: addStateBaseLabels(psd.labelValues, hashID, now),
 	}, nil
 }
 
@@ -371,6 +373,6 @@ func (as *abiSchema) RecoverLabels(ctx context.Context, s *State) (*StateWithLab
 	}
 	return &StateWithLabels{
 		State:       s,
-		LabelValues: psd.labelValues,
+		LabelValues: addStateBaseLabels(psd.labelValues, s.ID, s.CreatedAt),
 	}, nil
 }

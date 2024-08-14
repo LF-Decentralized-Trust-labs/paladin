@@ -116,8 +116,14 @@ func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, fa
 // Built in fields all start with "." as that prevents them
 // clashing with variable names in ABI structs ($ and _ are valid leading chars there)
 var baseStateFields = map[string]filters.FieldResolver{
-	".created": filters.TimestampField("created_at"),
 	".id":      filters.Bytes32Field("id"),
+	".created": filters.TimestampField("created_at"),
+}
+
+func addStateBaseLabels(labelValues filters.PassthroughValueSet, id types.Bytes32, createdAt types.Timestamp) filters.PassthroughValueSet {
+	labelValues[".id"] = id.HexString()
+	labelValues[".created"] = int64(createdAt)
+	return labelValues
 }
 
 type trackingLabelSet struct {

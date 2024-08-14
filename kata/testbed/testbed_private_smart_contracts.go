@@ -160,7 +160,7 @@ func (psc *tbPrivateSmartContract) gatherEndorsements(ctx context.Context,
 				Statements: filters.Statements{
 					Ops: filters.Ops{
 						In: []*filters.OpMultiVal{
-							{Op: filters.Op{Field: "hash"}, Values: stateIDs},
+							{Op: filters.Op{Field: ".id"}, Values: stateIDs},
 						},
 					},
 				},
@@ -279,7 +279,7 @@ func (psc *tbPrivateSmartContract) validateAndWriteStates(seq uuid.UUID, newStat
 			return nil, nil, fmt.Errorf("unknown schema %s", s.SchemaId)
 		}
 		newStatesToWrite[i] = &statestore.NewState{
-			SchemaID: schema.ID(),
+			SchemaID: schema.IDString(),
 			Data:     types.RawJSON(s.StateDataJson),
 		}
 	}

@@ -131,7 +131,7 @@ func (tb *testbed) registerDomain(ctx context.Context, name string, config *prot
 
 	schemasProto := make([]*proto.StateSchema, len(schemas))
 	for i, s := range schemas {
-		schemaID := s.ID()
+		schemaID := s.IDString()
 		domain.schemasByID[schemaID] = s
 		domain.schemasBySignature[s.Signature()] = s
 		schemasProto[i] = &proto.StateSchema{
