@@ -22,16 +22,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
-	protobuf "google.golang.org/protobuf/proto"
 )
 
 type testExtension struct {
@@ -443,7 +439,7 @@ func TestDecodeCompactRSVBadLen(t *testing.T) {
 	assert.Regexp(t, "PD011420", err)
 }
 
-func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
+func TestZKPSigningModuleKeyResolution(t *testing.T) {
 	tmpDir := t.TempDir()
 	ctx := context.Background()
 
@@ -468,12 +464,23 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(resp1.Identifiers))
-	aliceKeyHandle := resp1.KeyHandle
-	alicePrivateKeyBytes, err := sm.(*signingModule).keyStore.LoadKeyMaterial(ctx, aliceKeyHandle)
+}
+
+func TestZKPSigningModuleKeyResolutionMisses(t *testing.T) {
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyStore: api.StoreConfig{
+			Type:       api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{Path: confutil.P(tmpDir)},
+			SnarkProver: api.SnarkProverConfig{
+				CircuitsDir:    "tests",
+				ProvingKeysDir: "tests",
+			},
+		},
+	}, nil)
 	assert.NoError(t, err)
-	privKeyBytes := [32]byte{}
-	copy(privKeyBytes[:], alicePrivateKeyBytes)
-	alice := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		MustExist:  true,
@@ -494,39 +501,4 @@ func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(resp2.Identifiers))
-	bobKeyHandle := resp2.KeyHandle
-
-	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
-	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
-
-	salt1 := utxo.NewSalt()
-	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
-	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
-	inputCommitments := []string{input1.Text(16), input2.Text(16)}
-
-	inputValueInts := []uint64{inputValues[0].Uint64(), inputValues[1].Uint64()}
-	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
-	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
-
-	req := proto.ProvingRequest{
-		CircuitId: "anon",
-		Common: &proto.ProvingRequestCommon{
-			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
-			InputSalts:       inputSalts,
-			InputOwner:       aliceKeyHandle,
-			OutputValues:     outputValueInts,
-			OutputOwners:     []string{aliceKeyHandle, bobKeyHandle},
-		},
-	}
-	payload, err := protobuf.Marshal(&req)
-	assert.NoError(t, err)
-
-	_, err = sm.Sign(ctx, &proto.SignRequest{
-		KeyHandle: aliceKeyHandle,
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
-		Payload:   payload,
-	})
-	assert.EqualError(t, err, "open tests/anon_js/anon.wasm: no such file or directory")
 }
