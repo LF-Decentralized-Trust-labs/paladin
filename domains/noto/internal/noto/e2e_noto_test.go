@@ -13,19 +13,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package noto
 
 import (
 	"context"
-	"fmt"
+	"testing"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/domains/noto/internal/noto"
+	"github.com/stretchr/testify/assert"
 )
 
+// TODO: fix things that should not be hard-coded
 var (
 	toDomain    = "to-domain"
 	testbedAddr = "http://127.0.0.1:49603"
@@ -33,18 +34,16 @@ var (
 	account1    = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
 )
 
-func runTest(ctx context.Context) error {
-	domain, err := noto.New(ctx, grpcAddr)
-	if err != nil {
-		return err
-	}
+func TestNoto(t *testing.T) {
+	ctx := context.Background()
+
+	domain, err := New(ctx, grpcAddr)
+	assert.NoError(t, err)
 	defer domain.Close()
 
 	log.L(ctx).Infof("Listening for gRPC messages on %s", toDomain)
 	err = domain.Listen(ctx, toDomain)
-	if err != nil {
-		return err
-	}
+	assert.NoError(t, err)
 
 	conf := ffresty.Config{URL: testbedAddr}
 	rest := ffresty.NewWithConfig(ctx, conf)
@@ -60,30 +59,22 @@ func runTest(ctx context.Context) error {
 	log.L(ctx).Infof("Calling testbed_deployBytecode")
 	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode", account1, domain.Factory.Bytecode.String())
 	if rpcerr != nil {
-		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
+		assert.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Deployed to %s", addressResult)
 
 	log.L(ctx).Infof("Calling testbed_configureInit")
-	domainConfig := noto.Config{FactoryAddress: addressResult}
+	domainConfig := Config{FactoryAddress: addressResult}
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_configureInit", "noto", domainConfig)
 	if rpcerr != nil {
-		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
+		assert.NoError(t, rpcerr.Error())
 	}
 
 	log.L(ctx).Infof("Calling testbed_deploy")
-	rpcerr = rpc.CallRPC(callCtx, &objResult, "testbed_deploy", "noto", &noto.NotoConstructor{
+	rpcerr = rpc.CallRPC(callCtx, &objResult, "testbed_deploy", "noto", &NotoConstructor{
 		Notary: account1,
 	})
 	if rpcerr != nil {
-		return fmt.Errorf("failed to call JSON RPC: %v", rpcerr)
-	}
-	return nil
-}
-
-func main() {
-	ctx := context.Background()
-	if err := runTest(ctx); err != nil {
-		log.L(ctx).Fatalf("%s", err)
+		assert.NoError(t, rpcerr.Error())
 	}
 }
