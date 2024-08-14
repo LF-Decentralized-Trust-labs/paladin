@@ -57,11 +57,11 @@ func (fcb *fakeCommsBusServer) Listen(lr *proto.ListenRequest, ls proto.KataMess
 	ctx := ls.Context()
 
 	if fcb.recvMessages[lr.Destination] == nil {
-		fcb.recvMessages[lr.Destination] = make(chan *proto.Message)
+		fcb.recvMessages[lr.Destination] = make(chan *proto.Message, 1)
 	}
 
 	if fcb.sendMessages[lr.Destination] == nil {
-		fcb.sendMessages[lr.Destination] = make(chan *proto.Message)
+		fcb.sendMessages[lr.Destination] = make(chan *proto.Message, 1)
 	}
 
 	// Register that we have a new destination
@@ -372,7 +372,7 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	// After the first test, we know that the Paladin should trust the CA of our client cert, so make a request direct
 	// to the gRPC external server presenting the client cert from that CA
 	realPaladinCertPool := x509.NewCertPool()
-	ok = certPool.AppendCertsFromPEM(realPaladinCACert)
+	ok = realPaladinCertPool.AppendCertsFromPEM(realPaladinCACert)
 	assert.Equal(t, true, ok)
 
 	fakeClientTLSConfig := &tls.Config{
