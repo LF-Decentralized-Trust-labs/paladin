@@ -17,6 +17,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -74,4 +75,213 @@ func TestStandardABISerializer(t *testing.T) {
 		"score": "-1000",
 		"shiny": true
 	}`, (string)(standardizedJSON))
+}
+
+func TestABIsMustMatchSubMatch(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "mismatchedFunction",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "event",
+			"name": "MatchedEvent",
+			"inputs": [
+			  {
+			    "name": "nameInBoth",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiA)
+	assert.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "mismatchedFunction",
+			"inputs": [
+			  {
+			    "name": "nameInB",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "event",
+			"name": "MatchedEvent",
+			"inputs": [
+			  {
+			    "name": "nameInBoth",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiB)
+	assert.NoError(t, err)
+
+	// Fails match on whole (either direction)
+	err = ABIsMustMatch(context.Background(), abiA, abiB)
+	assert.Regexp(t, "PD011103.*mismatchedFunction", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.Regexp(t, "PD011103.*mismatchedFunction", err)
+
+	// Is ok for a sub-match on just the events (either direction)
+	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
+	assert.NoError(t, err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Event)
+	assert.NoError(t, err)
+
+}
+
+func TestABIsMustMatchExtra(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "extraFunction",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "event",
+			"name": "MatchedEvent",
+			"inputs": [
+			  {
+			    "name": "nameInBoth",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiA)
+	assert.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[
+		{
+			"type": "event",
+			"name": "MatchedEvent",
+			"inputs": [
+			  {
+			    "name": "nameInBoth",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiB)
+	assert.NoError(t, err)
+
+	// Fails match on whole (either direction)
+	err = ABIsMustMatch(context.Background(), abiA, abiB)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
+	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Function)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Function)
+	assert.Regexp(t, "PD011103.*extraFunction", err)
+
+	// Is ok for a sub-match on just the events (either direction)
+	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
+	assert.NoError(t, err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Event)
+	assert.NoError(t, err)
+
+}
+
+func TestABIsDeepMisMatchName(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "event",
+			"name": "NestedTypeEvent",
+			"inputs": [
+			  {
+			    "name": "widget",
+				"type": "tuple",
+				"internalType": "struct WidgetContract.Widget",
+				"components": [
+				   {
+				     "name": "_sku",
+					 "type": "uint256"
+				   }
+				]
+			  }
+			]
+		}
+	]`), &abiA)
+	assert.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[
+		{
+			"type": "event",
+			"name": "NestedTypeEvent",
+			"inputs": [
+			  {
+			    "name": "widget",
+				"type": "tuple",
+				"internalType": "struct WidgetContract.Widget",
+				"components": [
+				   {
+				     "name": "sku",
+					 "type": "uint256"
+				   }
+				]
+			  }
+			]
+		}
+	]`), &abiB)
+	assert.NoError(t, err)
+
+	// Fails match simply due to that one missing _ on _sku vs. sku
+	err = ABIsMustMatch(context.Background(), abiA, abiB)
+	assert.Regexp(t, "PD011103.*NestedTypeEvent", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.Regexp(t, "PD011103.*NestedTypeEvent", err)
+
+}
+
+func TestABIsBadTypes(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "event",
+			"name": "Bad",
+			"inputs": [
+			  {
+			    "name": "badness",
+				"type": "wrong"
+			  }
+			]
+		}
+	]`), &abiA)
+	assert.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[]`), &abiB)
+	assert.NoError(t, err)
+
+	// Fails match simply due to that one missing _ on _sku vs. sku
+	err = ABIsMustMatch(context.Background(), abiA, abiB)
+	assert.Regexp(t, "FF22025", err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.Regexp(t, "FF22025", err)
+
 }

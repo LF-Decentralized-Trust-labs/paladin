@@ -39,6 +39,7 @@ import (
 type blockListener struct {
 	ctx                        context.Context
 	wsConn                     rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
+	wsConnClosed               bool
 	listenLoopDone             chan struct{}
 	initialBlockHeightObtained chan struct{}
 	newHeadsTap                chan struct{}
@@ -461,10 +462,15 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, error) {
 func (bl *blockListener) waitClosed() {
 	bl.mux.Lock()
 	listenLoopDone := bl.listenLoopDone
+	var wsConnToClose rpcbackend.WebSocketRPCClient
+	if bl.wsConn != nil && !bl.wsConnClosed {
+		wsConnToClose = bl.wsConn
+		bl.wsConnClosed = true
+	}
 	bl.mux.Unlock()
-	if bl.wsConn != nil {
-		_ = bl.wsConn.UnsubscribeAll(bl.ctx)
-		bl.wsConn.Close()
+	if wsConnToClose != nil {
+		_ = wsConnToClose.UnsubscribeAll(bl.ctx)
+		wsConnToClose.Close()
 	}
 	if listenLoopDone != nil {
 		<-listenLoopDone

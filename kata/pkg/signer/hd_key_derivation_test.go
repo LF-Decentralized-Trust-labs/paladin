@@ -208,8 +208,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	expectedKey, err := tk.ECPrivKey()
 	assert.NoError(t, err)
 	keyBytes := expectedKey.Key.Bytes()
-	testKeyPair, err := secp256k1.NewSecp256k1KeyPair(keyBytes[:])
-	assert.NoError(t, err)
+	testKeyPair := secp256k1.KeyPairFromBytes(keyBytes[:])
 	assert.Equal(t, testKeyPair.Address.String(), res.Identifiers[0].Identifier)
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
