@@ -15,13 +15,18 @@
 
 package common
 
-import "github.com/hyperledger/firefly-signer/pkg/secp256k1"
+import (
+	"testing"
 
-// We use the ethereum convention of R,S,V for compact packing (mentioned because Golang tends to prefer V,R,S)
-func CompactRSV(sig *secp256k1.SignatureData) []byte {
-	signatureBytes := make([]byte, 65)
-	sig.R.FillBytes(signatureBytes[0:32])
-	sig.S.FillBytes(signatureBytes[32:64])
-	signatureBytes[64] = byte(sig.V.Int64())
-	return signatureBytes
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestEncodeDecode(t *testing.T) {
+	privKey := babyjub.NewRandPrivKey()
+	pubKey := privKey.Public()
+	pubKeyHex := EncodePublicKey(pubKey)
+	pubKey2, _ := DecodePublicKey(pubKeyHex)
+	assert.Equal(t, pubKey.X, pubKey2.X)
+	assert.Equal(t, pubKey.Y, pubKey2.Y)
 }

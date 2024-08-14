@@ -132,7 +132,7 @@ func NewSigningModule(ctx context.Context, config *api.Config, extensions ...api
 	// Register any in-memory signers
 	sm.inMemorySigners = make(map[string]api.InMemorySigner)
 	sepc256k1Signer.Register(sm.inMemorySigners)
-	err = zkpSigner.Register(ctx, &config.KeyStore, sm.inMemorySigners)
+	err = zkpSigner.Register(ctx, config.KeyStore.SnarkProver, sm.inMemorySigners)
 
 	return sm, err
 }

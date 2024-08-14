@@ -24,7 +24,6 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -32,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -40,16 +40,18 @@ type snarkProver struct {
 	zkpProverConfig  api.SnarkProverConfig
 	circuitsCache    cache.Cache[string, witness.Calculator]
 	provingKeysCache cache.Cache[string, []byte]
+	circuitLoader    func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error)
+	proofGenerator   func(witness []byte, provingKey []byte) (*types.ZKProof, error)
 }
 
-func Register(ctx context.Context, config *api.StoreConfig, registry map[string]api.InMemorySigner) error {
+func Register(ctx context.Context, config api.SnarkProverConfig, registry map[string]api.InMemorySigner) error {
 	// skip registration is no ZKP prover config is provided
-	if config.SnarkProver.CircuitsDir == "" || config.SnarkProver.ProvingKeysDir == "" {
+	if config.CircuitsDir == "" || config.ProvingKeysDir == "" {
 		log.L(ctx).Info("zkp prover not configured, skip registering as an in-memory signer")
 		return nil
 	}
 
-	signer, err := NewSnarkProver(ctx, config)
+	signer, err := newSnarkProver(config)
 	if err != nil {
 		return err
 	}
@@ -57,14 +59,16 @@ func Register(ctx context.Context, config *api.StoreConfig, registry map[string]
 	return nil
 }
 
-func NewSnarkProver(ctx context.Context, config *api.StoreConfig) (*snarkProver, error) {
+func newSnarkProver(config api.SnarkProverConfig) (*snarkProver, error) {
 	cacheConfig := cache.Config{
 		Capacity: confutil.P(5),
 	}
 	return &snarkProver{
-		zkpProverConfig:  config.SnarkProver,
+		zkpProverConfig:  config,
 		circuitsCache:    cache.NewCache[string, witness.Calculator](&cacheConfig, &cacheConfig),
 		provingKeysCache: cache.NewCache[string, []byte](&cacheConfig, &cacheConfig),
+		circuitLoader:    loadCircuit,
+		proofGenerator:   generateProof,
 	}, nil
 }
 
@@ -91,7 +95,7 @@ func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 	circuit, _ := ks.circuitsCache.Get(inputs.CircuitId)
 	provingKey, _ := ks.provingKeysCache.Get(inputs.CircuitId)
 	if circuit == nil || provingKey == nil {
-		c, p, err := loadCircuit(inputs.CircuitId, ks.zkpProverConfig)
+		c, p, err := ks.circuitLoader(inputs.CircuitId, ks.zkpProverConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +116,7 @@ func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 		return nil, err
 	}
 
-	proof, err := generateProof(wtns, provingKey)
+	proof, err := ks.proofGenerator(wtns, provingKey)
 	if err != nil {
 		return nil, err
 	}
@@ -176,9 +180,7 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 	for i, value := range commonInputs.OutputValues {
 		salt := utxo.NewSalt()
 		outputSalts[i] = salt
-		var ownerPubKeyComp babyjub.PublicKeyComp
-		copy(ownerPubKeyComp[:], []byte(commonInputs.OutputOwners[i]))
-		ownerPubKey, err := ownerPubKeyComp.Decompress()
+		ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
 		if err != nil {
 			return nil, err
 		}

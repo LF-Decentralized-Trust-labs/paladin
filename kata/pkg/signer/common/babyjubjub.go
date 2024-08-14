@@ -15,13 +15,22 @@
 
 package common
 
-import "github.com/hyperledger/firefly-signer/pkg/secp256k1"
+import (
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/utils"
+)
 
-// We use the ethereum convention of R,S,V for compact packing (mentioned because Golang tends to prefer V,R,S)
-func CompactRSV(sig *secp256k1.SignatureData) []byte {
-	signatureBytes := make([]byte, 65)
-	sig.R.FillBytes(signatureBytes[0:32])
-	sig.S.FillBytes(signatureBytes[32:64])
-	signatureBytes[64] = byte(sig.V.Int64())
-	return signatureBytes
+func EncodePublicKey(pubKey *babyjub.PublicKey) string {
+	pubKeyComp := pubKey.Compress()
+	return utils.HexEncode(pubKeyComp[:])
+}
+
+func DecodePublicKey(pubKeyHex string) (*babyjub.PublicKey, error) {
+	pubKeyCompBytes, err := utils.HexDecode(pubKeyHex)
+	if err != nil {
+		return nil, err
+	}
+	var compressedPubKey babyjub.PublicKeyComp
+	copy(compressedPubKey[:], pubKeyCompBytes)
+	return compressedPubKey.Decompress()
 }

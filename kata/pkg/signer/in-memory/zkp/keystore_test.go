@@ -38,11 +38,8 @@ type User struct {
 	PrivateKeyBigInt *big.Int
 }
 
-// generate a new BabyJub keypair
 func NewKeypair() *User {
-	// generate babyJubjub private key randomly
 	babyJubjubPrivKey := babyjub.NewRandPrivKey()
-	// generate public key from private key
 	babyJubjubPubKey := babyJubjubPrivKey.Public()
 	// convert the private key to big.Int for use inside circuits
 	privKeyBigInt := babyjub.SkToBigInt(&babyJubjubPrivKey)

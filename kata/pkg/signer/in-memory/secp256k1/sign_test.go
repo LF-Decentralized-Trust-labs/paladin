@@ -17,25 +17,29 @@ package secp256k1
 
 import (
 	"context"
+	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	k1 "github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
+	"github.com/stretchr/testify/assert"
 )
 
-type sepc256k1Signer struct{}
-
-func Register(registry map[string]api.InMemorySigner) {
-	signer := &sepc256k1Signer{}
-	registry[api.Algorithm_ECDSA_SECP256K1_PLAINBYTES] = signer
+func TestRegister(t *testing.T) {
+	registry := make(map[string]api.InMemorySigner)
+	Register(registry)
+	assert.Equal(t, 1, len(registry))
 }
 
-func (s *sepc256k1Signer) Sign(ctx context.Context, privateKey []byte, req *proto.SignRequest) (*proto.SignResponse, error) {
-	kp, _ := secp256k1.NewSecp256k1KeyPair(privateKey)
-	sig, err := kp.SignDirect(req.Payload)
-	if err == nil {
-		return &proto.SignResponse{Payload: common.CompactRSV(sig)}, nil
-	}
-	return nil, err
+func TestNewSigner(t *testing.T) {
+	keypair, err := k1.GenerateSecp256k1KeyPair()
+	assert.NoError(t, err)
+	signer := &sepc256k1Signer{}
+	res, err := signer.Sign(context.Background(), keypair.PrivateKeyBytes(), &proto.SignRequest{
+		KeyHandle: "key1",
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   ([]byte)("something to sign"),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
 }

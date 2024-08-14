@@ -22,12 +22,16 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 type testExtension struct {
@@ -439,137 +443,90 @@ func TestDecodeCompactRSVBadLen(t *testing.T) {
 	assert.Regexp(t, "PD011420", err)
 }
 
-// func TestZetoKeystoreExtension(t *testing.T) {
-// 	ctx := context.Background()
-// 	zke := NewZkpSignerExtension()
-// 	ks, err := zke.KeyStore(ctx, &api.StoreConfig{
-// 		Type: ZkpKeyStoreSigner,
-// 		FileSystem: api.FileSystemConfig{
-// 			Path: confutil.P(t.TempDir()),
-// 		},
-// 		SnarkProver: api.SnarkProverConfig{
-// 			CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
-// 			ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
+func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
+	tmpDir := t.TempDir()
+	ctx := context.Background()
 
-// 	keyHex := "627d15ca47363fb118997679bc8941d1ae16a034dc8ae96c938e3997e3d6ca98"
-// 	keyBytes, _ := hex.DecodeString(keyHex)
-// 	privKeyBytes := [32]byte{}
-// 	copy(privKeyBytes[:], keyBytes)
-// 	key0 := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyStore: api.StoreConfig{
+			Type:       api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{Path: confutil.P(tmpDir)},
+			SnarkProver: api.SnarkProverConfig{
+				CircuitsDir:    "tests",
+				ProvingKeysDir: "tests",
+			},
+		},
+	}, nil)
+	assert.NoError(t, err)
 
-// 	req := pb.ResolveKeyRequest{
-// 		Name: "42",
-// 		Path: []*pb.ResolveKeyPathSegment{
-// 			{Name: "bob"},
-// 			{Name: "blue"},
-// 		},
-// 	}
-// 	newKeyFunc := func() ([]byte, error) { return key0.PrivateKey[:], nil }
-// 	_, keyHandle, err := ks.FindOrCreateLoadableKey(context.Background(), &req, newKeyFunc)
-// 	assert.NoError(t, err)
-// 	_, err = ks.LoadKeyMaterial(context.Background(), keyHandle)
-// 	assert.NoError(t, err)
-// }
+	resp1, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "blueKey",
+		Path: []*proto.ResolveKeyPathSegment{
+			{Name: "alice"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(resp1.Identifiers))
+	aliceKeyHandle := resp1.KeyHandle
+	alicePrivateKeyBytes, err := sm.(*signingModule).keyStore.LoadKeyMaterial(ctx, aliceKeyHandle)
+	assert.NoError(t, err)
+	privKeyBytes := [32]byte{}
+	copy(privKeyBytes[:], alicePrivateKeyBytes)
+	alice := key.NewKeyEntryFromPrivateKeyBytes(privKeyBytes)
 
-// func TestZetoKeystoreExtensionMissingKeystoreConfig(t *testing.T) {
-// 	ctx := context.Background()
-// 	zke := NewZkpSignerExtension()
-// 	_, err := zke.KeyStore(ctx, &api.StoreConfig{Type: ZkpKeyStoreSigner})
-// 	assert.EqualError(t, err, "key store config is required")
-// }
+	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		MustExist:  true,
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "redKey",
+		Path: []*proto.ResolveKeyPathSegment{
+			{Name: "bob"},
+		},
+	})
+	assert.EqualError(t, err, "PD011406: Key 'bob/redKey' does not exist")
 
-// func TestZKPSigningModuleUsingFileSystemStore(t *testing.T) {
-// 	ctx, fs, dir := newTestFilesystemStore(t)
+	resp2, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "redKey",
+		Path: []*proto.ResolveKeyPathSegment{
+			{Name: "bob"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(resp2.Identifiers))
+	bobKeyHandle := resp2.KeyHandle
 
-// 	// // create a BJJ key in the filesystem store
-// 	alice := NewKeypair()
-// 	bob := NewKeypair()
+	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
+	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-// 	_, aliceKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
-// 		Name: "blueKey",
-// 		Path: []*pb.ResolveKeyPathSegment{
-// 			{Name: "alice"},
-// 		},
-// 	}, func() ([]byte, error) { return alice.PrivateKey[:], nil })
-// 	assert.NoError(t, err)
+	salt1 := utxo.NewSalt()
+	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
+	salt2 := utxo.NewSalt()
+	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
+	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
-// 	_, bobKeyHandle, err := fs.FindOrCreateLoadableKey(ctx, &pb.ResolveKeyRequest{
-// 		Name: "redKey",
-// 		Path: []*pb.ResolveKeyPathSegment{
-// 			{Name: "bob"},
-// 		},
-// 	}, func() ([]byte, error) { return bob.PrivateKey[:], nil })
-// 	assert.NoError(t, err)
+	inputValueInts := []uint64{inputValues[0].Uint64(), inputValues[1].Uint64()}
+	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
+	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
 
-// 	sm, err := signer.NewSigningModule(ctx, &api.Config{
-// 		KeyStore: api.StoreConfig{
-// 			Type:       ZkpKeyStoreSigner,
-// 			FileSystem: api.FileSystemConfig{Path: confutil.P(dir)},
-// 			SnarkProver: api.SnarkProverConfig{
-// 				CircuitsDir:    "/Users/jimzhang/workspace.zkp/confidential-utxo/zkp/js/lib/",
-// 				ProvingKeysDir: "/Users/jimzhang/Documents/zkp/proving-keys",
-// 			},
-// 		},
-// 	}, NewZkpSignerExtension())
-// 	assert.NoError(t, err)
-// 	assert.NotZero(t, sm)
+	req := proto.ProvingRequest{
+		CircuitId: "anon",
+		Common: &proto.ProvingRequestCommon{
+			InputCommitments: inputCommitments,
+			InputValues:      inputValueInts,
+			InputSalts:       inputSalts,
+			InputOwner:       aliceKeyHandle,
+			OutputValues:     outputValueInts,
+			OutputOwners:     []string{aliceKeyHandle, bobKeyHandle},
+		},
+	}
+	payload, err := protobuf.Marshal(&req)
+	assert.NoError(t, err)
 
-// 	_, err = sm.Resolve(ctx, &pb.ResolveKeyRequest{
-// 		MustExist:  true,
-// 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
-// 		Name:       "blue",
-// 		Path: []*pb.ResolveKeyPathSegment{
-// 			{Name: "bob"},
-// 		},
-// 	})
-// 	assert.EqualError(t, err, "PD011406: Key 'bob/blue' does not exist")
-
-// 	resp, err := sm.Resolve(ctx, &pb.ResolveKeyRequest{
-// 		MustExist:  true,
-// 		Algorithms: []string{signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
-// 		Name:       "blueKey",
-// 		Path: []*pb.ResolveKeyPathSegment{
-// 			{Name: "alice"},
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, 2, len(resp.Identifiers))
-
-// 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
-// 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
-
-// 	salt1 := utxo.NewSalt()
-// 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-// 	salt2 := utxo.NewSalt()
-// 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
-// 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
-
-// 	inputValueInts := []uint64{inputValues[0].Uint64(), inputValues[1].Uint64()}
-// 	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
-// 	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
-
-// 	req := zeto.ProvingRequest{
-// 		CircuitId: "anon",
-// 		Common: &zeto.ProvingRequestCommon{
-// 			InputCommitments: inputCommitments,
-// 			InputValues:      inputValueInts,
-// 			InputSalts:       inputSalts,
-// 			InputOwner:       aliceKeyHandle,
-// 			OutputValues:     outputValueInts,
-// 			OutputOwners:     []string{aliceKeyHandle, bobKeyHandle},
-// 		},
-// 	}
-// 	payload, err := proto.Marshal(&req)
-// 	assert.NoError(t, err)
-
-// 	resSign, err := sm.Sign(ctx, &pb.SignRequest{
-// 		KeyHandle: resp.KeyHandle,
-// 		Algorithm: signer.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
-// 		Payload:   payload,
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.NotZero(t, resSign.Payload)
-// }
+	_, err = sm.Sign(ctx, &proto.SignRequest{
+		KeyHandle: aliceKeyHandle,
+		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Payload:   payload,
+	})
+	assert.EqualError(t, err, "open tests/anon_js/anon.wasm: no such file or directory")
+}
