@@ -193,9 +193,11 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInstanceRequest *pluginPB.CreateInstance) error {
 	log.L(ctx).Infof("grpctransport.createInstance: name: %s, destination: %s", createInstanceRequest.GetName(), createInstanceRequest.GetMessageDestination())
 
+	instanceName := createInstanceRequest.GetName()
+
 	listenerContext, stopListener := context.WithCancel(ctx)
 	messageStream, err := gtp.client.Listen(listenerContext, &proto.ListenRequest{
-		Destination: createInstanceRequest.GetName(),
+		Destination: instanceName,
 	})
 	if err != nil {
 		stopListener()
@@ -211,7 +213,7 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 			stopListener()
 		},
 	}
-	gtp.instances[destination(createInstanceRequest.GetName())] = newInstance
+	gtp.instances[destination(instanceName)] = newInstance
 
 	go func() {
 		for {
@@ -236,7 +238,7 @@ func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInst
 		}
 	}()
 
-	instanceMessageRecvChannel := externalServer.GetMessages(destination(createInstanceRequest.GetMessageDestination()))
+	instanceMessageRecvChannel := externalServer.GetMessages(destination(instanceName))
 
 	go func() {
 		for {
