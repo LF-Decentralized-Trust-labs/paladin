@@ -45,7 +45,7 @@ dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
 }
 
-task installTools(type:Exec) {
+task installTools(type: Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
@@ -130,7 +130,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
     delete 'componenttest/abis'
 }
 
-task goGet(type:Exec, dependsOn:tasks.protoc) {
+task goGet(type: Exec, dependsOn: protoc) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -141,7 +141,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
     args 'get'
 }
 
-task lint(type: Exec, dependsOn:tasks.protoc) {
+task lint(type: Exec, dependsOn: protoc) {
     workingDir '.'
 
     inputs.files(goFiles);
@@ -154,7 +154,7 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
+task buildSharedLibrary(type: Exec, dependsOn: goGet) {
     workingDir '.'
 
     def libName;
@@ -178,7 +178,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts]) {
+task buildTestbed(type: Exec, dependsOn: [goGet, copyTestbedContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)
@@ -193,7 +193,7 @@ task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts
     args './testbed'
 }
 
-task buildTestPluginsSharedLibraryA(type:Exec) {
+task buildTestPluginsSharedLibraryA(type: Exec) {
 
     workingDir '.'
 
@@ -221,8 +221,7 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
 }
 
 task buildTestPluginsSharedLibraries {
-    dependsOn tasks.buildTestPluginsSharedLibraryA
-
+    dependsOn buildTestPluginsSharedLibraryA
 }
 
 abstract class UnitTests extends Exec {
@@ -243,8 +242,6 @@ abstract class UnitTests extends Exec {
 
 
 abstract class ComponentTest extends Exec {
-
-
     {
         java.text.DateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
         df.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
@@ -284,7 +281,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: tasks.protoc) {
+task setupCoverage(dependsOn: protoc) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
@@ -296,28 +293,29 @@ task setupCoverage(dependsOn: tasks.protoc) {
     }
 }
 
-task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, ':testinfra:startTestInfra']) {
+task unitTestPostgres(type: UnitTests, dependsOn: [setupCoverage, goGet, ':testinfra:startTestInfra']) {
     args '-tags', "testdbpostgres"
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
     ':testinfra:startTestInfra',
-    tasks.setupCoverage,
-    tasks.goGet,
-    tasks.copyTestContracts,
-    tasks.copyTestbedContracts,
+    setupCoverage,
+    goGet,
+    copyTestContracts,
+    copyTestbedContracts,
     ]) {
 }
 
 
-task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
-        tasks.unitTestSQLite,
-        tasks.unitTestPostgres,
-        tasks.componentTestSQLite,
-        // tasks.componentTestPostgres
+task buildCoverageTxt(type: Exec, dependsOn: [
+        protoc,
+        unitTestSQLite,
+        unitTestPostgres,
+        componentTestSQLite,
+        // componentTestPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"
@@ -331,7 +329,7 @@ task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
 
 }
 
-task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
+task aggregateCoverage(type: Copy, dependsOn: buildCoverageTxt) {
     from 'coverage/coverage_unfiltered.txt'
     into 'coverage'
     outputs.files('coverage/coverage.txt')
@@ -341,7 +339,7 @@ task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
     filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
-task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
+task checkCoverage(dependsOn: [aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
 
     doLast {
@@ -358,13 +356,11 @@ task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
     }
 }
 
-task test() {
-    finalizedBy [
-        tasks.checkCoverage,
-    ]
+task test {
+    finalizedBy checkCoverage
 }
 
-task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
+task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
     workingDir '.'
     executable 'go'
@@ -374,11 +370,11 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
-    dependsOn tasks.buildTestbed
-    dependsOn tasks.lint
-    dependsOn tasks.test
-    dependsOn tasks.aggregateCoverage
-    dependsOn tasks.checkCoverage
+    dependsOn buildTestbed
+    dependsOn lint
+    dependsOn test
+    dependsOn aggregateCoverage
+    dependsOn checkCoverage
 }
 
 configurations {
