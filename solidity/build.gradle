@@ -50,9 +50,6 @@ task test(type: Exec, dependsOn: compile) {
     args 'hardhat'
     args 'test'
 
-    inputs.dir('artifacts')
-    outputs.files([])
-
     // Print output to screen and to file
     doFirst { testResults.text = "" }
     standardOutput = new ByteArrayOutputStream() {
@@ -62,6 +59,7 @@ task test(type: Exec, dependsOn: compile) {
             reset()
         }
     }
+    inputs.dir('artifacts')
     outputs.file(testResults)
 }
 
