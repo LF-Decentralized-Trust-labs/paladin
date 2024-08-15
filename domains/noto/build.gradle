@@ -22,18 +22,19 @@ ext {
 }
 
 configurations {
-    compiledContracts {
-        canBeConsumed = false
-    }
+    // Resolvable configurations (inputs)
+    contractCompile { canBeConsumed = false }
+    protocCompile { canBeConsumed = false }
 }
 
 dependencies {
-    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+    contractCompile project(path: ":solidity", configuration: "compiledContracts")
+    protocCompile project(path: ":kata", configuration: "protocCompile")
 }
 
 task copySolidity(type: Copy) {
-    inputs.files(configurations.compiledContracts)
-    from fileTree(configurations.compiledContracts.asPath) {
+    inputs.files(configurations.contractCompile)
+    from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
     }
     into 'internal/noto/abis'
@@ -59,6 +60,7 @@ task stopTestbed {
 }
 
 task test(type: Exec) {
+    inputs.files(configurations.protocCompile)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
@@ -71,7 +73,6 @@ task test(type: Exec) {
     args '-timeout=30s'
     args "-test.gocoverdir=${projectDir}/coverage"
 
-    dependsOn ':kata:build' // TODO: is there a better way?
     dependsOn copySolidity
     dependsOn startTestbed
     finalizedBy stopTestbed

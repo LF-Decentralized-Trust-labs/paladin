@@ -378,11 +378,10 @@ task build {
 }
 
 configurations {
-    libkata
-    protocFiles {
-        canBeConsumed = true
-        canBeResolved = false
-    }
+    // Consumable configurations (outputs)
+    libkata { canBeResolved = false }
+    protocFiles { canBeResolved = false }
+    protocCompile { canBeResolved = false }
 }
 
 tasks.register('zipProtocFiles', Zip) {  
@@ -404,4 +403,5 @@ artifacts {
 
 dependencies {
     libkata files(buildSharedLibrary)
+    protocCompile files(protoc)
 }
