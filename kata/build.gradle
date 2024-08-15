@@ -278,7 +278,7 @@ abstract class ComponentTest extends Exec {
                     println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
                     println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
                 }
-                throw new Exception("COMPONENT TEST FAILED");
+                execResult.assertNormalExitValue();
             }
         }
     }
