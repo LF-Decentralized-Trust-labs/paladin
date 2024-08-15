@@ -33,21 +33,3 @@ type KeyStoreSigner_secp256k1 interface {
 	FindOrCreateKey_secp256k1(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error)
 	Sign_secp256k1(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error)
 }
-
-// Some cryptographic stores are capable of listing their contents in a natural order.
-//
-// It is a friendly behavior particularly at development/exploration time to be able to present
-// these keys back as key mappings automatically, simply picking a name for them that
-// is intuitive based on the store in the backend.
-//
-// The backend store is not responsible for any fancy query/sort capabilities - as the listing
-// is only used to build the key mapping entries into Paladin.
-// The only requirements are:
-// 1) that there is a natural order
-// 2) that there is a finite list (thus this is NOT supported by the HD Wallet derivation scheme if used in the signing module on top of a key store)
-// 3) that when presented with the nextPtr from the last call, the listing can continue to list keys after that point (according to the natural order)
-//
-// This behavior can be explicitly disabled in the configuration for any store type.
-type KeyStoreListable interface {
-	ListKeys(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
-}

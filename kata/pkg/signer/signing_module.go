@@ -286,7 +286,7 @@ func (sm *signingModule) Sign(ctx context.Context, req *proto.SignRequest) (res 
 }
 
 func (sm *signingModule) List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
-	listableStore, isListable := sm.keyStore.(KeyStoreListable)
+	listableStore, isListable := sm.keyStore.(api.KeyStoreListable)
 	if !isListable || sm.disableKeyListing {
 		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyListingNotSupported)
 	}
