@@ -14,8 +14,6 @@
  */
 
 ext {
-    testProcess = null
-
     goFiles = fileTree(".") {
         include "internal/**/*.go"
     }
@@ -44,19 +42,18 @@ task copySolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-task startTestbed {
-    doFirst {
-        project.ext.testProcess = new ProcessBuilder()
-            .directory(project(':kata').projectDir)
-            .command("go", "run", "./testbed", "${projectDir}/testbed.config.yaml")
-            .start()
-    }
+task startTestbed(type: DockerCompose) {
+    composeFile '../../testinfra/docker-compose-test.yml'
+    composeFile 'docker-compose-test.yml'
+    projectName 'paladin-noto'
+    args 'up', '-d', '--build'
 }
 
-task stopTestbed {
-    doFirst {
-        project.ext.testProcess.destroy()
-    }
+task stopTestbed(type: DockerCompose) {
+    composeFile '../../testinfra/docker-compose-test.yml'
+    composeFile 'docker-compose-test.yml'
+    projectName 'paladin-noto'
+    args 'down'
 }
 
 task test(type: Exec) {
@@ -75,7 +72,22 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn startTestbed
-    finalizedBy stopTestbed
+
+    ignoreExitValue true
+
+    doLast {
+        ExecResult execResult = executionResult.get()
+        if (execResult.exitValue != 0) {
+            startTestbed.dumpLogs("testbed")
+        }
+        execResult.assertNormalExitValue()
+    }
 }
 
-task build(dependsOn: test) {}
+task build {
+    dependsOn test
+}
+
+task clean {
+    dependsOn stopTestbed
+}

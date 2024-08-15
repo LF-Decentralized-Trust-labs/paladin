@@ -29,8 +29,8 @@ import (
 // TODO: fix things that should not be hard-coded
 var (
 	toDomain    = "to-domain"
-	testbedAddr = "http://127.0.0.1:49603"
-	grpcAddr    = "unix:/tmp/testbed.paladin.1542386773.sock"
+	testbedAddr = "http://127.0.0.1:49600"
+	grpcAddr    = "dns:localhost:49601"
 	account1    = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
 )
 

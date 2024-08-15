@@ -6,16 +6,18 @@ db:
     migrationsDir: './db/migrations/sqlite'
 rpcServer:
   http:
-    port: 49603
+    address: 0.0.0.0
+    port: 49600
   ws:
     disabled: true
 blockchain:
   ws:
-    url: ws://localhost:8546
+    url: ws://besu:8546
     initialConnectAttempts: 25
 bus:
   grpc:
-    socketAddress: /tmp/testbed.paladin.1542386773.sock
+    socketProtocol: tcp
+    socketAddress: ":49601"
 signer:
   keyDerivation:
     type: "bip32"
