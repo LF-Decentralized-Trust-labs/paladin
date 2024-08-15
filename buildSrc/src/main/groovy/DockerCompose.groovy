@@ -4,41 +4,51 @@ import org.gradle.process.ExecResult
 
 class DockerCompose extends Exec {
 
-    private String _composeFile = 'docker-compose.yml'
+    private List<String> _composeFiles = []
 
     DockerCompose() {
         ignoreExitValue true
     }
 
     void composeFile(String f) {
-        this._composeFile = f
+        _composeFiles += '-f'
+        _composeFiles += f
     }
 
-    private String findExecutable() {
+    void dumpLogs(String service = "") {
+        if (service == "") {
+            println "Dumping Docker logs"
+        } else {
+            println "Dumping Docker logs for ${service}"
+        }
+        "${dockerCommand().join(' ')} logs ${service}"
+            .execute().waitForProcessOutput(System.err, System.err)
+    }
+
+    private List<String> dockerCommand() {
+        if (_composeFiles.size() == 0) {
+            _composeFiles = ['-f', 'docker-compose.yml']
+        }
         String dockerComposeV2Check = 'docker compose version'.execute().text
         if (dockerComposeV2Check.contains('Docker Compose')) {
-            executable = 'docker'
-            args = ['compose', *args]
-            return 'docker compose'
+            return ['docker', 'compose', *_composeFiles]
         }
-        executable = 'docker-compose'
-        return 'docker-compose'
+        return ['docker-compose', *_composeFiles]
     }
 
     @Override
     protected void exec() {
-        args = ['-f', _composeFile, *args]
-        String composeCommand = findExecutable()
+        List<String> cmd = dockerCommand()
+        executable = cmd.remove(0)
+        args = [*cmd, *args]
 
         super.exec()
 
         ExecResult execResult = executionResult.get()
         if (execResult.exitValue != 0) {
-            println "${composeCommand} -f ${_composeFile} logs"
-                .execute()
-                .waitForProcessOutput(System.err, System.err)
-            throw new GradleException('Docker compose failed')
+            dumpLogs()
         }
+        execResult.assertNormalExitValue()
     }
 
 }
