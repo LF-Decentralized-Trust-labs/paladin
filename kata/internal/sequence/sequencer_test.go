@@ -40,6 +40,7 @@ func TestSequencerGraphOfOne(t *testing.T) {
 	txn1ID := uuid.New()
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:        node1ID.String(),
 		TransactionId: txn1ID.String(),
 	})
 	assert.NoError(t, err)
@@ -66,12 +67,16 @@ func TestSequencerLocalDependency(t *testing.T) {
 	}
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:          node1ID.String(),
 		TransactionId:   txn1ID.String(),
 		OutputStateHash: []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 
+	node1SequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash.String()).Return(nil, nil)
+
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:         node1ID.String(),
 		TransactionId:  txn2ID.String(),
 		InputStateHash: []string{stateHash.String()},
 	})
@@ -98,33 +103,67 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	// Transactions that are added to a sequencer's graph and have dependencies on other transactions that are
 	// managed by another sequencer, will be moved to that other sequencer as soon as they are assembled
 	ctx := context.Background()
-	node1ID := uuid.New()
+	localNodeId := uuid.New()
+	remoteNodeId := uuid.New()
+
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
+
 	stateHash := statestore.HashID{
 		L: uuid.New(),
 		H: uuid.New(),
 	}
-	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
+
+	//create a sequencer for the local node
+	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
+	commsBusBrokerMock1 := node1SequencerMockDependencies.brokerMock
+
+	//TODO need to decide the scope of this test.  are we just firing events at the sequencer and letting it build up its awareness of the global graph
+	// or are we emulating a local persistence layer that has already been told about remote transactions
+	// the answer is really an architectural one about how this code module glues into the rest of the system
+
+	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:   txn1ID.String(),
+		NodeId:          remoteNodeId.String(),
 		OutputStateHash: []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
+	node1SequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash.String()).Return(&transactionstore.Transaction{
+		ID:               txn1ID,
+		AssemblingNodeID: remoteNodeId,
+		SequencingNodeID: remoteNodeId,
+	}, nil)
 
+	// Should see an event relinquishing ownership of this this transaction
+	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		transactionRelegatedEvent := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
+		assert.Equal(t, txn2ID.String(), transactionRelegatedEvent.TransactionId)
+		assert.Equal(t, localNodeId.String(), transactionRelegatedEvent.DelegatingNodeId)
+		assert.Equal(t, remoteNodeId.String(), transactionRelegatedEvent.DelegateNodeId)
+	}).Return(nil)
+
+	//Second transaction (the spender of that state) is assembled on the local node
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:  txn2ID.String(),
+		NodeId:         localNodeId.String(),
 		InputStateHash: []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 
+	commsBusBrokerMock1.AssertExpectations(t)
+
+	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
 	assert.NoError(t, err)
 
-	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID, txn2ID}).Return(nil).Once()
-	node1SequencerMockDependencies.dispatcherMock.AssertExpectations(t)
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn2ID.String(),
+	})
+	assert.NoError(t, err)
+
 }
 
 // Test cases to assert the emergent behaviour when multiple concurrent copies of the sequencer are running
@@ -163,12 +202,12 @@ func TestSequencer(t *testing.T) {
 	}
 
 	txn1 := transactionstore.Transaction{
-		ID:     txn1ID,
-		NodeID: node1ID,
+		ID:               txn1ID,
+		AssemblingNodeID: node1ID,
 	}
 	txn2 := transactionstore.Transaction{
-		ID:     txn2ID,
-		NodeID: node2ID,
+		ID:               txn2ID,
+		AssemblingNodeID: node2ID,
 	}
 
 	node1PersistedState := stateKnownByNode1
@@ -286,12 +325,12 @@ func TestSequencerLoopDetection(t *testing.T) {
 	txn2ID := uuid.New()
 
 	txn1 := transactionstore.Transaction{
-		ID:     txn1ID,
-		NodeID: node1ID,
+		ID:               txn1ID,
+		AssemblingNodeID: node1ID,
 	}
 	txn2 := transactionstore.Transaction{
-		ID:     txn2ID,
-		NodeID: node2ID,
+		ID:               txn2ID,
+		AssemblingNodeID: node2ID,
 	}
 
 	stateAHash := statestore.HashID{

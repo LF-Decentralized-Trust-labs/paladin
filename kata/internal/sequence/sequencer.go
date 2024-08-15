@@ -52,7 +52,7 @@ type Persistence interface {
 
 	GetTransactionByID(context.Context, uuid.UUID) (transactionstore.Transaction, error)
 	//return the transaction that has minted, or is assembled to mint the state with the given hash
-	GetMintingTransactionByStateHash(context.Context, string) (transactionstore.Transaction, error)
+	GetMintingTransactionByStateHash(context.Context, string) (*transactionstore.Transaction, error)
 }
 
 type Sequencer interface {
@@ -129,25 +129,90 @@ func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID str
 		log.L(ctx).Errorf("Error sending reassemble message: %s", err)
 	}
 }
+
+func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.TransactionAssembledEvent) ([]transactionstore.Transaction, error) {
+	mintingTransactions := make([]transactionstore.Transaction, 0, len(event.InputStateHash))
+	for _, stateHash := range event.InputStateHash {
+		mintingTransaction, err := s.persistence.GetMintingTransactionByStateHash(ctx, stateHash)
+		if err != nil {
+			log.L(ctx).Errorf("Error getting minting transaction by state hash: %s", err)
+			return nil, err
+		}
+		if mintingTransaction != nil {
+			mintingTransactions = append(mintingTransactions, *mintingTransaction)
+		}
+	}
+	return mintingTransactions, nil
+}
+
+func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.TransactionAssembledEvent) (bool, error) {
+	//if the transaction has any dependencies on transactions that are being managed by other nodes,
+	//then we need to delegate this one to that remote node too
+	unconfirmedDependencies, err := s.getUnconfirmedDependencies(ctx, event)
+	if err != nil {
+		log.L(ctx).Errorf("Error getting unconfirmed dependencies: %s", err)
+		return false, err
+	}
+	for _, dependency := range unconfirmedDependencies {
+		if dependency.SequencingNodeID != s.nodeID {
+			err := s.commsBus.Broker().SendMessage(ctx, commsbus.Message{
+				Body: &pb.DelegateTransaction{
+					TransactionId:    event.TransactionId,
+					DelegatingNodeId: s.nodeID.String(),
+					DelegateNodeId:   dependency.SequencingNodeID.String(),
+				},
+			})
+			if err != nil {
+				log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
+				return false, err
+			}
+			//TODO still need to handle the case where there are multiple dependencies on multiple nodes
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
+	//if the transaction was assembled on the local node, then we add it into the graph
+	//if it was assembled on another node, then we remember it in case we end up getting some dependencies on it
+	if event.NodeId == s.nodeID.String() {
+		delegated, err := s.delegateIfAppropriate(ctx, event)
+		if err != nil {
+			log.L(ctx).Errorf("Error delegating transaction: %s", err)
+			return err
+		}
+		if delegated {
+			return nil
+		}
 
-	err := s.graph.AddTransaction(ctx, event.TransactionId, event.InputStateHash, event.OutputStateHash)
-	if err != nil {
-		log.L(ctx).Errorf("Error adding transaction to graph: %s", err)
-		return err
-	}
-	err = s.evaluateGraph(ctx)
-	if err != nil {
-		log.L(ctx).Errorf("Error evaluating graph: %s", err)
-		return err
+		err = s.graph.AddTransaction(ctx, event.TransactionId, event.InputStateHash, event.OutputStateHash)
+		if err != nil {
+			log.L(ctx).Errorf("Error adding transaction to graph: %s", err)
+			return err
+		}
+		err = s.evaluateGraph(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Error evaluating graph: %s", err)
+			return err
+		}
+	} else {
+		//TODO this could be a dependency on a transaction that we have already added to our graph but
+		// we didn't know about it when we added the dependant transaction
 	}
 
 	return nil
 }
+
 func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
 
 	log.L(ctx).Infof("Received transaction endorsed event: %s", event.String())
+
+	if !s.graph.IncludesTransaction(event.TransactionId) {
+		log.L(ctx).Debugf("Transaction %s does not exist locally", event.TransactionId)
+		return nil
+	}
 
 	err := s.graph.RecordEndorsement(ctx, event.TransactionId)
 	if err != nil {
@@ -155,7 +220,7 @@ func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.Transac
 		return err
 	}
 
-	s.evaluateGraph(ctx)
+	err = s.evaluateGraph(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Error evaluating graph: %s", err)
 		return err
@@ -188,7 +253,7 @@ func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimE
 				log.L(ctx).Errorf("Error getting transaction by ID: %s", err)
 				return err
 			}
-			if currentClaimer.NodeID == s.nodeID {
+			if currentClaimer.AssemblingNodeID == s.nodeID {
 
 				// if the loser is assembled by the current node, then send a message to the assembler to reassemble
 				// TODO - not sure this is exactly how the orchestrator expects us to deal with this.

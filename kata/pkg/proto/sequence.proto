@@ -35,3 +35,20 @@ message StateClaimLostEvent {
 message ReassembleRequest {
     string transactionId = 1;   
 }
+
+message TransactionAssembledEvent {
+    string transactionId = 1;
+    string nodeId = 2;
+    repeated string inputStateHash = 3;
+    repeated string outputStateHash = 4;
+}
+
+message TransactionEndorsedEvent {
+    string transactionId = 1;
+}
+
+message DelegateTransaction {
+    string transactionId = 1;
+    string delegatingNodeId = 2;
+    string delegateNodeId = 3;
+}
