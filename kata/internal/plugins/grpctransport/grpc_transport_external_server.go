@@ -135,15 +135,6 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 		}
 	}
 
-	serverTLSConfig.GetConfigForClient = func(chi *tls.ClientHelloInfo) (*tls.Config, error) {
-		return &tls.Config{
-			RootCAs:      egs.serverCertPool,
-			ClientCAs:    egs.serverCertPool,
-			Certificates: []tls.Certificate{*egs.serverCertificate},
-			ClientAuth:   tls.RequireAndVerifyClientCert,
-		}, nil
-	}
-
 	externalGRPCListener, err := net.Listen("tcp", fmt.Sprintf(":%d", egs.port))
 	if err != nil {
 		log.L(ctx).Errorf("grpctransport: failed to listen for external grpc connections: %v", err)
