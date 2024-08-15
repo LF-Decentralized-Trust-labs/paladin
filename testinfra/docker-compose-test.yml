@@ -7,8 +7,8 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: my-secret
-  besu_boostrap:
-    container_name: paladin-besu-boostrap
+  besu_bootstrap:
+    container_name: paladin-besu-bootstrap
     image: paladin/besu_bootstrap
     user: 0:0
     volumes:
@@ -25,7 +25,7 @@ services:
       - 8545:8545
       - 8546:8546
     depends_on:
-      besu_boostrap:
+      besu_bootstrap:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/localhost/8545'"]
