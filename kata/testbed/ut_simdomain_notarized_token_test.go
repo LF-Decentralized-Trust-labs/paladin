@@ -576,11 +576,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, err)
 
-	err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
-		"some": "config"
-	}`))
-	assert.NoError(t, err)
-
 	var contractAddr ethtypes.Address0xHex
 	err = rpcCall(&contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "domain1/contract1/notary",

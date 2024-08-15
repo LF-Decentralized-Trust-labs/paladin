@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
@@ -156,9 +155,7 @@ func (ds *domainSimulator) waitDone() {
 func newSimulatorRPCClient(t *testing.T, url string) func(res interface{}, method string, params ...interface{}) error {
 	rpcClient := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return func(res interface{}, method string, params ...interface{}) error {
-		ctx, cancelCtx := context.WithTimeout(context.Background(), 9*time.Second)
-		defer cancelCtx()
-		err := rpcClient.CallRPC(ctx, &res, method, params...)
+		err := rpcClient.CallRPC(context.Background(), &res, method, params...)
 		if err != nil {
 			return err.Error()
 		}
