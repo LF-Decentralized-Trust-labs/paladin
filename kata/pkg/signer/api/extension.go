@@ -13,33 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-syntax = "proto3";
+package api
 
-package github.com.kaleido_io.paladin.kata.zkp;
-option go_package = "pkg/proto";
+import (
+	"context"
+)
 
-message ProvingRequest {
-  string circuitId = 1;
-  ProvingRequestCommon common = 2;
-  bytes extras = 3;
-}
-
-message ProvingRequestCommon {
-  repeated string inputCommitments = 1;
-  repeated uint64 inputValues = 2;
-  repeated string inputSalts = 3;
-  string inputOwner = 4;
-  repeated uint64 outputValues = 5;
-  repeated string outputOwners = 6;
-}
-
-message SnarkProof {
- 	repeated string  A = 1;
-	repeated B_Item B = 2;
-	repeated string  C = 3;
-	string Protocol = 4;
-}
-
-message B_Item {
-  repeated string items = 1;
+type Extension interface {
+	// Return nil if keystore type is not known, or error if initialization fails
+	KeyStore(ctx context.Context, config *StoreConfig) (store KeyStore, err error)
 }

@@ -30,7 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 	sepc256k1Signer "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/secp256k1"
-	zkpSigner "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/zkp"
+	zkpSigner "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/snark"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 )
 

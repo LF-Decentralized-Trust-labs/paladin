@@ -13,23 +13,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zkp
+package keystore
 
 import (
-	"context"
 	"math/big"
 	"os"
 	"path"
 	"testing"
 
-	"github.com/alecthomas/assert/v2"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
 
 type User struct {
@@ -51,31 +48,8 @@ func NewKeypair() *User {
 	}
 }
 
-func newTestFilesystemStore(t *testing.T) (context.Context, api.KeyStore, string) {
-	ctx := context.Background()
-
-	dirPath := t.TempDir()
-	store, err := keystore.NewFilesystemStore(ctx, api.FileSystemConfig{
-		Path: confutil.P(dirPath),
-	})
-	assert.NoError(t, err)
-
-	return ctx, store, dirPath
-}
-
-func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) (context.Context, api.KeyStore) {
-	ctx := context.Background()
-
-	store, err := keystore.NewStaticKeyStore(ctx, api.StaticKeyStorageConfig{
-		Keys: keys,
-	})
-	assert.NoError(t, err)
-
-	return ctx, store
-}
-
 func TestFileSystemStoreCreateBJJ(t *testing.T) {
-	ctx, fs, _ := newTestFilesystemStore(t)
+	ctx, fs := newTestFilesystemStore(t)
 
 	key0 := babyjub.NewRandPrivKey()
 
@@ -103,7 +77,7 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 	assert.NotZero(t, keyEntry.PrivateKeyForZkp)
 }
 
-func TestStaticStoreFileFileWithTrim(t *testing.T) {
+func TestStaticStoreFileFileWithTrimForBJJ(t *testing.T) {
 	keyData := types.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
+	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -31,6 +32,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
+
+type User struct {
+	PrivateKey       *babyjub.PrivateKey
+	PublicKey        *babyjub.PublicKey
+	PrivateKeyBigInt *big.Int
+}
+
+func NewKeypair() *User {
+	babyJubjubPrivKey := babyjub.NewRandPrivKey()
+	babyJubjubPubKey := babyJubjubPrivKey.Public()
+	// convert the private key to big.Int for use inside circuits
+	privKeyBigInt := babyjub.SkToBigInt(&babyJubjubPrivKey)
+
+	return &User{
+		PrivateKey:       &babyJubjubPrivKey,
+		PublicKey:        babyJubjubPubKey,
+		PrivateKeyBigInt: privKeyBigInt,
+	}
+}
 
 func TestRegister(t *testing.T) {
 	registry := make(map[string]api.InMemorySigner)

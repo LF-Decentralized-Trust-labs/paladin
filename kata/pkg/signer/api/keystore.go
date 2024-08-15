@@ -32,12 +32,3 @@ type KeyStore interface {
 	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
 }
-
-type Extension interface {
-	// Return nil if keystore type is not known, or error if initialization fails
-	KeyStore(ctx context.Context, config *StoreConfig) (store KeyStore, err error)
-}
-
-type InMemorySigner interface {
-	Sign(ctx context.Context, privateKey []byte, req *proto.SignRequest) (*proto.SignResponse, error)
-}

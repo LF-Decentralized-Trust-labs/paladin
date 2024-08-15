@@ -72,7 +72,7 @@ func newSnarkProver(config api.SnarkProverConfig) (*snarkProver, error) {
 	}, nil
 }
 
-func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.SignRequest) (*pb.SignResponse, error) {
+func (sp *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.SignRequest) (*pb.SignResponse, error) {
 	keyBytes := [32]byte{}
 	copy(keyBytes[:], privateKey)
 	keyEntry := key.NewKeyEntryFromPrivateKeyBytes(keyBytes)
@@ -92,15 +92,15 @@ func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 	}
 
 	// Perform proof generation
-	circuit, _ := ks.circuitsCache.Get(inputs.CircuitId)
-	provingKey, _ := ks.provingKeysCache.Get(inputs.CircuitId)
+	circuit, _ := sp.circuitsCache.Get(inputs.CircuitId)
+	provingKey, _ := sp.provingKeysCache.Get(inputs.CircuitId)
 	if circuit == nil || provingKey == nil {
-		c, p, err := ks.circuitLoader(inputs.CircuitId, ks.zkpProverConfig)
+		c, p, err := sp.circuitLoader(inputs.CircuitId, sp.zkpProverConfig)
 		if err != nil {
 			return nil, err
 		}
-		ks.circuitsCache.Set(inputs.CircuitId, c)
-		ks.provingKeysCache.Set(inputs.CircuitId, p)
+		sp.circuitsCache.Set(inputs.CircuitId, c)
+		sp.provingKeysCache.Set(inputs.CircuitId, p)
 		circuit = c
 		provingKey = p
 	}
@@ -116,7 +116,7 @@ func (ks *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 		return nil, err
 	}
 
-	proof, err := ks.proofGenerator(wtns, provingKey)
+	proof, err := sp.proofGenerator(wtns, provingKey)
 	if err != nil {
 		return nil, err
 	}
