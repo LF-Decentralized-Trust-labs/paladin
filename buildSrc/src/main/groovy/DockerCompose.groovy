@@ -15,28 +15,26 @@ class DockerCompose extends Exec {
     }
 
     private String findExecutable() {
-        String composeCommand
         String dockerComposeV2Check = 'docker compose version'.execute().text
         if (dockerComposeV2Check.contains('Docker Compose')) {
             executable = 'docker'
             args = ['compose', *args]
             return 'docker compose'
-        } else {
-            executable = 'docker-compose'
-            return 'docker-compose'
         }
+        executable = 'docker-compose'
+        return 'docker-compose'
     }
 
     @Override
     protected void exec() {
-        args = ['-f', this._composeFile, *args]
+        args = ['-f', _composeFile, *args]
         String composeCommand = findExecutable()
 
         super.exec()
 
         ExecResult execResult = executionResult.get()
         if (execResult.exitValue != 0) {
-            println "${composeCommand} -f ${project.projectDir}/docker-compose-test.yml logs"
+            println "${composeCommand} -f ${_composeFile} logs"
                 .execute()
                 .waitForProcessOutput(System.err, System.err)
             throw new GradleException('Docker compose failed')
