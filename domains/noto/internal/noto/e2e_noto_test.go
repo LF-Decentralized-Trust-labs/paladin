@@ -26,12 +26,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO: fix things that should not be hard-coded
 var (
 	toDomain    = "to-domain"
 	testbedAddr = "http://127.0.0.1:49600"
 	grpcAddr    = "dns:localhost:49601"
-	account1    = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
+	notaryName  = "notary1"
+	notaryAddr  = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
 )
 
 func TestNoto(t *testing.T) {
@@ -57,7 +57,7 @@ func TestNoto(t *testing.T) {
 	defer cancel()
 
 	log.L(ctx).Infof("Calling testbed_deployBytecode")
-	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode", account1, domain.Factory.Bytecode.String())
+	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode", notaryName, domain.Factory.ABI, domain.Factory.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
@@ -72,7 +72,7 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Calling testbed_deploy")
 	rpcerr = rpc.CallRPC(callCtx, &objResult, "testbed_deploy", "noto", &NotoConstructor{
-		Notary: account1,
+		Notary: notaryAddr,
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())

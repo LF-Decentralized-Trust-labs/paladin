@@ -43,7 +43,11 @@ describe("Noto", function () {
     const [notary, other] = await ethers.getSigners();
 
     const Noto = await ethers.getContractFactory("Noto");
-    const noto = await Noto.deploy(notary.address);
+    const noto = await Noto.deploy(
+      randomBytes32(),
+      "0xab5a1b758fdabfa31542bf50de1e1689ab64db6e",
+      notary.address
+    );
 
     return { noto, notary, other };
   }

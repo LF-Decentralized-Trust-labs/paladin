@@ -34,6 +34,7 @@ task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
+        include 'contracts/noto/Noto.sol/Noto.json'
     }
     into 'internal/noto/abis'
 

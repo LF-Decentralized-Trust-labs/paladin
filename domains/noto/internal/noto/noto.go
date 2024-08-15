@@ -37,6 +37,9 @@ import (
 //go:embed abis/NotoFactory.json
 var notoFactoryJSON []byte // From "gradle copySolidity"
 
+//go:embed abis/Noto.json
+var notoJSON []byte // From "gradle copySolidity"
+
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
 }
@@ -48,6 +51,7 @@ type SolidityBuild struct {
 
 type Noto struct {
 	Factory      SolidityBuild
+	Contract     SolidityBuild
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
@@ -79,23 +83,34 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 
-	factory, err := loadABI()
+	factory, err := loadNotoFactoryABI()
+	if err != nil {
+		return nil, err
+	}
+	contract, err := loadNotoABI()
 	if err != nil {
 		return nil, err
 	}
 
 	d := &Noto{
-		conn:    conn,
-		client:  pb.NewKataMessageServiceClient(conn),
-		Factory: factory,
+		conn:     conn,
+		client:   pb.NewKataMessageServiceClient(conn),
+		Factory:  factory,
+		Contract: contract,
 	}
 	return d, d.waitForReady(ctx)
 }
 
-func loadABI() (SolidityBuild, error) {
-	var notoFactoryBuild SolidityBuild
-	err := json.Unmarshal(notoFactoryJSON, &notoFactoryBuild)
-	return notoFactoryBuild, err
+func loadNotoFactoryABI() (SolidityBuild, error) {
+	var build SolidityBuild
+	err := json.Unmarshal(notoFactoryJSON, &build)
+	return build, err
+}
+
+func loadNotoABI() (SolidityBuild, error) {
+	var build SolidityBuild
+	err := json.Unmarshal(notoJSON, &build)
+	return build, err
 }
 
 func (d *Noto) waitForReady(ctx context.Context) error {
@@ -206,11 +221,16 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
+		notoJSON, err := json.Marshal(d.Contract.ABI)
+		if err != nil {
+			return err
+		}
 
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
 				FactoryContractAddress: config.FactoryAddress,
 				FactoryContractAbiJson: string(factoryJSON),
+				PrivateContractAbiJson: string(notoJSON),
 				ConstructorAbiJson:     constructorAbi,
 				AbiStateSchemasJson:    []string{},
 			},
@@ -255,10 +275,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 
 		response := &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
-				FunctionName:   "deploy",
-				ParamsJson:     `{"notary": "` + params.Notary + `"}`,
-				SigningAddress: params.Notary,
+				FunctionName: "deploy",
+				ParamsJson:   `{"txId": "` + m.Transaction.TransactionId + `", "notary": "` + params.Notary + `"}`,
 			},
+			SigningAddress: params.Notary,
 		}
 		if err := d.sendReply(ctx, message, response); err != nil {
 			return err

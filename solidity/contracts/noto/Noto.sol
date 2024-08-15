@@ -7,7 +7,15 @@ import {NotoBase} from "./NotoBase.sol";
  * Noto variant which requires all transfers/approvals to be submitted by the notary.
  */
 contract Noto is NotoBase {
-    constructor(address notary) NotoBase(notary) {}
+    event PaladinNewSmartContract_V0(
+        bytes32 indexed txId,
+        address indexed domain,
+        bytes data
+    );
+
+    constructor(bytes32 txId, address domain, address notary) NotoBase(notary) {
+        emit PaladinNewSmartContract_V0(txId, domain, "");
+    }
 
     function transfer(
         bytes32[] memory inputs,
