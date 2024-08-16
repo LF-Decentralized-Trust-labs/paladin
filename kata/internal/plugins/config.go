@@ -26,24 +26,24 @@ type PluginControllerConfig struct {
 type LibraryType string
 
 const (
-	PluginTypeCShared LibraryType = "c-shared"
-	PluginTypeJar     LibraryType = "jar"
+	LibraryTypeCShared LibraryType = "c-shared"
+	LibraryTypeJar     LibraryType = "jar"
 )
 
 func (pl LibraryType) Default() string {
-	return string(PluginTypeCShared)
+	return string(LibraryTypeCShared)
 }
 
 func (pl LibraryType) Options() []string {
 	return []string{
-		string(PluginTypeCShared),
-		string(PluginTypeJar),
+		string(LibraryTypeCShared),
+		string(LibraryTypeJar),
 	}
 }
 
 var golangToProtoLibTypeMap = map[LibraryType]pbp.PluginLoad_LibType{
-	PluginTypeCShared: pbp.PluginLoad_C_SHARED,
-	PluginTypeJar:     pbp.PluginLoad_JAR,
+	LibraryTypeCShared: pbp.PluginLoad_C_SHARED,
+	LibraryTypeJar:     pbp.PluginLoad_JAR,
 }
 
 type PluginConfig struct {

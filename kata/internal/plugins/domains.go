@@ -58,7 +58,7 @@ func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], se
 		pc:   pc,
 		send: make(chan *pbp.DomainMessage),
 	}
-	dh.callbacks = pc.DomainManager.DomainRegistered(plugin.name, plugin.id, dh)
+	dh.callbacks = pc.domainManager.DomainRegistered(plugin.name, plugin.id, dh)
 	go dh.sender(sendStream)
 	return dh
 }
