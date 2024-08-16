@@ -30,7 +30,8 @@ ext {
         'github.com/kaleido-io/paladin/kata/pkg/proto',
         'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
-        'github.com/kaleido-io/paladin/kata/internal/plugins/loader'
+        'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
+        'github.com/kaleido-io/paladin/kata/testbed',
     ]
 }
 
@@ -91,10 +92,25 @@ task copyTestContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
+task copyTestbedContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testbed_sim/SIMDomain.sol/SIMDomain.json'
+        include 'contracts/testbed_sim/SIMToken.sol/SIMToken.json'
+        include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
+        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+    }
+    into 'testbed/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
 task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     workingDir '.'
-    inputs.files(fileTree(".") { include "**/*.proto" })
-    outputs.files(fileTree(".") { include "**/*.pb.go" })
+    inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
+    outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
     environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
     executable 'protoc'
     args "--go_out=${projectDir}"
@@ -138,7 +154,7 @@ task lint(type: Exec, dependsOn:tasks.protoc) {
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
+task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     workingDir '.'
 
     def libName;
@@ -160,6 +176,21 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet,tasks.lint]) {
     args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
+}
+
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts]) {
+    workingDir '.'
+
+    inputs.files(goFiles)
+    inputs.dir("testbed")
+    outputs.dir("bin")
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', 'bin/'
+    args './testbed'
 }
 
 task buildTestPluginsSharedLibraryA(type:Exec) {
@@ -212,18 +243,44 @@ abstract class UnitTests extends Exec {
 
 
 abstract class ComponentTest extends Exec {
+
+
     {
+        java.text.DateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        df.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        Date startTime = new Date();
+
+        inputs.files(getProject().goFiles)
+        inputs.files(getProject().fileTree("testbed") {
+            include "**/*.json"
+        })
+
         outputs.dir('coverage')
 
         workingDir '.'
         executable 'go'
         args 'test'
-        args './componenttest'
+        args './componenttest', './testbed'
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/..."
         args '-covermode=atomic'
         args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
+
+        ignoreExitValue true
+
+        doLast {
+            def ExecResult execResult = getExecutionResult().get();
+            def composeLogs = getProject().findProperty('composeLogs');
+            if (execResult.getExitValue() != 0) {
+                if (composeLogs == "true") {
+                    println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
+                    println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
+                }
+                execResult.assertNormalExitValue();
+            }
+        }
     }
 }
 
@@ -251,6 +308,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     tasks.setupCoverage,
     tasks.goGet,
     tasks.copyTestContracts,
+    tasks.copyTestbedContracts,
     ]) {
 }
 
@@ -316,6 +374,7 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
+    dependsOn tasks.buildTestbed
     dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage

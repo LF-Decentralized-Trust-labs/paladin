@@ -258,9 +258,13 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
+		Name:       "key1",
 		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 	})
 	assert.Regexp(t, "pop", err)
+
+	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{})
+	assert.Regexp(t, "PD011420", err)
 
 }
 
@@ -431,9 +435,4 @@ func TestInMemorySignFailures(t *testing.T) {
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "PD011409", err)
-}
-
-func TestDecodeCompactRSVBadLen(t *testing.T) {
-	_, err := DecodeCompactRSV(context.Background(), make([]byte, 64))
-	assert.Regexp(t, "PD011420", err)
 }

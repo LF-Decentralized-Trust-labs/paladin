@@ -116,6 +116,7 @@ func newTestClientAndServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context
 		assert.NoError(t, err)
 		ec = iec.(*ethClient)
 	}
+	assert.Equal(t, int64(12345), ec.ChainID())
 
 	return ctx, ec, func() {
 		serverDone()

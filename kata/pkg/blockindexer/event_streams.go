@@ -39,8 +39,7 @@ type eventStream struct {
 	bi             *blockIndexer
 	definition     *EventStream
 	signatures     map[string]bool
-	signaturesH    []uuid.UUID
-	signaturesL    []uuid.UUID
+	signatureList  []types.Bytes32
 	eventABIs      []*abi.Entry
 	batchSize      int
 	batchTimeout   time.Duration
@@ -200,14 +199,12 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
-			sig := abiEntry.SignatureHashBytes()
+			sig := *types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 			sigStr := sig.String()
 			es.eventABIs = append(es.eventABIs, abiEntry)
 			if _, dup := es.signatures[sigStr]; !dup {
 				es.signatures[sigStr] = true
-				sig := types.NewHashIDSlice32(sig)
-				es.signaturesL = append(es.signaturesL, sig.L)
-				es.signaturesH = append(es.signaturesH, sig.H)
+				es.signatureList = append(es.signatureList, sig)
 			}
 		}
 	}
@@ -517,8 +514,7 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		return true, es.bi.persistence.DB().
 			Table("indexed_events").
-			Where("signature_l IN (?)", es.signaturesL).
-			Where("signature_h IN (?)", es.signaturesH).
+			Where("signature IN (?)", es.signatureList).
 			Where("block_number > ?", checkpointBlock).
 			Where("block_number < ?", catchUpToBlockNumber).
 			Order("block_number").Order("transaction_index").Order("log_index").

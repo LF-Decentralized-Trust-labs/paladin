@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.14-0.20240812205501-7e256d7bc276
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240814030058-7c2d912b10e8
 	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0

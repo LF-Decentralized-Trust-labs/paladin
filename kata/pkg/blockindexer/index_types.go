@@ -21,12 +21,12 @@ import (
 )
 
 type IndexedBlock struct {
-	Number int64        `json:"number"`
-	Hash   types.HashID `json:"hash"                                     gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Number int64         `json:"number"`
+	Hash   types.Bytes32 `json:"hash"                                     gorm:"primaryKey"`
 }
 
 type IndexedTransaction struct {
-	Hash             types.HashID      `json:"hash"                      gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	Hash             types.Bytes32     `json:"hash"                      gorm:"primaryKey"`
 	BlockNumber      int64             `json:"blockNumber"`
 	TransactionIndex int64             `json:"transactionIndex"`
 	From             *types.EthAddress `json:"from"`
@@ -38,8 +38,8 @@ type IndexedEvent struct {
 	BlockNumber      int64               `json:"blockNumber"             gorm:"primaryKey"`
 	TransactionIndex int64               `json:"transactionIndex"        gorm:"primaryKey"`
 	LogIndex         int64               `json:"logIndex"                gorm:"primaryKey"`
-	TransactionHash  types.HashID        `json:"transactionHash"         gorm:"embedded;embeddedPrefix:transaction_;"`
-	Signature        types.HashID        `json:"signature"               gorm:"embedded;embeddedPrefix:signature_;"`
-	Transaction      *IndexedTransaction `json:"transaction,omitempty"   gorm:"foreignKey:hash_l,hash_h;references:transaction_l,transaction_h;"`
-	Block            *IndexedBlock       `json:"block,omitempty"         gorm:"foreignKey:number;references:block_number;"`
+	TransactionHash  types.Bytes32       `json:"transactionHash"`
+	Signature        types.Bytes32       `json:"signature"`
+	Transaction      *IndexedTransaction `json:"transaction,omitempty"   gorm:"foreignKey:block_number,transaction_index;references:block_number,transaction_index"`
+	Block            *IndexedBlock       `json:"block,omitempty"         gorm:"foreignKey:number;references:block_number"`
 }

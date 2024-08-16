@@ -62,7 +62,7 @@ func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCSe
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterKataMessageServiceServer(s, newKataMessageService(ctx, broker))
+	proto.RegisterKataMessageServiceServer(s, newKataMessageService(broker))
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
@@ -96,7 +96,7 @@ func (s *grpcServer) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newKataMessageService(ctx context.Context, messageBroker Broker) *KataMessageService {
+func newKataMessageService(messageBroker Broker) *KataMessageService {
 	return &KataMessageService{
 		messageBroker: messageBroker,
 	}

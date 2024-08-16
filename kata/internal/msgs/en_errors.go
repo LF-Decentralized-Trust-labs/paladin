@@ -110,6 +110,7 @@ var (
 	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010716", "Field does not support LIKE comparison (%T)")
 	MsgFiltersTypeErrorDuringCompare      = ffe("PD010717", "Mismatched types during compare t1=%T t2=%T")
 	MsgFiltersMissingSortField            = ffe("PD010718", "Must specify at least one sort field")
+	MsgFiltersValueInvalidHexBytes32      = ffe("PD010719", "Failed to parse value as 32 byte hex string (parsedBytes=%d)")
 
 	// HTTPServer PD0108XX
 	MsgHTTPServerStartFailed        = ffe("PD010800", "Failed to start server on '%s'")
@@ -155,6 +156,7 @@ var (
 	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
 	MsgBlockIndexerInvalidEventStreamType   = ffe("PD011306", "Unsupported event stream type: %s")
 	MsgBlockMissingHandler                  = ffe("PD011307", "Handler not registered for stream")
+	MsgBlockIndexerNoBlocksIndexed          = ffe("PD011308", "No confirmed blocks have yet been indexed")
 
 	// Signing module PD0114XX
 	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
@@ -177,7 +179,7 @@ var (
 	MsgSigningStaticBadEncoding                 = ffe("PD011417", "Statically configured key with handle %s has invalid encoding (must be one of 'none', 'hex', 'base64') '%s'")
 	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
 	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
-	MsgSigningInvalidCompactRSV                 = ffe("PD011420", "Invalid signature data (compact R,S,V) length=%d (expected=65)")
+	MsgSigningKeyCannotBeEmpty                  = ffe("PD011420", "Cannot resolve a signing key for the empty string")
 
 	// EthClient module PD0115XX
 	MsgEthClientInvalidInput      = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")

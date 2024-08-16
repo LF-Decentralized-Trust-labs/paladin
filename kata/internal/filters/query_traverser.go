@@ -36,14 +36,14 @@ type Traverser[T any] interface {
 	Order(f string) Traverser[T]
 	And(ot T) Traverser[T]
 	BuildOr(ot ...T) Traverser[T]
-	IsEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsLike(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsNull(e *FilterJSONBase, fieldName string, field FieldResolver) Traverser[T]
-	IsLessThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsLessThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsGreaterThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
-	IsIn(e *FilterJSONKeyValues, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[T]
+	IsEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsLike(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsNull(e *Op, fieldName string, field FieldResolver) Traverser[T]
+	IsLessThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsLessThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsGreaterThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsGreaterThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[T]
+	IsIn(e *OpMultiVal, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[T]
 }
 
 var allMods = []string{"not", "caseInsensitive"}
@@ -104,7 +104,7 @@ func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
 		}
 		t = t.Order(tSortField.sql())
 	}
-	return qt.BuildAndFilter(t, &jf.FilterJSON)
+	return qt.BuildAndFilter(t, &jf.Statements)
 }
 
 func resolveSortField(ctx context.Context, fieldSet FieldSet, fieldName string) (*sortField, error) {
@@ -170,7 +170,7 @@ func resolveFieldAndValues(ctx context.Context, fieldSet FieldSet, fieldName str
 	return field, values, nil
 }
 
-func (qt *queryTraverser[T]) addSimpleFilters(t Traverser[T], jf *FilterJSON) Traverser[T] {
+func (qt *queryTraverser[T]) addSimpleFilters(t Traverser[T], jf *Statements) Traverser[T] {
 	for _, e := range joinShortNames(jf.Equal, jf.Eq, jf.NEq) {
 		field, testValue, err := resolveFieldAndValue(qt.ctx, qt.fieldSet, e.Field, e.Value)
 		if err != nil {
@@ -198,8 +198,8 @@ func (qt *queryTraverser[T]) addSimpleFilters(t Traverser[T], jf *FilterJSON) Tr
 	return t
 }
 
-func joinShortNames(long, short, negated []*FilterJSONKeyValue) []*FilterJSONKeyValue {
-	res := make([]*FilterJSONKeyValue, len(long)+len(short)+len(negated))
+func joinShortNames(long, short, negated []*OpSingleVal) []*OpSingleVal {
+	res := make([]*OpSingleVal, len(long)+len(short)+len(negated))
 	copy(res, long)
 	copy(res[len(long):], short)
 	negs := res[len(short)+len(long):]
@@ -210,8 +210,8 @@ func joinShortNames(long, short, negated []*FilterJSONKeyValue) []*FilterJSONKey
 	return res
 }
 
-func joinInAndNin(in, nin []*FilterJSONKeyValues) []*FilterJSONKeyValues {
-	res := make([]*FilterJSONKeyValues, len(in)+len(nin))
+func joinInAndNin(in, nin []*OpMultiVal) []*OpMultiVal {
+	res := make([]*OpMultiVal, len(in)+len(nin))
 	copy(res, in)
 	negs := res[len(in):]
 	copy(negs, nin)
@@ -221,7 +221,7 @@ func joinInAndNin(in, nin []*FilterJSONKeyValues) []*FilterJSONKeyValues {
 	return res
 }
 
-func (qt *queryTraverser[T]) BuildAndFilter(t Traverser[T], jf *FilterJSON) Traverser[T] {
+func (qt *queryTraverser[T]) BuildAndFilter(t Traverser[T], jf *Statements) Traverser[T] {
 	t = t.NewRoot()
 	t = qt.addSimpleFilters(t, jf)
 	if t.Error() != nil {

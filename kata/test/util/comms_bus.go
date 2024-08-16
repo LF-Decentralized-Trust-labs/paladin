@@ -35,7 +35,7 @@ func NewCommsBusForTesting(ctx context.Context, t *testing.T) commsbus.CommsBus 
 	socketAddress := file.Name()
 	os.Remove(file.Name())
 	commsBus, err := commsbus.NewCommsBus(ctx, &commsbus.Config{
-		GRPC: &commsbus.GRPCConfig{
+		GRPC: commsbus.GRPCConfig{
 			SocketAddress: &socketAddress,
 		},
 	})

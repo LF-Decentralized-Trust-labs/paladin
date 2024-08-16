@@ -68,8 +68,8 @@ type EventStreamCheckpoint struct {
 }
 
 type EventStreamSignature struct {
-	Stream    uuid.UUID    `json:"stream"                      gorm:"primaryKey"`
-	Signature types.HashID `json:"signature"                   gorm:"primaryKey;embedded;embeddedPrefix:signature_;"`
+	Stream    uuid.UUID     `json:"stream"                      gorm:"primaryKey"`
+	Signature types.Bytes32 `json:"signature"                   gorm:"primaryKey"`
 }
 
 type EventWithData struct {

@@ -164,14 +164,16 @@ func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ AB
 	return ac.functionCommon(ctx, functionABI)
 }
 
-func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error) {
+func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (ABIFunctionClient, error) {
 	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode}
 	functionABI := abic.abi.Constructor()
 	if functionABI == nil {
-		err = i18n.NewError(ctx, msgs.MsgEthClientFunctionNotFound, "constructor")
-	}
-	if err != nil {
-		return nil, err
+		// Default constructor
+		functionABI = &abi.Entry{
+			Type:    abi.Constructor,
+			Inputs:  abi.ParameterArray{},
+			Outputs: abi.ParameterArray{},
+		}
 	}
 	return ac.functionCommon(ctx, functionABI)
 }

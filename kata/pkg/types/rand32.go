@@ -24,10 +24,14 @@ import (
 var randReader = rand.Reader
 
 func RandHex(count int) string {
+	return hex.EncodeToString(RandBytes(count))
+}
+
+func RandBytes(count int) []byte {
 	b := make([]byte, count)
 	i, err := randReader.Read(b)
 	if err != nil || i != count {
 		panic(err)
 	}
-	return hex.EncodeToString(b)
+	return b
 }

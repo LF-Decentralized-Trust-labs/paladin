@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -44,6 +45,7 @@ type EthClient interface {
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	MustABIJSON(abiJson []byte) ABIClient
+	ChainID() int64
 
 	// Below are raw functions that the ABI() above provides wrappers for
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error)
@@ -109,6 +111,10 @@ func (ec *ethClient) Close() {
 	}
 }
 
+func (ec *ethClient) ChainID() int64 {
+	return ec.chainID
+}
+
 func (ec *ethClient) setupChainID(ctx context.Context) error {
 	var chainID ethtypes.HexUint64
 	if rpcErr := ec.rpc.CallRPC(ctx, &chainID, "eth_chainId"); rpcErr != nil {
@@ -126,7 +132,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 		if err != nil {
 			return nil, err
 		}
-		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
+		tx.From = json.RawMessage(types.JSONString(fromAddr))
 	}
 
 	if rpcErr := ec.rpc.CallRPC(ctx, &data, "eth_call", tx, block); rpcErr != nil {
@@ -144,7 +150,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	if err != nil {
 		return nil, err
 	}
-	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, fromAddr))
+	tx.From = json.RawMessage(types.JSONString(fromAddr))
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
 	if tx.Nonce == nil {
@@ -189,7 +195,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	})
 	var sig *secp256k1.SignatureData
 	if err == nil {
-		sig, err = signer.DecodeCompactRSV(ctx, signature.Payload)
+		sig, err = secp256k1.DecodeCompactRSV(ctx, signature.Payload)
 	}
 	var rawTX []byte
 	if err == nil {
