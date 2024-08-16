@@ -36,7 +36,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +114,7 @@ func TestRunSimpleStorageEthTransaction(t *testing.T) {
 		Persistence persistence.Config  `yaml:"persistence"`
 		Eth         ethclient.Config    `yaml:"eth"`
 		Indexer     blockindexer.Config `yaml:"indexer"`
-		Keys        signer.Config       `yaml:"keys"`
+		Keys        api.Config          `yaml:"keys"`
 	}
 	var testConfig testConfigType
 

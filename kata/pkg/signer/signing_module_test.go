@@ -26,15 +26,16 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
 )
 
 type testExtension struct {
-	keyStore func(keystoreType string) (store KeyStore, err error)
+	keyStore func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error)
 }
 
-func (te *testExtension) KeyStore(keystoreType string) (store KeyStore, err error) {
-	return te.keyStore(keystoreType)
+func (te *testExtension) KeyStore(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+	return te.keyStore(ctx, config)
 }
 
 type testKeyStoreAll struct {
@@ -68,14 +69,14 @@ func (tk *testKeyStoreAll) ListKeys(ctx context.Context, req *proto.ListKeysRequ
 func TestExtensionInitFail(t *testing.T) {
 
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return nil, fmt.Errorf("pop")
 		},
 	}
 
-	_, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	_, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
@@ -86,10 +87,10 @@ func TestExtensionInitFail(t *testing.T) {
 func TestKeystoreTypeUnknown(t *testing.T) {
 
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) { return nil, nil },
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) { return nil, nil },
 	}
-	_, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	_, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "unknown",
 		},
 	}, te)
@@ -100,12 +101,12 @@ func TestKeystoreTypeUnknown(t *testing.T) {
 func TestKeyDerivationTypeUnknown(t *testing.T) {
 
 	ctx := context.Background()
-	_, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
+	_, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
 			Type: "unknown",
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
 		},
 	})
 	assert.Regexp(t, "PD011419", err)
@@ -120,7 +121,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 				Name:      "key 23456",
 				KeyHandle: "key23456",
 				Identifiers: []*proto.PublicKeyIdentifier{
-					{Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
+					{Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
 				},
 			},
 		},
@@ -134,14 +135,14 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 		},
 	}
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return tk, nil
 		},
 	}
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
@@ -171,14 +172,14 @@ func TestExtensionKeyStoreListFail(t *testing.T) {
 		},
 	}
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return tk, nil
 		},
 	}
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
@@ -206,21 +207,21 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 		},
 	}
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return tk, nil
 		},
 	}
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
 	assert.NoError(t, err)
 
 	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -228,7 +229,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 
 	resSign, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.NoError(t, err)
@@ -244,14 +245,14 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 		},
 	}
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return tk, nil
 		},
 	}
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
@@ -259,7 +260,7 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Name:       "key1",
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -276,14 +277,14 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 		},
 	}
 	te := &testExtension{
-		keyStore: func(keystoreType string) (store KeyStore, err error) {
-			assert.Equal(t, "ext-store", keystoreType)
+		keyStore: func(ctx context.Context, config *api.StoreConfig) (store api.KeyStore, err error) {
+			assert.Equal(t, "ext-store", config.Type)
 			return tk, nil
 		},
 	}
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
 			Type: "ext-store",
 		},
 	}, te)
@@ -291,7 +292,7 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "pop", err)
@@ -300,16 +301,16 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 
 func TestSignInMemoryFailBadKey(t *testing.T) {
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
 		},
 	})
 	assert.NoError(t, err)
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "PD011418", err)
@@ -318,10 +319,10 @@ func TestSignInMemoryFailBadKey(t *testing.T) {
 
 func TestResolveSignWithNewKeyCreation(t *testing.T) {
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -329,18 +330,18 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, resolveRes.KeyHandle)
 	assert.Equal(t, "key1", resolveRes.KeyHandle)
-	assert.Equal(t, Algorithm_ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
+	assert.Equal(t, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
 	assert.NotEmpty(t, resolveRes.Identifiers[0].Identifier)
 
 	signRes, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: resolveRes.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("sign me"),
 	})
 	assert.NoError(t, err)
@@ -350,10 +351,10 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 
 func TestResolveUnsupportedAlgo(t *testing.T) {
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -370,10 +371,10 @@ func TestResolveUnsupportedAlgo(t *testing.T) {
 
 func TestResolveMissingAlgo(t *testing.T) {
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},
@@ -389,11 +390,11 @@ func TestResolveMissingAlgo(t *testing.T) {
 
 func TestInMemorySignFailures(t *testing.T) {
 
-	sm, err := NewSigningModule(context.Background(), &Config{
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+	sm, err := NewSigningModule(context.Background(), &api.Config{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"key1": {
 						Encoding: "hex",
 						Inline:   "0x00",
@@ -405,7 +406,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -425,7 +426,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	sm.(*signingModule).disableKeyLoading = true
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011409", err)
@@ -435,4 +436,31 @@ func TestInMemorySignFailures(t *testing.T) {
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "PD011409", err)
+}
+
+func TestZKPSigningModuleKeyResolution(t *testing.T) {
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyStore: api.StoreConfig{
+			Type:       api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{Path: confutil.P(tmpDir)},
+			SnarkProver: api.SnarkProverConfig{
+				CircuitsDir:    "tests",
+				ProvingKeysDir: "tests",
+			},
+		},
+	}, nil)
+	assert.NoError(t, err)
+
+	resp1, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Name:       "blueKey",
+		Path: []*proto.ResolveKeyPathSegment{
+			{Name: "alice"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(resp1.Identifiers))
 }

@@ -13,25 +13,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package common
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/utils"
 )
 
-type FileSystemConfig struct {
-	Path     *string      `yaml:"path"`
-	Cache    cache.Config `yaml:"cache"`
-	FileMode *string      `yaml:"fileMode"`
-	DirMode  *string      `yaml:"dirMode"`
+func EncodePublicKey(pubKey *babyjub.PublicKey) string {
+	pubKeyComp := pubKey.Compress()
+	return utils.HexEncode(pubKeyComp[:])
 }
 
-var FileSystemDefaults = &FileSystemConfig{
-	Path:     confutil.P("keystore"),
-	FileMode: confutil.P("0600"),
-	DirMode:  confutil.P("0700"),
-	Cache: cache.Config{
-		Capacity: confutil.P(100),
-	},
+func DecodePublicKey(pubKeyHex string) (*babyjub.PublicKey, error) {
+	pubKeyCompBytes, err := utils.HexDecode(pubKeyHex)
+	if err != nil {
+		return nil, err
+	}
+	var compressedPubKey babyjub.PublicKeyComp
+	copy(compressedPubKey[:], pubKeyCompBytes)
+	return compressedPubKey.Decompress()
 }

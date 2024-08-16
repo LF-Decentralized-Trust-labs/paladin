@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package api
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
@@ -36,6 +36,7 @@ type StoreConfig struct {
 	DisableKeyLoading bool                   `yaml:"disableKeyLoading"` // if HD Wallet or ZKP based signing is required, in-memory keys are required (so this needs to be false)
 	FileSystem        FileSystemConfig       `yaml:"filesystem"`
 	Static            StaticKeyStorageConfig `yaml:"static"`
+	SnarkProver       SnarkProverConfig      `yaml:"snarkProver"`
 }
 
 type KeyDerivationType string
