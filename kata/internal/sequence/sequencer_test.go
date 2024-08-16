@@ -100,7 +100,7 @@ func TestSequencerLocalDependency(t *testing.T) {
 }
 
 func TestSequencerRemoteDependency(t *testing.T) {
-	// Transactions that are added to a sequencer's graph and have dependencies on other transactions that are
+	// Transactions that are added to a sequencer's graph and have dependencies on another transaction that is
 	// managed by another sequencer, will be moved to that other sequencer as soon as they are assembled
 	ctx := context.Background()
 	localNodeId := uuid.New()
@@ -137,10 +137,10 @@ func TestSequencerRemoteDependency(t *testing.T) {
 
 	// Should see an event relinquishing ownership of this this transaction
 	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		transactionRelegatedEvent := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
-		assert.Equal(t, txn2ID.String(), transactionRelegatedEvent.TransactionId)
-		assert.Equal(t, localNodeId.String(), transactionRelegatedEvent.DelegatingNodeId)
-		assert.Equal(t, remoteNodeId.String(), transactionRelegatedEvent.DelegateNodeId)
+		delegateTransactionMessage := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
+		assert.Equal(t, txn2ID.String(), delegateTransactionMessage.TransactionId)
+		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
+		assert.Equal(t, remoteNodeId.String(), delegateTransactionMessage.DelegateNodeId)
 	}).Return(nil)
 
 	//Second transaction (the spender of that state) is assembled on the local node
@@ -165,6 +165,114 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	assert.NoError(t, err)
 
 }
+
+func TestSequencerMultipleRemoteDependencies(t *testing.T) {
+	// Transactions that are added to a sequencer's graph and have dependencies on multiple other transactions that are
+	// managed by multiple other sequencers, will be moved to the blocked stage until all bar one of their dependencies are
+	// committed
+	ctx := context.Background()
+	localNodeId := uuid.New()
+	remoteNode1Id := uuid.New()
+	remoteNode2Id := uuid.New()
+
+	newTransactionID := uuid.New()
+	dependency1TransactionID := uuid.New()
+	dependency2TransactionID := uuid.New()
+
+	stateHash1 := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	stateHash2 := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	//create a sequencer for the local node
+	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
+	commsBusBrokerMock1 := localNodeSequencerMockDependencies.brokerMock
+
+	//TODO need to decide the scope of this test.  are we just firing events at the sequencer and letting it build up its awareness of the global graph
+	// or are we emulating a local persistence layer that has already been told about remote transactions
+	// the answer is really an architectural one about how this code module glues into the rest of the system
+
+	// First transaction (the minter of a given state) is assembled on the remote node
+	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   dependency1TransactionID.String(),
+		NodeId:          remoteNode1Id.String(),
+		OutputStateHash: []string{stateHash1.String()},
+	})
+	assert.NoError(t, err)
+	localNodeSequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash1.String()).Return(&transactionstore.Transaction{
+		ID:               dependency1TransactionID,
+		AssemblingNodeID: remoteNode1Id,
+		SequencingNodeID: remoteNode1Id,
+	}, nil)
+
+	// Second transaction (the minter of the other state) is assembled on a different remote node
+	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   dependency2TransactionID.String(),
+		NodeId:          remoteNode2Id.String(),
+		OutputStateHash: []string{stateHash2.String()},
+	})
+	assert.NoError(t, err)
+	localNodeSequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash2.String()).Return(&transactionstore.Transaction{
+		ID:               dependency2TransactionID,
+		AssemblingNodeID: remoteNode2Id,
+		SequencingNodeID: remoteNode2Id,
+	}, nil)
+
+	// Should see an event moving this transaction to the blocked stage
+	commsBusBrokerMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		transactionBlockedEvent := args.Get(1).(commsbus.Event).Body.(*pb.TransactionBlockedEvent)
+		assert.Equal(t, newTransactionID.String(), transactionBlockedEvent.TransactionId)
+	}).Return(nil)
+
+	// new transaction (the spender of that states) is assembled on the local node
+	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:  newTransactionID.String(),
+		NodeId:         localNodeId.String(),
+		InputStateHash: []string{stateHash1.String(), stateHash2.String()},
+	})
+	assert.NoError(t, err)
+
+	commsBusBrokerMock1.AssertExpectations(t)
+
+	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
+	err = localNodeSequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: dependency1TransactionID.String(),
+	})
+	assert.NoError(t, err)
+
+	err = localNodeSequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: dependency2TransactionID.String(),
+	})
+	assert.NoError(t, err)
+
+	err = localNodeSequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: newTransactionID.String(),
+	})
+	assert.NoError(t, err)
+
+	// once all bar one transaction is confirmed, should see the dependant transaction being delegated
+	// Should see an event relinquishing ownership of this this transaction
+	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
+		assert.Equal(t, newTransactionID.String(), delegateTransactionMessage.TransactionId)
+		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
+		assert.Equal(t, remoteNode1Id.String(), delegateTransactionMessage.DelegateNodeId)
+	}).Return(nil)
+
+	err = localNodeSequencer.OnTransactionConfirmed(ctx, &pb.TransactionConfirmedEvent{
+		TransactionId: dependency2TransactionID.String(),
+	})
+	assert.NoError(t, err)
+	// TODO I know I have a bug where I am leaving the transaction in the `blockedTransactions` array even after it has been delegated.  I need to fix that but first I need to write a test that proves it is wrong.
+}
+
+// TODO mode complex variations of TestSequencerMultipleRemoteDependencies where there are still multiple remainign dependency transactions but they are all on the same remote node and/or they are all on the local node
+// timing conditions where the remote transactions themselves get delegated to another node or even get delegated to this local node
 
 // Test cases to assert the emergent behaviour when multiple concurrent copies of the sequencer are running
 // as in a distributed system.

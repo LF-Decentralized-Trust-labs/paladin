@@ -18,6 +18,7 @@ package sequence
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -32,6 +33,7 @@ type Graph interface {
 	AddTransaction(ctx context.Context, txID string, inputStates []string, outputStates []string) error
 	GetDispatchableTransactions(ctx context.Context) ([]string, error)
 	RecordEndorsement(ctx context.Context, txID string) error
+	IncludesTransaction(txID string) bool
 }
 
 type transaction struct {
@@ -81,10 +83,14 @@ func (g *graph) AddTransaction(ctx context.Context, txID string, inputStates []s
 	return nil
 }
 
+func (g *graph) IncludesTransaction(txID string) bool {
+	return g.allTransactions[txID] != nil
+}
+
 func (g *graph) RecordEndorsement(ctx context.Context, txID string) error {
 	if g.allTransactions[txID] == nil {
 		log.L(ctx).Errorf("Transaction %s does not exist", txID)
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, fmt.Sprintf("Transaction %s does not exist", txID))
 	}
 	g.allTransactions[txID].endorsed = true
 	return nil

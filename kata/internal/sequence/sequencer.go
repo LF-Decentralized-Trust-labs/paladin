@@ -59,15 +59,33 @@ type Sequencer interface {
 	OnStateClaimEvent(ctx context.Context, event *pb.StateClaimEvent) error
 	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
 	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
+	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
+}
+
+type blockingTransaction struct {
+	transactionID string
+	nodeID        string
+}
+
+type blockedTransaction struct {
+	transactionID string
+	blockedBy     []blockingTransaction
+}
+
+// a delegatable transaction is one that has only one dependency on a transaction that is owned by another node
+type delegatableTransaction struct {
+	transactionID string
+	nodeId        string
 }
 
 type sequencer struct {
-	nodeID      uuid.UUID
-	persistence Persistence
-	commsBus    commsbus.CommsBus
-	resolver    ContentionResolver
-	dispatcher  Dispatcher
-	graph       Graph
+	nodeID              uuid.UUID
+	persistence         Persistence
+	commsBus            commsbus.CommsBus
+	resolver            ContentionResolver
+	dispatcher          Dispatcher
+	graph               Graph
+	blockedTransactions []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 }
 
 func NewSequencer(eventSync EventSync, persistence Persistence) Sequencer {
@@ -145,6 +163,38 @@ func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.Tr
 	return mintingTransactions, nil
 }
 
+func (s *sequencer) delegate(ctx context.Context, transactionId string, delegateNodeID string) error {
+	err := s.commsBus.Broker().SendMessage(ctx, commsbus.Message{
+		Body: &pb.DelegateTransaction{
+			TransactionId:    transactionId,
+			DelegatingNodeId: s.nodeID.String(),
+			DelegateNodeId:   delegateNodeID,
+		},
+	})
+	if err != nil {
+		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, blockedBy []blockingTransaction) error {
+	s.blockedTransactions = append(s.blockedTransactions, &blockedTransaction{
+		transactionID: transactionId,
+		blockedBy:     blockedBy,
+	})
+	err := s.commsBus.Broker().PublishEvent(ctx, commsbus.Event{
+		Body: &pb.TransactionBlockedEvent{
+			TransactionId: transactionId,
+		},
+	})
+	if err != nil {
+		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
+		return err
+	}
+	return nil
+}
+
 func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.TransactionAssembledEvent) (bool, error) {
 	//if the transaction has any dependencies on transactions that are being managed by other nodes,
 	//then we need to delegate this one to that remote node too
@@ -153,24 +203,92 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.Transac
 		log.L(ctx).Errorf("Error getting unconfirmed dependencies: %s", err)
 		return false, err
 	}
+
+	blockingNodeIDs := make(map[string]bool)
+	blockedBy := make([]blockingTransaction, 0, len(unconfirmedDependencies))
+
 	for _, dependency := range unconfirmedDependencies {
-		if dependency.SequencingNodeID != s.nodeID {
-			err := s.commsBus.Broker().SendMessage(ctx, commsbus.Message{
-				Body: &pb.DelegateTransaction{
-					TransactionId:    event.TransactionId,
-					DelegatingNodeId: s.nodeID.String(),
-					DelegateNodeId:   dependency.SequencingNodeID.String(),
-				},
-			})
-			if err != nil {
-				log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
-				return false, err
+		blockingNodeIDs[dependency.SequencingNodeID.String()] = true
+		blockedBy = append(blockedBy, blockingTransaction{
+			transactionID: dependency.ID.String(),
+			nodeID:        dependency.SequencingNodeID.String(),
+		})
+	}
+	keys := make([]string, 0, len(blockingNodeIDs))
+	for k := range blockingNodeIDs {
+		keys = append(keys, k)
+	}
+	if len(keys) > 1 {
+
+		// we have a dependency on transactions from multiple nodes
+		// we can't delegate this transaction to multiple nodes, so we need to wait for the dependencies to be resolved
+		err := s.blockTransaction(ctx, event.TransactionId, blockedBy)
+
+		if err != nil {
+			log.L(ctx).Errorf("Error blocking transaction: %s", err)
+			return false, err
+		}
+		return true, nil
+	}
+	if len(keys) == 1 && keys[0] != s.nodeID.String() {
+		// we are dependent on one other node so we can delegate
+		err := s.delegate(ctx, event.TransactionId, keys[0])
+		if err != nil {
+			log.L(ctx).Errorf("Error delegating: %s", err)
+			return false, err
+		}
+		return true, nil
+
+	}
+	//otherwise there are no dependencies ( or they are all on the local node) so we can just add the transaction to the graph
+
+	return false, nil
+}
+
+func (s *sequencer) updateBlockedTransactions(ctx context.Context, event *pb.TransactionConfirmedEvent) {
+	for _, blockedTransaction := range s.blockedTransactions {
+		for i, dependency := range blockedTransaction.blockedBy {
+			if dependency.transactionID == event.TransactionId {
+				//TODO assuming the dependency transaction is only in the array once.  Can we assert this?
+				blockedTransaction.blockedBy = append(blockedTransaction.blockedBy[:i], blockedTransaction.blockedBy[i+1:]...)
+				continue
 			}
-			//TODO still need to handle the case where there are multiple dependencies on multiple nodes
-			return true, nil
 		}
 	}
-	return false, nil
+}
+
+func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatableTransaction {
+	delegatableTransactions := make([]delegatableTransaction, 0, len(s.blockedTransactions))
+	//if I have any transactions in blocked that are dependant on this confirmed transaction, then I need to re-evaluate them
+
+	for _, blockedTransaction := range s.blockedTransactions {
+		blockingNodeIDs := make(map[string]bool)
+
+		for _, dependency := range blockedTransaction.blockedBy {
+			blockingNodeIDs[dependency.nodeID] = true
+		}
+		keys := make([]string, 0, len(blockingNodeIDs))
+		for k := range blockingNodeIDs {
+			keys = append(keys, k)
+		}
+		if len(keys) > 1 {
+			// we still have a dependency on transactions from multiple nodes
+			// we can't delegate this transaction to multiple nodes, so we need to wait for the dependencies to be resolved
+			continue
+		}
+		if len(keys) == 1 && keys[0] != s.nodeID.String() {
+			// we are dependent on one other node so we can delegate
+			delegatableTransactions = append(delegatableTransactions, delegatableTransaction{
+				transactionID: blockedTransaction.transactionID,
+				nodeId:        keys[0],
+			})
+			continue
+
+		}
+		//otherwise there are no dependencies ( or they are all on the local node) so we can just add the transaction to the graph
+		//TODO - is there any scenario ( including timing conditions) where the number of blockedBy could be zero? and we just dispatch it ourselves rather than delegating it?
+	}
+	return delegatableTransactions
 }
 
 func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
@@ -283,5 +401,20 @@ func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimE
 			return err
 		}
 	}
+	return nil
+}
+
+func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
+	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
+	s.updateBlockedTransactions(ctx, event)
+	delegatableTransactions := s.findDelegatableTransactions(ctx)
+	for _, delegatableTransaction := range delegatableTransactions {
+		err := s.delegate(ctx, delegatableTransaction.transactionID, delegatableTransaction.nodeId)
+		if err != nil {
+			log.L(ctx).Errorf("Error delegating: %s", err)
+			return err
+		}
+	}
+
 	return nil
 }
