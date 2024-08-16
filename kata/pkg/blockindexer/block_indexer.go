@@ -71,7 +71,7 @@ type blockIndexer struct {
 	stateLock                  sync.Mutex
 	fromBlock                  *ethtypes.HexUint64
 	nextBlock                  *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
-	highestConfirmedBlock      int64               // set after we persist blocks
+	highestConfirmedBlock      atomic.Int64        // set after we persist blocks
 	blocksSinceCheckpoint      []*BlockInfoJSONRPC
 	newHeadToAdd               []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
 	requiredConfirmations      int
@@ -111,7 +111,6 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		retry:                      blockListener.retry,
 		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
-		highestConfirmedBlock:      -1,
 		txWaiters:                  make(map[string]*txWaiter),
 		eventStreams:               make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
@@ -119,6 +118,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		esCatchUpQueryPageSize:     confutil.IntMin(config.EventStreams.CatchUpQueryPageSize, 0, *DefaultEventStreamsConfig.CatchUpQueryPageSize),
 		dispatcherTap:              make(chan struct{}, 1),
 	}
+	bi.highestConfirmedBlock.Store(-1)
 	if err := bi.setFromBlock(ctx, config); err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (bi *blockIndexer) Stop() {
 }
 
 func (bi *blockIndexer) GetConfirmedBlockHeight(ctx context.Context) (highest uint64, err error) {
-	highestConfirmedBlock := atomic.LoadInt64(&bi.highestConfirmedBlock)
+	highestConfirmedBlock := bi.highestConfirmedBlock.Load()
 	if highestConfirmedBlock < 0 {
 		return 0, i18n.NewError(ctx, msgs.MsgBlockIndexerNoBlocksIndexed)
 	}
@@ -276,7 +276,7 @@ func (bi *blockIndexer) restoreCheckpoint() error {
 	case len(blocks) > 0:
 		nextBlock := ethtypes.HexUint64(blocks[0].Number + 1)
 		bi.nextBlock = &nextBlock
-		atomic.StoreInt64(&bi.highestConfirmedBlock, blocks[0].Number)
+		bi.highestConfirmedBlock.Store(blocks[0].Number)
 	default:
 		bi.nextBlock = bi.fromBlock
 	}
@@ -546,7 +546,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		bi.notifyEventStreams(ctx, batch)
 	}
 	if newHighestBlock >= 0 {
-		atomic.StoreInt64(&bi.highestConfirmedBlock, newHighestBlock)
+		bi.highestConfirmedBlock.Store(newHighestBlock)
 	}
 	if err == nil {
 		if bi.utBatchNotify != nil {
