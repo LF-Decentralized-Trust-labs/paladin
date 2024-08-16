@@ -25,7 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -222,8 +221,8 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	assert.NoError(t, err)
-	assert.Equal(t, common.CompactRSV(testSign), resSign.Payload)
-	sig, err := DecodeCompactRSV(ctx, resSign.Payload)
+	assert.Equal(t, testSign.CompactRSV(), resSign.Payload)
+	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
 	assert.NoError(t, err)
 	assert.Equal(t, testSign, sig)
 

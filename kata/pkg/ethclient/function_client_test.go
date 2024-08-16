@@ -211,7 +211,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 				assert.Equal(t, "latest", s)
 			}
 			if withFrom {
-				assert.Equal(t, fmt.Sprintf(`"%s"`, key1), string(tx.From))
+				assert.Equal(t, types.JSONString(key1), types.RawJSON(tx.From))
 			} else {
 				assert.Nil(t, tx.From)
 			}
@@ -340,9 +340,19 @@ func TestFunctionFail(t *testing.T) {
 func TestConstructorFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
 	defer done()
+
 	tABI := ec.MustABIJSON(([]byte)(`[]`))
+	defaultConstructor := tABI.MustConstructor([]byte{})
+	assert.Equal(t, "()", defaultConstructor.(*abiFunctionClient).inputs.String())
+
+	tABI.(*abiClient).abi = abi.ABI{
+		{
+			Type:   abi.Constructor,
+			Inputs: abi.ParameterArray{{Type: "!wrong"}},
+		},
+	}
 	_, err := tABI.Constructor(ctx, []byte{})
-	assert.Regexp(t, "PD011507", err)
+	assert.Regexp(t, "FF22025", err)
 
 	assert.Panics(t, func() {
 		_ = tABI.MustConstructor([]byte{})

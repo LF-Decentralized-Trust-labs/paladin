@@ -21,7 +21,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 )
 
 type sepc256k1Signer struct{}
@@ -35,7 +34,7 @@ func (s *sepc256k1Signer) Sign(ctx context.Context, privateKey []byte, req *prot
 	kp := secp256k1.KeyPairFromBytes(privateKey)
 	sig, err := kp.SignDirect(req.Payload)
 	if err == nil {
-		return &proto.SignResponse{Payload: common.CompactRSV(sig)}, nil
+		return &proto.SignResponse{Payload: sig.CompactRSV()}, nil
 	}
 	return nil, err
 }

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,7 +49,8 @@ type BlockIndexer interface {
 	GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
 	WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error)
-	GetBlockHeight(ctx context.Context) (uint64, error)
+	GetBlockListenerHeight(ctx context.Context) (highest uint64, err error)
+	GetConfirmedBlockHeight(ctx context.Context) (confirmed uint64, err error)
 }
 
 // Processes blocks from a configure baseline block (0 for example), up until it
@@ -69,6 +71,7 @@ type blockIndexer struct {
 	stateLock                  sync.Mutex
 	fromBlock                  *ethtypes.HexUint64
 	nextBlock                  *ethtypes.HexUint64 // nil in the special case of "latest" and no block received yet
+	highestConfirmedBlock      atomic.Int64        // set after we persist blocks
 	blocksSinceCheckpoint      []*BlockInfoJSONRPC
 	newHeadToAdd               []*BlockInfoJSONRPC // used by the notification routine when there are new blocks that add directly onto the end of the blocksSinceCheckpoint
 	requiredConfirmations      int
@@ -115,6 +118,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		esCatchUpQueryPageSize:     confutil.IntMin(config.EventStreams.CatchUpQueryPageSize, 0, *DefaultEventStreamsConfig.CatchUpQueryPageSize),
 		dispatcherTap:              make(chan struct{}, 1),
 	}
+	bi.highestConfirmedBlock.Store(-1)
 	if err := bi.setFromBlock(ctx, config); err != nil {
 		return nil, err
 	}
@@ -207,7 +211,15 @@ func (bi *blockIndexer) Stop() {
 	}
 }
 
-func (bi *blockIndexer) GetBlockHeight(ctx context.Context) (uint64, error) {
+func (bi *blockIndexer) GetConfirmedBlockHeight(ctx context.Context) (highest uint64, err error) {
+	highestConfirmedBlock := bi.highestConfirmedBlock.Load()
+	if highestConfirmedBlock < 0 {
+		return 0, i18n.NewError(ctx, msgs.MsgBlockIndexerNoBlocksIndexed)
+	}
+	return uint64(highestConfirmedBlock), nil
+}
+
+func (bi *blockIndexer) GetBlockListenerHeight(ctx context.Context) (confirmed uint64, err error) {
 	return bi.blockListener.getHighestBlock(ctx)
 }
 
@@ -264,6 +276,7 @@ func (bi *blockIndexer) restoreCheckpoint() error {
 	case len(blocks) > 0:
 		nextBlock := ethtypes.HexUint64(blocks[0].Number + 1)
 		bi.nextBlock = &nextBlock
+		bi.highestConfirmedBlock.Store(blocks[0].Number)
 	default:
 		bi.nextBlock = bi.fromBlock
 	}
@@ -461,13 +474,13 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 }
 
 func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
-	var topic0 types.HashID
+	var topic0 types.Bytes32
 	if len(l.Topics) > 0 {
-		topic0 = *types.NewHashIDSlice32(l.Topics[0])
+		topic0 = *types.NewBytes32FromSlice(l.Topics[0])
 	}
 	return &IndexedEvent{
 		Signature:        topic0,
-		TransactionHash:  *types.NewHashIDSlice32(l.TransactionHash),
+		TransactionHash:  *types.NewBytes32FromSlice(l.TransactionHash),
 		BlockNumber:      int64(l.BlockNumber),
 		TransactionIndex: int64(l.TransactionIndex),
 		LogIndex:         int64(l.LogIndex),
@@ -479,15 +492,17 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 	var blocks []*IndexedBlock
 	var transactions []*IndexedTransaction
 	var events []*IndexedEvent
+	newHighestBlock := int64(-1)
 
 	for i, block := range batch.blocks {
+		newHighestBlock = int64(block.Number)
 		blocks = append(blocks, &IndexedBlock{
 			Number: int64(block.Number),
-			Hash:   *types.NewHashIDSlice32(block.Hash),
+			Hash:   *types.NewBytes32FromSlice(block.Hash),
 		})
 		for txIndex, r := range batch.receipts[i] {
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:             *types.NewHashIDSlice32(r.TransactionHash),
+				Hash:             *types.NewBytes32FromSlice(r.TransactionHash),
 				BlockNumber:      int64(r.BlockNumber),
 				TransactionIndex: int64(txIndex),
 				From:             (*types.EthAddress)(r.From),
@@ -524,25 +539,28 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			}
 			return err
 		})
-		if err == nil {
-			if bi.utBatchNotify != nil {
-				bi.utBatchNotify <- batch
-			}
-			bi.txWaiterLock.Lock()
-			for _, w := range bi.txWaiters {
-				for _, t := range transactions {
-					if w.hash.Equals(&t.Hash) {
-						w.notify(t)
-					}
-				}
-			}
-			defer bi.txWaiterLock.Unlock()
-		}
 		return true, err
 	})
 	if err == nil {
 		// Context was cancelled exiting retry - no notification in that case
 		bi.notifyEventStreams(ctx, batch)
+	}
+	if newHighestBlock >= 0 {
+		bi.highestConfirmedBlock.Store(newHighestBlock)
+	}
+	if err == nil {
+		if bi.utBatchNotify != nil {
+			bi.utBatchNotify <- batch
+		}
+		bi.txWaiterLock.Lock()
+		for _, w := range bi.txWaiters {
+			for _, t := range transactions {
+				if w.hash.Equals(&t.Hash) {
+					w.notify(t)
+				}
+			}
+		}
+		defer bi.txWaiterLock.Unlock()
 	}
 }
 
@@ -668,7 +686,7 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 
 type txWaiter struct {
 	start time.Time
-	hash  *types.HashID
+	hash  *types.Bytes32
 	done  chan *IndexedTransaction
 }
 
@@ -691,7 +709,7 @@ func (w *txWaiter) wait(ctx context.Context, waiterID string) (*IndexedTransacti
 }
 
 func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	txHash, err := types.ParseHashID(ctx, hash)
+	txHash, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -741,21 +759,20 @@ func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint
 }
 
 func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	hashID, err := types.ParseHashID(ctx, hash)
+	hashID, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
 	return bi.getIndexedTransactionByHash(ctx, *hashID)
 }
 
-func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.HashID) (*IndexedTransaction, error) {
+func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.Bytes32) (*IndexedTransaction, error) {
 	var txns []*IndexedTransaction
 	db := bi.persistence.DB()
 	err := db.
 		WithContext(ctx).
 		Table("indexed_transactions").
-		Where("hash_l = ?", hashID.L).
-		Where("hash_h = ?", hashID.H).
+		Where("hash = ?", hashID).
 		Find(&txns).
 		Error
 	if err != nil || len(txns) < 1 {
@@ -779,7 +796,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 }
 
 func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error) {
-	hashID, err := types.ParseHashID(ctx, hash)
+	hashID, err := types.ParseBytes32(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -789,8 +806,7 @@ func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash str
 	err = db.
 		WithContext(ctx).
 		Table("indexed_events").
-		Where("transaction_l = ?", hashID.L).
-		Where("transaction_h = ?", hashID.H).
+		Where("transaction_hash = ?", hashID).
 		Order("log_index").
 		Find(&events).
 		Error

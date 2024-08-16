@@ -18,7 +18,6 @@ package signer
 import (
 	"context"
 	"crypto/rand"
-	"math/big"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
@@ -28,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 	sepc256k1Signer "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/secp256k1"
 	zkpSigner "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/snark"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
@@ -161,24 +159,13 @@ func (sm *signingModule) resolveKeystoreSECP256K1(ctx context.Context, req *prot
 	}, nil
 }
 
-func DecodeCompactRSV(ctx context.Context, compactRSV []byte) (*secp256k1.SignatureData, error) {
-	if len(compactRSV) != 65 {
-		return nil, i18n.NewError(ctx, msgs.MsgSigningInvalidCompactRSV, len(compactRSV))
-	}
-	var sig secp256k1.SignatureData
-	sig.R = new(big.Int).SetBytes(compactRSV[0:32])
-	sig.S = new(big.Int).SetBytes(compactRSV[32:64])
-	sig.V = new(big.Int).SetBytes(compactRSV[64:65])
-	return &sig, nil
-}
-
 func (sm *signingModule) signKeystoreSECP256K1(ctx context.Context, req *proto.SignRequest, keyStoreSigner KeyStoreSigner_secp256k1) (res *proto.SignResponse, err error) {
 	sig, err := keyStoreSigner.Sign_secp256k1(ctx, req.KeyHandle, req.Payload)
 	if err != nil {
 		return nil, err
 	}
 	return &proto.SignResponse{
-		Payload: common.CompactRSV(sig),
+		Payload: sig.CompactRSV(),
 	}, nil
 }
 
@@ -236,6 +223,9 @@ func (sm *signingModule) publicKeyIdentifiersForAlgorithms(ctx context.Context, 
 }
 
 func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
+	if len(req.Name) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyCannotBeEmpty)
+	}
 	if sm.hd != nil {
 		return sm.hd.resolveHDWalletKey(ctx, req)
 	}

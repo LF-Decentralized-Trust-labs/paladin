@@ -59,6 +59,7 @@ task test(type: Exec, dependsOn: compile) {
             reset()
         }
     }
+    inputs.dir('artifacts')
     outputs.file(testResults)
 }
 
