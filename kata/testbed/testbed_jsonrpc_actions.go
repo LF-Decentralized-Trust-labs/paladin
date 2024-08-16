@@ -148,8 +148,8 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		defer waiter.cancel()
 
 		// Init the deployment transaction
-		var initDeployRes *proto.InitDeployTransactionResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitDeployTransactionRequest{
+		var initDeployRes *proto.InitDeployResponse
+		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitDeployRequest{
 			Transaction: deployTXSpec,
 		}, &initDeployRes)
 		if err != nil {
@@ -157,7 +157,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		}
 
 		// Resolve all the addresses locally in the testbed
-		prepareReq := &proto.PrepareDeployTransactionRequest{
+		prepareReq := &proto.PrepareDeployRequest{
 			Transaction:       deployTXSpec,
 			ResolvedVerifiers: make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
 		}
@@ -174,7 +174,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		}
 
 		// Prepare the deployment transaction
-		var prepareDeployRes *proto.PrepareDeployTransactionResponse
+		var prepareDeployRes *proto.PrepareDeployResponse
 		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, prepareReq, &prepareDeployRes)
 		if err != nil {
 			return nil, err

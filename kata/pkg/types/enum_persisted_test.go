@@ -25,12 +25,22 @@ import (
 
 type TestEnum string
 
+const (
+	TestEnumOption1 TestEnum = "option1"
+	TestEnumOption2 TestEnum = "option2"
+	TestEnumOption3 TestEnum = "option3"
+)
+
 func (te TestEnum) Options() []string {
-	return []string{"option1", "option2", "option3"}
+	return []string{
+		string(TestEnumOption1),
+		string(TestEnumOption2),
+		string(TestEnumOption3),
+	}
 }
 
 func (te TestEnum) Default() string {
-	return "option2"
+	return string(TestEnumOption2)
 }
 
 func TestEnumValue(t *testing.T) {
@@ -60,12 +70,41 @@ func TestEnumJSON(t *testing.T) {
 		Field1: "",
 		Field2: nil,
 	}, v1)
-	testVal, err := v1.Field1.Validate()
+	testVal, err := v1.Field1.MapToString()
 	assert.NoError(t, err)
 	assert.Equal(t, "option2", testVal)
-	testVal, err = v1.Field1.Validate()
+	testVal, err = v1.Field1.MapToString()
 	assert.NoError(t, err)
 	assert.Equal(t, "option2", testVal)
+}
+
+func TestMapEnum(t *testing.T) {
+	v := Enum[TestEnum]("option3")
+	i, err := MapEnum(v, map[TestEnum]int{
+		"option1": 111,
+		"option2": 222,
+		"option3": 333,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 333, i)
+
+	_, err = MapEnum(v, map[TestEnum]int{
+		"option1": 111,
+		"option2": 222,
+	})
+	assert.Regexp(t, "PD011102.*option1,option2", err)
+	// Would be confusing for error to include the value that isn't in the type mapping
+	assert.NotRegexp(t, "option3", err.Error())
+
+	v = Enum[TestEnum]("option4")
+	_, err = MapEnum(v, map[TestEnum]int{
+		"option1":  111,
+		"option2":  222,
+		"option3":  333,
+		"option99": 999,
+	})
+	assert.Regexp(t, "PD011102.*option1,option2,option3", err)
+	assert.NotRegexp(t, "option99", err.Error())
 }
 
 func TestEnumScan(t *testing.T) {

@@ -328,10 +328,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		INIT_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := iReq.(*proto.InitDeployTransactionRequest)
+			req := iReq.(*proto.InitDeployRequest)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
-			return &proto.InitDeployTransactionResponse{
+			return &proto.InitDeployResponse{
 				RequiredVerifiers: []*proto.ResolveVerifierRequest{
 					{
 						Lookup:    "domain1/contract1/notary",
@@ -342,7 +342,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		},
 
 		PREPARE_DEPLOY: func(_ simCallbacks, iReq pb.Message) (pb.Message, error) {
-			req := iReq.(*proto.PrepareDeployTransactionRequest)
+			req := iReq.(*proto.PrepareDeployRequest)
 			assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 			assert.JSONEq(t, `{
 				"notary": "domain1/contract1/notary",
@@ -353,7 +353,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.Equal(t, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
 			assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
 			assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
-			return &proto.PrepareDeployTransactionResponse{
+			return &proto.PrepareDeployResponse{
 				SigningAddress: fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId),
 				Transaction: &proto.BaseLedgerTransaction{
 					FunctionName: "newSIMTokenNotarized",

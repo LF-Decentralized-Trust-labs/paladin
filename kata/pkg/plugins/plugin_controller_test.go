@@ -12,24 +12,4 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
-syntax = "proto3";
-
-package github.com.kaleido_io.paladin.kata.plugin;
-option go_package = "pkg/proto/plugin";
-
-message CreateInstance {
-    string name = 1;
-    string messageDestination = 2;
-}
-
-// published whenever a plugin becomes ready
-message PluginProviderReadyEvent {
-  string providerName = 1;
-}
-
-// published whenever a new instance of a plugin becomes ready
-message PluginInstanceReadyEvent {
-  string providerName = 1;
-  string instanceName = 2;
-}
+package plugins

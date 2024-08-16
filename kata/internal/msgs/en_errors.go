@@ -141,11 +141,11 @@ var (
 	MsgTypesABIDefNotInBothStructs          = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
 	MsgTypesInvalidName64SafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-64 characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric")
 
-	// Plugin registry PD0112XX
-	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
-	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
-	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
-	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+	// Plugin controller PD0112XX
+	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
+	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
+	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
+	MsgPluginAlreadyLoaded     = ffe("PD011203", "Plugin %s of type %s with UUID %s already loaded")
 
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")

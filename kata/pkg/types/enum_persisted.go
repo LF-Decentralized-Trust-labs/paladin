@@ -39,22 +39,52 @@ func (p Enum[O]) V() O {
 }
 
 // Case insensitive validation, with default, returning a string value
-func (p Enum[O]) Validate() (string, error) {
+func (p Enum[O]) MapToString() (string, error) {
+	ps, err := p.Validate()
+	return string(ps), err
+}
+
+// Case insensitive validation, with default
+func (p Enum[O]) Validate() (O, error) {
 	validator := (*new(O))
 	if p == "" {
-		return validator.Default(), nil
+		if validator.Default() != "" {
+			return O(validator.Default()), nil
+		}
 	}
 	for _, o := range validator.Options() {
 		if strings.EqualFold(o, (string)(p)) {
-			return o, nil
+			return O(o), nil
 		}
 	}
 	return "", i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(validator.Options(), ","))
 }
 
+func MapEnum[O EnumStringOptions, T any](p Enum[O], mapped map[O]T) (ret T, err error) {
+	v, err := p.Validate()
+	if err != nil {
+		return
+	}
+	ret, ok := mapped[v]
+	if !ok {
+		allOpts := (*new(O)).Options()
+		mappedOpts := []string{}
+		for k := range mapped {
+			for _, o := range allOpts {
+				if string(k) == o {
+					mappedOpts = append(mappedOpts, o)
+				}
+			}
+		}
+		err = i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(mappedOpts, ","))
+		return
+	}
+	return
+}
+
 // SQL valuer returns a string, and only allows the possible values
 func (p Enum[O]) Value() (driver.Value, error) {
-	return p.Validate()
+	return p.MapToString()
 }
 
 // SQL scanner handles strings, bytes, and nil - where nil will be set to the default
