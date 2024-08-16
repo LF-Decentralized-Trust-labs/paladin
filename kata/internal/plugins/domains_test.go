@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -55,8 +56,8 @@ func (tp *testDomain) conf() *PluginConfig {
 	}
 }
 
-func (tp *testDomain) run(t *testing.T, ctx context.Context, id string, client pbp.PluginControllerClient) {
-	stream, err := client.ConnectDomain(ctx)
+func (tp *testDomain) run(t *testing.T, connectCtx context.Context, id string, client pbp.PluginControllerClient) {
+	stream, err := client.ConnectDomain(connectCtx)
 	assert.NoError(t, err)
 
 	err = stream.Send(&pbp.DomainMessage{
@@ -66,15 +67,16 @@ func (tp *testDomain) run(t *testing.T, ctx context.Context, id string, client p
 	})
 	assert.NoError(t, err)
 
+	ctx := stream.Context()
 	for {
 		msg, err := stream.Recv()
-		assert.NoError(t, err)
 		if err != nil {
+			log.L(ctx).Infof("exiting: %s", err)
 			return
 		}
 		if msg.MessageType == pbp.DomainMessage_REQUEST_TO_DOMAIN {
 			assert.NotEmpty(t, msg.MessageId)
-			assert.NotNil(t, msg.CorrelationId)
+			assert.Nil(t, msg.CorrelationId)
 			reply := &pbp.DomainMessage{
 				DomainId:      id,
 				MessageId:     uuid.New().String(),
@@ -154,6 +156,6 @@ func TestDomain1(t *testing.T) {
 		ChainId: int64(12345),
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "ABI1", res.DomainConfig.AbiStateSchemasJson)
+	assert.Equal(t, "ABI1", res.DomainConfig.ConstructorAbiJson)
 
 }

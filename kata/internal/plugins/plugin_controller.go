@@ -49,10 +49,12 @@ type PluginControllerArgs struct {
 }
 
 type plugin[CB any] struct {
-	name        string
-	id          uuid.UUID
-	pbDef       *pbp.PluginLoad
-	initialized bool
+	name string
+	id   uuid.UUID
+	def  *pbp.PluginLoad
+
+	initializing bool
+	initialized  bool
 }
 
 type pluginController struct {
@@ -83,16 +85,15 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		loaderID:      args.LoaderID,
 		socketAddress: args.SocketAddress,
 
-		domainManager: args.DomainManager,
-		domainPlugins: make(map[uuid.UUID]*plugin[DomainCallbacks]),
-		domainRequests: newInFlightRequests(func(dm *pbp.DomainMessage) (string, *string) {
-			return dm.MessageId, dm.CorrelationId
-		}),
+		domainManager:  args.DomainManager,
+		domainPlugins:  make(map[uuid.UUID]*plugin[DomainCallbacks]),
+		domainRequests: newInFlightRequests[*pbp.DomainMessage](),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
 		loadingProgressed:    make(chan *pbp.PluginLoadFailed, 1),
 	}
+
 	if err := pc.PluginsUpdated(args.InitialConfig); err != nil {
 		return nil, err
 	}
@@ -139,7 +140,7 @@ func (pc *pluginController) LoaderID() uuid.UUID {
 
 func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
 	for name, dp := range conf.DomainPlugins {
-		if err := initPlugin[DomainCallbacks](pc.bgCtx, pc, name, pbp.PluginInfo_DOMAIN, dp); err != nil {
+		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, pbp.PluginInfo_DOMAIN, dp); err != nil {
 			return err
 		}
 	}
@@ -152,7 +153,7 @@ func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
 
 func (pc *pluginController) WaitForInit(ctx context.Context) error {
 	for {
-		unloadedDomainPlugins := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN)
+		unloadedDomainPlugins, _ := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN, false)
 		unloadedCount := len(unloadedDomainPlugins)
 		if unloadedCount == 0 {
 			return nil
@@ -186,8 +187,7 @@ func (pc *pluginController) InitLoader(req *pbp.PluginLoaderInit, stream pbp.Plu
 	pc.pluginLoaderDone = make(chan struct{})
 	pc.mux.Unlock()
 	log.L(ctx).Infof("Plugin loader connected")
-	go pc.sendPluginsToLoader(stream)
-	return nil
+	return pc.sendPluginsToLoader(stream)
 }
 
 func (pc *pluginController) PluginLoadFailed(req *pbp.PluginLoadFailed) (*pbp.EmptyResponse, error) {
@@ -203,14 +203,14 @@ func (pc *pluginController) ConnectDomain(stream pbp.PluginController_ConnectDom
 	return pc.domainServer(stream)
 }
 
-func initPlugin[CB any](ctx context.Context, pc *pluginController, name string, pType pbp.PluginInfo_PluginType, conf *PluginConfig) (err error) {
+func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType pbp.PluginInfo_PluginType, conf *PluginConfig) (err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
-	plugin := &plugin[CB]{id: uuid.New()}
+	plugin := &plugin[CB]{id: uuid.New(), name: name}
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, name, "name"); err != nil {
 		return err
 	}
-	plugin.pbDef = &pbp.PluginLoad{
+	plugin.def = &pbp.PluginLoad{
 		Plugin: &pbp.PluginInfo{
 			Id:         plugin.id.String(),
 			Name:       name,
@@ -218,15 +218,30 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, name string, 
 		},
 		Location: conf.Location,
 	}
-	plugin.pbDef.LibType, err = types.MapEnum(conf.Type, golangToProtoLibTypeMap)
+	plugin.def.LibType, err = types.MapEnum(conf.Type, golangToProtoLibTypeMap)
+	pluginMap[plugin.id] = plugin
 	return err
 }
 
-func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType pbp.PluginInfo_PluginType) (unloaded []*plugin[CB]) {
+func (p *plugin[CB]) registered(pc *pluginController) {
+	log.L(pc.bgCtx).Errorf("Plugin load %s (type=%s) completed", p.def.Plugin, p.def.Plugin.PluginType)
+	select {
+	case pc.loadingProgressed <- nil:
+	default:
+	}
+}
+
+func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType pbp.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	for _, plugin := range pluginMap {
 		if !plugin.initialized {
+			if !plugin.initializing {
+				notInitializing = append(notInitializing, plugin)
+				if setInitializing {
+					plugin.initializing = true
+				}
+			}
 			unloaded = append(unloaded, plugin)
 		}
 	}
@@ -235,7 +250,7 @@ func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plug
 	} else {
 		log.L(pc.bgCtx).Infof("All plugins loaded")
 	}
-	return unloaded
+	return unloaded, notInitializing
 }
 
 func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType pbp.PluginInfo_PluginType, setInitialized bool) (*plugin[CB], error) {
@@ -258,7 +273,7 @@ func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*
 	return p, nil
 }
 
-func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_InitLoaderServer) {
+func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_InitLoaderServer) error {
 	defer func() {
 		pc.mux.Lock()
 		defer pc.mux.Unlock()
@@ -270,16 +285,17 @@ func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_Init
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
-		for _, plugin := range unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN) {
-			if err := stream.Send(plugin.pbDef); err != nil {
-				log.L(ctx).Debugf("loader stream send failed")
-				return
+		_, notInitializing := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN, true)
+		for _, plugin := range notInitializing {
+			if err := stream.Send(plugin.def); err != nil {
+				log.L(ctx).Errorf("loader stream send failed: %s", err)
+				return err
 			}
 		}
 		select {
 		case <-ctx.Done():
 			log.L(ctx).Debugf("loader stream closed")
-			return
+			return i18n.NewError(ctx, msgs.MsgContextCanceled)
 		case <-pc.notifyPluginsUpdated:
 			// loop and load any that need loading
 		}
@@ -328,6 +344,8 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			domainName = plugin.name
 			// The handler starts and owns the sending routine
 			handler = pc.newDomainHandler(plugin, stream)
+			// Notify the controller this plugin is registered
+			plugin.registered(pc)
 		case pbp.DomainMessage_RESPONSE_FROM_DOMAIN,
 			pbp.DomainMessage_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel

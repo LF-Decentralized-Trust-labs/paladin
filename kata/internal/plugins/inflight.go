@@ -22,13 +22,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	pb "google.golang.org/protobuf/proto"
 )
 
 type inflightManager[T any] struct {
-	getMsgAndCorrelIDs func(T) (string, *string)
-	lock               sync.Mutex
-	requests           map[uuid.UUID]*inflightRequest[T]
+	lock     sync.Mutex
+	requests map[uuid.UUID]*inflightRequest[T]
 }
 
 type inflightRequest[T any] struct {
@@ -38,22 +36,19 @@ type inflightRequest[T any] struct {
 	done   chan T
 }
 
-func newInFlightRequests[T any](getMsgAndCorrelIDs func(T) (string, *string)) *inflightManager[T] {
+func newInFlightRequests[T any]() *inflightManager[T] {
 	return &inflightManager[T]{
-		getMsgAndCorrelIDs: getMsgAndCorrelIDs,
-		requests:           make(map[uuid.UUID]*inflightRequest[T]),
+		requests: make(map[uuid.UUID]*inflightRequest[T]),
 	}
 }
 
-func (ifm *inflightManager[T]) addInflight(ctx context.Context, msg pb.Message) *inflightRequest[T] {
-	id := uuid.New()
+func (ifm *inflightManager[T]) addInflight(id uuid.UUID) *inflightRequest[T] {
 	inFlight := &inflightRequest[T]{
 		ifm:    ifm,
-		id:     uuid.New(),
+		id:     id,
 		queued: time.Now(),
 		done:   make(chan T, 1),
 	}
-	log.L(ctx).Infof("--> %s [%s]", id, msg.ProtoReflect().Descriptor().FullName())
 	ifm.lock.Lock()
 	defer ifm.lock.Unlock()
 	ifm.requests[id] = inFlight
@@ -77,10 +72,8 @@ func (ifm *inflightManager[T]) getInflight(ctx context.Context, correlID *string
 func (ifm *inflightManager[T]) waitInFlight(ctx context.Context, inFlight *inflightRequest[T]) (T, error) {
 	select {
 	case <-ctx.Done():
-		log.L(ctx).Errorf("<!- %s", inFlight.id)
 		return *new(T), fmt.Errorf("timeout")
 	case reply := <-inFlight.done:
-		log.L(ctx).Infof("<-- %s", inFlight.id)
 		return reply, nil
 	}
 }

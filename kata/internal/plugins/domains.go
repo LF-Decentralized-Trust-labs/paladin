@@ -18,13 +18,13 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
-	pb "google.golang.org/protobuf/proto"
 )
 
 type DomainManager interface {
@@ -55,8 +55,9 @@ type domainHandler struct {
 
 func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], sendStream pbp.PluginController_ConnectDomainServer) *domainHandler {
 	dh := &domainHandler{
-		pc:   pc,
-		send: make(chan *pbp.DomainMessage),
+		pc:     pc,
+		plugin: plugin,
+		send:   make(chan *pbp.DomainMessage),
 	}
 	dh.callbacks = pc.domainManager.DomainRegistered(plugin.name, plugin.id, dh)
 	go dh.sender(sendStream)
@@ -201,27 +202,29 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 	setReqBody func(*pbp.DomainMessage),
 	getResBody func(*pbp.DomainMessage) bool,
 ) error {
+	msgID := uuid.New()
 	req := &pbp.DomainMessage{
 		DomainId:    dh.plugin.id.String(),
-		MessageId:   uuid.New().String(),
+		MessageId:   msgID.String(),
 		MessageType: pbp.DomainMessage_REQUEST_TO_DOMAIN,
 	}
 	setReqBody(req)
-	inflight := dh.pc.domainRequests.addInflight(ctx, req)
+	inflight := dh.pc.domainRequests.addInflight(msgID)
 	defer inflight.cancel()
 
-	log.L(ctx).Infof("DOMAIN(%s)[%s] => %s", dh.plugin.name, req.MessageId, req.RequestToDomain.(pb.Message).ProtoReflect().Descriptor().FullName())
+	startTime := time.Now()
+	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestToDomain)
 
 	select {
 	case dh.send <- req:
 	case <-ctx.Done():
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (SEND)", dh.plugin.name, req.MessageId)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (SEND) [%s]", dh.plugin.name, req.MessageId, time.Since(startTime))
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
 
 	res, err := inflight.wait(ctx)
 	if err != nil {
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (RECEIVE): %s", dh.plugin.name, req.MessageId, err)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (RECEIVE) [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
 		return err
 	}
 	responseOk := getResBody(res)
@@ -234,11 +237,11 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 			// We got something unexpected - log whatever we've got in full
 			errorMessage = jsonProto(res)
 		}
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR: %s", dh.plugin.name, req.MessageId, errorMessage)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
 		return err
 	}
 
-	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %s", dh.plugin.name, req.MessageId, res.ResponseFromDomain.(pb.Message).ProtoReflect().Descriptor().FullName())
+	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.MessageId, res.ResponseFromDomain, time.Since(startTime))
 	return nil
 }
 

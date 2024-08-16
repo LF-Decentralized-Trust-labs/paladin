@@ -16,12 +16,16 @@ package plugins
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path"
+	"runtime/debug"
 	"sync"
 	"testing"
 
 	"github.com/alecthomas/assert/v2"
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -57,7 +61,10 @@ func (tpl *testPluginLoader) run(t *testing.T, ctx context.Context, socketAddres
 
 	for {
 		msg, err := loaderStream.Recv()
-		assert.NoError(t, err)
+		if err != nil {
+			log.L(ctx).Infof("loader stream closed: %s", err)
+			return
+		}
 		tp := tpl.plugins[msg.Plugin.Name]
 		if tp != nil {
 			wg.Add(1)
@@ -105,6 +112,11 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 	assert.NoError(t, err)
 
 	return ctx, pc.(*pluginController), func() {
+		recovered := recover()
+		if recovered != nil {
+			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
+			panic(recovered)
+		}
 		cancelCtx()
 		pc.Stop(ctx)
 		<-tpl.done
