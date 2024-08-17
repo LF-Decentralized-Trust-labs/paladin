@@ -230,7 +230,6 @@ func TestDomainRequestsOK(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	domainAPI := <-waitForRegister
 
@@ -244,6 +243,9 @@ func TestDomainRequestsOK(t *testing.T) {
 		DomainUuid: domainID,
 	})
 	assert.NoError(t, err)
+
+	// Should not be initialized
+	assert.NoError(t, pc.WaitForInit(ctx))
 
 	idr, err := domainAPI.InitDeploy(ctx, &pbp.InitDeployRequest{
 		Transaction: &pbp.DeployTransactionSpecification{
@@ -309,7 +311,7 @@ func TestFromDomainRequestsOK(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			sendRequest: func(domainID string) *pbp.DomainMessage {
 				return &pbp.DomainMessage{
@@ -332,7 +334,6 @@ func TestFromDomainRequestsOK(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	<-waitForResponse
 
@@ -349,7 +350,7 @@ func TestFromDomainRequestsError(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			sendRequest: func(domainID string) *pbp.DomainMessage {
 				return &pbp.DomainMessage{
@@ -371,7 +372,6 @@ func TestFromDomainRequestsError(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	<-waitForResponse
 
@@ -388,7 +388,7 @@ func TestFromDomainRequestPanic(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			sendRequest: func(domainID string) *pbp.DomainMessage {
 				return &pbp.DomainMessage{
@@ -410,7 +410,6 @@ func TestFromDomainRequestPanic(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	<-waitForResponse
 
@@ -424,7 +423,7 @@ func TestFromDomainRequestBadRequest(t *testing.T) {
 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainAPI) (fromDomain DomainCallbacks) { return tdm }
 
 	msgID := uuid.NewString()
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			sendRequest: func(domainID string) *pbp.DomainMessage {
 				return &pbp.DomainMessage{
@@ -442,7 +441,6 @@ func TestFromDomainRequestBadRequest(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	<-waitForResponse
 
@@ -458,7 +456,7 @@ func TestDomainRequestsFail(t *testing.T) {
 		return tdm
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			customResponses: func(req *pbp.DomainMessage) []*pbp.DomainMessage {
 				return []*pbp.DomainMessage{
@@ -474,7 +472,6 @@ func TestDomainRequestsFail(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	domainAPI := <-waitForRegister
 
@@ -493,7 +490,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 		return tdm
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			customResponses: func(req *pbp.DomainMessage) []*pbp.DomainMessage {
 				return []*pbp.DomainMessage{
@@ -507,7 +504,6 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	domainAPI := <-waitForRegister
 
@@ -614,11 +610,11 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 
 func TestDomainSendDoubleRegister(t *testing.T) {
 
-	waitForRegister := make(chan uuid.UUID, 1)
+	waitForRegister := make(chan DomainAPI, 1)
 
 	tdm := &testDomainManager{}
 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainAPI) (fromDomain DomainCallbacks) {
-		waitForRegister <- id
+		waitForRegister <- toDomain
 		return tdm
 	}
 
@@ -636,6 +632,7 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 	defer done()
 
 	<-waitForRegister
+
 }
 
 func TestDomainRegisterWrongID(t *testing.T) {
@@ -652,7 +649,7 @@ func TestDomainRegisterWrongID(t *testing.T) {
 			preRegister: func(domainID string) *pbp.DomainMessage {
 				return &pbp.DomainMessage{
 					MessageType: pbp.DomainMessage_REGISTER,
-					DomainId:    "wrong",
+					DomainId:    uuid.NewString(), // unknown to registry
 					MessageId:   uuid.NewString(),
 				}
 			},
@@ -676,7 +673,7 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 		return tdm
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
 		"domain1": {
 			customResponses: func(req *pbp.DomainMessage) []*pbp.DomainMessage {
 				unknownRequest := uuid.NewString()
@@ -709,7 +706,6 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 		},
 	})
 	defer done()
-	assert.NoError(t, pc.WaitForInit(ctx))
 
 	domainAPI := <-waitForRegister
 	atr, err := domainAPI.AssembleTransaction(ctx, &pbp.AssembleTransactionRequest{

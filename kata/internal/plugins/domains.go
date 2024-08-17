@@ -62,15 +62,18 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 	ctx := stream.Context()
 	var plugin *plugin[DomainCallbacks]
 	defer func() {
-		// If we got to the point we've initialized, then we're uninitialized when we return
+		// If we got to the point we've initialized, then we're unregistered & uninitialized when we return
 		if plugin != nil {
 			pc.mux.Lock()
+			plugin.registered = false
 			plugin.initialized = false
 			pc.mux.Unlock()
 			if plugin.handler != nil {
 				plugin.handler.close()
 			}
 		}
+		// Notify as we might need re-initialization
+		pc.tapLoadingProgressed()
 	}()
 	domainName := "UNINITIALIZED"
 	// We are the receiving routine for the gRPC stream (we do NOT send)
@@ -90,7 +93,7 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
 				continue
 			}
-			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN, true)
+			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN)
 			if err != nil {
 				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.DomainId)
 				// Close the connection to this plugin
@@ -100,8 +103,6 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			domainName = plugin.name
 			// The handler starts and owns the sending routine (we only use it on this routine, so no locking on this line)
 			plugin.handler = pc.newDomainHandler(plugin, stream)
-			// Notify the controller this plugin is registered
-			plugin.registered(pc)
 		case pbp.DomainMessage_RESPONSE_FROM_DOMAIN,
 			pbp.DomainMessage_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel
@@ -160,6 +161,10 @@ func (dh *domainHandler) InitDomain(ctx context.Context, req *pbp.InitDomainRequ
 			return res != nil
 		},
 	)
+	if err == nil {
+		// At this point the plugin is initialized
+		dh.plugin.notifyInitialized()
+	}
 	return
 }
 

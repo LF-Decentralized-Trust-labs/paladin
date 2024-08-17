@@ -145,7 +145,6 @@ var (
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
 	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
 	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
-	MsgPluginAlreadyLoaded     = ffe("PD011203", "%s %s with UUID %s already loaded")
 	MsgPluginInvalidResponse   = ffe("PD011204", "%s %s returned error: %s")
 	MsgPluginInvalidRequest    = ffe("PD011205", "%s %s sent invalid request: %T")
 

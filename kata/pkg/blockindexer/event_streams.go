@@ -101,6 +101,9 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 		def = &EventStream{}
 	}
 
+	// This will need to open up when we have more externally consumable event streams
+	def.Type = EventStreamTypeInternal.Enum()
+
 	// Validate the name
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
 		return nil, err

@@ -47,7 +47,6 @@ func (est EventStreamType) Options() []string {
 		string(EventStreamTypeInternal),
 	}
 }
-func (est EventStreamType) Default() string { return string(EventStreamTypeInternal) }
 func (est EventStreamType) Enum() types.Enum[EventStreamType] {
 	return types.Enum[EventStreamType](est)
 }

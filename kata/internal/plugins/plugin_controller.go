@@ -18,10 +18,12 @@ import (
 	"context"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -49,11 +51,13 @@ type PluginControllerArgs struct {
 }
 
 type plugin[CB any] struct {
+	pc   *pluginController
 	name string
 	id   uuid.UUID
 	def  *pbp.PluginLoad
 
 	initializing bool
+	registered   bool
 	initialized  bool
 	handler      *domainHandler
 }
@@ -65,9 +69,10 @@ type pluginController struct {
 	listener net.Listener
 	server   *grpc.Server
 
-	loaderID      uuid.UUID
-	socketAddress string
-	domainManager DomainManager
+	loaderID        uuid.UUID
+	socketAddress   string
+	domainManager   DomainManager
+	shutdownTimeout time.Duration
 
 	domainPlugins  map[uuid.UUID]*plugin[DomainCallbacks]
 	domainRequests *inflightManager[*pbp.DomainMessage]
@@ -83,8 +88,9 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 	pc := &pluginController{
 		bgCtx: bgCtx,
 
-		loaderID:      args.LoaderID,
-		socketAddress: args.SocketAddress,
+		loaderID:        args.LoaderID,
+		socketAddress:   args.SocketAddress,
+		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
 		domainManager:  args.DomainManager,
 		domainPlugins:  make(map[uuid.UUID]*plugin[DomainCallbacks]),
@@ -125,7 +131,16 @@ func (pc *pluginController) Run(ctx context.Context) error {
 func (pc *pluginController) Stop(ctx context.Context) {
 	log.L(ctx).Infof("Stop")
 
-	pc.server.GracefulStop()
+	gracefullyStopped := make(chan struct{})
+	go func() {
+		defer close(gracefullyStopped)
+		pc.server.GracefulStop()
+	}()
+	select {
+	case <-gracefullyStopped:
+	case <-time.After(pc.shutdownTimeout):
+		pc.server.Stop()
+	}
 	serverErr := <-pc.serverDone
 	log.L(ctx).Infof("Server stopped (err=%v)", serverErr)
 
@@ -140,7 +155,7 @@ func (pc *pluginController) LoaderID() uuid.UUID {
 }
 
 func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
-	for name, dp := range conf.DomainPlugins {
+	for name, dp := range conf.Domains {
 		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, pbp.PluginInfo_DOMAIN, dp); err != nil {
 			return err
 		}
@@ -183,6 +198,7 @@ func (pc *pluginController) InitLoader(req *pbp.PluginLoaderInit, stream pbp.Plu
 	}
 	pc.mux.Lock()
 	if pc.pluginLoaderDone != nil {
+		pc.mux.Unlock()
 		return i18n.WrapError(ctx, err, msgs.MsgPluginLoaderAlreadyInit)
 	}
 	pc.pluginLoaderDone = make(chan struct{})
@@ -191,8 +207,8 @@ func (pc *pluginController) InitLoader(req *pbp.PluginLoaderInit, stream pbp.Plu
 	return pc.sendPluginsToLoader(stream)
 }
 
-func (pc *pluginController) PluginLoadFailed(req *pbp.PluginLoadFailed) (*pbp.EmptyResponse, error) {
-	log.L(pc.bgCtx).Errorf("Plugin load %s (type=%s) failed: %s", req.Plugin.Name, req.Plugin.PluginType, req.ErrorMessage)
+func (pc *pluginController) LoadFailed(ctx context.Context, req *pbp.PluginLoadFailed) (*pbp.EmptyResponse, error) {
+	log.L(ctx).Errorf("Plugin load %s (type=%s) failed: %s", req.Plugin.Name, req.Plugin.PluginType, req.ErrorMessage)
 	select {
 	case pc.loadingProgressed <- req:
 	default:
@@ -207,7 +223,7 @@ func (pc *pluginController) ConnectDomain(stream pbp.PluginController_ConnectDom
 func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType pbp.PluginInfo_PluginType, conf *PluginConfig) (err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
-	plugin := &plugin[CB]{id: uuid.New(), name: name}
+	plugin := &plugin[CB]{pc: pc, id: uuid.New(), name: name}
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, name, "name"); err != nil {
 		return err
 	}
@@ -224,8 +240,15 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map
 	return err
 }
 
-func (p *plugin[CB]) registered(pc *pluginController) {
-	log.L(pc.bgCtx).Errorf("Plugin load %s (type=%s) completed", p.def.Plugin, p.def.Plugin.PluginType)
+func (p *plugin[CB]) notifyInitialized() {
+	p.pc.mux.Lock()
+	p.initialized = true
+	p.pc.mux.Unlock()
+	log.L(p.pc.bgCtx).Errorf("Plugin load %s (type=%s) completed", p.def.Plugin, p.def.Plugin.PluginType)
+	p.pc.tapLoadingProgressed()
+}
+
+func (pc *pluginController) tapLoadingProgressed() {
 	select {
 	case pc.loadingProgressed <- nil:
 	default:
@@ -254,27 +277,20 @@ func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plug
 	return unloaded, notInitializing
 }
 
-func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType pbp.PluginInfo_PluginType, setInitialized bool) (*plugin[CB], error) {
+func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType pbp.PluginInfo_PluginType) (p *plugin[CB], err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	id, err := uuid.Parse(idStr)
-	if err != nil {
-		return nil, err
-	}
-	p, found := pluginMap[id]
-	if !found {
-		return nil, i18n.NewError(pc.bgCtx, msgs.MsgPluginUUIDNotFound, pbType, id)
-	}
-	if setInitialized {
-		if p.initialized {
-			return nil, i18n.NewError(pc.bgCtx, msgs.MsgPluginAlreadyLoaded, pbType, p.name, id)
+	if err == nil {
+		p = pluginMap[id]
+		if p == nil {
+			err = i18n.NewError(pc.bgCtx, msgs.MsgPluginUUIDNotFound, pbType, id)
 		}
-		p.initialized = true
 	}
-	return p, nil
+	return p, err
 }
 
-func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_InitLoaderServer) error {
+func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_InitLoaderServer) (err error) {
 	defer func() {
 		pc.mux.Lock()
 		defer pc.mux.Unlock()
@@ -282,23 +298,26 @@ func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_Init
 		pc.pluginLoaderDone = nil
 	}()
 	ctx := stream.Context()
-
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
 		_, notInitializing := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN, true)
 		for _, plugin := range notInitializing {
-			if err := stream.Send(plugin.def); err != nil {
-				log.L(ctx).Errorf("loader stream send failed: %s", err)
-				return err
+			if err == nil {
+				err = stream.Send(plugin.def)
 			}
 		}
-		select {
-		case <-ctx.Done():
-			log.L(ctx).Debugf("loader stream closed")
-			return i18n.NewError(ctx, msgs.MsgContextCanceled)
-		case <-pc.notifyPluginsUpdated:
-			// loop and load any that need loading
+		if err == nil {
+			select {
+			case <-ctx.Done():
+				log.L(ctx).Debugf("loader stream closed")
+				err = i18n.NewError(ctx, msgs.MsgContextCanceled)
+			case <-pc.notifyPluginsUpdated:
+				// loop and load any that need loading
+			}
+		}
+		if err != nil {
+			return err
 		}
 	}
 }

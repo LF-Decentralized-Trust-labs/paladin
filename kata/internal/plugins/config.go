@@ -15,12 +15,22 @@
 package plugins
 
 import (
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type PluginControllerConfig struct {
-	DomainPlugins map[string]*PluginConfig
+	GRPC    GRPCConfig               `yaml:"grpc"`
+	Domains map[string]*PluginConfig `yaml:"domains"`
+}
+
+type GRPCConfig struct {
+	ShutdownTimeout *string `yaml:"shutdownTimeout"`
+}
+
+var DefaultGRPCConfig = &GRPCConfig{
+	ShutdownTimeout: confutil.P("10s"),
 }
 
 type LibraryType string
@@ -30,8 +40,8 @@ const (
 	LibraryTypeJar     LibraryType = "jar"
 )
 
-func (pl LibraryType) Default() string {
-	return string(LibraryTypeCShared)
+func (lt LibraryType) Enum() types.Enum[LibraryType] {
+	return types.Enum[LibraryType](lt)
 }
 
 func (pl LibraryType) Options() []string {

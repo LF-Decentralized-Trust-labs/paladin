@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -85,12 +86,15 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
 		InitialConfig: &PluginControllerConfig{
-			DomainPlugins: make(map[string]*PluginConfig),
+			GRPC: GRPCConfig{
+				ShutdownTimeout: confutil.P("1ms"),
+			},
+			Domains: make(map[string]*PluginConfig),
 		},
 	}
 	testPlugins := make(map[string]testPlugin)
 	for name, td := range testDomains {
-		args.InitialConfig.DomainPlugins[name] = td.conf()
+		args.InitialConfig.Domains[name] = td.conf()
 		testPlugins[name] = td
 	}
 
@@ -119,4 +123,160 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 		<-tpl.done
 	}
 
+}
+
+func TestInitPluginControllerBadPlugin(t *testing.T) {
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			Domains: map[string]*PluginConfig{
+				"!badname": {},
+			},
+		},
+	}
+	_, err := NewPluginController(context.Background(), args)
+	assert.Regexp(t, "PD011106", err)
+}
+
+func TestInitPluginControllerBadSocket(t *testing.T) {
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		SocketAddress: t.TempDir(), // can't use a dir as a socket
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{},
+	}
+	_, err := NewPluginController(context.Background(), args)
+	assert.Regexp(t, "bind", err)
+}
+
+func TestNotifyPluginUpdateNotStarted(t *testing.T) {
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+
+	err = pc.WaitForInit(context.Background())
+	assert.NoError(t, err)
+
+	err = pc.PluginsUpdated(&PluginControllerConfig{})
+	assert.NoError(t, err)
+	err = pc.PluginsUpdated(&PluginControllerConfig{})
+	assert.NoError(t, err)
+}
+
+func TestInflightHandleBadCorrelIDs(t *testing.T) {
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+
+	inFlight := pc.(*pluginController).domainRequests
+	assert.Nil(t, inFlight.getInflight(context.Background(), nil))
+	assert.Nil(t, inFlight.getInflight(context.Background(), confutil.P("wrong")))
+}
+
+func TestLoaderErrors(t *testing.T) {
+	ctx := context.Background()
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{
+				ShutdownTimeout: confutil.P("1ms"),
+			},
+			Domains: map[string]*PluginConfig{
+				"domain1": {
+					Type:     LibraryTypeJar.Enum(),
+					Location: "some/where",
+				},
+			},
+		},
+	}
+	pc, err := NewPluginController(ctx, args)
+	assert.NoError(t, err)
+
+	conn, err := grpc.NewClient("unix:"+pc.SocketAddress(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NoError(t, err)
+	defer conn.Close() // will close all the child conns too
+
+	client := pbp.NewPluginControllerClient(conn)
+
+	go func() {
+		err := pc.Run(ctx)
+		assert.NoError(t, err)
+	}()
+
+	// first load with wrong ID
+	wrongLoader, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+		Id: uuid.NewString(),
+	})
+	assert.NoError(t, err)
+	_, err = wrongLoader.Recv()
+	assert.Regexp(t, "PD011200", err)
+
+	// then load correctly
+	loaderStream, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+		Id: pc.LoaderID().String(),
+	})
+	assert.NoError(t, err)
+
+	loadReq, err := loaderStream.Recv()
+	assert.NoError(t, err)
+
+	_, err = client.LoadFailed(ctx, &pbp.PluginLoadFailed{
+		Plugin:       loadReq.Plugin,
+		ErrorMessage: "pop",
+	})
+	assert.NoError(t, err)
+
+	// We should be notified of the error if we were waiting
+	err = pc.WaitForInit(ctx)
+	assert.Regexp(t, "pop", err)
+
+	// then attempt double start of the loader
+	dupLoader, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+		Id: pc.LoaderID().String(),
+	})
+	assert.NoError(t, err)
+	_, err = dupLoader.Recv()
+	assert.Regexp(t, "PD011201", err)
+
+	// If we come back, we won't be (only one caller of WaitForInit supported)
+	// - check it times out context not an error on load
+	cancelled, cancelCtx := context.WithCancel(context.Background())
+	cancelCtx()
+	err = pc.WaitForInit(cancelled)
+	assert.Regexp(t, "PD010301", err)
+
+	err = loaderStream.CloseSend()
+	assert.NoError(t, err)
+
+	// Notify of a plugin after closed stream
+	err = pc.PluginsUpdated(&PluginControllerConfig{
+		Domains: map[string]*PluginConfig{
+			"domain2": {
+				Type:     LibraryTypeCShared.Enum(),
+				Location: "some/where/else",
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	pc.Stop(ctx)
+
+	// Also check we don't block on the LoadFailed notification if the channel gets full (which it will after stop)
+	for i := 0; i < 3; i++ {
+		_, _ = pc.(*pluginController).LoadFailed(context.Background(), &pbp.PluginLoadFailed{Plugin: &pbp.PluginInfo{}})
+	}
 }

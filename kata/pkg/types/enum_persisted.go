@@ -27,8 +27,11 @@ import (
 
 type EnumStringOptions interface {
 	~string
-	Default() string
 	Options() []string
+}
+
+type EnumStringDefault interface {
+	Default() string
 }
 
 // Enum is a persistence wrapper for an enum with a set of options
@@ -48,8 +51,10 @@ func (p Enum[O]) MapToString() (string, error) {
 func (p Enum[O]) Validate() (O, error) {
 	validator := (*new(O))
 	if p == "" {
-		if validator.Default() != "" {
-			return O(validator.Default()), nil
+		var iVal any = validator
+		enumDefault, ok := iVal.(EnumStringDefault)
+		if ok {
+			return O(enumDefault.Default()), nil
 		}
 	}
 	for _, o := range validator.Options() {
