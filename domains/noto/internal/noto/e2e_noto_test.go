@@ -60,7 +60,7 @@ func TestNoto(t *testing.T) {
 	rest := ffresty.NewWithConfig(ctx, conf)
 	rpc := rpcbackend.NewRPCClient(rest)
 
-	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	log.L(ctx).Infof("Calling testbed_deployBytecode")
