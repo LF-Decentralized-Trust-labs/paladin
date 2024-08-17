@@ -271,9 +271,12 @@ abstract class ComponentTest extends Exec {
             def composeLogs = getProject().findProperty('composeLogs');
             if (execResult.getExitValue() != 0) {
                 if (composeLogs == "true") {
+                    // TODO: can we use DockerCompose.dumpLogs() here?
                     println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
-                    println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
-                    println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-postgres-1"
+                        .execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-besu-1"
+                        .execute().waitForProcessOutput(System.err,System.err)
                 }
                 execResult.assertNormalExitValue();
             }
@@ -296,17 +299,23 @@ task setupCoverage(dependsOn: protoc) {
 task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [setupCoverage, goGet, ':testinfra:startTestInfra']) {
+task unitTestPostgres(type: UnitTests) {
+    dependsOn [
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+    ]
     args '-tags', "testdbpostgres"
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [
-    ':testinfra:startTestInfra',
-    setupCoverage,
-    goGet,
-    copyTestContracts,
-    copyTestbedContracts,
-    ]) {
+task componentTestSQLite(type: ComponentTest) {
+    dependsOn [
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+        copyTestContracts,
+        copyTestbedContracts,
+    ]
 }
 
 
