@@ -47,11 +47,13 @@ type DomainCallbacks interface {
 }
 
 type domainHandler struct {
+	ctx        context.Context
+	cancelCtx  context.CancelFunc
 	pc         *pluginController
 	plugin     *plugin[DomainCallbacks]
 	callbacks  DomainCallbacks
 	sendStream pbp.PluginController_ConnectDomainServer
-	send       chan *pbp.DomainMessage
+	sendChl    chan *pbp.DomainMessage
 	senderDone chan struct{}
 }
 
@@ -65,9 +67,9 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			pc.mux.Lock()
 			plugin.initialized = false
 			pc.mux.Unlock()
-		}
-		if plugin.handler != nil {
-			plugin.handler.close()
+			if plugin.handler != nil {
+				plugin.handler.close()
+			}
 		}
 	}()
 	domainName := "UNINITIALIZED"
@@ -90,6 +92,8 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			}
 			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN, true)
 			if err != nil {
+				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.DomainId)
+				// Close the connection to this plugin
 				return err
 			}
 			// We now have the plugin ready for use
@@ -119,10 +123,11 @@ func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], se
 	dh := &domainHandler{
 		pc:         pc,
 		plugin:     plugin,
-		send:       make(chan *pbp.DomainMessage),
+		sendChl:    make(chan *pbp.DomainMessage),
 		senderDone: make(chan struct{}),
 		sendStream: sendStream,
 	}
+	dh.ctx, dh.cancelCtx = context.WithCancel(log.WithLogField(pc.bgCtx, "domain_handler", plugin.name))
 	dh.callbacks = pc.domainManager.DomainRegistered(plugin.name, plugin.id, dh)
 	go dh.sender()
 	return dh
@@ -250,17 +255,32 @@ func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *pbp.Prepar
 
 func (dh *domainHandler) sender() {
 	defer close(dh.senderDone)
-	for msg := range dh.send {
+	for {
+		var msg *pbp.DomainMessage
+		select {
+		case msg = <-dh.sendChl:
+		case <-dh.ctx.Done():
+			log.L(dh.ctx).Debugf("domain handler ending")
+			return
+		}
 		if err := dh.sendStream.Send(msg); err != nil {
 			// gRPC promises to abort the stream is this case, so just log and return
-			log.L(context.Background()).Errorf("domain %s stream send error: %s", dh.plugin.name, err)
+			log.L(dh.ctx).Errorf("domain %s stream send error: %s", dh.plugin.name, err)
 			return
 		}
 	}
 }
 
+// returns once send is dispatched to sendChl, or context is cancelled
+func (dh *domainHandler) send(ctx context.Context, msg *pbp.DomainMessage) {
+	select {
+	case dh.sendChl <- msg:
+	case <-ctx.Done():
+	}
+}
+
 func (dh *domainHandler) close() {
-	close(dh.send)
+	dh.cancelCtx()
 	<-dh.senderDone
 }
 
@@ -282,10 +302,7 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 	startTime := time.Now()
 	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestToDomain)
 
-	select {
-	case dh.send <- req:
-	case <-ctx.Done(): // we'll catch this below in the wait
-	}
+	dh.send(ctx, req)
 	res, err := inflight.wait(ctx)
 	if err != nil {
 		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
@@ -316,6 +333,7 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainM
 		CorrelationId: &req.MessageId,
 		MessageType:   pbp.DomainMessage_RESPONSE_TO_DOMAIN,
 	}
+	startTime := time.Now()
 	var err error
 	defer func() {
 		var errorMessage string
@@ -330,9 +348,13 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainM
 			reply.MessageType = pbp.DomainMessage_ERROR_RESPONSE
 			reply.ErrorMessage = &errorMessage
 			reply.ResponseToDomain = nil
+			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
+		} else {
+			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.MessageId, reply.ResponseToDomain, time.Since(startTime))
 		}
-
+		dh.send(ctx, reply)
 	}()
+	log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestFromDomain)
 	switch msg := req.RequestFromDomain.(type) {
 	case *pbp.DomainMessage_FindAvailableStates:
 		var res *pbp.FindAvailableStatesResponse
@@ -343,6 +365,7 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainM
 			}
 		}
 	default:
+		err = i18n.NewError(ctx, msgs.MsgPluginInvalidRequest, dh.plugin.def.Plugin.PluginType, dh.plugin.name, req.RequestFromDomain)
 	}
 
 }

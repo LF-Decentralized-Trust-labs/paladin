@@ -108,9 +108,6 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 		assert.NoError(t, err)
 	}()
 
-	err = pc.WaitForInit(ctx)
-	assert.NoError(t, err)
-
 	return ctx, pc.(*pluginController), func() {
 		recovered := recover()
 		if recovered != nil {
