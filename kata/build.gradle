@@ -144,10 +144,6 @@ task toolkitProtoBindings(type:Exec) {
     args fileTree(configurations.toolkitProtoDefinitions.asPath) {
         include "*.proto"
     }
-
-    doFirst {
-      println commandLine.join(" ")
-    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
