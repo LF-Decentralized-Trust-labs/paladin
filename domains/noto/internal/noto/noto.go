@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -279,6 +280,63 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				ParamsJson:   `{"txId": "` + m.Transaction.TransactionId + `", "notary": "` + params.Notary + `"}`,
 			},
 			SigningAddress: params.Notary,
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.InitTransactionRequest:
+		log.L(ctx).Infof("Received InitTransactionRequest")
+
+		response := &pb.InitTransactionResponse{
+			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.AssembleTransactionRequest:
+		log.L(ctx).Infof("Received AssembleTransactionRequest")
+
+		response := &pb.AssembleTransactionResponse{
+			AssemblyResult:       pb.AssembleTransactionResponse_OK,
+			AssembledTransaction: &pb.AssembledTransaction{},
+			AttestationPlan: []*pb.AttestationRequest{
+				{
+					Name:            "signer",
+					AttestationType: pb.AttestationType_ENDORSE,
+					Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Parties:         []string{"notary1"},
+				},
+			},
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.EndorseTransactionRequest:
+		log.L(ctx).Infof("Received EndorseTransactionRequest")
+
+		response := &pb.EndorseTransactionResponse{
+			EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
+		}
+		if err := d.sendReply(ctx, message, response); err != nil {
+			return err
+		}
+
+	case *pb.PrepareTransactionRequest:
+		log.L(ctx).Infof("Received PrepareTransactionRequest")
+
+		response := &pb.PrepareTransactionResponse{
+			Transaction: &pb.BaseLedgerTransaction{
+				FunctionName: "transfer",
+				ParamsJson: `{
+					"inputs": [],
+					"outputs": [],
+					"signature": "0x",
+					"data": "0x"
+				}`,
+			},
 		}
 		if err := d.sendReply(ctx, message, response); err != nil {
 			return err

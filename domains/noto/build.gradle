@@ -44,6 +44,7 @@ task copySolidity(type: Copy) {
 }
 
 task startTestbed(type: DockerCompose) {
+    dependsOn ':testinfra:besuBootstrapTool' // TODO fix?
     composeFile '../../testinfra/docker-compose-test.yml'
     composeFile 'docker-compose-test.yml'
     projectName 'paladin-noto'
