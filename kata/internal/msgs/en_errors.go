@@ -145,7 +145,8 @@ var (
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
 	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
 	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
-	MsgPluginAlreadyLoaded     = ffe("PD011203", "Plugin %s of type %s with UUID %s already loaded")
+	MsgPluginAlreadyLoaded     = ffe("PD011203", "%s %s with UUID %s already loaded")
+	MsgPluginInvalidResponse   = ffe("PD011204", "%s %s returned error: %s")
 
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")

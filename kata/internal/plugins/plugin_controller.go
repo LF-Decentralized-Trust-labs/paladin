@@ -55,6 +55,7 @@ type plugin[CB any] struct {
 
 	initializing bool
 	initialized  bool
+	handler      *domainHandler
 }
 
 type pluginController struct {
@@ -266,7 +267,7 @@ func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*
 	}
 	if setInitialized {
 		if p.initialized {
-			return nil, i18n.NewError(pc.bgCtx, msgs.MsgPluginAlreadyLoaded, p.name, pbType, id)
+			return nil, i18n.NewError(pc.bgCtx, msgs.MsgPluginAlreadyLoaded, pbType, p.name, id)
 		}
 		p.initialized = true
 	}
@@ -299,67 +300,6 @@ func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_Init
 		case <-pc.notifyPluginsUpdated:
 			// loop and load any that need loading
 		}
-	}
-}
-
-// Domains connect over this channel, and must announce themselves with their ID to complete the load
-func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDomainServer) error {
-	ctx := stream.Context()
-	var plugin *plugin[DomainCallbacks]
-	var handler *domainHandler
-	defer func() {
-		// If we got to the point we've initialized, then we're uninitialized when we return
-		if plugin != nil {
-			pc.mux.Lock()
-			plugin.initialized = false
-			pc.mux.Unlock()
-		}
-		if handler != nil {
-			handler.close()
-		}
-	}()
-	domainName := "UNINITIALIZED"
-	// We are the receiving routine for the gRPC stream (we do NOT send)
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			log.L(ctx).Errorf("Stream for domain %s failed: %s", domainName, err)
-			return err
-		}
-		if plugin == nil && msg.MessageType != pbp.DomainMessage_REGISTER {
-			log.L(ctx).Warnf("Domain %s sent request before registration: %s", domainName, jsonProto(msg))
-			continue
-		}
-		switch msg.MessageType {
-		case pbp.DomainMessage_REGISTER:
-			if plugin != nil {
-				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
-				continue
-			}
-			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN, true)
-			if err != nil {
-				return err
-			}
-			// We now have the plugin ready for use
-			domainName = plugin.name
-			// The handler starts and owns the sending routine
-			handler = pc.newDomainHandler(plugin, stream)
-			// Notify the controller this plugin is registered
-			plugin.registered(pc)
-		case pbp.DomainMessage_RESPONSE_FROM_DOMAIN,
-			pbp.DomainMessage_ERROR_RESPONSE:
-			// If this is an in-flight request, then pass it back to the handler over the request channel
-			req := pc.domainRequests.getInflight(ctx, msg.CorrelationId)
-			if req == nil {
-				log.L(ctx).Warnf("Domain %s sent response for unknown/expired request: %s", domainName, jsonProto(msg))
-				continue
-			}
-			req.done <- msg
-		case pbp.DomainMessage_REQUEST_FROM_DOMAIN:
-			// We can't block the stream for this processing, so kick it off to a go routine for the handler
-			go handler.requestFromDomain(ctx, msg)
-		}
-
 	}
 }
 

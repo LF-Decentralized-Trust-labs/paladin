@@ -23,10 +23,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alecthomas/assert/v2"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

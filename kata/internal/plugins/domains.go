@@ -47,20 +47,84 @@ type DomainCallbacks interface {
 }
 
 type domainHandler struct {
-	pc        *pluginController
-	plugin    *plugin[DomainCallbacks]
-	callbacks DomainCallbacks
-	send      chan *pbp.DomainMessage
+	pc         *pluginController
+	plugin     *plugin[DomainCallbacks]
+	callbacks  DomainCallbacks
+	sendStream pbp.PluginController_ConnectDomainServer
+	send       chan *pbp.DomainMessage
+	senderDone chan struct{}
+}
+
+// Domains connect over this channel, and must announce themselves with their ID to complete the load
+func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDomainServer) error {
+	ctx := stream.Context()
+	var plugin *plugin[DomainCallbacks]
+	defer func() {
+		// If we got to the point we've initialized, then we're uninitialized when we return
+		if plugin != nil {
+			pc.mux.Lock()
+			plugin.initialized = false
+			pc.mux.Unlock()
+		}
+		if plugin.handler != nil {
+			plugin.handler.close()
+		}
+	}()
+	domainName := "UNINITIALIZED"
+	// We are the receiving routine for the gRPC stream (we do NOT send)
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			log.L(ctx).Errorf("Stream for domain %s failed: %s", domainName, err)
+			return err
+		}
+		if plugin == nil && msg.MessageType != pbp.DomainMessage_REGISTER {
+			log.L(ctx).Warnf("Domain %s sent request before registration: %s", domainName, jsonProto(msg))
+			continue
+		}
+		switch msg.MessageType {
+		case pbp.DomainMessage_REGISTER:
+			if plugin != nil {
+				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
+				continue
+			}
+			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN, true)
+			if err != nil {
+				return err
+			}
+			// We now have the plugin ready for use
+			domainName = plugin.name
+			// The handler starts and owns the sending routine (we only use it on this routine, so no locking on this line)
+			plugin.handler = pc.newDomainHandler(plugin, stream)
+			// Notify the controller this plugin is registered
+			plugin.registered(pc)
+		case pbp.DomainMessage_RESPONSE_FROM_DOMAIN,
+			pbp.DomainMessage_ERROR_RESPONSE:
+			// If this is an in-flight request, then pass it back to the handler over the request channel
+			req := pc.domainRequests.getInflight(ctx, msg.CorrelationId)
+			if req == nil {
+				log.L(ctx).Warnf("Domain %s sent response for unknown/expired request: %s", domainName, jsonProto(msg))
+				continue
+			}
+			req.done <- msg
+		case pbp.DomainMessage_REQUEST_FROM_DOMAIN:
+			// We can't block the stream for this processing, so kick it off to a go routine for the handler
+			go plugin.handler.requestFromDomain(ctx, msg)
+		}
+
+	}
 }
 
 func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], sendStream pbp.PluginController_ConnectDomainServer) *domainHandler {
 	dh := &domainHandler{
-		pc:     pc,
-		plugin: plugin,
-		send:   make(chan *pbp.DomainMessage),
+		pc:         pc,
+		plugin:     plugin,
+		send:       make(chan *pbp.DomainMessage),
+		senderDone: make(chan struct{}),
+		sendStream: sendStream,
 	}
 	dh.callbacks = pc.domainManager.DomainRegistered(plugin.name, plugin.id, dh)
-	go dh.sender(sendStream)
+	go dh.sender()
 	return dh
 }
 
@@ -184,24 +248,27 @@ func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *pbp.Prepar
 	return
 }
 
-func (dh *domainHandler) sender(sendStream pbp.PluginController_ConnectDomainServer) {
+func (dh *domainHandler) sender() {
+	defer close(dh.senderDone)
 	for msg := range dh.send {
-		if err := sendStream.Send(msg); err != nil {
+		if err := dh.sendStream.Send(msg); err != nil {
 			// gRPC promises to abort the stream is this case, so just log and return
 			log.L(context.Background()).Errorf("domain %s stream send error: %s", dh.plugin.name, err)
+			return
 		}
 	}
 }
 
 func (dh *domainHandler) close() {
 	close(dh.send)
+	<-dh.senderDone
 }
 
 func (dh *domainHandler) requestToDomain(ctx context.Context,
 	// The protobuf codegen isn't generics friendly, so we use functions here
 	setReqBody func(*pbp.DomainMessage),
 	getResBody func(*pbp.DomainMessage) bool,
-) error {
+) (err error) {
 	msgID := uuid.New()
 	req := &pbp.DomainMessage{
 		DomainId:    dh.plugin.id.String(),
@@ -217,14 +284,11 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 
 	select {
 	case dh.send <- req:
-	case <-ctx.Done():
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (SEND) [%s]", dh.plugin.name, req.MessageId, time.Since(startTime))
-		return i18n.NewError(ctx, msgs.MsgContextCanceled)
+	case <-ctx.Done(): // we'll catch this below in the wait
 	}
-
 	res, err := inflight.wait(ctx)
 	if err != nil {
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT (RECEIVE) [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
 		return err
 	}
 	responseOk := getResBody(res)
@@ -238,7 +302,7 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 			errorMessage = jsonProto(res)
 		}
 		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
-		return err
+		return i18n.NewError(ctx, msgs.MsgPluginInvalidResponse, dh.plugin.def.Plugin.PluginType, dh.plugin.name, errorMessage)
 	}
 
 	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.MessageId, res.ResponseFromDomain, time.Since(startTime))
