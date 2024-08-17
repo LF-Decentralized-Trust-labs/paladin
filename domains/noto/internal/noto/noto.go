@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -65,7 +66,7 @@ type NotoConstructor struct {
 	Notary string `json:"notary"`
 }
 
-var constructorAbi = `{
+var constructorABI = `{
 	"type": "constructor",
 	"inputs": [
 		{
@@ -75,6 +76,10 @@ var constructorAbi = `{
 		}
 	]
 }`
+
+var domainConfigABI = &abi.ParameterArray{
+	{Name: "notary", Type: "address"},
+}
 
 func New(ctx context.Context, addr string) (*Noto, error) {
 	var opts []grpc.DialOption
@@ -232,7 +237,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				FactoryContractAddress: config.FactoryAddress,
 				FactoryContractAbiJson: string(factoryJSON),
 				PrivateContractAbiJson: string(notoJSON),
-				ConstructorAbiJson:     constructorAbi,
+				ConstructorAbiJson:     constructorABI,
 				AbiStateSchemasJson:    []string{},
 			},
 		}
@@ -298,6 +303,21 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
 
+		configValues, err := domainConfigABI.DecodeABIDataCtx(ctx, m.Transaction.ContractConfig, 0)
+		if err != nil {
+			return err
+		}
+		configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
+		if err != nil {
+			return err
+		}
+		var config map[string]interface{}
+		err = json.Unmarshal(configJSON, &config)
+		if err != nil {
+			return err
+		}
+		notary := config["notary"].(string)
+
 		response := &pb.AssembleTransactionResponse{
 			AssemblyResult:       pb.AssembleTransactionResponse_OK,
 			AssembledTransaction: &pb.AssembledTransaction{},
@@ -306,7 +326,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 					Name:            "signer",
 					AttestationType: pb.AttestationType_ENDORSE,
 					Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-					Parties:         []string{"notary1"},
+					Parties:         []string{notary},
 				},
 			},
 		}

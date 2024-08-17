@@ -14,7 +14,7 @@ contract Noto is NotoBase {
     );
 
     constructor(bytes32 txId, address domain, address notary) NotoBase(notary) {
-        emit PaladinNewSmartContract_V0(txId, domain, "");
+        emit PaladinNewSmartContract_V0(txId, domain, abi.encode(notary));
     }
 
     function transfer(
