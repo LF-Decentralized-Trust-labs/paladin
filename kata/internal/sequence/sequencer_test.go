@@ -18,13 +18,11 @@ package sequence
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/mocks/commsbusmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/sequencemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
@@ -73,8 +71,6 @@ func TestSequencerLocalDependency(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	node1SequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash.String()).Return(nil, nil)
-
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:         node1ID.String(),
 		TransactionId:  txn2ID.String(),
@@ -118,10 +114,6 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
 	commsBusBrokerMock1 := node1SequencerMockDependencies.brokerMock
 
-	//TODO need to decide the scope of this test.  are we just firing events at the sequencer and letting it build up its awareness of the global graph
-	// or are we emulating a local persistence layer that has already been told about remote transactions
-	// the answer is really an architectural one about how this code module glues into the rest of the system
-
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:   txn1ID.String(),
@@ -129,11 +121,6 @@ func TestSequencerRemoteDependency(t *testing.T) {
 		OutputStateHash: []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
-	node1SequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash.String()).Return(&transactionstore.Transaction{
-		ID:               txn1ID,
-		AssemblingNodeID: remoteNodeId,
-		SequencingNodeID: remoteNodeId,
-	}, nil)
 
 	// Should see an event relinquishing ownership of this this transaction
 	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
@@ -193,10 +180,6 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
 	commsBusBrokerMock1 := localNodeSequencerMockDependencies.brokerMock
 
-	//TODO need to decide the scope of this test.  are we just firing events at the sequencer and letting it build up its awareness of the global graph
-	// or are we emulating a local persistence layer that has already been told about remote transactions
-	// the answer is really an architectural one about how this code module glues into the rest of the system
-
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:   dependency1TransactionID.String(),
@@ -204,11 +187,6 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 		OutputStateHash: []string{stateHash1.String()},
 	})
 	assert.NoError(t, err)
-	localNodeSequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash1.String()).Return(&transactionstore.Transaction{
-		ID:               dependency1TransactionID,
-		AssemblingNodeID: remoteNode1Id,
-		SequencingNodeID: remoteNode1Id,
-	}, nil)
 
 	// Second transaction (the minter of the other state) is assembled on a different remote node
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -217,11 +195,6 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 		OutputStateHash: []string{stateHash2.String()},
 	})
 	assert.NoError(t, err)
-	localNodeSequencerMockDependencies.persistenceMock.On("GetMintingTransactionByStateHash", ctx, stateHash2.String()).Return(&transactionstore.Transaction{
-		ID:               dependency2TransactionID,
-		AssemblingNodeID: remoteNode2Id,
-		SequencingNodeID: remoteNode2Id,
-	}, nil)
 
 	// Should see an event moving this transaction to the blocked stage
 	commsBusBrokerMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
@@ -274,9 +247,16 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 // TODO mode complex variations of TestSequencerMultipleRemoteDependencies where there are still multiple remainign dependency transactions but they are all on the same remote node and/or they are all on the local node
 // timing conditions where the remote transactions themselves get delegated to another node or even get delegated to this local node
 
+func TestSequencerCommitEndorsement(t *testing.T) {
+	// before endorsement is confirmed, the sequencer on the node local to the endorser is invoked to
+	//  a) record the endorsement
+	//  b) assert that the endorsement does not result in any contention
+
+}
+
 // Test cases to assert the emergent behaviour when multiple concurrent copies of the sequencer are running
 // as in a distributed system.
-func TestSequencer(t *testing.T) {
+/*func TestSequencer(t *testing.T) {
 	// when 2 transactions attempt to claim the same state id, then
 	// both sequencers agree on which one emerges as the winner
 	// and which one is reassembled
@@ -563,12 +543,11 @@ func TestSequencerLoopDetection(t *testing.T) {
 	assert.Equal(t, 1, numberOfReassembleMessages)
 
 }
-
+*/
 type sequencerMockDependencies struct {
-	brokerMock      *commsbusmocks.Broker
-	persistenceMock *sequencemocks.Persistence
-	resolverMock    *sequencemocks.ContentionResolver
-	dispatcherMock  *sequencemocks.Dispatcher
+	brokerMock     *commsbusmocks.Broker
+	resolverMock   *sequencemocks.ContentionResolver
+	dispatcherMock *sequencemocks.Dispatcher
 }
 
 func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (Sequencer, sequencerMockDependencies) {
@@ -576,7 +555,6 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 	brokerMock := commsbusmocks.NewBroker(t)
 	commsBusMock := commsbusmocks.NewCommsBus(t)
 	commsBusMock.On("Broker").Return(brokerMock).Maybe()
-	persistenceMock := sequencemocks.NewPersistence(t)
 	dispatcherMock := sequencemocks.NewDispatcher(t)
 	var resolverMock *sequencemocks.ContentionResolver = nil
 	var resolver ContentionResolver
@@ -588,17 +566,20 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 	}
 
 	return &sequencer{
-			nodeID:      nodeID,
-			persistence: persistenceMock,
-			commsBus:    commsBusMock,
-			resolver:    resolver,
-			dispatcher:  dispatcherMock,
-			graph:       NewGraph(),
-		}, sequencerMockDependencies{
+			nodeID:                      nodeID,
+			commsBus:                    commsBusMock,
+			resolver:                    resolver,
+			dispatcher:                  dispatcherMock,
+			graph:                       NewGraph(),
+			unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
+			unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+		},
+		sequencerMockDependencies{
 			brokerMock,
-			persistenceMock,
 			resolverMock,
 			dispatcherMock,
 		}
 
 }
+
+//TODO test that the right thing happens when I deletegate a dependent transaction to a node but that node (unbeknown to me yet) has already delegated the depencency elsewhere

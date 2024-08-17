@@ -24,7 +24,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 )
@@ -43,20 +42,7 @@ type Dispatcher interface {
 	Dispatch(context.Context, []uuid.UUID) error
 }
 
-type Persistence interface {
-	// this is some temporary scaffolding around the core logic of the algorithm to allow us to make progress on the alogrithm and its functional tests
-	// before figuring how to integrate it into the main codebase and frameworks of Orchestrator, StageController, CommsBus etc...
-	// most likely will be replaced with some utility of the StageController or direct access to state store and transaction store etc..
-	GetStateByHash(context.Context, string) (statestore.State, error)
-	UpdateState(context.Context, statestore.State) error
-
-	GetTransactionByID(context.Context, uuid.UUID) (transactionstore.Transaction, error)
-	//return the transaction that has minted, or is assembled to mint the state with the given hash
-	GetMintingTransactionByStateHash(context.Context, string) (*transactionstore.Transaction, error)
-}
-
 type Sequencer interface {
-	OnStateClaimEvent(ctx context.Context, event *pb.StateClaimEvent) error
 	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
 	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
@@ -78,20 +64,31 @@ type delegatableTransaction struct {
 	nodeId        string
 }
 
-type sequencer struct {
-	nodeID              uuid.UUID
-	persistence         Persistence
-	commsBus            commsbus.CommsBus
-	resolver            ContentionResolver
-	dispatcher          Dispatcher
-	graph               Graph
-	blockedTransactions []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
+type unconfirmedState struct {
+	stateHash            string
+	mintingTransactionID string
 }
 
-func NewSequencer(eventSync EventSync, persistence Persistence) Sequencer {
-	return &sequencer{
-		persistence: persistence,
-	}
+type unconfirmedTransaction struct {
+	transactionID    string
+	sequencingNodeID string
+	assemblerNodeID  string
+	outputStates     []string
+}
+
+type sequencer struct {
+	nodeID                      uuid.UUID
+	commsBus                    commsbus.CommsBus
+	resolver                    ContentionResolver
+	dispatcher                  Dispatcher
+	graph                       Graph
+	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
+	unconfirmedStatesByHash     map[string]*unconfirmedState
+	unconfirmedTransactionsByID map[string]*unconfirmedTransaction
+}
+
+func NewSequencer(eventSync EventSync) Sequencer {
+	return &sequencer{}
 }
 
 func (s *sequencer) evaluateGraph(ctx context.Context) error {
@@ -148,16 +145,14 @@ func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID str
 	}
 }
 
-func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.TransactionAssembledEvent) ([]transactionstore.Transaction, error) {
-	mintingTransactions := make([]transactionstore.Transaction, 0, len(event.InputStateHash))
+func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.TransactionAssembledEvent) ([]*unconfirmedTransaction, error) {
+	mintingTransactions := make([]*unconfirmedTransaction, 0, len(event.InputStateHash))
 	for _, stateHash := range event.InputStateHash {
-		mintingTransaction, err := s.persistence.GetMintingTransactionByStateHash(ctx, stateHash)
-		if err != nil {
-			log.L(ctx).Errorf("Error getting minting transaction by state hash: %s", err)
-			return nil, err
-		}
+		mintingTransactionID := s.unconfirmedStatesByHash[stateHash].mintingTransactionID
+		mintingTransaction := s.unconfirmedTransactionsByID[mintingTransactionID]
+
 		if mintingTransaction != nil {
-			mintingTransactions = append(mintingTransactions, *mintingTransaction)
+			mintingTransactions = append(mintingTransactions, mintingTransaction)
 		}
 	}
 	return mintingTransactions, nil
@@ -208,10 +203,10 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.Transac
 	blockedBy := make([]blockingTransaction, 0, len(unconfirmedDependencies))
 
 	for _, dependency := range unconfirmedDependencies {
-		blockingNodeIDs[dependency.SequencingNodeID.String()] = true
+		blockingNodeIDs[dependency.sequencingNodeID] = true
 		blockedBy = append(blockedBy, blockingTransaction{
-			transactionID: dependency.ID.String(),
-			nodeID:        dependency.SequencingNodeID.String(),
+			transactionID: dependency.transactionID,
+			nodeID:        dependency.sequencingNodeID,
 		})
 	}
 	keys := make([]string, 0, len(blockingNodeIDs))
@@ -293,6 +288,20 @@ func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatab
 
 func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
+	//Record the new transaction
+	s.unconfirmedTransactionsByID[event.TransactionId] = &unconfirmedTransaction{
+		transactionID:    event.TransactionId,
+		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
+		assemblerNodeID:  event.NodeId,
+		outputStates:     event.OutputStateHash,
+	}
+	for _, unconfirmedStateHash := range event.OutputStateHash {
+		s.unconfirmedStatesByHash[unconfirmedStateHash] = &unconfirmedState{
+			stateHash:            unconfirmedStateHash,
+			mintingTransactionID: event.TransactionId,
+		}
+	}
+
 	//if the transaction was assembled on the local node, then we add it into the graph
 	//if it was assembled on another node, then we remember it in case we end up getting some dependencies on it
 	if event.NodeId == s.nodeID.String() {
@@ -346,6 +355,7 @@ func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.Transac
 	return nil
 }
 
+/*
 func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimEvent) error {
 	log.L(ctx).Infof("Received state claim event: %s", event.String())
 	state, err := s.persistence.GetStateByHash(ctx, event.StateHash)
@@ -403,9 +413,16 @@ func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimE
 	}
 	return nil
 }
+*/
 
 func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
+	outputStateHashes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
+	for _, outputStateHash := range outputStateHashes {
+		s.unconfirmedStatesByHash[outputStateHash] = nil
+	}
+	s.unconfirmedTransactionsByID[event.TransactionId] = nil
+
 	s.updateBlockedTransactions(ctx, event)
 	delegatableTransactions := s.findDelegatableTransactions(ctx)
 	for _, delegatableTransaction := range delegatableTransactions {
