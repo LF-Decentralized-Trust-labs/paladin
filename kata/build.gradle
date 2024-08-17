@@ -39,10 +39,14 @@ configurations {
     compiledContracts {
         canBeConsumed = false
     }
+    toolkitProtoDefinitions {
+        canBeConsumed = false
+    }
 }
 
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
 }
 
 task installTools(type:Exec) {
@@ -107,6 +111,7 @@ task copyTestbedContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
+// TODO: This can be removed once everything moves to the toolkit / plugins
 task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     workingDir '.'
     inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
@@ -117,6 +122,32 @@ task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     args "--go-grpc_out=${projectDir}"
     args "--proto_path=${projectDir}"
     args inputs.files
+}
+
+task toolkitProtoBindings(type:Exec) {
+    workingDir '.'
+    inputs.files(configurations.toolkitProtoDefinitions)
+    outputs.dir("pkg/proto/plugins")
+    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
+    executable 'protoc'
+    args "--go_out=${projectDir}/pkg/proto/plugins"
+    args "--go_opt=paths=source_relative"
+    args "--go-grpc_out=${projectDir}/pkg/proto/plugins"
+    args "--go-grpc_opt=paths=source_relative"
+    fileTree(configurations.toolkitProtoDefinitions.asPath) {
+        include "*.proto"
+    }.each { File file ->
+        args "--go_opt=M${file.name}=pkg/proto/plugins"
+        args "--go-grpc_opt=M${file.name}=pkg/proto/plugins"
+    }
+    args "--proto_path=${configurations.toolkitProtoDefinitions.asPath}"
+    args fileTree(configurations.toolkitProtoDefinitions.asPath) {
+        include "*.proto"
+    }
+
+    doFirst {
+      println commandLine.join(" ")
+    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'

@@ -30,6 +30,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
@@ -61,17 +62,16 @@ type testbed struct {
 	cancelCtx        context.CancelFunc
 	conf             *TestBedConfig
 	sigc             chan os.Signal
+	socketFile       string
+	loaderID         uuid.UUID
+	pluginController plugins.PluginController
 	rpcServer        rpcserver.Server
 	stateStore       statestore.StateStore
 	blockindexer     blockindexer.BlockIndexer
 	keyMgr           ethclient.KeyManager
 	ethClient        ethclient.EthClient
 	signer           signer.SigningModule
-	bus              commsbus.CommsBus
 	fromDomain       commsbus.MessageHandler
-	socketFile       string
-	destToDomain     string
-	destFromDomain   string
 	inflight         map[string]*inflightRequest
 	inflightLock     sync.Mutex
 	domainsByUUID    map[uuid.UUID]*tbDomain
@@ -87,6 +87,7 @@ func newTestBed() (tb *testbed) {
 	tb = &testbed{
 		sigc:             make(chan os.Signal, 1),
 		inflight:         make(map[string]*inflightRequest),
+		loaderID:         uuid.New(),
 		domainsByUUID:    make(map[uuid.UUID]*tbDomain),
 		domainsByName:    make(map[string]*tbDomain),
 		domainsByAddress: make(map[ethtypes.Address0xHex]*tbDomain),
@@ -107,15 +108,20 @@ func (tb *testbed) listenTerm() {
 func (tb *testbed) stop() {
 	log.L(tb.ctx).Infof("Testbed shutting down")
 	tb.cancelCtx()
-	_ = tb.bus.GRPCServer().Stop(tb.ctx)
 }
 
-func (tb *testbed) tempSocketFile() (string, error) {
+func (tb *testbed) tempSocketFile() (fileName string, err error) {
 	f, err := os.CreateTemp(confutil.StringOrEmpty(tb.conf.TempDir, ""), "testbed.paladin.*.sock")
-	if err != nil {
-		return "", err
+	if err == nil {
+		fileName = f.Name()
 	}
-	return f.Name(), err
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		err = os.Remove(fileName)
+	}
+	return
 }
 
 func (tb *testbed) setupConfig(args []string) error {
@@ -127,30 +133,11 @@ func (tb *testbed) setupConfig(args []string) error {
 	if err == nil {
 		err = yaml.Unmarshal(configBytes, &tb.conf)
 	}
-	if err == nil {
-		tb.socketFile = confutil.StringOrEmpty(tb.conf.CommsBus.GRPC.SocketAddress, "")
-		if tb.socketFile == "" {
-			tb.socketFile, err = tb.tempSocketFile()
-			tb.conf.CommsBus.GRPC.SocketAddress = &tb.socketFile
-		}
-	}
-	if err == nil {
-		// Possible a file might be lying around that needs deleting
-		err = tb.cleanupOldSocket()
+	if tb.conf.GRPC.Address == "" {
+		tb.conf.GRPC.Address, err = tb.tempSocketFile()
 	}
 	if err != nil {
 		return err
-	}
-	tb.destFromDomain = confutil.StringNotEmpty(tb.conf.Destinations.FromDomain, "from-domain")
-	tb.destToDomain = confutil.StringNotEmpty(tb.conf.Destinations.ToDomain, "to-domain")
-	return nil
-}
-
-func (tb *testbed) cleanupOldSocket() error {
-	if _, err := os.Stat(tb.socketFile); err == nil {
-		if err = os.Remove(tb.socketFile); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -172,12 +159,14 @@ func (tb *testbed) run() (err error) {
 	}
 	defer p.Close()
 
-	tb.bus, err = commsbus.NewCommsBus(tb.ctx, &tb.conf.CommsBus)
+	tb.pluginController, err = plugins.NewPluginController(tb.ctx, &plugins.PluginControllerArgs{
+		LoaderID: tb.loaderID,
+	})
 	if err == nil {
-		tb.fromDomain, err = tb.bus.Broker().Listen(tb.ctx, "from-domain")
+		err = tb.pluginController.Start(tb.ctx)
 	}
 	if err != nil {
-		return fmt.Errorf("Comms bus init failed: %s", err)
+		return fmt.Errorf("Plugin server init failed: %s", err)
 	}
 
 	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
