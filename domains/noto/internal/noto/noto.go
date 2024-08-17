@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -70,9 +70,9 @@ var constructorABI = `{
 	"type": "constructor",
 	"inputs": [
 		{
-			"internalType": "address",
+			"internalType": "string",
 			"name": "notary",
-			"type": "address"
+			"type": "string"
 		}
 	]
 }`
@@ -263,7 +263,12 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		log.L(ctx).Infof("Deployment parameters: %+v", params)
 
 		response := &pb.InitDeployTransactionResponse{
-			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
+			RequiredVerifiers: []*pb.ResolveVerifierRequest{
+				{
+					Lookup:    params.Notary,
+					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				},
+			},
 		}
 		if err := d.sendReply(ctx, message, response); err != nil {
 			return err
@@ -278,11 +283,13 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 			return err
 		}
 		log.L(ctx).Infof("Deployment parameters: %+v", params)
+		log.L(ctx).Infof("Resolved verifiers: %+v", m.ResolvedVerifiers)
+		notary := m.ResolvedVerifiers[0].Verifier
 
 		response := &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
 				FunctionName: "deploy",
-				ParamsJson:   `{"txId": "` + m.Transaction.TransactionId + `", "notary": "` + params.Notary + `"}`,
+				ParamsJson:   `{"txId": "` + m.Transaction.TransactionId + `", "notary": "` + notary + `"}`,
 			},
 			SigningAddress: params.Notary,
 		}
@@ -316,7 +323,8 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
-		notary := config["notary"].(string)
+		// TODO: use this address instead of hard-coding below
+		// notary := config["notary"].(string)
 
 		response := &pb.AssembleTransactionResponse{
 			AssemblyResult:       pb.AssembleTransactionResponse_OK,
@@ -325,8 +333,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				{
 					Name:            "signer",
 					AttestationType: pb.AttestationType_ENDORSE,
-					Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-					Parties:         []string{notary},
+					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Parties: []string{
+						"notary1", // TODO: why can't we pass notary address here?
+					},
 				},
 			},
 		}

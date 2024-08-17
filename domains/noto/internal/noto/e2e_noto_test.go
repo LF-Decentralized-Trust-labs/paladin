@@ -34,7 +34,6 @@ var (
 	testbedAddr = "http://127.0.0.1:49600"
 	grpcAddr    = "dns:localhost:49601"
 	notaryName  = "notary1"
-	notaryAddr  = "0x9180ff8fa5c502b9bfe5dfeaf477e157dbfaba5c"
 )
 
 func findMethod(contractABI abi.ABI, method string) *abi.Entry {
@@ -84,7 +83,7 @@ func TestNoto(t *testing.T) {
 	log.L(ctx).Infof("Calling testbed_deploy")
 	var deployResult ethtypes.Address0xHex
 	rpcerr = rpc.CallRPC(callCtx, &deployResult, "testbed_deploy", "noto", &NotoConstructor{
-		Notary: notaryAddr,
+		Notary: notaryName,
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -94,7 +93,7 @@ func TestNoto(t *testing.T) {
 	transfer := findMethod(domain.Contract.ABI, "transfer")
 	assert.NotNil(t, transfer)
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     notaryAddr,
+		From:     notaryName,
 		To:       types.EthAddress(deployResult),
 		Function: *transfer,
 		Inputs: types.RawJSON(`{
