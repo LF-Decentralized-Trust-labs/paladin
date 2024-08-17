@@ -13,23 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package api
 
-type StaticKeyEntryEncoding string
-
-const (
-	StaticKeyEntryEncodingNONE   StaticKeyEntryEncoding = "none"
-	StaticKeyEntryEncodingHEX    StaticKeyEntryEncoding = "hex"
-	StaticKeyEntryEncodingBase64 StaticKeyEntryEncoding = "base64"
+import (
+	"context"
 )
 
-type StaticKeyEntryConfig struct {
-	Encoding StaticKeyEntryEncoding `yaml:"encoding"`
-	Filename string                 `yaml:"filename"`
-	Trim     bool                   `yaml:"trim"`
-	Inline   string                 `yaml:"inline"`
-}
-
-type StaticKeyStorageConfig struct {
-	Keys map[string]StaticKeyEntryConfig `yaml:"keys"`
+type Extension interface {
+	// Return nil if keystore type is not known, or error if initialization fails
+	KeyStore(ctx context.Context, config *StoreConfig) (store KeyStore, err error)
 }

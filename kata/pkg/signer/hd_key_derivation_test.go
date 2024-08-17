@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -32,16 +33,16 @@ func TestHDSigningStaticExample(t *testing.T) {
 
 	ctx := context.Background()
 	mnemonic := "extra monster happy tone improve slight duck equal sponsor fruit sister rate very bulb reopen mammal venture pull just motion faculty grab tenant kind"
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type:                  KeyDerivationTypeBIP32,
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type:                  api.KeyDerivationTypeBIP32,
 			BIP44Prefix:           confutil.P(" m / 44' / 60' / 0' / 0 "), // we allow friendly spaces here
 			BIP44HardenedSegments: confutil.P(0),
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -53,7 +54,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 		Index:      0,
 	})
@@ -63,7 +64,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)
@@ -74,22 +75,22 @@ func TestHDSigningStaticExample(t *testing.T) {
 func TestHDSigningDirectResNoPrefix(t *testing.T) {
 
 	ctx := context.Background()
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type:                  KeyDerivationTypeBIP32,
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type:                  api.KeyDerivationTypeBIP32,
 			BIP44Prefix:           confutil.P("m"),
 			BIP44HardenedSegments: confutil.P(0),
 			BIP44DirectResolution: true,
 		},
-		KeyStore: StoreConfig{
-			Type:       KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{Path: confutil.P(t.TempDir())},
+		KeyStore: api.StoreConfig{
+			Type:       api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{Path: confutil.P(t.TempDir())},
 		},
 	})
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "50'",
 		Index:      0,
 		Path: []*proto.ResolveKeyPathSegment{
@@ -115,14 +116,14 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 		Index:      0,
 	})
 	assert.Regexp(t, "PD011413", err)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "2147483648", // too big
 		Index:      0,
 	})
@@ -147,21 +148,21 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	mnemonic, err := bip39.NewMnemonic(entropy)
 	assert.NoError(t, err)
 
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: ConfigKeyEntry{
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
+			SeedKeyPath: api.ConfigKeyEntry{
 				Name:  "seed",
 				Index: 0,
-				Path: []ConfigKeyPathEntry{
+				Path: []api.ConfigKeyPathEntry{
 					{Name: "custom", Index: 0},
 				},
 			},
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"custom/seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -173,7 +174,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "E82D5A3F-D154-4C5B-A297-F8D49528DA73",
 		Index:      0x7FFFFFFF, // largest possible - not in hardened range
 		Path: []*proto.ResolveKeyPathSegment{
@@ -213,7 +214,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)
@@ -230,13 +231,13 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 func TestHDSigningInitFailDisabled(t *testing.T) {
 
 	ctx := context.Background()
-	_, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type: KeyDerivationTypeBIP32,
+	_, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
 		},
-		KeyStore: StoreConfig{
+		KeyStore: api.StoreConfig{
 			DisableKeyLoading: true,
-			Type:              KeyStoreTypeStatic,
+			Type:              api.KeyStoreTypeStatic,
 		},
 	})
 	assert.Regexp(t, "PD011408", err)
@@ -246,14 +247,14 @@ func TestHDSigningInitFailDisabled(t *testing.T) {
 func TestHDSigningInitFailBadMnemonic(t *testing.T) {
 
 	ctx := context.Background()
-	_, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type: KeyDerivationTypeBIP32,
+	_, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   "wrong",
@@ -275,17 +276,17 @@ func TestHDInitBadSeed(t *testing.T) {
 	mnemonic, err := bip39.NewMnemonic(entropy)
 	assert.NoError(t, err)
 
-	_, err = NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: ConfigKeyEntry{
+	_, err = NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
+			SeedKeyPath: api.ConfigKeyEntry{
 				Name: "missing",
 			},
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeStatic,
-			Static: StaticKeyStorageConfig{
-				Keys: map[string]StaticKeyEntryConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeStatic,
+			Static: api.StaticKeyStorageConfig{
+				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "none",
 						Inline:   mnemonic,
@@ -302,17 +303,17 @@ func TestHDInitGenSeed(t *testing.T) {
 
 	ctx := context.Background()
 
-	sm, err := NewSigningModule(ctx, &Config{
-		KeyDerivation: KeyDerivationConfig{
-			Type: KeyDerivationTypeBIP32,
-			SeedKeyPath: ConfigKeyEntry{
+	sm, err := NewSigningModule(ctx, &api.Config{
+		KeyDerivation: api.KeyDerivationConfig{
+			Type: api.KeyDerivationTypeBIP32,
+			SeedKeyPath: api.ConfigKeyEntry{
 				Name: "seed",
-				Path: []ConfigKeyPathEntry{{Name: "generate"}},
+				Path: []api.ConfigKeyPathEntry{{Name: "generate"}},
 			},
 		},
-		KeyStore: StoreConfig{
-			Type: KeyStoreTypeFilesystem,
-			FileSystem: FileSystemConfig{
+		KeyStore: api.StoreConfig{
+			Type: api.KeyStoreTypeFilesystem,
+			FileSystem: api.FileSystemConfig{
 				Path: confutil.P(t.TempDir()),
 			},
 		},

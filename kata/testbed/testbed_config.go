@@ -22,7 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
 type TestbedDestinationsConfig struct {
@@ -37,7 +37,7 @@ type TestBedConfig struct {
 	RPCServer    rpcserver.Config          `yaml:"rpcServer"`
 	StateStore   statestore.Config         `yaml:"statestore"`
 	BlockIndexer blockindexer.Config       `yaml:"blockIndexer"`
-	Signer       signer.Config             `yaml:"signer"`
+	Signer       api.Config                `yaml:"signer"`
 	TempDir      *string                   `yaml:"tempDir"`
 	Destinations TestbedDestinationsConfig `yaml:"destinations"`
 }

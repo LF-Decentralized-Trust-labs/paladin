@@ -32,7 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	pb "google.golang.org/protobuf/proto"
@@ -335,7 +335,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				RequiredVerifiers: []*proto.ResolveVerifierRequest{
 					{
 						Lookup:    "domain1/contract1/notary",
-						Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 					},
 				},
 			}, nil
@@ -350,7 +350,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				"symbol": "FT1"
 			}`, req.Transaction.ConstructorParamsJson)
 			assert.Len(t, req.ResolvedVerifiers, 1)
-			assert.Equal(t, signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
+			assert.Equal(t, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
 			assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
 			assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 			return &proto.PrepareDeployResponse{
@@ -375,19 +375,19 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			requiredVerifiers := []*proto.ResolveVerifierRequest{
 				{
 					Lookup:    notaryLocator,
-					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				},
 			}
 			if txInputs.From != "" {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
 					Lookup:    txInputs.From,
-					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
 			if txInputs.To != "" && (txInputs.From == "" || txInputs.From != txInputs.To) {
 				requiredVerifiers = append(requiredVerifiers, &proto.ResolveVerifierRequest{
 					Lookup:    txInputs.To,
-					Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				})
 			}
 			return &proto.InitTransactionResponse{
@@ -449,7 +449,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					{
 						Name:            "sender",
 						AttestationType: proto.AttestationType_SIGN,
-						Algorithm:       signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 						Payload:         eip712Payload,
 						Parties: []string{
 							req.Transaction.From,
@@ -459,7 +459,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						Name:            "notary",
 						AttestationType: proto.AttestationType_ENDORSE,
 						// we expect an endorsement is of the form ENDORSER_SUBMIT - so we need an eth signing key to exist
-						Algorithm: signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 						Parties: []string{
 							notaryLocator,
 						},
@@ -496,7 +496,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			for _, ar := range req.Signatures {
 				if ar.AttestationType == proto.AttestationType_SIGN &&
 					ar.Name == "sender" &&
-					ar.Verifier.Algorithm == signer.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
+					ar.Verifier.Algorithm == api.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
 					signerVerification = ar
 					break
 				}

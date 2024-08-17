@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package keystore
 
 import (
 	"context"
@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
@@ -41,20 +42,20 @@ type filesystemStore struct {
 	dirMode  os.FileMode
 }
 
-func newFilesystemStore(ctx context.Context, conf *FileSystemConfig) (fss KeyStore, err error) {
+func NewFilesystemStore(ctx context.Context, conf api.FileSystemConfig) (fss api.KeyStore, err error) {
 	// Determine the path
 	var pathInfo fs.FileInfo
-	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *FileSystemDefaults.Path))
+	path, err := filepath.Abs(confutil.StringNotEmpty(conf.Path, *api.FileSystemDefaults.Path))
 	if err == nil {
 		pathInfo, err = os.Stat(path)
 	}
 	if err != nil || !pathInfo.IsDir() {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadPathError, *FileSystemDefaults.Path)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgSigningModuleBadPathError, *api.FileSystemDefaults.Path)
 	}
 	return &filesystemStore{
-		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &FileSystemDefaults.Cache),
-		fileMode: confutil.UnixFileMode(conf.FileMode, *FileSystemDefaults.FileMode),
-		dirMode:  confutil.UnixFileMode(conf.DirMode, *FileSystemDefaults.DirMode),
+		cache:    cache.NewCache[string, keystorev3.WalletFile](&conf.Cache, &api.FileSystemDefaults.Cache),
+		fileMode: confutil.UnixFileMode(conf.FileMode, *api.FileSystemDefaults.FileMode),
+		dirMode:  confutil.UnixFileMode(conf.DirMode, *api.FileSystemDefaults.DirMode),
 		path:     path,
 	}, nil
 }

@@ -13,13 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package signer
+package api
 
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -33,17 +31,6 @@ import (
 type KeyStore interface {
 	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
-}
-
-// Some cryptographic storage supports signing directly with secp256k1 curve and an ECDSA algorithm,
-// which is a core signing function used in many Paladin domains, and during base EVM signing.
-//
-// Because an administrator might require certain wallets are ONLY used this way, there is an
-// option on all wallets to require it. In which case (even though it's always supported)
-// that wallet will reject any signing/proof-generation request that requires uses a loadable key.
-type KeyStoreSigner_secp256k1 interface {
-	FindOrCreateKey_secp256k1(ctx context.Context, req *proto.ResolveKeyRequest) (addr *ethtypes.Address0xHex, keyHandle string, err error)
-	Sign_secp256k1(ctx context.Context, keyHandle string, payload []byte) (*secp256k1.SignatureData, error)
 }
 
 // Some cryptographic stores are capable of listing their contents in a natural order.
