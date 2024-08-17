@@ -17,6 +17,7 @@ package plugins
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,9 +35,9 @@ import (
 )
 
 type PluginController interface {
-	Run(ctx context.Context) error
+	Start(ctx context.Context) error
 	Stop(ctx context.Context)
-	SocketAddress() string
+	GRPCTargetURL() string
 	LoaderID() uuid.UUID
 	WaitForInit(ctx context.Context) error
 	PluginsUpdated(conf *PluginControllerConfig) error
@@ -45,7 +46,6 @@ type PluginController interface {
 // Runtime items to be supplied by process, including the config
 type PluginControllerArgs struct {
 	LoaderID      uuid.UUID
-	SocketAddress string
 	DomainManager DomainManager
 	InitialConfig *PluginControllerConfig
 }
@@ -70,7 +70,8 @@ type pluginController struct {
 	server   *grpc.Server
 
 	loaderID        uuid.UUID
-	socketAddress   string
+	network         string
+	address         string
 	domainManager   DomainManager
 	shutdownTimeout time.Duration
 
@@ -89,7 +90,6 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		bgCtx: bgCtx,
 
 		loaderID:        args.LoaderID,
-		socketAddress:   args.SocketAddress,
 		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
 		domainManager:  args.DomainManager,
@@ -105,27 +105,69 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		return nil, err
 	}
 
-	log.L(bgCtx).Infof("server starting at unix socket %s", pc.socketAddress)
-	pc.listener, err = net.Listen("unix", pc.socketAddress)
-	if err != nil {
-		log.L(bgCtx).Error("failed to listen: ", err)
+	if err := pc.parseGRPCAddress(bgCtx, args.InitialConfig.GRPC.Address); err != nil {
 		return nil, err
+	}
+	return pc, nil
+}
+
+func (pc *pluginController) parseGRPCAddress(ctx context.Context, serverAddr string) error {
+
+	// We support a subset of the Go network prefixes, and if none is found, we default to UNIX Domain Sockets ("unix:")
+	tcpStr, isTCP := strings.CutPrefix(serverAddr, "tcp:")
+	if isTCP {
+		pc.network = "tcp"
+		pc.address = tcpStr
+		return nil
+	}
+	tcp4Str, isTCP4 := strings.CutPrefix(serverAddr, "tcp4:")
+	if isTCP4 {
+		pc.network = "tcp4"
+		pc.address = tcp4Str
+		return nil
+	}
+	tcp6Str, isTCP6 := strings.CutPrefix(serverAddr, "tcp6:")
+	if isTCP6 {
+		pc.network = "tcp6"
+		pc.address = tcp6Str
+		return nil
+	}
+	udsPath := strings.Trim(serverAddr, "unix:")
+	if len(udsPath) > 107 {
+		// socket paths longer than 107 are not safe for UDS on Linux/Mac and will fail with an odd bind error.
+		// So we fail with a hard to explain bind failure - so we give a nicer error here
+		// Note: it's not actually 107 chars on all platforms, but it's good enough for us.
+		// See https://man7.org/linux/man-pages/man7/unix.7.html for a complex description of "sun_path"
+		return i18n.NewError(ctx, msgs.MsgPluginUDSPathTooLong, len(udsPath))
+	}
+	pc.network = "unix"
+	pc.address = udsPath
+	return nil
+
+}
+
+func (pc *pluginController) Start(ctx context.Context) (err error) {
+	log.L(ctx).Infof("server starting on %s:%s", pc.network, pc.address)
+	pc.listener, err = net.Listen(pc.network, pc.address)
+	if err != nil {
+		log.L(ctx).Error("failed to listen: ", err)
+		return err
 	}
 	pc.server = grpc.NewServer()
 
 	pbp.RegisterPluginControllerServer(pc.server, pc)
 
-	log.L(bgCtx).Infof("server listening at %v", pc.listener.Addr())
-	return pc, nil
+	log.L(ctx).Infof("server listening at %v", pc.listener.Addr())
+	go pc.runServer(ctx)
+	return nil
 }
 
-func (pc *pluginController) Run(ctx context.Context) error {
+func (pc *pluginController) runServer(ctx context.Context) {
 	log.L(ctx).Infof("Run GRPC Server")
 
 	log.L(ctx).Infof("Server started")
 	pc.serverDone <- pc.server.Serve(pc.listener)
 	log.L(ctx).Infof("Server ended")
-	return nil
 }
 
 func (pc *pluginController) Stop(ctx context.Context) {
@@ -146,8 +188,14 @@ func (pc *pluginController) Stop(ctx context.Context) {
 
 }
 
-func (pc *pluginController) SocketAddress() string {
-	return pc.socketAddress
+// Must be started to call this function
+func (pc *pluginController) GRPCTargetURL() string {
+	switch pc.network {
+	case "unix":
+		return "unix:" + pc.listener.Addr().String()
+	default:
+		return "dns:///" + pc.listener.Addr().String()
+	}
 }
 
 func (pc *pluginController) LoaderID() uuid.UUID {

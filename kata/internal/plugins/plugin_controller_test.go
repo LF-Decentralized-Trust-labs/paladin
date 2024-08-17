@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"testing"
 
@@ -42,14 +42,29 @@ type testPluginLoader struct {
 	done    chan struct{}
 }
 
-func (tpl *testPluginLoader) run(t *testing.T, ctx context.Context, socketAddress string, loaderID uuid.UUID) {
+func tempUDS(t *testing.T) string {
+	// Not safe to use t.TempDir() as it generates too long paths including the test name
+	f, err := os.CreateTemp("", "ut_*.sock")
+	assert.NoError(t, err)
+	_ = f.Close()
+	allocatedUDSName := f.Name()
+	err = os.Remove(allocatedUDSName)
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		err := os.Remove(allocatedUDSName)
+		assert.True(t, err == nil || os.IsNotExist(err))
+	})
+	return allocatedUDSName
+}
+
+func (tpl *testPluginLoader) run(t *testing.T, ctx context.Context, targetURL string, loaderID uuid.UUID) {
 	wg := new(sync.WaitGroup)
 	defer func() {
 		wg.Wait()
 		close(tpl.done)
 	}()
 
-	conn, err := grpc.NewClient("unix:"+socketAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(targetURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
@@ -83,10 +98,10 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 
 	args := &PluginControllerArgs{
 		DomainManager: tdm,
-		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
 		InitialConfig: &PluginControllerConfig{
 			GRPC: GRPCConfig{
+				Address:         tempUDS(t),
 				ShutdownTimeout: confutil.P("1ms"),
 			},
 			Domains: make(map[string]*PluginConfig),
@@ -105,12 +120,10 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 		plugins: testPlugins,
 		done:    make(chan struct{}),
 	}
-	go tpl.run(t, ctx, pc.SocketAddress(), pc.LoaderID())
+	err = pc.Start(ctx)
+	assert.NoError(t, err)
 
-	go func() {
-		err := pc.Run(ctx)
-		assert.NoError(t, err)
-	}()
+	go tpl.run(t, ctx, pc.GRPCTargetURL(), pc.LoaderID())
 
 	return ctx, pc.(*pluginController), func() {
 		recovered := recover()
@@ -128,9 +141,9 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 func TestInitPluginControllerBadPlugin(t *testing.T) {
 	args := &PluginControllerArgs{
 		DomainManager: nil,
-		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
 		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: tempUDS(t)},
 			Domains: map[string]*PluginConfig{
 				"!badname": {},
 			},
@@ -143,20 +156,84 @@ func TestInitPluginControllerBadPlugin(t *testing.T) {
 func TestInitPluginControllerBadSocket(t *testing.T) {
 	args := &PluginControllerArgs{
 		DomainManager: nil,
-		SocketAddress: t.TempDir(), // can't use a dir as a socket
 		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{},
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: t.TempDir() /* can't use a dir as a socket */},
+		},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+
+	err = pc.Start(context.Background())
+	assert.Regexp(t, "bind", err)
+}
+
+func TestInitPluginControllerUDSTooLong(t *testing.T) {
+	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
+	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
+		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
+	}
+
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: string(longerThanUDSSafelySupportsCrossPlatform)},
+		},
 	}
 	_, err := NewPluginController(context.Background(), args)
-	assert.Regexp(t, "bind", err)
+	assert.Regexp(t, "PD011206", err)
+}
+
+func TestInitPluginControllerTCP4(t *testing.T) {
+	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
+	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
+		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
+	}
+
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: "tcp4:0.0.0.0:0"},
+		},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+
+	err = pc.Start(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
+}
+
+func TestInitPluginControllerTCP6(t *testing.T) {
+	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
+	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
+		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
+	}
+
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: "tcp6:[::1]:0"},
+		},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+
+	err = pc.Start(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
 
 func TestNotifyPluginUpdateNotStarted(t *testing.T) {
 	args := &PluginControllerArgs{
 		DomainManager: nil,
-		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{},
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: tempUDS(t)},
+		},
 	}
 	pc, err := NewPluginController(context.Background(), args)
 	assert.NoError(t, err)
@@ -173,9 +250,10 @@ func TestNotifyPluginUpdateNotStarted(t *testing.T) {
 func TestInflightHandleBadCorrelIDs(t *testing.T) {
 	args := &PluginControllerArgs{
 		DomainManager: nil,
-		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{},
+		InitialConfig: &PluginControllerConfig{
+			GRPC: GRPCConfig{Address: tempUDS(t)},
+		},
 	}
 	pc, err := NewPluginController(context.Background(), args)
 	assert.NoError(t, err)
@@ -189,10 +267,10 @@ func TestLoaderErrors(t *testing.T) {
 	ctx := context.Background()
 	args := &PluginControllerArgs{
 		DomainManager: nil,
-		SocketAddress: path.Join(t.TempDir(), "ut.sock"),
 		LoaderID:      uuid.New(),
 		InitialConfig: &PluginControllerConfig{
 			GRPC: GRPCConfig{
+				Address:         "tcp:127.0.0.1:0",
 				ShutdownTimeout: confutil.P("1ms"),
 			},
 			Domains: map[string]*PluginConfig{
@@ -206,16 +284,14 @@ func TestLoaderErrors(t *testing.T) {
 	pc, err := NewPluginController(ctx, args)
 	assert.NoError(t, err)
 
-	conn, err := grpc.NewClient("unix:"+pc.SocketAddress(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	err = pc.Start(ctx)
+	assert.NoError(t, err)
+
+	conn, err := grpc.NewClient(pc.GRPCTargetURL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
 	client := pbp.NewPluginControllerClient(conn)
-
-	go func() {
-		err := pc.Run(ctx)
-		assert.NoError(t, err)
-	}()
 
 	// first load with wrong ID
 	wrongLoader, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{

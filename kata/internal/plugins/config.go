@@ -26,6 +26,7 @@ type PluginControllerConfig struct {
 }
 
 type GRPCConfig struct {
+	Address         string  `yaml:"address"` // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
 	ShutdownTimeout *string `yaml:"shutdownTimeout"`
 }
 

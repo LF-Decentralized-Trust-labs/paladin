@@ -415,7 +415,7 @@ func TestFromDomainRequestPanic(t *testing.T) {
 
 }
 
-func TestFromDomainRequestBadRequest(t *testing.T) {
+func TestFromDomainRequestBadReq(t *testing.T) {
 
 	waitForResponse := make(chan struct{}, 1)
 

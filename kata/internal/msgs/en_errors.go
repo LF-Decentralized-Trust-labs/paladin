@@ -147,6 +147,7 @@ var (
 	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
 	MsgPluginInvalidResponse   = ffe("PD011204", "%s %s returned error: %s")
 	MsgPluginInvalidRequest    = ffe("PD011205", "%s %s sent invalid request: %T")
+	MsgPluginUDSPathTooLong    = ffe("PD011206", "Unix domain socket path too log (len=%d,limit=100)")
 
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
