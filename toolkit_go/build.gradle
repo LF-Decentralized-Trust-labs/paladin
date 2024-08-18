@@ -52,21 +52,21 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task toolkitProtoBindings(type:Exec, dependsOn: [installTools]) {
+task protoc(type:Exec, dependsOn: [installTools]) {
     workingDir '.'
     inputs.files(configurations.toolkitProtoDefinitions)
-    outputs.dir("pkg/proto/plugins")
+    outputs.dir("pkg/prototk")
     environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
     executable 'protoc'
-    args "--go_out=${projectDir}/pkg/proto/plugins"
+    args "--go_out=${projectDir}/pkg/prototk"
     args "--go_opt=paths=source_relative"
-    args "--go-grpc_out=${projectDir}/pkg/proto/plugins"
+    args "--go-grpc_out=${projectDir}/pkg/prototk"
     args "--go-grpc_opt=paths=source_relative"
     fileTree(configurations.toolkitProtoDefinitions.asPath) {
         include "*.proto"
     }.each { File file ->
-        args "--go_opt=M${file.name}=pkg/proto/plugins"
-        args "--go-grpc_opt=M${file.name}=pkg/proto/plugins"
+        args "--go_opt=M${file.name}=pkg/prototk"
+        args "--go-grpc_opt=M${file.name}=pkg/prototk"
     }
     args "--proto_path=${configurations.toolkitProtoDefinitions.asPath}"
     args fileTree(configurations.toolkitProtoDefinitions.asPath) {
@@ -85,7 +85,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
     delete 'componenttest/abis'
 }
 
-task goGet(type:Exec, dependsOn:tasks.toolkitProtoBindings) {
+task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -96,7 +96,7 @@ task goGet(type:Exec, dependsOn:tasks.toolkitProtoBindings) {
     args 'get'
 }
 
-task lint(type: Exec, dependsOn:tasks.toolkitProtoBindings) {
+task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
     inputs.files(goFiles);

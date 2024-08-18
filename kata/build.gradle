@@ -111,8 +111,11 @@ task copyTestbedContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
-// TODO: This can be removed once everything moves to the toolkit / plugins
-task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
+task protoc(type:Exec, dependsOn: [
+        ":toolkit_go:protoc",
+        tasks.makeMocks,
+        tasks.copyTestContracts
+    ]) {
     workingDir '.'
     inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
     outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
@@ -122,28 +125,6 @@ task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     args "--go-grpc_out=${projectDir}"
     args "--proto_path=${projectDir}"
     args inputs.files
-}
-
-task toolkitProtoBindings(type:Exec) {
-    workingDir '.'
-    inputs.files(configurations.toolkitProtoDefinitions)
-    outputs.dir("pkg/proto/plugins")
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
-    args "--go_out=${projectDir}/pkg/proto/plugins"
-    args "--go_opt=paths=source_relative"
-    args "--go-grpc_out=${projectDir}/pkg/proto/plugins"
-    args "--go-grpc_opt=paths=source_relative"
-    fileTree(configurations.toolkitProtoDefinitions.asPath) {
-        include "*.proto"
-    }.each { File file ->
-        args "--go_opt=M${file.name}=pkg/proto/plugins"
-        args "--go-grpc_opt=M${file.name}=pkg/proto/plugins"
-    }
-    args "--proto_path=${configurations.toolkitProtoDefinitions.asPath}"
-    args fileTree(configurations.toolkitProtoDefinitions.asPath) {
-        include "*.proto"
-    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
@@ -157,7 +138,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
     delete 'componenttest/abis'
 }
 
-task goGet(type:Exec, dependsOn:tasks.protoc) {
+task goGet(type:Exec, dependsOn:[tasks.protoc]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -168,7 +149,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
     args 'get'
 }
 
-task lint(type: Exec, dependsOn:tasks.protoc) {
+task lint(type: Exec, dependsOn:[tasks.protoc]) {
     workingDir '.'
 
     inputs.files(goFiles);
@@ -311,7 +292,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: tasks.protoc) {
+task setupCoverage(dependsOn: [tasks.protoc]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
@@ -340,7 +321,8 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
 }
 
 
-task buildCoverageTxt(type: Exec, dependsOn: [tasks.protoc,
+task buildCoverageTxt(type: Exec, dependsOn: [
+        tasks.protoc,
         tasks.unitTestSQLite,
         tasks.unitTestPostgres,
         tasks.componentTestSQLite,

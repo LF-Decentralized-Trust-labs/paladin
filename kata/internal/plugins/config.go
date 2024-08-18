@@ -16,8 +16,8 @@ package plugins
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type PluginControllerConfig struct {
@@ -52,9 +52,9 @@ func (pl LibraryType) Options() []string {
 	}
 }
 
-var golangToProtoLibTypeMap = map[LibraryType]pbp.PluginLoad_LibType{
-	LibraryTypeCShared: pbp.PluginLoad_C_SHARED,
-	LibraryTypeJar:     pbp.PluginLoad_JAR,
+var golangToProtoLibTypeMap = map[LibraryType]prototk.PluginLoad_LibType{
+	LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
+	LibraryTypeJar:     prototk.PluginLoad_JAR,
 }
 
 type PluginConfig struct {

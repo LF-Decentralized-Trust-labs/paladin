@@ -24,43 +24,29 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domaintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type DomainManager interface {
-	DomainRegistered(name string, id uuid.UUID, toDomain DomainAPI) (fromDomain DomainCallbacks)
-}
-
-type DomainAPI interface {
-	ConfigureDomain(context.Context, *pbp.ConfigureDomainRequest) (*pbp.ConfigureDomainResponse, error)
-	InitDomain(context.Context, *pbp.InitDomainRequest) (*pbp.InitDomainResponse, error)
-	InitDeploy(context.Context, *pbp.InitDeployRequest) (*pbp.InitDeployResponse, error)
-	PrepareDeploy(context.Context, *pbp.PrepareDeployRequest) (*pbp.PrepareDeployResponse, error)
-	InitTransaction(context.Context, *pbp.InitTransactionRequest) (*pbp.InitTransactionResponse, error)
-	AssembleTransaction(context.Context, *pbp.AssembleTransactionRequest) (*pbp.AssembleTransactionResponse, error)
-	EndorseTransaction(context.Context, *pbp.EndorseTransactionRequest) (*pbp.EndorseTransactionResponse, error)
-	PrepareTransaction(context.Context, *pbp.PrepareTransactionRequest) (*pbp.PrepareTransactionResponse, error)
-}
-
-type DomainCallbacks interface {
-	FindAvailableStates(context.Context, *pbp.FindAvailableStatesRequest) (*pbp.FindAvailableStatesResponse, error)
+	DomainRegistered(name string, id uuid.UUID, toDomain domaintk.DomainAPI) (fromDomain domaintk.DomainCallbacks)
 }
 
 type domainHandler struct {
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	pc         *pluginController
-	plugin     *plugin[DomainCallbacks]
-	callbacks  DomainCallbacks
-	sendStream pbp.PluginController_ConnectDomainServer
-	sendChl    chan *pbp.DomainMessage
+	plugin     *plugin[domaintk.DomainCallbacks]
+	callbacks  domaintk.DomainCallbacks
+	sendStream prototk.PluginController_ConnectDomainServer
+	sendChl    chan *prototk.DomainMessage
 	senderDone chan struct{}
 }
 
 // Domains connect over this channel, and must announce themselves with their ID to complete the load
-func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDomainServer) error {
+func (pc *pluginController) domainServer(stream prototk.PluginController_ConnectDomainServer) error {
 	ctx := stream.Context()
-	var plugin *plugin[DomainCallbacks]
+	var plugin *plugin[domaintk.DomainCallbacks]
 	defer func() {
 		// If we got to the point we've initialized, then we're unregistered & uninitialized when we return
 		if plugin != nil {
@@ -83,17 +69,17 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			log.L(ctx).Errorf("Stream for domain %s failed: %s", domainName, err)
 			return err
 		}
-		if plugin == nil && msg.MessageType != pbp.DomainMessage_REGISTER {
+		if plugin == nil && msg.MessageType != prototk.DomainMessage_REGISTER {
 			log.L(ctx).Warnf("Domain %s sent request before registration: %s", domainName, jsonProto(msg))
 			continue
 		}
 		switch msg.MessageType {
-		case pbp.DomainMessage_REGISTER:
+		case prototk.DomainMessage_REGISTER:
 			if plugin != nil {
 				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
 				continue
 			}
-			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, pbp.PluginInfo_DOMAIN)
+			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, prototk.PluginInfo_DOMAIN)
 			if err != nil {
 				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.DomainId)
 				// Close the connection to this plugin
@@ -103,16 +89,16 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 			domainName = plugin.name
 			// The handler starts and owns the sending routine (we only use it on this routine, so no locking on this line)
 			plugin.handler = pc.newDomainHandler(plugin, stream)
-		case pbp.DomainMessage_RESPONSE_FROM_DOMAIN,
-			pbp.DomainMessage_ERROR_RESPONSE:
+		case prototk.DomainMessage_RESPONSE_FROM_DOMAIN,
+			prototk.DomainMessage_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel
-			req := pc.domainRequests.getInflight(ctx, msg.CorrelationId)
+			req := pc.domainRequests.GetInflightCorrelID(msg.CorrelationId)
 			if req == nil {
 				log.L(ctx).Warnf("Domain %s sent response for unknown/expired request: %s", domainName, jsonProto(msg))
 				continue
 			}
-			req.done <- msg
-		case pbp.DomainMessage_REQUEST_FROM_DOMAIN:
+			req.Complete(msg)
+		case prototk.DomainMessage_REQUEST_FROM_DOMAIN:
 			// We can't block the stream for this processing, so kick it off to a go routine for the handler
 			go plugin.handler.requestFromDomain(ctx, msg)
 		}
@@ -120,11 +106,11 @@ func (pc *pluginController) domainServer(stream pbp.PluginController_ConnectDoma
 	}
 }
 
-func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], sendStream pbp.PluginController_ConnectDomainServer) *domainHandler {
+func (pc *pluginController) newDomainHandler(plugin *plugin[domaintk.DomainCallbacks], sendStream prototk.PluginController_ConnectDomainServer) *domainHandler {
 	dh := &domainHandler{
 		pc:         pc,
 		plugin:     plugin,
-		sendChl:    make(chan *pbp.DomainMessage),
+		sendChl:    make(chan *prototk.DomainMessage),
 		senderDone: make(chan struct{}),
 		sendStream: sendStream,
 	}
@@ -134,13 +120,13 @@ func (pc *pluginController) newDomainHandler(plugin *plugin[DomainCallbacks], se
 	return dh
 }
 
-func (dh *domainHandler) ConfigureDomain(ctx context.Context, req *pbp.ConfigureDomainRequest) (res *pbp.ConfigureDomainResponse, err error) {
+func (dh *domainHandler) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (res *prototk.ConfigureDomainResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_ConfigureDomain{ConfigureDomain: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_ConfigureDomain{ConfigureDomain: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_ConfigureDomainRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_ConfigureDomainRes); ok {
 				res = r.ConfigureDomainRes
 			}
 			return res != nil
@@ -149,13 +135,13 @@ func (dh *domainHandler) ConfigureDomain(ctx context.Context, req *pbp.Configure
 	return
 }
 
-func (dh *domainHandler) InitDomain(ctx context.Context, req *pbp.InitDomainRequest) (res *pbp.InitDomainResponse, err error) {
+func (dh *domainHandler) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (res *prototk.InitDomainResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_InitDomain{InitDomain: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_InitDomain{InitDomain: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_InitDomainRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitDomainRes); ok {
 				res = r.InitDomainRes
 			}
 			return res != nil
@@ -168,13 +154,13 @@ func (dh *domainHandler) InitDomain(ctx context.Context, req *pbp.InitDomainRequ
 	return
 }
 
-func (dh *domainHandler) InitDeploy(ctx context.Context, req *pbp.InitDeployRequest) (res *pbp.InitDeployResponse, err error) {
+func (dh *domainHandler) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (res *prototk.InitDeployResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_InitDeploy{InitDeploy: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_InitDeploy{InitDeploy: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_InitDeployRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitDeployRes); ok {
 				res = r.InitDeployRes
 			}
 			return res != nil
@@ -183,13 +169,13 @@ func (dh *domainHandler) InitDeploy(ctx context.Context, req *pbp.InitDeployRequ
 	return
 }
 
-func (dh *domainHandler) PrepareDeploy(ctx context.Context, req *pbp.PrepareDeployRequest) (res *pbp.PrepareDeployResponse, err error) {
+func (dh *domainHandler) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (res *prototk.PrepareDeployResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_PrepareDeploy{PrepareDeploy: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_PrepareDeploy{PrepareDeploy: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_PrepareDeployRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_PrepareDeployRes); ok {
 				res = r.PrepareDeployRes
 			}
 			return res != nil
@@ -198,13 +184,13 @@ func (dh *domainHandler) PrepareDeploy(ctx context.Context, req *pbp.PrepareDepl
 	return
 }
 
-func (dh *domainHandler) InitTransaction(ctx context.Context, req *pbp.InitTransactionRequest) (res *pbp.InitTransactionResponse, err error) {
+func (dh *domainHandler) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (res *prototk.InitTransactionResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_InitTransaction{InitTransaction: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_InitTransaction{InitTransaction: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_InitTransactionRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitTransactionRes); ok {
 				res = r.InitTransactionRes
 			}
 			return res != nil
@@ -213,13 +199,13 @@ func (dh *domainHandler) InitTransaction(ctx context.Context, req *pbp.InitTrans
 	return
 }
 
-func (dh *domainHandler) AssembleTransaction(ctx context.Context, req *pbp.AssembleTransactionRequest) (res *pbp.AssembleTransactionResponse, err error) {
+func (dh *domainHandler) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_AssembleTransaction{AssembleTransaction: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_AssembleTransactionRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_AssembleTransactionRes); ok {
 				res = r.AssembleTransactionRes
 			}
 			return res != nil
@@ -228,13 +214,13 @@ func (dh *domainHandler) AssembleTransaction(ctx context.Context, req *pbp.Assem
 	return
 }
 
-func (dh *domainHandler) EndorseTransaction(ctx context.Context, req *pbp.EndorseTransactionRequest) (res *pbp.EndorseTransactionResponse, err error) {
+func (dh *domainHandler) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (res *prototk.EndorseTransactionResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_EndorseTransaction{EndorseTransaction: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_EndorseTransaction{EndorseTransaction: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_EndorseTransactionRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_EndorseTransactionRes); ok {
 				res = r.EndorseTransactionRes
 			}
 			return res != nil
@@ -243,13 +229,13 @@ func (dh *domainHandler) EndorseTransaction(ctx context.Context, req *pbp.Endors
 	return
 }
 
-func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *pbp.PrepareTransactionRequest) (res *pbp.PrepareTransactionResponse, err error) {
+func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (res *prototk.PrepareTransactionResponse, err error) {
 	err = dh.requestToDomain(ctx,
-		func(dm *pbp.DomainMessage) {
-			dm.RequestToDomain = &pbp.DomainMessage_PrepareTransaction{PrepareTransaction: req}
+		func(dm *prototk.DomainMessage) {
+			dm.RequestToDomain = &prototk.DomainMessage_PrepareTransaction{PrepareTransaction: req}
 		},
-		func(dm *pbp.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*pbp.DomainMessage_PrepareTransactionRes); ok {
+		func(dm *prototk.DomainMessage) bool {
+			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_PrepareTransactionRes); ok {
 				res = r.PrepareTransactionRes
 			}
 			return res != nil
@@ -261,7 +247,7 @@ func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *pbp.Prepar
 func (dh *domainHandler) sender() {
 	defer close(dh.senderDone)
 	for {
-		var msg *pbp.DomainMessage
+		var msg *prototk.DomainMessage
 		select {
 		case msg = <-dh.sendChl:
 		case <-dh.ctx.Done():
@@ -277,7 +263,7 @@ func (dh *domainHandler) sender() {
 }
 
 // returns once send is dispatched to sendChl, or context is cancelled
-func (dh *domainHandler) send(ctx context.Context, msg *pbp.DomainMessage) {
+func (dh *domainHandler) send(ctx context.Context, msg *prototk.DomainMessage) {
 	select {
 	case dh.sendChl <- msg:
 	case <-ctx.Done():
@@ -291,32 +277,32 @@ func (dh *domainHandler) close() {
 
 func (dh *domainHandler) requestToDomain(ctx context.Context,
 	// The protobuf codegen isn't generics friendly, so we use functions here
-	setReqBody func(*pbp.DomainMessage),
-	getResBody func(*pbp.DomainMessage) bool,
+	setReqBody func(*prototk.DomainMessage),
+	getResBody func(*prototk.DomainMessage) bool,
 ) (err error) {
 	msgID := uuid.New()
-	req := &pbp.DomainMessage{
+	req := &prototk.DomainMessage{
 		DomainId:    dh.plugin.id.String(),
 		MessageId:   msgID.String(),
-		MessageType: pbp.DomainMessage_REQUEST_TO_DOMAIN,
+		MessageType: prototk.DomainMessage_REQUEST_TO_DOMAIN,
 	}
 	setReqBody(req)
-	inflight := dh.pc.domainRequests.addInflight(msgID)
-	defer inflight.cancel()
+	inflight := dh.pc.domainRequests.AddInflight(msgID)
+	defer inflight.Cancel()
 
 	startTime := time.Now()
 	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestToDomain)
 
 	dh.send(ctx, req)
-	res, err := inflight.wait(ctx)
+	res, err := inflight.Wait(ctx)
 	if err != nil {
 		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
 		return err
 	}
 	responseOk := getResBody(res)
-	if res.MessageType != pbp.DomainMessage_RESPONSE_FROM_DOMAIN || !responseOk {
+	if res.MessageType != prototk.DomainMessage_RESPONSE_FROM_DOMAIN || !responseOk {
 		var errorMessage string
-		if res.MessageType == pbp.DomainMessage_ERROR_RESPONSE && res.ErrorMessage != nil {
+		if res.MessageType == prototk.DomainMessage_ERROR_RESPONSE && res.ErrorMessage != nil {
 			// We've got a formatted error from the other side
 			errorMessage = *res.ErrorMessage
 		} else {
@@ -331,12 +317,12 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 	return nil
 }
 
-func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainMessage) {
-	reply := &pbp.DomainMessage{
+func (dh *domainHandler) requestFromDomain(ctx context.Context, req *prototk.DomainMessage) {
+	reply := &prototk.DomainMessage{
 		DomainId:      dh.plugin.id.String(),
 		MessageId:     uuid.New().String(),
 		CorrelationId: &req.MessageId,
-		MessageType:   pbp.DomainMessage_RESPONSE_TO_DOMAIN,
+		MessageType:   prototk.DomainMessage_RESPONSE_TO_DOMAIN,
 	}
 	startTime := time.Now()
 	var err error
@@ -350,7 +336,7 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainM
 			errorMessage = err.Error()
 		}
 		if errorMessage != "" {
-			reply.MessageType = pbp.DomainMessage_ERROR_RESPONSE
+			reply.MessageType = prototk.DomainMessage_ERROR_RESPONSE
 			reply.ErrorMessage = &errorMessage
 			reply.ResponseToDomain = nil
 			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
@@ -361,11 +347,11 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *pbp.DomainM
 	}()
 	log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestFromDomain)
 	switch msg := req.RequestFromDomain.(type) {
-	case *pbp.DomainMessage_FindAvailableStates:
-		var res *pbp.FindAvailableStatesResponse
+	case *prototk.DomainMessage_FindAvailableStates:
+		var res *prototk.FindAvailableStatesResponse
 		res, err = dh.callbacks.FindAvailableStates(ctx, msg.FindAvailableStates)
 		if err == nil {
-			reply.ResponseToDomain = &pbp.DomainMessage_FindAvailableStatesRes{
+			reply.ResponseToDomain = &prototk.DomainMessage_FindAvailableStatesRes{
 				FindAvailableStatesRes: res,
 			}
 		}

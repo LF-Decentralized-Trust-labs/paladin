@@ -26,8 +26,10 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domaintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -54,7 +56,7 @@ type plugin[CB any] struct {
 	pc   *pluginController
 	name string
 	id   uuid.UUID
-	def  *pbp.PluginLoad
+	def  *prototk.PluginLoad
 
 	initializing bool
 	registered   bool
@@ -63,7 +65,7 @@ type plugin[CB any] struct {
 }
 
 type pluginController struct {
-	pbp.UnimplementedPluginControllerServer
+	prototk.UnimplementedPluginControllerServer
 	bgCtx    context.Context
 	mux      sync.Mutex
 	listener net.Listener
@@ -75,12 +77,12 @@ type pluginController struct {
 	domainManager   DomainManager
 	shutdownTimeout time.Duration
 
-	domainPlugins  map[uuid.UUID]*plugin[DomainCallbacks]
-	domainRequests *inflightManager[*pbp.DomainMessage]
+	domainPlugins  map[uuid.UUID]*plugin[domaintk.DomainCallbacks]
+	domainRequests *inflight.InflightManager[uuid.UUID, *prototk.DomainMessage]
 
 	notifyPluginsUpdated chan bool
 	pluginLoaderDone     chan struct{}
-	loadingProgressed    chan *pbp.PluginLoadFailed
+	loadingProgressed    chan *prototk.PluginLoadFailed
 	serverDone           chan error
 }
 
@@ -93,12 +95,12 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
 		domainManager:  args.DomainManager,
-		domainPlugins:  make(map[uuid.UUID]*plugin[DomainCallbacks]),
-		domainRequests: newInFlightRequests[*pbp.DomainMessage](),
+		domainPlugins:  make(map[uuid.UUID]*plugin[domaintk.DomainCallbacks]),
+		domainRequests: inflight.NewInflightManager[uuid.UUID, *prototk.DomainMessage](uuid.Parse),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
-		loadingProgressed:    make(chan *pbp.PluginLoadFailed, 1),
+		loadingProgressed:    make(chan *prototk.PluginLoadFailed, 1),
 	}
 
 	if err := pc.PluginsUpdated(args.InitialConfig); err != nil {
@@ -155,7 +157,7 @@ func (pc *pluginController) Start(ctx context.Context) (err error) {
 	}
 	pc.server = grpc.NewServer()
 
-	pbp.RegisterPluginControllerServer(pc.server, pc)
+	prototk.RegisterPluginControllerServer(pc.server, pc)
 
 	log.L(ctx).Infof("server listening at %v", pc.listener.Addr())
 	go pc.runServer(ctx)
@@ -204,7 +206,7 @@ func (pc *pluginController) LoaderID() uuid.UUID {
 
 func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
 	for name, dp := range conf.Domains {
-		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, pbp.PluginInfo_DOMAIN, dp); err != nil {
+		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp); err != nil {
 			return err
 		}
 	}
@@ -217,7 +219,7 @@ func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
 
 func (pc *pluginController) WaitForInit(ctx context.Context) error {
 	for {
-		unloadedDomainPlugins, _ := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN, false)
+		unloadedDomainPlugins, _ := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, false)
 		unloadedCount := len(unloadedDomainPlugins)
 		if unloadedCount == 0 {
 			return nil
@@ -238,7 +240,7 @@ func (pc *pluginController) newReqContext() context.Context {
 	return log.WithLogField(pc.bgCtx, "plugin_reqid", types.ShortID())
 }
 
-func (pc *pluginController) InitLoader(req *pbp.PluginLoaderInit, stream pbp.PluginController_InitLoaderServer) error {
+func (pc *pluginController) InitLoader(req *prototk.PluginLoaderInit, stream prototk.PluginController_InitLoaderServer) error {
 	ctx := pc.newReqContext()
 	suppliedID, err := uuid.Parse(req.Id)
 	if err != nil || suppliedID != pc.loaderID {
@@ -255,28 +257,28 @@ func (pc *pluginController) InitLoader(req *pbp.PluginLoaderInit, stream pbp.Plu
 	return pc.sendPluginsToLoader(stream)
 }
 
-func (pc *pluginController) LoadFailed(ctx context.Context, req *pbp.PluginLoadFailed) (*pbp.EmptyResponse, error) {
+func (pc *pluginController) LoadFailed(ctx context.Context, req *prototk.PluginLoadFailed) (*prototk.EmptyResponse, error) {
 	log.L(ctx).Errorf("Plugin load %s (type=%s) failed: %s", req.Plugin.Name, req.Plugin.PluginType, req.ErrorMessage)
 	select {
 	case pc.loadingProgressed <- req:
 	default:
 	}
-	return &pbp.EmptyResponse{}, nil
+	return &prototk.EmptyResponse{}, nil
 }
 
-func (pc *pluginController) ConnectDomain(stream pbp.PluginController_ConnectDomainServer) error {
+func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
 	return pc.domainServer(stream)
 }
 
-func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType pbp.PluginInfo_PluginType, conf *PluginConfig) (err error) {
+func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType prototk.PluginInfo_PluginType, conf *PluginConfig) (err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	plugin := &plugin[CB]{pc: pc, id: uuid.New(), name: name}
 	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, name, "name"); err != nil {
 		return err
 	}
-	plugin.def = &pbp.PluginLoad{
-		Plugin: &pbp.PluginInfo{
+	plugin.def = &prototk.PluginLoad{
+		Plugin: &prototk.PluginInfo{
 			Id:         plugin.id.String(),
 			Name:       name,
 			PluginType: pType,
@@ -303,7 +305,7 @@ func (pc *pluginController) tapLoadingProgressed() {
 	}
 }
 
-func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType pbp.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
+func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType prototk.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	for _, plugin := range pluginMap {
@@ -325,7 +327,7 @@ func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plug
 	return unloaded, notInitializing
 }
 
-func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType pbp.PluginInfo_PluginType) (p *plugin[CB], err error) {
+func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType prototk.PluginInfo_PluginType) (p *plugin[CB], err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	id, err := uuid.Parse(idStr)
@@ -338,7 +340,7 @@ func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*
 	return p, err
 }
 
-func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_InitLoaderServer) (err error) {
+func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_InitLoaderServer) (err error) {
 	defer func() {
 		pc.mux.Lock()
 		defer pc.mux.Unlock()
@@ -349,7 +351,7 @@ func (pc *pluginController) sendPluginsToLoader(stream pbp.PluginController_Init
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
-		_, notInitializing := unloadedPlugins(pc, pc.domainPlugins, pbp.PluginInfo_DOMAIN, true)
+		_, notInitializing := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, true)
 		for _, plugin := range notInitializing {
 			if err == nil {
 				err = stream.Send(plugin.def)

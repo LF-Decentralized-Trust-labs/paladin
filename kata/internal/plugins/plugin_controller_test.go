@@ -26,7 +26,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	pbp "github.com/kaleido-io/paladin/kata/pkg/proto/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,7 +34,7 @@ import (
 
 type testPlugin interface {
 	conf() *PluginConfig
-	run(t *testing.T, ctx context.Context, id string, client pbp.PluginControllerClient)
+	run(t *testing.T, ctx context.Context, id string, client prototk.PluginControllerClient)
 }
 
 type testPluginLoader struct {
@@ -68,9 +68,9 @@ func (tpl *testPluginLoader) run(t *testing.T, ctx context.Context, targetURL st
 	assert.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
-	client := pbp.NewPluginControllerClient(conn)
+	client := prototk.NewPluginControllerClient(conn)
 
-	loaderStream, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+	loaderStream, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: loaderID.String(),
 	})
 	assert.NoError(t, err)
@@ -259,8 +259,8 @@ func TestInflightHandleBadCorrelIDs(t *testing.T) {
 	assert.NoError(t, err)
 
 	inFlight := pc.(*pluginController).domainRequests
-	assert.Nil(t, inFlight.getInflight(context.Background(), nil))
-	assert.Nil(t, inFlight.getInflight(context.Background(), confutil.P("wrong")))
+	assert.Nil(t, inFlight.GetInflightCorrelID(nil))
+	assert.Nil(t, inFlight.GetInflightCorrelID(confutil.P("wrong")))
 }
 
 func TestLoaderErrors(t *testing.T) {
@@ -291,10 +291,10 @@ func TestLoaderErrors(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
-	client := pbp.NewPluginControllerClient(conn)
+	client := prototk.NewPluginControllerClient(conn)
 
 	// first load with wrong ID
-	wrongLoader, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+	wrongLoader, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: uuid.NewString(),
 	})
 	assert.NoError(t, err)
@@ -302,7 +302,7 @@ func TestLoaderErrors(t *testing.T) {
 	assert.Regexp(t, "PD011200", err)
 
 	// then load correctly
-	loaderStream, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+	loaderStream, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: pc.LoaderID().String(),
 	})
 	assert.NoError(t, err)
@@ -310,7 +310,7 @@ func TestLoaderErrors(t *testing.T) {
 	loadReq, err := loaderStream.Recv()
 	assert.NoError(t, err)
 
-	_, err = client.LoadFailed(ctx, &pbp.PluginLoadFailed{
+	_, err = client.LoadFailed(ctx, &prototk.PluginLoadFailed{
 		Plugin:       loadReq.Plugin,
 		ErrorMessage: "pop",
 	})
@@ -321,7 +321,7 @@ func TestLoaderErrors(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 
 	// then attempt double start of the loader
-	dupLoader, err := client.InitLoader(ctx, &pbp.PluginLoaderInit{
+	dupLoader, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: pc.LoaderID().String(),
 	})
 	assert.NoError(t, err)
@@ -353,6 +353,6 @@ func TestLoaderErrors(t *testing.T) {
 
 	// Also check we don't block on the LoadFailed notification if the channel gets full (which it will after stop)
 	for i := 0; i < 3; i++ {
-		_, _ = pc.(*pluginController).LoadFailed(context.Background(), &pbp.PluginLoadFailed{Plugin: &pbp.PluginInfo{}})
+		_, _ = pc.(*pluginController).LoadFailed(context.Background(), &prototk.PluginLoadFailed{Plugin: &prototk.PluginInfo{}})
 	}
 }

@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package plugins
+package pluggrpc
 
 import (
 	"context"
@@ -28,20 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testDomainManager struct {
-	domainRegistered    func(name string, id uuid.UUID, toDomain domaintk.DomainAPI) (fromDomain domaintk.DomainCallbacks)
-	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
-}
-
-func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-	return tp.findAvailableStates(ctx, req)
-}
-
-func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain domaintk.DomainAPI) (fromDomain domaintk.DomainCallbacks) {
-	return tdm.domainRegistered(name, id, toDomain)
-}
-
-type testDomain struct {
+type grpcPluginClient struct {
 	configureDomain     func(*prototk.ConfigureDomainRequest) *prototk.ConfigureDomainResponse
 	initDomain          func(*prototk.InitDomainRequest) *prototk.InitDomainResponse
 	initDeploy          func(*prototk.InitDeployRequest) *prototk.InitDeployResponse
@@ -59,14 +46,14 @@ type testDomain struct {
 	handleResponse func(*prototk.DomainMessage)
 }
 
-func (tp *testDomain) conf() *PluginConfig {
+func (tp *grpcPluginClient) conf() *PluginConfig {
 	return &PluginConfig{
 		Type:     types.Enum[LibraryType](LibraryTypeCShared),
 		Location: "/any/where",
 	}
 }
 
-func (tp *testDomain) run(t *testing.T, connectCtx context.Context, id string, client prototk.PluginControllerClient) {
+func (tp *grpcPluginClient) run(t *testing.T, connectCtx context.Context, id string, client prototk.PluginControllerClient) {
 	stream, err := client.ConnectDomain(connectCtx)
 	assert.NoError(t, err)
 
@@ -174,7 +161,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		return tdm
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			configureDomain: func(cdr *prototk.ConfigureDomainRequest) *prototk.ConfigureDomainResponse {
 				assert.Equal(t, int64(12345), cdr.ChainId)
@@ -314,7 +301,7 @@ func TestFromDomainRequestsOK(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			sendRequest: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -355,7 +342,7 @@ func TestFromDomainRequestsError(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			sendRequest: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -395,7 +382,7 @@ func TestFromDomainRequestPanic(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			sendRequest: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -432,7 +419,7 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 	}
 
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			sendRequest: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -465,7 +452,7 @@ func TestDomainRequestsFail(t *testing.T) {
 		return tdm
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 				return []*prototk.DomainMessage{
@@ -499,7 +486,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 		return tdm
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 				return []*prototk.DomainMessage{
@@ -531,7 +518,7 @@ func TestDomainSendAfterClose(t *testing.T) {
 		return tdm
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {},
 	})
 
@@ -565,7 +552,7 @@ func TestDomainRequestTimeoutSend(t *testing.T) {
 		return tdm
 	}
 
-	_, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, pc, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {},
 	})
 
@@ -603,7 +590,7 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 		return tdm
 	}
 
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			preRegister: func(string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -627,7 +614,7 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 		return tdm
 	}
 
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			preRegister: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -653,7 +640,7 @@ func TestDomainRegisterWrongID(t *testing.T) {
 		return tdm
 	}
 
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	_, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			preRegister: func(domainID string) *prototk.DomainMessage {
 				return &prototk.DomainMessage{
@@ -682,7 +669,7 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 		return tdm
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
+	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*grpcPluginClient{
 		"domain1": {
 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 				unknownRequest := uuid.NewString()
