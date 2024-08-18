@@ -52,3 +52,15 @@ message DelegateTransaction {
     string delegatingNodeId = 2;
     string delegateNodeId = 3;
 }
+
+message TransactionBlockedEvent {
+    string transactionId = 1;
+}
+
+message TransactionConfirmedEvent {
+    string transactionId = 1;
+}
+
+message TransactionRevertedEvent {
+    string transactionId = 1;
+}

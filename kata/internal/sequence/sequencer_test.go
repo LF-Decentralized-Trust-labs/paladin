@@ -247,11 +247,133 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 // TODO mode complex variations of TestSequencerMultipleRemoteDependencies where there are still multiple remainign dependency transactions but they are all on the same remote node and/or they are all on the local node
 // timing conditions where the remote transactions themselves get delegated to another node or even get delegated to this local node
 
-func TestSequencerCommitEndorsement(t *testing.T) {
-	// before endorsement is confirmed, the sequencer on the node local to the endorser is invoked to
-	//  a) record the endorsement
-	//  b) assert that the endorsement does not result in any contention
+//Endorsement tests
+// before endorsement is confirmed, the sequencer on the node local to the endorser is invoked to
+//  a) record the endorsement
+//  b) assert that the endorsement does not result in any contention with any transaction that we have already endorsed
+//  make no assumption about what endorsement mode we are in ( e.g. we might be the notary, we might just one of a privacy group in a 100% endorsement)
+//  all we can be sure is that we do not endorse 2 conflicting transactions
+//  whichever one we see first is the winner in our eyes.
+//  that might turn out to be wrong later.  The contention resolution alorithm might decide that the other one is the winner
+//  and the first transaction will be re-assembled so in that case, we must retract our endorsement for it
+//  and endorse the other one instead
 
+func TestSequencerApproveEndorsement(t *testing.T) {
+
+	ctx := context.Background()
+	nodeID := uuid.New()
+	txn1ID := uuid.New()
+	stateHash := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
+
+	//with no other information, a sequencer should have no reason not to approve endorsement
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn1ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.True(t, approved)
+}
+
+func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
+
+	//in this test, we do the check after we have seen the assembled event
+	ctx := context.Background()
+	nodeID := uuid.New()
+	remoteNodeID := uuid.New()
+
+	txn1ID := uuid.New()
+	stateHash := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:         remoteNodeID.String(),
+		TransactionId:  txn1ID.String(),
+		InputStateHash: []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn1ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.True(t, approved)
+}
+
+func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
+
+	ctx := context.Background()
+	nodeID := uuid.New()
+	stateHash := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	txn1ID := uuid.New()
+	txn2ID := uuid.New()
+	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
+
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn1ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.True(t, approved)
+
+	approved, err = node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn2ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.False(t, approved)
+}
+
+func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
+
+	ctx := context.Background()
+	nodeID := uuid.New()
+	remoteNodeID := uuid.New()
+	stateHash := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	txn1ID := uuid.New()
+	txn2ID := uuid.New()
+	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:         remoteNodeID.String(),
+		TransactionId:  txn1ID.String(),
+		InputStateHash: []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
+	//with no other information, a sequencer should have no reason not to approve endorsement
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn1ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.True(t, approved)
+
+	err = node1Sequencer.OnTransactionReverted(ctx, &pb.TransactionRevertedEvent{
+		TransactionId: txn1ID.String(),
+	})
+	assert.NoError(t, err)
+
+	approved, err = node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
+		transactionID: txn2ID.String(),
+		inputStates:   []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+	assert.True(t, approved)
 }
 
 // Test cases to assert the emergent behaviour when multiple concurrent copies of the sequencer are running
@@ -573,6 +695,7 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 			graph:                       NewGraph(),
 			unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
 			unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+			stateSpenders:               make(map[string]string),
 		},
 		sequencerMockDependencies{
 			brokerMock,

@@ -42,10 +42,20 @@ type Dispatcher interface {
 	Dispatch(context.Context, []uuid.UUID) error
 }
 
+type EndorsementRequest struct {
+	transactionID string
+	inputStates   []string
+}
 type Sequencer interface {
 	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
 	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
+	/* OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
+	steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
+	event is emitted.
+	*/
+	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
+	ApproveEndorsement(ctx context.Context, endorsementRequest EndorsementRequest) (bool, error)
 }
 
 type blockingTransaction struct {
@@ -74,6 +84,7 @@ type unconfirmedTransaction struct {
 	sequencingNodeID string
 	assemblerNodeID  string
 	outputStates     []string
+	inputStates      []string
 }
 
 type sequencer struct {
@@ -85,6 +96,7 @@ type sequencer struct {
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 	unconfirmedStatesByHash     map[string]*unconfirmedState
 	unconfirmedTransactionsByID map[string]*unconfirmedTransaction
+	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
 }
 
 func NewSequencer(eventSync EventSync) Sequencer {
@@ -294,6 +306,7 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
 		assemblerNodeID:  event.NodeId,
 		outputStates:     event.OutputStateHash,
+		inputStates:      event.InputStateHash,
 	}
 	for _, unconfirmedStateHash := range event.OutputStateHash {
 		s.unconfirmedStatesByHash[unconfirmedStateHash] = &unconfirmedState{
@@ -434,4 +447,36 @@ func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.Transa
 	}
 
 	return nil
+}
+
+func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error {
+	//release the transaction's claim on any states
+	for state, spender := range s.stateSpenders {
+		if spender == event.TransactionId {
+			delete(s.stateSpenders, state)
+		}
+	}
+
+	return nil
+}
+
+func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst EndorsementRequest) (bool, error) {
+	contentionFound := false
+	for _, stateHash := range endorsementRequst.inputStates {
+		if stateSpender, ok := s.stateSpenders[stateHash]; ok {
+			if stateSpender != endorsementRequst.transactionID {
+				//another transaction is already recognised as the spender of this state
+				contentionFound = true
+				break
+			}
+		}
+	}
+	if contentionFound {
+		return false, nil
+	}
+	//register this transaction as the spender of all the states
+	for _, stateHash := range endorsementRequst.inputStates {
+		s.stateSpenders[stateHash] = endorsementRequst.transactionID
+	}
+	return true, nil
 }
