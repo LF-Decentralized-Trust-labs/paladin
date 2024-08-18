@@ -22,12 +22,12 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 

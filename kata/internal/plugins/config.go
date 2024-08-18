@@ -15,8 +15,8 @@
 package plugins
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 

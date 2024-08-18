@@ -17,8 +17,8 @@
 package rpcserver
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 const DefaultHTTPPort = 8645

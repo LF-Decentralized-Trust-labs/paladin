@@ -29,7 +29,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -38,6 +37,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/signer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gopkg.in/yaml.v3"
 )
 

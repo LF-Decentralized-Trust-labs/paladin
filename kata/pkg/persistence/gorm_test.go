@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 

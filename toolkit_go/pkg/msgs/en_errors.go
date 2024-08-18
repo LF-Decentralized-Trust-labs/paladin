@@ -31,7 +31,15 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 }
 
 var (
+	// Generic PD0200XX
+	MsgContextCanceled = ffe("PD020000", "Context canceled")
 
 	// Inflight PD0201XX
-	MsgInflightRequestTimedOut = ffe("PD020100", "Request timed out after %s")
+	MsgInflightRequestCancelled = ffe("PD020100", "Request cancelled after %s")
+
+	// Config PD0202XX
+	MsgConfigFileMissing               = ffe("PD020200", "Config file not found at path: %s")
+	MsgConfigFileReadError             = ffe("PD020201", "Failed to read config file %s with error: %s")
+	MsgConfigFileParseError            = ffe("PD020202", "Failed to parse config file %s with error: %s")
+	MsgConfigFileMissingMandatoryValue = ffe("PD020203", "Mandatory config field %s missing ")
 )

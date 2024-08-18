@@ -28,11 +28,11 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/keystorev3"
 	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 type filesystemStore struct {

@@ -28,29 +28,20 @@ func TestInFlightLifecycleOK(t *testing.T) {
 		return uuid.Parse(s)
 	})
 
-	ctx := context.Background()
-	cancelledCtx, cancel := context.WithCancel(ctx)
-	cancel()
-
 	id := uuid.New()
-	req := ifm.AddInflight(id)
+	req := ifm.AddInflight(context.Background(), id)
 	assert.Equal(t, id, req.ID())
 
-	assert.Nil(t, ifm.GetInflightCorrelID(nil))
-	assert.Nil(t, ifm.GetInflightCorrelID(prtTo("wrong")))
-	assert.Nil(t, ifm.GetInflightCorrelID(prtTo(uuid.NewString())))
+	assert.Nil(t, ifm.GetInflightStr("wrong"))
+	assert.Nil(t, ifm.GetInflightStr(uuid.NewString()))
 
-	assert.Equal(t, req, ifm.GetInflightCorrelID(prtTo(req.ID().String())))
-
-	// Check context timeout
-	_, err := req.Wait(cancelledCtx)
-	assert.Regexp(t, "PD020100", err)
+	assert.Equal(t, req, ifm.GetInflightStr(req.ID().String()))
 
 	// Complete
 	go func() {
 		req.Complete("hello")
 	}()
-	v, err := req.Wait(context.Background())
+	v, err := req.Wait()
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", v)
 
@@ -63,6 +54,19 @@ func TestInFlightLifecycleOK(t *testing.T) {
 	req.Complete("mew")
 }
 
-func prtTo[T any](v T) *T {
-	return &v
+func TestInFlightCancel(t *testing.T) {
+
+	ifm := NewInflightManager[uuid.UUID, string](func(s string) (uuid.UUID, error) {
+		return uuid.Parse(s)
+	})
+
+	id := uuid.New()
+	req := ifm.AddInflight(context.Background(), id)
+	assert.Equal(t, id, req.ID())
+
+	go func() {
+		ifm.Close()
+	}()
+	_, err := req.Wait()
+	assert.Regexp(t, "PD020100", err)
 }

@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 

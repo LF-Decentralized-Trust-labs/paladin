@@ -68,9 +68,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 type Config struct {

@@ -20,21 +20,28 @@ package github.com.kaleido_io.paladin.toolkit;
 import "to_domain.proto";
 import "from_domain.proto";
 
-message DomainMessage {
+enum PluginType {
+  DOMAIN = 0;
+}
+
+message Header {
+  enum MessageType {
+    REGISTER = 0;
+    ERROR_RESPONSE = 1;
+    REQUEST_TO_PLUGIN = 2;
+    RESPONSE_FROM_PLUGIN = 3;
+    REQUEST_FROM_PLUGIN= 4;
+    RESPONSE_TO_PLUGIN = 5;
+  }
   string domain_id = 1; // unique runtime identifier for this domain
   string message_id = 2; // a unique identifier for this message
   optional string correlation_id = 3; // for replies the identifier of the request (for publications TBD)
   optional string error_message = 4;
-  enum MessageType {
-    REGISTER = 0;
-    ERROR_RESPONSE = 1;
-    REQUEST_TO_DOMAIN = 2;
-    RESPONSE_FROM_DOMAIN = 3;
-    REQUEST_FROM_DOMAIN = 4;
-    RESPONSE_TO_DOMAIN = 5;
-  }
   MessageType message_type = 5;
+}
 
+message DomainMessage {
+  Header header = 1;
   // Request/reply exchanges initiated by the paladin node, to the domain
   oneof request_to_domain {
     ConfigureDomainRequest      configure_domain =          1010;

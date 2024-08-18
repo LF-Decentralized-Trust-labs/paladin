@@ -27,10 +27,10 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 type Server interface {

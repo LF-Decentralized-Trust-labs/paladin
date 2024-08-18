@@ -16,7 +16,7 @@
 
 package retry
 
-import "github.com/kaleido-io/paladin/kata/internal/confutil"
+import "github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
 type Config struct {
 	InitialDelay *string  `yaml:"initialDelay"`

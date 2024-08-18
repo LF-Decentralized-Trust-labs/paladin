@@ -25,9 +25,9 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -23,12 +23,12 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

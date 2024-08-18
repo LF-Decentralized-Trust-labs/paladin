@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/rs/cors"
 )
 
