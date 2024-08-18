@@ -12,12 +12,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package plugbase
+package plugintk
 
 import (
 	"context"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	pb "google.golang.org/protobuf/proto"
 )
 
@@ -49,9 +51,29 @@ type PluginImplementation[M any] interface {
 }
 
 type PluginHandler[M any] interface {
-	RequestToDomain(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
+	RequestToPlugin(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
 }
 
 type PluginProxy[M any] interface {
-	RequestFromDomain(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
+	RequestFromPlugin(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
+}
+
+// Maps the response payload to the requested type (avoids boilerplate in plugin types)
+func responseToPluginAs[M any, T any](ctx context.Context, msg PluginMessage[M], err error) (*T, error) {
+	if err != nil {
+		return nil, err
+	}
+	res := msg.ResponseToPlugin()
+	iRes, ok := res.(*T)
+	if !ok {
+		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, res, new(T))
+	}
+	return iRes, nil
+}
+
+func callPluginImpl[IN, OUT any](ctx context.Context, in *IN, fn func(context.Context, *IN) (*OUT, error)) (*OUT, error) {
+	if fn == nil {
+		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnimplementedRequest, new(IN))
+	}
+	return fn(ctx, in)
 }

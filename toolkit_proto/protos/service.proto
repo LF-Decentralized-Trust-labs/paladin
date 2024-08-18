@@ -33,7 +33,7 @@ message Header {
     REQUEST_FROM_PLUGIN= 4;
     RESPONSE_TO_PLUGIN = 5;
   }
-  string domain_id = 1; // unique runtime identifier for this domain
+  string plugin_id = 1; // unique runtime identifier for this domain
   string message_id = 2; // a unique identifier for this message
   optional string correlation_id = 3; // for replies the identifier of the request (for publications TBD)
   optional string error_message = 4;

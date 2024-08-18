@@ -23,7 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type Retry struct {
@@ -82,7 +82,7 @@ func (r *Retry) WaitDelay(ctx context.Context, failureCount int) error {
 		select {
 		case <-time.After(retryDelay):
 		case <-ctx.Done():
-			return i18n.NewError(ctx, msgs.MsgContextCanceled)
+			return i18n.NewError(ctx, tkmsgs.MsgContextCanceled)
 		}
 	}
 	return nil

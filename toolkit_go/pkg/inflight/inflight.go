@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type InflightManager[K comparable, T any] struct {
@@ -81,7 +81,7 @@ func (ifm *InflightManager[K, T]) GetInflight(id K) *InflightRequest[K, T] {
 func (ifm *InflightManager[K, T]) waitInFlight(req *InflightRequest[K, T]) (T, error) {
 	select {
 	case <-req.ctx.Done():
-		return *new(T), i18n.NewError(req.ctx, msgs.MsgInflightRequestCancelled, req.Age())
+		return *new(T), i18n.NewError(req.ctx, tkmsgs.MsgInflightRequestCancelled, req.Age())
 	case reply := <-req.done:
 		return reply, nil
 	}

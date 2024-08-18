@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package msgs
+package tkmsgs
 
 import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -42,4 +42,9 @@ var (
 	MsgConfigFileReadError             = ffe("PD020201", "Failed to read config file %s with error: %s")
 	MsgConfigFileParseError            = ffe("PD020202", "Failed to parse config file %s with error: %s")
 	MsgConfigFileMissingMandatoryValue = ffe("PD020203", "Mandatory config field %s missing ")
+
+	// Plugin PD0203XX
+	MsgPluginUnsupportedRequest   = ffe("PD020300", "Unsupported request %T")
+	MsgPluginUnexpectedResponse   = ffe("PD020301", "Unexpected response %T (expected %T)")
+	MsgPluginUnimplementedRequest = ffe("PD020302", "Unimplemented plugin request %T")
 )

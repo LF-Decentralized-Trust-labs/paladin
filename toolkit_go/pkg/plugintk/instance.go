@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package plugbase
+package plugintk
 
 import (
 	"context"
@@ -29,19 +29,20 @@ import (
 )
 
 type pluginInstance[M any] struct {
+	pluginType string
 	id         string
 	connString string
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	factory    *pluginFactory[M]
-	connector  func(client prototk.PluginControllerClient) (grpc.BidiStreamingClient[M, M], error)
+	connector  PluginConnector[M]
 	impl       PluginImplementation[M]
 	retry      *retry.Retry
 	done       chan struct{}
 }
 
 type pluginRun[M any] struct {
-	*pluginInstance[M]
+	pi         *pluginInstance[M]
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	stream     grpc.BidiStreamingClient[M, M]
@@ -53,12 +54,14 @@ type pluginRun[M any] struct {
 
 func newPluginInstance[M any](pf *pluginFactory[M], pluginID, connString string) *pluginInstance[M] {
 	pi := &pluginInstance[M]{
+		pluginType: pf.pluginType.String(),
 		factory:    pf,
 		connector:  pf.connector,
 		impl:       pf.impl,
 		id:         pluginID,
 		connString: connString,
 		retry:      retry.NewRetryIndefinite(&retry.Defaults.Config),
+		done:       make(chan struct{}),
 	}
 	pi.ctx, pi.cancelCtx = context.WithCancel(log.WithLogField(context.Background(), "plugin", pluginID))
 	return pi
@@ -69,16 +72,21 @@ func (pi *pluginInstance[M]) run() {
 	defer close(pi.done)
 	ccErr := pi.retry.Do(pi.ctx, func(attempt int) (retryable bool, err error) {
 		// Create a new runner each time round the reconnect retry loop
-		pr := &pluginRun[M]{pluginInstance: pi}
+		pr := &pluginRun[M]{pi: pi}
 		return true, pr.run()
 	})
 	log.L(pi.ctx).Debugf("exiting (%v)", ccErr)
 }
 
+func (pi *pluginInstance[M]) connect(conn *grpc.ClientConn) (grpc.BidiStreamingClient[M, M], error) {
+	client := prototk.NewPluginControllerClient(conn)
+	return pi.connector(pi.ctx, client)
+}
+
 func (pr *pluginRun[M]) run() error {
 	pr.inflight = inflight.NewInflightManager[uuid.UUID, PluginMessage[M]](uuid.Parse)
 
-	conn, err := grpc.NewClient(pr.connString, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(pr.pi.connString, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
@@ -89,22 +97,22 @@ func (pr *pluginRun[M]) run() error {
 		_ = conn.Close()
 		// Cancel any in-flight requests
 		pr.inflight.Close()
-		// Cancel the ctx
-		pr.cancelCtx()
-		// Wait for the sender to finish
+		// Cancel the ctx and wait for the sender to finish
+		if pr.cancelCtx != nil {
+			pr.cancelCtx()
+		}
 		if pr.senderDone != nil {
 			<-pr.senderDone
 		}
 	}()
-
 	// Create the long-lived bi-directional stream to the plugin controller
-	client := prototk.NewPluginControllerClient(conn)
-	pr.stream, err = pr.connector(client)
+	pr.stream, err = pr.pi.connect(conn)
 	if err != nil {
 		return err
 	}
+
 	pr.ctx, pr.cancelCtx = context.WithCancel(log.WithLogField(
-		pr.stream.Context(), pr.factory.pluginType.String(), pr.id))
+		pr.stream.Context(), pr.pi.pluginType, pr.pi.id))
 
 	// Start a separate sender routine for our stream
 	pr.senderChl = make(chan *M)
@@ -112,7 +120,7 @@ func (pr *pluginRun[M]) run() error {
 	go pr.sender()
 
 	// Initialize the implementation
-	pr.handler = pr.impl.NewHandler(pr)
+	pr.handler = pr.pi.impl.NewHandler(pr)
 
 	// Serve the receiver
 	return pr.serve()
@@ -150,7 +158,7 @@ func (pr *pluginRun[M]) serve() error {
 			log.L(pr.ctx).Errorf("received failed: %s", err)
 			return err
 		}
-		msg := pr.impl.Wrap(sMsg)
+		msg := pr.pi.impl.Wrap(sMsg)
 		header := msg.Header()
 
 		// Handling based on the type
@@ -198,10 +206,10 @@ func (pr *pluginRun[M]) handleRequestToPlugin(msg PluginMessage[M]) {
 	var replyHeader *prototk.Header
 
 	// Call the handler
-	reply, err := pr.handler.RequestToDomain(pr.ctx, msg)
+	reply, err := pr.handler.RequestToPlugin(pr.ctx, msg)
 	if err != nil {
 		// Build an new message containing only the error
-		reply = pr.impl.Wrap(new(M))
+		reply = pr.pi.impl.Wrap(new(M))
 		replyHeader = reply.Header()
 		errorMessage := err.Error()
 		replyHeader.MessageType = prototk.Header_ERROR_RESPONSE
@@ -213,7 +221,7 @@ func (pr *pluginRun[M]) handleRequestToPlugin(msg PluginMessage[M]) {
 		replyHeader.MessageType = prototk.Header_RESPONSE_FROM_PLUGIN
 		log.L(pr.ctx).Infof("[%s] <-- [%s] %T [%s]", header.MessageId, replyID, msg.ResponseFromPlugin(), time.Since(timeReceived))
 	}
-	replyHeader.DomainId = pr.id
+	replyHeader.PluginId = pr.pi.id
 	replyHeader.CorrelationId = &header.MessageId
 	replyHeader.MessageId = replyID
 
@@ -221,11 +229,12 @@ func (pr *pluginRun[M]) handleRequestToPlugin(msg PluginMessage[M]) {
 	pr.send(reply.Message())
 }
 
-func (pr *pluginRun[M]) RequestFromDomain(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error) {
+func (pr *pluginRun[M]) RequestFromPlugin(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error) {
 
 	// We are responsible for the header (we ignore anything set by the caller)
 	reqID := uuid.New()
 	header := req.Header()
+	header.PluginId = pr.pi.id
 	header.CorrelationId = nil
 	header.MessageId = reqID.String()
 	header.MessageType = prototk.Header_REQUEST_FROM_PLUGIN

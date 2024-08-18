@@ -12,7 +12,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package plugbase
+package plugintk
 
 import (
 	"context"
@@ -30,27 +30,26 @@ type PluginBase interface {
 	Stop()
 }
 
+type PluginConnector[M any] func(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[M, M], error)
+
 type pluginFactory[M any] struct {
 	mux        sync.Mutex
 	pluginType prototk.PluginType
 	instances  map[string]*pluginInstance[M]
-	connector  func(client prototk.PluginControllerClient) (grpc.BidiStreamingClient[M, M], error)
+	connector  PluginConnector[M]
 	impl       PluginImplementation[M]
-	proxy      PluginProxy[M]
 }
 
 func NewPluginBase[M any](
 	pluginType prototk.PluginType,
-	connector func(client prototk.PluginControllerClient) (grpc.BidiStreamingClient[M, M], error),
+	connector PluginConnector[M],
 	impl PluginImplementation[M],
-	proxy PluginProxy[M],
 ) PluginBase {
 	return &pluginFactory[M]{
 		instances:  make(map[string]*pluginInstance[M]),
 		pluginType: pluginType,
 		connector:  connector,
 		impl:       impl,
-		proxy:      proxy,
 	}
 }
 
@@ -61,6 +60,7 @@ func (pf *pluginFactory[M]) instanceStarted(inst *pluginInstance[M]) {
 		// Considered exceptional case - the plugin loader should not have done this
 		panic("duplicate load " + inst.id)
 	}
+	pf.instances[inst.id] = inst
 }
 
 func (pf *pluginFactory[M]) instanceStopped(inst *pluginInstance[M]) {

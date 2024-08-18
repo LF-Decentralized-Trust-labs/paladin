@@ -13,24 +13,3 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 package domaintk
-
-import (
-	"context"
-
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-)
-
-type DomainAPI interface {
-	ConfigureDomain(context.Context, *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error)
-	InitDomain(context.Context, *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error)
-	InitDeploy(context.Context, *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error)
-	PrepareDeploy(context.Context, *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error)
-	InitTransaction(context.Context, *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error)
-	AssembleTransaction(context.Context, *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error)
-	EndorseTransaction(context.Context, *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error)
-	PrepareTransaction(context.Context, *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error)
-}
-
-type DomainCallbacks interface {
-	FindAvailableStates(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
-}
