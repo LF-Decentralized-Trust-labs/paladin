@@ -30,6 +30,9 @@ import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -51,10 +54,12 @@ public class SimpleStorageWrappedGetSetTest {
         EVMRunner evmRunner = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
 
         // Load some bytecode for our first contract deploy
+        String resourcePath = "contracts/testcontracts/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
         String hexByteCode;
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("solidity/SimpleStorageWrapped.bin")) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
             assertNotNull(is);
-            hexByteCode = IOUtils.toString(is, StandardCharsets.UTF_8);
+            JsonNode node = new ObjectMapper().readTree(is);
+            hexByteCode = node.get("bytecode").asText();
         }
         final Address smartContractAddress = EVMRunner.randomAddress();
         final Address sender = EVMRunner.randomAddress();

@@ -1,10 +1,10 @@
 plugins {
     id 'java'
-    id "org.web3j.solidity" version "0.5.0"
 }
 
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
+java.sourceCompatibility = JavaVersion.VERSION_21
 
 test {
     testLogging {
@@ -33,8 +33,8 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.12+'
     testImplementation 'org.mockito:mockito-core:5.12+'
     testImplementation 'org.slf4j:slf4j-reload4j:2.0.13'
-    testImplementation "org.web3j.solidity:solidity-gradle-plugin:0.5+"
-    testImplementation project(':contracts')
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    testImplementation project(path: ":solidity", configuration: "compiledContracts")
 
     implementation 'org.hyperledger.besu:evm:24.5.4'
     implementation 'org.hyperledger.besu:besu-datatypes:24.5.4'

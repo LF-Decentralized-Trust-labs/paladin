@@ -21,22 +21,36 @@ package kata
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"io"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
-
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 )
+
+//go:embed abis/SimpleStorage.json
+var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
 
 func TestRunTransactionSubmission(t *testing.T) {
 	ctx := context.Background()
@@ -88,6 +102,122 @@ func TestRunTransactionSubmission(t *testing.T) {
 	stopListener()
 	// Stop the server
 	kata.Stop(ctx, socketAddress)
+}
+
+func TestRunSimpleStorageEthTransaction(t *testing.T) {
+	ctx := context.Background()
+	logrus.SetLevel(logrus.DebugLevel)
+
+	// This is a placeholder for when we have the TX engine in place with full
+	// JSON/RPC commands on the main Paladin engine to invoke this over HTTP
+	type testConfigType struct {
+		Persistence persistence.Config  `yaml:"persistence"`
+		Eth         ethclient.Config    `yaml:"eth"`
+		Indexer     blockindexer.Config `yaml:"indexer"`
+		Keys        api.Config          `yaml:"keys"`
+	}
+	var testConfig testConfigType
+
+	err := yaml.Unmarshal([]byte(`
+persistence:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: ../db/migrations/sqlite
+    debugQueries:  true
+eth:  
+    ws:
+        url: ws://localhost:8546
+        initialConnectAttempts: 25
+keys:
+    keyDerivation:
+      type: bip32
+    keyStore:
+      type: static
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: polar mechanic crouch jungle field room dry sure machine brisk seed bulk student total ethics
+`), &testConfig)
+	assert.NoError(t, err)
+
+	p, err := persistence.NewPersistence(ctx, &testConfig.Persistence)
+	assert.NoError(t, err)
+	defer p.Close()
+
+	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
+		FromBlock: types.RawJSON(`"latest"`), // don't want earlier events
+	}, &testConfig.Eth.WS, p)
+	assert.NoError(t, err)
+
+	type solBuild struct {
+		ABI      abi.ABI                   `json:"abi"`
+		Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
+	}
+	var simpleStorageBuild solBuild
+	err = json.Unmarshal(simpleStorageBuildJSON, &simpleStorageBuild)
+	assert.NoError(t, err)
+
+	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
+	err = indexer.Start(&blockindexer.InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
+			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
+			for _, e := range batch.Events {
+				select {
+				case eventStreamEvents <- e:
+				default:
+					assert.Fail(t, "more than expected number of events received")
+				}
+			}
+			return nil
+		},
+		Definition: &blockindexer.EventStream{
+			Name: "unittest",
+			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
+		},
+	})
+	assert.NoError(t, err)
+	defer indexer.Stop()
+
+	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Keys)
+	assert.NoError(t, err)
+
+	ethClient, err := ethclient.NewEthClient(ctx, keyMgr, &testConfig.Eth)
+	assert.NoError(t, err)
+	defer ethClient.Close()
+
+	simpleStorage, err := ethClient.ABI(ctx, simpleStorageBuild.ABI)
+	assert.NoError(t, err)
+
+	txHash1, err := simpleStorage.MustConstructor(simpleStorageBuild.Bytecode).R(ctx).
+		Signer("key1").Input(`{"x":11223344}`).SignAndSend()
+	assert.NoError(t, err)
+	deployTX, err := indexer.WaitForTransaction(ctx, txHash1.String())
+	assert.NoError(t, err)
+	contractAddr := deployTX.ContractAddress.Address0xHex()
+
+	getX1, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"x":"11223344"}`, string(getX1))
+
+	txHash2, err := simpleStorage.MustFunction("set").R(ctx).
+		Signer("key1").To(contractAddr).Input(`{"_x":99887766}`).SignAndSend()
+	assert.NoError(t, err)
+	_, err = indexer.WaitForTransaction(ctx, txHash2.String())
+	assert.NoError(t, err)
+
+	getX2, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"x":"99887766"}`, string(getX2))
+
+	// Expect our event listener to be queued up with two Changed events
+	event1 := <-eventStreamEvents
+	assert.JSONEq(t, `{"x":"11223344"}`, string(event1.Data))
+	event2 := <-eventStreamEvents
+	assert.JSONEq(t, `{"x":"99887766"}`, string(event2.Data))
+
 }
 
 func runServiceForTesting(ctx context.Context, t *testing.T) (string, func()) {

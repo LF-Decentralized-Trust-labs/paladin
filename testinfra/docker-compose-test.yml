@@ -1,0 +1,51 @@
+services:
+  postgres:
+    container_name: paladin-test-db
+    image: postgres
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: my-secret
+  besu_bootstrap:
+    container_name: paladin-besu-bootstrap
+    image: paladin/besu_bootstrap
+    user: 0:0
+    volumes:
+      - besu_data:/var/besu:rw
+    command:
+      - /var/besu
+  besu:
+    container_name: paladin-test-besu
+    image: hyperledger/besu:latest
+    user: 0:0
+    volumes:
+      - besu_data:/var/besu:rw
+    ports:
+      - 8545:8545
+      - 8546:8546
+    depends_on:
+      besu_bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/localhost/8545'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      - --logging=DEBUG
+      - --rpc-http-enabled
+      - --rpc-http-api=ETH,QBFT,WEB3,DEBUG
+      - --rpc-ws-enabled
+      - --rpc-ws-api=ETH,QBFT,WEB3,DEBUG
+      - --tx-pool=SEQUENCED
+      - --tx-pool-limit-by-account-percentage=1.0
+      - --tx-pool-max-size=1000000
+      - --target-gas-limit=30000000
+      - --genesis-file=/var/besu/genesis.json
+      - --data-path=/var/besu/data
+      - --node-private-key-file=/var/besu/key
+      - --revert-reason-enabled
+volumes:
+  besu_data:
+    driver: local

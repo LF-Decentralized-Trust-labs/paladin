@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,7 +77,7 @@ func TestFlushTimeout(t *testing.T) {
 	closedCtx, closeCtx := context.WithCancel(ctx)
 	closeCtx()
 	err := txOp.flush(closedCtx)
-	assert.Regexp(t, "FF00154", err)
+	assert.Regexp(t, "PD010301", err)
 }
 
 func TestFlushClosed(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) error
@@ -46,7 +46,7 @@ type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) e
 type DomainStateInterface interface {
 
 	// EnsureABISchema is expected to be called on startup with all schemas required for operation of the domain
-	EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error)
+	EnsureABISchemas(defs []*abi.Parameter) ([]Schema, error)
 
 	// FindAvailableStates is the main query function, only returning states that are available.
 	// Note this does not lock these states in any way, you must call that afterwards as:
@@ -69,7 +69,7 @@ type DomainStateInterface interface {
 	// CreateNewStates creates new states that are locked for reading to the specified sequence from creation.
 	// They are available immediately within the domain for return in FindAvailableStates
 	// (even before the flush)
-	CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (s []*State, err error)
+	CreateNewStates(sequenceID uuid.UUID, states []*NewState) (s []*State, err error)
 
 	// ResetSequence queues up removal of all lock records for a given sequence
 	// Note that the private data of the states themselves are not removed
@@ -142,7 +142,7 @@ func (ss *stateStore) getDomainContext(domainID string) *domainContext {
 func (dc *domainContext) takeLatch() error {
 	select {
 	case <-dc.ctx.Done():
-		return i18n.NewError(dc.ctx, i18n.MsgContextCanceled)
+		return i18n.NewError(dc.ctx, msgs.MsgContextCanceled)
 	case dc.latch <- struct{}{}:
 		return nil
 	}
@@ -162,16 +162,18 @@ func (dc *domainContext) run(fn func(ctx context.Context, dsi DomainStateInterfa
 	return fn(dc.ctx, dc)
 }
 
-func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, error) {
+func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]Schema, error) {
 
 	// Validate all the schemas
-	prepared := make([]*Schema, len(defs))
+	prepared := make([]Schema, len(defs))
+	toFlush := make([]*SchemaPersisted, len(defs))
 	for i, def := range defs {
 		s, err := newABISchema(dc.ctx, dc.domainID, def)
 		if err != nil {
 			return nil, err
 		}
-		prepared[i] = s.Schema
+		prepared[i] = s
+		toFlush[i] = s.SchemaPersisted
 	}
 
 	// Take lock and check flush state
@@ -182,11 +184,11 @@ func (dc *domainContext) EnsureABISchemas(defs []*abi.Parameter) ([]*Schema, err
 	}
 
 	// Add them to the unflushed state
-	dc.unFlushed.schemas = append(dc.unFlushed.schemas, prepared...)
+	dc.unFlushed.schemas = append(dc.unFlushed.schemas, toFlush...)
 	return prepared, nil
 }
 
-func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
+func (dc *domainContext) getUnFlushedSpending() ([]*idOnly, error) {
 	// Take lock and check flush state
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
@@ -194,23 +196,23 @@ func (dc *domainContext) getUnFlushedSpending() ([]*hashIDOnly, error) {
 		return nil, flushErr
 	}
 
-	var spendLocks []*hashIDOnly
+	var spendLocks []*idOnly
 	for _, l := range dc.unFlushed.stateLocks {
 		if l.Spending {
-			spendLocks = append(spendLocks, &hashIDOnly{HashID: l.State})
+			spendLocks = append(spendLocks, &idOnly{ID: l.State})
 		}
 	}
 	if dc.flushing != nil {
 		for _, l := range dc.flushing.stateLocks {
 			if l.Spending {
-				spendLocks = append(spendLocks, &hashIDOnly{HashID: l.State})
+				spendLocks = append(spendLocks, &idOnly{ID: l.State})
 			}
 		}
 	}
 	return spendLocks, nil
 }
 
-func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
+func (dc *domainContext) mergedUnFlushed(schema Schema, states []*State, query *filters.QueryJSON) (_ []*State, err error) {
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
 	if flushErr := dc.checkFlushCompletion(false); flushErr != nil {
@@ -228,7 +230,7 @@ func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, q
 	for _, s := range allUnFlushedStates {
 		var locked *StateLock
 		for _, l := range allUnFlushedStateLocks {
-			if s.Hash == l.State {
+			if s.ID == l.State {
 				locked = l
 				break
 			}
@@ -244,7 +246,7 @@ func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, q
 			return nil, err
 		}
 		if match {
-			log.L(dc.ctx).Debugf("Matched state %s from un-flushed writes", &s.Hash)
+			log.L(dc.ctx).Debugf("Matched state %s from un-flushed writes", &s.ID)
 			matches = append(matches, s)
 		}
 	}
@@ -259,23 +261,23 @@ func (dc *domainContext) mergedUnFlushed(schema SchemaCommon, states []*State, q
 	return states, nil
 }
 
-func (dc *domainContext) mergeInMemoryMatches(schema SchemaCommon, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
+func (dc *domainContext) mergeInMemoryMatches(schema Schema, states []*State, extras []*StateWithLabels, query *filters.QueryJSON) (_ []*State, err error) {
 
 	// Reconstitute the labels for all the loaded states into the front of an aggregate list
 	fullList := make([]*StateWithLabels, len(states), len(states)+len(extras))
-	persistedStateHashes := make(map[string]bool)
+	persistedStateIDs := make(map[string]bool)
 	for i, s := range states {
 		if fullList[i], err = schema.RecoverLabels(dc.ctx, s); err != nil {
 			return nil, err
 		}
-		persistedStateHashes[s.Hash.String()] = true
+		persistedStateIDs[s.ID.String()] = true
 	}
 
 	// Copy the matches to the end of that same list
 	// However, we can't be certain that some of the states that were in the flushing list, haven't made it
 	// to the DB yet - so we do need to de-dup here.
 	for _, s := range extras {
-		if !persistedStateHashes[s.Hash.String()] {
+		if !persistedStateIDs[s.ID.String()] {
 			fullList = append(fullList, s)
 		}
 	}
@@ -321,17 +323,17 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	return dc.mergedUnFlushed(schema, states, query)
 }
 
-func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, data []types.RawJSON) (states []*State, err error) {
+func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, newStates []*NewState) (states []*State, err error) {
 
-	schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, schemaID, true)
-	if err != nil {
-		return nil, err
-	}
+	states = make([]*State, len(newStates))
+	withValues := make([]*StateWithLabels, len(newStates))
+	for i, ns := range newStates {
+		schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, ns.SchemaID, true)
+		if err != nil {
+			return nil, err
+		}
 
-	states = make([]*State, len(data))
-	withValues := make([]*StateWithLabels, len(data))
-	for i, d := range data {
-		withValues[i], err = schema.ProcessState(dc.ctx, d)
+		withValues[i], err = schema.ProcessState(dc.ctx, ns.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +351,7 @@ func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, 
 	for _, s := range withValues {
 		s.Locked = &StateLock{
 			Sequence: sequenceID,
-			State:    s.State.Hash,
+			State:    s.State.ID,
 			Creating: true,
 			Spending: false,
 		}
@@ -359,10 +361,10 @@ func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, schemaID string, 
 	return states, nil
 }
 
-func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDs []string, setState func(*StateLock)) (err error) {
-	stateHashes := make([]*HashID, len(stateIDs))
-	for i, id := range stateIDs {
-		stateHashes[i], err = ParseHashID(dc.ctx, id)
+func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDStrings []string, setState func(*StateLock)) (err error) {
+	stateIDs := make([]*types.Bytes32, len(stateIDStrings))
+	for i, id := range stateIDStrings {
+		stateIDs[i], err = types.ParseBytes32(dc.ctx, id)
 		if err != nil {
 			return err
 		}
@@ -376,10 +378,10 @@ func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDs []string, set
 	}
 
 	// Update an existing un-flushed record, or add a new one
-	for _, hash := range stateHashes {
+	for _, id := range stateIDs {
 		var lock *StateLock
 		for _, l := range dc.unFlushed.stateLocks {
-			if l.State == *hash {
+			if l.State == *id {
 				if l.Sequence != sequenceID {
 					// This represents a failure to call ResetSequence() correctly
 					return i18n.NewError(dc.ctx, msgs.MsgStateLockConflictUnexpected, l.Sequence, sequenceID)
@@ -389,7 +391,7 @@ func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDs []string, set
 			}
 		}
 		if lock == nil {
-			lock = &StateLock{State: *hash, Sequence: sequenceID}
+			lock = &StateLock{State: *id, Sequence: sequenceID}
 			dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, lock)
 		}
 		setState(lock)

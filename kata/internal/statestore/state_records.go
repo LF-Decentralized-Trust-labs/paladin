@@ -16,30 +16,33 @@
 
 package statestore
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+)
 
 // State record can be updated before, during and after confirm records are written
 // For example the confirmation of the existence of states will be coming all the time
 // from the base ledger, for which we will never receive the private state itself.
 // Immutable once written
 type StateConfirm struct {
-	State       HashID    `json:"-"          gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
-	Transaction uuid.UUID `json:"transaction"`
+	State       types.Bytes32 `json:"-"            gorm:"primaryKey"`
+	Transaction uuid.UUID     `json:"transaction"`
 }
 
 // State record can be updated before, during and after spend records are written
 // Immutable once written
 type StateSpend struct {
-	State       HashID    `json:"-"          gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
-	Transaction uuid.UUID `json:"transaction"`
+	State       types.Bytes32 `json:"-"            gorm:"primaryKey"`
+	Transaction uuid.UUID     `json:"transaction"`
 }
 
 // State locks record which sequence a state is being locked to, either
 // spending a previously confirmed state, or an optimistic record of creating
 // (and maybe later spending) a state that is yet to be confirmed.
 type StateLock struct {
-	State    HashID    `json:"-"          gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
-	Sequence uuid.UUID `json:"sequence"`
-	Creating bool      `json:"creating"`
-	Spending bool      `json:"spending"`
+	State    types.Bytes32 `json:"-"                gorm:"primaryKey"`
+	Sequence uuid.UUID     `json:"sequence"`
+	Creating bool          `json:"creating"`
+	Spending bool          `json:"spending"`
 }

@@ -17,11 +17,11 @@
 package filters
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type QueryJSON struct {
-	FilterJSON
+	Statements
 	Limit *int     `json:"limit,omitempty"`
 	Sort  []string `json:"sort,omitempty"`
 }
@@ -39,41 +39,41 @@ type ItemsResultTyped[T any] struct {
 	Items []T    `json:"items"`
 }
 
-type FilterJSONBase struct {
+type Op struct {
 	Not             bool   `json:"not,omitempty"`
 	CaseInsensitive bool   `json:"caseInsensitive,omitempty"`
 	Field           string `json:"field,omitempty"`
 }
 
-type FilterJSONKeyValue struct {
-	FilterJSONBase
+type OpSingleVal struct {
+	Op
 	Value types.RawJSON `json:"value,omitempty"`
 }
 
-type FilterJSONKeyValues struct {
-	FilterJSONBase
+type OpMultiVal struct {
+	Op
 	Values []types.RawJSON `json:"values,omitempty"`
 }
 
-type FilterJSON struct {
-	Or []*FilterJSON `json:"or,omitempty"`
-	FilterJSONOps
+type Statements struct {
+	Or []*Statements `json:"or,omitempty"`
+	Ops
 }
 
-type FilterJSONOps struct {
-	Equal              []*FilterJSONKeyValue  `json:"equal,omitempty"`
-	Eq                 []*FilterJSONKeyValue  `json:"eq,omitempty"`  // short name
-	NEq                []*FilterJSONKeyValue  `json:"neq,omitempty"` // negated short name
-	Like               []*FilterJSONKeyValue  `json:"like,omitempty"`
-	LessThan           []*FilterJSONKeyValue  `json:"lessThan,omitempty"`
-	LT                 []*FilterJSONKeyValue  `json:"lt,omitempty"` // short name
-	LessThanOrEqual    []*FilterJSONKeyValue  `json:"lessThanOrEqual,omitempty"`
-	LTE                []*FilterJSONKeyValue  `json:"lte,omitempty"` // short name
-	GreaterThan        []*FilterJSONKeyValue  `json:"greaterThan,omitempty"`
-	GT                 []*FilterJSONKeyValue  `json:"gt,omitempty"` // short name
-	GreaterThanOrEqual []*FilterJSONKeyValue  `json:"greaterThanOrEqual,omitempty"`
-	GTE                []*FilterJSONKeyValue  `json:"gte,omitempty"` // short name
-	In                 []*FilterJSONKeyValues `json:"in,omitempty"`
-	NIn                []*FilterJSONKeyValues `json:"nin,omitempty"` // negated short name
-	Null               []*FilterJSONBase      `json:"null,omitempty"`
+type Ops struct {
+	Equal              []*OpSingleVal `json:"equal,omitempty"`
+	Eq                 []*OpSingleVal `json:"eq,omitempty"`  // short name
+	NEq                []*OpSingleVal `json:"neq,omitempty"` // negated short name
+	Like               []*OpSingleVal `json:"like,omitempty"`
+	LessThan           []*OpSingleVal `json:"lessThan,omitempty"`
+	LT                 []*OpSingleVal `json:"lt,omitempty"` // short name
+	LessThanOrEqual    []*OpSingleVal `json:"lessThanOrEqual,omitempty"`
+	LTE                []*OpSingleVal `json:"lte,omitempty"` // short name
+	GreaterThan        []*OpSingleVal `json:"greaterThan,omitempty"`
+	GT                 []*OpSingleVal `json:"gt,omitempty"` // short name
+	GreaterThanOrEqual []*OpSingleVal `json:"greaterThanOrEqual,omitempty"`
+	GTE                []*OpSingleVal `json:"gte,omitempty"` // short name
+	In                 []*OpMultiVal  `json:"in,omitempty"`
+	NIn                []*OpMultiVal  `json:"nin,omitempty"` // negated short name
+	Null               []*Op          `json:"null,omitempty"`
 }

@@ -24,20 +24,25 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type State struct {
-	Hash        HashID             `json:"hash"                gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+	ID          types.Bytes32      `json:"id"                  gorm:"primaryKey"`
 	CreatedAt   types.Timestamp    `json:"created"             gorm:"autoCreateTime:nano"`
 	DomainID    string             `json:"domain"`
-	Schema      HashID             `json:"schema"              gorm:"embedded;embeddedPrefix:schema_;"`
+	Schema      types.Bytes32      `json:"schema"`
 	Data        types.RawJSON      `json:"data"`
-	Labels      []*StateLabel      `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Int64Labels []*StateInt64Label `json:"-"                   gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Confirmed   *StateConfirm      `json:"confirmed,omitempty" gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Spent       *StateSpend        `json:"spent,omitempty"     gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
-	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state_l,state_h;references:hash_l,hash_h;"`
+	Labels      []*StateLabel      `json:"-"                   gorm:"foreignKey:state;references:id;"`
+	Int64Labels []*StateInt64Label `json:"-"                   gorm:"foreignKey:state;references:id;"`
+	Confirmed   *StateConfirm      `json:"confirmed,omitempty" gorm:"foreignKey:state;references:id;"`
+	Spent       *StateSpend        `json:"spent,omitempty"     gorm:"foreignKey:state;references:id;"`
+	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state;references:id;"`
+}
+
+type NewState struct {
+	SchemaID string
+	Data     types.RawJSON
 }
 
 // StateWithLabels is a newly prepared state that has not yet been persisted
@@ -47,13 +52,13 @@ type StateWithLabels struct {
 }
 
 type StateLabel struct {
-	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	State types.Bytes32 `gorm:"primaryKey"`
 	Label string
 	Value string
 }
 
 type StateInt64Label struct {
-	State HashID `gorm:"primaryKey;embedded;embeddedPrefix:state_;"`
+	State types.Bytes32 `gorm:"primaryKey"`
 	Label string
 	Value int64
 }
@@ -86,7 +91,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
-	hash, err := ParseHashID(ctx, stateID)
+	id, err := types.ParseBytes32(ctx, stateID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,13 +103,12 @@ func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, fa
 	var states []*State
 	err = q.
 		Where("domain_id = ?", domainID).
-		Where("hash_l = ?", hash.L.String()).
-		Where("hash_h = ?", hash.H.String()).
+		Where("id = ?", id).
 		Limit(1).
 		Find(&states).
 		Error
 	if err == nil && len(states) == 0 && failNotFound {
-		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, hash)
+		return nil, i18n.NewError(ctx, msgs.MsgStateNotFound, id)
 	}
 	return states[0], err
 }
@@ -112,10 +116,14 @@ func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, fa
 // Built in fields all start with "." as that prevents them
 // clashing with variable names in ABI structs ($ and _ are valid leading chars there)
 var baseStateFields = map[string]filters.FieldResolver{
-	// Only field you can query on outside of the labels, is the created timestamp.
-	// - if getting by the state ID you make a different API call
-	// - when submitting a query you have to specify the domain + schema to scope your query
+	".id":      filters.Bytes32Field("id"),
 	".created": filters.TimestampField("created_at"),
+}
+
+func addStateBaseLabels(labelValues filters.PassthroughValueSet, id types.Bytes32, createdAt types.Timestamp) filters.PassthroughValueSet {
+	labelValues[".id"] = id.HexString()
+	labelValues[".created"] = int64(createdAt)
+	return labelValues
 }
 
 type trackingLabelSet struct {
@@ -136,7 +144,7 @@ func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 	return nil
 }
 
-func (ss *stateStore) labelSetFor(schema SchemaCommon) *trackingLabelSet {
+func (ss *stateStore) labelSetFor(schema Schema) *trackingLabelSet {
 	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
 	for _, fi := range schema.LabelInfo() {
 		tls.labels[fi.label] = fi
@@ -149,7 +157,7 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 	return s, err
 }
 
-func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*hashIDOnly) (schema SchemaCommon, s []*State, err error) {
+func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*idOnly) (schema Schema, s []*State, err error) {
 	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, nil, err
@@ -170,15 +178,14 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 		if fi.labelType == labelTypeInt64 || fi.labelType == labelTypeBool {
 			typeMod = "int64_"
 		}
-		q = q.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS %[2]s ON %[2]s.state_l = hash_l AND %[2]s.state_h = hash_h AND %[2]s.label = ?", typeMod, fi.virtualColumn), fi.label)
+		q = q.Joins(fmt.Sprintf("INNER JOIN state_%[1]slabels AS %[2]s ON %[2]s.state = id AND %[2]s.label = ?", typeMod, fi.virtualColumn), fi.label)
 	}
 
 	q = q.Joins("Confirmed", db.Select("transaction")).
 		Joins("Spent", db.Select("transaction")).
 		Joins("Locked", db.Select("sequence")).
 		Where("domain_id = ?", domainID).
-		Where("schema_l = ?", schema.Persisted().Hash.L).
-		Where("schema_h = ?", schema.Persisted().Hash.H)
+		Where("schema = ?", schema.Persisted().ID)
 
 	if len(excluded) > 0 {
 		q = q.Not(&State{}, excluded)
@@ -196,14 +203,14 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	hash, err := ParseHashID(ctx, stateID)
+	id, err := types.ParseBytes32(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateConfirms = []*StateConfirm{
-		{State: *hash, Transaction: transactionID},
+		{State: *id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -211,14 +218,14 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 }
 
 func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	hash, err := ParseHashID(ctx, stateID)
+	id, err := types.ParseBytes32(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateSpends = []*StateSpend{
-		{State: *hash, Transaction: transactionID},
+		{State: *id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -226,14 +233,14 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 }
 
 func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID, creating, spending bool) error {
-	hash, err := ParseHashID(ctx, stateID)
+	id, err := types.ParseBytes32(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateLocks = []*StateLock{
-		{State: *hash, Sequence: sequenceID, Creating: creating, Spending: spending},
+		{State: *id, Sequence: sequenceID, Creating: creating, Spending: spending},
 	}
 
 	ss.writer.queue(ctx, op)
