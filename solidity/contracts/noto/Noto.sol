@@ -19,8 +19,8 @@ contract Noto is NotoBase {
         bytes memory data
     ) external onlyNotary {
         _transfer(inputs, outputs, data);
-        bytes32 id = abi.decode(data, (bytes32));
-        emit IPaladinContract_V0.PaladinPrivateTransaction_V0(id, inputs, outputs, "");
+        // bytes32 id = abi.decode(data, (bytes32));
+        // emit IPaladinContract_V0.PaladinPrivateTransaction_V0(id, inputs, outputs, "");
     }
 
     function approve(
