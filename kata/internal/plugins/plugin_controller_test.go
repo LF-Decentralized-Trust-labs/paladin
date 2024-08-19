@@ -20,27 +20,15 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	prototk "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-type testPlugin interface {
-	conf() *PluginConfig
-	run(t *testing.T, ctx context.Context, id string, client prototk.PluginControllerClient)
-}
-
-type testPluginLoader struct {
-	plugins map[string]testPlugin
-	done    chan struct{}
-}
 
 func tempUDS(t *testing.T) string {
 	// Not safe to use t.TempDir() as it generates too long paths including the test name
@@ -54,76 +42,50 @@ func tempUDS(t *testing.T) string {
 		err := os.Remove(allocatedUDSName)
 		assert.True(t, err == nil || os.IsNotExist(err))
 	})
-	return allocatedUDSName
+	return "unix:" + allocatedUDSName
 }
 
-func (tpl *testPluginLoader) run(t *testing.T, ctx context.Context, targetURL string, loaderID uuid.UUID) {
-	wg := new(sync.WaitGroup)
-	defer func() {
-		wg.Wait()
-		close(tpl.done)
-	}()
-
-	conn, err := grpc.NewClient(targetURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
-	defer conn.Close() // will close all the child conns too
-
-	client := prototk.NewPluginControllerClient(conn)
-
-	loaderStream, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
-		Id: loaderID.String(),
-	})
-	assert.NoError(t, err)
-
-	for {
-		msg, err := loaderStream.Recv()
-		if err != nil {
-			log.L(ctx).Infof("loader stream closed: %s", err)
-			return
-		}
-		tp := tpl.plugins[msg.Plugin.Name]
-		if tp != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				tp.run(t, ctx, msg.Plugin.Id, client)
-			}()
-		}
-	}
-
+type testSetup struct {
+	testDomainManager *testDomainManager
+	testDomains       map[string]UnitTestPlugin
 }
 
-func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDomains map[string]*testDomain) (context.Context, *pluginController, func()) {
+func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Context, *pluginController, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
+	udsString := tempUDS(t)
+	loaderId := uuid.New()
 	args := &PluginControllerArgs{
-		DomainManager: tdm,
-		LoaderID:      uuid.New(),
+		DomainManager: setup.testDomainManager,
+		LoaderID:      loaderId,
 		InitialConfig: &PluginControllerConfig{
 			GRPC: GRPCConfig{
-				Address:         tempUDS(t),
+				Address:         udsString,
 				ShutdownTimeout: confutil.P("1ms"),
 			},
 			Domains: make(map[string]*PluginConfig),
 		},
 	}
-	testPlugins := make(map[string]testPlugin)
-	for name, td := range testDomains {
-		args.InitialConfig.Domains[name] = td.conf()
+	testPlugins := make(map[string]UnitTestPlugin)
+	for name, td := range setup.testDomains {
+		args.InitialConfig.Domains[name] = td.Conf()
 		testPlugins[name] = td
 	}
 
 	pc, err := NewPluginController(ctx, args)
 	assert.NoError(t, err)
 
-	tpl := &testPluginLoader{
-		plugins: testPlugins,
-		done:    make(chan struct{}),
-	}
-	err = pc.Start(ctx)
+	err = pc.Start(context.Background())
 	assert.NoError(t, err)
 
-	go tpl.run(t, ctx, pc.GRPCTargetURL(), pc.LoaderID())
+	tpl, err := NewUnitTestPluginLoader(udsString, loaderId.String(), testPlugins)
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tpl.Run()
+	}()
 
 	return ctx, pc.(*pluginController), func() {
 		recovered := recover()
@@ -133,7 +95,8 @@ func newTestDomainPluginController(t *testing.T, tdm *testDomainManager, testDom
 		}
 		cancelCtx()
 		pc.Stop(ctx)
-		<-tpl.done
+		tpl.Stop()
+		<-done
 	}
 
 }
