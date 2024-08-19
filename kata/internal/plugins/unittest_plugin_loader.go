@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -29,17 +30,12 @@ type UnitTestPluginLoader interface {
 	Stop() // causes the run function to terminate all connections to plugins and wait to exit
 }
 
-type UnitTestPlugin interface {
-	Conf() *PluginConfig
-	Run(pluginID, connString string)
-}
-
 type testPluginLoader struct {
 	ctx          context.Context
 	cancelCtx    context.CancelFunc
 	targetURL    string
 	loaderID     string
-	plugins      map[string]UnitTestPlugin
+	plugins      map[string]plugintk.Plugin
 	conn         *grpc.ClientConn
 	loaderStream grpc.ServerStreamingClient[prototk.PluginLoad]
 	done         chan struct{}
@@ -48,7 +44,7 @@ type testPluginLoader struct {
 // Provides a convenient way for unit tests (in this package, and in the test bed)
 // to load up Go coded plugins in-process, without having to first compile them
 // to a C-Shared library.
-func NewUnitTestPluginLoader(targetURL, loaderID string, plugins map[string]UnitTestPlugin) (_ UnitTestPluginLoader, err error) {
+func NewUnitTestPluginLoader(targetURL, loaderID string, plugins map[string]plugintk.Plugin) (_ UnitTestPluginLoader, err error) {
 	tpl := &testPluginLoader{
 		targetURL: targetURL,
 		loaderID:  loaderID,
@@ -70,6 +66,9 @@ func NewUnitTestPluginLoader(targetURL, loaderID string, plugins map[string]Unit
 func (tpl *testPluginLoader) Stop() {
 	tpl.conn.Close()
 	tpl.cancelCtx()
+	for _, p := range tpl.plugins {
+		p.Stop()
+	}
 	<-tpl.done
 }
 

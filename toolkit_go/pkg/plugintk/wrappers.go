@@ -24,6 +24,14 @@ import (
 	pb "google.golang.org/protobuf/proto"
 )
 
+// The external interface of a plugin is run a run function with two strings, which should
+// not exit in any other case apart from being stopped. This includes retrying connection
+// to the gRPC endpoint.
+type Plugin interface {
+	Run(pluginID, connString string)
+	Stop()
+}
+
 // Each type of plugin (Domain, Transport etc.) maintains a bi-directional stream of protobuf messages,
 // established from the plugin to the plugin-controller.
 // Requests and responses can flow in either direction on this stream, and MUST be processed with parallelism

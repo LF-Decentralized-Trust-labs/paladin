@@ -91,22 +91,24 @@ func checkPanic() {
 }
 
 type pluginExerciser[M any] struct {
-	t        *testing.T
-	wrapper  PluginMessageWrapper[M]
-	inOutMap map[string]func(*M)
-	pluginID string
-	sendChl  chan *M
-	recvChl  chan *M
+	t          *testing.T
+	wrapper    PluginMessageWrapper[M]
+	inOutMap   map[string]func(*M)
+	pluginID   string
+	registered chan bool
+	sendChl    chan *M
+	recvChl    chan *M
 }
 
 func newPluginExerciser[M any](t *testing.T, pluginID string, wrapper PluginMessageWrapper[M], inOutMap map[string]func(*M)) *pluginExerciser[M] {
 	return &pluginExerciser[M]{
-		t:        t,
-		wrapper:  wrapper,
-		inOutMap: inOutMap,
-		pluginID: pluginID,
-		sendChl:  make(chan *M),
-		recvChl:  make(chan *M),
+		t:          t,
+		wrapper:    wrapper,
+		inOutMap:   inOutMap,
+		pluginID:   pluginID,
+		registered: make(chan bool, 1),
+		sendChl:    make(chan *M),
+		recvChl:    make(chan *M),
 	}
 }
 
@@ -126,6 +128,8 @@ func (pe *pluginExerciser[M]) controller(stream grpc.BidiStreamingServer[M, M]) 
 		msg := pe.wrapper.Wrap(iMsg)
 		assert.Equal(t, pe.pluginID, msg.Header().PluginId)
 		switch msg.Header().MessageType {
+		case prototk.Header_REGISTER:
+			pe.registered <- true
 		case prototk.Header_REQUEST_FROM_PLUGIN:
 			reply := pe.wrapper.Wrap(new(M))
 			reply.Header().PluginId = msg.Header().PluginId
@@ -143,7 +147,7 @@ func (pe *pluginExerciser[M]) controller(stream grpc.BidiStreamingServer[M, M]) 
 		case prototk.Header_RESPONSE_FROM_PLUGIN, prototk.Header_ERROR_RESPONSE:
 			pe.recvChl <- msg.Message()
 		default:
-			assert.Fail(t, "Unexpected message: %s", msg.Header().MessageType)
+			assert.Failf(t, "", "Unexpected message: %s", msg.Header().MessageType)
 		}
 	}
 }

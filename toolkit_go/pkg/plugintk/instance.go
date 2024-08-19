@@ -120,6 +120,14 @@ func (pr *pluginRun[M]) run() error {
 	pr.senderDone = make(chan struct{})
 	go pr.sender()
 
+	// Send the register
+	regMsg := pr.pi.impl.Wrap(new(M))
+	regHeader := regMsg.Header()
+	regHeader.PluginId = pr.pi.id
+	regHeader.MessageId = uuid.NewString()
+	regHeader.MessageType = prototk.Header_REGISTER
+	pr.send(regMsg.Message())
+
 	// Initialize the implementation
 	pr.handler = pr.pi.impl.NewHandler(pr)
 

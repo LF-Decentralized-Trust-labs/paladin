@@ -38,6 +38,9 @@ func TestCallPluginImpl(t *testing.T) {
 		assert.Regexp(t, "PD020302", *res.Header.ErrorMessage)
 	})
 
+	// Check it registered
+	<-exerciser.registered
+
 }
 
 func TestResponseToPluginAs(t *testing.T) {

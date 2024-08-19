@@ -121,6 +121,11 @@ func (tp *mockPlugin) Run(pluginId, targetURL string) {
 	}
 }
 
+func (tp *mockPlugin) Stop() {
+	// the mock plugin stops when the conn is closed - that's not the right thing for a proper
+	// plugin, but suits the mock one just fine
+}
+
 func TestPluginRequestsError(t *testing.T) {
 
 	waitForResponse := make(chan struct{}, 1)
@@ -136,7 +141,7 @@ func TestPluginRequestsError(t *testing.T) {
 	msgID := uuid.NewString()
 	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				sendRequest: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -178,7 +183,7 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 	msgID := uuid.NewString()
 	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				sendRequest: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -216,7 +221,7 @@ func TestDomainRequestsFail(t *testing.T) {
 
 	ctx, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					return []*prototk.DomainMessage{
@@ -255,7 +260,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 
 	ctx, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					return []*prototk.DomainMessage{
@@ -297,7 +302,7 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 
 	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -326,7 +331,7 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 
 	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -357,7 +362,7 @@ func TestDomainRegisterWrongID(t *testing.T) {
 
 	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -391,7 +396,7 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 
 	ctx, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
-		testDomains: map[string]UnitTestPlugin{
+		testDomains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					unknownRequest := uuid.NewString()

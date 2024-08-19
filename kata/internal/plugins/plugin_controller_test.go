@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	prototk "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -47,7 +48,7 @@ func tempUDS(t *testing.T) string {
 
 type testSetup struct {
 	testDomainManager *testDomainManager
-	testDomains       map[string]UnitTestPlugin
+	testDomains       map[string]plugintk.Plugin
 }
 
 func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Context, *pluginController, func()) {
@@ -66,9 +67,12 @@ func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Cont
 			Domains: make(map[string]*PluginConfig),
 		},
 	}
-	testPlugins := make(map[string]UnitTestPlugin)
+	testPlugins := make(map[string]plugintk.Plugin)
 	for name, td := range setup.testDomains {
-		args.InitialConfig.Domains[name] = td.Conf()
+		args.InitialConfig.Domains[name] = &PluginConfig{
+			Type:     LibraryTypeCShared.Enum(),
+			Location: "/tmp/not/applicable",
+		}
 		testPlugins[name] = td
 	}
 

@@ -16,10 +16,12 @@ package plugins
 
 import (
 	"context"
+	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/stretchr/testify/assert"
 )
 
 type testDomainManager struct {
@@ -35,265 +37,147 @@ func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDoma
 	return tdm.domainRegistered(name, id, toDomain)
 }
 
-// type testDomain struct {
-// 	configureDomain     func(*prototk.ConfigureDomainRequest) *prototk.ConfigureDomainResponse
-// 	initDomain          func(*prototk.InitDomainRequest) *prototk.InitDomainResponse
-// 	initDeploy          func(*prototk.InitDeployRequest) *prototk.InitDeployResponse
-// 	prepareDeploy       func(*prototk.PrepareDeployRequest) *prototk.PrepareDeployResponse
-// 	initTransaction     func(*prototk.InitTransactionRequest) *prototk.InitTransactionResponse
-// 	assembleTransaction func(*prototk.AssembleTransactionRequest) *prototk.AssembleTransactionResponse
-// 	endorseTransaction  func(*prototk.EndorseTransactionRequest) *prototk.EndorseTransactionResponse
-// 	prepareTransaction  func(*prototk.PrepareTransactionRequest) *prototk.PrepareTransactionResponse
+func TestDomainRequestsOK(t *testing.T) {
 
-// 	preRegister     func(domainID string) *prototk.DomainMessage
-// 	customResponses func(*prototk.DomainMessage) []*prototk.DomainMessage
-// 	expectClose     func(err error)
+	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-// 	sendRequest    func(domainID string) *prototk.DomainMessage
-// 	handleResponse func(*prototk.DomainMessage)
-// }
+	tdm := &testDomainManager{}
+	var domainID string
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
+		assert.Equal(t, "domain1", name)
+		domainID = id.String()
+		waitForRegister <- toDomain
+		return tdm
+	}
 
-// func (tp *testDomain) conf() *PluginConfig {
-// 	return &PluginConfig{
-// 		Type:     types.Enum[LibraryType](LibraryTypeCShared),
-// 		Location: "/any/where",
-// 	}
-// }
+	domainFunctions := &plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			assert.Equal(t, int64(12345), cdr.ChainId)
+			return &prototk.ConfigureDomainResponse{
+				DomainConfig: &prototk.DomainConfig{
+					ConstructorAbiJson: "ABI1",
+				},
+			}, nil
+		},
+		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+			assert.Equal(t, domainID, idr.DomainUuid)
+			return &prototk.InitDomainResponse{}, nil
+		},
+		InitDeploy: func(ctx context.Context, idr *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
+			assert.Equal(t, "deploy_tx1_init", idr.Transaction.TransactionId)
+			return &prototk.InitDeployResponse{RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+				{Lookup: "lookup1"},
+			}}, nil
+		},
+		PrepareDeploy: func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+			assert.Equal(t, "deploy_tx1_prepare", pdr.Transaction.TransactionId)
+			return &prototk.PrepareDeployResponse{
+				SigningAddress: "signing1",
+			}, nil
+		},
+		InitTransaction: func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+			assert.Equal(t, "tx2_init", itr.Transaction.TransactionId)
+			return &prototk.InitTransactionResponse{
+				RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+					{Lookup: "lookup2"},
+				},
+			}, nil
+		},
+		AssembleTransaction: func(ctx context.Context, atr *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+			assert.Equal(t, "tx2_prepare", atr.Transaction.TransactionId)
+			return &prototk.AssembleTransactionResponse{
+				AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+			}, nil
+		},
+		EndorseTransaction: func(ctx context.Context, etr *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+			assert.Equal(t, "tx2_endorse", etr.Transaction.TransactionId)
+			return &prototk.EndorseTransactionResponse{
+				EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
+			}, nil
+		},
+		PrepareTransaction: func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+			assert.Equal(t, "tx2_prepare", ptr.Transaction.TransactionId)
+			return &prototk.PrepareTransactionResponse{
+				Transaction: &prototk.BaseLedgerTransaction{
+					FunctionName: "func1",
+				},
+			}, nil
+		},
+	}
+	ctx, pc, done := newTestDomainPluginController(t, &testSetup{
+		testDomainManager: tdm,
+		testDomains: map[string]plugintk.Plugin{
+			"domain1": plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+				return plugintk.DomainImplementation(domainFunctions)
+			}),
+		},
+	})
+	defer done()
 
-// func (tp *testDomain) run(t *testing.T, connectCtx context.Context, id string, client prototk.PluginControllerClient) {
-// 	stream, err := client.ConnectDomain(connectCtx)
-// 	assert.NoError(t, err)
+	domainAPI := <-waitForRegister
 
-// 	if tp.preRegister != nil {
-// 		err = stream.Send(tp.preRegister(id))
-// 		assert.NoError(t, err)
-// 	}
-// 	err = stream.Send(&prototk.DomainMessage{
-// 		Header: &prototk.Header{
-// 			PluginId:    id,
-// 			MessageId:   uuid.New().String(),
-// 			MessageType: prototk.Header_REGISTER,
-// 		},
-// 	})
-// 	assert.NoError(t, err)
+	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
+		ChainId: int64(12345),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "ABI1", cdr.DomainConfig.ConstructorAbiJson)
 
-// 	ctx := stream.Context()
-// 	for {
-// 		if tp.sendRequest != nil {
-// 			req := tp.sendRequest(id)
-// 			err := stream.Send(req)
-// 			assert.NoError(t, err)
-// 			tp.sendRequest = nil
-// 		}
+	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
+		DomainUuid: domainID,
+	})
+	assert.NoError(t, err)
 
-// 		msg, err := stream.Recv()
-// 		if err != nil {
-// 			log.L(ctx).Infof("exiting: %s", err)
-// 			if tp.expectClose != nil {
-// 				tp.expectClose(err)
-// 			}
-// 			return
-// 		}
-// 		switch msg.Header.MessageType {
-// 		case prototk.Header_REQUEST_TO_PLUGIN:
-// 			if tp.customResponses != nil {
-// 				responses := tp.customResponses(msg)
-// 				for _, r := range responses {
-// 					err := stream.Send(r)
-// 					assert.NoError(t, err)
-// 				}
-// 				continue
-// 			}
-// 			assert.NotEmpty(t, msg.Header.MessageId)
-// 			assert.Nil(t, msg.Header.CorrelationId)
-// 			reply := &prototk.DomainMessage{
-// 				Header: &prototk.Header{
-// 					PluginId:      id,
-// 					MessageId:     uuid.New().String(),
-// 					MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
-// 					CorrelationId: &msg.Header.MessageId,
-// 				},
-// 			}
-// 			switch req := msg.RequestToDomain.(type) {
-// 			case *prototk.DomainMessage_ConfigureDomain:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_ConfigureDomainRes{
-// 					ConfigureDomainRes: tp.configureDomain(req.ConfigureDomain),
-// 				}
-// 			case *prototk.DomainMessage_InitDomain:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_InitDomainRes{
-// 					InitDomainRes: tp.initDomain(req.InitDomain),
-// 				}
-// 			case *prototk.DomainMessage_InitDeploy:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_InitDeployRes{
-// 					InitDeployRes: tp.initDeploy(req.InitDeploy),
-// 				}
-// 			case *prototk.DomainMessage_PrepareDeploy:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_PrepareDeployRes{
-// 					PrepareDeployRes: tp.prepareDeploy(req.PrepareDeploy),
-// 				}
-// 			case *prototk.DomainMessage_InitTransaction:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_InitTransactionRes{
-// 					InitTransactionRes: tp.initTransaction(req.InitTransaction),
-// 				}
-// 			case *prototk.DomainMessage_AssembleTransaction:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_AssembleTransactionRes{
-// 					AssembleTransactionRes: tp.assembleTransaction(req.AssembleTransaction),
-// 				}
-// 			case *prototk.DomainMessage_EndorseTransaction:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_EndorseTransactionRes{
-// 					EndorseTransactionRes: tp.endorseTransaction(req.EndorseTransaction),
-// 				}
-// 			case *prototk.DomainMessage_PrepareTransaction:
-// 				reply.ResponseFromDomain = &prototk.DomainMessage_PrepareTransactionRes{
-// 					PrepareTransactionRes: tp.prepareTransaction(req.PrepareTransaction),
-// 				}
-// 			default:
-// 				assert.Fail(t, "unexpected: %T", req)
-// 			}
-// 			err := stream.Send(reply)
-// 			assert.NoError(t, err)
-// 		case prototk.Header_RESPONSE_TO_PLUGIN, prototk.Header_ERROR_RESPONSE:
-// 			tp.handleResponse(msg)
-// 		}
-// 	}
-// }
+	// Should not be initialized
+	assert.NoError(t, pc.WaitForInit(ctx))
 
-// func TestDomainRequestsOK(t *testing.T) {
+	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
+		Transaction: &prototk.DeployTransactionSpecification{
+			TransactionId: "deploy_tx1_init",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "lookup1", idr.RequiredVerifiers[0].Lookup)
 
-// 	waitForRegister := make(chan plugintk.DomainAPI, 1)
+	pdr, err := domainAPI.PrepareDeploy(ctx, &prototk.PrepareDeployRequest{
+		Transaction: &prototk.DeployTransactionSpecification{
+			TransactionId: "deploy_tx1_prepare",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "signing1", pdr.SigningAddress)
 
-// 	tdm := &testDomainManager{}
-// 	var domainID string
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		assert.Equal(t, "domain1", name)
-// 		assert.NotEmpty(t, id)
-// 		domainID = id.String()
-// 		waitForRegister <- toDomain
-// 		return tdm
-// 	}
+	itr, err := domainAPI.InitTransaction(ctx, &prototk.InitTransactionRequest{
+		Transaction: &prototk.TransactionSpecification{
+			TransactionId: "tx2_init",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "lookup2", itr.RequiredVerifiers[0].Lookup)
 
-// 	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			configureDomain: func(cdr *prototk.ConfigureDomainRequest) *prototk.ConfigureDomainResponse {
-// 				assert.Equal(t, int64(12345), cdr.ChainId)
-// 				return &prototk.ConfigureDomainResponse{
-// 					DomainConfig: &prototk.DomainConfig{
-// 						ConstructorAbiJson: "ABI1",
-// 					},
-// 				}
-// 			},
-// 			initDomain: func(idr *prototk.InitDomainRequest) *prototk.InitDomainResponse {
-// 				assert.Equal(t, domainID, idr.DomainUuid)
-// 				return &prototk.InitDomainResponse{}
-// 			},
-// 			initDeploy: func(idr *prototk.InitDeployRequest) *prototk.InitDeployResponse {
-// 				assert.Equal(t, "deploy_tx1_init", idr.Transaction.TransactionId)
-// 				return &prototk.InitDeployResponse{RequiredVerifiers: []*prototk.ResolveVerifierRequest{
-// 					{Lookup: "lookup1"},
-// 				}}
-// 			},
-// 			prepareDeploy: func(pdr *prototk.PrepareDeployRequest) *prototk.PrepareDeployResponse {
-// 				assert.Equal(t, "deploy_tx1_prepare", pdr.Transaction.TransactionId)
-// 				return &prototk.PrepareDeployResponse{
-// 					SigningAddress: "signing1",
-// 				}
-// 			},
-// 			initTransaction: func(itr *prototk.InitTransactionRequest) *prototk.InitTransactionResponse {
-// 				assert.Equal(t, "tx2_init", itr.Transaction.TransactionId)
-// 				return &prototk.InitTransactionResponse{
-// 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
-// 						{Lookup: "lookup2"},
-// 					},
-// 				}
-// 			},
-// 			assembleTransaction: func(atr *prototk.AssembleTransactionRequest) *prototk.AssembleTransactionResponse {
-// 				assert.Equal(t, "tx2_prepare", atr.Transaction.TransactionId)
-// 				return &prototk.AssembleTransactionResponse{
-// 					AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
-// 				}
-// 			},
-// 			endorseTransaction: func(etr *prototk.EndorseTransactionRequest) *prototk.EndorseTransactionResponse {
-// 				assert.Equal(t, "tx2_endorse", etr.Transaction.TransactionId)
-// 				return &prototk.EndorseTransactionResponse{
-// 					EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
-// 				}
-// 			},
-// 			prepareTransaction: func(ptr *prototk.PrepareTransactionRequest) *prototk.PrepareTransactionResponse {
-// 				assert.Equal(t, "tx2_prepare", ptr.Transaction.TransactionId)
-// 				return &prototk.PrepareTransactionResponse{
-// 					Transaction: &prototk.BaseLedgerTransaction{
-// 						FunctionName: "func1",
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
+	atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
+		Transaction: &prototk.TransactionSpecification{
+			TransactionId: "tx2_prepare",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
 
-// 	domainAPI := <-waitForRegister
+	etr, err := domainAPI.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
+		Transaction: &prototk.TransactionSpecification{
+			TransactionId: "tx2_endorse",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, prototk.EndorseTransactionResponse_SIGN, etr.EndorsementResult)
 
-// 	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
-// 		ChainId: int64(12345),
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "ABI1", cdr.DomainConfig.ConstructorAbiJson)
-
-// 	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
-// 		DomainUuid: domainID,
-// 	})
-// 	assert.NoError(t, err)
-
-// 	// Should not be initialized
-// 	assert.NoError(t, pc.WaitForInit(ctx))
-
-// 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
-// 		Transaction: &prototk.DeployTransactionSpecification{
-// 			TransactionId: "deploy_tx1_init",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "lookup1", idr.RequiredVerifiers[0].Lookup)
-
-// 	pdr, err := domainAPI.PrepareDeploy(ctx, &prototk.PrepareDeployRequest{
-// 		Transaction: &prototk.DeployTransactionSpecification{
-// 			TransactionId: "deploy_tx1_prepare",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "signing1", pdr.SigningAddress)
-
-// 	itr, err := domainAPI.InitTransaction(ctx, &prototk.InitTransactionRequest{
-// 		Transaction: &prototk.TransactionSpecification{
-// 			TransactionId: "tx2_init",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "lookup2", itr.RequiredVerifiers[0].Lookup)
-
-// 	atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
-// 		Transaction: &prototk.TransactionSpecification{
-// 			TransactionId: "tx2_prepare",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
-
-// 	etr, err := domainAPI.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
-// 		Transaction: &prototk.TransactionSpecification{
-// 			TransactionId: "tx2_endorse",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, prototk.EndorseTransactionResponse_SIGN, etr.EndorsementResult)
-
-// 	ptr, err := domainAPI.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
-// 		Transaction: &prototk.FinalizedTransaction{
-// 			TransactionId: "tx2_prepare",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
-// }
+	ptr, err := domainAPI.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
+		Transaction: &prototk.FinalizedTransaction{
+			TransactionId: "tx2_prepare",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
+}
 
 // func TestFromDomainRequestsOK(t *testing.T) {
 
