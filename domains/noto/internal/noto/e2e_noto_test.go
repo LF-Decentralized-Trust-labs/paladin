@@ -30,10 +30,11 @@ import (
 )
 
 var (
-	toDomain    = "to-domain"
-	testbedAddr = "http://localhost:49600"
-	grpcAddr    = "dns:localhost:49601"
-	notaryName  = "notary"
+	toDomain      = "to-domain"
+	testbedAddr   = "http://localhost:49600"
+	grpcAddr      = "dns:localhost:49601"
+	notaryName    = "notary"
+	recipientName = "recipient"
 )
 
 func TestNoto(t *testing.T) {
@@ -81,14 +82,14 @@ func TestNoto(t *testing.T) {
 		assert.NoError(t, rpcerr.Error())
 	}
 
-	log.L(ctx).Infof("Calling testbed_invoke")
+	log.L(ctx).Infof("Calling testbed_invoke (mint)")
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(deployResult),
 		Function: *NotoMintABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"to": "%s",
-			"amount": "100"
+			"amount": 100
 		}`, notaryName)),
 	})
 	if rpcerr != nil {
@@ -98,5 +99,50 @@ func TestNoto(t *testing.T) {
 	coins, err := domain.FindCoins(ctx, "{}")
 	assert.NoError(t, err)
 	assert.Len(t, coins, 1)
-	assert.Equal(t, "100", coins[0].Amount)
+	assert.Equal(t, int64(100), coins[0].Amount.Int64())
+	assert.Equal(t, notaryName, coins[0].Owner)
+
+	log.L(ctx).Infof("Calling testbed_invoke (transfer) - should fail")
+	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     notaryName,
+		To:       types.EthAddress(deployResult),
+		Function: *NotoTransferABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"from": "%s",
+			"to": "%s",
+			"amount": 150
+		}`, notaryName, recipientName)),
+	})
+	assert.NotNil(t, rpcerr)
+	assert.Regexp(t, "insufficient funds", rpcerr.Error())
+
+	log.L(ctx).Infof("Calling testbed_invoke (transfer)")
+	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     notaryName,
+		To:       types.EthAddress(deployResult),
+		Function: *NotoTransferABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"from": "%s",
+			"to": "%s",
+			"amount": 50
+		}`, notaryName, recipientName)),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+
+	coins, err = domain.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 3)
+
+	// This should have been spent
+	// TODO: why does it still exist?
+	assert.Equal(t, int64(100), coins[0].Amount.Int64())
+	assert.Equal(t, notaryName, coins[0].Owner)
+
+	// These are the expected coins after the transfer
+	assert.Equal(t, int64(50), coins[1].Amount.Int64())
+	assert.Equal(t, recipientName, coins[1].Owner)
+	assert.Equal(t, int64(50), coins[2].Amount.Int64())
+	assert.Equal(t, notaryName, coins[2].Owner)
 }

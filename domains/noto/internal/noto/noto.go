@@ -20,7 +20,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -41,6 +43,10 @@ var notoFactoryJSON []byte // From "gradle copySolidity"
 
 //go:embed abis/Noto.json
 var notoJSON []byte // From "gradle copySolidity"
+
+var (
+	fromDomain = "from-domain"
+)
 
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
@@ -77,8 +83,8 @@ var NotoConstructorABI = &abi.Entry{
 }
 
 type NotoMintParams struct {
-	To     string `json:"to"`
-	Amount string `json:"amount"`
+	To     string              `json:"to"`
+	Amount ethtypes.HexInteger `json:"amount"`
 }
 
 var NotoMintABI = &abi.Entry{
@@ -88,6 +94,12 @@ var NotoMintABI = &abi.Entry{
 		{Name: "to", Type: "string"},
 		{Name: "amount", Type: "uint256"},
 	},
+}
+
+type NotoTransferParams struct {
+	From   string              `json:"from"`
+	To     string              `json:"to"`
+	Amount ethtypes.HexInteger `json:"amount"`
 }
 
 var NotoTransferABI = &abi.Entry{
@@ -115,9 +127,9 @@ var NotoDomainConfigABI = &abi.ParameterArray{
 }
 
 type NotoCoin struct {
-	Salt   string `json:"salt"`
-	Owner  string `json:"owner"`
-	Amount string `json:"amount"`
+	Salt   string              `json:"salt"`
+	Owner  string              `json:"owner"`
+	Amount ethtypes.HexInteger `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -125,8 +137,8 @@ var NotoCoinABI = &abi.Parameter{
 	InternalType: "struct NotoCoin",
 	Components: abi.ParameterArray{
 		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "string"},
-		{Name: "amount", Type: "uint256"},
+		{Name: "owner", Type: "string", Indexed: true},
+		{Name: "amount", Type: "uint256", Indexed: true},
 	},
 }
 
@@ -257,17 +269,22 @@ func (d *Noto) handler(ctx context.Context) {
 			log.L(ctx).Errorf("Error receiving message - terminating handler loop: %v", err)
 			return
 		}
-		reply, err := d.handleMessage(ctx, in)
-		if err != nil {
-			reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
-			err = nil
-		}
-		if reply != nil {
-			if err = d.sendReply(ctx, in, reply); err != nil {
-				log.L(ctx).Errorf("Error sending message reply - terminating handler loop: %v", err)
-				return
+
+		// TODO: should probably have a finite number of workers?
+		// Cannot be synchronous, as some calls ("assemble") may need to make
+		// their own additional calls ("find states") and receive the results
+		go func() {
+			reply, err := d.handleMessage(ctx, in)
+			if err != nil {
+				reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
+				err = nil
 			}
-		}
+			if reply != nil {
+				if err = d.sendReply(ctx, in, reply); err != nil {
+					log.L(ctx).Errorf("Error sending message reply: %s", err)
+				}
+			}
+		}()
 	}
 }
 
@@ -386,7 +403,17 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		var assembled *pb.AssembledTransaction
 		switch functionABI.Name {
 		case "mint":
-			assembled, err = d.assembleMint(m.Transaction.FunctionParamsJson)
+			var mintParams NotoMintParams
+			err = json.Unmarshal([]byte(m.Transaction.FunctionParamsJson), &mintParams)
+			if err == nil {
+				assembled, err = d.assembleMint(&mintParams)
+			}
+		case "transfer":
+			var transferParams NotoTransferParams
+			err = json.Unmarshal([]byte(m.Transaction.FunctionParamsJson), &transferParams)
+			if err == nil {
+				assembled, err = d.assembleTransfer(ctx, &transferParams)
+			}
 		default:
 			err = fmt.Errorf("Unsupported method: %s", functionABI.Name)
 		}
@@ -476,34 +503,124 @@ func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*No
 	return &config, err
 }
 
-func (d *Noto) assembleMint(params string) (*pb.AssembledTransaction, error) {
-	var functionParams NotoMintParams
-	err := json.Unmarshal([]byte(params), &functionParams)
+func (d *Noto) makeCoin(state *pb.StoredState) (*NotoCoin, error) {
+	coin := &NotoCoin{}
+	err := json.Unmarshal([]byte(state.DataJson), &coin)
+	return coin, err
+}
+
+func (d *Noto) makeState(coin *NotoCoin) (*pb.NewState, error) {
+	coinJSON, err := json.Marshal(coin)
 	if err != nil {
 		return nil, err
 	}
-
-	newCoin := &NotoCoin{
-		Salt:   types.RandHex(32),
-		Owner:  functionParams.To,
-		Amount: functionParams.Amount,
-	}
-	newCoinJSON, err := json.Marshal(newCoin)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.AssembledTransaction{
-		NewStates: []*pb.NewState{
-			{
-				SchemaId:      d.coinSchema.Id,
-				StateDataJson: string(newCoinJSON),
-			},
-		},
+	return &pb.NewState{
+		SchemaId:      d.coinSchema.Id,
+		StateDataJson: string(coinJSON),
 	}, nil
 }
 
-func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
+func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.HexInteger) ([]*pb.StateRef, *big.Int, error) {
+	var lastStateTimestamp int64
+	total := big.NewInt(0)
+	stateRefs := []*pb.StateRef{}
+	for {
+		// Simple oldest coin first algorithm
+		// TODO: make this configurable
+		// TODO: why is filters.QueryJSON not a public interface?
+		query := fmt.Sprintf(`
+			"limit": 10,
+			"sort": [".created"],
+			"eq": [{
+				"field": "owner",
+				"value": "%s"
+			}]
+		`, owner)
+		if lastStateTimestamp > 0 {
+			query += fmt.Sprintf(`,
+				"gt": [{
+					"field": ".created",
+					"value": "%s"
+				}]
+			`, strconv.FormatInt(lastStateTimestamp, 10))
+		}
+		query = "{" + query + "}"
+
+		states, err := d.findAvailableStates(ctx, query)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(states) == 0 {
+			return nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
+		}
+		for _, state := range states {
+			lastStateTimestamp = state.StoredAt
+			coin, err := d.makeCoin(state)
+			if err != nil {
+				return nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+			}
+			total = total.Add(total, coin.Amount.BigInt())
+			stateRefs = append(stateRefs, &pb.StateRef{
+				HashId:   state.HashId,
+				SchemaId: state.SchemaId,
+			})
+			if total.Cmp(amount.BigInt()) >= 0 {
+				return stateRefs, total, nil
+			}
+		}
+	}
+}
+
+func (d *Noto) prepareOutputs(owner string, amount ethtypes.HexInteger) ([]*pb.NewState, error) {
+	// Always produce a single coin for the entire output amount
+	// TODO: make this configurable
+	newCoin := &NotoCoin{
+		Salt:   types.RandHex(32),
+		Owner:  owner,
+		Amount: amount,
+	}
+	newState, err := d.makeState(newCoin)
+	if err != nil {
+		return nil, err
+	}
+	return []*pb.NewState{newState}, nil
+}
+
+func (d *Noto) assembleMint(params *NotoMintParams) (*pb.AssembledTransaction, error) {
+	outputs, err := d.prepareOutputs(params.To, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.AssembledTransaction{
+		NewStates: outputs,
+	}, nil
+}
+
+func (d *Noto) assembleTransfer(ctx context.Context, params *NotoTransferParams) (*pb.AssembledTransaction, error) {
+	inputs, total, err := d.prepareInputs(ctx, params.From, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := d.prepareOutputs(params.To, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	if total.Cmp(params.Amount.BigInt()) == 1 {
+		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
+		returnedStates, err := d.prepareOutputs(params.From, *ethtypes.NewHexInteger(remainder))
+		if err != nil {
+			return nil, err
+		}
+		outputs = append(outputs, returnedStates...)
+	}
+
+	return &pb.AssembledTransaction{
+		SpentStates: inputs,
+		NewStates:   outputs,
+	}, nil
+}
+
+func (d *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
 	req := &pb.FindAvailableStatesRequest{
 		DomainUuid: d.domainID,
 		SchemaId:   d.coinSchema.Id,
@@ -511,15 +628,19 @@ func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error)
 	}
 
 	res := &pb.FindAvailableStatesResponse{}
-	err := requestReply(ctx, d.replies, "from-domain", *d.dest, req, &res)
+	err := requestReply(ctx, d.replies, fromDomain, *d.dest, req, &res)
+	return res.States, err
+}
+
+func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
+	states, err := d.findAvailableStates(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
-	coins := make([]*NotoCoin, len(res.States))
-	for i, state := range res.States {
-		coins[i] = &NotoCoin{}
-		if err := json.Unmarshal([]byte(state.DataJson), &coins[i]); err != nil {
+	coins := make([]*NotoCoin, len(states))
+	for i, state := range states {
+		if coins[i], err = d.makeCoin(state); err != nil {
 			return nil, err
 		}
 	}
