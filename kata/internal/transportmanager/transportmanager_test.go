@@ -37,7 +37,7 @@ func (ftp *fakeTransportProvider) Status(ctx context.Context, in *emptypb.Empty)
 func (ftp *fakeTransportProvider) Transport(stream transportmanagerpb.TransportManager_TransportServer) error {
 	ctx := stream.Context()
 
-	go func(){
+	go func() {
 		for {
 			recvMessage, err := stream.Recv()
 			if err != nil {
@@ -107,7 +107,7 @@ func TestRegisterNewTransportProviderMessageSendFlow(t *testing.T) {
 	s := grpc.NewServer()
 
 	transportmanagerpb.RegisterTransportManagerServer(s, fakeProvider)
-	
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -264,7 +264,7 @@ func TestSendMessagesProviderAvailable(t *testing.T) {
 	err := tm.Send(ctx, &proto.Message{Destination: "fakeidentity"})
 	assert.NoError(t, err)
 
-	_ = <-tm.sendMessages[TransportType(fakeTransportType)]
+	<-tm.sendMessages[TransportType(fakeTransportType)]
 }
 
 func TestRecieveMessages(t *testing.T) {
