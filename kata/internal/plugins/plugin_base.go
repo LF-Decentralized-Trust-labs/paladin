@@ -35,7 +35,7 @@ import (
 // functions are used rather than types to set the request/reply inputs, due to specifics
 // of the way typing works in the go protobuf codegen library
 type managerToPlugin[M any] interface {
-	requestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error
+	RequestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error
 }
 
 // pluginToManager is the inverse interface where requests are received from plugins, and need
@@ -43,15 +43,12 @@ type managerToPlugin[M any] interface {
 //
 // Here a function is only needed to store the response - the request is received from the plugin
 type pluginToManager[M any] interface {
-	requestReply(ctx context.Context, req plugintk.PluginMessage[M]) (resFn func(plugintk.PluginMessage[M]), err error)
+	RequestReply(ctx context.Context, req plugintk.PluginMessage[M]) (resFn func(plugintk.PluginMessage[M]), err error)
 }
 
 // each type of plugin implements a bridge that is just the specific set of operations mapped
 // down on the toPlugin and fromPlugin interfaces as appropriate
-type pluginBridgeFactory[M any] interface {
-	plugintk.PluginMessageWrapper[M]
-	pluginRegistered(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M])
-}
+type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M])
 
 type plugin[M any] struct {
 	pc   *pluginController
@@ -73,6 +70,7 @@ type pluginHandler[M any] struct {
 	pluginMap map[uuid.UUID]*plugin[M]
 
 	// Reference to the manager
+	wrapper       plugintk.PluginMessageWrapper[M]
 	bridgeFactory pluginBridgeFactory[M]
 
 	// Runtime state that exists from creation time
@@ -103,10 +101,11 @@ func (p *plugin[CB]) notifyStopped() {
 	p.pc.tapLoadingProgressed()
 }
 
-func newPluginHandler[M any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[M], stream grpc.BidiStreamingServer[M, M], bridgeFactory pluginBridgeFactory[M]) *pluginHandler[M] {
+func newPluginHandler[M any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[M], stream grpc.BidiStreamingServer[M, M], wrapper plugintk.PluginMessageWrapper[M], bridgeFactory pluginBridgeFactory[M]) *pluginHandler[M] {
 	ph := &pluginHandler[M]{
 		pc:            pc,
 		pluginMap:     pluginMap,
+		wrapper:       wrapper,
 		bridgeFactory: bridgeFactory,
 		inflight:      inflight.NewInflightManager[uuid.UUID, plugintk.PluginMessage[M]](uuid.Parse),
 		sendChl:       make(chan plugintk.PluginMessage[M]),
@@ -141,7 +140,7 @@ func (ph *pluginHandler[M]) serve() error {
 			log.L(serverCtx).Errorf("Stream for plugin ailed: %s", err)
 			return err
 		}
-		msg := ph.bridgeFactory.Wrap(iMsg)
+		msg := ph.wrapper.Wrap(iMsg)
 		header := msg.Header()
 		if plugin == nil && header.MessageType != prototk.Header_REGISTER {
 			log.L(serverCtx).Warnf("Plugin sent request before registration: %s", plugintk.PluginMessageToJSON(msg))
@@ -165,7 +164,7 @@ func (ph *pluginHandler[M]) serve() error {
 			serverCtx = log.WithLogField(serverCtx, "plugin", debugInfo)
 			// We now have the plugin ready for use
 			pluginId = plugin.id.String()
-			ph.pluginToManager = ph.bridgeFactory.pluginRegistered(plugin, ph)
+			ph.pluginToManager = ph.bridgeFactory(plugin, ph)
 		case prototk.Header_RESPONSE_FROM_PLUGIN,
 			prototk.Header_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel
@@ -223,11 +222,11 @@ func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pluginI
 	// Call the manager
 	startTime := time.Now()
 	log.L(ctx).Infof("[%s] ==> %T", req.Header().MessageId, req.RequestToPlugin())
-	resFn, err := ph.pluginToManager.requestReply(ctx, req)
+	resFn, err := ph.pluginToManager.RequestReply(ctx, req)
 
 	// Build and send the reply (success or error)
 	replyID := uuid.NewString()
-	res := ph.bridgeFactory.Wrap(new(M))
+	res := ph.wrapper.Wrap(new(M))
 	header := res.Header()
 	header.PluginId = pluginId
 	header.MessageId = replyID
@@ -245,13 +244,13 @@ func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pluginI
 	ph.send(res)
 }
 
-func (ph *pluginHandler[M]) requestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error {
+func (ph *pluginHandler[M]) RequestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error {
 	// Log under our context so we get the plugin ID
 	reqID := uuid.New()
 	l := log.L(ph.ctx)
 
 	// Caller is responsible for filling in the body
-	req := ph.bridgeFactory.Wrap(new(M))
+	req := ph.wrapper.Wrap(new(M))
 	reqFn(req)
 
 	// We are responsible for the header

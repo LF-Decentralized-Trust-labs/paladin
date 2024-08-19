@@ -31,13 +31,20 @@ type DomainManager interface {
 
 // The gRPC stream connected to by domain plugins
 func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
-	handler := newPluginHandler(pc, pc.domainPlugins, stream, &domainBridgeFactory{pc: pc})
+	handler := newPluginHandler(pc, pc.domainPlugins, stream,
+		&plugintk.DomainMessageWrapper{},
+		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage]) {
+			br := &domainBridge{
+				plugin:     plugin,
+				pluginType: plugin.def.Plugin.PluginType.String(),
+				pluginName: plugin.name,
+				pluginId:   plugin.id.String(),
+				toPlugin:   toPlugin,
+			}
+			br.manager = pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
+			return br
+		})
 	return handler.serve()
-}
-
-type domainBridgeFactory struct {
-	plugintk.DomainMessageWrapper
-	pc *pluginController
 }
 
 type domainBridge struct {
@@ -49,20 +56,8 @@ type domainBridge struct {
 	manager    plugintk.DomainCallbacks
 }
 
-func (bfr *domainBridgeFactory) pluginRegistered(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage]) {
-	br := &domainBridge{
-		plugin:     plugin,
-		pluginType: plugin.def.Plugin.PluginType.String(),
-		pluginName: plugin.name,
-		pluginId:   plugin.id.String(),
-		toPlugin:   toPlugin,
-	}
-	br.manager = bfr.pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
-	return br
-}
-
 // requests to callbacks in the domain manager
-func (br *domainBridge) requestReply(ctx context.Context, reqMsg plugintk.PluginMessage[prototk.DomainMessage]) (resFn func(plugintk.PluginMessage[prototk.DomainMessage]), err error) {
+func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.PluginMessage[prototk.DomainMessage]) (resFn func(plugintk.PluginMessage[prototk.DomainMessage]), err error) {
 	switch req := reqMsg.Message().RequestFromDomain.(type) {
 	case *prototk.DomainMessage_FindAvailableStates:
 		return callManagerImpl(ctx, req.FindAvailableStates,
@@ -79,7 +74,7 @@ func (br *domainBridge) requestReply(ctx context.Context, reqMsg plugintk.Plugin
 }
 
 func (br *domainBridge) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (res *prototk.ConfigureDomainResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_ConfigureDomain{ConfigureDomain: req}
@@ -95,7 +90,7 @@ func (br *domainBridge) ConfigureDomain(ctx context.Context, req *prototk.Config
 }
 
 func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (res *prototk.InitDomainResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDomain{InitDomain: req}
@@ -115,7 +110,7 @@ func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainR
 }
 
 func (br *domainBridge) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (res *prototk.InitDeployResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDeploy{InitDeploy: req}
@@ -131,7 +126,7 @@ func (br *domainBridge) InitDeploy(ctx context.Context, req *prototk.InitDeployR
 }
 
 func (br *domainBridge) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (res *prototk.PrepareDeployResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareDeploy{PrepareDeploy: req}
@@ -147,7 +142,7 @@ func (br *domainBridge) PrepareDeploy(ctx context.Context, req *prototk.PrepareD
 }
 
 func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (res *prototk.InitTransactionResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitTransaction{InitTransaction: req}
@@ -163,7 +158,7 @@ func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTr
 }
 
 func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
@@ -179,7 +174,7 @@ func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.As
 }
 
 func (br *domainBridge) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (res *prototk.EndorseTransactionResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_EndorseTransaction{EndorseTransaction: req}
@@ -195,7 +190,7 @@ func (br *domainBridge) EndorseTransaction(ctx context.Context, req *prototk.End
 }
 
 func (br *domainBridge) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (res *prototk.PrepareTransactionResponse, err error) {
-	err = br.toPlugin.requestReply(ctx,
+	err = br.toPlugin.RequestReply(ctx,
 		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareTransaction{PrepareTransaction: req}

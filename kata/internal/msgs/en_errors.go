@@ -143,6 +143,7 @@ var (
 	MsgPluginBadResponseBody   = ffe("PD011204", "Invalid response body %T")
 	MsgPluginUDSPathTooLong    = ffe("PD011205", "Unix domain socket path too log (len=%d,limit=100)")
 	MsgPluginError             = ffe("PD011206", "Plugin returned error: %s")
+	MsgPluginLoadFailed        = ffe("PD011207", "Plugin load failed: %s")
 
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")

@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -209,7 +208,7 @@ func (pc *pluginController) WaitForInit(ctx context.Context) error {
 		select {
 		case loadErrOrNil := <-pc.loadingProgressed:
 			if loadErrOrNil != nil {
-				return errors.Errorf(loadErrOrNil.ErrorMessage)
+				return i18n.NewError(ctx, msgs.MsgPluginLoadFailed, loadErrOrNil.ErrorMessage)
 			}
 		case <-ctx.Done():
 			log.L(ctx).Warnf("server exiting before plugin initialization complete")
