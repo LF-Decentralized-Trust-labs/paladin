@@ -207,6 +207,10 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 	fakePaladinClientCert, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client2.crt", "../../../test/ca2/clients/client2.key")
 	assert.NoError(t, err)
 
+	// Certs for the client that does not have its CA trusted
+	untrustedCACert, err := tls.LoadX509KeyPair("../../../test/ca3/clients/client1.crt", "../../../test/ca3/clients/client1.key")
+	assert.NoError(t, err)
+
 	// ---------------------------------------------------------------------------- GRPC Transport Provider
 
 	providerDestinationName := uuid.New().String()
@@ -392,4 +396,20 @@ func TestGRPCTransportEndToEnd(t *testing.T) {
 
 	// Check that we got the messsage back from the plugin in the comms bus
 	<-fakeCommsBus.recvMessages[newTransportInstanceName]
+
+	// Now send a message to the node using a cert from a CA that we don't trust and verify that the message is rejected
+	fakeClientTLSConfig = &tls.Config{
+		Certificates: []tls.Certificate{untrustedCACert},
+		RootCAs:      realPaladinCertPool,
+	}
+
+	badconn, err := grpc.NewClient(realAddress, grpc.WithTransportCredentials(credentials.NewTLS(fakeClientTLSConfig)))
+	assert.NoError(t, err)
+	defer badconn.Close()
+
+	badclient := interPaladinPB.NewInterPaladinTransportClient(badconn)
+
+	_, err = badclient.SendInterPaladinMessage(ctx, interPaladinMessage)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown certificate authority")
 }

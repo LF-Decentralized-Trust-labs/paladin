@@ -38,11 +38,6 @@ import (
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
 
-type fakePayload struct {
-	Key   string
-	Value string
-}
-
 var (
 	testPort        = 10002
 	testBufferSize  = 1
