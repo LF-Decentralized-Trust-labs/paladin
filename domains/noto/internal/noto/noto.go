@@ -60,17 +60,50 @@ type Noto struct {
 	stream       pb.KataMessageService_ListenClient
 	stopListener context.CancelFunc
 	done         chan bool
+	domainID     string
+	coinSchema   *pb.StateSchema
+	replies      *replyTracker
 }
 
-type NotoConstructor struct {
+type NotoConstructorParams struct {
 	Notary string `json:"notary"`
 }
 
 var NotoConstructorABI = &abi.Entry{
-	Type: "constructor",
+	Type: abi.Constructor,
 	Inputs: abi.ParameterArray{
 		{Name: "notary", Type: "string"},
 	},
+}
+
+type NotoMintParams struct {
+	To     string `json:"to"`
+	Amount string `json:"amount"`
+}
+
+var NotoMintABI = &abi.Entry{
+	Name: "mint",
+	Type: abi.Function,
+	Inputs: abi.ParameterArray{
+		{Name: "to", Type: "string"},
+		{Name: "amount", Type: "uint256"},
+	},
+}
+
+var NotoTransferABI = &abi.Entry{
+	Name: "transfer",
+	Type: abi.Function,
+	Inputs: abi.ParameterArray{
+		{Name: "from", Type: "string"},
+		{Name: "to", Type: "string"},
+		{Name: "amount", Type: "uint256"},
+	},
+}
+
+var NotoABI = &abi.ABI{
+	NotoConstructorABI,
+	NotoMintABI,
+	NotoTransferABI,
 }
 
 type NotoDomainConfig struct {
@@ -79,6 +112,22 @@ type NotoDomainConfig struct {
 
 var NotoDomainConfigABI = &abi.ParameterArray{
 	{Name: "notary", Type: "address"},
+}
+
+type NotoCoin struct {
+	Salt   string `json:"salt"`
+	Owner  string `json:"owner"`
+	Amount string `json:"amount"`
+}
+
+var NotoCoinABI = &abi.Parameter{
+	Type:         "tuple",
+	InternalType: "struct NotoCoin",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "bytes32"},
+		{Name: "owner", Type: "string"},
+		{Name: "amount", Type: "uint256"},
+	},
 }
 
 func loadBuild(buildOutput []byte) SolidityBuild {
@@ -120,6 +169,10 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		client:   pb.NewKataMessageServiceClient(conn),
 		Factory:  loadBuild(notoFactoryJSON),
 		Contract: contract,
+	}
+	d.replies = &replyTracker{
+		inflight: make(map[string]*inflightRequest),
+		client:   d.client,
 	}
 	return d, d.waitForReady(ctx)
 }
@@ -218,6 +271,12 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		return err
 	}
 
+	inflight := d.replies.getInflight(message.CorrelationId)
+	if inflight != nil {
+		inflight.done <- message
+		return nil
+	}
+
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Received ConfigureDomainRequest")
@@ -239,6 +298,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
+		schemaJSON, err := json.Marshal(NotoCoinABI)
+		if err != nil {
+			return err
+		}
 
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
@@ -246,20 +309,21 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				FactoryContractAbiJson: string(factoryJSON),
 				PrivateContractAbiJson: string(notoJSON),
 				ConstructorAbiJson:     string(constructorJSON),
-				AbiStateSchemasJson:    []string{},
+				AbiStateSchemasJson:    []string{string(schemaJSON)},
 			},
 		}
 		return d.sendReply(ctx, message, response)
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
-		response := &pb.InitDomainResponse{}
-		return d.sendReply(ctx, message, response)
+		d.domainID = m.DomainUuid
+		d.coinSchema = m.AbiStateSchemas[0]
+		return d.sendReply(ctx, message, &pb.InitDomainResponse{})
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
 
-		var params NotoConstructor
+		var params NotoConstructorParams
 		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
 		if err != nil {
 			return err
@@ -279,7 +343,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
 
-		var params NotoConstructor
+		var params NotoConstructorParams
 		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
 		if err != nil {
 			return err
@@ -311,16 +375,24 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
 
-		configValues, err := NotoDomainConfigABI.DecodeABIDataCtx(ctx, m.Transaction.ContractConfig, 0)
+		var functionABI abi.Entry
+		err := json.Unmarshal([]byte(m.Transaction.FunctionAbiJson), &functionABI)
 		if err != nil {
 			return err
 		}
-		configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
+
+		var assembled *pb.AssembledTransaction
+		switch functionABI.Name {
+		case "mint":
+			assembled, err = d.assembleMint(m.Transaction.FunctionParamsJson)
+		default:
+			err = fmt.Errorf("Unsupported method: %s", functionABI.Name)
+		}
 		if err != nil {
 			return err
 		}
-		var config NotoDomainConfig
-		err = json.Unmarshal(configJSON, &config)
+
+		_, err = d.decodeDomainConfig(ctx, m.Transaction.ContractConfig)
 		if err != nil {
 			return err
 		}
@@ -328,7 +400,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 
 		response := &pb.AssembleTransactionResponse{
 			AssemblyResult:       pb.AssembleTransactionResponse_OK,
-			AssembledTransaction: &pb.AssembledTransaction{},
+			AssembledTransaction: assembled,
 			AttestationPlan: []*pb.AttestationRequest{
 				{
 					Name:            "signer",
@@ -353,15 +425,30 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
 
+		inputs := make([]string, len(m.Transaction.SpentStates))
+		for i, state := range m.Transaction.SpentStates {
+			inputs[i] = state.HashId
+		}
+		outputs := make([]string, len(m.Transaction.NewStates))
+		for i, state := range m.Transaction.NewStates {
+			outputs[i] = state.HashId
+		}
+
+		params := map[string]interface{}{
+			"inputs":    inputs,
+			"outputs":   outputs,
+			"signature": "0x",
+			"data":      m.Transaction.TransactionId,
+		}
+		paramsJSON, err := json.Marshal(params)
+		if err != nil {
+			return err
+		}
+
 		response := &pb.PrepareTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
-				FunctionName: "transfer",
-				ParamsJson: `{
-					"inputs": [],
-					"outputs": [],
-					"signature": "0x",
-					"data": "0x"
-				}`,
+				FunctionName: "transfer", // TODO: can we have more than one method on base ledger?
+				ParamsJson:   string(paramsJSON),
 			},
 		}
 		return d.sendReply(ctx, message, response)
@@ -374,4 +461,68 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		log.L(ctx).Errorf("Unknown type: %s", reflect.TypeOf(m))
 		return nil
 	}
+}
+
+func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
+	configValues, err := NotoDomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
+	if err != nil {
+		return nil, err
+	}
+	configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
+	if err != nil {
+		return nil, err
+	}
+	var config NotoDomainConfig
+	err = json.Unmarshal(configJSON, &config)
+	return &config, err
+}
+
+func (d *Noto) assembleMint(params string) (*pb.AssembledTransaction, error) {
+	var functionParams NotoMintParams
+	err := json.Unmarshal([]byte(params), &functionParams)
+	if err != nil {
+		return nil, err
+	}
+
+	newCoin := &NotoCoin{
+		Salt:   types.RandHex(32),
+		Owner:  functionParams.To,
+		Amount: functionParams.Amount,
+	}
+	newCoinJSON, err := json.Marshal(newCoin)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.AssembledTransaction{
+		NewStates: []*pb.NewState{
+			{
+				SchemaId:      d.coinSchema.Id,
+				StateDataJson: string(newCoinJSON),
+			},
+		},
+	}, nil
+}
+
+func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
+	req := &pb.FindAvailableStatesRequest{
+		DomainUuid: d.domainID,
+		SchemaId:   d.coinSchema.Id,
+		QueryJson:  query,
+	}
+
+	res := &pb.FindAvailableStatesResponse{}
+	err := requestReply(ctx, d.replies, "from-domain", *d.dest, req, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	coins := make([]*NotoCoin, len(res.States))
+	for i, state := range res.States {
+		coins[i] = &NotoCoin{}
+		if err := json.Unmarshal([]byte(state.DataJson), &coins[i]); err != nil {
+			return nil, err
+		}
+	}
+	return coins, err
 }

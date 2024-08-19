@@ -17,6 +17,7 @@ package noto
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -75,26 +76,27 @@ func TestNoto(t *testing.T) {
 	log.L(ctx).Infof("Calling testbed_deploy")
 	var deployResult ethtypes.Address0xHex
 	rpcerr = rpc.CallRPC(callCtx, &deployResult, "testbed_deploy",
-		"noto", &NotoConstructor{Notary: notaryName})
+		"noto", &NotoConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
 
 	log.L(ctx).Infof("Calling testbed_invoke")
-	transfer := findMethod(domain.Contract.ABI, "transfer")
-	assert.NotNil(t, transfer)
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(deployResult),
-		Function: *transfer,
-		Inputs: types.RawJSON(`{
-			"inputs": [],
-			"outputs": [],
-			"signature": "0x",
-			"data": "0x"
-		}`),
+		Function: *NotoMintABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"to": "%s",
+			"amount": "100"
+		}`, notaryName)),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
+
+	coins, err := domain.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 1)
+	assert.Equal(t, "100", coins[0].Amount)
 }
