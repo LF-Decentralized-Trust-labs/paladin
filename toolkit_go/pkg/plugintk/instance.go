@@ -86,17 +86,15 @@ func (pi *pluginInstance[M]) connect(conn *grpc.ClientConn) (grpc.BidiStreamingC
 func (pr *pluginRun[M]) run() error {
 	pr.inflight = inflight.NewInflightManager[uuid.UUID, PluginMessage[M]](uuid.Parse)
 
-	conn, err := grpc.NewClient(pr.pi.connString, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
-	}
-
 	// Ensure we cleanup
+	var conn *grpc.ClientConn
 	defer func() {
-		// Close the connection
-		_ = conn.Close()
 		// Cancel any in-flight requests
 		pr.inflight.Close()
+		// Close the connection
+		if conn != nil {
+			_ = conn.Close()
+		}
 		// Cancel the ctx and wait for the sender to finish
 		if pr.cancelCtx != nil {
 			pr.cancelCtx()
@@ -105,8 +103,12 @@ func (pr *pluginRun[M]) run() error {
 			<-pr.senderDone
 		}
 	}()
+
 	// Create the long-lived bi-directional stream to the plugin controller
-	pr.stream, err = pr.pi.connect(conn)
+	conn, err := grpc.NewClient(pr.pi.connString, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err == nil {
+		pr.stream, err = pr.pi.connect(conn)
+	}
 	if err != nil {
 		return err
 	}
@@ -166,7 +168,7 @@ func (pr *pluginRun[M]) serve() error {
 		case prototk.Header_REQUEST_TO_PLUGIN:
 			// Dispatch to another go routine so we can continue to serve requests
 			go pr.handleRequestToPlugin(msg)
-		case prototk.Header_RESPONSE_TO_PLUGIN:
+		case prototk.Header_RESPONSE_TO_PLUGIN, prototk.Header_ERROR_RESPONSE:
 			// Find the in-flight request and complete it
 			if header.CorrelationId == nil {
 				l.Warnf("[NO_CORRELATION_ID] <== [%s] %T", header.MessageId, msg.ResponseToPlugin())
@@ -175,20 +177,20 @@ func (pr *pluginRun[M]) serve() error {
 			correlID := *header.CorrelationId
 			req := pr.inflight.GetInflightStr(correlID)
 			if req == nil {
-				l.Warnf("[%s] <== [%s] EXPIRED [%s]", correlID, header.MessageId, req.Age())
+				l.Warnf("[%s] <== [%s] EXPIRED", correlID, header.MessageId)
 				continue
 			}
 			req.Complete(msg)
 		default:
 			// We don't expect any other message types to be sent to a plugin right now
 			// Just log and ignore
-			l.Warnf("UNEXPECTED %s", pr.toJSON(msg))
+			l.Warnf("UNEXPECTED %s", toJSON(msg))
 		}
 	}
 
 }
 
-func (pr *pluginRun[M]) toJSON(msg PluginMessage[M]) (s string) {
+func toJSON[M any](msg PluginMessage[M]) (s string) {
 	b, _ := protojson.Marshal(msg.ProtoMessage())
 	if b != nil {
 		s = string(b)

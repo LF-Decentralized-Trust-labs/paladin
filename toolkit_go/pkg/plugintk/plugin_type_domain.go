@@ -52,7 +52,7 @@ func NewDomain(df DomainFactory) PluginBase {
 	)
 }
 
-func DomainImplementation(d DomainAPIFunctions) DomainAPI {
+func DomainImplementation(d *DomainAPIFunctions) DomainAPI {
 	return &domainAPIBase{d}
 }
 
@@ -163,7 +163,9 @@ func (dp *domainHandler) FindAvailableStates(ctx context.Context, req *prototk.F
 			FindAvailableStates: req,
 		},
 	}))
-	return responseToPluginAs[prototk.DomainMessage, prototk.FindAvailableStatesResponse](ctx, res, err)
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_FindAvailableStatesRes) *prototk.FindAvailableStatesResponse {
+		return msg.FindAvailableStatesRes
+	})
 }
 
 type DomainAPIFunctions struct {
@@ -178,7 +180,7 @@ type DomainAPIFunctions struct {
 }
 
 type domainAPIBase struct {
-	d DomainAPIFunctions
+	d *DomainAPIFunctions
 }
 
 func (db *domainAPIBase) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {

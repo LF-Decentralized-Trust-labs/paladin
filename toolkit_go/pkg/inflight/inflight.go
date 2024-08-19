@@ -28,6 +28,7 @@ type InflightManager[K comparable, T any] struct {
 	lock     sync.Mutex
 	parseStr func(string) (K, error)
 	requests map[K]*InflightRequest[K, T]
+	closed   bool
 }
 
 type InflightRequest[K comparable, T any] struct {
@@ -60,6 +61,9 @@ func (ifm *InflightManager[K, T]) AddInflight(ctx context.Context, id K) *Inflig
 	ifm.lock.Lock()
 	defer ifm.lock.Unlock()
 	ifm.requests[id] = req
+	if ifm.closed {
+		req.cancelCtx()
+	}
 	return req
 }
 
@@ -97,6 +101,7 @@ func (ifm *InflightManager[K, T]) cancelInFlight(req *InflightRequest[K, T]) {
 func (ifm *InflightManager[K, T]) Close() {
 	ifm.lock.Lock()
 	defer ifm.lock.Unlock()
+	ifm.closed = true
 	for _, req := range ifm.requests {
 		req.cancelCtx()
 		delete(ifm.requests, req.id)

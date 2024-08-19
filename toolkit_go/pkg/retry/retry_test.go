@@ -50,7 +50,7 @@ func TestRetryDeadlineTimeout(t *testing.T) {
 	err := r.Do(ctx, func(i int) (retry bool, err error) {
 		return true, fmt.Errorf("pop")
 	})
-	assert.Regexp(t, "PD010301", err)
+	assert.Regexp(t, "PD020000", err)
 }
 
 func TestRetryContextCanceled(t *testing.T) {
@@ -63,7 +63,7 @@ func TestRetryContextCanceled(t *testing.T) {
 	err := r.Do(ctx, func(i int) (retry bool, err error) {
 		return true, fmt.Errorf("pop")
 	})
-	assert.Regexp(t, "PD010301", err)
+	assert.Regexp(t, "PD020000", err)
 }
 
 func TestRetryLimited(t *testing.T) {

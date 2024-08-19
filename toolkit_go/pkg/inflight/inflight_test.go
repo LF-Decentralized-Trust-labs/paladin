@@ -69,4 +69,11 @@ func TestInFlightCancel(t *testing.T) {
 	}()
 	_, err := req.Wait()
 	assert.Regexp(t, "PD020100", err)
+
+	// check we do not block after close
+	id2 := uuid.New()
+	req2 := ifm.AddInflight(context.Background(), id2)
+	assert.Equal(t, id2, req2.ID())
+	_, err = req.Wait()
+	assert.Regexp(t, "PD020100", err)
 }

@@ -251,7 +251,7 @@ func TestReadAndParseYAMLFileFailMissingFile(t *testing.T) {
 
 	err = ReadAndParseYAMLFile(ctx, tempFile.Name(), P(struct{}{}))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "PD010500")
+	assert.Contains(t, err.Error(), "PD020200")
 	assert.Contains(t, err.Error(), tempFile.Name())
 
 }
@@ -260,7 +260,7 @@ func TestReadAndParseYAMLFileFailDirNotFile(t *testing.T) {
 	ctx := context.Background()
 	err := ReadAndParseYAMLFile(ctx, t.TempDir(), P(struct{}{}))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "PD010501")
+	assert.Contains(t, err.Error(), "PD020201")
 }
 
 func TestReadAndParseYAMLFileFailedParse(t *testing.T) {
@@ -291,5 +291,5 @@ invalid yaml content
 
 	err = ReadAndParseYAMLFile(ctx, tempFile.Name(), &result)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "PD010502")
+	assert.Contains(t, err.Error(), "PD020202")
 }

@@ -59,16 +59,16 @@ type PluginProxy[M any] interface {
 }
 
 // Maps the response payload to the requested type (avoids boilerplate in plugin types)
-func responseToPluginAs[M any, T any](ctx context.Context, msg PluginMessage[M], err error) (*T, error) {
+func responseToPluginAs[M, ResType, T any](ctx context.Context, msg PluginMessage[M], err error, unwrap func(*ResType) *T) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
 	res := msg.ResponseToPlugin()
-	iRes, ok := res.(*T)
+	iRes, ok := res.(*ResType)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, res, new(T))
+		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, res, new(ResType))
 	}
-	return iRes, nil
+	return unwrap(iRes), nil
 }
 
 func callPluginImpl[IN, OUT any](ctx context.Context, in *IN, fn func(context.Context, *IN) (*OUT, error)) (*OUT, error) {

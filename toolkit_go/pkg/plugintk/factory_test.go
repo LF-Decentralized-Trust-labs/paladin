@@ -22,8 +22,10 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/alecthomas/assert/v2"
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )
 
@@ -86,4 +88,114 @@ func checkPanic() {
 		panic(panicked)
 	}
 
+}
+
+type pluginExerciser[M any] struct {
+	t        *testing.T
+	wrapper  PluginImplementation[M]
+	inOutMap map[string]func(*M)
+	pluginID string
+	sendChl  chan *M
+	recvChl  chan *M
+}
+
+func newPluginExerciser[M any](t *testing.T, pluginID string, wrapper PluginImplementation[M], inOutMap map[string]func(*M)) *pluginExerciser[M] {
+	return &pluginExerciser[M]{
+		t:        t,
+		wrapper:  wrapper,
+		inOutMap: inOutMap,
+		pluginID: pluginID,
+		sendChl:  make(chan *M),
+		recvChl:  make(chan *M),
+	}
+}
+
+func (pe *pluginExerciser[M]) controller(stream grpc.BidiStreamingServer[M, M]) error {
+	t := pe.t
+	go func() {
+		for msg := range pe.sendChl {
+			err := stream.Send(msg)
+			assert.NoError(t, err)
+		}
+	}()
+	for {
+		iMsg, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		msg := pe.wrapper.Wrap(iMsg)
+		assert.Equal(t, pe.pluginID, msg.Header().PluginId)
+		switch msg.Header().MessageType {
+		case prototk.Header_REQUEST_FROM_PLUGIN:
+			reply := pe.wrapper.Wrap(new(M))
+			reply.Header().PluginId = msg.Header().PluginId
+			reply.Header().MessageId = uuid.NewString()
+			reply.Header().CorrelationId = &msg.Header().MessageId
+			reply.Header().MessageType = prototk.Header_RESPONSE_TO_PLUGIN
+
+			// Use the map to determine what to do
+			reqType := fmt.Sprintf("%T", msg.RequestFromPlugin())
+			mapper := pe.inOutMap[reqType]
+			assert.NotNil(t, mapper, fmt.Sprintf("MISSING: %s", reqType))
+			mapper(reply.Message())
+			err = stream.Send(reply.Message())
+			assert.NoError(t, err)
+		case prototk.Header_RESPONSE_FROM_PLUGIN, prototk.Header_ERROR_RESPONSE:
+			pe.recvChl <- msg.Message()
+		default:
+			assert.Fail(t, "Unexpected message: %s", msg.Header().MessageType)
+		}
+	}
+}
+
+func (pe *pluginExerciser[M]) doExchangeToPlugin(setReq func(*M), checkRes func(*M)) {
+	t := pe.t
+
+	req := pe.wrapper.Wrap(new(M))
+	req.Header().PluginId = pe.pluginID
+	req.Header().MessageId = uuid.NewString()
+	req.Header().MessageType = prototk.Header_REQUEST_TO_PLUGIN
+	log.L(context.Background()).Infof("IN %s", toJSON(req))
+	setReq(req.Message())
+
+	pe.sendChl <- req.Message()
+
+	reply := pe.wrapper.Wrap(<-pe.recvChl)
+	log.L(context.Background()).Infof("OUT %s", toJSON(reply))
+	assert.Equal(t, pe.pluginID, reply.Header().PluginId)
+	assert.Equal(t, req.Header().MessageId, *reply.Header().CorrelationId)
+	if reply.Header().MessageType == prototk.Header_ERROR_RESPONSE {
+		assert.NotNil(t, reply.Header().ErrorMessage)
+		assert.NotEmpty(t, *reply.Header().ErrorMessage)
+	} else {
+		assert.Equal(t, prototk.Header_RESPONSE_FROM_PLUGIN, reply.Header().MessageType)
+	}
+	checkRes(reply.Message())
+}
+
+func TestUnimplementedDoesNotPanic(t *testing.T) {
+	// Use domains for this test for convenience
+	_, exerciser, funcs, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// This is what a domain would actually implement
+	assert.Nil(t, funcs.ConfigureDomain)
+
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {
+		req.RequestToDomain = &prototk.DomainMessage_ConfigureDomain{}
+	}, func(res *prototk.DomainMessage) {
+		// Get an error back saying this request hasn't been implemented by the plugin
+		assert.Regexp(t, "PD020302", *res.Header.ErrorMessage)
+	})
+}
+
+func TestDualLoadPanics(t *testing.T) {
+	pf := &pluginFactory[string]{
+		instances: make(map[string]*pluginInstance[string]),
+	}
+	id := uuid.NewString()
+	pf.instanceStarted(&pluginInstance[string]{id: id})
+	assert.Panics(t, func() {
+		pf.instanceStarted(&pluginInstance[string]{id: id})
+	})
 }

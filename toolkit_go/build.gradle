@@ -20,6 +20,11 @@ ext {
     goFiles = fileTree(".") {
         include "pkg/**/*.go"
     }
+    targetCoverage = 97
+    maxCoverageBarGap = 1
+    coverageExcludedPackages = [
+        'github.com/kaleido-io/paladin/toolkit/pkg/prototk',
+    ]
 }
 
 configurations {
@@ -94,6 +99,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
 
     executable 'go'
     args 'get'
+    args './pkg/...'
 }
 
 task lint(type: Exec, dependsOn:tasks.protoc) {
@@ -116,15 +122,60 @@ task test(type: Exec, dependsOn: [tasks.goGet]) {
     workingDir '.'
     executable 'go'
     args 'test'
-    args './pkg/...', './internal/...'
+    args './pkg/...'
     args '-cover'
     args '-covermode=atomic'
     args '-timeout=30s'
     args "-test.gocoverdir=${getProject().projectDir}/coverage"
 }
 
+task buildCoverageTxt(type: Exec, dependsOn: [
+        tasks.protoc,
+        tasks.lint,
+        tasks.test,
+    ]) {
+    inputs.files(fileTree(project.mkdir('coverage')) {
+        include "covcounters.*"
+        include "covmeta.*"
+    })
+    outputs.files('coverage/coverage_unfiltered.txt')
+    executable 'go'
+    args 'tool', 'covdata', 'textfmt'
+    args '-i', "${projectDir}/coverage"
+    args '-o', "${projectDir}/coverage/coverage_unfiltered.txt"
+
+}
+
+task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
+    from 'coverage/coverage_unfiltered.txt'
+    into 'coverage'
+    outputs.files('coverage/coverage.txt')
+    eachFile { fcd ->
+        fcd.setRelativePath(fcd.relativePath.replaceLastName('coverage.txt'))
+    }
+    filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
+}
+
+task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
+    inputs.files('coverage/coverage.txt')
+
+    doLast {
+        def coverageOutput = ("go tool cover -func=${projectDir}/coverage/coverage.txt").execute().text
+        def totalCoverage = coverageOutput.readLines().find { it.contains('total:') }?.split()?.last()?.replace('%', '')
+        println "Coverage is ${totalCoverage}%"
+        if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
+            throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
+        } else if ( totalCoverage.toFloat() - targetCoverage > maxCoverageBarGap) {
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./kata/build.gradle file")
+        } else {
+            println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
+        }
+    }
+}
+
 task build {
     dependsOn tasks.lint
     dependsOn tasks.test
+    dependsOn tasks.checkCoverage
 }
 
