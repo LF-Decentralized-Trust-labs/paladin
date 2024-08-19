@@ -227,7 +227,6 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
-
 		factoryJSON, err := json.Marshal(d.Factory.ABI)
 		if err != nil {
 			return err
@@ -250,16 +249,12 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				AbiStateSchemasJson:    []string{},
 			},
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
 		response := &pb.InitDomainResponse{}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
@@ -279,9 +274,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				},
 			},
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
@@ -305,9 +298,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 			},
 			SigningAddress: params.Notary,
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
@@ -315,9 +306,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		response := &pb.InitTransactionResponse{
 			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
@@ -351,9 +340,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				},
 			},
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
@@ -361,9 +348,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		response := &pb.EndorseTransactionResponse{
 			EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
@@ -379,16 +364,14 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				}`,
 			},
 		}
-		if err := d.sendReply(ctx, message, response); err != nil {
-			return err
-		}
+		return d.sendReply(ctx, message, response)
 
 	case *pb.DomainAPIError:
 		log.L(ctx).Errorf("Received error: %s", m.ErrorMessage)
+		return nil
 
 	default:
 		log.L(ctx).Errorf("Unknown type: %s", reflect.TypeOf(m))
+		return nil
 	}
-
-	return nil
 }
