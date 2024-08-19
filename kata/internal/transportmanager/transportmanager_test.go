@@ -3,18 +3,19 @@ package transportmanager
 import (
 	"context"
 	"sync"
+
+	"fmt"
+	"net"
+	"os"
+	"path"
+	"testing"
 	"time"
 
-	// "fmt"
-	// "net"
-	// "os"
-	// "path"
-	"testing"
-
-	// "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	// "google.golang.org/grpc"
-	// "google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/grpc"
+
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	// grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
@@ -24,6 +25,8 @@ import (
 
 type fakeTransportProvider struct {
 	transportmanagerpb.UnimplementedTransportManagerServer
+
+	sendMessages chan *anypb.Any
 }
 
 func (ftp *fakeTransportProvider) Status(ctx context.Context, in *emptypb.Empty) (*transportmanagerpb.PluginStatus, error) {
@@ -31,8 +34,21 @@ func (ftp *fakeTransportProvider) Status(ctx context.Context, in *emptypb.Empty)
 		Ok: true,
 	}, nil
 }
-func (ftp *fakeTransportProvider) Transport(transportmanagerpb.TransportManager_TransportServer) {
-	return
+func (ftp *fakeTransportProvider) Transport(stream transportmanagerpb.TransportManager_TransportServer) error {
+	ctx := stream.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case msg := <-ftp.sendMessages: {
+			err := stream.Send(msg)
+			if err != nil {
+				return err
+			}
+		}
+		}
+	}
 }
 
 type fakeRegistryClient struct {
@@ -45,6 +61,102 @@ func (frc *fakeRegistryClient) ResolveIdentity(identity *ResolveIdentityRequest)
 }
 func (frc *fakeRegistryClient) GetTransportInformation(identity *ResolveIdentityResponse) map[string]string {
 	return frc.transportDetails
+}
+
+func TestRegisterNewTransportProviderMessageReturnFlow(t *testing.T) {
+	// Simulate a message coming back from the plugin
+	ctx, cancel := context.WithCancel(context.Background())
+	tm := NewTransportManager(nil)
+	testingSocketLocation := fmt.Sprintf("%s.sock", uuid.NewString())
+
+	fakeProvider := &fakeTransportProvider{
+		sendMessages: make(chan *anypb.Any),
+	}
+	testDir := os.TempDir()
+	testingSocket := path.Join(testDir, testingSocketLocation)
+	defer os.Remove(testingSocket)
+
+	pluginListener, err := net.Listen("unix", testingSocket)
+	assert.NoError(t, err)
+	s := grpc.NewServer()
+
+	transportmanagerpb.RegisterTransportManagerServer(s, fakeProvider)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := s.Serve(pluginListener)
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	err = tm.RegisterNewTransportProvider(ctx, fmt.Sprintf("unix://%s", testingSocket), "magicaltransportprovider")
+	assert.NoError(t, err)
+
+	// Send a message through our side of the transport link to the transport manager and check that it comes through on the correct channel internally
+	fakeMessage := &proto.Message{
+		Destination: "somemagicalcomponent",
+		Id: uuid.NewString(),
+	}
+	fakeMessageAny, err := anypb.New(fakeMessage)
+	assert.NoError(t, err)
+	
+	fakeProvider.sendMessages <- fakeMessageAny
+
+	var recvMessage *proto.Message
+	tm.Recieve(ctx, "somemagicalcomponent", func(m *proto.Message) {
+		recvMessage = m
+	})
+
+	var msgWg sync.WaitGroup
+	msgWg.Add(1)
+	go func() {
+		for {
+			if recvMessage != nil {
+				msgWg.Done()
+				cancel()
+				return				
+			}
+
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	msgWg.Wait()
+
+	assert.Equal(t, "somemagicalcomponent", recvMessage.Destination)
+}
+
+func TestRegisterNewTransportProviderInitialisationFlow(t *testing.T) {
+	ctx := context.Background()
+	tm := NewTransportManager(nil)
+
+	err := tm.RegisterNewTransportProvider(ctx, "somesocketthatdoesnotexist", "magicaltransportprovider")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "zero addresses")
+
+	testingSocketLocation := fmt.Sprintf("%s.sock", uuid.NewString())
+
+	fakeProvider := &fakeTransportProvider{}
+	testDir := os.TempDir()
+	testingSocket := path.Join(testDir, testingSocketLocation)
+	defer os.Remove(testingSocket)
+
+	pluginListener, err := net.Listen("unix", testingSocket)
+	assert.NoError(t, err)
+	s := grpc.NewServer()
+
+	transportmanagerpb.RegisterTransportManagerServer(s, fakeProvider)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := s.Serve(pluginListener)
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	err = tm.RegisterNewTransportProvider(ctx, fmt.Sprintf("unix://%s", testingSocket), "magicaltransportprovider")
+	assert.NoError(t, err)
 }
 
 func TestSendMessagesFailWhenNoCommonPluginsWithRemote(t *testing.T) {
