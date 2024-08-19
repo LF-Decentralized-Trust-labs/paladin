@@ -257,24 +257,30 @@ func (d *Noto) handler(ctx context.Context) {
 			log.L(ctx).Errorf("Error receiving message - terminating handler loop: %v", err)
 			return
 		}
-		err = d.handleMessage(ctx, in)
+		reply, err := d.handleMessage(ctx, in)
 		if err != nil {
-			log.L(ctx).Errorf("Error handling message - terminating handler loop: %v", err)
-			return
+			reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
+			err = nil
+		}
+		if reply != nil {
+			if err = d.sendReply(ctx, in, reply); err != nil {
+				log.L(ctx).Errorf("Error sending message reply - terminating handler loop: %v", err)
+				return
+			}
 		}
 	}
 }
 
-func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
+func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply proto.Message, err error) {
 	body, err := message.Body.UnmarshalNew()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	inflight := d.replies.getInflight(message.CorrelationId)
 	if inflight != nil {
 		inflight.done <- message
-		return nil
+		return nil, nil
 	}
 
 	switch m := body.(type) {
@@ -284,26 +290,26 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		var config Config
 		err := yaml.Unmarshal([]byte(m.ConfigYaml), &config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		factoryJSON, err := json.Marshal(d.Factory.ABI)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		notoJSON, err := json.Marshal(d.Contract.ABI)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		constructorJSON, err := json.Marshal(NotoConstructorABI)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		schemaJSON, err := json.Marshal(NotoCoinABI)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		response := &pb.ConfigureDomainResponse{
+		return &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
 				FactoryContractAddress: config.FactoryAddress,
 				FactoryContractAbiJson: string(factoryJSON),
@@ -311,14 +317,13 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				ConstructorAbiJson:     string(constructorJSON),
 				AbiStateSchemasJson:    []string{string(schemaJSON)},
 			},
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
 		d.domainID = m.DomainUuid
 		d.coinSchema = m.AbiStateSchemas[0]
-		return d.sendReply(ctx, message, &pb.InitDomainResponse{})
+		return &pb.InitDomainResponse{}, nil
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
@@ -326,19 +331,18 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		var params NotoConstructorParams
 		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		log.L(ctx).Infof("Deployment parameters: %+v", params)
 
-		response := &pb.InitDeployTransactionResponse{
+		return &pb.InitDeployTransactionResponse{
 			RequiredVerifiers: []*pb.ResolveVerifierRequest{
 				{
 					Lookup:    params.Notary,
 					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				},
 			},
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
@@ -346,13 +350,13 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		var params NotoConstructorParams
 		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		log.L(ctx).Infof("Deployment parameters: %+v", params)
 		log.L(ctx).Infof("Resolved verifiers: %+v", m.ResolvedVerifiers)
 		notary := m.ResolvedVerifiers[0].Verifier
 
-		response := &pb.PrepareDeployTransactionResponse{
+		return &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
 				FunctionName: "deploy",
 				ParamsJson: fmt.Sprintf(`{
@@ -361,16 +365,14 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 				}`, m.Transaction.TransactionId, notary),
 			},
 			SigningAddress: params.Notary,
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
 
-		response := &pb.InitTransactionResponse{
+		return &pb.InitTransactionResponse{
 			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
@@ -378,7 +380,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		var functionABI abi.Entry
 		err := json.Unmarshal([]byte(m.Transaction.FunctionAbiJson), &functionABI)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var assembled *pb.AssembledTransaction
@@ -389,16 +391,16 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 			err = fmt.Errorf("Unsupported method: %s", functionABI.Name)
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		_, err = d.decodeDomainConfig(ctx, m.Transaction.ContractConfig)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// TODO: use config.Notary instead of hard-coding below
 
-		response := &pb.AssembleTransactionResponse{
+		return &pb.AssembleTransactionResponse{
 			AssemblyResult:       pb.AssembleTransactionResponse_OK,
 			AssembledTransaction: assembled,
 			AttestationPlan: []*pb.AttestationRequest{
@@ -411,16 +413,14 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 					},
 				},
 			},
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
 
-		response := &pb.EndorseTransactionResponse{
+		return &pb.EndorseTransactionResponse{
 			EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
@@ -442,24 +442,23 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		}
 		paramsJSON, err := json.Marshal(params)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		response := &pb.PrepareTransactionResponse{
+		return &pb.PrepareTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
 				FunctionName: "transfer", // TODO: can we have more than one method on base ledger?
 				ParamsJson:   string(paramsJSON),
 			},
-		}
-		return d.sendReply(ctx, message, response)
+		}, nil
 
 	case *pb.DomainAPIError:
 		log.L(ctx).Errorf("Received error: %s", m.ErrorMessage)
-		return nil
+		return nil, nil
 
 	default:
-		log.L(ctx).Errorf("Unknown type: %s", reflect.TypeOf(m))
-		return nil
+		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(m))
+		return nil, nil
 	}
 }
 
