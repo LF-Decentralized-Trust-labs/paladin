@@ -39,15 +39,25 @@ func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDoma
 
 func TestDomainRequestsOK(t *testing.T) {
 
-	waitForRegister := make(chan plugintk.DomainAPI, 1)
+	waitForAPI := make(chan plugintk.DomainAPI, 1)
+	waitForCallbacks := make(chan plugintk.DomainCallbacks, 1)
 
 	tdm := &testDomainManager{}
 	var domainID string
 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
 		assert.Equal(t, "domain1", name)
 		domainID = id.String()
-		waitForRegister <- toDomain
+		waitForAPI <- toDomain
 		return tdm
+	}
+
+	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
+		assert.Equal(t, "schema1", req.SchemaId)
+		return &prototk.FindAvailableStatesResponse{
+			States: []*prototk.StoredState{
+				{HashId: "12345"},
+			},
+		}, nil
 	}
 
 	domainFunctions := &plugintk.DomainAPIFunctions{
@@ -108,13 +118,14 @@ func TestDomainRequestsOK(t *testing.T) {
 		testDomainManager: tdm,
 		testDomains: map[string]plugintk.Plugin{
 			"domain1": plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+				waitForCallbacks <- callbacks
 				return plugintk.DomainImplementation(domainFunctions)
 			}),
 		},
 	})
 	defer done()
 
-	domainAPI := <-waitForRegister
+	domainAPI := <-waitForAPI
 
 	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
 		ChainId: int64(12345),
@@ -177,346 +188,11 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
+
+	callbacks := <-waitForCallbacks
+	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
+		SchemaId: "schema1",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "12345", fas.States[0].HashId)
 }
-
-// func TestFromDomainRequestsOK(t *testing.T) {
-
-// 	waitForResponse := make(chan struct{}, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		return tdm
-// 	}
-// 	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-// 		return &prototk.FindAvailableStatesResponse{
-// 			States: []*prototk.StoredState{
-// 				{HashId: "12345"},
-// 			},
-// 		}, nil
-// 	}
-
-// 	msgID := uuid.NewString()
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			sendRequest: func(domainID string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						PluginId:    domainID,
-// 						MessageId:   msgID,
-// 						MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
-// 					},
-// 					RequestFromDomain: &prototk.DomainMessage_FindAvailableStates{
-// 						FindAvailableStates: &prototk.FindAvailableStatesRequest{
-// 							SchemaId: "schema1",
-// 						},
-// 					},
-// 				}
-// 			},
-// 			handleResponse: func(dm *prototk.DomainMessage) {
-// 				assert.Equal(t, msgID, *dm.Header.CorrelationId)
-// 				res := dm.ResponseToDomain.(*prototk.DomainMessage_FindAvailableStatesRes).FindAvailableStatesRes
-// 				assert.Equal(t, "12345", res.States[0].HashId)
-// 				close(waitForResponse)
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	<-waitForResponse
-
-// }
-
-// func TestFromDomainRequestsError(t *testing.T) {
-
-// 	waitForResponse := make(chan struct{}, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		return tdm
-// 	}
-// 	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-// 		return nil, fmt.Errorf("pop")
-// 	}
-
-// 	msgID := uuid.NewString()
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			sendRequest: func(domainID string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						PluginId:    domainID,
-// 						MessageId:   msgID,
-// 						MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
-// 					},
-// 					RequestFromDomain: &prototk.DomainMessage_FindAvailableStates{
-// 						FindAvailableStates: &prototk.FindAvailableStatesRequest{
-// 							SchemaId: "schema1",
-// 						},
-// 					},
-// 				}
-// 			},
-// 			handleResponse: func(dm *prototk.DomainMessage) {
-// 				assert.Equal(t, msgID, *dm.Header.CorrelationId)
-// 				assert.Regexp(t, "pop", *dm.Header.ErrorMessage)
-// 				close(waitForResponse)
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	<-waitForResponse
-
-// }
-
-// func TestFromDomainRequestBadReq(t *testing.T) {
-
-// 	waitForResponse := make(chan struct{}, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		return tdm
-// 	}
-
-// 	msgID := uuid.NewString()
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			sendRequest: func(domainID string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						PluginId:    domainID,
-// 						MessageId:   msgID,
-// 						MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
-// 						// Missing payload
-// 					},
-// 				}
-// 			},
-// 			handleResponse: func(dm *prototk.DomainMessage) {
-// 				assert.Equal(t, msgID, *dm.Header.CorrelationId)
-// 				assert.Regexp(t, "PD011203", *dm.Header.ErrorMessage)
-// 				close(waitForResponse)
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	<-waitForResponse
-
-// }
-
-// func TestDomainRequestsFail(t *testing.T) {
-
-// 	waitForRegister := make(chan plugintk.DomainAPI, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		waitForRegister <- toDomain
-// 		return tdm
-// 	}
-
-// 	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
-// 				return []*prototk.DomainMessage{
-// 					{
-// 						Header: &prototk.Header{
-// 							PluginId:      req.Header.PluginId,
-// 							MessageId:     uuid.NewString(),
-// 							CorrelationId: &req.Header.MessageId,
-// 							MessageType:   prototk.Header_ERROR_RESPONSE,
-// 							ErrorMessage:  confutil.P("pop"),
-// 						},
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	domainAPI := <-waitForRegister
-
-// 	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-// 	assert.Regexp(t, "pop", err)
-
-// }
-
-// func TestDomainRequestsBadResponse(t *testing.T) {
-
-// 	waitForRegister := make(chan plugintk.DomainAPI, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		waitForRegister <- toDomain
-// 		return tdm
-// 	}
-
-// 	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
-// 				return []*prototk.DomainMessage{
-// 					{
-// 						Header: &prototk.Header{
-// 							PluginId:      req.Header.PluginId,
-// 							CorrelationId: &req.Header.MessageId,
-// 							MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
-// 						},
-// 						ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
-// 							AssembleTransactionRes: &prototk.AssembleTransactionResponse{
-// 								RevertReason: confutil.P("this is not a configure response"),
-// 							},
-// 						},
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	domainAPI := <-waitForRegister
-
-// 	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-// 	assert.Regexp(t, "PD011204", err)
-
-// }
-
-// func TestDomainSendBeforeRegister(t *testing.T) {
-
-// 	waitForRegister := make(chan uuid.UUID, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		waitForRegister <- id
-// 		return tdm
-// 	}
-
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			preRegister: func(string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	<-waitForRegister
-// }
-
-// func TestDomainSendDoubleRegister(t *testing.T) {
-
-// 	waitForRegister := make(chan plugintk.DomainAPI, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		waitForRegister <- toDomain
-// 		return tdm
-// 	}
-
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			preRegister: func(domainID string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						MessageType: prototk.Header_REGISTER,
-// 						PluginId:    domainID,
-// 						MessageId:   uuid.NewString(),
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	<-waitForRegister
-
-// }
-
-// func TestDomainRegisterWrongID(t *testing.T) {
-
-// 	waitForError := make(chan error, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		return tdm
-// 	}
-
-// 	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			preRegister: func(domainID string) *prototk.DomainMessage {
-// 				return &prototk.DomainMessage{
-// 					Header: &prototk.Header{
-// 						MessageType: prototk.Header_REGISTER,
-// 						PluginId:    uuid.NewString(), // unknown to registry
-// 						MessageId:   uuid.NewString(),
-// 					},
-// 				}
-// 			},
-// 			expectClose: func(err error) {
-// 				waitForError <- err
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	assert.Regexp(t, "UUID", <-waitForError)
-// }
-
-// func TestDomainSendResponseWrongID(t *testing.T) {
-
-// 	waitForRegister := make(chan plugintk.DomainAPI, 1)
-
-// 	tdm := &testDomainManager{}
-// 	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-// 		waitForRegister <- toDomain
-// 		return tdm
-// 	}
-
-// 	ctx, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-// 		"domain1": {
-// 			customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
-// 				unknownRequest := uuid.NewString()
-// 				return []*prototk.DomainMessage{
-// 					// One response for an unknown request - should be ignored, as it could
-// 					// simply be a context timeout on the requesting side
-// 					{
-// 						Header: &prototk.Header{
-// 							PluginId:      req.Header.PluginId,
-// 							MessageId:     uuid.NewString(),
-// 							CorrelationId: &unknownRequest,
-// 							MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
-// 						},
-// 						ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
-// 							AssembleTransactionRes: &prototk.AssembleTransactionResponse{},
-// 						},
-// 					},
-// 					// Response with the data we want to see on the right correlID after
-// 					{
-// 						Header: &prototk.Header{
-// 							PluginId:      req.Header.PluginId,
-// 							MessageId:     uuid.NewString(),
-// 							CorrelationId: &req.Header.MessageId,
-// 							MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
-// 						},
-// 						ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
-// 							AssembleTransactionRes: &prototk.AssembleTransactionResponse{
-// 								AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
-// 							},
-// 						},
-// 					},
-// 				}
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	domainAPI := <-waitForRegister
-// 	atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
-// 		Transaction: &prototk.TransactionSpecification{
-// 			TransactionId: "tx2_prepare",
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
-// }

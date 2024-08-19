@@ -162,7 +162,7 @@ func TestInitPluginControllerTCP4(t *testing.T) {
 		DomainManager: nil,
 		LoaderID:      uuid.New(),
 		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: "tcp4:0.0.0.0:0"},
+			GRPC: GRPCConfig{Address: "tcp4:127.0.0.1:0"},
 		},
 	}
 	pc, err := NewPluginController(context.Background(), args)
