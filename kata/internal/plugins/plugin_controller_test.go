@@ -247,22 +247,6 @@ func TestNotifyPluginUpdateNotStarted(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestInflightHandleBadCorrelIDs(t *testing.T) {
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: tempUDS(t)},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
-	assert.NoError(t, err)
-
-	inFlight := pc.(*pluginController).domainRequests
-	assert.Nil(t, inFlight.GetInflightCorrelID(nil))
-	assert.Nil(t, inFlight.GetInflightCorrelID(confutil.P("wrong")))
-}
-
 func TestLoaderErrors(t *testing.T) {
 	ctx := context.Background()
 	args := &PluginControllerArgs{

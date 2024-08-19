@@ -24,20 +24,21 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domaintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type DomainManager interface {
-	DomainRegistered(name string, id uuid.UUID, toDomain domaintk.DomainAPI) (fromDomain domaintk.DomainCallbacks)
+	DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks)
 }
 
 type domainHandler struct {
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	pc         *pluginController
-	plugin     *plugin[domaintk.DomainCallbacks]
-	callbacks  domaintk.DomainCallbacks
+	plugin     *plugin[plugintk.DomainCallbacks]
+	callbacks  plugintk.DomainCallbacks
 	sendStream prototk.PluginController_ConnectDomainServer
 	sendChl    chan *prototk.DomainMessage
 	senderDone chan struct{}
@@ -46,7 +47,7 @@ type domainHandler struct {
 // Domains connect over this channel, and must announce themselves with their ID to complete the load
 func (pc *pluginController) domainServer(stream prototk.PluginController_ConnectDomainServer) error {
 	ctx := stream.Context()
-	var plugin *plugin[domaintk.DomainCallbacks]
+	var plugin *plugin[plugintk.DomainCallbacks]
 	defer func() {
 		// If we got to the point we've initialized, then we're unregistered & uninitialized when we return
 		if plugin != nil {
@@ -69,19 +70,19 @@ func (pc *pluginController) domainServer(stream prototk.PluginController_Connect
 			log.L(ctx).Errorf("Stream for domain %s failed: %s", domainName, err)
 			return err
 		}
-		if plugin == nil && msg.MessageType != prototk.DomainMessage_REGISTER {
+		if plugin == nil && msg.Header.MessageType != prototk.Header_REGISTER {
 			log.L(ctx).Warnf("Domain %s sent request before registration: %s", domainName, jsonProto(msg))
 			continue
 		}
-		switch msg.MessageType {
-		case prototk.DomainMessage_REGISTER:
+		switch msg.Header.MessageType {
+		case prototk.Header_REGISTER:
 			if plugin != nil {
 				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
 				continue
 			}
-			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.DomainId, prototk.PluginInfo_DOMAIN)
+			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.Header.PluginId, prototk.PluginInfo_DOMAIN)
 			if err != nil {
-				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.DomainId)
+				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.Header.PluginId)
 				// Close the connection to this plugin
 				return err
 			}
@@ -89,16 +90,19 @@ func (pc *pluginController) domainServer(stream prototk.PluginController_Connect
 			domainName = plugin.name
 			// The handler starts and owns the sending routine (we only use it on this routine, so no locking on this line)
 			plugin.handler = pc.newDomainHandler(plugin, stream)
-		case prototk.DomainMessage_RESPONSE_FROM_DOMAIN,
-			prototk.DomainMessage_ERROR_RESPONSE:
+		case prototk.Header_RESPONSE_FROM_PLUGIN,
+			prototk.Header_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel
-			req := pc.domainRequests.GetInflightCorrelID(msg.CorrelationId)
+			var req *inflight.InflightRequest[uuid.UUID, *prototk.DomainMessage]
+			if msg.Header.CorrelationId != nil {
+				req = pc.domainRequests.GetInflightStr(*msg.Header.CorrelationId)
+			}
 			if req == nil {
 				log.L(ctx).Warnf("Domain %s sent response for unknown/expired request: %s", domainName, jsonProto(msg))
 				continue
 			}
 			req.Complete(msg)
-		case prototk.DomainMessage_REQUEST_FROM_DOMAIN:
+		case prototk.Header_REQUEST_FROM_PLUGIN:
 			// We can't block the stream for this processing, so kick it off to a go routine for the handler
 			go plugin.handler.requestFromDomain(ctx, msg)
 		}
@@ -106,7 +110,7 @@ func (pc *pluginController) domainServer(stream prototk.PluginController_Connect
 	}
 }
 
-func (pc *pluginController) newDomainHandler(plugin *plugin[domaintk.DomainCallbacks], sendStream prototk.PluginController_ConnectDomainServer) *domainHandler {
+func (pc *pluginController) newDomainHandler(plugin *plugin[plugintk.DomainCallbacks], sendStream prototk.PluginController_ConnectDomainServer) *domainHandler {
 	dh := &domainHandler{
 		pc:         pc,
 		plugin:     plugin,
@@ -282,47 +286,51 @@ func (dh *domainHandler) requestToDomain(ctx context.Context,
 ) (err error) {
 	msgID := uuid.New()
 	req := &prototk.DomainMessage{
-		DomainId:    dh.plugin.id.String(),
-		MessageId:   msgID.String(),
-		MessageType: prototk.DomainMessage_REQUEST_TO_DOMAIN,
+		Header: &prototk.Header{
+			PluginId:    dh.plugin.id.String(),
+			MessageId:   msgID.String(),
+			MessageType: prototk.Header_REQUEST_TO_PLUGIN,
+		},
 	}
 	setReqBody(req)
-	inflight := dh.pc.domainRequests.AddInflight(msgID)
+	inflight := dh.pc.domainRequests.AddInflight(ctx, msgID)
 	defer inflight.Cancel()
 
 	startTime := time.Now()
-	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestToDomain)
+	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.Header.MessageId, req.RequestToDomain)
 
 	dh.send(ctx, req)
-	res, err := inflight.Wait(ctx)
+	res, err := inflight.Wait()
 	if err != nil {
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), err)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), err)
 		return err
 	}
 	responseOk := getResBody(res)
-	if res.MessageType != prototk.DomainMessage_RESPONSE_FROM_DOMAIN || !responseOk {
+	if res.Header.MessageType != prototk.Header_RESPONSE_FROM_PLUGIN || !responseOk {
 		var errorMessage string
-		if res.MessageType == prototk.DomainMessage_ERROR_RESPONSE && res.ErrorMessage != nil {
+		if res.Header.MessageType == prototk.Header_ERROR_RESPONSE && res.Header.ErrorMessage != nil {
 			// We've got a formatted error from the other side
-			errorMessage = *res.ErrorMessage
+			errorMessage = *res.Header.ErrorMessage
 		} else {
 			// We got something unexpected - log whatever we've got in full
 			errorMessage = jsonProto(res)
 		}
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
+		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), errorMessage)
 		return i18n.NewError(ctx, msgs.MsgPluginInvalidResponse, dh.plugin.def.Plugin.PluginType, dh.plugin.name, errorMessage)
 	}
 
-	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.MessageId, res.ResponseFromDomain, time.Since(startTime))
+	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.Header.MessageId, res.ResponseFromDomain, time.Since(startTime))
 	return nil
 }
 
 func (dh *domainHandler) requestFromDomain(ctx context.Context, req *prototk.DomainMessage) {
 	reply := &prototk.DomainMessage{
-		DomainId:      dh.plugin.id.String(),
-		MessageId:     uuid.New().String(),
-		CorrelationId: &req.MessageId,
-		MessageType:   prototk.DomainMessage_RESPONSE_TO_DOMAIN,
+		Header: &prototk.Header{
+			PluginId:      dh.plugin.id.String(),
+			MessageId:     uuid.New().String(),
+			CorrelationId: &req.Header.MessageId,
+			MessageType:   prototk.Header_RESPONSE_TO_PLUGIN,
+		},
 	}
 	startTime := time.Now()
 	var err error
@@ -330,22 +338,22 @@ func (dh *domainHandler) requestFromDomain(ctx context.Context, req *prototk.Dom
 		var errorMessage string
 		panic := recover()
 		if panic != nil {
-			log.L(ctx).Errorf("Panic handling domain %s request %s: %s\n%s", dh.plugin.name, req.MessageId, panic, debug.Stack())
+			log.L(ctx).Errorf("Panic handling domain %s request %s: %s\n%s", dh.plugin.name, req.Header.MessageId, panic, debug.Stack())
 			errorMessage = fmt.Sprintf("%s", panic)
 		} else if err != nil {
 			errorMessage = err.Error()
 		}
 		if errorMessage != "" {
-			reply.MessageType = prototk.DomainMessage_ERROR_RESPONSE
-			reply.ErrorMessage = &errorMessage
+			reply.Header.MessageType = prototk.Header_ERROR_RESPONSE
+			reply.Header.ErrorMessage = &errorMessage
 			reply.ResponseToDomain = nil
-			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.MessageId, time.Since(startTime), errorMessage)
+			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), errorMessage)
 		} else {
-			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.MessageId, reply.ResponseToDomain, time.Since(startTime))
+			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.Header.MessageId, reply.ResponseToDomain, time.Since(startTime))
 		}
 		dh.send(ctx, reply)
 	}()
-	log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] => %T", dh.plugin.name, req.MessageId, req.RequestFromDomain)
+	log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] => %T", dh.plugin.name, req.Header.MessageId, req.RequestFromDomain)
 	switch msg := req.RequestFromDomain.(type) {
 	case *prototk.DomainMessage_FindAvailableStates:
 		var res *prototk.FindAvailableStatesResponse

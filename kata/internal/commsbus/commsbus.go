@@ -21,8 +21,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type Config struct {
@@ -39,7 +38,7 @@ func NewCommsBus(ctx context.Context, conf *Config) (CommsBus, error) {
 
 	if conf == nil {
 		log.L(ctx).Error("Missing comms bus config")
-		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "commsBus")
+		return nil, i18n.NewError(ctx, tkmsgs.MsgConfigFileMissingMandatoryValue, "commsBus")
 	}
 
 	broker, err := newBroker()

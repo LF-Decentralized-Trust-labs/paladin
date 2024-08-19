@@ -27,8 +27,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domaintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -77,7 +77,7 @@ type pluginController struct {
 	domainManager   DomainManager
 	shutdownTimeout time.Duration
 
-	domainPlugins  map[uuid.UUID]*plugin[domaintk.DomainCallbacks]
+	domainPlugins  map[uuid.UUID]*plugin[plugintk.DomainCallbacks]
 	domainRequests *inflight.InflightManager[uuid.UUID, *prototk.DomainMessage]
 
 	notifyPluginsUpdated chan bool
@@ -95,7 +95,7 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
 		domainManager:  args.DomainManager,
-		domainPlugins:  make(map[uuid.UUID]*plugin[domaintk.DomainCallbacks]),
+		domainPlugins:  make(map[uuid.UUID]*plugin[plugintk.DomainCallbacks]),
 		domainRequests: inflight.NewInflightManager[uuid.UUID, *prototk.DomainMessage](uuid.Parse),
 
 		serverDone:           make(chan error),
