@@ -678,30 +678,35 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 	commsBusMock := commsbusmocks.NewCommsBus(t)
 	commsBusMock.On("Broker").Return(brokerMock).Maybe()
 	dispatcherMock := sequencemocks.NewDispatcher(t)
-	var resolverMock *sequencemocks.ContentionResolver = nil
-	var resolver ContentionResolver
 	if mockResolver {
-		resolverMock = sequencemocks.NewContentionResolver(t)
-		resolver = resolverMock
+		resolverMock := sequencemocks.NewContentionResolver(t)
+		return &sequencer{
+				nodeID:                      nodeID,
+				commsBus:                    commsBusMock,
+				resolver:                    resolverMock,
+				dispatcher:                  dispatcherMock,
+				graph:                       NewGraph(),
+				unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
+				unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+				stateSpenders:               make(map[string]string),
+			},
+			sequencerMockDependencies{
+				brokerMock,
+				resolverMock,
+				dispatcherMock,
+			}
 	} else {
-		resolver = NewContentionResolver()
+		return NewSequencer(
+				nodeID,
+				commsBusMock,
+				dispatcherMock,
+			),
+			sequencerMockDependencies{
+				brokerMock,
+				nil,
+				dispatcherMock,
+			}
 	}
-
-	return &sequencer{
-			nodeID:                      nodeID,
-			commsBus:                    commsBusMock,
-			resolver:                    resolver,
-			dispatcher:                  dispatcherMock,
-			graph:                       NewGraph(),
-			unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
-			unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
-			stateSpenders:               make(map[string]string),
-		},
-		sequencerMockDependencies{
-			brokerMock,
-			resolverMock,
-			dispatcherMock,
-		}
 
 }
 

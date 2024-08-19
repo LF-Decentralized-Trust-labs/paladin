@@ -47,15 +47,60 @@ type EndorsementRequest struct {
 	inputStates   []string
 }
 type Sequencer interface {
+	/*
+		OnTransactionAssembled is emitted whenever a transaction has been assembled by any node in the network, including the local node.
+	*/
 	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
+
+	/*
+		OnTransactionEndorsed is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
+	*/
 	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
+
+	/*
+		OnTransactionConfirmed is emitted whenever a transaction has been confirmed on the base ledger
+		i.e. it has been included in a block with enough subsequent blocks to consider this final for that particular chain.
+	*/
 	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
-	/* OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
-	steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
-	event is emitted.
+
+	/*
+		OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
+		steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
+		event is emitted.
 	*/
 	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
+
+	/*
+		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
+		"given the information available to the local node at this point in time, does it appear that this transaction has no contention on input states".
+	*/
 	ApproveEndorsement(ctx context.Context, endorsementRequest EndorsementRequest) (bool, error)
+}
+
+func NewSequencer(
+	nodeID uuid.UUID,
+
+	/*
+		commsBus is a placeholder for the transport layer that will be used to communicate with other nodes in the network
+	*/
+	commsBus commsbus.CommsBus,
+
+	/*
+		dispatcher is the reciever of the sequenced transactions and will be responsible for submitting them to the base ledger in the correct order
+	*/
+	dispatcher Dispatcher,
+
+) Sequencer {
+	return &sequencer{
+		commsBus:                    commsBus,
+		dispatcher:                  dispatcher,
+		nodeID:                      nodeID,
+		resolver:                    NewContentionResolver(),
+		graph:                       NewGraph(),
+		unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
+		unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+		stateSpenders:               make(map[string]string),
+	}
 }
 
 type blockingTransaction struct {
@@ -97,10 +142,6 @@ type sequencer struct {
 	unconfirmedStatesByHash     map[string]*unconfirmedState
 	unconfirmedTransactionsByID map[string]*unconfirmedTransaction
 	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
-}
-
-func NewSequencer(eventSync EventSync) Sequencer {
-	return &sequencer{}
 }
 
 func (s *sequencer) evaluateGraph(ctx context.Context) error {
