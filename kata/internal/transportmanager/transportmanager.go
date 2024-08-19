@@ -113,7 +113,7 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 			if err != nil {
 				log.L(ctx).Errorf("transportmanager: error unmarshalling reply from plugin: %v", err)
 			}
-			
+
 			tm.recvMessages[Component(msg.Destination)] <- msg
 		}
 	}()
@@ -184,17 +184,17 @@ func (tm *transportManager) Recieve(ctx context.Context, component string, newMe
 		tm.recvMessages[Component(component)] = make(chan *proto.Message)
 	}
 
-	go func(){
+	// TODO: Not sure on this model
+	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case message := <- tm.recvMessages[Component(component)]: {
-				newMessageHandler(message)
-			}
+			case message := <-tm.recvMessages[Component(component)]:
+				{
+					newMessageHandler(message)
+				}
 			}
 		}
 	}()
-
-	return
 }

@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	// grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 	transportmanagerpb "github.com/kaleido-io/paladin/kata/pkg/proto/transportmanager"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -27,6 +26,7 @@ type fakeTransportProvider struct {
 	transportmanagerpb.UnimplementedTransportManagerServer
 
 	sendMessages chan *anypb.Any
+	recvMessages chan *transportmanagerpb.ExternalMessage
 }
 
 func (ftp *fakeTransportProvider) Status(ctx context.Context, in *emptypb.Empty) (*transportmanagerpb.PluginStatus, error) {
@@ -37,16 +37,28 @@ func (ftp *fakeTransportProvider) Status(ctx context.Context, in *emptypb.Empty)
 func (ftp *fakeTransportProvider) Transport(stream transportmanagerpb.TransportManager_TransportServer) error {
 	ctx := stream.Context()
 
+	go func(){
+		for {
+			recvMessage, err := stream.Recv()
+			if err != nil {
+				return
+			}
+
+			ftp.recvMessages <- recvMessage
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg := <-ftp.sendMessages: {
-			err := stream.Send(msg)
-			if err != nil {
-				return err
+		case msg := <-ftp.sendMessages:
+			{
+				err := stream.Send(msg)
+				if err != nil {
+					return err
+				}
 			}
-		}
 		}
 	}
 }
@@ -61,6 +73,56 @@ func (frc *fakeRegistryClient) ResolveIdentity(identity *ResolveIdentityRequest)
 }
 func (frc *fakeRegistryClient) GetTransportInformation(identity *ResolveIdentityResponse) map[string]string {
 	return frc.transportDetails
+}
+
+func TestRegisterNewTransportProviderMessageSendFlow(t *testing.T) {
+	// Simulate a message coming back from the plugin
+	ctx := context.Background()
+
+	transportType := "carrier_pigeon"
+	fakeIdentity := &ResolveIdentityResponse{
+		Name: "fakeidentity",
+	}
+	fakeTransportDetails := map[string]string{
+		transportType: "<some serialised json>",
+	}
+
+	tm := NewTransportManager(&fakeRegistryClient{
+		knownIdentity:    fakeIdentity,
+		transportDetails: fakeTransportDetails,
+	})
+	tm.knownTransportProviders[transportType] = nil
+
+	testingSocketLocation := fmt.Sprintf("%s.sock", uuid.NewString())
+	fakeProvider := &fakeTransportProvider{
+		sendMessages: make(chan *anypb.Any),
+		recvMessages: make(chan *transportmanagerpb.ExternalMessage, 1),
+	}
+	testDir := os.TempDir()
+	testingSocket := path.Join(testDir, testingSocketLocation)
+	defer os.Remove(testingSocket)
+
+	pluginListener, err := net.Listen("unix", testingSocket)
+	assert.NoError(t, err)
+	s := grpc.NewServer()
+
+	transportmanagerpb.RegisterTransportManagerServer(s, fakeProvider)
+	
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := s.Serve(pluginListener)
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	err = tm.RegisterNewTransportProvider(ctx, fmt.Sprintf("unix://%s", testingSocket), "carrier_pigeon")
+	assert.NoError(t, err)
+
+	err = tm.Send(ctx, &proto.Message{Destination: "fakeidentity"})
+	assert.NoError(t, err)
+
+	<-fakeProvider.recvMessages
 }
 
 func TestRegisterNewTransportProviderMessageReturnFlow(t *testing.T) {
@@ -96,11 +158,11 @@ func TestRegisterNewTransportProviderMessageReturnFlow(t *testing.T) {
 	// Send a message through our side of the transport link to the transport manager and check that it comes through on the correct channel internally
 	fakeMessage := &proto.Message{
 		Destination: "somemagicalcomponent",
-		Id: uuid.NewString(),
+		Id:          uuid.NewString(),
 	}
 	fakeMessageAny, err := anypb.New(fakeMessage)
 	assert.NoError(t, err)
-	
+
 	fakeProvider.sendMessages <- fakeMessageAny
 
 	var recvMessage *proto.Message
@@ -115,7 +177,7 @@ func TestRegisterNewTransportProviderMessageReturnFlow(t *testing.T) {
 			if recvMessage != nil {
 				msgWg.Done()
 				cancel()
-				return				
+				return
 			}
 
 			time.Sleep(100 * time.Millisecond)
