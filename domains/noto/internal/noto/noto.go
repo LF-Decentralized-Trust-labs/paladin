@@ -66,19 +66,37 @@ type NotoConstructor struct {
 	Notary string `json:"notary"`
 }
 
-var constructorABI = `{
-	"type": "constructor",
-	"inputs": [
-		{
-			"internalType": "string",
-			"name": "notary",
-			"type": "string"
-		}
-	]
-}`
+var NotoConstructorABI = &abi.Entry{
+	Type: "constructor",
+	Inputs: abi.ParameterArray{
+		{Name: "notary", Type: "string"},
+	},
+}
 
-var domainConfigABI = &abi.ParameterArray{
+type NotoDomainConfig struct {
+	Notary string `json:"notary"`
+}
+
+var NotoDomainConfigABI = &abi.ParameterArray{
 	{Name: "notary", Type: "address"},
+}
+
+func loadBuild(buildOutput []byte) SolidityBuild {
+	var build SolidityBuild
+	err := json.Unmarshal(buildOutput, &build)
+	if err != nil {
+		panic(err)
+	}
+	return build
+}
+
+func findMethod(entries []*abi.Entry, name string) *abi.Entry {
+	for _, entry := range entries {
+		if entry.Name == name {
+			return entry
+		}
+	}
+	return nil
 }
 
 func New(ctx context.Context, addr string) (*Noto, error) {
@@ -89,34 +107,21 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 
-	factory, err := loadNotoFactoryABI()
-	if err != nil {
-		return nil, err
-	}
-	contract, err := loadNotoABI()
-	if err != nil {
-		return nil, err
+	contract := loadBuild(notoJSON)
+	transfer := findMethod(contract.ABI, "transfer")
+	if transfer != nil {
+		// Add names for unused parameters in this contract variant
+		// (underlying library does not allow unnamed parameters)
+		transfer.Inputs[2].Name = "signature"
 	}
 
 	d := &Noto{
 		conn:     conn,
 		client:   pb.NewKataMessageServiceClient(conn),
-		Factory:  factory,
+		Factory:  loadBuild(notoFactoryJSON),
 		Contract: contract,
 	}
 	return d, d.waitForReady(ctx)
-}
-
-func loadNotoFactoryABI() (SolidityBuild, error) {
-	var build SolidityBuild
-	err := json.Unmarshal(notoFactoryJSON, &build)
-	return build, err
-}
-
-func loadNotoABI() (SolidityBuild, error) {
-	var build SolidityBuild
-	err := json.Unmarshal(notoJSON, &build)
-	return build, err
 }
 
 func (d *Noto) waitForReady(ctx context.Context) error {
@@ -168,7 +173,8 @@ func (d *Noto) Listen(ctx context.Context, dest string) error {
 		return fmt.Errorf("failed to listen for domain events: %v", err)
 	}
 
-	go d.handler(ctx)
+	handlerCtx := log.WithLogField(ctx, "role", "handler")
+	go d.handler(handlerCtx)
 	return nil
 }
 
@@ -186,7 +192,6 @@ func (d *Noto) sendReply(ctx context.Context, message *pb.Message, reply proto.M
 }
 
 func (d *Noto) handler(ctx context.Context) {
-	handlerCtx := log.WithLogField(ctx, "role", "handler")
 	for {
 		in, err := d.stream.Recv()
 		select {
@@ -196,12 +201,12 @@ func (d *Noto) handler(ctx context.Context) {
 			// do nothing
 		}
 		if err != nil {
-			log.L(handlerCtx).Errorf("Error receiving message - terminating handler loop: %v", err)
+			log.L(ctx).Errorf("Error receiving message - terminating handler loop: %v", err)
 			return
 		}
-		err = d.handleMessage(handlerCtx, in)
+		err = d.handleMessage(ctx, in)
 		if err != nil {
-			log.L(handlerCtx).Errorf("Error handling message - terminating handler loop: %v", err)
+			log.L(ctx).Errorf("Error handling message - terminating handler loop: %v", err)
 			return
 		}
 	}
@@ -231,13 +236,17 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
+		constructorJSON, err := json.Marshal(NotoConstructorABI)
+		if err != nil {
+			return err
+		}
 
 		response := &pb.ConfigureDomainResponse{
 			DomainConfig: &pb.DomainConfig{
 				FactoryContractAddress: config.FactoryAddress,
 				FactoryContractAbiJson: string(factoryJSON),
 				PrivateContractAbiJson: string(notoJSON),
-				ConstructorAbiJson:     constructorABI,
+				ConstructorAbiJson:     string(constructorJSON),
 				AbiStateSchemasJson:    []string{},
 			},
 		}
@@ -289,7 +298,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		response := &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
 				FunctionName: "deploy",
-				ParamsJson:   `{"txId": "` + m.Transaction.TransactionId + `", "notary": "` + notary + `"}`,
+				ParamsJson: fmt.Sprintf(`{
+					"txId": "%s",
+					"notary": "%s"
+				}`, m.Transaction.TransactionId, notary),
 			},
 			SigningAddress: params.Notary,
 		}
@@ -310,7 +322,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
 
-		configValues, err := domainConfigABI.DecodeABIDataCtx(ctx, m.Transaction.ContractConfig, 0)
+		configValues, err := NotoDomainConfigABI.DecodeABIDataCtx(ctx, m.Transaction.ContractConfig, 0)
 		if err != nil {
 			return err
 		}
@@ -318,13 +330,12 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 		if err != nil {
 			return err
 		}
-		var config map[string]interface{}
+		var config NotoDomainConfig
 		err = json.Unmarshal(configJSON, &config)
 		if err != nil {
 			return err
 		}
-		// TODO: use this address instead of hard-coding below
-		// notary := config["notary"].(string)
+		// TODO: use config.Notary instead of hard-coding below
 
 		response := &pb.AssembleTransactionResponse{
 			AssemblyResult:       pb.AssembleTransactionResponse_OK,
@@ -335,7 +346,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) error {
 					AttestationType: pb.AttestationType_ENDORSE,
 					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 					Parties: []string{
-						"notary1", // TODO: why can't we pass notary address here?
+						"notary", // TODO: why can't we pass notary address here?
 					},
 				},
 			},

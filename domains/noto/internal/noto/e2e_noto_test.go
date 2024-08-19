@@ -22,7 +22,6 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -31,19 +30,10 @@ import (
 
 var (
 	toDomain    = "to-domain"
-	testbedAddr = "http://127.0.0.1:49600"
+	testbedAddr = "http://localhost:49600"
 	grpcAddr    = "dns:localhost:49601"
-	notaryName  = "notary1"
+	notaryName  = "notary"
 )
-
-func findMethod(contractABI abi.ABI, method string) *abi.Entry {
-	for _, entry := range contractABI {
-		if entry.Name == method {
-			return entry
-		}
-	}
-	return nil
-}
 
 func TestNoto(t *testing.T) {
 	ctx := context.Background()
@@ -65,7 +55,8 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Calling testbed_deployBytecode")
 	var addressResult string
-	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode", notaryName, domain.Factory.ABI, domain.Factory.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(callCtx, &addressResult, "testbed_deployBytecode",
+		notaryName, domain.Factory.ABI, domain.Factory.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
@@ -74,7 +65,8 @@ func TestNoto(t *testing.T) {
 	log.L(ctx).Infof("Calling testbed_configureInit")
 	var boolResult bool
 	domainConfig := Config{FactoryAddress: addressResult}
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_configureInit", "noto", domainConfig)
+	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_configureInit",
+		"noto", domainConfig)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
@@ -82,9 +74,8 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Calling testbed_deploy")
 	var deployResult ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(callCtx, &deployResult, "testbed_deploy", "noto", &NotoConstructor{
-		Notary: notaryName,
-	})
+	rpcerr = rpc.CallRPC(callCtx, &deployResult, "testbed_deploy",
+		"noto", &NotoConstructor{Notary: notaryName})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}

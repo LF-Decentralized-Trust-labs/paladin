@@ -20,7 +20,7 @@ contract Noto is NotoBase {
     function transfer(
         bytes32[] memory inputs,
         bytes32[] memory outputs,
-        bytes memory signature,
+        bytes memory /*signature*/,
         bytes memory data
     ) external onlyNotary {
         _transfer(inputs, outputs, data);
@@ -29,7 +29,7 @@ contract Noto is NotoBase {
     function approve(
         address delegate,
         bytes32 txhash,
-        bytes memory signature
+        bytes memory /*signature*/
     ) external onlyNotary {
         _approve(delegate, txhash);
     }
