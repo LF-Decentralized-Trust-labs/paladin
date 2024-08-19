@@ -24,13 +24,15 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 )
 
 type EventSync interface {
-	// most likely will be replaced with either the comms bus or some utility of the StageController framework
-	Publish(event *commsbus.Event)
+	// most likely will be replaced (or become a thin wrapper to) transport manager
+	PublishEvent(ctx context.Context, event commsbus.Event) error
+	SendMessage(ctx context.Context, message commsbus.Message) error
 }
 
 // an ordered list of transactions that are handed over to the dispatcher to be submitted to the base ledger in that order
@@ -42,10 +44,6 @@ type Dispatcher interface {
 	Dispatch(context.Context, []uuid.UUID) error
 }
 
-type EndorsementRequest struct {
-	transactionID string
-	inputStates   []string
-}
 type Sequencer interface {
 	/*
 		OnTransactionAssembled is emitted whenever a transaction has been assembled by any node in the network, including the local node.
@@ -74,7 +72,7 @@ type Sequencer interface {
 		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
 		"given the information available to the local node at this point in time, does it appear that this transaction has no contention on input states".
 	*/
-	ApproveEndorsement(ctx context.Context, endorsementRequest EndorsementRequest) (bool, error)
+	ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error)
 }
 
 func NewSequencer(
@@ -83,7 +81,7 @@ func NewSequencer(
 	/*
 		commsBus is a placeholder for the transport layer that will be used to communicate with other nodes in the network
 	*/
-	commsBus commsbus.CommsBus,
+	eventSync EventSync,
 
 	/*
 		dispatcher is the reciever of the sequenced transactions and will be responsible for submitting them to the base ledger in the correct order
@@ -92,7 +90,7 @@ func NewSequencer(
 
 ) Sequencer {
 	return &sequencer{
-		commsBus:                    commsBus,
+		eventSync:                   eventSync,
 		dispatcher:                  dispatcher,
 		nodeID:                      nodeID,
 		resolver:                    NewContentionResolver(),
@@ -134,7 +132,7 @@ type unconfirmedTransaction struct {
 
 type sequencer struct {
 	nodeID                      uuid.UUID
-	commsBus                    commsbus.CommsBus
+	eventSync                   EventSync
 	resolver                    ContentionResolver
 	dispatcher                  Dispatcher
 	graph                       Graph
@@ -174,7 +172,7 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 }
 
 func (s *sequencer) publishStateClaimLostEvent(ctx context.Context, stateHash, transactionID string) {
-	err := s.commsBus.Broker().PublishEvent(ctx, commsbus.Event{
+	err := s.eventSync.PublishEvent(ctx, commsbus.Event{
 		Body: &pb.StateClaimLostEvent{
 			StateHash:     stateHash,
 			TransactionId: transactionID,
@@ -187,7 +185,7 @@ func (s *sequencer) publishStateClaimLostEvent(ctx context.Context, stateHash, t
 }
 
 func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID string) {
-	err := s.commsBus.Broker().SendMessage(ctx, commsbus.Message{
+	err := s.eventSync.SendMessage(ctx, commsbus.Message{
 		Body: &pb.ReassembleRequest{
 			TransactionId: transactionID,
 		},
@@ -212,7 +210,7 @@ func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.Tr
 }
 
 func (s *sequencer) delegate(ctx context.Context, transactionId string, delegateNodeID string) error {
-	err := s.commsBus.Broker().SendMessage(ctx, commsbus.Message{
+	err := s.eventSync.SendMessage(ctx, commsbus.Message{
 		Body: &pb.DelegateTransaction{
 			TransactionId:    transactionId,
 			DelegatingNodeId: s.nodeID.String(),
@@ -231,7 +229,7 @@ func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, 
 		transactionID: transactionId,
 		blockedBy:     blockedBy,
 	})
-	err := s.commsBus.Broker().PublishEvent(ctx, commsbus.Event{
+	err := s.eventSync.PublishEvent(ctx, commsbus.Event{
 		Body: &pb.TransactionBlockedEvent{
 			TransactionId: transactionId,
 		},
@@ -501,11 +499,11 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst EndorsementRequest) (bool, error) {
+func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {
 	contentionFound := false
-	for _, stateHash := range endorsementRequst.inputStates {
+	for _, stateHash := range endorsementRequst.InputStates {
 		if stateSpender, ok := s.stateSpenders[stateHash]; ok {
-			if stateSpender != endorsementRequst.transactionID {
+			if stateSpender != endorsementRequst.TransactionID {
 				//another transaction is already recognised as the spender of this state
 				contentionFound = true
 				break
@@ -516,8 +514,8 @@ func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst En
 		return false, nil
 	}
 	//register this transaction as the spender of all the states
-	for _, stateHash := range endorsementRequst.inputStates {
-		s.stateSpenders[stateHash] = endorsementRequst.transactionID
+	for _, stateHash := range endorsementRequst.InputStates {
+		s.stateSpenders[stateHash] = endorsementRequst.TransactionID
 	}
 	return true, nil
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/commsbusmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/sequencemocks"
@@ -112,7 +113,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
-	commsBusBrokerMock1 := node1SequencerMockDependencies.brokerMock
+	commsBusBrokerMock1 := node1SequencerMockDependencies.eventSyncMock
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -178,7 +179,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 
 	//create a sequencer for the local node
 	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
-	commsBusBrokerMock1 := localNodeSequencerMockDependencies.brokerMock
+	commsBusBrokerMock1 := localNodeSequencerMockDependencies.eventSyncMock
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -270,9 +271,9 @@ func TestSequencerApproveEndorsement(t *testing.T) {
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
-	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn1ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn1ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -299,9 +300,9 @@ func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn1ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn1ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -320,16 +321,16 @@ func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
 	txn2ID := uuid.New()
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 
-	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn1ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn1ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
 
-	approved, err = node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn2ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err = node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn2ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.False(t, approved)
@@ -356,9 +357,9 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	assert.NoError(t, err)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
-	approved, err := node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn1ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn1ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -368,9 +369,9 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	approved, err = node1Sequencer.ApproveEndorsement(ctx, EndorsementRequest{
-		transactionID: txn2ID.String(),
-		inputStates:   []string{stateHash.String()},
+	approved, err = node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
+		TransactionID: txn2ID.String(),
+		InputStates:   []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -667,7 +668,7 @@ func TestSequencerLoopDetection(t *testing.T) {
 }
 */
 type sequencerMockDependencies struct {
-	brokerMock     *commsbusmocks.Broker
+	eventSyncMock  *sequencemocks.EventSync
 	resolverMock   *sequencemocks.ContentionResolver
 	dispatcherMock *sequencemocks.Dispatcher
 }
@@ -677,12 +678,13 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 	brokerMock := commsbusmocks.NewBroker(t)
 	commsBusMock := commsbusmocks.NewCommsBus(t)
 	commsBusMock.On("Broker").Return(brokerMock).Maybe()
+	eventSyncMock := sequencemocks.NewEventSync(t)
 	dispatcherMock := sequencemocks.NewDispatcher(t)
 	if mockResolver {
 		resolverMock := sequencemocks.NewContentionResolver(t)
 		return &sequencer{
 				nodeID:                      nodeID,
-				commsBus:                    commsBusMock,
+				eventSync:                   eventSyncMock,
 				resolver:                    resolverMock,
 				dispatcher:                  dispatcherMock,
 				graph:                       NewGraph(),
@@ -691,18 +693,18 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 				stateSpenders:               make(map[string]string),
 			},
 			sequencerMockDependencies{
-				brokerMock,
+				eventSyncMock,
 				resolverMock,
 				dispatcherMock,
 			}
 	} else {
 		return NewSequencer(
 				nodeID,
-				commsBusMock,
+				eventSyncMock,
 				dispatcherMock,
 			),
 			sequencerMockDependencies{
-				brokerMock,
+				eventSyncMock,
 				nil,
 				dispatcherMock,
 			}
