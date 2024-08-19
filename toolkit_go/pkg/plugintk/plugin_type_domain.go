@@ -42,7 +42,9 @@ type DomainCallbacks interface {
 type DomainFactory func(callbacks DomainCallbacks) DomainAPI
 
 func NewDomain(df DomainFactory) PluginBase {
-	impl := &domainPlugin{df}
+	impl := &domainPlugin{
+		factory: df,
+	}
 	return NewPluginBase(
 		prototk.PluginType_DOMAIN,
 		func(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
@@ -91,11 +93,14 @@ func (pm *domainPluginMessage) ProtoMessage() pb.Message {
 	return pm.m
 }
 
+type DomainMessageWrapper struct{}
+
 type domainPlugin struct {
+	DomainMessageWrapper
 	factory DomainFactory
 }
 
-func (dp *domainPlugin) Wrap(m *prototk.DomainMessage) PluginMessage[prototk.DomainMessage] {
+func (dp *DomainMessageWrapper) Wrap(m *prototk.DomainMessage) PluginMessage[prototk.DomainMessage] {
 	return &domainPluginMessage{m: m}
 }
 

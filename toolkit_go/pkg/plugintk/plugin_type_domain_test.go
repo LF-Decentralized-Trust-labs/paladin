@@ -43,7 +43,7 @@ func setupDomainTests(t *testing.T) (context.Context, *pluginExerciser[prototk.D
 	// The rest is mocking the other side of the interface
 	inOutMap := map[string]func(*prototk.DomainMessage){}
 	pluginID := uuid.NewString()
-	exerciser := newPluginExerciser(t, pluginID, &domainPlugin{}, inOutMap)
+	exerciser := newPluginExerciser(t, pluginID, &DomainMessageWrapper{}, inOutMap)
 	tc.fakeDomainController = exerciser.controller
 
 	domainDone := make(chan struct{})

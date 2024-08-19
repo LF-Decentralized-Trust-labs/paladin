@@ -25,7 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type pluginInstance[M any] struct {
@@ -184,18 +183,10 @@ func (pr *pluginRun[M]) serve() error {
 		default:
 			// We don't expect any other message types to be sent to a plugin right now
 			// Just log and ignore
-			l.Warnf("UNEXPECTED %s", toJSON(msg))
+			l.Warnf("UNEXPECTED %s", PluginMessageToJSON(msg))
 		}
 	}
 
-}
-
-func toJSON[M any](msg PluginMessage[M]) (s string) {
-	b, _ := protojson.Marshal(msg.ProtoMessage())
-	if b != nil {
-		s = string(b)
-	}
-	return
 }
 
 func (pr *pluginRun[M]) handleRequestToPlugin(msg PluginMessage[M]) {

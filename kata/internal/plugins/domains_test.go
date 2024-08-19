@@ -154,7 +154,7 @@ func (tp *testDomain) run(t *testing.T, connectCtx context.Context, id string, c
 					PrepareTransactionRes: tp.prepareTransaction(req.PrepareTransaction),
 				}
 			default:
-				assert.Failf(t, "unexpected: %s", jsonProto(msg))
+				assert.Fail(t, "unexpected: %T", req)
 			}
 			err := stream.Send(reply)
 			assert.NoError(t, err)
@@ -390,48 +390,6 @@ func TestFromDomainRequestsError(t *testing.T) {
 
 }
 
-func TestFromDomainRequestPanic(t *testing.T) {
-
-	waitForResponse := make(chan struct{}, 1)
-
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		return tdm
-	}
-	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-		panic("pop")
-	}
-
-	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-		"domain1": {
-			sendRequest: func(domainID string) *prototk.DomainMessage {
-				return &prototk.DomainMessage{
-					Header: &prototk.Header{
-						PluginId:    domainID,
-						MessageId:   msgID,
-						MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
-					},
-					RequestFromDomain: &prototk.DomainMessage_FindAvailableStates{
-						FindAvailableStates: &prototk.FindAvailableStatesRequest{
-							SchemaId: "schema1",
-						},
-					},
-				}
-			},
-			handleResponse: func(dm *prototk.DomainMessage) {
-				assert.Equal(t, msgID, *dm.Header.CorrelationId)
-				assert.Regexp(t, "pop", *dm.Header.ErrorMessage)
-				close(waitForResponse)
-			},
-		},
-	})
-	defer done()
-
-	<-waitForResponse
-
-}
-
 func TestFromDomainRequestBadReq(t *testing.T) {
 
 	waitForResponse := make(chan struct{}, 1)
@@ -456,7 +414,7 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 			},
 			handleResponse: func(dm *prototk.DomainMessage) {
 				assert.Equal(t, msgID, *dm.Header.CorrelationId)
-				assert.Regexp(t, "PD011205", *dm.Header.ErrorMessage)
+				assert.Regexp(t, "PD011203", *dm.Header.ErrorMessage)
 				close(waitForResponse)
 			},
 		},
@@ -523,6 +481,11 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 							CorrelationId: &req.Header.MessageId,
 							MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
 						},
+						ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
+							AssembleTransactionRes: &prototk.AssembleTransactionResponse{
+								RevertReason: confutil.P("this is not a configure response"),
+							},
+						},
 					},
 				}
 			},
@@ -533,79 +496,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 	domainAPI := <-waitForRegister
 
 	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD011204.*RESPONSE_FROM_PLUGIN", err)
-
-}
-
-func TestDomainSendAfterClose(t *testing.T) {
-
-	waitForRegister := make(chan uuid.UUID, 1)
-
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- id
-		return tdm
-	}
-
-	ctx, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-		"domain1": {},
-	})
-
-	// Get handler, and close it
-	domainID := <-waitForRegister
-	plugin := pc.domainPlugins[domainID]
-	assert.NotNil(t, plugin.handler)
-	done()
-	dh := plugin.handler
-	<-dh.senderDone
-
-	// Check send doesn't block on closed context
-	dh.send(ctx, &prototk.DomainMessage{})
-
-	// Not restart trying to send on closed stream, and check it handles it
-	dh.sendChl = make(chan *prototk.DomainMessage, 1)
-	dh.senderDone = make(chan struct{})
-	dh.ctx = context.Background()
-	dh.sendChl <- &prototk.DomainMessage{}
-	dh.sender()
-
-}
-
-func TestDomainRequestTimeoutSend(t *testing.T) {
-
-	waitForRegister := make(chan uuid.UUID, 1)
-
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- id
-		return tdm
-	}
-
-	_, pc, done := newTestDomainPluginController(t, tdm, map[string]*testDomain{
-		"domain1": {},
-	})
-
-	// Get handler, and close it
-	domainID := <-waitForRegister
-	plugin := pc.domainPlugins[domainID]
-	assert.NotNil(t, plugin.handler)
-	done()
-	dh := plugin.handler
-	<-dh.senderDone
-	dh.sendChl = make(chan *prototk.DomainMessage, 1)
-
-	// Request with cancelled context
-	cancelled, cancelFunc := context.WithCancel(context.Background())
-	cancelFunc()
-	err := dh.requestToDomain(cancelled,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_InitDomain{}
-		},
-		func(dm *prototk.DomainMessage) bool {
-			return true
-		},
-	)
-	assert.Error(t, err)
+	assert.Regexp(t, "PD011204", err)
 
 }
 

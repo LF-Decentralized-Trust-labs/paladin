@@ -16,121 +16,76 @@ package plugins
 
 import (
 	"context"
-	"fmt"
-	"runtime/debug"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
+// The interface the rest of Paladin uses to integrate with domain plugins
 type DomainManager interface {
 	DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks)
 }
 
-type domainHandler struct {
-	ctx        context.Context
-	cancelCtx  context.CancelFunc
-	pc         *pluginController
-	plugin     *plugin[plugintk.DomainCallbacks]
-	callbacks  plugintk.DomainCallbacks
-	sendStream prototk.PluginController_ConnectDomainServer
-	sendChl    chan *prototk.DomainMessage
-	senderDone chan struct{}
+// The gRPC stream connected to by domain plugins
+func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
+	handler := newPluginHandler(pc, pc.domainPlugins, stream, &domainBridgeFactory{pc: pc})
+	return handler.serve()
 }
 
-// Domains connect over this channel, and must announce themselves with their ID to complete the load
-func (pc *pluginController) domainServer(stream prototk.PluginController_ConnectDomainServer) error {
-	ctx := stream.Context()
-	var plugin *plugin[plugintk.DomainCallbacks]
-	defer func() {
-		// If we got to the point we've initialized, then we're unregistered & uninitialized when we return
-		if plugin != nil {
-			pc.mux.Lock()
-			plugin.registered = false
-			plugin.initialized = false
-			pc.mux.Unlock()
-			if plugin.handler != nil {
-				plugin.handler.close()
-			}
-		}
-		// Notify as we might need re-initialization
-		pc.tapLoadingProgressed()
-	}()
-	domainName := "UNINITIALIZED"
-	// We are the receiving routine for the gRPC stream (we do NOT send)
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			log.L(ctx).Errorf("Stream for domain %s failed: %s", domainName, err)
-			return err
-		}
-		if plugin == nil && msg.Header.MessageType != prototk.Header_REGISTER {
-			log.L(ctx).Warnf("Domain %s sent request before registration: %s", domainName, jsonProto(msg))
-			continue
-		}
-		switch msg.Header.MessageType {
-		case prototk.Header_REGISTER:
-			if plugin != nil {
-				log.L(ctx).Warnf("Domain %s sent request duplicate registration: %s", domainName, jsonProto(msg))
-				continue
-			}
-			plugin, err = getPluginByIDString(pc, pc.domainPlugins, msg.Header.PluginId, prototk.PluginInfo_DOMAIN)
-			if err != nil {
-				log.L(ctx).Errorf("Request to register an unknown domain %s", msg.Header.PluginId)
-				// Close the connection to this plugin
-				return err
-			}
-			// We now have the plugin ready for use
-			domainName = plugin.name
-			// The handler starts and owns the sending routine (we only use it on this routine, so no locking on this line)
-			plugin.handler = pc.newDomainHandler(plugin, stream)
-		case prototk.Header_RESPONSE_FROM_PLUGIN,
-			prototk.Header_ERROR_RESPONSE:
-			// If this is an in-flight request, then pass it back to the handler over the request channel
-			var req *inflight.InflightRequest[uuid.UUID, *prototk.DomainMessage]
-			if msg.Header.CorrelationId != nil {
-				req = pc.domainRequests.GetInflightStr(*msg.Header.CorrelationId)
-			}
-			if req == nil {
-				log.L(ctx).Warnf("Domain %s sent response for unknown/expired request: %s", domainName, jsonProto(msg))
-				continue
-			}
-			req.Complete(msg)
-		case prototk.Header_REQUEST_FROM_PLUGIN:
-			// We can't block the stream for this processing, so kick it off to a go routine for the handler
-			go plugin.handler.requestFromDomain(ctx, msg)
-		}
-
-	}
+type domainBridgeFactory struct {
+	plugintk.DomainMessageWrapper
+	pc *pluginController
 }
 
-func (pc *pluginController) newDomainHandler(plugin *plugin[plugintk.DomainCallbacks], sendStream prototk.PluginController_ConnectDomainServer) *domainHandler {
-	dh := &domainHandler{
-		pc:         pc,
+type domainBridge struct {
+	plugin     *plugin[prototk.DomainMessage]
+	pluginType string
+	pluginName string
+	pluginId   string
+	toPlugin   managerToPlugin[prototk.DomainMessage]
+	manager    plugintk.DomainCallbacks
+}
+
+func (bfr *domainBridgeFactory) pluginRegistered(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage]) {
+	br := &domainBridge{
 		plugin:     plugin,
-		sendChl:    make(chan *prototk.DomainMessage),
-		senderDone: make(chan struct{}),
-		sendStream: sendStream,
+		pluginType: plugin.def.Plugin.PluginType.String(),
+		pluginName: plugin.name,
+		pluginId:   plugin.id.String(),
+		toPlugin:   toPlugin,
 	}
-	dh.ctx, dh.cancelCtx = context.WithCancel(log.WithLogField(pc.bgCtx, "domain_handler", plugin.name))
-	dh.callbacks = pc.domainManager.DomainRegistered(plugin.name, plugin.id, dh)
-	go dh.sender()
-	return dh
+	br.manager = bfr.pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
+	return br
 }
 
-func (dh *domainHandler) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (res *prototk.ConfigureDomainResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_ConfigureDomain{ConfigureDomain: req}
+// requests to callbacks in the domain manager
+func (br *domainBridge) requestReply(ctx context.Context, reqMsg plugintk.PluginMessage[prototk.DomainMessage]) (resFn func(plugintk.PluginMessage[prototk.DomainMessage]), err error) {
+	switch req := reqMsg.Message().RequestFromDomain.(type) {
+	case *prototk.DomainMessage_FindAvailableStates:
+		return callManagerImpl(ctx, req.FindAvailableStates,
+			br.manager.FindAvailableStates,
+			func(resMsg *prototk.DomainMessage, res *prototk.FindAvailableStatesResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_FindAvailableStatesRes{
+					FindAvailableStatesRes: res,
+				}
+			},
+		)
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
+	}
+}
+
+func (br *domainBridge) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (res *prototk.ConfigureDomainResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_ConfigureDomain{ConfigureDomain: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_ConfigureDomainRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_ConfigureDomainRes); ok {
 				res = r.ConfigureDomainRes
 			}
 			return res != nil
@@ -139,13 +94,14 @@ func (dh *domainHandler) ConfigureDomain(ctx context.Context, req *prototk.Confi
 	return
 }
 
-func (dh *domainHandler) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (res *prototk.InitDomainResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_InitDomain{InitDomain: req}
+func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (res *prototk.InitDomainResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDomain{InitDomain: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitDomainRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_InitDomainRes); ok {
 				res = r.InitDomainRes
 			}
 			return res != nil
@@ -153,18 +109,19 @@ func (dh *domainHandler) InitDomain(ctx context.Context, req *prototk.InitDomain
 	)
 	if err == nil {
 		// At this point the plugin is initialized
-		dh.plugin.notifyInitialized()
+		br.plugin.notifyInitialized()
 	}
 	return
 }
 
-func (dh *domainHandler) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (res *prototk.InitDeployResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_InitDeploy{InitDeploy: req}
+func (br *domainBridge) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (res *prototk.InitDeployResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDeploy{InitDeploy: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitDeployRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_InitDeployRes); ok {
 				res = r.InitDeployRes
 			}
 			return res != nil
@@ -173,13 +130,14 @@ func (dh *domainHandler) InitDeploy(ctx context.Context, req *prototk.InitDeploy
 	return
 }
 
-func (dh *domainHandler) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (res *prototk.PrepareDeployResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_PrepareDeploy{PrepareDeploy: req}
+func (br *domainBridge) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (res *prototk.PrepareDeployResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareDeploy{PrepareDeploy: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_PrepareDeployRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_PrepareDeployRes); ok {
 				res = r.PrepareDeployRes
 			}
 			return res != nil
@@ -188,13 +146,14 @@ func (dh *domainHandler) PrepareDeploy(ctx context.Context, req *prototk.Prepare
 	return
 }
 
-func (dh *domainHandler) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (res *prototk.InitTransactionResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_InitTransaction{InitTransaction: req}
+func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (res *prototk.InitTransactionResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_InitTransaction{InitTransaction: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_InitTransactionRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_InitTransactionRes); ok {
 				res = r.InitTransactionRes
 			}
 			return res != nil
@@ -203,13 +162,14 @@ func (dh *domainHandler) InitTransaction(ctx context.Context, req *prototk.InitT
 	return
 }
 
-func (dh *domainHandler) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
+func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_AssembleTransactionRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_AssembleTransactionRes); ok {
 				res = r.AssembleTransactionRes
 			}
 			return res != nil
@@ -218,13 +178,14 @@ func (dh *domainHandler) AssembleTransaction(ctx context.Context, req *prototk.A
 	return
 }
 
-func (dh *domainHandler) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (res *prototk.EndorseTransactionResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_EndorseTransaction{EndorseTransaction: req}
+func (br *domainBridge) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (res *prototk.EndorseTransactionResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_EndorseTransaction{EndorseTransaction: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_EndorseTransactionRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_EndorseTransactionRes); ok {
 				res = r.EndorseTransactionRes
 			}
 			return res != nil
@@ -233,138 +194,18 @@ func (dh *domainHandler) EndorseTransaction(ctx context.Context, req *prototk.En
 	return
 }
 
-func (dh *domainHandler) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (res *prototk.PrepareTransactionResponse, err error) {
-	err = dh.requestToDomain(ctx,
-		func(dm *prototk.DomainMessage) {
-			dm.RequestToDomain = &prototk.DomainMessage_PrepareTransaction{PrepareTransaction: req}
+func (br *domainBridge) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (res *prototk.PrepareTransactionResponse, err error) {
+	err = br.toPlugin.requestReply(ctx,
+		br.pluginId,
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
+			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareTransaction{PrepareTransaction: req}
 		},
-		func(dm *prototk.DomainMessage) bool {
-			if r, ok := dm.ResponseFromDomain.(*prototk.DomainMessage_PrepareTransactionRes); ok {
+		func(dm plugintk.PluginMessage[prototk.DomainMessage]) bool {
+			if r, ok := dm.Message().ResponseFromDomain.(*prototk.DomainMessage_PrepareTransactionRes); ok {
 				res = r.PrepareTransactionRes
 			}
 			return res != nil
 		},
 	)
 	return
-}
-
-func (dh *domainHandler) sender() {
-	defer close(dh.senderDone)
-	for {
-		var msg *prototk.DomainMessage
-		select {
-		case msg = <-dh.sendChl:
-		case <-dh.ctx.Done():
-			log.L(dh.ctx).Debugf("domain handler ending")
-			return
-		}
-		if err := dh.sendStream.Send(msg); err != nil {
-			// gRPC promises to abort the stream is this case, so just log and return
-			log.L(dh.ctx).Errorf("domain %s stream send error: %s", dh.plugin.name, err)
-			return
-		}
-	}
-}
-
-// returns once send is dispatched to sendChl, or context is cancelled
-func (dh *domainHandler) send(ctx context.Context, msg *prototk.DomainMessage) {
-	select {
-	case dh.sendChl <- msg:
-	case <-ctx.Done():
-	}
-}
-
-func (dh *domainHandler) close() {
-	dh.cancelCtx()
-	<-dh.senderDone
-}
-
-func (dh *domainHandler) requestToDomain(ctx context.Context,
-	// The protobuf codegen isn't generics friendly, so we use functions here
-	setReqBody func(*prototk.DomainMessage),
-	getResBody func(*prototk.DomainMessage) bool,
-) (err error) {
-	msgID := uuid.New()
-	req := &prototk.DomainMessage{
-		Header: &prototk.Header{
-			PluginId:    dh.plugin.id.String(),
-			MessageId:   msgID.String(),
-			MessageType: prototk.Header_REQUEST_TO_PLUGIN,
-		},
-	}
-	setReqBody(req)
-	inflight := dh.pc.domainRequests.AddInflight(ctx, msgID)
-	defer inflight.Cancel()
-
-	startTime := time.Now()
-	log.L(ctx).Infof("DOMAIN(%s)[%s] => %T", dh.plugin.name, req.Header.MessageId, req.RequestToDomain)
-
-	dh.send(ctx, req)
-	res, err := inflight.Wait()
-	if err != nil {
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= TIMEOUT [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), err)
-		return err
-	}
-	responseOk := getResBody(res)
-	if res.Header.MessageType != prototk.Header_RESPONSE_FROM_PLUGIN || !responseOk {
-		var errorMessage string
-		if res.Header.MessageType == prototk.Header_ERROR_RESPONSE && res.Header.ErrorMessage != nil {
-			// We've got a formatted error from the other side
-			errorMessage = *res.Header.ErrorMessage
-		} else {
-			// We got something unexpected - log whatever we've got in full
-			errorMessage = jsonProto(res)
-		}
-		log.L(ctx).Infof("DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), errorMessage)
-		return i18n.NewError(ctx, msgs.MsgPluginInvalidResponse, dh.plugin.def.Plugin.PluginType, dh.plugin.name, errorMessage)
-	}
-
-	log.L(ctx).Infof("DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.Header.MessageId, res.ResponseFromDomain, time.Since(startTime))
-	return nil
-}
-
-func (dh *domainHandler) requestFromDomain(ctx context.Context, req *prototk.DomainMessage) {
-	reply := &prototk.DomainMessage{
-		Header: &prototk.Header{
-			PluginId:      dh.plugin.id.String(),
-			MessageId:     uuid.New().String(),
-			CorrelationId: &req.Header.MessageId,
-			MessageType:   prototk.Header_RESPONSE_TO_PLUGIN,
-		},
-	}
-	startTime := time.Now()
-	var err error
-	defer func() {
-		var errorMessage string
-		panic := recover()
-		if panic != nil {
-			log.L(ctx).Errorf("Panic handling domain %s request %s: %s\n%s", dh.plugin.name, req.Header.MessageId, panic, debug.Stack())
-			errorMessage = fmt.Sprintf("%s", panic)
-		} else if err != nil {
-			errorMessage = err.Error()
-		}
-		if errorMessage != "" {
-			reply.Header.MessageType = prototk.Header_ERROR_RESPONSE
-			reply.Header.ErrorMessage = &errorMessage
-			reply.ResponseToDomain = nil
-			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= ERROR [%s]: %s", dh.plugin.name, req.Header.MessageId, time.Since(startTime), errorMessage)
-		} else {
-			log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] <= %T [%s]", dh.plugin.name, req.Header.MessageId, reply.ResponseToDomain, time.Since(startTime))
-		}
-		dh.send(ctx, reply)
-	}()
-	log.L(ctx).Infof("FROM_DOMAIN(%s)[%s] => %T", dh.plugin.name, req.Header.MessageId, req.RequestFromDomain)
-	switch msg := req.RequestFromDomain.(type) {
-	case *prototk.DomainMessage_FindAvailableStates:
-		var res *prototk.FindAvailableStatesResponse
-		res, err = dh.callbacks.FindAvailableStates(ctx, msg.FindAvailableStates)
-		if err == nil {
-			reply.ResponseToDomain = &prototk.DomainMessage_FindAvailableStatesRes{
-				FindAvailableStatesRes: res,
-			}
-		}
-	default:
-		err = i18n.NewError(ctx, msgs.MsgPluginInvalidRequest, dh.plugin.def.Plugin.PluginType, dh.plugin.name, req.RequestFromDomain)
-	}
-
 }

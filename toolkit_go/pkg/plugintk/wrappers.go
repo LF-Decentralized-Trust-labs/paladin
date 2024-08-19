@@ -20,6 +20,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"google.golang.org/protobuf/encoding/protojson"
 	pb "google.golang.org/protobuf/proto"
 )
 
@@ -46,8 +47,12 @@ type PluginMessage[M any] interface {
 //
 // Implementations can be synchronous - the plugin base will ensure it's run on appropriate go routine
 type PluginImplementation[M any] interface {
-	Wrap(*M) PluginMessage[M]
+	PluginMessageWrapper[M]
 	NewHandler(proxy PluginProxy[M]) PluginHandler[M]
+}
+
+type PluginMessageWrapper[M any] interface {
+	Wrap(*M) PluginMessage[M]
 }
 
 type PluginHandler[M any] interface {
@@ -58,6 +63,14 @@ type PluginProxy[M any] interface {
 	RequestFromPlugin(ctx context.Context, req PluginMessage[M]) (PluginMessage[M], error)
 }
 
+func PluginMessageToJSON[M any](msg PluginMessage[M]) (s string) {
+	b, _ := protojson.Marshal(msg.ProtoMessage())
+	if b != nil {
+		s = string(b)
+	}
+	return
+}
+
 // Maps the response payload to the requested type (avoids boilerplate in plugin types)
 func responseToPluginAs[M, ResType, T any](ctx context.Context, msg PluginMessage[M], err error, unwrap func(*ResType) *T) (*T, error) {
 	if err != nil {
@@ -66,7 +79,7 @@ func responseToPluginAs[M, ResType, T any](ctx context.Context, msg PluginMessag
 	res := msg.ResponseToPlugin()
 	iRes, ok := res.(*ResType)
 	if !ok {
-		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, res, new(ResType))
+		return nil, i18n.NewError(ctx, tkmsgs.MsgPluginUnexpectedResponse, iRes, new(ResType))
 	}
 	return unwrap(iRes), nil
 }

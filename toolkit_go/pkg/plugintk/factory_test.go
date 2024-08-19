@@ -92,14 +92,14 @@ func checkPanic() {
 
 type pluginExerciser[M any] struct {
 	t        *testing.T
-	wrapper  PluginImplementation[M]
+	wrapper  PluginMessageWrapper[M]
 	inOutMap map[string]func(*M)
 	pluginID string
 	sendChl  chan *M
 	recvChl  chan *M
 }
 
-func newPluginExerciser[M any](t *testing.T, pluginID string, wrapper PluginImplementation[M], inOutMap map[string]func(*M)) *pluginExerciser[M] {
+func newPluginExerciser[M any](t *testing.T, pluginID string, wrapper PluginMessageWrapper[M], inOutMap map[string]func(*M)) *pluginExerciser[M] {
 	return &pluginExerciser[M]{
 		t:        t,
 		wrapper:  wrapper,
@@ -155,13 +155,13 @@ func (pe *pluginExerciser[M]) doExchangeToPlugin(setReq func(*M), checkRes func(
 	req.Header().PluginId = pe.pluginID
 	req.Header().MessageId = uuid.NewString()
 	req.Header().MessageType = prototk.Header_REQUEST_TO_PLUGIN
-	log.L(context.Background()).Infof("IN %s", toJSON(req))
+	log.L(context.Background()).Infof("IN %s", PluginMessageToJSON(req))
 	setReq(req.Message())
 
 	pe.sendChl <- req.Message()
 
 	reply := pe.wrapper.Wrap(<-pe.recvChl)
-	log.L(context.Background()).Infof("OUT %s", toJSON(reply))
+	log.L(context.Background()).Infof("OUT %s", PluginMessageToJSON(reply))
 	assert.Equal(t, pe.pluginID, reply.Header().PluginId)
 	assert.Equal(t, req.Header().MessageId, *reply.Header().CorrelationId)
 	if reply.Header().MessageType == prototk.Header_ERROR_RESPONSE {

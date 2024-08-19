@@ -182,7 +182,7 @@ func TestInitPluginControllerUDSTooLong(t *testing.T) {
 		},
 	}
 	_, err := NewPluginController(context.Background(), args)
-	assert.Regexp(t, "PD011206", err)
+	assert.Regexp(t, "PD011205", err)
 }
 
 func TestInitPluginControllerTCP4(t *testing.T) {

@@ -27,13 +27,9 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/encoding/protojson"
-	pb "google.golang.org/protobuf/proto"
 )
 
 type PluginController interface {
@@ -52,18 +48,6 @@ type PluginControllerArgs struct {
 	InitialConfig *PluginControllerConfig
 }
 
-type plugin[CB any] struct {
-	pc   *pluginController
-	name string
-	id   uuid.UUID
-	def  *prototk.PluginLoad
-
-	initializing bool
-	registered   bool
-	initialized  bool
-	handler      *domainHandler
-}
-
 type pluginController struct {
 	prototk.UnimplementedPluginControllerServer
 	bgCtx    context.Context
@@ -74,11 +58,10 @@ type pluginController struct {
 	loaderID        uuid.UUID
 	network         string
 	address         string
-	domainManager   DomainManager
 	shutdownTimeout time.Duration
 
-	domainPlugins  map[uuid.UUID]*plugin[plugintk.DomainCallbacks]
-	domainRequests *inflight.InflightManager[uuid.UUID, *prototk.DomainMessage]
+	domainManager DomainManager
+	domainPlugins map[uuid.UUID]*plugin[prototk.DomainMessage]
 
 	notifyPluginsUpdated chan bool
 	pluginLoaderDone     chan struct{}
@@ -94,9 +77,8 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		loaderID:        args.LoaderID,
 		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
-		domainManager:  args.DomainManager,
-		domainPlugins:  make(map[uuid.UUID]*plugin[plugintk.DomainCallbacks]),
-		domainRequests: inflight.NewInflightManager[uuid.UUID, *prototk.DomainMessage](uuid.Parse),
+		domainManager: args.DomainManager,
+		domainPlugins: make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -266,10 +248,6 @@ func (pc *pluginController) LoadFailed(ctx context.Context, req *prototk.PluginL
 	return &prototk.EmptyResponse{}, nil
 }
 
-func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
-	return pc.domainServer(stream)
-}
-
 func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType prototk.PluginInfo_PluginType, conf *PluginConfig) (err error) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
@@ -288,14 +266,6 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map
 	plugin.def.LibType, err = types.MapEnum(conf.Type, golangToProtoLibTypeMap)
 	pluginMap[plugin.id] = plugin
 	return err
-}
-
-func (p *plugin[CB]) notifyInitialized() {
-	p.pc.mux.Lock()
-	p.initialized = true
-	p.pc.mux.Unlock()
-	log.L(p.pc.bgCtx).Errorf("Plugin load %s (type=%s) completed", p.def.Plugin, p.def.Plugin.PluginType)
-	p.pc.tapLoadingProgressed()
 }
 
 func (pc *pluginController) tapLoadingProgressed() {
@@ -370,9 +340,4 @@ func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_
 			return err
 		}
 	}
-}
-
-func jsonProto(msg pb.Message) string {
-	b, _ := protojson.Marshal(msg)
-	return string(b)
 }
