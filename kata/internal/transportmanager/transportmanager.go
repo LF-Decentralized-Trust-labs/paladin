@@ -95,7 +95,7 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 		}
 	}()
 
-	// Plugin -> TransportManager flow
+	// TransportManager <- Plugin Flow
 	go func() {
 		for {
 			recvMessage, err := transportClient.Recv()
@@ -108,16 +108,12 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 			}
 
 			// TODO: Won't need to do this once we've fixed the proto
-			var msg *proto.Message
+			msg := &proto.Message{}
 			err = recvMessage.UnmarshalTo(msg)
 			if err != nil {
 				log.L(ctx).Errorf("transportmanager: error unmarshalling reply from plugin: %v", err)
 			}
-
-			if tm.recvMessages[Component(msg.Destination)] == nil {
-				tm.recvMessages[Component(msg.Destination)] = make(chan *proto.Message, 5) // TODO: Move this to config
-			}
-
+			
 			tm.recvMessages[Component(msg.Destination)] <- msg
 		}
 	}()
