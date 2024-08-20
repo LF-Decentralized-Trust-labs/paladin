@@ -7,7 +7,7 @@ class Mockery extends DefaultTask {
     private List<Mock> _mocks = []
     private List<String> _commonArgs = []
 
-    static class Mock {
+    class Mock {
 
         private String _dir
         private String _name
@@ -33,6 +33,7 @@ class Mockery extends DefaultTask {
 
         void output(String output) {
             _output = output
+            outputs.dir output
         }
 
         protected void configure(ExecSpec spec) {

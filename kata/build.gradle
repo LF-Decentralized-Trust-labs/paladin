@@ -66,7 +66,6 @@ task installTools(type:Exec) {
 }
 
 task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
-    outputs.dir('mocks/rpcbackendmocks')
     mockery 'bin/mockery'
     args '--case', 'underscore'
     mock {
@@ -105,16 +104,19 @@ task copyTestbedContracts(type: Copy) {
 }
 
 task protoc(type: ProtoCompile, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
-    outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
-
     protocPath "bin"
     protoPath projectDir
     protoFiles fileTree("pkg/proto") {
         include "**/*.proto"
     }
-
-    args "--go_out=${projectDir}"
-    args "--go-grpc_out=${projectDir}"
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
