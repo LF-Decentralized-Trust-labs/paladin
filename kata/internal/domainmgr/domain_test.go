@@ -87,7 +87,6 @@ func TestRegisterAndFindAvailableStates(t *testing.T) {
 					ConstructorAbiJson:     fakeCoinConstructorABI,
 					FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
 					FactoryContractAbiJson: `[]`,
-					PrivateContractAbiJson: `[]`,
 					AbiStateSchemasJson: []string{
 						fakeCoinStateSchema,
 					},
@@ -109,5 +108,181 @@ func TestRegisterAndFindAvailableStates(t *testing.T) {
 	d.initRetry.UTSetMaxAttempts(1)
 	assert.NoError(t, err)
 	assert.NoError(t, <-d.initDone)
+
+}
+
+func TestRegisterAndFindAvailableBadSchemas(t *testing.T) {
+
+	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	})
+	defer done()
+
+	domainFuncs := plugintk.DomainImplementation(&plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			assert.Equal(t, "test1", cdr.Name)
+			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
+			return &prototk.ConfigureDomainResponse{
+				DomainConfig: &prototk.DomainConfig{
+					ConstructorAbiJson:     fakeCoinConstructorABI,
+					FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+					FactoryContractAbiJson: `[]`,
+					AbiStateSchemasJson: []string{
+						`!!! Wrong`,
+					},
+				},
+			}, nil
+		},
+		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+			assert.Len(t, idr.AbiStateSchemas, 1)
+			return &prototk.InitDomainResponse{}, nil
+		},
+	})
+
+	domainID := uuid.New()
+	_, err := dm.DomainRegistered("test1", domainID, domainFuncs)
+	assert.NoError(t, err)
+
+	da, err := dm.GetDomainByName(ctx, "test1")
+	d := da.(*domain)
+	d.initRetry.UTSetMaxAttempts(1)
+	assert.NoError(t, err)
+	assert.Regexp(t, "PD011602", <-d.initDone)
+
+}
+
+func TestRegisterAndFindAvailableBadConstructor(t *testing.T) {
+
+	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	})
+	defer done()
+
+	domainFuncs := plugintk.DomainImplementation(&plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			assert.Equal(t, "test1", cdr.Name)
+			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
+			return &prototk.ConfigureDomainResponse{
+				DomainConfig: &prototk.DomainConfig{
+					ConstructorAbiJson:     `!!!wrong`,
+					FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+					FactoryContractAbiJson: `[]`,
+					AbiStateSchemasJson: []string{
+						fakeCoinStateSchema,
+					},
+				},
+			}, nil
+		},
+		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+			assert.Len(t, idr.AbiStateSchemas, 1)
+			return &prototk.InitDomainResponse{}, nil
+		},
+	})
+
+	domainID := uuid.New()
+	_, err := dm.DomainRegistered("test1", domainID, domainFuncs)
+	assert.NoError(t, err)
+
+	da, err := dm.GetDomainByName(ctx, "test1")
+	d := da.(*domain)
+	d.initRetry.UTSetMaxAttempts(1)
+	assert.NoError(t, err)
+	assert.Regexp(t, "PD011603", <-d.initDone)
+
+}
+
+func TestRegisterAndFindAvailableBadAddress(t *testing.T) {
+
+	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	})
+	defer done()
+
+	domainFuncs := plugintk.DomainImplementation(&plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			assert.Equal(t, "test1", cdr.Name)
+			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
+			return &prototk.ConfigureDomainResponse{
+				DomainConfig: &prototk.DomainConfig{
+					ConstructorAbiJson:     fakeCoinConstructorABI,
+					FactoryContractAddress: `!wrong`,
+					FactoryContractAbiJson: `[]`,
+					AbiStateSchemasJson: []string{
+						fakeCoinStateSchema,
+					},
+				},
+			}, nil
+		},
+		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+			assert.Len(t, idr.AbiStateSchemas, 1)
+			return &prototk.InitDomainResponse{}, nil
+		},
+	})
+
+	domainID := uuid.New()
+	_, err := dm.DomainRegistered("test1", domainID, domainFuncs)
+	assert.NoError(t, err)
+
+	da, err := dm.GetDomainByName(ctx, "test1")
+	d := da.(*domain)
+	d.initRetry.UTSetMaxAttempts(1)
+	assert.NoError(t, err)
+	assert.Regexp(t, "PD011606", <-d.initDone)
+
+}
+
+func TestRegisterAndFindAvailableFactoryABI(t *testing.T) {
+
+	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	})
+	defer done()
+
+	domainFuncs := plugintk.DomainImplementation(&plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			assert.Equal(t, "test1", cdr.Name)
+			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
+			return &prototk.ConfigureDomainResponse{
+				DomainConfig: &prototk.DomainConfig{
+					ConstructorAbiJson:     fakeCoinConstructorABI,
+					FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+					FactoryContractAbiJson: `!!!wrong`,
+					AbiStateSchemasJson: []string{
+						fakeCoinStateSchema,
+					},
+				},
+			}, nil
+		},
+		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+			assert.Len(t, idr.AbiStateSchemas, 1)
+			return &prototk.InitDomainResponse{}, nil
+		},
+	})
+
+	domainID := uuid.New()
+	_, err := dm.DomainRegistered("test1", domainID, domainFuncs)
+	assert.NoError(t, err)
+
+	da, err := dm.GetDomainByName(ctx, "test1")
+	d := da.(*domain)
+	d.initRetry.UTSetMaxAttempts(1)
+	assert.NoError(t, err)
+	assert.Regexp(t, "PD011605", <-d.initDone)
 
 }

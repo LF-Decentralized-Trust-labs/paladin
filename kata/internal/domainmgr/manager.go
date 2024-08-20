@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
@@ -33,11 +34,11 @@ type DomainManager interface {
 	GetDomainByName(ctx context.Context, name string) (DomainActions, error)
 }
 
-func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig, stateStore statestore.StateStore, chainID int64) DomainManager {
+func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig, stateStore statestore.StateStore, ethClient ethclient.EthClient) DomainManager {
 	return &domainManager{
 		bgCtx:         bgCtx,
 		stateStore:    stateStore,
-		chainID:       chainID,
+		chainID:       ethClient.ChainID(),
 		conf:          conf,
 		domainsByID:   make(map[uuid.UUID]*domain),
 		domainsByName: make(map[string]*domain),

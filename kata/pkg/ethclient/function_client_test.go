@@ -121,7 +121,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 
 	var testABI ABIClient
 	var key1 string
-	ctx, ec, done := newTestClientAndServer(t, isWS, &mockEth{
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, a ethtypes.Address0xHex, block string) (ethtypes.HexUint64, error) {
 			assert.Equal(t, key1, a.String())
 			assert.Equal(t, "latest", block)
@@ -161,7 +161,14 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 	})
 	defer done()
 
-	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	var ec EthClient
+	if isWS {
+		ec = ecf.SharedWS()
+	} else {
+		ec = ecf.HTTPClient()
+	}
+
+	_, key1, err := ecf.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	assert.NoError(t, err)
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
@@ -201,7 +208,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var testABI ABIClient
 	var key1 string
 	var err error
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
@@ -246,7 +253,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
 
-	testABI = ec.MustABIJSON(testABIJSON)
+	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)
 	getWidgetsReq := testABI.MustFunction("getWidgets").R(ctx).
 		To(fakeContractAddr).
 		Input(`{"sku": 1122334455}`)
@@ -295,14 +302,14 @@ func TestCallGetWidgetsFromWithBlockResOk(t *testing.T) {
 }
 
 func TestABIFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
 
 	assert.Panics(t, func() {
-		ec.MustABIJSON(([]byte)("!wrong"))
+		ec.HTTPClient().MustABIJSON(([]byte)("!wrong"))
 	})
 
-	_, err := ec.ABIJSON(ctx, ([]byte)(`[
+	_, err := ec.HTTPClient().ABIJSON(ctx, ([]byte)(`[
 		{
 		  "type": "function",
 		  "inputs": [
@@ -316,13 +323,13 @@ func TestABIFail(t *testing.T) {
 }
 
 func TestFunctionFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
-	tABI := ec.MustABIJSON(testABIJSON)
+	tABI := ec.HTTPClient().MustABIJSON(testABIJSON)
 	_, err := tABI.Function(ctx, "missing")
 	assert.Regexp(t, "PD011507", err)
 
-	abiFunctionWrong := &abiFunctionClient{ec: ec}
+	abiFunctionWrong := &abiFunctionClient{ec: ec.HTTPClient().(*ethClient)}
 	_, err = abiFunctionWrong.functionCommon(ctx, &abi.Entry{
 		Type: "function",
 		Name: "wrong",
@@ -338,10 +345,10 @@ func TestFunctionFail(t *testing.T) {
 }
 
 func TestConstructorFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
 
-	tABI := ec.MustABIJSON(([]byte)(`[]`))
+	tABI := ec.HTTPClient().MustABIJSON(([]byte)(`[]`))
 	defaultConstructor := tABI.MustConstructor([]byte{})
 	assert.Equal(t, "()", defaultConstructor.(*abiFunctionClient).inputs.String())
 
@@ -360,13 +367,13 @@ func TestConstructorFail(t *testing.T) {
 }
 
 func TestCallFunctionFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
 	defer done()
-	getWidgets := ec.MustABIJSON(testABIJSON).MustFunction("getWidgets")
+	getWidgets := ec.HTTPClient().MustABIJSON(testABIJSON).MustFunction("getWidgets")
 
 	to := ethtypes.MustNewAddress("0xD9E54Ba3F1419e6AC71A795d819fdBAE883A6575")
 
@@ -375,13 +382,13 @@ func TestCallFunctionFail(t *testing.T) {
 }
 
 func TestSignAndSendMissingFrom(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
 	defer done()
-	newWidget := ec.MustABIJSON(testABIJSON).MustFunction("newWidget")
+	newWidget := ec.HTTPClient().MustABIJSON(testABIJSON).MustFunction("newWidget")
 
 	req := newWidget.R(ctx).Input(&newWidgetInput{
 		Widget: widget{
@@ -396,9 +403,9 @@ func TestSignAndSendMissingFrom(t *testing.T) {
 }
 
 func TestMissingInputs(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
-	getWidgets := ec.MustABIJSON(testABIJSON).MustFunction("getWidgets")
+	getWidgets := ec.HTTPClient().MustABIJSON(testABIJSON).MustFunction("getWidgets")
 
 	to := ethtypes.MustNewAddress("0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e")
 
@@ -414,15 +421,15 @@ func TestMissingInputs(t *testing.T) {
 	_, err = getWidgets.R(ctx).Output("supplied").Input("supplied").RawTransaction()
 	assert.Regexp(t, "PD011502", err)
 
-	err = ec.MustABIJSON(testABIJSON).MustConstructor([]byte{}).R(ctx).Output("supplied").Input("supplied").To(to).Call()
+	err = ec.HTTPClient().MustABIJSON(testABIJSON).MustConstructor([]byte{}).R(ctx).Output("supplied").Input("supplied").To(to).Call()
 	assert.Regexp(t, "PD011510", err)
 
 }
 
 func TestBuildCallData(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
-	newWidget := ec.MustABIJSON(testABIJSON).MustFunction("newWidget")
+	newWidget := ec.HTTPClient().MustABIJSON(testABIJSON).MustFunction("newWidget")
 
 	to := ethtypes.MustNewAddress("0xD9E54Ba3F1419e6AC71A795d819fdBAE883A6575")
 
@@ -477,7 +484,7 @@ func TestInvokeConstructor(t *testing.T) {
 
 	var testABI ABIClient
 	var key1 string
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, a ethtypes.Address0xHex, block string) (ethtypes.HexUint64, error) {
 			assert.Equal(t, key1, a.String())
 			assert.Equal(t, "latest", block)
@@ -511,7 +518,7 @@ func TestInvokeConstructor(t *testing.T) {
 	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	assert.NoError(t, err)
 
-	testABI = ec.MustABIJSON(testABIJSON)
+	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)
 	req := testABI.MustConstructor(fakeBytecode).R(ctx).
 		Signer("key1").
 		Input(`{"supplier": "0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e"}`)
