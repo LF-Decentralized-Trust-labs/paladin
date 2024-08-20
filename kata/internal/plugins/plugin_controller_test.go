@@ -82,7 +82,7 @@ func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Cont
 	err = pc.Start(context.Background())
 	assert.NoError(t, err)
 
-	tpl, err := NewUnitTestPluginLoader(udsString, loaderId.String(), testPlugins)
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), testPlugins)
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -103,6 +103,22 @@ func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Cont
 		<-done
 	}
 
+}
+
+func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
+	args := &PluginControllerArgs{
+		DomainManager: nil,
+		LoaderID:      uuid.New(),
+		InitialConfig: &PluginControllerConfig{
+			GRPC:    GRPCConfig{Address: tempUDS(t)},
+			Domains: map[string]*PluginConfig{},
+		},
+	}
+	pc, err := NewPluginController(context.Background(), args)
+	assert.NoError(t, err)
+	err = pc.Start(context.Background())
+	assert.NoError(t, err)
+	pc.Stop(context.Background())
 }
 
 func TestInitPluginControllerBadPlugin(t *testing.T) {

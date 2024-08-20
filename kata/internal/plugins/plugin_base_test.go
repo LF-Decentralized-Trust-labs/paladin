@@ -209,7 +209,7 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 
 }
 
-func TestDomainRequestsFail(t *testing.T) {
+func TestSenderErrorHandling(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
@@ -219,32 +219,32 @@ func TestDomainRequestsFail(t *testing.T) {
 		return tdm
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
+	_, _, done := newTestDomainPluginController(t, &testSetup{
 		testDomainManager: tdm,
 		testDomains: map[string]plugintk.Plugin{
-			"domain1": &mockPlugin{
-				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
-					return []*prototk.DomainMessage{
-						{
-							Header: &prototk.Header{
-								PluginId:      req.Header.PluginId,
-								MessageId:     uuid.NewString(),
-								CorrelationId: &req.Header.MessageId,
-								MessageType:   prototk.Header_ERROR_RESPONSE,
-								ErrorMessage:  confutil.P("pop"),
-							},
-						},
-					}
-				},
-			},
+			"domain1": &mockPlugin{},
 		},
 	})
-	defer done()
 
 	domainAPI := <-waitForRegister
 
-	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "pop", err)
+	// Stop
+	done()
+
+	// Check send loop sending on closed stream
+	bridge := domainAPI.(*domainBridge)
+	handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
+	handler.senderDone = make(chan struct{})
+	handler.sendChl = make(chan plugintk.PluginMessage[prototk.DomainMessage])
+	cancellable, cancel := context.WithCancel(context.Background())
+	handler.ctx = cancellable
+	go func() {
+		handler.send(handler.wrapper.Wrap(&prototk.DomainMessage{}))
+		cancel() // cancel after first message pushed to sender
+	}()
+	handler.sender()
+	// Check does not block after context is closed
+	handler.send(handler.wrapper.Wrap(&prototk.DomainMessage{}))
 
 }
 
@@ -287,6 +287,122 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 
 	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
 	assert.Regexp(t, "PD011204", err)
+
+}
+
+func TestDomainRequestsErrorWithMessage(t *testing.T) {
+
+	waitForRegister := make(chan plugintk.DomainAPI, 1)
+
+	tdm := &testDomainManager{}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
+		waitForRegister <- toDomain
+		return tdm
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testSetup{
+		testDomainManager: tdm,
+		testDomains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin{
+				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
+					return []*prototk.DomainMessage{
+						{
+							Header: &prototk.Header{
+								PluginId:      req.Header.PluginId,
+								CorrelationId: &req.Header.MessageId,
+								MessageType:   prototk.Header_ERROR_RESPONSE,
+								ErrorMessage:  confutil.P("some error"),
+							},
+						},
+					}
+				},
+			},
+		},
+	})
+	defer done()
+
+	domainAPI := <-waitForRegister
+
+	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+	assert.Regexp(t, "PD011206.*some error", err)
+
+}
+
+func TestDomainRequestsErrorNoMessage(t *testing.T) {
+
+	waitForRegister := make(chan plugintk.DomainAPI, 1)
+
+	tdm := &testDomainManager{}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
+		waitForRegister <- toDomain
+		return tdm
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testSetup{
+		testDomainManager: tdm,
+		testDomains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin{
+				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
+					return []*prototk.DomainMessage{
+						{
+							Header: &prototk.Header{
+								PluginId:      req.Header.PluginId,
+								CorrelationId: &req.Header.MessageId,
+								MessageType:   prototk.Header_ERROR_RESPONSE,
+							},
+						},
+					}
+				},
+			},
+		},
+	})
+	defer done()
+
+	domainAPI := <-waitForRegister
+
+	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+	assert.Regexp(t, "PD011206.*ERROR_RESPONSE", err)
+
+}
+
+func TestReceiveAfterTimeout(t *testing.T) {
+
+	waitForRegister := make(chan plugintk.DomainAPI, 1)
+
+	tdm := &testDomainManager{}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
+		waitForRegister <- toDomain
+		return tdm
+	}
+
+	readyToGo := make(chan struct{})
+	gone := make(chan bool)
+	ctx, _, done := newTestDomainPluginController(t, &testSetup{
+		testDomainManager: tdm,
+		testDomains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin{
+				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
+					close(readyToGo)
+					<-gone
+					return nil
+				},
+			},
+		},
+	})
+	defer done()
+
+	domainAPI := <-waitForRegister
+
+	go func() {
+		<-readyToGo
+		// Force a timeout by closing the inflight handler while the request is mid-flight
+		bridge := domainAPI.(*domainBridge)
+		handler := bridge.toPlugin.(*pluginHandler[prototk.DomainMessage])
+		handler.inflight.Close()
+		close(gone)
+	}()
+	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
+	assert.Regexp(t, "PD020100", err)
 
 }
 
@@ -409,6 +525,17 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 								MessageId:     uuid.NewString(),
 								CorrelationId: &unknownRequest,
 								MessageType:   prototk.Header_RESPONSE_FROM_PLUGIN,
+							},
+							ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
+								AssembleTransactionRes: &prototk.AssembleTransactionResponse{},
+							},
+						},
+						// One response with a nil correl ID
+						{
+							Header: &prototk.Header{
+								PluginId:    req.Header.PluginId,
+								MessageId:   uuid.NewString(),
+								MessageType: prototk.Header_RESPONSE_FROM_PLUGIN,
 							},
 							ResponseFromDomain: &prototk.DomainMessage_AssembleTransactionRes{
 								AssembleTransactionRes: &prototk.AssembleTransactionResponse{},
