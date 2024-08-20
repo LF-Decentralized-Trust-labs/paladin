@@ -1,28 +1,32 @@
-import org.gradle.process.ExecResult
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecResult
 
 class DockerCompose extends DefaultTask {
 
-    private List<String> _composeFiles = []
-    private List<String> _projectName = []
-    private List<String> _args = []
+    @InputFiles
+    List<File> composeFiles = []
 
-    DockerCompose() {
-        doFirst {
-            this.exec()
-        }
-    }
+    @Input
+    @Optional
+    String projectName
 
-    void composeFile(String f) {
-        _composeFiles += ['-f', f]
+    @Input
+    List<String> args = []
+
+    void composeFile(Object f) {
+        composeFiles << project.file(f)
     }
 
     void projectName(String p) {
-        _projectName = ['-p', p]
+        projectName = p
     }
 
     void args(Object... args) {
-        _args += [*args]
+        this.args += [*args]
     }
 
     void dumpLogs(String service = '') {
@@ -36,23 +40,27 @@ class DockerCompose extends DefaultTask {
         project.exec { commandLine cmd }
     }
 
-    private List<String> dockerCommand() {
-        if (_composeFiles.size() == 0) {
-            _composeFiles = ['-f', 'docker-compose.yml']
-        }
-        String dockerComposeV2Check = 'docker compose version'.execute().text
-        return dockerComposeV2Check.contains('Docker Compose')
-            ? ['docker', 'compose', *_composeFiles, *_projectName]
-            : ['docker-compose', *_composeFiles, *_projectName]
-    }
-
-    protected void exec() {
-        List<String> cmd = [*dockerCommand(), *_args]
+    @TaskAction
+    void exec() {
+        List<String> cmd = [*dockerCommand(), *args]
         ExecResult execResult = project.exec { commandLine cmd }
         if (execResult.exitValue != 0) {
             dumpLogs()
         }
         execResult.assertNormalExitValue()
+    }
+
+    private List<String> dockerCommand() {
+        String dockerComposeV2Check = 'docker compose version'.execute().text
+        List<String> cmd = dockerComposeV2Check.contains('Docker Compose')
+            ? ['docker', 'compose'] : ['docker-compose']
+        composeFiles.each { f ->
+            cmd += ['-f', f]
+        }
+        if (projectName != null) {
+            cmd += ['-p', projectName]
+        }
+        return cmd
     }
 
 }

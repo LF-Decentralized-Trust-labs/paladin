@@ -1,55 +1,67 @@
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.FileTree
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Nested
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputFiles
+import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecSpec
 
 class ProtoCompile extends DefaultTask {
 
-    private String _protoc = 'protoc'
-    private String _protocPath = null
-    private List<String> _protoPaths = []
-    private Set<File> _protoFiles = []
-    private List<String> _args = []
-    private Plugins _plugins = new Plugins()
+    private final String protoc = 'protoc'
 
-    ProtoCompile() {
-        doFirst {
-            this.exec()
-        }
-    }
+    @Input
+    @Optional
+    String protocPath
+
+    @Input
+    List<String> protoPaths = []
+
+    @InputFiles
+    Set<File> protoFiles = []
+
+    @Input
+    List<String> args = []
+
+    @Nested
+    Plugins plugins = new Plugins()
 
     void protocPath(Object path) {
-        _protocPath = project.file(path)
+        protocPath = project.file(path)
     }
 
     void protoPath(Object path) {
-        _protoPaths << project.file(path)
+        protoPaths << project.file(path)
     }
 
     void protoFiles(Object... paths) {
-        _protoFiles += project.files(paths).files
-        inputs.files(paths)
+        protoFiles += project.files(paths).files
     }
 
     void args(Object... args) {
-        _args += [*args]
+        this.args += [*args]
     }
 
     void plugins(Closure c) {
-        c.delegate = _plugins
+        c.delegate = plugins
         c.resolveStrategy = Closure.DELEGATE_FIRST
-        c(_plugins)
+        c(c.delegate)
     }
 
-    protected void exec() {
+    @TaskAction
+    void exec() {
         String path
-        if (_protocPath != null) {
-            path = _protocPath + File.pathSeparator + System.getenv('PATH')
+        if (protocPath != null) {
+            path = protocPath + File.pathSeparator + System.getenv('PATH')
         }
 
-        List<String> cmd = [_protoc, *_args]
-        _protoPaths.each { p -> cmd << "--proto_path=${p}" }
-        _protoFiles.each { f -> cmd << f }
+        List<String> cmd = [protoc, *args]
+        protoPaths.each { p -> cmd << "--proto_path=${p}" }
+        protoFiles.each { f -> cmd << f }
 
-        Plugins plugins = _plugins
+        Plugins plugins = this.plugins
 
         project.exec { spec ->
             commandLine cmd
@@ -62,62 +74,86 @@ class ProtoCompile extends DefaultTask {
 
     class Plugins {
 
-        private Plugin _go
-        private Plugin _go_grpc
+        private Plugin go
+        private Plugin go_grpc
+
+        @Nested
+        Plugin getGo() {
+            if (go == null) {
+                go = new Plugin('go', '**/*.pb.go')
+            }
+            return go
+        }
+
+        @Nested
+        Plugin getGo_grpc() {
+            if (go_grpc == null) {
+                go_grpc = new Plugin('go-grpc')
+            }
+            return go_grpc
+        }
 
         void go(Closure c) {
-            _go = new Plugin('go', '**/*.pb.go')
-            c.delegate = _go
+            c.delegate = getGo()
             c.resolveStrategy = Closure.DELEGATE_FIRST
-            c(_go)
+            c(c.delegate)
         }
 
         void go_grpc(Closure c) {
-            _go_grpc = new Plugin('go-grpc')
-            c.delegate = _go_grpc
+            c.delegate = getGo_grpc()
             c.resolveStrategy = Closure.DELEGATE_FIRST
-            c(_go_grpc)
+            c(c.delegate)
         }
 
         protected void configure(ExecSpec spec) {
-            if (_go != null) {
-                _go.configure spec
+            if (go != null) {
+                go.configure spec
             }
-            if (_go_grpc != null) {
-                _go_grpc.configure spec
+            if (go_grpc != null) {
+                go_grpc.configure spec
             }
         }
 
         class Plugin {
 
-            private String _prefix
-            private String _filePattern
-            private Object _out
-            private List<String> _opts = []
+            private final String prefix
+            private final String filePattern
+
+            @Input
+            Object out
+
+            @Input
+            List<String> opts = []
+
+            @OutputFiles
+            @Optional
+            FileTree getOutputFiles() {
+                if (filePattern == null) {
+                    return null
+                }
+                return project.fileTree(out) {
+                    include filePattern
+                }
+            }
 
             Plugin(String prefix, String filePattern = null) {
-                _prefix = prefix
-                _filePattern = filePattern
+                this.prefix = prefix
+                this.filePattern = filePattern
             }
 
             void out(Object out) {
-                _out = out
-                if (_filePattern != null) {
-                    outputs.files project.fileTree(out) {
-                        include _filePattern
-                    }
-                }
+                this.out = out
             }
 
             void opt(Object opt) {
-                _opts << opt
+                opts << opt
             }
 
             protected void configure(ExecSpec spec) {
-                if (_out != null) {
-                    spec.args "--${_prefix}_out=${_out}"
+                if (out != null) {
+                    spec.args "--${prefix}_out=${out}"
                 }
-                _opts.each { o -> spec.args "--${_prefix}_opt=${o}" }
+                opts.each { o -> spec.args "--${prefix}_opt=${o}" }
             }
 
         }

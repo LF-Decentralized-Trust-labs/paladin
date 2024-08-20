@@ -1,20 +1,24 @@
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Nested
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecSpec
 
 class Mockery extends DefaultTask {
 
-    private Object _mockery = 'mockery'
-    private List<Mock> _mocks = []
-    private List<String> _commonArgs = []
+    private String mockery = 'mockery'
 
-    Mockery() {
-        doFirst {
-            this.exec()
-        }
-    }
+    @Nested
+    List<Mock> mocks = []
+
+    @Input
+    List<String> args = []
 
     void mockery(Object m) {
-        _mockery = m
+        mockery = project.file(m)
         inputs.file(m)
     }
 
@@ -23,17 +27,18 @@ class Mockery extends DefaultTask {
         c.delegate = m
         c.resolveStrategy = Closure.DELEGATE_FIRST
         c(m)
-        _mocks << m
+        mocks << m
     }
 
     void args(Object... args) {
-        _commonArgs += [*args]
+        this.args += [*args]
     }
 
-    protected void exec() {
-        List<String> commonArgs = _commonArgs
-        String mockery = _mockery
-        _mocks.each { m ->
+    @TaskAction
+    void exec() {
+        List<String> commonArgs = args
+        String mockery = this.mockery
+        mocks.each { m ->
             project.exec { spec ->
                 executable mockery
                 args commonArgs
@@ -44,49 +49,58 @@ class Mockery extends DefaultTask {
 
     class Mock {
 
-        private String _inputDir
-        private String _name
-        private boolean _includeAll = false
-        private String _outputPackage
-        private String _outputDir
+        @InputDirectory
+        File inputDir
 
-        void inputDir(String dir) {
-            _inputDir = dir
-            inputs.dir dir
+        @Input
+        @Optional
+        String name
+
+        @Input
+        boolean includeAll = false
+
+        @Input
+        @Optional
+        String outputPackage
+
+        @OutputDirectory
+        File outputDir
+
+        void inputDir(Object dir) {
+            inputDir = project.file(dir)
         }
 
         void name(String name) {
-            _name = name
+            this.name = name
         }
 
         void includeAll(boolean include) {
-            _includeAll = include
+            includeAll = include
         }
 
         void outputPackage(String outpkg) {
-            _outputPackage = outpkg
+            outputPackage = outpkg
         }
 
-        void outputDir(String output) {
-            _outputDir = output
-            outputs.dir output
+        void outputDir(Object output) {
+            outputDir = project.file(output)
         }
 
         protected void configure(ExecSpec spec) {
-            if (_inputDir != null) {
-                spec.args '--dir', _inputDir
+            if (inputDir != null) {
+                spec.args '--dir', inputDir
             }
-            if (_name != null) {
-                spec.args '--name', _name
+            if (name != null) {
+                spec.args '--name', name
             }
-            if (_includeAll) {
+            if (includeAll) {
                 spec.args '--all'
             }
-            if (_outputPackage != null) {
-                spec.args '--outpkg', _outputPackage
+            if (outputPackage != null) {
+                spec.args '--outpkg', outputPackage
             }
-            if (_outputDir != null) {
-                spec.args '--output', _outputDir
+            if (outputDir != null) {
+                spec.args '--output', outputDir
             }
         }
 
