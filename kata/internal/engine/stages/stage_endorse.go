@@ -104,7 +104,7 @@ func (es *EndorsementStage) MatchStage(ctx context.Context, tsg transactionstore
 	return false
 }
 
-func (es *EndorsementStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
+func (es *EndorsementStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	if es.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), es.Name())
 	}

@@ -46,6 +46,7 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 	return &PaladinTxProcessor{
 		tsm:                 tsm,
 		stageController:     sc,
+		stageErrorRetry:     10 * time.Second,
 		bufferedStageEvents: make([]*types.StageEvent, 0),
 	}
 }
@@ -53,6 +54,7 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 type PaladinTxProcessor struct {
 	stageContext      *StageContext
 	stageTriggerError error
+	stageErrorRetry   time.Duration
 	tsm               transactionstore.TxStateManager
 
 	stageController StageController
@@ -114,6 +116,11 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 				Stage: stageContext.Stage,
 				Data:  synchronousActionOutput,
 			})
+		} else {
+			// if errored, retry with clean stage context
+			time.Sleep(ts.stageErrorRetry)
+			ts.initiateStageContext(ctx, true)
+
 		}
 	}, ctx)
 }

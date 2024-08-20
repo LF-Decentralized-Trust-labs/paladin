@@ -26,7 +26,7 @@ import (
 
 type TxStageProcessor interface {
 	ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep)
-	PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error)
+	PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error)
 	GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq
 	MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool
 	Name() string
@@ -35,7 +35,7 @@ type TxStageProcessor interface {
 type StageController interface {
 	CalculateStage(ctx context.Context, tsg transactionstore.TxStateGetters) string // output the processing stage a transaction is on based on the transaction state
 	ProcessEventsForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep)
-	PerformActionForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionErr error)
+	PerformActionForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionTriggerErr error)
 	GetAllStages() []string
 }
 
@@ -67,7 +67,7 @@ func (psc *PaladinStageController) ProcessEventsForStage(ctx context.Context, st
 	}
 	return stageProcessor.ProcessEvents(ctx, tsg, psc.stageFoundationService, stageEvents)
 }
-func (psc *PaladinStageController) PerformActionForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionErr error) {
+func (psc *PaladinStageController) PerformActionForStage(ctx context.Context, stage string, tsg transactionstore.TxStateGetters) (actionOutput interface{}, actionTriggerErr error) {
 	stageProcessor := psc.stageProcessors[stage]
 	if stageProcessor == nil {
 		panic(i18n.NewError(ctx, msgs.MsgTransactionProcessorInvalidStage, stage)) // This is a code bug, CalculateStage function should never return stage that doesn't have StageProcessor registered
@@ -77,7 +77,7 @@ func (psc *PaladinStageController) PerformActionForStage(ctx context.Context, st
 		psc.stageFoundationService.DependencyChecker().RegisterPreReqTrigger(ctx, tsg.GetTxID(ctx), txProcessPreReq)
 		return
 	}
-	actionOutput, actionErr = stageProcessor.PerformAction(ctx, tsg, psc.stageFoundationService)
+	actionOutput, actionTriggerErr = stageProcessor.PerformAction(ctx, tsg, psc.stageFoundationService)
 	return
 }
 

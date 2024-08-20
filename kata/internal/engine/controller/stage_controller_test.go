@@ -67,7 +67,7 @@ func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactio
 	}
 	return
 }
-func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
+func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	if tsg.GetContract(ctx) == "error" {
 		return nil, errors.New("pop")
 	} else if tsg.GetContract(ctx) == "complete" {

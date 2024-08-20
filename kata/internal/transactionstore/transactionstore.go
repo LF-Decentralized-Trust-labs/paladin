@@ -36,10 +36,10 @@ type TxStateGetters interface {
 	GetSchemaID(ctx context.Context) string
 
 	GetDispatchTxPayload(ctx context.Context) string
+	GetPayloadJSON(ctx context.Context) string
 
 	GetAssembledRound(ctx context.Context) int64
 
-	GetSequencePreReqTransactions(ctx context.Context) []string
 	GetPreReqTransactions(ctx context.Context) []string
 	GetDispatchAddress(ctx context.Context) string
 	GetDispatchNode(ctx context.Context) string
@@ -58,18 +58,18 @@ type TxStateManager interface {
 
 type Transaction struct {
 	gorm.Model
-	ID             uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
-	From           string     `gorm:"type:text"`
-	SequenceID     *uuid.UUID `gorm:"type:uuid"`
-	DomainID       string
-	SchemaID       string
-	AssembledRound int64   `gorm:"type:int"`
-	Contract       string  `gorm:"type:uuid"`
-	PayloadJSON    *string `gorm:"type:text"`
-	PayloadRLP     *string `gorm:"type:text"`
+	ID              uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
+	From            string     `gorm:"type:text"`
+	SequenceID      *uuid.UUID `gorm:"type:uuid"`
+	DomainID        string
+	SchemaID        string
+	AssembledRound  int64   `gorm:"type:int"`
+	AttestationPlan *string `gorm:"type:text[]; serializer:json"`
+	Contract        string  `gorm:"type:uuid"`
+	PayloadJSON     *string `gorm:"type:text"`
+	PayloadRLP      *string `gorm:"type:text"`
 
 	PreReqTxs         []string `gorm:"type:text[]; serializer:json"`
-	SystemPreReqTxs   []string `gorm:"type:text[]; serializer:json"`
 	DispatchNode      string   `gorm:"type:text"`
 	DispatchAddress   string   `gorm:"type:text"`
 	DispatchTxID      string   `gorm:"type:text"`
@@ -81,6 +81,10 @@ type TransactionUpdate struct { // TODO define updatable fields
 	SequenceID      *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
 	DispatchTxID    *string
 	DispatchAddress *string
+	AssembledRound  int64
+	PayloadJSON     string
+	AttestationPlan string
+	AssembleError   string
 }
 
 func NewTransactionStageManager(ctx context.Context, txID string) TxStateManager {
@@ -139,17 +143,16 @@ func (t *Transaction) GetDispatchTxPayload(ctx context.Context) string {
 	return t.DispatchTxPayload
 }
 
+func (t *Transaction) GetPayloadJSON(ctx context.Context) string {
+	return *t.PayloadJSON
+}
+
 func (t *Transaction) GetConfirmedTxHash(ctx context.Context) string {
 	return t.ConfirmedTxHash
 }
 
 func (t *Transaction) GetPreReqTransactions(ctx context.Context) []string {
-	allDeps := t.PreReqTxs[:]
-	return append(allDeps, t.SystemPreReqTxs...)
-}
-
-func (t *Transaction) GetSequencePreReqTransactions(ctx context.Context) []string {
-	return t.SystemPreReqTxs
+	return t.PreReqTxs
 }
 
 type TransactionStore interface {

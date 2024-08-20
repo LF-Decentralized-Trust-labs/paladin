@@ -17,17 +17,16 @@ package stages
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-)
 
-type AssembleResult struct {
-}
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
+)
 
 type AssembleStage struct{}
 
@@ -36,7 +35,7 @@ func (as *AssembleStage) Name() string {
 }
 
 func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
-	sequencePreReqsToCheck := tsg.GetSequencePreReqTransactions(ctx)                    // only get the pre-req in the sequence
+	sequencePreReqsToCheck := tsg.GetPreReqTransactions(ctx)                            // only get the pre-req in the sequence
 	assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: doesn't work when a tx is in multiple sequences and rounds need to checked for all sequences
 	preReqsPending := sfs.DependencyChecker().PreReqsMatchCondition(ctx, sequencePreReqsToCheck, func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool) {
 		return preReqTx.GetAssembledRound(ctx) == assembleRound // only treat pre-req in the sequence as assembled when their assembled record matches the newest assemble round,
@@ -56,22 +55,22 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case DispatchAddress:
-					if txUpdates == nil {
-						txUpdates = &transactionstore.TransactionUpdate{}
-					}
-					txUpdates.DispatchAddress = confutil.P(string(v))
-					nextStep = types.NextStepNewAction
-				case TxSubmissionOutput:
-					submissionOutput := v
-					if submissionOutput.ErrorMessage != "" {
-						// handle submission error
-					} else {
-						if txUpdates == nil {
-							txUpdates = &transactionstore.TransactionUpdate{}
+				case proto.AssembleTransactionResponse:
+					if v.AssemblyResult == proto.AssembleTransactionResponse_OK {
+						attPlan, err := json.Marshal(v.AttestationPlan)
+						// transaction assembled, store the information into DB
+						txUpdates = &transactionstore.TransactionUpdate{
+							AssembledRound:  tsg.GetAssembledRound(ctx) + 1, // TODO. this should be in the assemble response
+							PayloadJSON:     v.AssembledTransaction.String(),
+							AttestationPlan: string(attPlan),
+							AssembleError:   err.Error(),
 						}
-						txUpdates.DispatchTxID = &submissionOutput.TransactionID
-						nextStep = types.NextStepNewStage
+					} else {
+						txUpdates = &transactionstore.TransactionUpdate{
+							AssembledRound: tsg.GetAssembledRound(ctx) + 1, // TODO. this should be in the assemble response
+							PayloadJSON:    "",                             // wipe the previous assemble response as they are no longer valid
+							AssembleError:  *v.RevertReason,
+						}
 					}
 				}
 			}
@@ -86,28 +85,33 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 
 func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
 	assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: deal with a tx in multiple sequences
-	return tsg.GetAssembledRound(ctx) != assembleRound
+	return tsg.GetAssembledRound(ctx) != assembleRound || tsg.GetPayloadJSON(ctx) == ""
 }
 
-func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
+func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
-	sfs.StateStore().RunInDomainContext(tsg.GetDomainID(ctx), func(ctx context.Context, dsi statestore.DomainStateInterface) error {
+	var assembleResponse *proto.AssembleTransactionResponse
+
+	assembleErr := sfs.StateStore().RunInDomainContext(tsg.GetDomainID(ctx), func(ctx context.Context, dsi statestore.DomainStateInterface) error {
+		// todo delegate to domain to do state generation
+		assembleResponse = &proto.AssembleTransactionResponse{
+			// dummy empty object for now
+		}
 		return nil
 	})
 
-	if tsg.GetDispatchAddress(ctx) == "" {
-		preReqAddresses := sfs.DependencyChecker().GetPreReqDispatchAddresses(ctx, tsg.GetPreReqTransactions(ctx))
-		address := sfs.IdentityResolver().GetDispatchAddress(preReqAddresses)
-		if address != "" {
-			return DispatchAddress(address), nil
-		}
+	if assembleErr != nil {
+		assembleErrStr := assembleErr.Error()
+		return proto.AssembleTransactionResponse{
+			AssemblyResult: proto.AssembleTransactionResponse_REVERT,
+			RevertReason:   &assembleErrStr,
+		}, nil
+	} else if assembleResponse == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorEmptyAssembledResult, tsg.GetTxID(ctx))
 	} else {
-		// TODO: submit tx
-		return TxSubmissionOutput{}, nil
+		return assembleResponse, nil
 	}
-
-	return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorActionFailed, tsg.GetTxID(ctx), as.Name())
 }

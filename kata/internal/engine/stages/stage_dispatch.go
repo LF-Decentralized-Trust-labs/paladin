@@ -109,7 +109,7 @@ func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 	return false
 }
 
-func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionErr error) {
+func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	if ds.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), ds.Name())
 	}
