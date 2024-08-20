@@ -26,15 +26,14 @@ class DockerCompose extends DefaultTask {
     }
 
     void dumpLogs(String service = '') {
+        List<String> cmd = [*dockerCommand(), 'logs']
         if (service == '') {
             println 'Dumping Docker logs'
         } else {
             println "Dumping Docker logs for ${service}"
+            cmd << service
         }
-        new ProcessBuilder().command(*dockerCommand(), 'logs', service)
-            .directory(project.projectDir)
-            .start()
-            .waitForProcessOutput(System.err, System.err)
+        project.exec { commandLine cmd }
     }
 
     private List<String> dockerCommand() {
@@ -49,10 +48,7 @@ class DockerCompose extends DefaultTask {
 
     protected void exec() {
         List<String> cmd = [*dockerCommand(), *_args]
-        ExecResult execResult = project.exec {
-            executable cmd.remove(0)
-            args cmd
-        }
+        ExecResult execResult = project.exec { commandLine cmd }
         if (execResult.exitValue != 0) {
             dumpLogs()
         }
