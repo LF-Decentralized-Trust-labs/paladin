@@ -21,10 +21,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/mocks/commsbusmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/sequencemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/stretchr/testify/assert"
@@ -113,7 +111,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
-	commsBusBrokerMock1 := node1SequencerMockDependencies.eventSyncMock
+	transportMock1 := node1SequencerMockDependencies.eventSyncMock
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -124,8 +122,8 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should see an event relinquishing ownership of this this transaction
-	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		delegateTransactionMessage := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
+	transportMock1.On("SendMessage", ctx, remoteNodeId.String(), mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
 		assert.Equal(t, txn2ID.String(), delegateTransactionMessage.TransactionId)
 		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
 		assert.Equal(t, remoteNodeId.String(), delegateTransactionMessage.DelegateNodeId)
@@ -139,7 +137,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	commsBusBrokerMock1.AssertExpectations(t)
+	transportMock1.AssertExpectations(t)
 
 	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
@@ -179,7 +177,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 
 	//create a sequencer for the local node
 	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
-	commsBusBrokerMock1 := localNodeSequencerMockDependencies.eventSyncMock
+	transportMock1 := localNodeSequencerMockDependencies.eventSyncMock
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -198,8 +196,8 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should see an event moving this transaction to the blocked stage
-	commsBusBrokerMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		transactionBlockedEvent := args.Get(1).(commsbus.Event).Body.(*pb.TransactionBlockedEvent)
+	transportMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		transactionBlockedEvent := args.Get(1).(*pb.TransactionBlockedEvent)
 		assert.Equal(t, newTransactionID.String(), transactionBlockedEvent.TransactionId)
 	}).Return(nil)
 
@@ -211,7 +209,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	commsBusBrokerMock1.AssertExpectations(t)
+	transportMock1.AssertExpectations(t)
 
 	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = localNodeSequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
@@ -231,8 +229,8 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 
 	// once all bar one transaction is confirmed, should see the dependant transaction being delegated
 	// Should see an event relinquishing ownership of this this transaction
-	commsBusBrokerMock1.On("SendMessage", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		delegateTransactionMessage := args.Get(1).(commsbus.Message).Body.(*pb.DelegateTransaction)
+	transportMock1.On("SendMessage", ctx, remoteNode1Id.String(), mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
 		assert.Equal(t, newTransactionID.String(), delegateTransactionMessage.TransactionId)
 		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
 		assert.Equal(t, remoteNode1Id.String(), delegateTransactionMessage.DelegateNodeId)
@@ -387,12 +385,12 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	ctx := context.Background()
 	node1ID := uuid.New()
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
-	commsBusBrokerMock1 := node1SequencerMockDependencies.brokerMock
+	transportMock1 := node1SequencerMockDependencies.brokerMock
 	persistenceMock1 := node1SequencerMockDependencies.persistenceMock
 
 	node2ID := uuid.New()
 	node2Sequencer, node2SequencerMockDependencies := newSequencerForTesting(t, node2ID, false)
-	commsBusBrokerMock2 := node2SequencerMockDependencies.brokerMock
+	transportMock2 := node2SequencerMockDependencies.brokerMock
 	persistenceMock2 := node2SequencerMockDependencies.persistenceMock
 
 	txn1ID := uuid.New()
@@ -441,10 +439,10 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 
 	var node1StateClaimLostEvent *pb.StateClaimLostEvent = nil
 	var node2StateClaimLostEvent *pb.StateClaimLostEvent = nil
-	commsBusBrokerMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	transportMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		node1StateClaimLostEvent = args.Get(1).(commsbus.Event).Body.(*pb.StateClaimLostEvent)
 	}).Return(nil)
-	commsBusBrokerMock2.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	transportMock2.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		node2StateClaimLostEvent = args.Get(1).(commsbus.Event).Body.(*pb.StateClaimLostEvent)
 	}).Return(nil).Maybe()
 
@@ -457,8 +455,8 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 		numberOfReassembleMessages++
 	}
 
-	commsBusBrokerMock1.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
-	commsBusBrokerMock2.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
+	transportMock1.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
+	transportMock2.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
 
 	// txn1 claims the state
 	stateClaimEvent1 := &pb.StateClaimEvent{
@@ -522,13 +520,13 @@ func TestSequencerLoopDetection(t *testing.T) {
 
 	node1ID := uuid.New()
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
-	commsBusBrokerMock1 := node1SequencerMockDependencies.brokerMock
+	transportMock1 := node1SequencerMockDependencies.brokerMock
 	persistenceMock1 := node1SequencerMockDependencies.persistenceMock
 	resolverMock1 := node1SequencerMockDependencies.resolverMock
 
 	node2ID := uuid.New()
 	node2Sequencer, node2SequencerMockDependencies := newSequencerForTesting(t, node2ID, false)
-	commsBusBrokerMock2 := node2SequencerMockDependencies.brokerMock
+	transportMock2 := node2SequencerMockDependencies.brokerMock
 	persistenceMock2 := node2SequencerMockDependencies.persistenceMock
 	resolverMock2 := node2SequencerMockDependencies.resolverMock
 
@@ -596,10 +594,10 @@ func TestSequencerLoopDetection(t *testing.T) {
 
 	var node1StateClaimLostEvent *pb.StateClaimLostEvent = nil
 	var node2StateClaimLostEvent *pb.StateClaimLostEvent = nil
-	commsBusBrokerMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	transportMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		node1StateClaimLostEvent = args.Get(1).(commsbus.Event).Body.(*pb.StateClaimLostEvent)
 	}).Return(nil)
-	commsBusBrokerMock2.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	transportMock2.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		node2StateClaimLostEvent = args.Get(1).(commsbus.Event).Body.(*pb.StateClaimLostEvent)
 	}).Return(nil).Maybe()
 
@@ -612,8 +610,8 @@ func TestSequencerLoopDetection(t *testing.T) {
 		numberOfReassembleMessages++
 	}
 
-	commsBusBrokerMock1.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
-	commsBusBrokerMock2.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
+	transportMock1.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
+	transportMock2.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
 
 	stateClaimEvent1A := &pb.StateClaimEvent{
 		StateHash:     stateAHash.String(),
@@ -675,9 +673,6 @@ type sequencerMockDependencies struct {
 
 func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (Sequencer, sequencerMockDependencies) {
 
-	brokerMock := commsbusmocks.NewBroker(t)
-	commsBusMock := commsbusmocks.NewCommsBus(t)
-	commsBusMock.On("Broker").Return(brokerMock).Maybe()
 	eventSyncMock := sequencemocks.NewEventSync(t)
 	dispatcherMock := sequencemocks.NewDispatcher(t)
 	if mockResolver {

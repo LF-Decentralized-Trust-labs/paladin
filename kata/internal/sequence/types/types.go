@@ -22,3 +22,10 @@ type EndorsementRequest struct {
 	TransactionID string
 	InputStates   []string
 }
+
+type DelegationRequest struct {
+	TransactionID    string
+	DelegatingNodeID string
+	OutputStates     []string
+	InputStates      []string
+}

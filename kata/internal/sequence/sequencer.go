@@ -22,17 +22,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"google.golang.org/protobuf/proto"
 )
 
 type EventSync interface {
-	// most likely will be replaced (or become a thin wrapper to) transport manager
-	PublishEvent(ctx context.Context, event commsbus.Event) error
-	SendMessage(ctx context.Context, message commsbus.Message) error
+	// most likely will be replaced (or become a thin wrapper to transport manager
+	PublishEvent(ctx context.Context, eventPayload proto.Message) error
+	SendMessage(ctx context.Context, recipient string, message proto.Message) error
 }
 
 // an ordered list of transactions that are handed over to the dispatcher to be submitted to the base ledger in that order
@@ -84,7 +84,7 @@ func NewSequencer(
 	nodeID uuid.UUID,
 
 	/*
-		commsBus is a placeholder for the transport layer that will be used to communicate with other nodes in the network
+		eventSync is a placeholder for the transport layer that will be used to communicate with other nodes in the network
 	*/
 	eventSync EventSync,
 
@@ -177,12 +177,12 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 	return nil
 }
 
-func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID string) {
-	err := s.eventSync.SendMessage(ctx, commsbus.Message{
-		Body: &pb.ReassembleRequest{
-			TransactionId: transactionID,
-		},
-	})
+func (s *sequencer) sendReassembleMessage(ctx context.Context, assemblingNodeID string, transactionID string) {
+
+	err := s.eventSync.SendMessage(ctx, assemblingNodeID, &pb.ReassembleRequest{
+		TransactionId: transactionID,
+	},
+	)
 	if err != nil {
 		//TODO - what should we do here?  Should we retry?  Should we log and ignore?
 		log.L(ctx).Errorf("Error sending reassemble message: %s", err)
@@ -203,13 +203,12 @@ func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transact
 }
 
 func (s *sequencer) delegate(ctx context.Context, transactionId string, delegateNodeID string) error {
-	err := s.eventSync.SendMessage(ctx, commsbus.Message{
-		Body: &pb.DelegateTransaction{
-			TransactionId:    transactionId,
-			DelegatingNodeId: s.nodeID.String(),
-			DelegateNodeId:   delegateNodeID,
-		},
-	})
+	err := s.eventSync.SendMessage(ctx, delegateNodeID, &pb.DelegateTransaction{
+		TransactionId:    transactionId,
+		DelegatingNodeId: s.nodeID.String(),
+		DelegateNodeId:   delegateNodeID,
+	},
+	)
 	if err != nil {
 		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
 		return err
@@ -222,11 +221,10 @@ func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, 
 		transactionID: transactionId,
 		blockedBy:     blockedBy,
 	})
-	err := s.eventSync.PublishEvent(ctx, commsbus.Event{
-		Body: &pb.TransactionBlockedEvent{
-			TransactionId: transactionId,
-		},
-	})
+	err := s.eventSync.PublishEvent(ctx, &pb.TransactionBlockedEvent{
+		TransactionId: transactionId,
+	},
+	)
 	if err != nil {
 		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
 		return err
