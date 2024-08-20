@@ -53,6 +53,26 @@ func (_m *StageFoundationService) IdentityResolver() types.IdentityResolver {
 	return r0
 }
 
+// Sequencer provides a mock function with given fields:
+func (_m *StageFoundationService) Sequencer() types.Sequencer {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Sequencer")
+	}
+
+	var r0 types.Sequencer
+	if rf, ok := ret.Get(0).(func() types.Sequencer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.Sequencer)
+		}
+	}
+
+	return r0
+}
+
 // StateStore provides a mock function with given fields:
 func (_m *StageFoundationService) StateStore() statestore.StateStore {
 	ret := _m.Called()

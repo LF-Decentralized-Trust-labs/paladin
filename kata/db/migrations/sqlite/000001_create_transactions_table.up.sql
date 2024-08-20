@@ -7,8 +7,8 @@ CREATE TABLE transactions (
   "from"                    VARCHAR         NOT NULL,
   sequence_id               UUID,
   payload_json              VARCHAR,
-  payload_rlp               VARCHAR
-  
+  payload_rlp               VARCHAR,
+  assembled_round           BIGINT,
   pre_req_txs               TEXT,
   dispatch_node             TEXT,
   dispatch_address          TEXT,
