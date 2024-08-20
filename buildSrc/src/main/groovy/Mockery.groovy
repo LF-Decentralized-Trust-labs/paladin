@@ -52,6 +52,7 @@ class Mockery extends DefaultTask {
 
         void dir(String dir) {
             _dir = dir
+            inputs.dir dir
         }
 
         void name(String name) {
