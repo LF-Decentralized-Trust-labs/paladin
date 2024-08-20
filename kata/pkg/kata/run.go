@@ -69,8 +69,8 @@ import (
 
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/persistence"
 	"github.com/kaleido-io/paladin/kata/internal/transaction"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 )
 
 type Config struct {

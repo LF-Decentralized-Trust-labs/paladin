@@ -24,8 +24,9 @@ import (
 
 func TestSQLLikeToRegexp(t *testing.T) {
 
+	escapeChar := '\\'
 	checkMapping := func(sqlLike, expectedRegex, test, negTest string) {
-		r, err := sqlLikeToRegexp(sqlLike, false, '\\')
+		r, err := sqlLikeToRegexp(sqlLike, false, escapeChar)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedRegex, r.String())
 		assert.True(t, r.MatchString(test))
@@ -36,7 +37,11 @@ func TestSQLLikeToRegexp(t *testing.T) {
 	checkMapping("som_thing", "^som.thing$", "something", "someth1ng")
 	checkMapping("s_______g", "^s.......g$", "smoothing", " smoothing ")
 	checkMapping("\\%\\%%\\__\\_", "^%%.*?_._$", "%%stuff_A_", "stuff_A_")
-	checkMapping("%\\\\%.thing", "^.*?\\\\.*?\\.thing$", "some\\stuff.thing", "somestuff.thing")
 	checkMapping("(%)/(%).txt", "^\\(.*?\\)/\\(.*?\\)\\.txt$", "(some)/(thing).txt", "some/thing.txt")
+	checkMapping("%\\\\%.thing", "^.*?\\\\.*?\\.thing$", "some\\stuff.thing", "somestuff.thing")
+
+	escapeChar = '#'
+	checkMapping("%\\\\%.thing", "^.*?\\\\\\\\.*?\\.thing$", "some\\\\\\\\stuff.thing", "somestuff.thing")
+	checkMapping("#%_#%", "^%.%$", "%*%", "a+b")
 
 }

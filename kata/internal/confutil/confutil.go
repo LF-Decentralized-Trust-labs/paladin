@@ -18,8 +18,10 @@ package confutil
 
 import (
 	"context"
+	"io/fs"
 	"math"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/docker/go-units"
@@ -57,6 +59,13 @@ func Int64Min(iVal *int64, min int64, def int64) int64 {
 	return *iVal
 }
 
+func Float64Min(iVal *float64, min float64, def float64) float64 {
+	if iVal == nil || *iVal < min {
+		return def
+	}
+	return *iVal
+}
+
 func Bool(bVal *bool, def bool) bool {
 	if bVal == nil {
 		return def
@@ -83,6 +92,23 @@ func StringSlice(sVal []string, def []string) []string {
 		return def
 	}
 	return sVal
+}
+
+func UnixFileMode(sVal *string, def string) fs.FileMode {
+	var iVal *fs.FileMode
+	if sVal != nil {
+		i64, err := strconv.ParseUint(*sVal, 8, 32)
+		if err == nil {
+			i := fs.FileMode(i64)
+			iVal = &i
+		}
+	}
+	if iVal == nil || *iVal > 0777 {
+		i64, _ := strconv.ParseUint(def, 8, 32)
+		i := fs.FileMode(i64)
+		iVal = &i
+	}
+	return *iVal
 }
 
 func DurationMin(sVal *string, min time.Duration, def string) time.Duration {

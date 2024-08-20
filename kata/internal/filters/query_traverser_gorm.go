@@ -38,7 +38,7 @@ func (qj *QueryJSON) BuildGORM(ctx context.Context, db *gorm.DB, fieldSet FieldS
 		jsonFilter: qj,
 		fieldSet:   fieldSet,
 	}
-	return qt.traverse(gt).Result().db
+	return qt.traverse(gt).T().db
 }
 
 type gormTraverser struct {
@@ -50,7 +50,7 @@ func (t *gormTraverser) NewRoot() Traverser[*gormTraverser] {
 	return &gormTraverser{rootDB: t.rootDB, db: t.rootDB}
 }
 
-func (t *gormTraverser) Result() *gormTraverser {
+func (t *gormTraverser) T() *gormTraverser {
 	return t
 }
 
@@ -79,14 +79,14 @@ func (t *gormTraverser) And(ot *gormTraverser) Traverser[*gormTraverser] {
 }
 
 func (t *gormTraverser) BuildOr(ot ...*gormTraverser) Traverser[*gormTraverser] {
-	or := t.NewRoot().Result()
+	or := t.NewRoot().T()
 	for _, o := range ot {
 		or.db = or.db.Or(o.db)
 	}
 	return or
 }
 
-func (t *gormTraverser) IsEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	if e.CaseInsensitive {
 		if e.Not {
 			t.db = t.db.Where(fmt.Sprintf("LOWER(%s) != LOWER(?)", field.SQLColumn()), testValue)
@@ -103,7 +103,7 @@ func (t *gormTraverser) IsEqual(e *FilterJSONKeyValue, fieldName string, field F
 	return t
 }
 
-func (t *gormTraverser) IsLike(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsLike(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	if e.CaseInsensitive {
 		if e.Not {
 			t.db = t.db.Where(fmt.Sprintf("%s NOT ILIKE ?", field.SQLColumn()), testValue)
@@ -120,7 +120,7 @@ func (t *gormTraverser) IsLike(e *FilterJSONKeyValue, fieldName string, field Fi
 	return t
 }
 
-func (t *gormTraverser) IsNull(e *FilterJSONBase, fieldName string, field FieldResolver) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsNull(e *Op, fieldName string, field FieldResolver) Traverser[*gormTraverser] {
 	if e.Not {
 		t.db = t.db.Where(fmt.Sprintf("%s IS NOT NULL", field.SQLColumn()))
 	} else {
@@ -129,27 +129,27 @@ func (t *gormTraverser) IsNull(e *FilterJSONBase, fieldName string, field FieldR
 	return t
 }
 
-func (t *gormTraverser) IsLessThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsLessThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	t.db = t.db.Where(fmt.Sprintf("%s < ?", field.SQLColumn()), testValue)
 	return t
 }
 
-func (t *gormTraverser) IsLessThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsLessThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	t.db = t.db.Where(fmt.Sprintf("%s <= ?", field.SQLColumn()), testValue)
 	return t
 }
 
-func (t *gormTraverser) IsGreaterThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsGreaterThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	t.db = t.db.Where(fmt.Sprintf("%s > ?", field.SQLColumn()), testValue)
 	return t
 }
 
-func (t *gormTraverser) IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsGreaterThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*gormTraverser] {
 	t.db = t.db.Where(fmt.Sprintf("%s >= ?", field.SQLColumn()), testValue)
 	return t
 }
 
-func (t *gormTraverser) IsIn(e *FilterJSONKeyValues, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[*gormTraverser] {
+func (t *gormTraverser) IsIn(e *OpMultiVal, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[*gormTraverser] {
 	if e.Not {
 		t.db = t.db.Where(fmt.Sprintf("%s NOT IN (?)", field.SQLColumn()), testValues)
 	} else {

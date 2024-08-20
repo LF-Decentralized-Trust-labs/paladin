@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -43,7 +43,7 @@ type writeOperation struct {
 	stateSpends         []*StateSpend
 	stateLocks          []*StateLock
 	sequenceLockDeletes []uuid.UUID
-	schemas             []*Schema
+	schemas             []*SchemaPersisted
 }
 
 type stateWriter struct {
@@ -100,7 +100,7 @@ func (op *writeOperation) flush(ctx context.Context) error {
 		log.L(ctx).Debugf("Flushed write operation %s (err=%v)", op.id, err)
 		return err
 	case <-ctx.Done():
-		return i18n.NewError(ctx, i18n.MsgContextCanceled)
+		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
 }
 
@@ -188,7 +188,7 @@ func (sw *stateWriter) worker(i int) {
 func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 
 	// Build lists of things to insert (we are insert only)
-	var schemas []*Schema
+	var schemas []*SchemaPersisted
 	var states []*State
 	var labels []*StateLabel
 	var int64Labels []*StateInt64Label
@@ -226,7 +226,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("schemas").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					Columns:   []clause.Column{{Name: "id"}},
 					DoNothing: true, // immutable
 				}).
 				Create(schemas).
@@ -236,7 +236,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("states").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "hash_l"}, {Name: "hash_h"}},
+					Columns:   []clause.Column{{Name: "id"}},
 					DoNothing: true, // immutable
 				}).
 				Omit("Labels", "Int64Labels", "Confirmed", "Spent", "Locked"). // we do this ourselves below
@@ -247,7 +247,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_confirms").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns:   []clause.Column{{Name: "state"}},
 					DoNothing: true, // immutable
 				}).
 				Create(stateConfirms).
@@ -257,7 +257,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_labels").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					Columns:   []clause.Column{{Name: "state"}, {Name: "label"}},
 					DoNothing: true, // immutable
 				}).
 				Create(labels).
@@ -267,7 +267,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_int64_labels").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}, {Name: "label"}},
+					Columns:   []clause.Column{{Name: "state"}, {Name: "label"}},
 					DoNothing: true, // immutable
 				}).
 				Create(int64Labels).
@@ -277,7 +277,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_spends").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns:   []clause.Column{{Name: "state"}},
 					DoNothing: true, // immutable
 				}).
 				Create(stateSpends).
@@ -287,12 +287,12 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("state_locks").
 				Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "state_l"}, {Name: "state_h"}},
+					Columns: []clause.Column{{Name: "state"}},
 					// locks can move to another sequence
 					DoUpdates: clause.AssignmentColumns([]string{
 						"sequence",
 						"spending",
-						"minting",
+						"creating",
 					}),
 				}).
 				Create(stateLocks).

@@ -1,0 +1,11 @@
+node_modules
+.env
+.DS_Store
+coverage
+coverage.json
+typechain
+typechain-types
+cache
+artifacts
+.openzeppelin/unknown*.json
+test-results.txt

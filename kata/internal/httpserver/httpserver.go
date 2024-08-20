@@ -30,7 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/tls"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type Server interface {
@@ -112,6 +112,10 @@ func (s *httpServer) calcRequestTimeout(req *http.Request, defaultTimeout, maxTi
 	// and the caller can either listen on the websocket for updates, or poll the status of the affected object.
 	// This is dependent on the context being passed down through to all blocking operations down the stack
 	// (while avoiding passing the context to asynchronous tasks that are dispatched as a result of the request)
+	//
+	// Note: We've made the decision to implement a non-standard HTTP header roughly based on the
+	// one that was proposed in https://www.ietf.org/archive/id/draft-thomson-hybi-http-timeout-00.html,
+	// but tailored to our own needs. Specifically by allowing a time unit to be specified.
 	reqTimeout := defaultTimeout
 	reqTimeoutHeader := req.Header.Get("Request-Timeout")
 	if reqTimeoutHeader != "" {

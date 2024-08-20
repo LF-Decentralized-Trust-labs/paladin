@@ -33,6 +33,12 @@ func NewRPCModule(prefix string) *RPCModule {
 	}
 }
 
+// While this rpcserver is generally unopinionated on what is implemented in the JSON/RPC methods,
+// (leaving that to other code) it does enforce a convention of "group_function" naming,
+// where first segment is a group of functions all implemented by the same module.
+//
+// This is inspired by strong adoption of this convention in the Ethereum ecosystem, although
+// it is not part of the JSON/RPC 2.0 standard.
 func (m *RPCModule) Add(method string, handler RPCHandler) *RPCModule {
 	prefix := m.group + "_"
 	if !strings.HasPrefix(method, prefix) {

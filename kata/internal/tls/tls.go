@@ -162,17 +162,13 @@ var SubjectDNKnownAttributes = map[string]func(pkix.Name) []string{
 	},
 }
 
-func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]interface{}) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
+func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]string) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 
 	validators := make(map[string]*regexp.Regexp)
-	for attr, v := range requiredDNAttributes {
+	for attr, validatorString := range requiredDNAttributes {
 		attr = strings.ToUpper(attr)
 		if _, knownAttr := SubjectDNKnownAttributes[attr]; !knownAttr {
 			return nil, i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnMatcherAttr, attr)
-		}
-		validatorString, ok := v.(string)
-		if !ok {
-			return nil, i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnMatcherType, attr, v)
 		}
 		// Ensure full string match with all regexp
 		validatorString = "^" + strings.TrimSuffix(strings.TrimPrefix(validatorString, "^"), "$") + "$"

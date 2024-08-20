@@ -74,11 +74,12 @@ var (
 	MsgTransactionProcessorUndeterminedStage   = ffe("PD010301", "Cannot determine a processing stage for transaction with ID: %s")
 	MsgTransactionProcessorActionFailed        = ffe("PD010302", "Action for transaction with ID: %s at stage %s failed")
 	MsgTransactionProcessorBlockedOnDependency = ffe("PD010303", "Transaction with ID: %s cannot be processed by %s stage due to dependent transactions.")
+	MsgContextCanceled                         = ffe("PD010304", "Context canceled")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField           = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
-	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
-	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError           = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialise transaction response.")
 	MsgTransactionInvalidTransactionID = ffe("PD010403", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Config PD0105XX
@@ -113,6 +114,7 @@ var (
 	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010716", "Field does not support LIKE comparison (%T)")
 	MsgFiltersTypeErrorDuringCompare      = ffe("PD010717", "Mismatched types during compare t1=%T t2=%T")
 	MsgFiltersMissingSortField            = ffe("PD010718", "Must specify at least one sort field")
+	MsgFiltersValueInvalidHexBytes32      = ffe("PD010719", "Failed to parse value as 32 byte hex string (parsedBytes=%d)")
 
 	// HTTPServer PD0108XX
 	MsgHTTPServerStartFailed        = ffe("PD010800", "Failed to start server on '%s'")
@@ -124,10 +126,9 @@ var (
 	MsgTLSConfigFailed              = ffe("PD010901", "Failed to initialize TLS configuration")
 	MsgTLSInvalidKeyPairFiles       = ffe("PD010902", "Invalid certificate and key pair files")
 	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010903", "Unknown DN attribute '%s'")
-	MsgTLSInvalidTLSDnMatcherType   = ffe("PD010904", "Expected string value for '%s' field of requiredDNAttributes (found %T)")
-	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010905", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
-	MsgTLSInvalidTLSDnChain         = ffe("PD010906", "Cannot match subject distinguished name as cert chain is not verified")
-	MsgTLSInvalidTLSDnMismatch      = ffe("PD010907", "Certificate subject does not meet requirements")
+	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010904", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
+	MsgTLSInvalidTLSDnChain         = ffe("PD010905", "Cannot match subject distinguished name as cert chain is not verified")
+	MsgTLSInvalidTLSDnMismatch      = ffe("PD010906", "Certificate subject does not meet requirements")
 
 	// JSON/RPC PD0110XX
 	MsgJSONRPCInvalidRequest      = ffe("PD011000", "Invalid JSON/RPC request data")
@@ -138,6 +139,62 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesUnmarshalNil                    = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                        = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid                = ffe("PD011102", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs          = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidName64SafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-64 characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric")
+
+	// Plugin registry PD0112XX
+	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
+	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
+	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
+	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// BlockIndexer PD0113XX
+	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerInvalidWebSocketURL      = ffe("PD011301", "Invalid WebSocket URL: %s")
+	MsgBlockIndexerInvalidHTTPURL           = ffe("PD011302", "Invalid HTTP URL: %s")
+	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed")
+	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
+	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
+	MsgBlockIndexerInvalidEventStreamType   = ffe("PD011306", "Unsupported event stream type: %s")
+	MsgBlockMissingHandler                  = ffe("PD011307", "Handler not registered for stream")
+	MsgBlockIndexerNoBlocksIndexed          = ffe("PD011308", "No confirmed blocks have yet been indexed")
+
+	// Signing module PD0114XX
+	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
+	MsgSigningModuleBadKeyFile                  = ffe("PD011401", "Key file '%s' does not exist")
+	MsgSigningModuleBadPassFile                 = ffe("PD011402", "Password file '%s' does not exist")
+	MsgSigningModuleBadKeyHandle                = ffe("PD011403", "Invalid key handle")
+	MsgSigningModuleFSError                     = ffe("PD011404", "Filesystem error")
+	MsgSigningModuleKeyHandleClash              = ffe("PD011405", "Invalid key handle (clash)")
+	MsgSigningModuleKeyNotExist                 = ffe("PD011406", "Key '%s' does not exist")
+	MsgSigningUnsupportedKeyStoreType           = ffe("PD011407", "Unsupported key store type: '%s'")
+	MsgSigningHierarchicalRequiresLoading       = ffe("PD011408", "Signing module has been configured to disallow in-memory key material. Hierarchical Deterministic (HD) wallet function implemented in the signing module requires in-memory key material")
+	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s")
+	MsgSigningUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
+	MsgSigningMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
+	MsgSigningHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
+	MsgSignerBIP44DerivationInvalid             = ffe("PD011413", "Invalid key handle - BIP44 key identifier expected (invalid derivation: '%s')")
+	MsgSingerBIP32DerivationTooLarge            = ffe("PD011414", "BIP-32 key index must be between 0 and 2^31-1 at each level in the hierarchy")
+	MsgSigningKeyListingNotSupported            = ffe("PD011415", "Listing keys in the key store is not supported by this signing module")
+	MsgSigningStaticKeyInvalid                  = ffe("PD011416", "Statically configured key with handle %s is invalid")
+	MsgSigningStaticBadEncoding                 = ffe("PD011417", "Statically configured key with handle %s has invalid encoding (must be one of 'none', 'hex', 'base64') '%s'")
+	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
+	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
+	MsgSigningKeyCannotBeEmpty                  = ffe("PD011420", "Cannot resolve a signing key for the empty string")
+
+	// EthClient module PD0115XX
+	MsgEthClientInvalidInput      = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
+	MsgEthClientMissingFrom       = ffe("PD011501", "Signer (from) missing")
+	MsgEthClientMissingTo         = ffe("PD011502", "To missing")
+	MsgEthClientMissingInput      = ffe("PD011503", "Input missing")
+	MsgEthClientMissingOutput     = ffe("PD011504", "Output missing")
+	MsgEthClientInvalidTXVersion  = ffe("PD011505", "Invalid TX Version (%s)")
+	MsgEthClientABIJson           = ffe("PD011506", "JSON ABI parsing failed")
+	MsgEthClientFunctionNotFound  = ffe("PD011507", "Function %q not found on ABI")
+	MsgEthClientChainIDFailed     = ffe("PD011508", "Failed to query chain ID")
+	MsgEthClientKeyMismatch       = ffe("PD011509", "Resolved %q to different key handle expected=%q received=%q")
+	MsgEthClientToWithConstructor = ffe("PD011510", "To address cannot be specified for constructor")
 )

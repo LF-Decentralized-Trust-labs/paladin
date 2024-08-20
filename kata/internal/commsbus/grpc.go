@@ -23,17 +23,25 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type GRPCServer interface {
 	Run(ctx context.Context) error
 	Stop(ctx context.Context) error
+	GetSocketAddress() string
 }
 
 type grpcServer struct {
-	listener net.Listener
-	server   *grpc.Server
-	done     chan error
+	listener      net.Listener
+	server        *grpc.Server
+	done          chan error
+	socketAddress string
+}
+
+// GetSocketAddress implements GRPCServer.
+func (s *grpcServer) GetSocketAddress() string {
+	return s.socketAddress
 }
 
 type GRPCConfig struct {
@@ -54,13 +62,14 @@ func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCSe
 	}
 	s := grpc.NewServer()
 
-	proto.RegisterKataMessageServiceServer(s, newKataMessageService(ctx, broker))
+	proto.RegisterKataMessageServiceServer(s, newKataMessageService(broker))
 
 	log.L(ctx).Infof("server listening at %v", l.Addr())
 	return &grpcServer{
-		listener: l,
-		server:   s,
-		done:     make(chan error),
+		listener:      l,
+		server:        s,
+		done:          make(chan error),
+		socketAddress: socketAddress,
 	}, nil
 }
 
@@ -87,7 +96,7 @@ func (s *grpcServer) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newKataMessageService(ctx context.Context, messageBroker Broker) *KataMessageService {
+func newKataMessageService(messageBroker Broker) *KataMessageService {
 	return &KataMessageService{
 		messageBroker: messageBroker,
 	}
@@ -130,16 +139,21 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 		replyDestinationPtr = &replyDestination
 	}
 
+	body, err := msg.GetBody().UnmarshalNew()
+	if err != nil {
+		log.L(ctx).Error("Error unmarshalling message body", err)
+		return nil, err
+	}
+
 	commsbusMessage := Message{
 		Destination:   msg.GetDestination(),
-		Body:          []byte(msg.GetBody()),
+		Body:          body,
 		ID:            msg.GetId(),
-		Type:          msg.GetType(),
 		ReplyTo:       replyDestinationPtr,
 		CorrelationID: msg.CorrelationId,
 	}
 
-	err := s.messageBroker.SendMessage(ctx, commsbusMessage)
+	err = s.messageBroker.SendMessage(ctx, commsbusMessage)
 	if err != nil {
 		log.L(ctx).Error("Error sending message", err)
 		// Handle the error
@@ -152,14 +166,18 @@ func (s *KataMessageService) SendMessage(ctx context.Context, msg *proto.Message
 
 func (s *KataMessageService) PublishEvent(ctx context.Context, event *proto.Event) (*proto.PublishEventResponse, error) {
 	log.L(ctx).Info("PublishEvent")
+	body, err := event.GetBody().UnmarshalNew()
+	if err != nil {
+		log.L(ctx).Error("Error unmarshalling event body", err)
+		return nil, err
+	}
 	commsbusEvent := Event{
 		ID:    event.GetId(),
 		Topic: event.GetTopic(),
-		Body:  []byte(event.GetBody()),
-		Type:  event.GetType(),
+		Body:  body,
 	}
 
-	err := s.messageBroker.PublishEvent(ctx, commsbusEvent)
+	err = s.messageBroker.PublishEvent(ctx, commsbusEvent)
 	if err != nil {
 		log.L(ctx).Error("Error publishing event", err)
 		// Handle the error
@@ -184,6 +202,7 @@ func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *prot
 	}, nil
 }
 
+// TODO should we implement a handshake to prevent clients from listening to arbitrary destinations?
 // Listen implements the Listen RPC method of KataService which is the main entry point for sending messages to plugins
 func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream proto.KataMessageService_ListenServer) error {
 	//TODO validate
@@ -205,14 +224,22 @@ func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream p
 			return nil
 		case msg := <-messageHandler.Channel:
 			log.L(ctx).Info("Received message from comms bus to forward to client")
-
-			response := &proto.Message{
-				Id:            msg.ID,
-				Type:          msg.Type,
-				Body:          string(msg.Body),
-				CorrelationId: msg.CorrelationID,
+			body, err := anypb.New(msg.Body)
+			if err != nil {
+				log.L(ctx).Error("Error marshalling message body", err)
+				return err
 			}
-			err := stream.Send(response)
+
+			message := &proto.Message{
+				Id:            msg.ID,
+				Body:          body,
+				CorrelationId: msg.CorrelationID,
+				EventId:       msg.EventID,
+				Topic:         msg.Topic,
+				ReplyTo:       msg.ReplyTo,
+			}
+
+			err = stream.Send(message)
 			if err != nil {
 				log.L(ctx).Error("Error sending message", err)
 			}

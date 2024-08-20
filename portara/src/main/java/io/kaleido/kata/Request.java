@@ -17,7 +17,7 @@ package io.kaleido.kata;
 
 import java.util.UUID;
 
-import paladin.kata.Kata;
+import github.com.kaleido_io.paladin.kata.Kata;
 
 // Create a class that includes a method receiving a callback function
 public abstract class Request {

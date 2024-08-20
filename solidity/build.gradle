@@ -1,0 +1,77 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+ext {
+    buildOutput = layout.projectDirectory.dir('artifacts')
+    testResults = file('test-results.txt')
+}
+
+configurations {
+    compiledContracts {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+}
+
+task install(type: Exec) {
+    executable 'npm'
+    args 'install'
+    inputs.files("package.json", "package-lock.json")
+    outputs.files("package-lock.json")
+    outputs.dir("node_modules")
+}
+
+task compile(type: Exec, dependsOn: install) {
+    executable 'npx'
+    args 'hardhat'
+    args 'compile'
+
+    inputs.files(fileTree(".") {
+        include "contracts/**/*.sol"
+        include "test/**/*.ts"
+    })
+    outputs.dirs(buildOutput, "cache", "typechain-types")
+}
+
+task test(type: Exec, dependsOn: compile) {
+    executable 'npx'
+    args 'hardhat'
+    args 'test'
+
+    // Print output to screen and to file
+    doFirst { testResults.text = "" }
+    standardOutput = new ByteArrayOutputStream() {
+        void flush() {
+            print(toString())
+            testResults << toString()
+            reset()
+        }
+    }
+    inputs.dir('artifacts')
+    outputs.file(testResults)
+}
+
+task build(dependsOn: test) {}
+
+task clean(type: Delete) {
+    delete buildOutput, "cache", "typechain-types"
+    delete testResults
+}
+
+artifacts {
+    compiledContracts(buildOutput) {
+        builtBy(compile)
+    }
+}

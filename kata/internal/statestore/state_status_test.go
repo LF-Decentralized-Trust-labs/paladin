@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,7 +53,7 @@ const widgetABI = `{
 	]
 }`
 
-func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, schemaHash string, withoutSalt []string) []*StateWithLabels {
+func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, schemaID string, withoutSalt []string) []*StateWithLabels {
 	states := make([]*StateWithLabels, len(withoutSalt))
 	for i, w := range withoutSalt {
 		var ij map[string]interface{}
@@ -62,7 +62,7 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, sc
 		ij["salt"] = types.RandHex(32)
 		withSalt, err := json.Marshal(ij)
 		assert.NoError(t, err)
-		states[i], err = ss.PersistState(ctx, domainID, schemaHash, withSalt)
+		states[i], err = ss.PersistState(ctx, domainID, schemaID, withSalt)
 		assert.NoError(t, err)
 		fmt.Printf("widget[%d]: %s\n", i, states[i].Data)
 	}
@@ -85,9 +85,9 @@ func TestStateLockingQuery(t *testing.T) {
 	assert.NoError(t, err)
 	err = ss.PersistSchema(ctx, schema)
 	assert.NoError(t, err)
-	schemaHash := schema.Persisted().Hash.String()
+	schemaID := schema.IDString()
 
-	widgets := makeWidgets(t, ctx, ss, "domain1", schemaHash, []string{
+	widgets := makeWidgets(t, ctx, ss, "domain1", schemaID, []string{
 		`{"size": 11111, "color": "red",  "price": 100}`,
 		`{"size": 22222, "color": "red",  "price": 150}`,
 		`{"size": 33333, "color": "blue", "price": 199}`,
@@ -96,13 +96,13 @@ func TestStateLockingQuery(t *testing.T) {
 	})
 
 	checkQuery := func(query string, status StateStatusQualifier, expected ...int) {
-		states, err := ss.FindStates(ctx, "domain1", schemaHash, toQuery(t, query), status)
+		states, err := ss.FindStates(ctx, "domain1", schemaID, toQuery(t, query), status)
 		assert.NoError(t, err)
 		assert.Len(t, states, len(expected))
 		for _, wIndex := range expected {
 			found := false
 			for _, state := range states {
-				if state.Hash == widgets[wIndex].Hash {
+				if state.ID == widgets[wIndex].ID {
 					assert.False(t, found)
 					found = true
 					break
@@ -126,7 +126,7 @@ func TestStateLockingQuery(t *testing.T) {
 	// Mark them all confirmed apart from one
 	for i, w := range widgets {
 		if i != 3 {
-			err = ss.MarkConfirmed(ctx, "domain1", w.Hash.String(), uuid.New())
+			err = ss.MarkConfirmed(ctx, "domain1", w.ID.String(), uuid.New())
 			assert.NoError(t, err)
 		}
 	}
@@ -140,7 +140,7 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{}`, seqQual)                          // unchanged
 
 	// Mark one spent
-	err = ss.MarkSpent(ctx, "domain1", widgets[0].Hash.String(), uuid.New())
+	err = ss.MarkSpent(ctx, "domain1", widgets[0].ID.String(), uuid.New())
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
@@ -152,7 +152,7 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{}`, seqQual)                       // unchanged
 
 	// lock a confirmed one for spending
-	err = ss.MarkLocked(ctx, "domain1", widgets[1].Hash.String(), seqID, false, true)
+	err = ss.MarkLocked(ctx, "domain1", widgets[1].ID.String(), seqID, false, true)
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
@@ -164,7 +164,7 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{}`, seqQual, 1)                    // added 1
 
 	// lock the unconfirmed one for spending
-	err = ss.MarkLocked(ctx, "domain1", widgets[3].Hash.String(), seqID, false, true)
+	err = ss.MarkLocked(ctx, "domain1", widgets[3].ID.String(), seqID, false, true)
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
@@ -198,7 +198,7 @@ func TestStateStatusQualifierJSON(t *testing.T) {
 	assert.Regexp(t, "PD010117", err)
 
 	u := uuid.New().String()
-	err = json.Unmarshal(([]byte)(fmt.Sprintf(`"%s"`, u)), &q)
+	err = json.Unmarshal(types.JSONString(u), &q)
 	assert.NoError(t, err)
 	assert.Equal(t, u, (string)(q))
 }
