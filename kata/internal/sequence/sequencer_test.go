@@ -689,7 +689,7 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 				dispatcher:                  dispatcherMock,
 				graph:                       NewGraph(),
 				unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
-				unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+				unconfirmedTransactionsByID: make(map[string]*transaction),
 				stateSpenders:               make(map[string]string),
 			},
 			sequencerMockDependencies{

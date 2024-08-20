@@ -69,6 +69,11 @@ type Sequencer interface {
 	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
 
 	/*
+		DelegateTransaction is a request for the given transaction to be managed by this sequencer
+	*/
+	DelegateTransaction(ctx context.Context, request types.DelegationRequest) error
+
+	/*
 		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
 		"given the information available to the local node at this point in time, does it appear that this transaction has no contention on input states".
 	*/
@@ -96,7 +101,7 @@ func NewSequencer(
 		resolver:                    NewContentionResolver(),
 		graph:                       NewGraph(),
 		unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
-		unconfirmedTransactionsByID: make(map[string]*unconfirmedTransaction),
+		unconfirmedTransactionsByID: make(map[string]*transaction),
 		stateSpenders:               make(map[string]string),
 	}
 }
@@ -122,12 +127,13 @@ type unconfirmedState struct {
 	mintingTransactionID string
 }
 
-type unconfirmedTransaction struct {
-	transactionID    string
+type transaction struct {
+	id               string
 	sequencingNodeID string
 	assemblerNodeID  string
-	outputStates     []string
+	endorsed         bool
 	inputStates      []string
+	outputStates     []string
 }
 
 type sequencer struct {
@@ -138,7 +144,7 @@ type sequencer struct {
 	graph                       Graph
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 	unconfirmedStatesByHash     map[string]*unconfirmedState
-	unconfirmedTransactionsByID map[string]*unconfirmedTransaction
+	unconfirmedTransactionsByID map[string]*transaction
 	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
 }
 
@@ -171,19 +177,6 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 	return nil
 }
 
-func (s *sequencer) publishStateClaimLostEvent(ctx context.Context, stateHash, transactionID string) {
-	err := s.eventSync.PublishEvent(ctx, commsbus.Event{
-		Body: &pb.StateClaimLostEvent{
-			StateHash:     stateHash,
-			TransactionId: transactionID,
-		},
-	})
-	if err != nil {
-		// TODO - what should we do here?  Should we retry?  Should we log and ignore?
-		log.L(ctx).Errorf("Error publishing state claim lost event: %s", err)
-	}
-}
-
 func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID string) {
 	err := s.eventSync.SendMessage(ctx, commsbus.Message{
 		Body: &pb.ReassembleRequest{
@@ -196,9 +189,9 @@ func (s *sequencer) sendReassembleMessage(ctx context.Context, transactionID str
 	}
 }
 
-func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, event *pb.TransactionAssembledEvent) ([]*unconfirmedTransaction, error) {
-	mintingTransactions := make([]*unconfirmedTransaction, 0, len(event.InputStateHash))
-	for _, stateHash := range event.InputStateHash {
+func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
+	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
+	for _, stateHash := range txn.inputStates {
 		mintingTransactionID := s.unconfirmedStatesByHash[stateHash].mintingTransactionID
 		mintingTransaction := s.unconfirmedTransactionsByID[mintingTransactionID]
 
@@ -241,10 +234,10 @@ func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, 
 	return nil
 }
 
-func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.TransactionAssembledEvent) (bool, error) {
+func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction transaction) (bool, error) {
 	//if the transaction has any dependencies on transactions that are being managed by other nodes,
 	//then we need to delegate this one to that remote node too
-	unconfirmedDependencies, err := s.getUnconfirmedDependencies(ctx, event)
+	unconfirmedDependencies, err := s.getUnconfirmedDependencies(ctx, transaction)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting unconfirmed dependencies: %s", err)
 		return false, err
@@ -256,7 +249,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.Transac
 	for _, dependency := range unconfirmedDependencies {
 		blockingNodeIDs[dependency.sequencingNodeID] = true
 		blockedBy = append(blockedBy, blockingTransaction{
-			transactionID: dependency.transactionID,
+			transactionID: dependency.id,
 			nodeID:        dependency.sequencingNodeID,
 		})
 	}
@@ -268,7 +261,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.Transac
 
 		// we have a dependency on transactions from multiple nodes
 		// we can't delegate this transaction to multiple nodes, so we need to wait for the dependencies to be resolved
-		err := s.blockTransaction(ctx, event.TransactionId, blockedBy)
+		err := s.blockTransaction(ctx, transaction.id, blockedBy)
 
 		if err != nil {
 			log.L(ctx).Errorf("Error blocking transaction: %s", err)
@@ -278,7 +271,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, event *pb.Transac
 	}
 	if len(keys) == 1 && keys[0] != s.nodeID.String() {
 		// we are dependent on one other node so we can delegate
-		err := s.delegate(ctx, event.TransactionId, keys[0])
+		err := s.delegate(ctx, transaction.id, keys[0])
 		if err != nil {
 			log.L(ctx).Errorf("Error delegating: %s", err)
 			return false, err
@@ -336,12 +329,34 @@ func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatab
 	}
 	return delegatableTransactions
 }
+func (s *sequencer) acceptTransaction(ctx context.Context, transaction transaction) error {
+	delegated, err := s.delegateIfAppropriate(ctx, transaction)
+	if err != nil {
+		log.L(ctx).Errorf("Error delegating transaction: %s", err)
+		return err
+	}
+	if delegated {
+		return nil
+	}
+
+	err = s.graph.AddTransaction(ctx, transaction.id, transaction.inputStates, transaction.outputStates)
+	if err != nil {
+		log.L(ctx).Errorf("Error adding transaction to graph: %s", err)
+		return err
+	}
+	err = s.evaluateGraph(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("Error evaluating graph: %s", err)
+		return err
+	}
+	return nil
+}
 
 func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
 	//Record the new transaction
-	s.unconfirmedTransactionsByID[event.TransactionId] = &unconfirmedTransaction{
-		transactionID:    event.TransactionId,
+	s.unconfirmedTransactionsByID[event.TransactionId] = &transaction{
+		id:               event.TransactionId,
 		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
 		assemblerNodeID:  event.NodeId,
 		outputStates:     event.OutputStateHash,
@@ -357,25 +372,13 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 	//if the transaction was assembled on the local node, then we add it into the graph
 	//if it was assembled on another node, then we remember it in case we end up getting some dependencies on it
 	if event.NodeId == s.nodeID.String() {
-		delegated, err := s.delegateIfAppropriate(ctx, event)
-		if err != nil {
-			log.L(ctx).Errorf("Error delegating transaction: %s", err)
-			return err
-		}
-		if delegated {
-			return nil
-		}
-
-		err = s.graph.AddTransaction(ctx, event.TransactionId, event.InputStateHash, event.OutputStateHash)
-		if err != nil {
-			log.L(ctx).Errorf("Error adding transaction to graph: %s", err)
-			return err
-		}
-		err = s.evaluateGraph(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("Error evaluating graph: %s", err)
-			return err
-		}
+		return s.acceptTransaction(ctx, transaction{
+			id:               event.TransactionId,
+			sequencingNodeID: s.nodeID.String(),
+			assemblerNodeID:  event.NodeId,
+			outputStates:     event.OutputStateHash,
+			inputStates:      event.InputStateHash,
+		})
 	} else {
 		//TODO this could be a dependency on a transaction that we have already added to our graph but
 		// we didn't know about it when we added the dependant transaction
@@ -497,6 +500,16 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 	}
 
 	return nil
+}
+
+func (s *sequencer) DelegateTransaction(ctx context.Context, delegationRequest types.DelegationRequest) error {
+	return s.acceptTransaction(ctx, transaction{
+		id:               delegationRequest.TransactionID,
+		sequencingNodeID: s.nodeID.String(),
+		assemblerNodeID:  delegationRequest.DelegatingNodeID,
+		outputStates:     delegationRequest.OutputStates,
+		inputStates:      delegationRequest.InputStates,
+	})
 }
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {
