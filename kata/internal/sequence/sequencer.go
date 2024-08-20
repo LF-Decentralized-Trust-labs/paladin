@@ -71,7 +71,7 @@ type Sequencer interface {
 	/*
 		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
 	*/
-	AssignTransaction(ctx context.Context, request types.Transaction) error
+	AssignTransaction(ctx context.Context, transactionID string) error
 
 	/*
 		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
@@ -192,7 +192,14 @@ func (s *sequencer) sendReassembleMessage(ctx context.Context, assemblingNodeID 
 func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
 	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
 	for _, stateHash := range txn.inputStates {
-		mintingTransactionID := s.unconfirmedStatesByHash[stateHash].mintingTransactionID
+		unconfirmedState, ok := s.unconfirmedStatesByHash[stateHash]
+		if !ok {
+			//this state is already confirmed
+			//TODO should we verify this is the case and not just the case that we have not learned about it yet?
+			log.L(ctx).Debugf("State %s is already confirmed", stateHash)
+			continue
+		}
+		mintingTransactionID := unconfirmedState.mintingTransactionID
 		mintingTransaction := s.unconfirmedTransactionsByID[mintingTransactionID]
 
 		if mintingTransaction != nil {
@@ -488,14 +495,17 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-func (s *sequencer) AssignTransaction(ctx context.Context, txn types.Transaction) error {
-	return s.acceptTransaction(ctx, transaction{
-		id:               txn.ID,
-		sequencingNodeID: s.nodeID.String(),
-		assemblerNodeID:  txn.AssemblerNodeID,
-		outputStates:     txn.OutputStates,
-		inputStates:      txn.InputStates,
-	})
+func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
+	log.L(ctx).Infof("AssignTransaction: %s", txnID)
+
+	//TODO we assume that the AssignTransaction message always comes _after_ the transactionAssembled event.  Is this safe to assume?  Should we pass the full transaction details on the delegateTransaction message? Or should we wait for the transactionAssembled event before actioning the delgation?
+	txn, ok := s.unconfirmedTransactionsByID[txnID]
+	if !ok {
+		log.L(ctx).Errorf("Transaction %s does not exist", txnID)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, txnID)
+	}
+
+	return s.acceptTransaction(ctx, *txn)
 }
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {

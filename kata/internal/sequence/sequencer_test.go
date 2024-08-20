@@ -36,10 +36,14 @@ func TestSequencerGraphOfOne(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
-	err := node1Sequencer.AssignTransaction(ctx, types.Transaction{
-		AssemblerNodeID: node1ID.String(),
-		ID:              txn1ID.String(),
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:        node1ID.String(),
+		TransactionId: txn1ID.String(),
 	})
+
+	assert.NoError(t, err)
+
+	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
 	assert.NoError(t, err)
 
 	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID}).Return(nil).Once()
@@ -64,25 +68,14 @@ func TestSequencerLocalDependency(t *testing.T) {
 	}
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 
-	err := node1Sequencer.AssignTransaction(ctx, types.Transaction{
-		AssemblerNodeID: node1ID.String(),
-		ID:              txn1ID.String(),
-		OutputStates:    []string{stateHash.String()},
-	})
-	assert.NoError(t, err)
-
-	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:          node1ID.String(),
 		TransactionId:   txn1ID.String(),
 		OutputStateHash: []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
+	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
 
-	err = node1Sequencer.AssignTransaction(ctx, types.Transaction{
-		AssemblerNodeID: node1ID.String(),
-		ID:              txn2ID.String(),
-		InputStates:     []string{stateHash.String()},
-	})
 	assert.NoError(t, err)
 
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
@@ -90,6 +83,9 @@ func TestSequencerLocalDependency(t *testing.T) {
 		TransactionId:  txn2ID.String(),
 		InputStateHash: []string{stateHash.String()},
 	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
 	assert.NoError(t, err)
 
 	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
@@ -144,19 +140,15 @@ func TestSequencerRemoteDependency(t *testing.T) {
 		assert.Equal(t, remoteNodeId.String(), delegateTransactionMessage.DelegateNodeId)
 	}).Return(nil)
 
-	//Second transaction (the spender of that state) is assembled on the local node
-	err = node1Sequencer.AssignTransaction(ctx, types.Transaction{
-		ID:              txn2ID.String(),
-		AssemblerNodeID: localNodeId.String(),
-		InputStates:     []string{stateHash.String()},
-	})
-	assert.NoError(t, err)
-
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:  txn2ID.String(),
 		NodeId:         localNodeId.String(),
 		InputStateHash: []string{stateHash.String()},
 	})
+	assert.NoError(t, err)
+
+	//Second transaction (the spender of that state) is assembled on the local node
+	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
 	assert.NoError(t, err)
 
 	transportMock1.AssertExpectations(t)
@@ -224,18 +216,15 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	}).Return(nil)
 
 	// new transaction (the spender of that states) is assembled on the local node
-	err = localNodeSequencer.AssignTransaction(ctx, types.Transaction{
-		ID:              newTransactionID.String(),
-		AssemblerNodeID: localNodeId.String(),
-		InputStates:     []string{stateHash1.String(), stateHash2.String()},
-	})
-	assert.NoError(t, err)
 
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:  newTransactionID.String(),
 		NodeId:         localNodeId.String(),
 		InputStateHash: []string{stateHash1.String(), stateHash2.String()},
 	})
+	assert.NoError(t, err)
+
+	err = localNodeSequencer.AssignTransaction(ctx, newTransactionID.String())
 	assert.NoError(t, err)
 
 	transportMock1.AssertExpectations(t)
