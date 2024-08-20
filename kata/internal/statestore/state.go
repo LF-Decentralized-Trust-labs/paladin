@@ -146,7 +146,7 @@ func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 
 func (ss *stateStore) labelSetFor(schema Schema) *trackingLabelSet {
 	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
-	for _, fi := range schema.LabelInfo() {
+	for _, fi := range schema.(labelInfoAccess).labelInfo() {
 		tls.labels[fi.label] = fi
 	}
 	return &tls

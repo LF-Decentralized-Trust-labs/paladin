@@ -104,6 +104,19 @@ task makeStateStoreMock(type:Exec, dependsOn: tasks.installTools) {
     args '--output', 'mocks/componentmocks'
 }
 
+task makeDomainStateInterfaceMock(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('internal/statestore')
+    outputs.dir('mocks/componentmocks') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'internal/statestore'
+    args '--name', 'DomainStateInterface'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
+
 task makeBlockIndexerMock(type:Exec, dependsOn: tasks.installTools) {
     inputs.files('bin/mockery')
     inputs.dir('pkg/blockindexer')
@@ -132,6 +145,7 @@ task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
     tasks.makeComponentMocks,
     tasks.makeStateStoreMock,
+    tasks.makeDomainStateInterfaceMock,
     tasks.makeBlockIndexerMock,
     tasks.makeEthClientMocks,
 ]) {}

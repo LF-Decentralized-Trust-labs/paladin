@@ -18,7 +18,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -62,6 +61,7 @@ type domain struct {
 	constructorABI         *abi.Entry
 	factoryContractAddress *ethtypes.Address0xHex
 	factoryContractABI     abi.ABI
+	privateContractABI     abi.ABI
 
 	initDone chan error
 }
@@ -105,12 +105,16 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	}
 
 	if err := json.Unmarshal(([]byte)(d.config.FactoryContractAbiJson), &d.factoryContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgFactoryContractAbiJsonInvalid)
+		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+	}
+
+	if err := json.Unmarshal(([]byte)(d.config.PrivateContractAbiJson), &d.privateContractABI); err != nil {
+		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
 	d.factoryContractAddress, err = ethtypes.NewAddress(d.config.FactoryContractAddress)
 	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgFactoryContractAddressInvalid)
+		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
 	}
 
 	// Ensure all the schemas are recorded to the DB
@@ -199,7 +203,7 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 	var query filters.QueryJSON
 	err := json.Unmarshal([]byte(req.QueryJson), &query)
 	if err != nil {
-		return nil, fmt.Errorf("invalid query JSON: %s", err)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgDomainInvalidQueryJSON)
 	}
 
 	var states []*statestore.State

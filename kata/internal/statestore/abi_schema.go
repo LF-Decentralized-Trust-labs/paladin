@@ -34,11 +34,11 @@ import (
 
 type abiSchema struct {
 	*SchemaPersisted
-	tc          abi.TypeComponent
-	definition  *abi.Parameter
-	primaryType string
-	typeSet     eip712.TypeSet
-	labelInfo   []*schemaLabelInfo
+	tc           abi.TypeComponent
+	definition   *abi.Parameter
+	primaryType  string
+	typeSet      eip712.TypeSet
+	abiLabelInfo []*schemaLabelInfo
 }
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
@@ -98,8 +98,8 @@ func (as *abiSchema) Persisted() *SchemaPersisted {
 	return as.SchemaPersisted
 }
 
-func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
-	return as.labelInfo
+func (as *abiSchema) labelInfo() []*schemaLabelInfo {
+	return as.abiLabelInfo
 }
 
 // Build the TypedDataV4 signature of the struct, from the ABI definition
@@ -136,7 +136,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
 			if err != nil {
 				return err
 			}
-			as.labelInfo = append(as.labelInfo, &schemaLabelInfo{
+			as.abiLabelInfo = append(as.abiLabelInfo, &schemaLabelInfo{
 				label:         p.Name,
 				virtualColumn: fmt.Sprintf("l%d", labelIndex),
 				labelType:     labelType,

@@ -69,9 +69,12 @@ type Schema interface {
 	IDString() string
 	Signature() string
 	Persisted() *SchemaPersisted
-	LabelInfo() []*schemaLabelInfo
 	ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
+}
+
+type labelInfoAccess interface {
+	labelInfo() []*schemaLabelInfo
 }
 
 func schemaCacheKey(domainID string, id *types.Bytes32) string {

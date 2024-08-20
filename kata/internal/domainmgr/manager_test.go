@@ -25,24 +25,27 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
 )
 
 type mockComponents struct {
-	db               sqlmock.Sqlmock
-	ethClient        *componentmocks.EthClient
-	ethClientFactory *componentmocks.EthClientFactory
-	stateStore       *componentmocks.StateStore
-	blockIndexer     *componentmocks.BlockIndexer
+	db                   sqlmock.Sqlmock
+	ethClient            *componentmocks.EthClient
+	ethClientFactory     *componentmocks.EthClientFactory
+	stateStore           *componentmocks.StateStore
+	domainStateInterface *componentmocks.DomainStateInterface
+	blockIndexer         *componentmocks.BlockIndexer
 }
 
 func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	mc := &mockComponents{
-		blockIndexer:     componentmocks.NewBlockIndexer(t),
-		stateStore:       componentmocks.NewStateStore(t),
-		ethClientFactory: componentmocks.NewEthClientFactory(t),
+		blockIndexer:         componentmocks.NewBlockIndexer(t),
+		stateStore:           componentmocks.NewStateStore(t),
+		domainStateInterface: componentmocks.NewDomainStateInterface(t),
+		ethClientFactory:     componentmocks.NewEthClientFactory(t),
 	}
 
 	// Blockchain stuff is always mocked
@@ -71,6 +74,18 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 			assert.NoError(t, mp.Mock.ExpectationsWereMet())
 		}
 		preMocks.On("StateStore").Return(mc.stateStore)
+		mridc := mc.stateStore.On("RunInDomainContext", mock.Anything, mock.Anything)
+		mridc.Run(func(args mock.Arguments) {
+			mridc.Return((args[1].(statestore.DomainContextFunction))(
+				ctx, mc.domainStateInterface,
+			))
+		}).Maybe()
+		mridcf := mc.stateStore.On("RunInDomainContextFlush", mock.Anything, mock.Anything)
+		mridcf.Run(func(args mock.Arguments) {
+			mridcf.Return((args[1].(statestore.DomainContextFunction))(
+				ctx, mc.domainStateInterface,
+			))
+		}).Maybe()
 	}
 	preMocks.On("Persistence").Return(p)
 

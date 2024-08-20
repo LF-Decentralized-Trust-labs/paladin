@@ -17,15 +17,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const fakeCoinConstructorABI = `{
@@ -71,6 +74,7 @@ const fakeCoinStateSchema = `{
 type testPlugin struct {
 	plugintk.DomainAPIBase
 	initialized atomic.Bool
+	mc          *mockComponents
 	d           *domain
 }
 
@@ -86,7 +90,7 @@ func newTestPlugin(domainFuncs *plugintk.DomainAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig) (context.Context, *domainManager, *testPlugin, error, func()) {
+func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *testPlugin, error, func()) {
 
 	ctx, dm, _, done := newTestDomainManager(t, realDB, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
@@ -94,7 +98,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 				Config: yamlNode(t, `{"some":"conf"}`),
 			},
 		},
-	})
+	}, extraSetup...)
 	defer done()
 
 	tp := newTestPlugin(&plugintk.DomainAPIFunctions{
@@ -106,7 +110,6 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 			}, nil
 		},
 		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
-			assert.Len(t, idr.AbiStateSchemas, 1)
 			return &prototk.InitDomainResponse{}, nil
 		},
 	})
@@ -123,31 +126,37 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	return ctx, dm, tp, <-tp.d.initDone, done
 }
 
-func TestRegisterAndFindAvailableStates(t *testing.T) {
-
-	addr := ethtypes.MustNewAddress(types.RandHex(20))
-	ctx, dm, tp, regErr, done := newTestDomain(t, true, &prototk.DomainConfig{
+func goodDomainConf() *prototk.DomainConfig {
+	return &prototk.DomainConfig{
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: addr.String(),
+		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
-	})
+	}
+}
+
+func TestDomainInitStates(t *testing.T) {
+
+	domainConf := goodDomainConf()
+	ctx, dm, tp, regErr, done := newTestDomain(t, true, domainConf)
 	defer done()
 	assert.NoError(t, regErr)
 	assert.True(t, tp.initialized.Load())
-	byAddr, err := dm.getDomainByAddress(ctx, addr)
+	byAddr, err := dm.getDomainByAddress(ctx, ethtypes.MustNewAddress(domainConf.FactoryContractAddress))
 	assert.NoError(t, err)
 	assert.Equal(t, tp.d, byAddr)
 
 }
 
-func TestRegisterAndFindAvailableBadSchemas(t *testing.T) {
+func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
@@ -157,11 +166,12 @@ func TestRegisterAndFindAvailableBadSchemas(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestRegisterAndFindAvailableBadConstructor(t *testing.T) {
+func TestDomainInitBadConstructor(t *testing.T) {
 	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
 		ConstructorAbiJson:     `!!!wrong`,
 		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -171,11 +181,42 @@ func TestRegisterAndFindAvailableBadConstructor(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestRegisterAndFindAvailableBadAddress(t *testing.T) {
+func TestDomainInitBadConstructorType(t *testing.T) {
+	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
+		ConstructorAbiJson:     `{"type":"event"}`,
+		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011604", regErr)
+	assert.False(t, tp.initialized.Load())
+}
+
+func TestDomainInitSchemaStoreFail(t *testing.T) {
+	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
+		ConstructorAbiJson:     `{"type":"event"}`,
+		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011604", regErr)
+	assert.False(t, tp.initialized.Load())
+}
+
+func TestDomainInitBadAddress(t *testing.T) {
 	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: `!wrong`,
 		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -185,11 +226,12 @@ func TestRegisterAndFindAvailableBadAddress(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestRegisterAndFindAvailableFactoryABI(t *testing.T) {
+func TestDomainInitFactoryABIInvalid(t *testing.T) {
 	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `!!!wrong`,
+		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -197,4 +239,88 @@ func TestRegisterAndFindAvailableFactoryABI(t *testing.T) {
 	defer done()
 	assert.Regexp(t, "PD011605", regErr)
 	assert.False(t, tp.initialized.Load())
+}
+
+func TestDomainInitPrivateABIInvalid(t *testing.T) {
+	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `!!!wrong`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011607", regErr)
+	assert.False(t, tp.initialized.Load())
+}
+
+func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
+	_, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: ethtypes.MustNewAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	}, func(mc *mockComponents) {
+		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
+	})
+	defer done()
+	assert.Regexp(t, "pop", regErr)
+	assert.False(t, tp.initialized.Load())
+}
+
+func TestDomainConfigureFail(t *testing.T) {
+
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	})
+	defer done()
+
+	tp := newTestPlugin(&plugintk.DomainAPIFunctions{
+		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+			return nil, fmt.Errorf("pop")
+		},
+	})
+
+	domainID := uuid.New()
+	_, err := dm.DomainRegistered("test1", domainID, tp)
+	assert.NoError(t, err)
+
+	da, err := dm.GetDomainByName(ctx, "test1")
+	assert.NoError(t, err)
+
+	d := da.(*domain)
+	d.initRetry.UTSetMaxAttempts(1)
+	assert.Regexp(t, "pop", <-d.initDone)
+}
+
+func TestDomainFindAvailableStatesNotInit(t *testing.T) {
+	ctx, _, tp, regErr, done := newTestDomain(t, false, &prototk.DomainConfig{
+		FactoryContractAbiJson: `!!!WRONG`,
+	})
+	defer done()
+	assert.NotNil(t, regErr)
+	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{SchemaId: "12345"})
+	assert.Regexp(t, "PD011601", err)
+}
+
+func TestDomainFindAvailableStatesBadQuery(t *testing.T) {
+	ctx, _, tp, regErr, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
+		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil).Maybe()
+	})
+	defer done()
+	assert.NoError(t, regErr)
+	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
+		SchemaId:  "12345",
+		QueryJson: `!!!{ wrong`,
+	})
+	assert.Regexp(t, "PD011608", err)
 }
