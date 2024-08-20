@@ -65,20 +65,17 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
+task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
     outputs.dir('mocks/rpcbackendmocks')
-    executable 'bin/mockery'
+    mockery 'bin/mockery'
     args '--case', 'underscore'
-    args '--dir', "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-    args '--all'
-    args '--outpkg', 'rpcbackendmocks'
-    args '--output', 'mocks/rpcbackendmocks'
+    mock {
+        dir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outpkg 'rpcbackendmocks'
+        output 'mocks/rpcbackendmocks'
+    }
 }
-
-task makeMocks(dependsOn: [
-    tasks.makeRPCMocks,
-]) {}
 
 task copyTestContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
