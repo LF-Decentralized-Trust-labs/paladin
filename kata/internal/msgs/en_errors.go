@@ -71,10 +71,10 @@ var (
 
 	// Transaction Processor PD0103XX
 	MsgTransactionProcessorInvalidStage        = ffe("PD010300", "Invalid stage: %s")
-	MsgTransactionProcessorUndeterminedStage   = ffe("PD010301", "Cannot determine a processing stage for transaction with ID: %s")
+	MsgContextCanceled                         = ffe("PD010301", "Context canceled")
 	MsgTransactionProcessorActionFailed        = ffe("PD010302", "Action for transaction with ID: %s at stage %s failed")
 	MsgTransactionProcessorBlockedOnDependency = ffe("PD010303", "Transaction with ID: %s cannot be processed by %s stage due to dependent transactions.")
-	MsgContextCanceled                         = ffe("PD010304", "Context canceled")
+	MsgTransactionProcessorUndeterminedStage   = ffe("PD010304", "Cannot determine a processing stage for transaction with ID: %s")
 
 	// Transaction store PD0104XX
 	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")

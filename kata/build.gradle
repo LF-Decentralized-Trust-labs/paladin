@@ -76,8 +76,44 @@ task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
     args '--output', 'mocks/rpcbackendmocks'
 }
 
+task makeEngineMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    outputs.dir('mocks/enginemocks')
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', "internal/engine"
+    args '--all'
+    args '--outpkg', 'enginemocks'
+    args '--output', 'mocks/enginemocks'
+}
+
+task makeStateMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    outputs.dir('mocks/statemocks')
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', "internal/statestore"
+    args '--all'
+    args '--outpkg', 'statemocks'
+    args '--output', 'mocks/statemocks'
+}
+
+task makeCommonBusMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    outputs.dir('mocks/commsbusmocks')
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', "internal/commsbus"
+    args '--all'
+    args '--outpkg', 'commsbusmocks'
+    args '--output', 'mocks/commsbusmocks'
+}
+
 task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
+    tasks.makeEngineMocks,
+    tasks.makeStateMocks,
+    tasks.makeCommonBusMocks,
 ]) {}
 
 task copyTestContracts(type: Copy) {
@@ -130,20 +166,6 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
     delete 'componenttest/abis'
 }
 
-
-task mockInternal(type: Exec) {
-    workingDir '.'
-    dependsOn tasks.protoc
-
-    executable "${projectDir}/bin/mockery"
-    args '--all'
-    args '--recursive'
-    args "--dir=${projectDir}/internal"
-    args "--output=${projectDir}/mocks"
-    
-    inputs.dir("${projectDir}/internal")
-}
-
 task goGet(type:Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
@@ -153,9 +175,6 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
 
     executable 'go'
     args 'get'
-
-    // generate mocks after go get
-    finalizedBy tasks.mockInternal
 }
 
 task lint(type: Exec, dependsOn:tasks.protoc) {
