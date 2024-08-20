@@ -107,16 +107,17 @@ task copyTestbedContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
-task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
-    workingDir '.'
-    inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
+task protoc(type: ProtoCompile, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
     outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
+
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
+    }
+
     args "--go_out=${projectDir}"
     args "--go-grpc_out=${projectDir}"
-    args "--proto_path=${projectDir}"
-    args inputs.files
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
