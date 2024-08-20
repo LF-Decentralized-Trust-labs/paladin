@@ -44,14 +44,14 @@ class Mockery extends DefaultTask {
 
     class Mock {
 
-        private String _dir
+        private String _inputDir
         private String _name
         private boolean _includeAll = false
-        private String _outpkg
-        private String _output
+        private String _outputPackage
+        private String _outputDir
 
-        void dir(String dir) {
-            _dir = dir
+        void inputDir(String dir) {
+            _inputDir = dir
             inputs.dir dir
         }
 
@@ -63,18 +63,18 @@ class Mockery extends DefaultTask {
             _includeAll = include
         }
 
-        void outpkg(String outpkg) {
-            _outpkg = outpkg
+        void outputPackage(String outpkg) {
+            _outputPackage = outpkg
         }
 
-        void output(String output) {
-            _output = output
+        void outputDir(String output) {
+            _outputDir = output
             outputs.dir output
         }
 
         protected void configure(ExecSpec spec) {
-            if (_dir != null) {
-                spec.args '--dir', _dir
+            if (_inputDir != null) {
+                spec.args '--dir', _inputDir
             }
             if (_name != null) {
                 spec.args '--name', _name
@@ -82,11 +82,11 @@ class Mockery extends DefaultTask {
             if (_includeAll) {
                 spec.args '--all'
             }
-            if (_outpkg != null) {
-                spec.args '--outpkg', _outpkg
+            if (_outputPackage != null) {
+                spec.args '--outpkg', _outputPackage
             }
-            if (_output != null) {
-                spec.args '--output', _output
+            if (_outputDir != null) {
+                spec.args '--output', _outputDir
             }
         }
 

@@ -69,10 +69,10 @@ task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
     mockery 'bin/mockery'
     args '--case', 'underscore'
     mock {
-        dir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
         includeAll true
-        outpkg 'rpcbackendmocks'
-        output 'mocks/rpcbackendmocks'
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
     }
 }
 
