@@ -1,18 +1,23 @@
-import org.gradle.api.GradleException
-import org.gradle.api.tasks.Exec
 import org.gradle.process.ExecResult
+import org.gradle.api.DefaultTask
 
-class DockerCompose extends Exec {
+class DockerCompose extends DefaultTask {
 
     private List<String> _composeFiles = []
+    private List<String> _args = []
 
     DockerCompose() {
-        ignoreExitValue true
+        doFirst {
+            this.exec()
+        }
     }
 
     void composeFile(String f) {
-        _composeFiles += '-f'
-        _composeFiles += f
+        _composeFiles += ['-f', f]
+    }
+
+    void args(Object... args) {
+        _args += [*args]
     }
 
     void dumpLogs(String service = "") {
@@ -36,15 +41,12 @@ class DockerCompose extends Exec {
         return ['docker-compose', *_composeFiles]
     }
 
-    @Override
     protected void exec() {
-        List<String> cmd = dockerCommand()
-        executable = cmd.remove(0)
-        args = [*cmd, *args]
-
-        super.exec()
-
-        ExecResult execResult = executionResult.get()
+        List<String> cmd = [*dockerCommand(), *_args]
+        ExecResult execResult = project.exec {
+            executable cmd.remove(0)
+            args cmd
+        }
         if (execResult.exitValue != 0) {
             dumpLogs()
         }
