@@ -80,7 +80,6 @@ func Shutdown() {
 }
 
 func BuildInfo() string {
-	// TODO: When we know more about build information change this out for something else
 	ctx := context.Background()
 	log.L(ctx).Infof("grpctransport.BuildInfo: %s", ProviderName)
 	return ProviderName
@@ -140,8 +139,6 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 				return
 			}
 			if err != nil {
-				// TODO: Something not quite right in the shutdown flow here which means we occaisionally see this, need to fix
-				// log.L(listenerContext).Error("grpctransport: Error when reading message")
 				continue
 			}
 			log.L(listenerContext).Infof("grpctransport: Received message")
@@ -174,7 +171,7 @@ func InitializeTransportProvider(socketAddress string, listenerDestination strin
 	// Now bring up the external endpoint other Paladin's are going to speak to us on
 	if externalServer == nil {
 		// Mostly put behind an interface to make stubbing for UTs easy
-		externalServer, err = NewExternalGRPCServer(ctx, config.ExternalListenPort, 10, config.ServerCertificate, config.ClientCertificate)
+		externalServer, err = NewExternalGRPCServer(ctx, config.ExternalListenPort, config.ServerCertificate, config.ClientCertificate)
 		if err != nil {
 			return err
 		}

@@ -40,7 +40,6 @@ import (
 
 var (
 	testPort        = 10002
-	testBufferSize  = 1
 	loopbackAddress = fmt.Sprintf("localhost:%d", testPort)
 	sendingAddress  = fmt.Sprintf("localhost:%d", testPort+1)
 	fakeDesintation = "somewhereoverthemoon"
@@ -72,7 +71,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 	server2ServerCertificate, err := tls.LoadX509KeyPair("../../../test/ca2/clients/client1.crt", "../../../test/ca2/clients/client1.key")
 	assert.NoError(t, err)
 
-	server, err := NewExternalGRPCServer(ctx, testPort, testBufferSize, &server1ServerCertificate, &server1ClientCertificate)
+	server, err := NewExternalGRPCServer(ctx, testPort, &server1ServerCertificate, &server1ClientCertificate)
 	defer server.Shutdown()
 	assert.NoError(t, err)
 
@@ -133,7 +132,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 
 func TestOutboundMessageFlow(t *testing.T) {
 	ctx := context.Background()
-	server, err := NewExternalGRPCServer(ctx, testPort, testBufferSize, nil, nil)
+	server, err := NewExternalGRPCServer(ctx, testPort, nil, nil)
 	defer server.Shutdown()
 	assert.NoError(t, err)
 
@@ -188,7 +187,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	serverCertificate, err := tls.LoadX509KeyPair("../../../test/ca1/clients/client2.crt", "../../../test/ca1/clients/client2.key")
 	assert.NoError(t, err)
 
-	server, err := NewExternalGRPCServer(ctx, testPort, testBufferSize, &serverCertificate, &clientCertificate)
+	server, err := NewExternalGRPCServer(ctx, testPort, &serverCertificate, &clientCertificate)
 	defer server.Shutdown()
 	assert.NoError(t, err)
 
@@ -239,7 +238,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 
 func TestInboundMessageFlow(t *testing.T) {
 	ctx := context.Background()
-	server, err := NewExternalGRPCServer(ctx, testPort, testBufferSize, nil, nil)
+	server, err := NewExternalGRPCServer(ctx, testPort, nil, nil)
 	defer server.Shutdown()
 	assert.NoError(t, err)
 
@@ -275,6 +274,6 @@ func TestInboundMessageFlow(t *testing.T) {
 
 func TestInitializeExternalListener(t *testing.T) {
 	ctx := context.Background()
-	_, err := NewExternalGRPCServer(ctx, 10002, 1, nil, nil)
+	_, err := NewExternalGRPCServer(ctx, 10002, nil, nil)
 	assert.NoError(t, err)
 }
