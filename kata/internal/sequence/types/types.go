@@ -23,9 +23,9 @@ type EndorsementRequest struct {
 	InputStates   []string
 }
 
-type DelegationRequest struct {
-	TransactionID    string
-	DelegatingNodeID string
-	OutputStates     []string
-	InputStates      []string
+type Transaction struct {
+	ID              string
+	AssemblerNodeID string
+	OutputStates    []string
+	InputStates     []string
 }

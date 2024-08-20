@@ -69,9 +69,9 @@ type Sequencer interface {
 	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
 
 	/*
-		DelegateTransaction is a request for the given transaction to be managed by this sequencer
+		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
 	*/
-	DelegateTransaction(ctx context.Context, request types.DelegationRequest) error
+	AssignTransaction(ctx context.Context, request types.Transaction) error
 
 	/*
 		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
@@ -367,20 +367,8 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 		}
 	}
 
-	//if the transaction was assembled on the local node, then we add it into the graph
-	//if it was assembled on another node, then we remember it in case we end up getting some dependencies on it
-	if event.NodeId == s.nodeID.String() {
-		return s.acceptTransaction(ctx, transaction{
-			id:               event.TransactionId,
-			sequencingNodeID: s.nodeID.String(),
-			assemblerNodeID:  event.NodeId,
-			outputStates:     event.OutputStateHash,
-			inputStates:      event.InputStateHash,
-		})
-	} else {
-		//TODO this could be a dependency on a transaction that we have already added to our graph but
-		// we didn't know about it when we added the dependant transaction
-	}
+	//TODO this could be a dependency on a transaction that we have already added to our graph but
+	// we didn't know about it when we added the dependant transaction
 
 	return nil
 }
@@ -500,13 +488,13 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-func (s *sequencer) DelegateTransaction(ctx context.Context, delegationRequest types.DelegationRequest) error {
+func (s *sequencer) AssignTransaction(ctx context.Context, txn types.Transaction) error {
 	return s.acceptTransaction(ctx, transaction{
-		id:               delegationRequest.TransactionID,
+		id:               txn.ID,
 		sequencingNodeID: s.nodeID.String(),
-		assemblerNodeID:  delegationRequest.DelegatingNodeID,
-		outputStates:     delegationRequest.OutputStates,
-		inputStates:      delegationRequest.InputStates,
+		assemblerNodeID:  txn.AssemblerNodeID,
+		outputStates:     txn.OutputStates,
+		inputStates:      txn.InputStates,
 	})
 }
 

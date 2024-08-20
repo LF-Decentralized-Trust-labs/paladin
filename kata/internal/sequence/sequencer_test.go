@@ -36,9 +36,9 @@ func TestSequencerGraphOfOne(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
-	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:        node1ID.String(),
-		TransactionId: txn1ID.String(),
+	err := node1Sequencer.AssignTransaction(ctx, types.Transaction{
+		AssemblerNodeID: node1ID.String(),
+		ID:              txn1ID.String(),
 	})
 	assert.NoError(t, err)
 
@@ -63,10 +63,25 @@ func TestSequencerLocalDependency(t *testing.T) {
 		H: uuid.New(),
 	}
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
-	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+
+	err := node1Sequencer.AssignTransaction(ctx, types.Transaction{
+		AssemblerNodeID: node1ID.String(),
+		ID:              txn1ID.String(),
+		OutputStates:    []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:          node1ID.String(),
 		TransactionId:   txn1ID.String(),
 		OutputStateHash: []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.AssignTransaction(ctx, types.Transaction{
+		AssemblerNodeID: node1ID.String(),
+		ID:              txn2ID.String(),
+		InputStates:     []string{stateHash.String()},
 	})
 	assert.NoError(t, err)
 
@@ -130,6 +145,13 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	}).Return(nil)
 
 	//Second transaction (the spender of that state) is assembled on the local node
+	err = node1Sequencer.AssignTransaction(ctx, types.Transaction{
+		ID:              txn2ID.String(),
+		AssemblerNodeID: localNodeId.String(),
+		InputStates:     []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:  txn2ID.String(),
 		NodeId:         localNodeId.String(),
@@ -202,6 +224,13 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	}).Return(nil)
 
 	// new transaction (the spender of that states) is assembled on the local node
+	err = localNodeSequencer.AssignTransaction(ctx, types.Transaction{
+		ID:              newTransactionID.String(),
+		AssemblerNodeID: localNodeId.String(),
+		InputStates:     []string{stateHash1.String(), stateHash2.String()},
+	})
+	assert.NoError(t, err)
+
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId:  newTransactionID.String(),
 		NodeId:         localNodeId.String(),
