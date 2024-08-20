@@ -69,7 +69,7 @@ const fakeCoinStateSchema = `{
 
 func TestRegisterAndFindAvailableStates(t *testing.T) {
 
-	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, true, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),
@@ -113,7 +113,7 @@ func TestRegisterAndFindAvailableStates(t *testing.T) {
 
 func TestRegisterAndFindAvailableBadSchemas(t *testing.T) {
 
-	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),
@@ -157,7 +157,7 @@ func TestRegisterAndFindAvailableBadSchemas(t *testing.T) {
 
 func TestRegisterAndFindAvailableBadConstructor(t *testing.T) {
 
-	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),
@@ -201,7 +201,7 @@ func TestRegisterAndFindAvailableBadConstructor(t *testing.T) {
 
 func TestRegisterAndFindAvailableBadAddress(t *testing.T) {
 
-	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),
@@ -245,7 +245,7 @@ func TestRegisterAndFindAvailableBadAddress(t *testing.T) {
 
 func TestRegisterAndFindAvailableFactoryABI(t *testing.T) {
 
-	ctx, dm, done := newTestDomainManager(t, &DomainManagerConfig{
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),

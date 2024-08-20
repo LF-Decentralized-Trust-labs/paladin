@@ -16,16 +16,16 @@
 package components
 
 import (
-	"context"
-
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 )
 
-// PreInitComponents are ones that are initialized independently without pre-requisites.
-// Components do not depend on any other components, they hold their
+// PreInitComponents are ones that are initialized before managers.
+// PreInit components do not depend on any other components, they hold their
 // own interface in their package.
 type PreInitComponents interface {
 	EthClientFactory() ethclient.EthClientFactory
@@ -38,10 +38,12 @@ type PreInitComponents interface {
 //
 // However, they are not managers in their own right and can be re-used across managers.
 //
-// Components do not depend on any other components, they hold their
-// own interface in their package.
+// Each component defines the subset of our "components" interface that they require
+// at initialization time, so they can still be independent go packages with their
+// own interfaces (they must not depend on the "components" package themselves).
 type PostInitComponents interface {
 	BlockIndexer() blockindexer.BlockIndexer
+	PluginController() plugins.PluginController
 }
 
 // Managers are initialized after base components with access to them, and provide
@@ -53,19 +55,28 @@ type PostInitComponents interface {
 // So that they can call each other, their external mockable interfaces provided
 // to the are all defined in this package.
 type Managers interface {
+	AllManagers() []ManagerLifecycle
 	DomainManager() DomainManager
 }
 
 // All managers conform to a standard lifecycle
-type ManagerLifecycle[ConfigType any] interface {
-	PreInit(bgCtx context.Context, postInitComponents PreInitComponents, config ConfigType) (*InitInstructions, error)
-	PostInit(preInitComponents PostInitComponents) error
+type ManagerLifecycle interface {
+	PreInit(PreInitComponents) (*InitInstructions, error)
+	PostInit(PostInitComponents) error
 	Start() error
 	Stop()
 }
 
-// Managers can instruct the init of the
+// Managers get limited influence over the event streams created for them,
+// to ensure consistent naming and lifecycle management semantics
+type ManagerEventStream struct {
+	ABI     abi.ABI
+	Handler blockindexer.InternalStreamCallback
+}
+
+// Managers can instruct the init of some of the PostInitComponents in a generic way
 type InitInstructions struct {
+	EventStreams []*ManagerEventStream
 }
 
 // The Engine starts lasts.

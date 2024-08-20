@@ -70,7 +70,7 @@ task installTools(type:Exec) {
 }
 
 task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
+    inputs.files(['bin/mockery', 'go.sum'])
     outputs.dir('mocks/rpcbackendmocks')
     executable 'bin/mockery'
     args '--case', 'underscore'
@@ -80,8 +80,60 @@ task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
     args '--output', 'mocks/rpcbackendmocks'
 }
 
+task makeComponentMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('internal/components')
+    outputs.dir('mocks/componentmocks')
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'internal/components'
+    args '--all'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
+task makeStateStoreMock(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('internal/statestore')
+    outputs.dir('mocks/componentmocks') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'internal/statestore'
+    args '--name', 'StateStore'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
+task makeBlockIndexerMock(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('pkg/blockindexer')
+    outputs.dir('mocks/componentmocks') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'pkg/blockindexer'
+    args '--name', 'BlockIndexer'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
+task makeEthClientMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('pkg/ethclient')
+    outputs.dir('mocks/componentmocks') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'pkg/ethclient'
+    args '--all'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
 task makeMocks(dependsOn: [
     tasks.makeRPCMocks,
+    tasks.makeComponentMocks,
+    tasks.makeStateStoreMock,
+    tasks.makeBlockIndexerMock,
+    tasks.makeEthClientMocks,
 ]) {}
 
 task copyTestContracts(type: Copy) {
@@ -111,10 +163,28 @@ task copyTestbedContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
+task copyDomainManagerContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+    }
+    into 'internal/domainmgr/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task copyContracts(dependsOn:[
+    copyTestContracts,
+    copyTestbedContracts,
+    copyDomainManagerContracts,
+])
+
 task protoc(type:Exec, dependsOn: [
         ":toolkit_go:protoc",
         tasks.makeMocks,
-        tasks.copyTestContracts
+        tasks.copyContracts
     ]) {
     workingDir '.'
     inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
@@ -186,7 +256,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyTestbedContracts]) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)
@@ -315,8 +385,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     ':testinfra:startTestInfra',
     tasks.setupCoverage,
     tasks.goGet,
-    tasks.copyTestContracts,
-    tasks.copyTestbedContracts,
+    tasks.copyContracts,
     ]) {
 }
 

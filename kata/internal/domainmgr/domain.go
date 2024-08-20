@@ -36,10 +36,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// External actions that other components (engine, testbed) can call against a domain
-type DomainActions interface {
-}
-
 type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc

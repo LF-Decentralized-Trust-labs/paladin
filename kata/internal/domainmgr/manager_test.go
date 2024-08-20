@@ -19,26 +19,79 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
-func newTestDomainManager(t *testing.T, conf *DomainManagerConfig) (context.Context, *domainManager, func()) {
+type mockComponents struct {
+	db               sqlmock.Sqlmock
+	ethClient        *componentmocks.EthClient
+	ethClientFactory *componentmocks.EthClientFactory
+	stateStore       *componentmocks.StateStore
+	blockIndexer     *componentmocks.BlockIndexer
+}
+
+func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	p, pDone, err := persistence.NewUnitTestPersistence(ctx)
+	mc := &mockComponents{
+		blockIndexer:     componentmocks.NewBlockIndexer(t),
+		stateStore:       componentmocks.NewStateStore(t),
+		ethClientFactory: componentmocks.NewEthClientFactory(t),
+	}
+
+	// Blockchain stuff is always mocked
+	preMocks := componentmocks.NewPreInitComponents(t)
+	preMocks.On("EthClientFactory").Return(mc.ethClientFactory)
+	mc.ethClientFactory.On("ChainID").Return(int64(12345))
+	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
+	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
+	postMocks := componentmocks.NewPostInitComponents(t)
+	postMocks.On("BlockIndexer").Return(mc.blockIndexer)
+
+	var p persistence.Persistence
+	var err error
+	var pDone func()
+	if realDB {
+		p, pDone, err = persistence.NewUnitTestPersistence(ctx)
+		assert.NoError(t, err)
+		realStateStore := statestore.NewStateStore(ctx, &statestore.Config{}, p)
+		preMocks.On("StateStore").Return(realStateStore)
+	} else {
+		mp, err := mockpersistence.NewSQLMockProvider()
+		assert.NoError(t, err)
+		p = mp.P
+		mc.db = mp.Mock
+		pDone = func() {
+			assert.NoError(t, mp.Mock.ExpectationsWereMet())
+		}
+		preMocks.On("StateStore").Return(mc.stateStore)
+	}
+	preMocks.On("Persistence").Return(p)
+
+	for _, fn := range extraSetup {
+		fn(mc)
+	}
+
+	dm := NewDomainManager(ctx, conf)
+	initInstructions, err := dm.PreInit(preMocks)
+	assert.NoError(t, err)
+	assert.Len(t, initInstructions.EventStreams, 1)
+	err = dm.PostInit(postMocks)
 	assert.NoError(t, err)
 
-	stateStore := statestore.NewStateStore(ctx, &statestore.Config{}, p)
+	err = dm.Start()
+	assert.NoError(t, err)
 
-	dm := NewDomainManager(ctx, conf, stateStore, 12345)
-
-	return ctx, dm.(*domainManager), func() {
+	return ctx, dm.(*domainManager), mc, func() {
 		cancelCtx()
-		stateStore.Close()
 		pDone()
+		dm.Stop()
 	}
 }
 
