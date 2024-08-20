@@ -10,70 +10,6 @@ class ProtoCompile extends DefaultTask {
     private List<String> _args = []
     private Plugins _plugins = new Plugins()
 
-    class Plugins {
-
-        private Plugin _go
-        private Plugin _go_grpc
-
-        class Plugin {
-
-            private String _prefix
-            private String _filePattern
-            private Object _out
-            private List<String> _opts = []
-
-            Plugin(String prefix, String filePattern = null) {
-                _prefix = prefix
-                _filePattern = filePattern
-            }
-
-            void out(Object out) {
-                _out = out
-                if (_filePattern != null) {
-                    outputs.files project.fileTree(out) {
-                        include _filePattern
-                    }
-                }
-            }
-
-            void opt(Object opt) {
-                _opts << opt
-            }
-
-            protected void configure(ExecSpec spec) {
-                if (_out != null) {
-                    spec.args "--${_prefix}_out=${_out}"
-                }
-                _opts.each { o -> spec.args "--${_prefix}_opt=${o}" }
-            }
-
-        }
-
-        void go(Closure c) {
-            _go = new Plugin('go', '**/*.pb.go')
-            c.delegate = _go
-            c.resolveStrategy = Closure.DELEGATE_FIRST
-            c(_go)
-        }
-
-        void go_grpc(Closure c) {
-            _go_grpc = new Plugin('go-grpc')
-            c.delegate = _go_grpc
-            c.resolveStrategy = Closure.DELEGATE_FIRST
-            c(_go_grpc)
-        }
-
-        protected void configure(ExecSpec spec) {
-            if (_go != null) {
-                _go.configure spec
-            }
-            if (_go_grpc != null) {
-                _go_grpc.configure spec
-            }
-        }
-
-    }
-
     ProtoCompile() {
         doFirst {
             this.exec()
@@ -122,6 +58,70 @@ class ProtoCompile extends DefaultTask {
             }
             plugins.configure spec
         }
+    }
+
+    class Plugins {
+
+        private Plugin _go
+        private Plugin _go_grpc
+
+        void go(Closure c) {
+            _go = new Plugin('go', '**/*.pb.go')
+            c.delegate = _go
+            c.resolveStrategy = Closure.DELEGATE_FIRST
+            c(_go)
+        }
+
+        void go_grpc(Closure c) {
+            _go_grpc = new Plugin('go-grpc')
+            c.delegate = _go_grpc
+            c.resolveStrategy = Closure.DELEGATE_FIRST
+            c(_go_grpc)
+        }
+
+        protected void configure(ExecSpec spec) {
+            if (_go != null) {
+                _go.configure spec
+            }
+            if (_go_grpc != null) {
+                _go_grpc.configure spec
+            }
+        }
+
+        class Plugin {
+
+            private String _prefix
+            private String _filePattern
+            private Object _out
+            private List<String> _opts = []
+
+            Plugin(String prefix, String filePattern = null) {
+                _prefix = prefix
+                _filePattern = filePattern
+            }
+
+            void out(Object out) {
+                _out = out
+                if (_filePattern != null) {
+                    outputs.files project.fileTree(out) {
+                        include _filePattern
+                    }
+                }
+            }
+
+            void opt(Object opt) {
+                _opts << opt
+            }
+
+            protected void configure(ExecSpec spec) {
+                if (_out != null) {
+                    spec.args "--${_prefix}_out=${_out}"
+                }
+                _opts.each { o -> spec.args "--${_prefix}_opt=${o}" }
+            }
+
+        }
+
     }
 
 }

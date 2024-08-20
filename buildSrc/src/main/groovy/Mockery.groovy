@@ -7,6 +7,41 @@ class Mockery extends DefaultTask {
     private List<Mock> _mocks = []
     private List<String> _commonArgs = []
 
+    Mockery() {
+        doFirst {
+            this.exec()
+        }
+    }
+
+    void mockery(Object m) {
+        _mockery = m
+        inputs.file(m)
+    }
+
+    void mock(Closure c) {
+        Mock m = new Mock()
+        c.delegate = m
+        c.resolveStrategy = Closure.DELEGATE_FIRST
+        c(m)
+        _mocks << m
+    }
+
+    void args(Object... args) {
+        _commonArgs += [*args]
+    }
+
+    protected void exec() {
+        List<String> commonArgs = _commonArgs
+        String mockery = _mockery
+        _mocks.each { m ->
+            project.exec { spec ->
+                executable mockery
+                args commonArgs
+                m.configure spec
+            }
+        }
+    }
+
     class Mock {
 
         private String _dir
@@ -54,41 +89,6 @@ class Mockery extends DefaultTask {
             }
         }
 
-    }
-
-    Mockery() {
-        doFirst {
-            this.exec()
-        }
-    }
-
-    void mockery(Object m) {
-        _mockery = m
-        inputs.file(m)
-    }
-
-    void mock(Closure c) {
-        Mock m = new Mock()
-        c.delegate = m
-        c.resolveStrategy = Closure.DELEGATE_FIRST
-        c(m)
-        _mocks << m
-    }
-
-    void args(Object... args) {
-        _commonArgs += [*args]
-    }
-
-    protected void exec() {
-        List<String> commonArgs = _commonArgs
-        String mockery = _mockery
-        _mocks.each { m ->
-            project.exec { spec ->
-                executable mockery
-                args commonArgs
-                m.configure spec
-            }
-        }
     }
 
 }
