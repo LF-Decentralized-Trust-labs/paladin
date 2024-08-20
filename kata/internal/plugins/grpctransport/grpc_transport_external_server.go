@@ -65,7 +65,7 @@ type externalGRPCServer struct {
 	port         int
 }
 
-func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int, serverCertificate *tls.Certificate, clientCertificate *tls.Certificate) (*externalGRPCServer, error) {
+func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls.Certificate, clientCertificate *tls.Certificate) (*externalGRPCServer, error) {
 	if clientCertificate == nil {
 		log.L(ctx).Warnf("grpcexternal: no client certificate provided, server will be unable to do mTLS")
 	}
@@ -75,8 +75,8 @@ func NewExternalGRPCServer(ctx context.Context, port int, bufferSize int, server
 	}
 
 	server := &externalGRPCServer{
-		recvMessages:      make(map[destination]chan *proto.Message, bufferSize),
-		sendMessages:      make(chan *proto.ExternalMessage, bufferSize),
+		recvMessages:      make(map[destination]chan *proto.Message, 1),
+		sendMessages:      make(chan *proto.ExternalMessage, 1),
 		port:              port,
 		clientCertificate: clientCertificate,
 		serverCertificate: serverCertificate,
@@ -97,7 +97,7 @@ func (egs *externalGRPCServer) QueueMessageForSend(msg *proto.ExternalMessage) {
 
 func (egs *externalGRPCServer) GetMessages(dest destination) chan *proto.Message {
 	if egs.recvMessages[dest] == nil {
-		egs.recvMessages[dest] = make(chan *proto.Message, 1) // TODO: Change this
+		egs.recvMessages[dest] = make(chan *proto.Message, 1)
 	}
 
 	return egs.recvMessages[dest]

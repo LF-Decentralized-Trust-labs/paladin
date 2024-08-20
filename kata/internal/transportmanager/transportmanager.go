@@ -29,15 +29,6 @@ type transportManager struct {
 	sendMessages            map[TransportType]chan *transportmanagerpb.ExternalMessage
 }
 
-/*
-
-	The transport manager maintains a list of socket locations of connected plugins for transport and
-	initialises a goroutine for each of the plugins. Each goroutine monitors a channel of messages for
-	that specific plugin, and when a message comes off the channel, we get all of the registry info,
-	package the message and then send it to the plugin.
-
-*/
-
 func NewTransportManager(registry RegistryClient) *transportManager {
 	return &transportManager{
 		recvMessages:            make(map[Component]chan *proto.Message),
@@ -50,14 +41,12 @@ func NewTransportManager(registry RegistryClient) *transportManager {
 func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, socketLocation string, name string) error {
 	log.L(ctx).Infof("transportmanager: registering new transport provider")
 
-	// Tight - we've got a new plugin at the endpoint, make a call and check the plugin is good and then
-	// register a client and monitor the send queue
+	// Create a new client to the plugin, and then initialise a transport connection
 	pluginConn, err := grpc.NewClient(socketLocation, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.L(ctx).Errorf("transportmanager: could not open a connection to the plugin, err: %v", err)
 		return err
 	}
-
 	pluginClient := transportmanagerpb.NewTransportManagerClient(pluginConn)
 	status, err := pluginClient.Status(ctx, nil)
 	if err != nil || status == nil {
@@ -65,10 +54,7 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 		return err
 	}
 
-	// We have a registered plugin that we know we can work with, we're going to now make its channels
-	// and start it's goroutine
-
-	tm.sendMessages[TransportType(name)] = make(chan *transportmanagerpb.ExternalMessage, 5) // TODO: Move this to config
+	tm.sendMessages[TransportType(name)] = make(chan *transportmanagerpb.ExternalMessage)
 	tm.knownTransportProviders[name] = pluginConn
 
 	transportClient, err := pluginClient.Transport(ctx)
@@ -77,12 +63,15 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 		return err
 	}
 
-	// TransportManager -> Plugin flow
+	// TransportManager -> Plugin flow (instructions to send messages)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				transportClient.CloseSend()
+				err = transportClient.CloseSend()
+				if err != nil {
+					log.L(ctx).Warnf("transportmanager: could not gracefully close client connection to plugin: %v", err)
+				}
 				return
 			case sendMsg := <-tm.sendMessages[TransportType(name)]:
 				{
@@ -95,7 +84,7 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 		}
 	}()
 
-	// TransportManager <- Plugin Flow
+	// TransportManager <- Plugin Flow (messages coming from other Paladins)
 	go func() {
 		for {
 			recvMessage, err := transportClient.Recv()
@@ -107,7 +96,7 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 				return
 			}
 
-			// TODO: Won't need to do this once we've fixed the proto
+			// TODO: Won't need to do this once we've fixed the proto (import issue)
 			msg := &proto.Message{}
 			err = recvMessage.UnmarshalTo(msg)
 			if err != nil {
@@ -123,17 +112,9 @@ func (tm *transportManager) RegisterNewTransportProvider(ctx context.Context, so
 
 // Implements ExternalTransporter
 func (tm *transportManager) Send(ctx context.Context, msg *proto.Message) error {
-	/*
-
-		When we get an inbound message, we need to figure out who we're sending the message to
-		and how we're going to send them that message. Then need to do GRPC to the plugin to make
-		sure that the message is sent.
-
-		TODO: When does this function error?
-
-	*/
-
+	// TODO: Error return updating
 	// TODO: down the line hierarchy utility
+
 	transportDetails := tm.regClient.ResolveIdentity(&ResolveIdentityRequest{
 		Name: msg.Destination,
 	})
@@ -168,7 +149,7 @@ func (tm *transportManager) Send(ctx context.Context, msg *proto.Message) error 
 
 	// For now just queue the message up
 	if tm.sendMessages[TransportType(commonTransportProvider)] == nil {
-		tm.sendMessages[TransportType(commonTransportProvider)] = make(chan *transportmanagerpb.ExternalMessage, 1) // TODO: Move this to config
+		tm.sendMessages[TransportType(commonTransportProvider)] = make(chan *transportmanagerpb.ExternalMessage, 1)
 	}
 
 	tm.sendMessages[TransportType(commonTransportProvider)] <- packagedMessage
@@ -177,14 +158,10 @@ func (tm *transportManager) Send(ctx context.Context, msg *proto.Message) error 
 
 // Implements ExternalTransporter
 func (tm *transportManager) Recieve(ctx context.Context, component string, newMessageHandler func(*proto.Message)) {
-	// Need to connect to the internal channels
-	// TODO: When do we push back on the caller
-
 	if tm.recvMessages[Component(component)] == nil {
 		tm.recvMessages[Component(component)] = make(chan *proto.Message)
 	}
 
-	// TODO: Not sure on this model
 	go func() {
 		for {
 			select {
