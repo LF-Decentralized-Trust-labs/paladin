@@ -33,6 +33,7 @@ import (
 type mockPlugin struct {
 	t *testing.T
 
+	conf            *PluginConfig
 	preRegister     func(domainID string) *prototk.DomainMessage
 	customResponses func(*prototk.DomainMessage) []*prototk.DomainMessage
 	expectClose     func(err error)
@@ -42,10 +43,13 @@ type mockPlugin struct {
 }
 
 func (tp *mockPlugin) Conf() *PluginConfig {
-	return &PluginConfig{
-		Type:     types.Enum[LibraryType](LibraryTypeCShared),
-		Location: "/any/where",
+	if tp.conf == nil {
+		tp.conf = &PluginConfig{
+			Type:     types.Enum[LibraryType](LibraryTypeCShared),
+			Location: "/any/where",
+		}
 	}
+	return tp.conf
 }
 
 // mockPlugin is used to test generic situations that apply across plugin types.
@@ -130,18 +134,9 @@ func TestPluginRequestsError(t *testing.T) {
 
 	waitForResponse := make(chan struct{}, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		return tdm
-	}
-	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-		return nil, fmt.Errorf("pop")
-	}
-
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				sendRequest: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -164,6 +159,16 @@ func TestPluginRequestsError(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		return tdm, nil
+	}
+	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -175,15 +180,9 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 
 	waitForResponse := make(chan struct{}, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		return tdm
-	}
-
 	msgID := uuid.NewString()
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				sendRequest: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -202,6 +201,13 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -213,17 +219,18 @@ func TestSenderErrorHandling(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 
 	domainAPI := <-waitForRegister
@@ -252,15 +259,8 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					return []*prototk.DomainMessage{
@@ -280,6 +280,14 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -294,15 +302,8 @@ func TestDomainRequestsErrorWithMessage(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					return []*prototk.DomainMessage{
@@ -318,6 +319,14 @@ func TestDomainRequestsErrorWithMessage(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -332,15 +341,8 @@ func TestDomainRequestsErrorNoMessage(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					return []*prototk.DomainMessage{
@@ -355,6 +357,14 @@ func TestDomainRequestsErrorNoMessage(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -369,17 +379,10 @@ func TestReceiveAfterTimeout(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
 	readyToGo := make(chan struct{})
 	gone := make(chan bool)
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					close(readyToGo)
@@ -388,6 +391,14 @@ func TestReceiveAfterTimeout(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -410,15 +421,8 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 
 	waitForRegister := make(chan uuid.UUID, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- id
-		return tdm
-	}
-
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -429,6 +433,14 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- id
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -439,15 +451,8 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -460,6 +465,14 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
@@ -471,14 +484,8 @@ func TestDomainRegisterWrongID(t *testing.T) {
 
 	waitForError := make(chan error, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		return tdm
-	}
-
-	_, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				preRegister: func(domainID string) *prototk.DomainMessage {
 					return &prototk.DomainMessage{
@@ -494,25 +501,59 @@ func TestDomainRegisterWrongID(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 
 	assert.Regexp(t, "UUID", <-waitForError)
 }
 
+func TestDomainRegisterFail(t *testing.T) {
+
+	waitForError := make(chan error, 1)
+
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin{
+				preRegister: func(domainID string) *prototk.DomainMessage {
+					return &prototk.DomainMessage{
+						Header: &prototk.Header{
+							MessageType: prototk.Header_REGISTER,
+							PluginId:    domainID,
+							MessageId:   uuid.NewString(),
+						},
+					}
+				},
+				expectClose: func(err error) {
+					waitForError <- err
+				},
+			},
+		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
+	})
+	defer done()
+
+	assert.Regexp(t, "pop", <-waitForError)
+}
+
 func TestDomainSendResponseWrongID(t *testing.T) {
 
 	waitForRegister := make(chan plugintk.DomainAPI, 1)
 
-	tdm := &testDomainManager{}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		waitForRegister <- toDomain
-		return tdm
-	}
-
-	ctx, _, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
 					unknownRequest := uuid.NewString()
@@ -560,6 +601,14 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 				},
 			},
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		waitForRegister <- toDomain
+		return tdm, nil
+	}
+
+	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 

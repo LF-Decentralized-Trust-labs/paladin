@@ -25,15 +25,27 @@ import (
 )
 
 type testDomainManager struct {
-	domainRegistered    func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks)
+	domains             map[string]plugintk.Plugin
+	domainRegistered    func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
+}
+
+func (tp *testDomainManager) ConfiguredDomains() map[string]*PluginConfig {
+	pluginMap := make(map[string]*PluginConfig)
+	for name := range tp.domains {
+		pluginMap[name] = &PluginConfig{
+			Type:     LibraryTypeCShared.Enum(),
+			Location: "/tmp/not/applicable",
+		}
+	}
+	return pluginMap
 }
 
 func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
 	return tp.findAvailableStates(ctx, req)
 }
 
-func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
+func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error) {
 	return tdm.domainRegistered(name, id, toDomain)
 }
 
@@ -42,24 +54,7 @@ func TestDomainRequestsOK(t *testing.T) {
 	waitForAPI := make(chan plugintk.DomainAPI, 1)
 	waitForCallbacks := make(chan plugintk.DomainCallbacks, 1)
 
-	tdm := &testDomainManager{}
 	var domainID string
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks) {
-		assert.Equal(t, "domain1", name)
-		domainID = id.String()
-		waitForAPI <- toDomain
-		return tdm
-	}
-
-	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-		assert.Equal(t, "schema1", req.SchemaId)
-		return &prototk.FindAvailableStatesResponse{
-			States: []*prototk.StoredState{
-				{HashId: "12345"},
-			},
-		}, nil
-	}
-
 	domainFunctions := &plugintk.DomainAPIFunctions{
 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 			assert.Equal(t, int64(12345), cdr.ChainId)
@@ -114,14 +109,33 @@ func TestDomainRequestsOK(t *testing.T) {
 			}, nil
 		},
 	}
-	ctx, pc, done := newTestDomainPluginController(t, &testSetup{
-		testDomainManager: tdm,
-		testDomains: map[string]plugintk.Plugin{
+
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
 			"domain1": plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 				waitForCallbacks <- callbacks
 				return plugintk.DomainImplementation(domainFunctions)
 			}),
 		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+		assert.Equal(t, "domain1", name)
+		domainID = id.String()
+		waitForAPI <- toDomain
+		return tdm, nil
+	}
+
+	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
+		assert.Equal(t, "schema1", req.SchemaId)
+		return &prototk.FindAvailableStatesResponse{
+			States: []*prototk.StoredState{
+				{HashId: "12345"},
+			},
+		}, nil
+	}
+
+	ctx, pc, done := newTestDomainPluginController(t, &testManagers{
+		testDomainManager: tdm,
 	})
 	defer done()
 

@@ -48,7 +48,7 @@ type pluginToManager[M any] interface {
 
 // each type of plugin implements a bridge that is just the specific set of operations mapped
 // down on the toPlugin and fromPlugin interfaces as appropriate
-type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M])
+type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M], err error)
 
 type plugin[M any] struct {
 	pc   *pluginController
@@ -164,7 +164,12 @@ func (ph *pluginHandler[M]) serve() error {
 			serverCtx = log.WithLogField(serverCtx, "plugin", debugInfo)
 			// We now have the plugin ready for use
 			pluginId = plugin.id.String()
-			ph.pluginToManager = ph.bridgeFactory(plugin, ph)
+			ph.pluginToManager, err = ph.bridgeFactory(plugin, ph)
+			if err != nil {
+				log.L(serverCtx).Errorf("Plugin factory failed %s: %s", header.PluginId, err)
+				// Close the connection to this plugin
+				return err
+			}
 		case prototk.Header_RESPONSE_FROM_PLUGIN,
 			prototk.Header_ERROR_RESPONSE:
 			// If this is an in-flight request, then pass it back to the handler over the request channel

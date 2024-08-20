@@ -120,9 +120,8 @@ message DomainConfig {
   string constructor_abi_json = 1; // Each domain can have a single constructor signature, that all deploy requests from callers must adhere to
   string factory_contract_address = 2;  // The address of the factory smart contract to invoke when the user requests deployment of a new private smart contract in this domain
   string factory_contract_abi_json = 3; // The ABI of the factory function the domain will translate the constructor_abi_json inputs into (the function MUST emit the Paladin defined event)
-  string private_contract_abi_json = 4; // The ABI of the base ledger private smart contract that is deployed for each instance (via the factory, or via direct bytecode deployment)
-  repeated string abi_state_schemas_json = 5; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
-  BaseLedgerSubmitConfig base_ledger_submit_config = 6; // Describe the requirements of this domain for how submission happens
+  repeated string abi_state_schemas_json = 4; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
+  BaseLedgerSubmitConfig base_ledger_submit_config = 5; // Describe the requirements of this domain for how submission happens
 }
 
 message BaseLedgerSubmitConfig {

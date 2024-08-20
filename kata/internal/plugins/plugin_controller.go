@@ -31,20 +31,17 @@ import (
 	"google.golang.org/grpc"
 )
 
+type Managers interface {
+	DomainManager() DomainRegistration
+}
+
 type PluginController interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context)
 	GRPCTargetURL() string
 	LoaderID() uuid.UUID
 	WaitForInit(ctx context.Context) error
-	PluginsUpdated(conf *PluginControllerConfig) error
-}
-
-// Runtime items to be supplied by process, including the config
-type PluginControllerArgs struct {
-	LoaderID      uuid.UUID
-	DomainManager DomainManager
-	InitialConfig *PluginControllerConfig
+	ReloadPluginList() error
 }
 
 type pluginController struct {
@@ -59,7 +56,7 @@ type pluginController struct {
 	address         string
 	shutdownTimeout time.Duration
 
-	domainManager DomainManager
+	domainManager DomainRegistration
 	domainPlugins map[uuid.UUID]*plugin[prototk.DomainMessage]
 
 	notifyPluginsUpdated chan bool
@@ -68,15 +65,15 @@ type pluginController struct {
 	serverDone           chan error
 }
 
-func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ PluginController, err error) {
+func NewPluginController(bgCtx context.Context, loaderID uuid.UUID, managers Managers, conf *PluginControllerConfig) (_ PluginController, err error) {
 
 	pc := &pluginController{
 		bgCtx: bgCtx,
 
-		loaderID:        args.LoaderID,
-		shutdownTimeout: confutil.DurationMin(args.InitialConfig.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
+		loaderID:        loaderID,
+		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
-		domainManager: args.DomainManager,
+		domainManager: managers.DomainManager(),
 		domainPlugins: make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
 
 		serverDone:           make(chan error),
@@ -84,11 +81,11 @@ func NewPluginController(bgCtx context.Context, args *PluginControllerArgs) (_ P
 		loadingProgressed:    make(chan *prototk.PluginLoadFailed, 1),
 	}
 
-	if err := pc.PluginsUpdated(args.InitialConfig); err != nil {
+	if err := pc.ReloadPluginList(); err != nil {
 		return nil, err
 	}
 
-	if err := pc.parseGRPCAddress(bgCtx, args.InitialConfig.GRPC.Address); err != nil {
+	if err := pc.parseGRPCAddress(bgCtx, conf.GRPC.Address); err != nil {
 		return nil, err
 	}
 	return pc, nil
@@ -185,8 +182,8 @@ func (pc *pluginController) LoaderID() uuid.UUID {
 	return pc.loaderID
 }
 
-func (pc *pluginController) PluginsUpdated(conf *PluginControllerConfig) error {
-	for name, dp := range conf.Domains {
+func (pc *pluginController) ReloadPluginList() error {
+	for name, dp := range pc.domainManager.ConfiguredDomains() {
 		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp); err != nil {
 			return err
 		}

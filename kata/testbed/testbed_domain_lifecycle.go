@@ -50,8 +50,8 @@ type tbDomain struct {
 	*transactionWaitUtils[*tbPrivateSmartContract]
 	tb                     *testbed
 	instanceUUID           uuid.UUID
-	config                 *proto.DomainConfig
 	name                   string
+	config                 *proto.DomainConfig
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry

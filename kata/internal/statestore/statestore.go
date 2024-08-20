@@ -46,6 +46,7 @@ var StateWriterConfigDefaults = StateWriterConfig{
 type StateStore interface {
 	RPCModule() *rpcserver.RPCModule
 	RunInDomainContext(domainID string, fn DomainContextFunction) error
+	RunInDomainContextFlush(domainID string, fn DomainContextFunction) error
 	Close()
 }
 

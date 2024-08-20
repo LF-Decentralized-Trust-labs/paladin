@@ -25,15 +25,16 @@ import (
 )
 
 // The interface the rest of Paladin uses to integrate with domain plugins
-type DomainManager interface {
-	DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks)
+type DomainRegistration interface {
+	ConfiguredDomains() map[string]*PluginConfig
+	DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error)
 }
 
 // The gRPC stream connected to by domain plugins
 func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
 	handler := newPluginHandler(pc, pc.domainPlugins, stream,
 		&plugintk.DomainMessageWrapper{},
-		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage]) {
+		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage], err error) {
 			br := &domainBridge{
 				plugin:     plugin,
 				pluginType: plugin.def.Plugin.PluginType.String(),
@@ -41,8 +42,11 @@ func (pc *pluginController) ConnectDomain(stream prototk.PluginController_Connec
 				pluginId:   plugin.id.String(),
 				toPlugin:   toPlugin,
 			}
-			br.manager = pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
-			return br
+			br.manager, err = pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
+			if err != nil {
+				return nil, err
+			}
+			return br, nil
 		})
 	return handler.serve()
 }

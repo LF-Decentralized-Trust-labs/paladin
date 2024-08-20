@@ -21,8 +21,7 @@ import (
 )
 
 type PluginControllerConfig struct {
-	GRPC    GRPCConfig               `yaml:"grpc"`
-	Domains map[string]*PluginConfig `yaml:"domains"`
+	GRPC GRPCConfig `yaml:"grpc"`
 }
 
 type GRPCConfig struct {

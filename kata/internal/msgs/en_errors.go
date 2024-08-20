@@ -191,4 +191,13 @@ var (
 	MsgEthClientChainIDFailed     = ffe("PD011508", "Failed to query chain ID")
 	MsgEthClientKeyMismatch       = ffe("PD011509", "Resolved %q to different key handle expected=%q received=%q")
 	MsgEthClientToWithConstructor = ffe("PD011510", "To address cannot be specified for constructor")
+
+	// DomainManager module PD0116XX
+	MsgDomainNotFound                  = ffe("PD011600", "Domain %q not found")
+	MsgDomainNotInitialized            = ffe("PD011601", "Domain not initialized")
+	MsgDomainInvalidSchema             = ffe("PD011602", "Domain schema %d is invalid")
+	MsgDomainConstructorAbiJsonInvalid = ffe("PD011603", "Constructor ABI function definition invalid")
+	MsgDomainConstructorABITypeWrong   = ffe("PD011604", "Constructor ABI function definition has wrong type: %s")
+	MsgFactoryContractAbiJsonInvalid   = ffe("PD011605", "Factory contract ABI invalid")
+	MsgFactoryContractAddressInvalid   = ffe("PD011606", "Factory contract address invalid")
 )

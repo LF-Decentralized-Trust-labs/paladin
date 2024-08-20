@@ -46,43 +46,43 @@ func tempUDS(t *testing.T) string {
 	return "unix:" + allocatedUDSName
 }
 
-type testSetup struct {
+type testManagers struct {
 	testDomainManager *testDomainManager
-	testDomains       map[string]plugintk.Plugin
 }
 
-func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Context, *pluginController, func()) {
+func (ts *testManagers) DomainManager() DomainRegistration {
+	if ts.testDomainManager == nil {
+		ts.testDomainManager = &testDomainManager{}
+	}
+	return ts.testDomainManager
+}
+
+func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
+	testPlugins := make(map[string]plugintk.Plugin)
+	for name, td := range ts.DomainManager().(*testDomainManager).domains {
+		testPlugins[name] = td
+	}
+	return testPlugins
+}
+
+func newTestDomainPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	udsString := tempUDS(t)
 	loaderId := uuid.New()
-	args := &PluginControllerArgs{
-		DomainManager: setup.testDomainManager,
-		LoaderID:      loaderId,
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{
-				Address:         udsString,
-				ShutdownTimeout: confutil.P("1ms"),
-			},
-			Domains: make(map[string]*PluginConfig),
+	allPlugins := setup.allPlugins()
+	pc, err := NewPluginController(ctx, loaderId, setup, &PluginControllerConfig{
+		GRPC: GRPCConfig{
+			Address:         udsString,
+			ShutdownTimeout: confutil.P("1ms"),
 		},
-	}
-	testPlugins := make(map[string]plugintk.Plugin)
-	for name, td := range setup.testDomains {
-		args.InitialConfig.Domains[name] = &PluginConfig{
-			Type:     LibraryTypeCShared.Enum(),
-			Location: "/tmp/not/applicable",
-		}
-		testPlugins[name] = td
-	}
-
-	pc, err := NewPluginController(ctx, args)
+	})
 	assert.NoError(t, err)
 
 	err = pc.Start(context.Background())
 	assert.NoError(t, err)
 
-	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), testPlugins)
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -106,15 +106,9 @@ func newTestDomainPluginController(t *testing.T, setup *testSetup) (context.Cont
 }
 
 func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC:    GRPCConfig{Address: tempUDS(t)},
-			Domains: map[string]*PluginConfig{},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
+	pc, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: tempUDS(t)},
+	})
 	assert.NoError(t, err)
 	err = pc.Start(context.Background())
 	assert.NoError(t, err)
@@ -122,29 +116,19 @@ func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
 }
 
 func TestInitPluginControllerBadPlugin(t *testing.T) {
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: tempUDS(t)},
-			Domains: map[string]*PluginConfig{
-				"!badname": {},
-			},
-		},
-	}
-	_, err := NewPluginController(context.Background(), args)
+	tdm := &testDomainManager{domains: map[string]plugintk.Plugin{
+		"!badname": &mockPlugin{},
+	}}
+	_, err := NewPluginController(context.Background(), uuid.New(), &testManagers{testDomainManager: tdm}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: tempUDS(t)},
+	})
 	assert.Regexp(t, "PD011106", err)
 }
 
 func TestInitPluginControllerBadSocket(t *testing.T) {
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: t.TempDir() /* can't use a dir as a socket */},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
+	pc, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: t.TempDir() /* can't use a dir as a socket */},
+	})
 	assert.NoError(t, err)
 
 	err = pc.Start(context.Background())
@@ -157,14 +141,9 @@ func TestInitPluginControllerUDSTooLong(t *testing.T) {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: string(longerThanUDSSafelySupportsCrossPlatform)},
-		},
-	}
-	_, err := NewPluginController(context.Background(), args)
+	_, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: string(longerThanUDSSafelySupportsCrossPlatform)},
+	})
 	assert.Regexp(t, "PD011205", err)
 }
 
@@ -174,14 +153,9 @@ func TestInitPluginControllerTCP4(t *testing.T) {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: "tcp4:127.0.0.1:0"},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
+	pc, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: "tcp4:127.0.0.1:0"},
+	})
 	assert.NoError(t, err)
 
 	err = pc.Start(context.Background())
@@ -195,14 +169,9 @@ func TestInitPluginControllerTCP6(t *testing.T) {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: "tcp6:[::1]:0"},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
+	pc, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: "tcp6:[::1]:0"},
+	})
 	assert.NoError(t, err)
 
 	err = pc.Start(context.Background())
@@ -211,44 +180,38 @@ func TestInitPluginControllerTCP6(t *testing.T) {
 }
 
 func TestNotifyPluginUpdateNotStarted(t *testing.T) {
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{Address: tempUDS(t)},
-		},
-	}
-	pc, err := NewPluginController(context.Background(), args)
+	pc, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
+		GRPC: GRPCConfig{Address: tempUDS(t)},
+	})
 	assert.NoError(t, err)
 
 	err = pc.WaitForInit(context.Background())
 	assert.NoError(t, err)
 
-	err = pc.PluginsUpdated(&PluginControllerConfig{})
+	err = pc.ReloadPluginList()
 	assert.NoError(t, err)
-	err = pc.PluginsUpdated(&PluginControllerConfig{})
+	err = pc.ReloadPluginList()
 	assert.NoError(t, err)
 }
 
 func TestLoaderErrors(t *testing.T) {
 	ctx := context.Background()
-	args := &PluginControllerArgs{
-		DomainManager: nil,
-		LoaderID:      uuid.New(),
-		InitialConfig: &PluginControllerConfig{
-			GRPC: GRPCConfig{
-				Address:         "tcp:127.0.0.1:0",
-				ShutdownTimeout: confutil.P("1ms"),
-			},
-			Domains: map[string]*PluginConfig{
-				"domain1": {
-					Type:     LibraryTypeJar.Enum(),
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin{
+				conf: &PluginConfig{
+					Type:     LibraryTypeCShared.Enum(),
 					Location: "some/where",
 				},
 			},
 		},
 	}
-	pc, err := NewPluginController(ctx, args)
+	pc, err := NewPluginController(ctx, uuid.New(), &testManagers{testDomainManager: tdm}, &PluginControllerConfig{
+		GRPC: GRPCConfig{
+			Address:         "tcp:127.0.0.1:0",
+			ShutdownTimeout: confutil.P("1ms"),
+		},
+	})
 	assert.NoError(t, err)
 
 	err = pc.Start(ctx)
@@ -306,14 +269,15 @@ func TestLoaderErrors(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Notify of a plugin after closed stream
-	err = pc.PluginsUpdated(&PluginControllerConfig{
-		Domains: map[string]*PluginConfig{
-			"domain2": {
-				Type:     LibraryTypeCShared.Enum(),
+	tdm.domains = map[string]plugintk.Plugin{
+		"domain2": &mockPlugin{
+			conf: &PluginConfig{
+				Type:     LibraryTypeJar.Enum(),
 				Location: "some/where/else",
 			},
 		},
-	})
+	}
+	err = pc.ReloadPluginList()
 	assert.NoError(t, err)
 
 	pc.Stop(ctx)

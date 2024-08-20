@@ -115,16 +115,19 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	sequenceID := uuid.New()
 	var schemaID string
 
-	err := ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		// Pop in our widget ABI
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
 		assert.Len(t, schemas, 1)
 		schemaID = schemas[0].IDString()
 
-		// Flush as ABI schemas only available after a flush
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		// Need to flush for the schemas to be available
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		// Store some states
 		tx1states, err := dsi.CreateNewStates(sequenceID, []*NewState{
@@ -193,11 +196,13 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(50), parseFakeCoin(t, states[0]).Amount.Int64())
 
 		// Flush the states to the database
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		// Check the DB persisted state is what we expect
-		states, err = dsi.FindAvailableStates(schemaID, toQuery(t, `{
+		states, err := dsi.FindAvailableStates(schemaID, toQuery(t, `{
 			"sort": [ "owner", "amount" ]
 		}`))
 		assert.NoError(t, err)
@@ -252,11 +257,14 @@ func TestStateContextMintSpendMint(t *testing.T) {
 
 		// None of the states will be returned to available after the flush
 		// - but before then the DB ones will be
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		// Confirm
-		states, err = dsi.FindAvailableStates(schemaID, toQuery(t, `{}`))
+		states, err := dsi.FindAvailableStates(schemaID, toQuery(t, `{}`))
 		assert.NoError(t, err)
 		assert.Empty(t, states)
 
@@ -304,12 +312,15 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		dc.flushResult <- fmt.Errorf("pop")
 	}
 
-	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	var schemas []Schema
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) (err error) {
+		schemas, err = dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
+		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
-		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
-		assert.NoError(t, err)
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		dc := dsi.(*domainContext)
 
@@ -350,6 +361,7 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		return nil
 
 	})
+	assert.NoError(t, err)
 
 }
 
@@ -472,18 +484,19 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 	_, ss, done := newDBTestStateStore(t)
 	defer done()
 
-	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	var schemas []Schema
+	var schemaID string
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) (err error) {
 
-		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
+		schemas, err = dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
-		schemaID := schemas[0].IDString()
+		schemaID = schemas[0].IDString()
 		assert.Equal(t, "type=FakeCoin(bytes32 salt,address owner,uint256 amount),labels=[owner,amount]", schemas[0].Signature())
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
-
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		_, err = dsi.FindAvailableStates(schemaID, toQuery(t,
 			`{"sort":["wrong"]}`))
 		assert.Regexp(t, "PD010700", err)
@@ -495,6 +508,7 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 
 		return nil
 	})
+	assert.NoError(t, err)
 
 }
 

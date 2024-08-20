@@ -89,17 +89,10 @@ type DomainStateInterface interface {
 	// Callback is invoked ONLY on a successful flush, asynchronously on the Domain Context.
 	// So if supplied, the caller must not rely on it being called, and must not block holding the
 	// domain context until it is called.
+	//
+	// NOTE: For special cases where a domain callback requires a sync flush or error to complete processing,
+	//       use RunInDomainContextFlush()
 	Flush(successCallback ...DomainContextFunction) error
-}
-
-// This lets experimentation code being written in various parts of paladin do sync flushes, but
-// is split from the main interface as it's not meant to exist long term.
-type DomainStateInterfaceUT interface {
-	DomainStateInterface
-
-	// Intended only to support convenient unit testing (blocks the calling routine until the flush
-	// has completed, and returns any error synchronously)
-	UnitTestFlushSync() error
 }
 
 type domainContext struct {
@@ -115,6 +108,18 @@ type domainContext struct {
 
 func (ss *stateStore) RunInDomainContext(domainID string, fn DomainContextFunction) error {
 	return ss.getDomainContext(domainID).run(fn)
+}
+
+func (ss *stateStore) RunInDomainContextFlush(domainID string, fn DomainContextFunction) error {
+	dc := ss.getDomainContext(domainID)
+	err := dc.run(fn)
+	if err == nil {
+		err = dc.Flush()
+	}
+	if err == nil {
+		err = dc.checkFlushCompletion(true)
+	}
+	return err
 }
 
 func (ss *stateStore) getDomainContext(domainID string) *domainContext {
@@ -450,14 +455,6 @@ func (dc *domainContext) Flush(successCallbacks ...DomainContextFunction) error 
 	// We pass the vars directly to the routine, so the routine does not need the lock
 	go dc.flushOp(dc.flushing, dc.flushResult, successCallbacks...)
 	return nil
-}
-
-func (dc *domainContext) UnitTestFlushSync() error {
-	err := dc.Flush()
-	if err == nil {
-		err = dc.checkFlushCompletion(true)
-	}
-	return err
 }
 
 // flushOp MUST NOT take the stateLock
