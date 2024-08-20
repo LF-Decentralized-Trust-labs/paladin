@@ -36,7 +36,7 @@ func setupDomainTests(t *testing.T) (context.Context, *pluginExerciser[prototk.D
 		// Implementation would construct an instance here to start handling the API calls from Paladin,
 		// (rather than passing the callbacks to the test as we do here)
 		waitForCallbacks <- callbacks
-		return DomainImplementation(funcs)
+		return &DomainAPIBase{funcs}
 	})
 	/************************************************/
 

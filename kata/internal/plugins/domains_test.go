@@ -26,7 +26,7 @@ import (
 
 type testDomainManager struct {
 	domains             map[string]plugintk.Plugin
-	domainRegistered    func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error)
+	domainRegistered    func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
 }
 
@@ -45,13 +45,13 @@ func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *proto
 	return tp.findAvailableStates(ctx, req)
 }
 
-func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error) {
+func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
 	return tdm.domainRegistered(name, id, toDomain)
 }
 
 func TestDomainRequestsOK(t *testing.T) {
 
-	waitForAPI := make(chan plugintk.DomainAPI, 1)
+	waitForAPI := make(chan DomainManagerToDomain, 1)
 	waitForCallbacks := make(chan plugintk.DomainCallbacks, 1)
 
 	var domainID string
@@ -114,11 +114,11 @@ func TestDomainRequestsOK(t *testing.T) {
 		domains: map[string]plugintk.Plugin{
 			"domain1": plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 				waitForCallbacks <- callbacks
-				return plugintk.DomainImplementation(domainFunctions)
+				return &plugintk.DomainAPIBase{Functions: domainFunctions}
 			}),
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		assert.Equal(t, "domain1", name)
 		domainID = id.String()
 		waitForAPI <- toDomain
@@ -152,7 +152,9 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	// Should not be initialized
+	// This is the point the domain manager would call us to say the domain is initialized
+	// (once it's happy it's updated its internal state)
+	domainAPI.Initialized()
 	assert.NoError(t, pc.WaitForInit(ctx))
 
 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{

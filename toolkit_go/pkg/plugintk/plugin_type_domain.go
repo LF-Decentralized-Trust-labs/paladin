@@ -54,10 +54,6 @@ func NewDomain(df DomainFactory) PluginBase {
 	)
 }
 
-func DomainImplementation(d *DomainAPIFunctions) DomainAPI {
-	return &domainAPIBase{d}
-}
-
 type domainPluginMessage struct {
 	m *prototk.DomainMessage
 }
@@ -184,38 +180,38 @@ type DomainAPIFunctions struct {
 	PrepareTransaction  func(context.Context, *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error)
 }
 
-type domainAPIBase struct {
-	d *DomainAPIFunctions
+type DomainAPIBase struct {
+	Functions *DomainAPIFunctions
 }
 
-func (db *domainAPIBase) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
-	return callPluginImpl(ctx, req, db.d.ConfigureDomain)
+func (db *DomainAPIBase) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.ConfigureDomain)
 }
 
-func (db *domainAPIBase) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
-	return callPluginImpl(ctx, req, db.d.InitDomain)
+func (db *DomainAPIBase) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.InitDomain)
 }
 
-func (db *domainAPIBase) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
-	return callPluginImpl(ctx, req, db.d.InitDeploy)
+func (db *DomainAPIBase) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.InitDeploy)
 }
 
-func (db *domainAPIBase) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
-	return callPluginImpl(ctx, req, db.d.PrepareDeploy)
+func (db *DomainAPIBase) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.PrepareDeploy)
 }
 
-func (db *domainAPIBase) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-	return callPluginImpl(ctx, req, db.d.InitTransaction)
+func (db *DomainAPIBase) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.InitTransaction)
 }
 
-func (db *domainAPIBase) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
-	return callPluginImpl(ctx, req, db.d.AssembleTransaction)
+func (db *DomainAPIBase) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.AssembleTransaction)
 }
 
-func (db *domainAPIBase) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	return callPluginImpl(ctx, req, db.d.EndorseTransaction)
+func (db *DomainAPIBase) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.EndorseTransaction)
 }
 
-func (db *domainAPIBase) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	return callPluginImpl(ctx, req, db.d.PrepareTransaction)
+func (db *DomainAPIBase) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	return callPluginImpl(ctx, req, db.Functions.PrepareTransaction)
 }

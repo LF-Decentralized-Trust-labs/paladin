@@ -24,10 +24,15 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
+type DomainManagerToDomain interface {
+	plugintk.DomainAPI
+	Initialized()
+}
+
 // The interface the rest of Paladin uses to integrate with domain plugins
 type DomainRegistration interface {
 	ConfiguredDomains() map[string]*PluginConfig
-	DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error)
+	DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 }
 
 // The gRPC stream connected to by domain plugins
@@ -58,6 +63,12 @@ type domainBridge struct {
 	pluginId   string
 	toPlugin   managerToPlugin[prototk.DomainMessage]
 	manager    plugintk.DomainCallbacks
+}
+
+// DomainManager calls this when it is satisfied the domain is fully initialized.
+// WaitForStart will block until this is done.
+func (br *domainBridge) Initialized() {
+	br.plugin.notifyInitialized()
 }
 
 // requests to callbacks in the domain manager
@@ -106,10 +117,6 @@ func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainR
 			return res != nil
 		},
 	)
-	if err == nil {
-		// At this point the plugin is initialized
-		br.plugin.notifyInitialized()
-	}
 	return
 }
 

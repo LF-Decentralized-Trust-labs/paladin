@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"golang.org/x/crypto/sha3"
@@ -97,7 +96,6 @@ func (id *Bytes32) UnmarshalText(text []byte) error {
 		return err
 	}
 	*id = *pID
-	uuid.New()
 	return nil
 }
 

@@ -29,12 +29,19 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"gopkg.in/yaml.v3"
 )
+
+type OnchainDomain struct {
+	DeployTX    uuid.UUID        `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	Address     types.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes types.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+}
 
 type domain struct {
 	ctx       context.Context
@@ -44,7 +51,7 @@ type domain struct {
 	dm   *domainManager
 	id   uuid.UUID
 	name string
-	api  plugintk.DomainAPI
+	api  plugins.DomainManagerToDomain
 
 	stateLock              sync.Mutex
 	initialized            atomic.Bool
@@ -59,7 +66,7 @@ type domain struct {
 	initDone chan error
 }
 
-func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugintk.DomainAPI) *domain {
+func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugins.DomainManagerToDomain) *domain {
 	d := &domain{
 		dm:        dm,
 		conf:      conf,
@@ -169,7 +176,10 @@ func (d *domain) init() {
 		log.L(d.ctx).Debugf("domain initialization cancelled before completion: %s", err)
 	} else {
 		log.L(d.ctx).Debugf("domain initialization complete")
+		d.dm.setDomainAddress(d)
 		d.initialized.Store(true)
+		// Inform the plugin manager callback
+		d.api.Initialized()
 	}
 }
 

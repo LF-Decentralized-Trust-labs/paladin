@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/components"
@@ -33,20 +34,25 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
+var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
+var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
 func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig) components.DomainManager {
 	return &domainManager{
-		bgCtx:         bgCtx,
-		conf:          conf,
-		domainsByID:   make(map[uuid.UUID]*domain),
-		domainsByName: make(map[string]*domain),
+		bgCtx:            bgCtx,
+		conf:             conf,
+		domainsByID:      make(map[uuid.UUID]*domain),
+		domainsByName:    make(map[string]*domain),
+		domainsByAddress: make(map[ethtypes.Address0xHex]*domain),
 	}
 }
 
@@ -64,6 +70,12 @@ type domainManager struct {
 	domainsByID      map[uuid.UUID]*domain
 	domainsByName    map[string]*domain
 	domainsByAddress map[ethtypes.Address0xHex]*domain
+}
+
+type event_PaladinNewSmartContract_V0 struct {
+	TXId    types.Bytes32             `json:"txId"`
+	Address ethtypes.Address0xHex     `json:"address"`
+	Data    ethtypes.HexBytes0xPrefix `json:"data"`
 }
 
 func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.InitInstructions, error) {
@@ -97,7 +109,7 @@ func (dm *domainManager) ConfiguredDomains() map[string]*plugins.PluginConfig {
 	return pluginConf
 }
 
-func (dm *domainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugintk.DomainAPI) (fromDomain plugintk.DomainCallbacks, err error) {
+func (dm *domainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugins.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
 
@@ -131,6 +143,12 @@ func (dm *domainManager) GetDomainByName(ctx context.Context, name string) (comp
 	return d, nil
 }
 
+func (dm *domainManager) setDomainAddress(d *domain) {
+	dm.mux.Lock()
+	defer dm.mux.Unlock()
+	dm.domainsByAddress[*d.factoryContractAddress] = d
+}
+
 func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *ethtypes.Address0xHex) (d *domain, _ error) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
@@ -144,6 +162,37 @@ func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *ethtypes.
 }
 
 func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
+
+	var contracts []*OnchainDomain
+
+	for _, ev := range batch.Events {
+		switch {
+		case ev.Signature.Equals(eventSig_PaladinNewSmartContract_V0):
+			var contract OnchainDomain
+			parseErr := json.Unmarshal(ev.Data, &contract)
+			if parseErr != nil {
+				log.L(ctx).Errorf("Failed to parse domain event: %s", types.JSONString(ev))
+			} else {
+				contracts = append(contracts, &contract)
+			}
+		}
+	}
+
+	// We have some contracts to persist
+	if len(contracts) > 0 {
+		err := tx.
+			Table("onchain_domains").
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "address"}},
+				DoNothing: true, // immutable
+			}).
+			Create(contracts).
+			Error
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -158,4 +207,16 @@ func mustParseEmbeddedBuildABI(abiJSON []byte) abi.ABI {
 		panic(err)
 	}
 	return build.ABI
+}
+
+func mustParseEventSignature(a abi.ABI, eventName string) (v *types.Bytes32) {
+	event := a.Events()[eventName]
+	if event == nil {
+		panic("ABI missing " + eventName)
+	}
+	sigBytes, err := event.SignatureHash()
+	if err != nil {
+		panic(err)
+	}
+	return types.NewBytes32FromSlice(sigBytes)
 }
