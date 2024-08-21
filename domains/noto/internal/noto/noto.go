@@ -70,6 +70,7 @@ type Noto struct {
 	domainID     string
 	coinSchema   *pb.StateSchema
 	replies      *replyTracker
+	handlers     map[string]DomainHandler
 }
 
 type NotoDomainConfig struct {
@@ -81,16 +82,31 @@ var NotoDomainConfigABI = &abi.ParameterArray{
 }
 
 type parsedTransaction struct {
+	functionABI     *abi.Entry
 	contractAddress *ethtypes.Address0xHex
 	domainConfig    *NotoDomainConfig
 	params          interface{}
 }
 
-type assemblyResult struct {
-	spentCoins  []*NotoCoin
-	spentStates []*pb.StateRef
-	newCoins    []*NotoCoin
-	newStates   []*pb.NewState
+type DomainHandler interface {
+	GetABI() *abi.Entry
+	ParseParams(params string) (interface{}, error)
+	Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
+	Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
+	Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
+	// TODO: add Prepare (requires prepare inputs to include the TransactionSpecification)
+}
+
+type domainHandler struct {
+	abi  *abi.Entry
+	noto *Noto
+}
+
+type gatheredCoins struct {
+	inCoins  []*NotoCoin
+	inTotal  *big.Int
+	outCoins []*NotoCoin
+	outTotal *big.Int
 }
 
 func loadBuild(buildOutput []byte) SolidityBuild {
@@ -136,6 +152,20 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 	d.replies = &replyTracker{
 		inflight: make(map[string]*inflightRequest),
 		client:   d.client,
+	}
+	d.handlers = map[string]DomainHandler{
+		"mint": &mintHandler{
+			domainHandler: domainHandler{
+				abi:  NotoMintABI,
+				noto: d,
+			},
+		},
+		"transfer": &transferHandler{
+			domainHandler: domainHandler{
+				abi:  NotoTransferABI,
+				noto: d,
+			},
+		},
 	}
 	return d, d.waitForReady(ctx)
 }
@@ -296,7 +326,6 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
-
 		params, err := d.validateDeploy(m.Transaction)
 		if err != nil {
 			return nil, err
@@ -313,7 +342,6 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-
 		params, err := d.validateDeploy(m.Transaction)
 		if err != nil {
 			return nil, err
@@ -333,171 +361,27 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
-
 		tx, err := d.validateTransaction(ctx, m.Transaction)
 		if err != nil {
 			return nil, err
 		}
-
-		requiredVerifiers := []*pb.ResolveVerifierRequest{{
-			Lookup:    tx.domainConfig.Notary,
-			Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-		}}
-
-		switch params := tx.params.(type) {
-		case NotoMintParams:
-			requiredVerifiers = append(requiredVerifiers, &pb.ResolveVerifierRequest{
-				Lookup:    params.To,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			})
-		case NotoTransferParams:
-			requiredVerifiers = append(requiredVerifiers, &pb.ResolveVerifierRequest{
-				Lookup:    params.From,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			}, &pb.ResolveVerifierRequest{
-				Lookup:    params.To,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			})
-		default:
-			return nil, fmt.Errorf("failed to parse parameters: %v", tx.params)
-		}
-
-		return &pb.InitTransactionResponse{
-			RequiredVerifiers: requiredVerifiers,
-		}, nil
+		return d.handlers[tx.functionABI.Name].Init(ctx, tx, m)
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
-
 		tx, err := d.validateTransaction(ctx, m.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		// TODO: use tx.domainConfig.Notary instead of hard-coding below
-
-		var assembled *assemblyResult
-		switch params := tx.params.(type) {
-		case NotoMintParams:
-			assembled, err = d.assembleMint(&params)
-		case NotoTransferParams:
-			assembled, err = d.assembleTransfer(ctx, &params)
-		default:
-			err = fmt.Errorf("failed to parse parameters: %v", tx.params)
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		encodedTransfer, err := d.encodeTransferData(ctx, tx.contractAddress, assembled.spentCoins, assembled.newCoins)
-		if err != nil {
-			return nil, err
-		}
-
-		return &pb.AssembleTransactionResponse{
-			AssemblyResult: pb.AssembleTransactionResponse_OK,
-			AssembledTransaction: &pb.AssembledTransaction{
-				SpentStates: assembled.spentStates,
-				NewStates:   assembled.newStates,
-			},
-			AttestationPlan: []*pb.AttestationRequest{
-				{
-					Name:            "sender",
-					AttestationType: pb.AttestationType_SIGN,
-					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-					Payload:         encodedTransfer,
-					Parties: []string{
-						m.Transaction.From,
-					},
-				},
-				{
-					Name:            "notary",
-					AttestationType: pb.AttestationType_ENDORSE,
-					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-					Parties: []string{
-						"notary", // TODO: why can't we pass notary address here?
-					},
-				},
-			},
-		}, nil
+		return d.handlers[tx.functionABI.Name].Assemble(ctx, tx, m)
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
-
 		tx, err := d.validateTransaction(ctx, m.Transaction)
 		if err != nil {
 			return nil, err
 		}
-
-		inCoins := make([]*NotoCoin, len(m.Inputs))
-		inTotal := big.NewInt(0)
-		for i, input := range m.Inputs {
-			if input.SchemaId != d.coinSchema.Id {
-				return nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
-			}
-			if inCoins[i], err = d.makeCoin(input.StateDataJson); err != nil {
-				return nil, fmt.Errorf("invalid input[%d] (%s): %s", i, input.HashId, err)
-			}
-			inTotal = inTotal.Add(inTotal, inCoins[i].Amount.BigInt())
-		}
-		outCoins := make([]*NotoCoin, len(m.Outputs))
-		outTotal := big.NewInt(0)
-		for i, output := range m.Outputs {
-			if output.SchemaId != d.coinSchema.Id {
-				return nil, fmt.Errorf("unknown schema ID: %s", output.SchemaId)
-			}
-			if outCoins[i], err = d.makeCoin(output.StateDataJson); err != nil {
-				return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.HashId, err)
-			}
-			outTotal = outTotal.Add(outTotal, outCoins[i].Amount.BigInt())
-		}
-
-		switch params := tx.params.(type) {
-		case NotoMintParams:
-			if len(inCoins) > 0 {
-				return nil, fmt.Errorf("invalid inputs to 'mint': %v", inCoins)
-			}
-			if outTotal.Cmp(params.Amount.BigInt()) != 0 {
-				return nil, fmt.Errorf("invalid amount for 'mint'")
-			}
-		case NotoTransferParams:
-			if inTotal.Cmp(outTotal) != 0 {
-				return nil, fmt.Errorf("invalid amount for 'transfer'")
-			}
-		default:
-			err = fmt.Errorf("failed to parse parameters: %v", tx.params)
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		var senderSignature *pb.AttestationResult
-		for _, ar := range m.Signatures {
-			if ar.AttestationType == pb.AttestationType_SIGN &&
-				ar.Name == "sender" &&
-				ar.Verifier.Algorithm == api.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
-				senderSignature = ar
-				break
-			}
-		}
-		if senderSignature == nil {
-			return nil, fmt.Errorf("did not find 'sender' attestation result")
-		}
-
-		encodedTransfer, err := d.encodeTransferData(ctx, tx.contractAddress, inCoins, outCoins)
-		if err != nil {
-			return nil, err
-		}
-		signingAddress, err := d.recoverSignature(ctx, encodedTransfer, senderSignature.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if signingAddress.String() != senderSignature.Verifier.Verifier {
-			return nil, fmt.Errorf("sender signature does not match")
-		}
-
-		return &pb.EndorseTransactionResponse{
-			EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-		}, nil
+		return d.handlers[tx.functionABI.Name].Endorse(ctx, tx, m)
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
@@ -573,53 +457,21 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, err
 	}
 
-	var params interface{}
-	switch functionABI.Name {
-	case "mint":
-		signature, err := NotoMintABI.SignatureCtx(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if tx.FunctionSignature != signature {
-			return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
-		}
-		var mintParams NotoMintParams
-		if err = json.Unmarshal([]byte(tx.FunctionParamsJson), &mintParams); err != nil {
-			return nil, err
-		}
-		if mintParams.To == "" {
-			return nil, fmt.Errorf("parameter 'to' is required")
-		}
-		if mintParams.Amount.BigInt().Sign() != 1 {
-			return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
-		}
-		params = mintParams
-
-	case "transfer":
-		signature, err := NotoTransferABI.SignatureCtx(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if tx.FunctionSignature != signature {
-			return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
-		}
-		var transferParams NotoTransferParams
-		if err = json.Unmarshal([]byte(tx.FunctionParamsJson), &transferParams); err != nil {
-			return nil, err
-		}
-		if transferParams.From == "" {
-			return nil, fmt.Errorf("parameter 'from' is required")
-		}
-		if transferParams.To == "" {
-			return nil, fmt.Errorf("parameter 'to' is required")
-		}
-		if transferParams.Amount.BigInt().Sign() != 1 {
-			return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
-		}
-		params = transferParams
-
-	default:
+	handler, found := d.handlers[functionABI.Name]
+	if !found {
 		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
+	}
+	params, err := handler.ParseParams(tx.FunctionParamsJson)
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := handler.GetABI().SignatureCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if tx.FunctionSignature != signature {
+		return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
 	}
 
 	domainConfig, err := d.decodeDomainConfig(ctx, tx.ContractConfig)
@@ -633,46 +485,10 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	}
 
 	return &parsedTransaction{
+		functionABI:     &functionABI,
 		contractAddress: contractAddress,
 		domainConfig:    domainConfig,
 		params:          params,
-	}, nil
-}
-
-func (d *Noto) assembleMint(params *NotoMintParams) (*assemblyResult, error) {
-	outputCoins, outputStates, err := d.prepareOutputs(params.To, params.Amount)
-	if err != nil {
-		return nil, err
-	}
-	return &assemblyResult{
-		newCoins:  outputCoins,
-		newStates: outputStates,
-	}, nil
-}
-
-func (d *Noto) assembleTransfer(ctx context.Context, params *NotoTransferParams) (*assemblyResult, error) {
-	inputCoins, inputStates, total, err := d.prepareInputs(ctx, params.From, params.Amount)
-	if err != nil {
-		return nil, err
-	}
-	outputCoins, outputStates, err := d.prepareOutputs(params.To, params.Amount)
-	if err != nil {
-		return nil, err
-	}
-	if total.Cmp(params.Amount.BigInt()) == 1 {
-		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := d.prepareOutputs(params.From, *ethtypes.NewHexInteger(remainder))
-		if err != nil {
-			return nil, err
-		}
-		outputCoins = append(outputCoins, returnedCoins...)
-		outputStates = append(outputStates, returnedStates...)
-	}
-	return &assemblyResult{
-		spentCoins:  inputCoins,
-		spentStates: inputStates,
-		newCoins:    outputCoins,
-		newStates:   outputStates,
 	}, nil
 }
 
@@ -682,4 +498,40 @@ func (d *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 		return nil, err
 	}
 	return sig.RecoverDirect(payload, d.chainID)
+}
+
+func (h *domainHandler) GetABI() *abi.Entry {
+	return h.abi
+}
+
+func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
+	var err error
+	inCoins := make([]*NotoCoin, len(inputs))
+	inTotal := big.NewInt(0)
+	for i, input := range inputs {
+		if input.SchemaId != h.noto.coinSchema.Id {
+			return nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
+		}
+		if inCoins[i], err = h.noto.makeCoin(input.StateDataJson); err != nil {
+			return nil, fmt.Errorf("invalid input[%d] (%s): %s", i, input.HashId, err)
+		}
+		inTotal = inTotal.Add(inTotal, inCoins[i].Amount.BigInt())
+	}
+	outCoins := make([]*NotoCoin, len(outputs))
+	outTotal := big.NewInt(0)
+	for i, output := range outputs {
+		if output.SchemaId != h.noto.coinSchema.Id {
+			return nil, fmt.Errorf("unknown schema ID: %s", output.SchemaId)
+		}
+		if outCoins[i], err = h.noto.makeCoin(output.StateDataJson); err != nil {
+			return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.HashId, err)
+		}
+		outTotal = outTotal.Add(outTotal, outCoins[i].Amount.BigInt())
+	}
+	return &gatheredCoins{
+		inCoins:  inCoins,
+		inTotal:  inTotal,
+		outCoins: outCoins,
+		outTotal: outTotal,
+	}, nil
 }
