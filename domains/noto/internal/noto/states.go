@@ -69,25 +69,26 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.
 		// Simple oldest coin first algorithm
 		// TODO: make this configurable
 		// TODO: why is filters.QueryJSON not a public interface?
-		query := fmt.Sprintf(`
+		query := map[string]interface{}{
 			"limit": 10,
-			"sort": [".created"],
-			"eq": [{
+			"sort":  []string{".created"},
+			"eq": []map[string]string{{
 				"field": "owner",
-				"value": "%s"
-			}]
-		`, owner)
-		if lastStateTimestamp > 0 {
-			query += fmt.Sprintf(`,
-				"gt": [{
-					"field": ".created",
-					"value": "%s"
-				}]
-			`, strconv.FormatInt(lastStateTimestamp, 10))
+				"value": owner,
+			}},
 		}
-		query = "{" + query + "}"
+		if lastStateTimestamp > 0 {
+			query["gt"] = []map[string]string{{
+				"field": ".created",
+				"value": strconv.FormatInt(lastStateTimestamp, 10),
+			}}
+		}
+		queryJSON, err := json.Marshal(query)
+		if err != nil {
+			return nil, nil, err
+		}
 
-		states, err := d.findAvailableStates(ctx, query)
+		states, err := d.findAvailableStates(ctx, string(queryJSON))
 		if err != nil {
 			return nil, nil, err
 		}
