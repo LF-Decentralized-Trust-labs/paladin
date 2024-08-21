@@ -380,8 +380,9 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 	defer done()
 	assert.Nil(t, tp.d.initError.Load())
 
+	txID := uuid.New()
 	err := dm.stateStore.RunInDomainContextFlush("test1", func(ctx context.Context, dsi statestore.DomainStateInterface) error {
-		newStates, err := dsi.CreateNewStates(uuid.New(), []*statestore.StateUpsert{
+		newStates, err := dsi.UpsertStates(&txID, []*statestore.StateUpsert{
 			{
 				SchemaID: tp.stateSchemas[0].Id,
 				Data: types.RawJSON(`{
@@ -389,6 +390,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 					"owner": "0x8d06f71D68216b31e9019C162528241F44fA0fD9",
 					"amount": "0x3033"
 				}`),
+				Creating: true,
 			},
 		})
 		assert.Len(t, newStates, 1)

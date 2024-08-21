@@ -66,10 +66,13 @@ type DomainStateInterface interface {
 	// That will inform them they need to join to this transaction if they wish to use those states.
 	MarkStatesRead(transactionID uuid.UUID, stateIDs []string) error
 
-	// UpsertStates creates new states that are locked for reading to the specified transaction from creation.
+	// UpsertStates creates or updates states.
 	// They are available immediately within the domain for return in FindAvailableStates
-	// (even before the flush)
-	UpsertStates(transactionID uuid.UUID, states []*StateUpsert) (s []*State, err error)
+	// on the domain (even before the flush).
+	// If a non-nil transaction ID is supplied, then the states are mark locked to the specified
+	// transaction. They can then be locked-for-creation, locked-for-spending, for simply
+	// locked for existence to avoid other transactions spending them.
+	UpsertStates(transactionID *uuid.UUID, states []*StateUpsert) (s []*State, err error)
 
 	// ResetTransaction queues up removal of all lock records for a given transaction
 	// Note that the private data of the states themselves are not removed
@@ -328,7 +331,7 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	return dc.mergedUnFlushed(schema, states, query)
 }
 
-func (dc *domainContext) UpsertStates(transactionID uuid.UUID, stateUpserts []*StateUpsert) (states []*State, err error) {
+func (dc *domainContext) UpsertStates(transactionID *uuid.UUID, stateUpserts []*StateUpsert) (states []*State, err error) {
 
 	states = make([]*State, len(stateUpserts))
 	withValues := make([]*StateWithLabels, len(stateUpserts))
@@ -343,13 +346,17 @@ func (dc *domainContext) UpsertStates(transactionID uuid.UUID, stateUpserts []*S
 			return nil, err
 		}
 		states[i] = withValues[i].State
-		states[i].Locked = &StateLock{
-			Transaction: transactionID,
-			State:       withValues[i].State.ID,
-			Creating:    ns.Creating,
-			Spending:    ns.Spending,
+		if transactionID != nil {
+			states[i].Locked = &StateLock{
+				Transaction: *transactionID,
+				State:       withValues[i].State.ID,
+				Creating:    ns.Creating,
+				Spending:    ns.Spending,
+			}
+			log.L(dc.ctx).Infof("Upserting state %s locked to tx=%s creating=%t spending=%t", states[i].ID, transactionID, states[i].Locked.Creating, states[i].Locked.Spending)
+		} else {
+			log.L(dc.ctx).Infof("Upserting state %s UNLOCKED", states[i].ID)
 		}
-		log.L(dc.ctx).Infof("Upserting state %s tx=%s creating=%t spending=%t", states[i].ID, transactionID, states[i].Locked.Creating, states[i].Locked.Spending)
 	}
 
 	// Take lock and check flush state
@@ -375,13 +382,15 @@ func (dc *domainContext) UpsertStates(transactionID uuid.UUID, stateUpserts []*S
 	}
 	// Now we can add our own un-flushed writes to the de-duplicated lists
 	dc.unFlushed.states = append(deDuppedUnFlushedStates, withValues...)
-	// Then add all the state locks (which need individual de-duping too)
-	for _, s := range withValues {
-		_, err = dc.setUnFlushedLock(transactionID, s.State.ID, func(sl *StateLock) {
-			// Upsert semantics for states will replace any existing locks with the explicitly set locks in the upsert
-			sl.Creating = s.Locked.Creating
-			sl.Spending = s.Locked.Spending
-		})
+	// Then add all the state locks if this is transaction flush (which need individual de-duping too)
+	if transactionID != nil {
+		for _, s := range withValues {
+			_, err = dc.setUnFlushedLock(*transactionID, s.State.ID, func(sl *StateLock) {
+				// Upsert semantics for states will replace any existing locks with the explicitly set locks in the upsert
+				sl.Creating = s.Locked.Creating
+				sl.Spending = s.Locked.Spending
+			})
+		}
 	}
 
 	return states, nil

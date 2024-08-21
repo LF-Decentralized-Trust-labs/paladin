@@ -221,9 +221,9 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 		}
 		if s.Locked != nil {
 			pbStates[i].Lock = &prototk.StateLock{
-				Sequence: s.Locked.Sequence.String(),
-				Creating: s.Locked.Creating,
-				Spending: s.Locked.Spending,
+				Transaction: s.Locked.Transaction.String(),
+				Creating:    s.Locked.Creating,
+				Spending:    s.Locked.Spending,
 			}
 		}
 	}

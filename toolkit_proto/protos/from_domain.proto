@@ -35,7 +35,7 @@ message StoredState {
 }
 
 message StateLock {
-  string sequence = 1;
+  string transaction = 1;
   bool creating = 2;
   bool spending = 3;
 }

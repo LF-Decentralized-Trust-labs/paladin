@@ -93,7 +93,7 @@ func TestStateFlushAsync(t *testing.T) {
 
 	// Run a 2nd handler that depends on that schema being available
 	err = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
-		states, err := dsi.UpsertStates(uuid.New(), []*StateUpsert{
+		states, err := dsi.UpsertStates(nil, []*StateUpsert{
 			{
 				SchemaID: schemaID,
 				Data:     types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, types.RandHex(32))),
@@ -130,7 +130,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		// Store some states
-		tx1states, err := dsi.UpsertStates(transactionID, []*StateUpsert{
+		tx1states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
 			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
@@ -173,7 +173,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		// Do a quick check on upsert semantics with un-flushed updates, to make sure the unflushed list doesn't dup
 		tx2Salts := []string{types.RandHex(32), types.RandHex(32)}
 		for dup := 0; dup < 2; dup++ {
-			tx2states, err := dsi.UpsertStates(transactionID, []*StateUpsert{
+			tx2states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
 				{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tx2Salts[0])), Creating: true},
 				{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tx2Salts[1])), Creating: true},
 			})
@@ -229,7 +229,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 			states[0].ID.String(), // 50
 		})
 		assert.NoError(t, err)
-		tx3states, err := dsi.UpsertStates(transactionID, []*StateUpsert{
+		tx3states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
 			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 		})
@@ -346,7 +346,7 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
-		_, err = dsi.UpsertStates(uuid.New(), nil)
+		_, err = dsi.UpsertStates(nil, nil)
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
@@ -508,7 +508,7 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 			`{"sort":["wrong"]}`))
 		assert.Regexp(t, "PD010700", err)
 
-		_, err = dsi.UpsertStates(uuid.New(), []*StateUpsert{
+		_, err = dsi.UpsertStates(nil, []*StateUpsert{
 			{SchemaID: schemaID, Data: types.RawJSON(`"wrong"`)},
 		})
 		assert.Regexp(t, "FF22038", err)
@@ -526,7 +526,7 @@ func TestDSIBadIDs(t *testing.T) {
 
 	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
-		_, err := dsi.UpsertStates(uuid.New(), []*StateUpsert{
+		_, err := dsi.UpsertStates(nil, []*StateUpsert{
 			{SchemaID: "wrong"},
 		})
 		assert.Regexp(t, "PD010100", err)

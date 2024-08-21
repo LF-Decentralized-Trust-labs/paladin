@@ -176,7 +176,6 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 	//
 	// Note: This only happens on the sequencer node - any endorsing nodes just take the Full states
 	//       and write them directly to the sequence prior to endorsement
-
 	postAssembly := tx.PostAssembly
 
 	var newStatesToWrite []*statestore.StateUpsert
@@ -192,12 +191,14 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 		newStatesToWrite[i] = &statestore.StateUpsert{
 			SchemaID: schema.IDString(),
 			Data:     types.RawJSON(s.StateDataJson),
+			// These are marked as locked and creating in the transaction
+			Creating: true,
 		}
 	}
 
 	var states []*statestore.State
 	err := dc.dm.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
-		states, err = dsi.CreateNewStates(*postAssembly.Sequence, newStatesToWrite)
+		states, err = dsi.UpsertStates(&tx.ID, newStatesToWrite)
 		return err
 	})
 	if err != nil {
@@ -218,7 +219,46 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 
 // Happens on all nodes that are aware of the transaction and want to mask input states from other
 // transactions being assembled on the same node.
-func (dc *domainContract) LockStates(ctx context.Context)
+func (dc *domainContract) LockStates(ctx context.Context, tx *components.PrivateTransaction) error {
+
+	postAssembly := tx.PostAssembly
+
+	// Input and output states are locked to the transaction
+	var txLockedStateUpserts []*statestore.StateUpsert
+	for _, s := range postAssembly.InputStates {
+		txLockedStateUpserts = append(txLockedStateUpserts, &statestore.StateUpsert{
+			SchemaID: s.Schema.String(),
+			Data:     s.Data,
+			Spending: true,
+		})
+	}
+	for _, s := range postAssembly.OutputStates {
+		txLockedStateUpserts = append(txLockedStateUpserts, &statestore.StateUpsert{
+			SchemaID: s.Schema.String(),
+			Data:     s.Data,
+			Creating: true,
+		})
+	}
+
+	// Read states are just stored
+	var readStateUpserts []*statestore.StateUpsert
+	for _, s := range postAssembly.ReadStates {
+		readStateUpserts = append(readStateUpserts, &statestore.StateUpsert{
+			SchemaID: s.Schema.String(),
+			Data:     s.Data,
+		})
+	}
+
+	return dc.dm.stateStore.RunInDomainContext(dc.d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) error {
+		// Heavy lifting is all done for us by the state store
+		_, err := dsi.UpsertStates(&tx.ID, txLockedStateUpserts)
+		if err == nil && len(readStateUpserts) > 0 {
+			_, err = dsi.UpsertStates(nil, readStateUpserts)
+		}
+		return err
+	})
+
+}
 
 func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
 
@@ -238,42 +278,12 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	// but for efficiency we can and should start the runtime exercise of endorsement + signing before
 	// waiting for the DB TX to commit.
 	//
-	if err := dc.ensureTXInputStatesLoaded(ctx, tx); err != nil {
-		return err
-	}
 
 	return nil
 }
 
 func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
 	return nil
-}
-
-func (dc *domainContract) addStatesForUpsert(ctx context.Context, states []*statestore.State, bySchema map[types.Bytes32][]*statestore.StateUpsert) {
-	for _, s := range states {
-		bySchema[s.Schema] = append(bySchema[s.Schema], &statestore.StateUpsert{
-			SchemaID: string(s.Schema),
-		})
-	}
-}
-
-func (dc *domainContract) analyzeInMemStates(ctx context.Context, stateRefs []*prototk.StateRef, fullStates []*statestore.State, loadedStatesByID map[types.Bytes32]*statestore.State) (missingStatesBySchema map[string][]types.RawJSON, err error) {
-
-	// Process the list, and check we haven't already loaded them on this engine
-	missingStatesBySchema = make(map[string][]types.RawJSON)
-	for i, s := range stateRefs {
-		stateID, err := types.ParseBytes32(ctx, s.HashId)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.HashId, i)
-		}
-		if i < len(fullStates) && fullStates[i].ID.Equals(stateID) {
-			// We already have this state loaded in memory
-			loadedStatesByID[*stateID] = fullStates[i]
-		} else {
-			missingStatesBySchema[s.SchemaId] = append(missingStatesBySchema[s.SchemaId], types.JSONString(s.HashId))
-		}
-	}
-	return missingStatesBySchema, nil
 }
 
 func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateRef) ([]*components.FullState, error) {
