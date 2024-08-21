@@ -204,4 +204,5 @@ var (
 	MsgDomainFactoryAddressInvalid     = ffe("PD011606", "Factory contract address invalid")
 	MsgDomainPrivateAbiJsonInvalid     = ffe("PD011607", "Private contract ABI invalid")
 	MsgDomainInvalidQueryJSON          = ffe("PD011608", "Invalid query JSON")
+	MsgDomainContractNotFoundByAddr    = ffe("PD011609", "Smart contract with address %s has not been indexed")
 )

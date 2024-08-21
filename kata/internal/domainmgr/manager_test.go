@@ -20,10 +20,14 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
@@ -114,4 +118,71 @@ func yamlNode(t *testing.T, s string) (n yaml.Node) {
 	err := yaml.Unmarshal([]byte(s), &n)
 	assert.NoError(t, err)
 	return
+}
+
+func TestConfiguredDomains(t *testing.T) {
+	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"test1": {
+				Plugin: plugins.PluginConfig{
+					Type:     plugins.LibraryTypeCShared.Enum(),
+					Location: "some/where",
+				},
+			},
+		},
+	})
+	defer done()
+
+	assert.Equal(t, map[string]*plugins.PluginConfig{
+		"test1": {
+			Type:     plugins.LibraryTypeCShared.Enum(),
+			Location: "some/where",
+		},
+	}, dm.ConfiguredDomains())
+}
+
+func TestDomainRegisteredNotFound(t *testing.T) {
+	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{},
+	})
+	defer done()
+
+	_, err := dm.DomainRegistered("unknown", uuid.New(), nil)
+	assert.Regexp(t, "PD011600", err)
+}
+
+func TestGetDomainNotFound(t *testing.T) {
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{},
+	})
+	defer done()
+
+	_, err := dm.GetDomainByName(ctx, "wrong")
+	assert.Regexp(t, "PD011600", err)
+
+	_, err = dm.getDomainByAddress(ctx, types.MustEthAddress(types.RandHex(20)))
+	assert.Regexp(t, "PD011600", err)
+}
+
+func TestMustParseLoaders(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = mustParseEmbeddedBuildABI([]byte(`{!wrong`))
+	})
+	assert.Panics(t, func() {
+		_ = mustParseEventSoliditySignature(abi.ABI{}, "nope")
+	})
+	assert.Panics(t, func() {
+		_ = mustParseEventSignatureHash(abi.ABI{}, "nope")
+	})
+	badEvent := &abi.Entry{
+		Type:   abi.Event,
+		Name:   "broken",
+		Inputs: abi.ParameterArray{{Type: "wrong"}},
+	}
+	assert.Panics(t, func() {
+		_ = mustParseEventSoliditySignature(abi.ABI{badEvent}, "broken")
+	})
+	assert.Panics(t, func() {
+		_ = mustParseEventSignatureHash(abi.ABI{badEvent}, "broken")
+	})
 }

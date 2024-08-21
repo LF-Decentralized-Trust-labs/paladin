@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"golang.org/x/crypto/sha3"
@@ -82,6 +83,18 @@ func (id *Bytes32) Equals(id2 *Bytes32) bool {
 		return false
 	}
 	return *id == *id2
+}
+
+// Return the lower 16 bytes as a UUID
+func (id *Bytes32) UUIDLower16() (u uuid.UUID) {
+	copy(u[:], id[0:16])
+	return u
+}
+
+func Bytes32UUIDLower16(u uuid.UUID) *Bytes32 {
+	var v Bytes32
+	copy(v[0:16], u[:])
+	return &v
 }
 
 // JSON representation is lower case hex, with 0x prefix

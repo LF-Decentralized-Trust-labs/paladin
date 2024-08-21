@@ -628,6 +628,7 @@ func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
 	for _, abiEntry := range es.eventABIs {
 		cv, err := abiEntry.DecodeEventDataCtx(es.ctx, in.Topics, in.Data)
 		if err == nil {
+			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
 			out.Data, err = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
 		}
 		if err == nil {

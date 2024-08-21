@@ -16,7 +16,9 @@
 package main
 
 import (
+	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"gopkg.in/yaml.v3"
 )
@@ -27,9 +29,14 @@ type DomainManagerConfig struct {
 }
 
 type DomainConfig struct {
-	Init   DomainInitConfig     `yaml:"init"`
-	Plugin plugins.PluginConfig `yaml:"plugin"`
-	Config yaml.Node            `yaml:"config"`
+	Init          DomainInitConfig     `yaml:"init"`
+	ContractCache cache.Config         `yaml:"contractCache"`
+	Plugin        plugins.PluginConfig `yaml:"plugin"`
+	Config        yaml.Node            `yaml:"config"`
+}
+
+var ContractCacheDefaults = &cache.Config{
+	Capacity: confutil.P(1000),
 }
 
 type DomainInitConfig struct {

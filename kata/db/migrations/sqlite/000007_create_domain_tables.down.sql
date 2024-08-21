@@ -1,1 +1,1 @@
-DROP TABLE onchain_domains;
+DROP TABLE private_smart_contracts;

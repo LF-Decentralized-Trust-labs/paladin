@@ -19,15 +19,22 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 // Domain manager is the boundary between the paladin core / testbed and the domains
 type DomainManager interface {
 	ManagerLifecycle
 	plugins.DomainRegistration
-	GetDomainByName(ctx context.Context, name string) (DomainActions, error)
+	GetDomainByName(ctx context.Context, name string) (Domain, error)
 }
 
-// External actions that other components (engine, testbed) can call against a domain
-type DomainActions interface {
+// External interface for other components (engine, testbed) to call against a domain
+type Domain interface {
+	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+}
+
+// External interface for other components to call against a private smart contract
+type DomainSmartContract interface {
+	Domain() Domain
 }

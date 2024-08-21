@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
@@ -36,21 +36,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type OnchainDomain struct {
-	DeployTX    uuid.UUID        `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	Address     types.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes types.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
-}
-
 type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf *DomainConfig
-	dm   *domainManager
-	id   uuid.UUID
-	name string
-	api  plugins.DomainManagerToDomain
+	conf          *DomainConfig
+	dm            *domainManager
+	id            uuid.UUID
+	name          string
+	api           plugins.DomainManagerToDomain
+	contractCache cache.Cache[types.EthAddress, *domainContract]
 
 	stateLock              sync.Mutex
 	initialized            atomic.Bool
@@ -59,22 +54,24 @@ type domain struct {
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry
-	factoryContractAddress *ethtypes.Address0xHex
+	factoryContractAddress *types.EthAddress
 	factoryContractABI     abi.ABI
 	privateContractABI     abi.ABI
 
-	initDone chan error
+	initError atomic.Pointer[error]
+	initDone  chan struct{}
 }
 
 func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugins.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:        dm,
-		conf:      conf,
-		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:      name,
-		id:        id,
-		api:       toDomain,
-		initDone:  make(chan error, 1),
+		dm:            dm,
+		conf:          conf,
+		initRetry:     retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:          name,
+		id:            id,
+		api:           toDomain,
+		initDone:      make(chan struct{}),
+		contractCache: cache.NewCache[types.EthAddress, *domainContract](&conf.ContractCache, ContractCacheDefaults),
 
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
@@ -112,7 +109,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
-	d.factoryContractAddress, err = ethtypes.NewAddress(d.config.FactoryContractAddress)
+	d.factoryContractAddress, err = types.ParseEthAddress(d.config.FactoryContractAddress)
 	if err != nil {
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
 	}
@@ -146,14 +143,11 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 }
 
 func (d *domain) init() {
-	var err error
-	defer func() {
-		d.initDone <- err
-	}()
+	defer close(d.initDone)
 
 	// We block retrying each part of init until we succeed, or are cancelled
 	// (which the plugin manager will do if the domain disconnects)
-	err = d.initRetry.Do(d.ctx, func(attempt int) (bool, error) {
+	err := d.initRetry.Do(d.ctx, func(attempt int) (bool, error) {
 
 		// Send the configuration to the domain for processing
 		confYAML, _ := yaml.Marshal(&d.conf.Config)
@@ -178,6 +172,7 @@ func (d *domain) init() {
 	})
 	if err != nil {
 		log.L(d.ctx).Debugf("domain initialization cancelled before completion: %s", err)
+		d.initError.Store(&err)
 	} else {
 		log.L(d.ctx).Debugf("domain initialization complete")
 		d.dm.setDomainAddress(d)

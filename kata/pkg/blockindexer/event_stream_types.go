@@ -67,12 +67,19 @@ type EventStreamCheckpoint struct {
 }
 
 type EventStreamSignature struct {
-	Stream    uuid.UUID     `json:"stream"                      gorm:"primaryKey"`
-	Signature types.Bytes32 `json:"signature"                   gorm:"primaryKey"`
+	Stream        uuid.UUID     `json:"stream"                 gorm:"primaryKey"`
+	SignatureHash types.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
 }
 
 type EventWithData struct {
 	*IndexedEvent
+
+	// SoliditySignature allows a deterministic comparison to which ABI to use in the runtime,
+	// when both the blockindexer and consuming code are using the same version of firefly-signer.
+	// Includes variable names, including deep within nested structure.
+	// Things like whitespace etc. subject to change (so should not stored for later comparison)
+	SoliditySignature string `json:"soliditySignature"`
+
 	Address types.EthAddress `json:"address"`
 	Data    types.RawJSON    `json:"data"`
 }

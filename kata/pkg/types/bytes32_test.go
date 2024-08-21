@@ -45,6 +45,8 @@ func TestBytes32Static(t *testing.T) {
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.String())
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString0xPrefix())
 		assert.Equal(t, "512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString())
+		assert.Equal(t, "512d0e59-5c71-863c-47e8-03c565562f92", id.UUIDLower16().String())
+		assert.Equal(t, "512d0e595c71863c47e803c565562f9200000000000000000000000000000000", Bytes32UUIDLower16(id.UUIDLower16()).HexString())
 	}
 
 	id2 := MustParseBytes32("0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")
