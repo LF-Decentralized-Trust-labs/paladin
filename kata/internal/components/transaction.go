@@ -18,10 +18,42 @@ package components
 import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
+
+type TransactionInputs struct {
+	Domain   string
+	From     string
+	To       *types.EthAddress
+	Function *abi.Entry
+	Inputs   types.RawJSON
+}
+
+type TransactionPreAssembly struct {
+	TransactionSpecification *prototk.TransactionSpecification
+	RequiredVerifiers        []*prototk.ResolveVerifierRequest
+	Verifiers                []*prototk.ResolvedVerifier
+}
+
+type FullState struct {
+	ID     types.Bytes32
+	Schema types.Bytes32
+	Data   types.RawJSON
+}
+
+type TransactionPostAssembly struct {
+	AssemblyResult prototk.AssembleTransactionResponse_Result
+	// InputStateRefs        []*prototk.StateRef
+	OutputStatesPotential []*prototk.NewState // the raw result of assembly, before sequence allocation
+	InputStates           []*FullState
+	ReadStates            []*FullState
+	OutputStates          []*FullState
+	AttestationPlan       []*prototk.AttestationRequest
+	Signatures            []*prototk.AttestationResult
+	Endorsements          []*prototk.AttestationResult
+	FinalizedTransaction  *prototk.FinalizedTransaction
+}
 
 // PrivateTransaction is the critical exchange object between the engine and the domain manager,
 // as it hops between the states in the state machine (on multiple paladin nodes) to reach
@@ -29,30 +61,15 @@ import (
 //
 // TODO: Struct or interface?
 type PrivateTransaction struct {
+	ID uuid.UUID // TODO: == idempotency key?
 
 	// INPUTS: Items that come in from the submitter of the transaction
-	ID       uuid.UUID // TODO: == idempotency key?
-	Domain   string
-	From     string
-	To       *types.EthAddress
-	Function *abi.Entry
-	Inputs   types.RawJSON
+	Inputs *TransactionInputs
 
 	// ASSEMBLY PHASE: Items that get added to the transaction as it goes on its journey through
 	// assembly, signing and endorsement (possibly going back through the journey many times)
-	TransactionSpecification *prototk.TransactionSpecification
-	RequiredVerifiers        []*prototk.ResolveVerifierRequest
-	Verifiers                []*prototk.ResolvedVerifier
-	SpendingStatesRefs       []*prototk.StateRef
-	ReadStatesRefs           []*prototk.StateRef
-	NewStatesAssembled       []*prototk.NewState
-	Sequence                 *uuid.UUID // assigned before writing new states or endorsing
-	NewStatesStored          []*statestore.State
-	NewStatesRefs            []*prototk.StateRef
-	AttestationPlan          []*prototk.AttestationRequest
-	Signatures               []*prototk.AttestationResult
-	Endorsements             []*prototk.AttestationResult
-	FinalizedTransaction     *prototk.FinalizedTransaction
+	PreAssembly  *TransactionPreAssembly  // the bit of the assembly phase state that can be retained across re-assembly
+	PostAssembly *TransactionPostAssembly // the bit of the assembly phase state that must be completely discarded on re-assembly
 
 	// DISPATCH PHASE: Once the transaction has reached sufficient confidence of success,
 	// we move on to submitting it to the blockchain.

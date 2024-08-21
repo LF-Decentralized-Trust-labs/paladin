@@ -209,4 +209,7 @@ var (
 	MsgDomainInvalidPrepareDeployResult = ffe("PD011611", "Prepare deploy did not result in exactly one of a invoke transaction or a deploy transaction")
 	MsgDomainInvalidFunctionParams      = ffe("PD011612", "Invalid function parameters for %s")
 	MsgDomainUnknownSchema              = ffe("PD011613", "Unknown schema %s")
+	MsgDomainInvalidStateIDFromDomain   = ffe("PD011614", "Domain returned invalid id '%s' for state %d")
+	MsgDomainInputStateNotFound         = ffe("PD011615", "Input state %d [%s] not found")
+	MsgDomainMissingStates              = ffe("PD011616", "Missing in-memory states")
 )
