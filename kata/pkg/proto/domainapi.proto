@@ -90,7 +90,7 @@ message AssembleTransactionResponse {
 message EndorseTransactionRequest {
     ResolvedVerifier endorsement_verifier = 1; // The resolved verifier requested to be used for endorsement
     TransactionSpecification transaction = 2; // The transaction specified by the user
-    repeated ResolvedVerifier resolved_verifiers = 3; // The list of resovled verifiers
+    repeated ResolvedVerifier resolved_verifiers = 3; // The list of resolved verifiers
     repeated EndorsableState inputs = 4; // Input states for the transaction
     repeated EndorsableState outputs = 5; // Output states for the transaction
     repeated AttestationResult signatures = 6; // All SIGN attestation results (required from submitting node before endorsement)
@@ -109,8 +109,9 @@ message EndorseTransactionResponse {
 
 // **PREPARE** step for a transaction 
 message PrepareTransactionRequest {
-    FinalizedTransaction transaction = 1; // The finalized transaction, as it went through the endorsement phase
-    repeated AttestationResult attestation_result = 2; // The results of any proofs/attestations that came out of the endorsement phase
+    TransactionSpecification transaction = 1; // The transaction specified by the user
+    FinalizedTransaction finalized_transaction = 2; // The finalized transaction, as it went through the endorsement phase
+    repeated AttestationResult attestation_result = 3; // The results of any proofs/attestations that came out of the endorsement phase
 }
 
 message PrepareTransactionResponse {

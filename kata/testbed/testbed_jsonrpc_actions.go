@@ -297,7 +297,8 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 		// Prepare the transaction
 		prepareTXReq := &proto.PrepareTransactionRequest{
-			Transaction: &proto.FinalizedTransaction{
+			Transaction: txSpec,
+			FinalizedTransaction: &proto.FinalizedTransaction{
 				TransactionId: txSpec.TransactionId,
 				SpentStates:   spentStateRefs,
 				NewStates:     newStateRefs,

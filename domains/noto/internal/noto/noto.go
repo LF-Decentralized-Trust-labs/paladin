@@ -359,12 +359,12 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
 
-		inputs := make([]string, len(m.Transaction.SpentStates))
-		for i, state := range m.Transaction.SpentStates {
+		inputs := make([]string, len(m.FinalizedTransaction.SpentStates))
+		for i, state := range m.FinalizedTransaction.SpentStates {
 			inputs[i] = state.HashId
 		}
-		outputs := make([]string, len(m.Transaction.NewStates))
-		for i, state := range m.Transaction.NewStates {
+		outputs := make([]string, len(m.FinalizedTransaction.NewStates))
+		for i, state := range m.FinalizedTransaction.NewStates {
 			outputs[i] = state.HashId
 		}
 
@@ -388,7 +388,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 		return &pb.PrepareTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
-				FunctionName: "transfer", // TODO: can we have more than one method on base ledger?
+				FunctionName: "transfer",
 				ParamsJson:   string(paramsJSON),
 			},
 		}, nil

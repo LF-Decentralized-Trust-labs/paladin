@@ -543,12 +543,12 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					signerSignature = att.Payload
 				}
 			}
-			spentStateIds := make([]string, len(req.Transaction.SpentStates))
-			for i, s := range req.Transaction.SpentStates {
+			spentStateIds := make([]string, len(req.FinalizedTransaction.SpentStates))
+			for i, s := range req.FinalizedTransaction.SpentStates {
 				spentStateIds[i] = s.HashId
 			}
-			newStateIds := make([]string, len(req.Transaction.NewStates))
-			for i, s := range req.Transaction.NewStates {
+			newStateIds := make([]string, len(req.FinalizedTransaction.NewStates))
+			for i, s := range req.FinalizedTransaction.NewStates {
 				newStateIds[i] = s.HashId
 			}
 			return &proto.PrepareTransactionResponse{
