@@ -16,19 +16,77 @@
 package noto
 
 import (
+	"context"
+
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 )
+
+type DomainInterface map[string]*DomainEntry
+
+type DomainEntry struct {
+	ABI     *abi.Entry
+	handler DomainHandler
+}
+
+type DomainHandler interface {
+	ParseParams(params string) (interface{}, error)
+	Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
+	Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
+	Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
+	// TODO: add Prepare (requires prepare inputs to include the TransactionSpecification)
+}
+
+type domainHandler struct {
+	noto *Noto
+}
+
+func (d *Noto) getInterface() DomainInterface {
+	iface := DomainInterface{
+		"constructor": {
+			ABI: &abi.Entry{
+				Type: abi.Constructor,
+				Inputs: abi.ParameterArray{
+					{Name: "notary", Type: "string"},
+				},
+			},
+		},
+		"mint": {
+			ABI: &abi.Entry{
+				Name: "mint",
+				Type: abi.Function,
+				Inputs: abi.ParameterArray{
+					{Name: "to", Type: "string"},
+					{Name: "amount", Type: "uint256"},
+				},
+			},
+		},
+		"transfer": {
+			ABI: &abi.Entry{
+				Name: "transfer",
+				Type: abi.Function,
+				Inputs: abi.ParameterArray{
+					{Name: "from", Type: "string"},
+					{Name: "to", Type: "string"},
+					{Name: "amount", Type: "uint256"},
+				},
+			},
+		},
+	}
+
+	iface["mint"].handler = &mintHandler{
+		domainHandler: domainHandler{noto: d},
+	}
+	iface["transfer"].handler = &transferHandler{
+		domainHandler: domainHandler{noto: d},
+	}
+
+	return iface
+}
 
 type NotoConstructorParams struct {
 	Notary string `json:"notary"`
-}
-
-var NotoConstructorABI = &abi.Entry{
-	Type: abi.Constructor,
-	Inputs: abi.ParameterArray{
-		{Name: "notary", Type: "string"},
-	},
 }
 
 type NotoMintParams struct {
@@ -36,33 +94,8 @@ type NotoMintParams struct {
 	Amount ethtypes.HexInteger `json:"amount"`
 }
 
-var NotoMintABI = &abi.Entry{
-	Name: "mint",
-	Type: abi.Function,
-	Inputs: abi.ParameterArray{
-		{Name: "to", Type: "string"},
-		{Name: "amount", Type: "uint256"},
-	},
-}
-
 type NotoTransferParams struct {
 	From   string              `json:"from"`
 	To     string              `json:"to"`
 	Amount ethtypes.HexInteger `json:"amount"`
-}
-
-var NotoTransferABI = &abi.Entry{
-	Name: "transfer",
-	Type: abi.Function,
-	Inputs: abi.ParameterArray{
-		{Name: "from", Type: "string"},
-		{Name: "to", Type: "string"},
-		{Name: "amount", Type: "uint256"},
-	},
-}
-
-var NotoABI = &abi.ABI{
-	NotoConstructorABI,
-	NotoMintABI,
-	NotoTransferABI,
 }

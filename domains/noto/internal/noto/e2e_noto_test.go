@@ -86,7 +86,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(deployResult),
-		Function: *NotoMintABI,
+		Function: *domain.Interface["mint"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"to": "%s",
 			"amount": 100
@@ -106,7 +106,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(deployResult),
-		Function: *NotoTransferABI,
+		Function: *domain.Interface["transfer"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"from": "%s",
 			"to": "%s",
@@ -120,7 +120,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(deployResult),
-		Function: *NotoTransferABI,
+		Function: *domain.Interface["transfer"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"from": "%s",
 			"to": "%s",

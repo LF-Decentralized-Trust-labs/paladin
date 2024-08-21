@@ -60,6 +60,7 @@ type SolidityBuild struct {
 type Noto struct {
 	Factory      SolidityBuild
 	Contract     SolidityBuild
+	Interface    DomainInterface
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
@@ -70,7 +71,6 @@ type Noto struct {
 	domainID     string
 	coinSchema   *pb.StateSchema
 	replies      *replyTracker
-	handlers     map[string]DomainHandler
 }
 
 type NotoDomainConfig struct {
@@ -86,20 +86,6 @@ type parsedTransaction struct {
 	contractAddress *ethtypes.Address0xHex
 	domainConfig    *NotoDomainConfig
 	params          interface{}
-}
-
-type DomainHandler interface {
-	GetABI() *abi.Entry
-	ParseParams(params string) (interface{}, error)
-	Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
-	Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
-	Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
-	// TODO: add Prepare (requires prepare inputs to include the TransactionSpecification)
-}
-
-type domainHandler struct {
-	abi  *abi.Entry
-	noto *Noto
 }
 
 type gatheredCoins struct {
@@ -153,20 +139,7 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		inflight: make(map[string]*inflightRequest),
 		client:   d.client,
 	}
-	d.handlers = map[string]DomainHandler{
-		"mint": &mintHandler{
-			domainHandler: domainHandler{
-				abi:  NotoMintABI,
-				noto: d,
-			},
-		},
-		"transfer": &transferHandler{
-			domainHandler: domainHandler{
-				abi:  NotoTransferABI,
-				noto: d,
-			},
-		},
-	}
+	d.Interface = d.getInterface()
 	return d, d.waitForReady(ctx)
 }
 
@@ -299,7 +272,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-		constructorJSON, err := json.Marshal(NotoConstructorABI)
+		constructorJSON, err := json.Marshal(d.Interface["constructor"].ABI)
 		if err != nil {
 			return nil, err
 		}
@@ -365,7 +338,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-		return d.handlers[tx.functionABI.Name].Init(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Init(ctx, tx, m)
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
@@ -373,7 +346,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-		return d.handlers[tx.functionABI.Name].Assemble(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, m)
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
@@ -381,7 +354,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-		return d.handlers[tx.functionABI.Name].Endorse(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, m)
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
@@ -457,16 +430,16 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, err
 	}
 
-	handler, found := d.handlers[functionABI.Name]
+	parser, found := d.Interface[functionABI.Name]
 	if !found {
 		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := handler.ParseParams(tx.FunctionParamsJson)
+	params, err := parser.handler.ParseParams(tx.FunctionParamsJson)
 	if err != nil {
 		return nil, err
 	}
 
-	signature, err := handler.GetABI().SignatureCtx(ctx)
+	signature, err := parser.ABI.SignatureCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -498,10 +471,6 @@ func (d *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 		return nil, err
 	}
 	return sig.RecoverDirect(payload, d.chainID)
-}
-
-func (h *domainHandler) GetABI() *abi.Entry {
-	return h.abi
 }
 
 func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
