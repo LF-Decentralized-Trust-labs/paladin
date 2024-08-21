@@ -159,3 +159,39 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
+
+func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+	inputs := make([]string, len(req.FinalizedTransaction.SpentStates))
+	for i, state := range req.FinalizedTransaction.SpentStates {
+		inputs[i] = state.HashId
+	}
+	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
+	for i, state := range req.FinalizedTransaction.NewStates {
+		outputs[i] = state.HashId
+	}
+
+	var senderSignature ethtypes.HexBytes0xPrefix
+	for _, att := range req.AttestationResult {
+		if att.AttestationType == pb.AttestationType_SIGN && att.Name == "sender" {
+			senderSignature = att.Payload
+		}
+	}
+
+	params := map[string]interface{}{
+		"inputs":    inputs,
+		"outputs":   outputs,
+		"signature": senderSignature,
+		"data":      req.Transaction.TransactionId,
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PrepareTransactionResponse{
+		Transaction: &pb.BaseLedgerTransaction{
+			FunctionName: "transfer",
+			ParamsJson:   string(paramsJSON),
+		},
+	}, nil
+}

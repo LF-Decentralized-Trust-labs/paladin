@@ -254,13 +254,13 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		return nil, nil
 	}
 
-	switch m := body.(type) {
+	switch req := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Received ConfigureDomainRequest")
-		d.chainID = m.ChainId
+		d.chainID = req.ChainId
 
 		var config Config
-		err := yaml.Unmarshal([]byte(m.ConfigYaml), &config)
+		err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 		if err != nil {
 			return nil, err
 		}
@@ -293,13 +293,13 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
-		d.domainID = m.DomainUuid
-		d.coinSchema = m.AbiStateSchemas[0]
+		d.domainID = req.DomainUuid
+		d.coinSchema = req.AbiStateSchemas[0]
 		return &pb.InitDomainResponse{}, nil
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
-		params, err := d.validateDeploy(m.Transaction)
+		params, err := d.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
@@ -315,11 +315,11 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		params, err := d.validateDeploy(m.Transaction)
+		params, err := d.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		notary := m.ResolvedVerifiers[0].Verifier
+		notary := req.ResolvedVerifiers[0].Verifier
 
 		return &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
@@ -327,78 +327,49 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 				ParamsJson: fmt.Sprintf(`{
 					"txId": "%s",
 					"notary": "%s"
-				}`, m.Transaction.TransactionId, notary),
+				}`, req.Transaction.TransactionId, notary),
 			},
 			SigningAddress: params.Notary,
 		}, nil
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
-		tx, err := d.validateTransaction(ctx, m.Transaction)
+		tx, err := d.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Init(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
-		tx, err := d.validateTransaction(ctx, m.Transaction)
+		tx, err := d.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
-		tx, err := d.validateTransaction(ctx, m.Transaction)
+		tx, err := d.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, m)
+		return d.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
-
-		inputs := make([]string, len(m.FinalizedTransaction.SpentStates))
-		for i, state := range m.FinalizedTransaction.SpentStates {
-			inputs[i] = state.HashId
-		}
-		outputs := make([]string, len(m.FinalizedTransaction.NewStates))
-		for i, state := range m.FinalizedTransaction.NewStates {
-			outputs[i] = state.HashId
-		}
-
-		var senderSignature ethtypes.HexBytes0xPrefix
-		for _, att := range m.AttestationResult {
-			if att.AttestationType == pb.AttestationType_SIGN && att.Name == "sender" {
-				senderSignature = att.Payload
-			}
-		}
-
-		params := map[string]interface{}{
-			"inputs":    inputs,
-			"outputs":   outputs,
-			"signature": senderSignature,
-			"data":      m.Transaction.TransactionId,
-		}
-		paramsJSON, err := json.Marshal(params)
+		tx, err := d.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-
-		return &pb.PrepareTransactionResponse{
-			Transaction: &pb.BaseLedgerTransaction{
-				FunctionName: "transfer",
-				ParamsJson:   string(paramsJSON),
-			},
-		}, nil
+		return d.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
 
 	case *pb.DomainAPIError:
-		log.L(ctx).Errorf("Received error: %s", m.ErrorMessage)
+		log.L(ctx).Errorf("Received error: %s", req.ErrorMessage)
 		return nil, nil
 
 	default:
-		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(m))
+		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(req))
 		return nil, nil
 	}
 }

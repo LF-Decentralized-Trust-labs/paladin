@@ -101,3 +101,32 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
+
+func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+	inputs := make([]string, len(req.FinalizedTransaction.SpentStates))
+	for i, state := range req.FinalizedTransaction.SpentStates {
+		inputs[i] = state.HashId
+	}
+	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
+	for i, state := range req.FinalizedTransaction.NewStates {
+		outputs[i] = state.HashId
+	}
+
+	params := map[string]interface{}{
+		"inputs":    inputs,
+		"outputs":   outputs,
+		"signature": "0x",
+		"data":      req.Transaction.TransactionId,
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PrepareTransactionResponse{
+		Transaction: &pb.BaseLedgerTransaction{
+			FunctionName: "transfer",
+			ParamsJson:   string(paramsJSON),
+		},
+	}, nil
+}
