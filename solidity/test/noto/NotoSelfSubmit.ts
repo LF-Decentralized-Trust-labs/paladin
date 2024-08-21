@@ -2,11 +2,11 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ContractTransactionReceipt, Signer } from "ethers";
 import hre, { ethers } from "hardhat";
-import { NotoSigned } from "../../typechain-types";
+import { NotoSelfSubmit } from "../../typechain-types";
 import { fakeTXO, randomBytes32 } from "./Noto";
 
 export async function prepareSignature(
-  noto: NotoSigned,
+  noto: NotoSelfSubmit,
   notary: Signer,
   inputs: string[],
   outputs: string[],
@@ -29,12 +29,16 @@ export async function prepareSignature(
   return notary.signTypedData(domain, types, value);
 }
 
-describe("NotoSigned", function () {
+describe("NotoSelfSubmit", function () {
   async function deployNotoFixture() {
     const [notary, other] = await ethers.getSigners();
 
-    const Noto = await ethers.getContractFactory("NotoSigned");
-    const noto = await Noto.deploy(notary.address);
+    const Noto = await ethers.getContractFactory("NotoSelfSubmit");
+    const noto = await Noto.deploy(
+      randomBytes32(),
+      "0xab5a1b758fdabfa31542bf50de1e1689ab64db6e",
+      notary.address
+    );
 
     return { noto, notary, other };
   }
@@ -42,7 +46,7 @@ describe("NotoSigned", function () {
   async function doTransfer(
     notary: Signer,
     submitter: Signer,
-    noto: NotoSigned,
+    noto: NotoSelfSubmit,
     inputs: string[],
     outputs: string[],
     data: string

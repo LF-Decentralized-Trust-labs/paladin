@@ -104,15 +104,6 @@ func loadBuild(buildOutput []byte) SolidityBuild {
 	return build
 }
 
-func findMethod(entries []*abi.Entry, name string) *abi.Entry {
-	for _, entry := range entries {
-		if entry.Name == name {
-			return entry
-		}
-	}
-	return nil
-}
-
 func New(ctx context.Context, addr string) (*Noto, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -120,20 +111,11 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
-
-	contract := loadBuild(notoJSON)
-	transfer := findMethod(contract.ABI, "transfer")
-	if transfer != nil {
-		// Add names for unused parameters in this contract variant
-		// (underlying library does not allow unnamed parameters)
-		transfer.Inputs[2].Name = "signature"
-	}
-
 	d := &Noto{
 		conn:     conn,
 		client:   pb.NewKataMessageServiceClient(conn),
 		Factory:  loadBuild(notoFactoryJSON),
-		Contract: contract,
+		Contract: loadBuild(notoJSON),
 	}
 	d.replies = &replyTracker{
 		inflight: make(map[string]*inflightRequest),
