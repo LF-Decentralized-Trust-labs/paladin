@@ -69,6 +69,13 @@ type Sequencer interface {
 	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
 
 	/*
+		OnTransactionDelegated is emitted whenever a transaction has been delegated from one node to another
+		this is an event that is broadcast to all nodes after the fact and should not be confused with the DelegateTransaction message which is
+		an instruction to the delegate node.
+	*/
+	OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error
+
+	/*
 		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
 	*/
 	AssignTransaction(ctx context.Context, transactionID string) error
@@ -168,6 +175,7 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 		transactionUUIDs[i] = transactionUUID
 	}
 
+	log.L(ctx).Debugf("Dispatching transactions: %v", transactionUUIDs)
 	err = s.dispatcher.Dispatch(ctx, transactionUUIDs)
 	if err != nil {
 		log.L(ctx).Errorf("Error dispatching transaction: %s", err)
@@ -203,6 +211,7 @@ func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transact
 		mintingTransaction := s.unconfirmedTransactionsByID[mintingTransactionID]
 
 		if mintingTransaction != nil {
+			log.L(ctx).Debugf("Transaction %s is dependant on transaction %s on node %s", txn.id, mintingTransactionID, mintingTransaction.sequencingNodeID)
 			mintingTransactions = append(mintingTransactions, mintingTransaction)
 		}
 	}
@@ -220,6 +229,14 @@ func (s *sequencer) delegate(ctx context.Context, transactionId string, delegate
 		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
 		return err
 	}
+	//update our local state to reflect that this transaction is now delegated
+	txn, ok := s.unconfirmedTransactionsByID[transactionId]
+	if !ok {
+		//TODO could we recover from this error by adding the transaction to the map now?
+		log.L(ctx).Errorf("failed to find minting transaction %s", transactionId)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, transactionId)
+	}
+	txn.sequencingNodeID = delegateNodeID
 	return nil
 }
 
@@ -239,10 +256,10 @@ func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, 
 	return nil
 }
 
-func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction transaction) (bool, error) {
+func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction *transaction) (bool, error) {
 	//if the transaction has any dependencies on transactions that are being managed by other nodes,
 	//then we need to delegate this one to that remote node too
-	unconfirmedDependencies, err := s.getUnconfirmedDependencies(ctx, transaction)
+	unconfirmedDependencies, err := s.getUnconfirmedDependencies(ctx, *transaction)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting unconfirmed dependencies: %s", err)
 		return false, err
@@ -266,6 +283,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction trans
 
 		// we have a dependency on transactions from multiple nodes
 		// we can't delegate this transaction to multiple nodes, so we need to wait for the dependencies to be resolved
+		log.L(ctx).Debugf("Transaction %s is blocked by transactions from multiple nodes %v", transaction.id, keys)
 		err := s.blockTransaction(ctx, transaction.id, blockedBy)
 
 		if err != nil {
@@ -276,11 +294,13 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction trans
 	}
 	if len(keys) == 1 && keys[0] != s.nodeID.String() {
 		// we are dependent on one other node so we can delegate
+		log.L(ctx).Debugf("Transaction %s is dependant on transaction(s). Delagating to node %s", transaction.id, keys[0])
 		err := s.delegate(ctx, transaction.id, keys[0])
 		if err != nil {
 			log.L(ctx).Errorf("Error delegating: %s", err)
 			return false, err
 		}
+
 		return true, nil
 
 	}
@@ -334,7 +354,9 @@ func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatab
 	}
 	return delegatableTransactions
 }
-func (s *sequencer) acceptTransaction(ctx context.Context, transaction transaction) error {
+func (s *sequencer) acceptTransaction(ctx context.Context, transaction *transaction) error {
+	transaction.sequencingNodeID = s.nodeID.String()
+
 	delegated, err := s.delegateIfAppropriate(ctx, transaction)
 	if err != nil {
 		log.L(ctx).Errorf("Error delegating transaction: %s", err)
@@ -491,7 +513,22 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 			delete(s.stateSpenders, state)
 		}
 	}
+	return nil
+}
 
+func (s *sequencer) OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error {
+	transaction := s.unconfirmedTransactionsByID[event.TransactionId]
+	if transaction == nil {
+		log.L(ctx).Errorf("Transaction %s does not exist", event.TransactionId)
+		//TODO - should we do something here?  Should we add the transaction to our map?
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, event.TransactionId)
+	}
+	log.L(ctx).Infof("OnTransactionDelegated transaction %s delegated from %s to %s", event.TransactionId, event.DelegatingNodeId, event.DelegateNodeId)
+	if transaction.sequencingNodeID != event.DelegatingNodeId {
+		log.L(ctx).Debugf("local info about transaction %s out of date current sequening node is thought to be  %s", event.TransactionId, transaction.sequencingNodeID)
+	}
+
+	transaction.sequencingNodeID = event.DelegateNodeId
 	return nil
 }
 
@@ -505,7 +542,9 @@ func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, txnID)
 	}
 
-	return s.acceptTransaction(ctx, *txn)
+	// txn is passed as a pointer so that it can be updated in the acceptTransaction method
+	// this is not thread safe but we assume that the sequencer is single threaded
+	return s.acceptTransaction(ctx, txn)
 }
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {

@@ -132,7 +132,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	// Should see an event relinquishing ownership of this this transaction
+	// Should see a message relinquishing ownership of this this transaction
 	transportMock1.On("SendMessage", ctx, remoteNodeId.String(), mock.Anything).Run(func(args mock.Arguments) {
 		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
 		assert.Equal(t, txn2ID.String(), delegateTransactionMessage.TransactionId)
@@ -162,6 +162,207 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
+	assert.NoError(t, err)
+
+}
+
+func TestSequencerTransitiveRemoteDependency(t *testing.T) {
+	// Transactions that are added to a sequencer's graph and have dependencies on another transaction that is
+	// managed by another sequencer, will be moved to that other sequencer as soon as they are assembled
+	// even when the dependency is itself dependent on another transaction and has already been delegated too
+	// i.e. make sure that we don't assume that the assemblyNodeID is the same as the delegatingNodeID
+	ctx := context.Background()
+	localNodeId := uuid.New()
+	remoteNode1Id := uuid.New()
+	remoteNode2Id := uuid.New()
+
+	txn1ID := uuid.New()
+	txn2ID := uuid.New()
+	txn3ID := uuid.New()
+
+	stateHashA := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	stateHashB := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	//create a sequencer for the local node
+	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
+	transportMock1 := node1SequencerMockDependencies.eventSyncMock
+
+	// First transaction (the minter of a given state) is assembled on the remote node
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   txn1ID.String(),
+		NodeId:          remoteNode1Id.String(),
+		OutputStateHash: []string{stateHashA.String()},
+	})
+	assert.NoError(t, err)
+
+	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   txn2ID.String(),
+		NodeId:          remoteNode2Id.String(),
+		InputStateHash:  []string{stateHashA.String()},
+		OutputStateHash: []string{stateHashB.String()},
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.OnTransactionDelegated(ctx, &pb.TransactionDelegatedEvent{
+		TransactionId:    txn2ID.String(),
+		DelegatingNodeId: remoteNode2Id.String(),
+		DelegateNodeId:   remoteNode1Id.String(),
+	})
+	assert.NoError(t, err)
+
+	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:  txn3ID.String(),
+		NodeId:         localNodeId.String(),
+		InputStateHash: []string{stateHashB.String()},
+	})
+	assert.NoError(t, err)
+
+	// Should see an event relinquishing ownership of this this transaction to the first remote node
+	// even though the transaction's direct dependency is on the second remote node
+	transportMock1.On("SendMessage", ctx, remoteNode1Id.String(), mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
+		assert.Equal(t, txn3ID.String(), delegateTransactionMessage.TransactionId)
+		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
+		assert.Equal(t, remoteNode1Id.String(), delegateTransactionMessage.DelegateNodeId)
+	}).Return(nil)
+
+	err = node1Sequencer.AssignTransaction(ctx, txn3ID.String())
+	assert.NoError(t, err)
+
+	transportMock1.AssertExpectations(t)
+
+	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn1ID.String(),
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn2ID.String(),
+	})
+	assert.NoError(t, err)
+}
+
+func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
+	//TODO test the following case
+	// txn1 is assembled on node1
+	// txn2 is assembled on node2 and has a dependency on txn1 and is delegated to remoteNode1
+	// txn3 is assembled on node3 and has a dependency on txn2 but the node3 node hasn't yet recieved the event to notify it that txn2 has been delegated to node1
+	// It is valid for node3 to delegate to node2 and it is node 2's responsibiilty to onward delegate to node1
+
+	ctx := context.Background()
+	localNodeId := uuid.New()
+	remoteNode1Id := uuid.New()
+	remoteNode2Id := uuid.New()
+
+	txn1ID := uuid.New()
+	txn2ID := uuid.New()
+	txn3ID := uuid.New()
+
+	stateHashA := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	stateHashB := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	//create a sequencer for the local node
+	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
+	transportMock1 := node1SequencerMockDependencies.eventSyncMock
+
+	// First transaction (the minter of a given state) is assembled on the remote node
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   txn1ID.String(),
+		NodeId:          remoteNode1Id.String(),
+		OutputStateHash: []string{stateHashA.String()},
+	})
+	assert.NoError(t, err)
+
+	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   txn2ID.String(),
+		NodeId:          remoteNode2Id.String(),
+		InputStateHash:  []string{stateHashA.String()},
+		OutputStateHash: []string{stateHashB.String()},
+	})
+	assert.NoError(t, err)
+
+	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
+	//but the local node has not been notified that txn2 has been delegated to remoteNode1 yet
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:  txn3ID.String(),
+		NodeId:         localNodeId.String(),
+		InputStateHash: []string{stateHashB.String()},
+	})
+	assert.NoError(t, err)
+
+	// Should see an event relinquishing ownership of this this transaction to the second remote node
+	transportMock1.On("SendMessage", ctx, remoteNode2Id.String(), mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
+		assert.Equal(t, txn3ID.String(), delegateTransactionMessage.TransactionId)
+		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
+		assert.Equal(t, remoteNode2Id.String(), delegateTransactionMessage.DelegateNodeId)
+	}).Return(nil).Once()
+
+	err = node1Sequencer.AssignTransaction(ctx, txn3ID.String())
+	assert.NoError(t, err)
+
+	transportMock1.AssertExpectations(t)
+
+	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn1ID.String(),
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn2ID.String(),
+	})
+	assert.NoError(t, err)
+
+	//Now a 4th node comes along and delegates txn4 (which has a dependency on txn3)
+	// this 4th node (remoteNode3) is in the same possition as the local node was.
+	// it has not been notified that txn3 has been delegated to remoteNode2
+	// and so it delegates txn4 to localNode
+	// local node is now in the possition that remoteNode2 was in above
+	// i.e. we expect localnode to forward the delegation to remoteNode2
+	remoteNode3Id := uuid.New()
+
+	txn4ID := uuid.New()
+
+	stateHashC := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		TransactionId:   txn4ID.String(),
+		NodeId:          remoteNode3Id.String(),
+		InputStateHash:  []string{stateHashB.String()},
+		OutputStateHash: []string{stateHashC.String()},
+	})
+	assert.NoError(t, err)
+
+	transportMock1.On("SendMessage", ctx, remoteNode2Id.String(), mock.Anything).Run(func(args mock.Arguments) {
+		delegateTransactionMessage := args.Get(2).(*pb.DelegateTransaction)
+		assert.Equal(t, txn4ID.String(), delegateTransactionMessage.TransactionId)
+		assert.Equal(t, localNodeId.String(), delegateTransactionMessage.DelegatingNodeId)
+		assert.Equal(t, remoteNode2Id.String(), delegateTransactionMessage.DelegateNodeId)
+	}).Return(nil).Once()
+
+	err = node1Sequencer.AssignTransaction(ctx, txn4ID.String())
 	assert.NoError(t, err)
 
 }
