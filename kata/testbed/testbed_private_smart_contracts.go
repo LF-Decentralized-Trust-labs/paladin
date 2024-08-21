@@ -269,7 +269,7 @@ func (psc *tbPrivateSmartContract) determineSubmitterIdentity(txSpec *proto.Tran
 func (psc *tbPrivateSmartContract) validateAndWriteStates(seq uuid.UUID, newStates []*proto.NewState) ([]*statestore.State, []*proto.StateRef, error) {
 
 	domain := psc.domain
-	newStatesToWrite := make([]*statestore.NewState, len(newStates))
+	newStatesToWrite := make([]*statestore.StateUpsert, len(newStates))
 	for i, s := range newStates {
 		schema := domain.schemasByID[s.SchemaId]
 		if schema == nil {
@@ -278,7 +278,7 @@ func (psc *tbPrivateSmartContract) validateAndWriteStates(seq uuid.UUID, newStat
 		if schema == nil {
 			return nil, nil, fmt.Errorf("unknown schema %s", s.SchemaId)
 		}
-		newStatesToWrite[i] = &statestore.NewState{
+		newStatesToWrite[i] = &statestore.StateUpsert{
 			SchemaID: schema.IDString(),
 			Data:     types.RawJSON(s.StateDataJson),
 		}

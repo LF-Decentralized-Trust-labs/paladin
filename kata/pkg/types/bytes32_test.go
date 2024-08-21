@@ -27,7 +27,6 @@ import (
 func TestBytes32Static(t *testing.T) {
 
 	var id1 *Bytes32
-	assert.Equal(t, "", id1.String())
 	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", id1.HexString0xPrefix())
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", id1.HexString())
 	assert.Nil(t, id1.Bytes())

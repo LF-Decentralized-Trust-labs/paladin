@@ -179,7 +179,7 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 
 	postAssembly := tx.PostAssembly
 
-	var newStatesToWrite []*statestore.NewState
+	var newStatesToWrite []*statestore.StateUpsert
 	domain := dc.d
 	for i, s := range postAssembly.OutputStatesPotential {
 		schema := domain.schemasByID[s.SchemaId]
@@ -189,7 +189,7 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 		if schema == nil {
 			return i18n.NewError(ctx, msgs.MsgDomainUnknownSchema, s.SchemaId)
 		}
-		newStatesToWrite[i] = &statestore.NewState{
+		newStatesToWrite[i] = &statestore.StateUpsert{
 			SchemaID: schema.IDString(),
 			Data:     types.RawJSON(s.StateDataJson),
 		}
@@ -249,9 +249,9 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	return nil
 }
 
-func (dc *domainContract) addStatesForUpsert(ctx context.Context, states []*statestore.State, bySchema map[types.Bytes32][]*statestore.NewState) {
+func (dc *domainContract) addStatesForUpsert(ctx context.Context, states []*statestore.State, bySchema map[types.Bytes32][]*statestore.StateUpsert) {
 	for _, s := range states {
-		bySchema[s.Schema] = append(bySchema[s.Schema], &statestore.NewState{
+		bySchema[s.Schema] = append(bySchema[s.Schema], &statestore.StateUpsert{
 			SchemaID: string(s.Schema),
 		})
 	}

@@ -51,29 +51,29 @@ type DomainStateInterface interface {
 	// FindAvailableStates is the main query function, only returning states that are available.
 	// Note this does not lock these states in any way, you must call that afterwards as:
 	// 1) We don't know which will be selected as important by the domain - some might be un-used
-	// 2) We deliberately return states that are locked to a sequence (but not spent yet) - which means the
+	// 2) We deliberately return states that are locked to a transaction (but not spent yet) - which means the
 	//    result of the any assemble that uses those states, will be a transaction that must
-	//    be on the same sequence where those states are locked.
+	//    be on the same transaction where those states are locked.
 	FindAvailableStates(schemaID string, query *filters.QueryJSON) (s []*State, err error)
 
 	// MarkStatesSpending writes a lock record so the state is now locked for spending, and
 	// thus subsequent calls to FindAvailableStates will not return these states.
-	MarkStatesSpending(sequenceID uuid.UUID, stateIDs []string) error
+	MarkStatesSpending(transactionID uuid.UUID, stateIDs []string) error
 
-	// MarkStatesRead writes a lock record so the state is now locked to this sequence
+	// MarkStatesRead writes a lock record so the state is now locked to this transaction
 	// for reading - thus subsequent calls to FindAvailableStates will return these states
 	// with the lock record attached.
-	// That will inform them they need to join to this sequence if they wish to use those states.
-	MarkStatesRead(sequenceID uuid.UUID, stateIDs []string) error
+	// That will inform them they need to join to this transaction if they wish to use those states.
+	MarkStatesRead(transactionID uuid.UUID, stateIDs []string) error
 
-	// CreateNewStates creates new states that are locked for reading to the specified sequence from creation.
+	// UpsertStates creates new states that are locked for reading to the specified transaction from creation.
 	// They are available immediately within the domain for return in FindAvailableStates
 	// (even before the flush)
-	CreateNewStates(sequenceID uuid.UUID, states []*NewState) (s []*State, err error)
+	UpsertStates(transactionID uuid.UUID, states []*StateUpsert) (s []*State, err error)
 
-	// ResetSequence queues up removal of all lock records for a given sequence
+	// ResetTransaction queues up removal of all lock records for a given transaction
 	// Note that the private data of the states themselves are not removed
-	ResetSequence(sequenceID uuid.UUID) error
+	ResetTransaction(transactionID uuid.UUID) error
 
 	// Flush moves the un-flushed set into flushing status, queueing to a DB writer to batch write
 	// to the database.
@@ -328,11 +328,11 @@ func (dc *domainContext) FindAvailableStates(schemaID string, query *filters.Que
 	return dc.mergedUnFlushed(schema, states, query)
 }
 
-func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, newStates []*NewState) (states []*State, err error) {
+func (dc *domainContext) UpsertStates(transactionID uuid.UUID, stateUpserts []*StateUpsert) (states []*State, err error) {
 
-	states = make([]*State, len(newStates))
-	withValues := make([]*StateWithLabels, len(newStates))
-	for i, ns := range newStates {
+	states = make([]*State, len(stateUpserts))
+	withValues := make([]*StateWithLabels, len(stateUpserts))
+	for i, ns := range stateUpserts {
 		schema, err := dc.ss.GetSchema(dc.ctx, dc.domainID, ns.SchemaID, true)
 		if err != nil {
 			return nil, err
@@ -343,6 +343,13 @@ func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, newStates []*NewS
 			return nil, err
 		}
 		states[i] = withValues[i].State
+		states[i].Locked = &StateLock{
+			Transaction: transactionID,
+			State:       withValues[i].State.ID,
+			Creating:    ns.Creating,
+			Spending:    ns.Spending,
+		}
+		log.L(dc.ctx).Infof("Upserting state %s tx=%s creating=%t spending=%t", states[i].ID, transactionID, states[i].Locked.Creating, states[i].Locked.Spending)
 	}
 
 	// Take lock and check flush state
@@ -352,21 +359,35 @@ func (dc *domainContext) CreateNewStates(sequenceID uuid.UUID, newStates []*NewS
 		return nil, flushErr
 	}
 
-	// This is a new state, so we don't check existing un-flushed records
-	for _, s := range withValues {
-		s.Locked = &StateLock{
-			Sequence: sequenceID,
-			State:    s.State.ID,
-			Creating: true,
-			Spending: false,
+	// We need to de-duplicate out any previous un-flushed state writes of the same ID
+	deDuppedUnFlushedStates := make([]*StateWithLabels, 0, len(dc.unFlushed.states))
+	for _, existing := range dc.unFlushed.states {
+		var replaced bool
+		for _, s := range withValues {
+			if existing.ID == s.ID {
+				replaced = true
+				break
+			}
 		}
-		dc.unFlushed.states = append(dc.unFlushed.states, s)
-		dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, s.Locked)
+		if !replaced {
+			deDuppedUnFlushedStates = append(deDuppedUnFlushedStates, existing)
+		}
 	}
+	// Now we can add our own un-flushed writes to the de-duplicated lists
+	dc.unFlushed.states = append(deDuppedUnFlushedStates, withValues...)
+	// Then add all the state locks (which need individual de-duping too)
+	for _, s := range withValues {
+		_, err = dc.setUnFlushedLock(transactionID, s.State.ID, func(sl *StateLock) {
+			// Upsert semantics for states will replace any existing locks with the explicitly set locks in the upsert
+			sl.Creating = s.Locked.Creating
+			sl.Spending = s.Locked.Spending
+		})
+	}
+
 	return states, nil
 }
 
-func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDStrings []string, setState func(*StateLock)) (err error) {
+func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []string, setLockState func(*StateLock)) (err error) {
 	stateIDs := make([]*types.Bytes32, len(stateIDStrings))
 	for i, id := range stateIDStrings {
 		stateIDs[i], err = types.ParseBytes32(dc.ctx, id)
@@ -382,37 +403,44 @@ func (dc *domainContext) lockStates(sequenceID uuid.UUID, stateIDStrings []strin
 		return flushErr
 	}
 
-	// Update an existing un-flushed record, or add a new one
+	// Update an existing un-flushed record, or add a new one.
+	// Note we might fail on a clash (and the caller should then reset this transaction)
 	for _, id := range stateIDs {
-		var lock *StateLock
-		for _, l := range dc.unFlushed.stateLocks {
-			if l.State == *id {
-				if l.Sequence != sequenceID {
-					// This represents a failure to call ResetSequence() correctly
-					return i18n.NewError(dc.ctx, msgs.MsgStateLockConflictUnexpected, l.Sequence, sequenceID)
-				}
-				lock = l
-				break
-			}
+		if _, err := dc.setUnFlushedLock(transactionID, *id, setLockState); err != nil {
+			return err
 		}
-		if lock == nil {
-			lock = &StateLock{State: *id, Sequence: sequenceID}
-			dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, lock)
-		}
-		setState(lock)
 	}
 	return nil
 }
 
-func (dc *domainContext) MarkStatesRead(sequenceID uuid.UUID, stateIDs []string) (err error) {
-	return dc.lockStates(sequenceID, stateIDs, func(*StateLock) {})
+func (dc *domainContext) setUnFlushedLock(transactionID uuid.UUID, stateID types.Bytes32, setLockState func(*StateLock)) (*StateLock, error) {
+	// Update an existing un-flushed record if one exists
+	for _, l := range dc.unFlushed.stateLocks {
+		if l.State == stateID {
+			if l.Transaction != transactionID {
+				// This represents a failure to call ResetTransaction() correctly
+				return nil, i18n.NewError(dc.ctx, msgs.MsgStateLockConflictUnexpected, l.Transaction, transactionID)
+			}
+			setLockState(l)
+			return l, nil
+		}
+	}
+	// Otherwise create a new one
+	l := &StateLock{State: stateID, Transaction: transactionID}
+	dc.unFlushed.stateLocks = append(dc.unFlushed.stateLocks, l)
+	setLockState(l)
+	return l, nil
 }
 
-func (dc *domainContext) MarkStatesSpending(sequenceID uuid.UUID, stateIDs []string) (err error) {
-	return dc.lockStates(sequenceID, stateIDs, func(l *StateLock) { l.Spending = true })
+func (dc *domainContext) MarkStatesRead(transactionID uuid.UUID, stateIDs []string) (err error) {
+	return dc.lockStates(transactionID, stateIDs, func(*StateLock) {})
 }
 
-func (dc *domainContext) ResetSequence(sequenceID uuid.UUID) error {
+func (dc *domainContext) MarkStatesSpending(transactionID uuid.UUID, stateIDs []string) (err error) {
+	return dc.lockStates(transactionID, stateIDs, func(l *StateLock) { l.Spending = true })
+}
+
+func (dc *domainContext) ResetTransaction(transactionID uuid.UUID) error {
 	// Take lock and check flush state
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
@@ -420,16 +448,16 @@ func (dc *domainContext) ResetSequence(sequenceID uuid.UUID) error {
 		return flushErr
 	}
 
-	// Remove anything un-flushed for this sequence, as we will delete everything instead
+	// Remove anything un-flushed for this transaction, as we will delete everything instead
 	newStateLocks := make([]*StateLock, 0, len(dc.unFlushed.stateLocks))
 	for _, l := range dc.unFlushed.stateLocks {
-		if l.Sequence != sequenceID {
+		if l.Transaction != transactionID {
 			newStateLocks = append(newStateLocks, l)
 		}
 	}
 	dc.unFlushed.stateLocks = newStateLocks
 	// Add the delete to be flushed
-	dc.unFlushed.sequenceLockDeletes = append(dc.unFlushed.sequenceLockDeletes, sequenceID)
+	dc.unFlushed.transactionLockDeletes = append(dc.unFlushed.transactionLockDeletes, transactionID)
 	return nil
 }
 

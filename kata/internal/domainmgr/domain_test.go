@@ -381,7 +381,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 	assert.Nil(t, tp.d.initError.Load())
 
 	err := dm.stateStore.RunInDomainContextFlush("test1", func(ctx context.Context, dsi statestore.DomainStateInterface) error {
-		newStates, err := dsi.CreateNewStates(uuid.New(), []*statestore.NewState{
+		newStates, err := dsi.CreateNewStates(uuid.New(), []*statestore.StateUpsert{
 			{
 				SchemaID: tp.stateSchemas[0].Id,
 				Data: types.RawJSON(`{

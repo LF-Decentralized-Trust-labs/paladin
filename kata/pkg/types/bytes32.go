@@ -68,10 +68,7 @@ func MustParseBytes32(s string) *Bytes32 {
 }
 
 // Natural string representation is HexString0xPrefix() if non-nil, or empty string if ""
-func (id *Bytes32) String() string {
-	if id == nil {
-		return ""
-	}
+func (id Bytes32) String() string {
 	return id.HexString0xPrefix()
 }
 
