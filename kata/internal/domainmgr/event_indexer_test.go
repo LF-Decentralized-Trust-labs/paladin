@@ -82,7 +82,8 @@ func TestEventIndexingWithDB(t *testing.T) {
 		Address:       contractAddr,
 		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
 	}, dc.info)
-	assert.Equal(t, tp.d, psc.Domain())
+	assert.Equal(t, tp.d, dc.d)
+	assert.Equal(t, dm, dc.dm)
 
 	// Get cached
 	psc2, err := tp.d.GetSmartContractByAddress(ctx, contractAddr)

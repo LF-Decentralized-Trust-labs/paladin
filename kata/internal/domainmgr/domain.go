@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/cache"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
@@ -230,6 +231,67 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 		States: pbStates,
 	}, nil
 
+}
+
+func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {
+
+	// Build the init request
+	var abiJSON []byte
+	var paramsJSON []byte
+	constructorValues, err := d.constructorABI.Inputs.ParseJSONCtx(ctx, tx.Inputs)
+	if err == nil {
+		abiJSON, err = json.Marshal(d.constructorABI)
+	}
+	if err == nil {
+		// Serialize to standardized JSON before passing to domain
+		paramsJSON, err = types.StandardABISerializer().SerializeJSONCtx(ctx, constructorValues)
+	}
+	if err != nil {
+		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidConstructorParams, d.constructorABI.SolString())
+	}
+
+	txSpec := &prototk.DeployTransactionSpecification{}
+	tx.TransactionSpecification = txSpec
+	txSpec.TransactionId = types.Bytes32UUIDLower16(tx.ID).String()
+	txSpec.ConstructorAbi = string(abiJSON)
+	txSpec.ConstructorParamsJson = string(paramsJSON)
+
+	// Do the request with the domain
+	res, err := d.api.InitDeploy(ctx, &prototk.InitDeployRequest{
+		Transaction: txSpec,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Store the response back on the TX
+	tx.RequiredVerifiers = res.RequiredVerifiers
+	return nil
+}
+
+func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {
+	// All the work is done for us by the engine in resolving the verifiers
+	// after InitDeploy, so we just pass it along
+	res, err := d.api.PrepareDeploy(ctx, &prototk.PrepareDeployRequest{
+		Transaction:       tx.TransactionSpecification,
+		ResolvedVerifiers: tx.Verifiers,
+	})
+	if err != nil {
+		return err
+	}
+
+	tx.Signer = res.SigningAddress
+	if res.Transaction != nil && res.Deploy == nil {
+		tx.InvokeTransaction = res.Transaction
+		tx.DeployTransaction = nil
+	} else if res.Deploy != nil && res.Transaction == nil {
+		tx.DeployTransaction = res.Deploy
+		tx.InvokeTransaction = nil
+	} else {
+		// Must specify exactly one of the two types of transaction
+		return i18n.NewError(ctx, msgs.MsgDomainInvalidPrepareDeployResult)
+	}
+	return nil
 }
 
 func (d *domain) close() {
