@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -65,6 +66,7 @@ type Noto struct {
 	stream       pb.KataMessageService_ListenClient
 	stopListener context.CancelFunc
 	done         chan bool
+	chainID      int64
 	domainID     string
 	coinSchema   *pb.StateSchema
 	replies      *replyTracker
@@ -76,6 +78,19 @@ type NotoDomainConfig struct {
 
 var NotoDomainConfigABI = &abi.ParameterArray{
 	{Name: "notary", Type: "address"},
+}
+
+type parsedTransaction struct {
+	contractAddress *ethtypes.Address0xHex
+	domainConfig    *NotoDomainConfig
+	params          interface{}
+}
+
+type assemblyResult struct {
+	spentCoins  []*NotoCoin
+	spentStates []*pb.StateRef
+	newCoins    []*NotoCoin
+	newStates   []*pb.NewState
 }
 
 func loadBuild(buildOutput []byte) SolidityBuild {
@@ -239,6 +254,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	switch m := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Received ConfigureDomainRequest")
+		d.chainID = m.ChainId
 
 		var config Config
 		err := yaml.Unmarshal([]byte(m.ConfigYaml), &config)
@@ -281,12 +297,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
 
-		var params NotoConstructorParams
-		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
+		params, err := d.validateDeploy(m.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		log.L(ctx).Infof("Deployment parameters: %+v", params)
 
 		return &pb.InitDeployTransactionResponse{
 			RequiredVerifiers: []*pb.ResolveVerifierRequest{
@@ -300,13 +314,10 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
 
-		var params NotoConstructorParams
-		err := yaml.Unmarshal([]byte(m.Transaction.ConstructorParamsJson), &params)
+		params, err := d.validateDeploy(m.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		log.L(ctx).Infof("Deployment parameters: %+v", params)
-		log.L(ctx).Infof("Resolved verifiers: %+v", m.ResolvedVerifiers)
 		notary := m.ResolvedVerifiers[0].Verifier
 
 		return &pb.PrepareDeployTransactionResponse{
@@ -323,52 +334,83 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
 
+		tx, err := d.validateTransaction(ctx, m.Transaction)
+		if err != nil {
+			return nil, err
+		}
+
+		requiredVerifiers := []*pb.ResolveVerifierRequest{{
+			Lookup:    tx.domainConfig.Notary,
+			Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		}}
+
+		switch params := tx.params.(type) {
+		case NotoMintParams:
+			requiredVerifiers = append(requiredVerifiers, &pb.ResolveVerifierRequest{
+				Lookup:    params.To,
+				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+			})
+		case NotoTransferParams:
+			requiredVerifiers = append(requiredVerifiers, &pb.ResolveVerifierRequest{
+				Lookup:    params.From,
+				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+			}, &pb.ResolveVerifierRequest{
+				Lookup:    params.To,
+				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+			})
+		default:
+			return nil, fmt.Errorf("failed to parse parameters: %v", tx.params)
+		}
+
 		return &pb.InitTransactionResponse{
-			RequiredVerifiers: []*pb.ResolveVerifierRequest{},
+			RequiredVerifiers: requiredVerifiers,
 		}, nil
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
 
-		var functionABI abi.Entry
-		err := json.Unmarshal([]byte(m.Transaction.FunctionAbiJson), &functionABI)
+		tx, err := d.validateTransaction(ctx, m.Transaction)
 		if err != nil {
 			return nil, err
 		}
+		// TODO: use tx.domainConfig.Notary instead of hard-coding below
 
-		var assembled *pb.AssembledTransaction
-		switch functionABI.Name {
-		case "mint":
-			var mintParams NotoMintParams
-			err = json.Unmarshal([]byte(m.Transaction.FunctionParamsJson), &mintParams)
-			if err == nil {
-				assembled, err = d.assembleMint(&mintParams)
-			}
-		case "transfer":
-			var transferParams NotoTransferParams
-			err = json.Unmarshal([]byte(m.Transaction.FunctionParamsJson), &transferParams)
-			if err == nil {
-				assembled, err = d.assembleTransfer(ctx, &transferParams)
-			}
+		var assembled *assemblyResult
+		switch params := tx.params.(type) {
+		case NotoMintParams:
+			assembled, err = d.assembleMint(&params)
+		case NotoTransferParams:
+			assembled, err = d.assembleTransfer(ctx, &params)
 		default:
-			err = fmt.Errorf("Unsupported method: %s", functionABI.Name)
+			err = fmt.Errorf("failed to parse parameters: %v", tx.params)
 		}
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = d.decodeDomainConfig(ctx, m.Transaction.ContractConfig)
+		encodedTransfer, err := d.encodeTransferData(ctx, tx.contractAddress, assembled.spentCoins, assembled.newCoins)
 		if err != nil {
 			return nil, err
 		}
-		// TODO: use config.Notary instead of hard-coding below
 
 		return &pb.AssembleTransactionResponse{
-			AssemblyResult:       pb.AssembleTransactionResponse_OK,
-			AssembledTransaction: assembled,
+			AssemblyResult: pb.AssembleTransactionResponse_OK,
+			AssembledTransaction: &pb.AssembledTransaction{
+				SpentStates: assembled.spentStates,
+				NewStates:   assembled.newStates,
+			},
 			AttestationPlan: []*pb.AttestationRequest{
 				{
-					Name:            "signer",
+					Name:            "sender",
+					AttestationType: pb.AttestationType_SIGN,
+					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					Payload:         encodedTransfer,
+					Parties: []string{
+						m.Transaction.From,
+					},
+				},
+				{
+					Name:            "notary",
 					AttestationType: pb.AttestationType_ENDORSE,
 					Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 					Parties: []string{
@@ -380,6 +422,78 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
+
+		tx, err := d.validateTransaction(ctx, m.Transaction)
+		if err != nil {
+			return nil, err
+		}
+
+		inCoins := make([]*NotoCoin, len(m.Inputs))
+		inTotal := big.NewInt(0)
+		for i, input := range m.Inputs {
+			if input.SchemaId != d.coinSchema.Id {
+				return nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
+			}
+			if inCoins[i], err = d.makeCoin(input.StateDataJson); err != nil {
+				return nil, fmt.Errorf("invalid input[%d] (%s): %s", i, input.HashId, err)
+			}
+			inTotal = inTotal.Add(inTotal, inCoins[i].Amount.BigInt())
+		}
+		outCoins := make([]*NotoCoin, len(m.Outputs))
+		outTotal := big.NewInt(0)
+		for i, output := range m.Outputs {
+			if output.SchemaId != d.coinSchema.Id {
+				return nil, fmt.Errorf("unknown schema ID: %s", output.SchemaId)
+			}
+			if outCoins[i], err = d.makeCoin(output.StateDataJson); err != nil {
+				return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.HashId, err)
+			}
+			outTotal = outTotal.Add(outTotal, outCoins[i].Amount.BigInt())
+		}
+
+		switch params := tx.params.(type) {
+		case NotoMintParams:
+			if len(inCoins) > 0 {
+				return nil, fmt.Errorf("invalid inputs to 'mint': %v", inCoins)
+			}
+			if outTotal.Cmp(params.Amount.BigInt()) != 0 {
+				return nil, fmt.Errorf("invalid amount for 'mint'")
+			}
+		case NotoTransferParams:
+			if inTotal.Cmp(outTotal) != 0 {
+				return nil, fmt.Errorf("invalid amount for 'transfer'")
+			}
+		default:
+			err = fmt.Errorf("failed to parse parameters: %v", tx.params)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		var senderSignature *pb.AttestationResult
+		for _, ar := range m.Signatures {
+			if ar.AttestationType == pb.AttestationType_SIGN &&
+				ar.Name == "sender" &&
+				ar.Verifier.Algorithm == api.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
+				senderSignature = ar
+				break
+			}
+		}
+		if senderSignature == nil {
+			return nil, fmt.Errorf("did not find 'sender' attestation result")
+		}
+
+		encodedTransfer, err := d.encodeTransferData(ctx, tx.contractAddress, inCoins, outCoins)
+		if err != nil {
+			return nil, err
+		}
+		signingAddress, err := d.recoverSignature(ctx, encodedTransfer, senderSignature.Payload)
+		if err != nil {
+			return nil, err
+		}
+		if signingAddress.String() != senderSignature.Verifier.Verifier {
+			return nil, fmt.Errorf("sender signature does not match")
+		}
 
 		return &pb.EndorseTransactionResponse{
 			EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
@@ -397,10 +511,17 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 			outputs[i] = state.HashId
 		}
 
+		var senderSignature ethtypes.HexBytes0xPrefix
+		for _, att := range m.AttestationResult {
+			if att.AttestationType == pb.AttestationType_SIGN && att.Name == "sender" {
+				senderSignature = att.Payload
+			}
+		}
+
 		params := map[string]interface{}{
 			"inputs":    inputs,
 			"outputs":   outputs,
-			"signature": "0x",
+			"signature": senderSignature,
 			"data":      m.Transaction.TransactionId,
 		}
 		paramsJSON, err := json.Marshal(params)
@@ -439,36 +560,126 @@ func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*No
 	return &config, err
 }
 
-func (d *Noto) assembleMint(params *NotoMintParams) (*pb.AssembledTransaction, error) {
-	outputs, err := d.prepareOutputs(params.To, params.Amount)
+func (d *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConstructorParams, error) {
+	var params NotoConstructorParams
+	err := yaml.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
+	return &params, err
+}
+
+func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*parsedTransaction, error) {
+	var functionABI abi.Entry
+	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.AssembledTransaction{
-		NewStates: outputs,
+
+	var params interface{}
+	switch functionABI.Name {
+	case "mint":
+		signature, err := NotoMintABI.SignatureCtx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if tx.FunctionSignature != signature {
+			return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
+		}
+		var mintParams NotoMintParams
+		if err = json.Unmarshal([]byte(tx.FunctionParamsJson), &mintParams); err != nil {
+			return nil, err
+		}
+		if mintParams.To == "" {
+			return nil, fmt.Errorf("parameter 'to' is required")
+		}
+		if mintParams.Amount.BigInt().Sign() != 1 {
+			return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
+		}
+		params = mintParams
+
+	case "transfer":
+		signature, err := NotoTransferABI.SignatureCtx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if tx.FunctionSignature != signature {
+			return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
+		}
+		var transferParams NotoTransferParams
+		if err = json.Unmarshal([]byte(tx.FunctionParamsJson), &transferParams); err != nil {
+			return nil, err
+		}
+		if transferParams.From == "" {
+			return nil, fmt.Errorf("parameter 'from' is required")
+		}
+		if transferParams.To == "" {
+			return nil, fmt.Errorf("parameter 'to' is required")
+		}
+		if transferParams.Amount.BigInt().Sign() != 1 {
+			return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
+		}
+		params = transferParams
+
+	default:
+		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
+	}
+
+	domainConfig, err := d.decodeDomainConfig(ctx, tx.ContractConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	contractAddress, err := ethtypes.NewAddress(tx.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsedTransaction{
+		contractAddress: contractAddress,
+		domainConfig:    domainConfig,
+		params:          params,
 	}, nil
 }
 
-func (d *Noto) assembleTransfer(ctx context.Context, params *NotoTransferParams) (*pb.AssembledTransaction, error) {
-	inputs, total, err := d.prepareInputs(ctx, params.From, params.Amount)
+func (d *Noto) assembleMint(params *NotoMintParams) (*assemblyResult, error) {
+	outputCoins, outputStates, err := d.prepareOutputs(params.To, params.Amount)
 	if err != nil {
 		return nil, err
 	}
-	outputs, err := d.prepareOutputs(params.To, params.Amount)
+	return &assemblyResult{
+		newCoins:  outputCoins,
+		newStates: outputStates,
+	}, nil
+}
+
+func (d *Noto) assembleTransfer(ctx context.Context, params *NotoTransferParams) (*assemblyResult, error) {
+	inputCoins, inputStates, total, err := d.prepareInputs(ctx, params.From, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	outputCoins, outputStates, err := d.prepareOutputs(params.To, params.Amount)
 	if err != nil {
 		return nil, err
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedStates, err := d.prepareOutputs(params.From, *ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := d.prepareOutputs(params.From, *ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
-		outputs = append(outputs, returnedStates...)
+		outputCoins = append(outputCoins, returnedCoins...)
+		outputStates = append(outputStates, returnedStates...)
 	}
-
-	return &pb.AssembledTransaction{
-		SpentStates: inputs,
-		NewStates:   outputs,
+	return &assemblyResult{
+		spentCoins:  inputCoins,
+		spentStates: inputStates,
+		newCoins:    outputCoins,
+		newStates:   outputStates,
 	}, nil
+}
+
+func (d *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
+	sig, err := secp256k1.DecodeCompactRSV(ctx, signature)
+	if err != nil {
+		return nil, err
+	}
+	return sig.RecoverDirect(payload, d.chainID)
 }

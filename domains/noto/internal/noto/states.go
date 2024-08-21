@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -44,13 +45,33 @@ var NotoCoinABI = &abi.Parameter{
 	},
 }
 
-func (d *Noto) makeCoin(state *pb.StoredState) (*NotoCoin, error) {
+var EIP712DomainName = "NotoTransfer"
+var EIP712DomainVersion = "0.0.1"
+var NotoTransferTypeSet = eip712.TypeSet{
+	"Transfer": {
+		{Name: "inputs", Type: "Coin[]"},
+		{Name: "outputs", Type: "Coin[]"},
+	},
+	"Coin": {
+		{Name: "salt", Type: "bytes32"},
+		{Name: "owner", Type: "string"},
+		{Name: "amount", Type: "uint256"},
+	},
+	eip712.EIP712Domain: {
+		{Name: "name", Type: "string"},
+		{Name: "version", Type: "string"},
+		{Name: "chainId", Type: "uint256"},
+		{Name: "verifyingContract", Type: "address"},
+	},
+}
+
+func (d *Noto) makeCoin(stateData string) (*NotoCoin, error) {
 	coin := &NotoCoin{}
-	err := json.Unmarshal([]byte(state.DataJson), &coin)
+	err := json.Unmarshal([]byte(stateData), &coin)
 	return coin, err
 }
 
-func (d *Noto) makeState(coin *NotoCoin) (*pb.NewState, error) {
+func (d *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
 	coinJSON, err := json.Marshal(coin)
 	if err != nil {
 		return nil, err
@@ -61,10 +82,11 @@ func (d *Noto) makeState(coin *NotoCoin) (*pb.NewState, error) {
 	}, nil
 }
 
-func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.HexInteger) ([]*pb.StateRef, *big.Int, error) {
+func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
+	coins := []*NotoCoin{}
 	for {
 		// Simple oldest coin first algorithm
 		// TODO: make this configurable
@@ -85,35 +107,36 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.
 		}
 		queryJSON, err := json.Marshal(query)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		states, err := d.findAvailableStates(ctx, string(queryJSON))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if len(states) == 0 {
-			return nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
+			return nil, nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
 		}
 		for _, state := range states {
 			lastStateTimestamp = state.StoredAt
-			coin, err := d.makeCoin(state)
+			coin, err := d.makeCoin(state.DataJson)
 			if err != nil {
-				return nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
 			}
 			total = total.Add(total, coin.Amount.BigInt())
 			stateRefs = append(stateRefs, &pb.StateRef{
-				HashId:   state.HashId,
 				SchemaId: state.SchemaId,
+				HashId:   state.HashId,
 			})
+			coins = append(coins, coin)
 			if total.Cmp(amount.BigInt()) >= 0 {
-				return stateRefs, total, nil
+				return coins, stateRefs, total, nil
 			}
 		}
 	}
 }
 
-func (d *Noto) prepareOutputs(owner string, amount ethtypes.HexInteger) ([]*pb.NewState, error) {
+func (d *Noto) prepareOutputs(owner string, amount ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &NotoCoin{
@@ -121,11 +144,8 @@ func (d *Noto) prepareOutputs(owner string, amount ethtypes.HexInteger) ([]*pb.N
 		Owner:  owner,
 		Amount: amount,
 	}
-	newState, err := d.makeState(newCoin)
-	if err != nil {
-		return nil, err
-	}
-	return []*pb.NewState{newState}, nil
+	newState, err := d.makeNewState(newCoin)
+	return []*NotoCoin{newCoin}, []*pb.NewState{newState}, err
 }
 
 func (d *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
@@ -148,9 +168,42 @@ func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error)
 
 	coins := make([]*NotoCoin, len(states))
 	for i, state := range states {
-		if coins[i], err = d.makeCoin(state); err != nil {
+		if coins[i], err = d.makeCoin(state.DataJson); err != nil {
 			return nil, err
 		}
 	}
 	return coins, err
+}
+
+func (d *Noto) encodeTransferData(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
+	messageInputs := make([]interface{}, len(inputs))
+	for i, input := range inputs {
+		messageInputs[i] = map[string]interface{}{
+			"salt":   input.Salt,
+			"owner":  input.Owner,
+			"amount": input.Amount.String(),
+		}
+	}
+	messageOutputs := make([]interface{}, len(outputs))
+	for i, output := range outputs {
+		messageOutputs[i] = map[string]interface{}{
+			"salt":   output.Salt,
+			"owner":  output.Owner,
+			"amount": output.Amount.String(),
+		}
+	}
+	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
+		Types:       NotoTransferTypeSet,
+		PrimaryType: "Transfer",
+		Domain: map[string]interface{}{
+			"name":              EIP712DomainName,
+			"version":           EIP712DomainVersion,
+			"chainId":           d.chainID,
+			"verifyingContract": contract,
+		},
+		Message: map[string]interface{}{
+			"inputs":  messageInputs,
+			"outputs": messageOutputs,
+		},
+	})
 }
