@@ -190,6 +190,22 @@ func (d *domain) checkInit(ctx context.Context) error {
 	return nil
 }
 
+func (d *domain) Initialized() bool {
+	return d.initialized.Load()
+}
+
+func (d *domain) Name() string {
+	return d.name
+}
+
+func (d *domain) Address() *types.EthAddress {
+	return d.factoryContractAddress
+}
+
+func (d *domain) Configuration() *prototk.DomainConfig {
+	return d.config
+}
+
 // Domain callback to query the state store
 func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
 	if err := d.checkInit(ctx); err != nil {

@@ -105,6 +105,7 @@ func TestStartOK(t *testing.T) {
 
 	mockBlockIndexer := componentmocks.NewBlockIndexer(t)
 	mockBlockIndexer.On("Start", mock.AnythingOfType("*blockindexer.InternalEventStream")).Return(nil)
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
 	mockBlockIndexer.On("Stop").Return()
 
 	mockPluginController := componentmocks.NewPluginController(t)
@@ -114,6 +115,9 @@ func TestStartOK(t *testing.T) {
 	mockDomainManager := componentmocks.NewDomainManager(t)
 	mockDomainManager.On("Start").Return(nil)
 	mockDomainManager.On("Stop").Return()
+
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
 
 	mockRPCServer := componentmocks.NewRPCServer(t)
 	mockRPCServer.On("Start").Return(nil)
@@ -139,6 +143,7 @@ func TestStartOK(t *testing.T) {
 	cm.blockIndexer = mockBlockIndexer
 	cm.pluginController = mockPluginController
 	cm.domainManager = mockDomainManager
+	cm.stateStore = mockStateStore
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine
 

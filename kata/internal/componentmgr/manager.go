@@ -139,6 +139,12 @@ func (cm *componentManager) Start() (err error) {
 		err = cm.blockIndexer.Start(cm.internalEventStreams...)
 		cm.addIfStarted(cm.blockIndexer, err)
 	}
+	if err == nil {
+		// we wait until the block indexer has connected and established the block height
+		// this is for the edge case that on first start, when using "latest" for listeners,
+		// we can't possibly submit any transactions before the block height is known
+		_, err = cm.blockIndexer.GetBlockListenerHeight(cm.bgCtx)
+	}
 
 	// start the managers
 	if err == nil {
@@ -206,6 +212,9 @@ func (cm *componentManager) buildInternalEventStreams() ([]*blockindexer.Interna
 }
 
 func (cm *componentManager) registerRPCModules() {
+	// Component modules
+	cm.rpcServer.Register(cm.stateStore.RPCModule())
+	// Manager/engine modules
 	for _, initResult := range cm.initResults {
 		for _, rpcMod := range initResult.RPCModules {
 			cm.rpcServer.Register(rpcMod)

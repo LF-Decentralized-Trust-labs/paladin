@@ -314,7 +314,7 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		Transaction:       preAssembly.TransactionSpecification,
 		InputStates:       dc.toReferenceList(postAssembly.InputStates),
 		OutputStates:      dc.toReferenceList(postAssembly.OutputStates),
-		AttestationResult: postAssembly.AllAttestations,
+		AttestationResult: dc.allAttestations(tx),
 	})
 	if err != nil {
 		return err
@@ -322,6 +322,24 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 
 	tx.PreparedTransaction = res.Transaction
 	return nil
+}
+
+func (dc *domainContract) Domain() components.Domain {
+	return dc.d
+}
+
+func (dc *domainContract) Address() types.EthAddress {
+	return dc.info.Address
+}
+
+func (dc *domainContract) ConfigBytes() []byte {
+	return dc.info.ConfigBytes
+}
+
+func (dc *domainContract) allAttestations(tx *components.PrivateTransaction) []*prototk.AttestationResult {
+	attestations := append([]*prototk.AttestationResult{}, tx.PostAssembly.Signatures...)
+	attestations = append(attestations, tx.PostAssembly.Endorsements...)
+	return attestations
 }
 
 func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateRef) ([]*components.FullState, error) {

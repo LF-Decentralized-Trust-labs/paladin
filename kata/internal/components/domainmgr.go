@@ -32,7 +32,11 @@ type DomainManager interface {
 
 // External interface for other components (engine, testbed) to call against a domain
 type Domain interface {
+	Initialized() bool
+	Name() string
+	Address() *types.EthAddress
 	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+	Configuration() *prototk.DomainConfig
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
@@ -40,6 +44,10 @@ type Domain interface {
 
 // External interface for other components to call against a private smart contract
 type DomainSmartContract interface {
+	Domain() Domain
+	Address() types.EthAddress
+	ConfigBytes() []byte
+
 	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
 	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error

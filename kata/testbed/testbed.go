@@ -17,26 +17,17 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-	"github.com/kaleido-io/paladin/kata/pkg/signer"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gopkg.in/yaml.v3"
 )
@@ -58,44 +49,31 @@ func main() {
 }
 
 type testbed struct {
-	ctx              context.Context
-	cancelCtx        context.CancelFunc
-	conf             *TestBedConfig
-	sigc             chan os.Signal
-	socketFile       string
-	loaderID         uuid.UUID
-	pluginController plugins.PluginController
-	rpcServer        rpcserver.RPCServer
-	stateStore       statestore.StateStore
-	blockindexer     blockindexer.BlockIndexer
-	keyMgr           ethclient.KeyManager
-	ethClient        ethclient.EthClient
-	signer           signer.SigningModule
-	fromDomain       commsbus.MessageHandler
-	inflight         map[string]*inflightRequest
-	inflightLock     sync.Mutex
-	domainsByUUID    map[uuid.UUID]*tbDomain
-	domainsByName    map[string]*tbDomain
-	domainsByAddress map[ethtypes.Address0xHex]*tbDomain
-	domainContracts  map[ethtypes.Address0xHex]*tbPrivateSmartContract
-	domainLock       sync.Mutex
-	ready            chan error
-	done             chan struct{}
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+
+	// TODO: Remove once testbed gets started by the module loader
+	sigc       chan os.Signal
+	socketFile string
+	instanceID uuid.UUID
+
+	conf       *componentmgr.Config
+	rpcModule  *rpcserver.RPCModule
+	components components.AllComponents
+
+	ready chan error
+	done  chan struct{}
 }
 
 func newTestBed() (tb *testbed) {
 	tb = &testbed{
-		sigc:             make(chan os.Signal, 1),
-		inflight:         make(map[string]*inflightRequest),
-		loaderID:         uuid.New(),
-		domainsByUUID:    make(map[uuid.UUID]*tbDomain),
-		domainsByName:    make(map[string]*tbDomain),
-		domainsByAddress: make(map[ethtypes.Address0xHex]*tbDomain),
-		domainContracts:  make(map[ethtypes.Address0xHex]*tbPrivateSmartContract),
-		ready:            make(chan error, 1),
-		done:             make(chan struct{}),
+		sigc:       make(chan os.Signal, 1),
+		instanceID: uuid.New(),
+		ready:      make(chan error, 1),
+		done:       make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
+	tb.initRPC()
 	return tb
 }
 
@@ -159,104 +137,15 @@ func (tb *testbed) run() (err error) {
 	}
 	defer p.Close()
 
-	tb.pluginController, err = plugins.NewPluginController(tb.ctx, &plugins.PluginControllerArgs{
-		LoaderID: tb.loaderID,
-	})
-	if err == nil {
-		err = tb.pluginController.Start(tb.ctx)
-	}
+	cm := componentmgr.NewComponentManager(tb.ctx, tb.instanceID, tb.conf, tb)
+	err = cm.Start()
 	if err != nil {
-		return fmt.Errorf("Plugin server init failed: %s", err)
+		return fmt.Errorf("Initialization failed: %s", err)
 	}
 
-	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
-	tb.rpcServer, err = rpcserver.NewRPCServer(tb.ctx, &tb.conf.RPCServer)
-	if err == nil {
-		err = tb.initRPC()
-	}
-	if err != nil {
-		return fmt.Errorf("RPC init failed: %s", err)
-	}
-
-	tb.keyMgr, err = ethclient.NewSimpleTestKeyManager(tb.ctx, &tb.conf.Signer)
-	if err == nil {
-		tb.ethClient, err = ethclient.NewEthClient(tb.ctx, tb.keyMgr, &tb.conf.Blockchain)
-	}
-	if err == nil {
-		tb.blockindexer, err = blockindexer.NewBlockIndexer(tb.ctx, &tb.conf.BlockIndexer, &tb.conf.Blockchain.WS, p)
-	}
-	var blockHeight uint64
-	if err == nil {
-		err = tb.blockindexer.Start(
-			tb.domainEventStream(),
-		)
-	}
-	if err == nil {
-		blockHeight, err = tb.blockindexer.GetBlockListenerHeight(tb.ctx)
-	}
-	if err != nil {
-		return fmt.Errorf("Blockchain init failed: %s", err)
-	}
-	defer tb.blockindexer.Stop()
-	log.L(tb.ctx).Infof("Connected to blockchain: ChainID=%d BlockHeight=%d", tb.ethClient.ChainID(), blockHeight)
-
-	tb.signer, err = signer.NewSigningModule(tb.ctx, &tb.conf.Signer)
-	if err != nil {
-		return fmt.Errorf("Signer init failed: %s", err)
-	}
-
-	go tb.listenTerm()
-
-	tb.ready <- nil
-	ready = true
-	tb.eventHandler()
+	log.L(tb.ctx).Info("Testbed started")
+	tb.listenTerm()
+	cm.Stop()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
-}
-
-func mustParseBuildABI(buildJSON []byte) abi.ABI {
-	var buildParsed map[string]types.RawJSON
-	var buildABI abi.ABI
-	err := json.Unmarshal(buildJSON, &buildParsed)
-	if err == nil {
-		err = json.Unmarshal(buildParsed["abi"], &buildABI)
-	}
-	if err != nil {
-		panic(err)
-	}
-	return buildABI
-}
-
-func mustParseBuildBytecode(buildJSON []byte) ethtypes.HexBytes0xPrefix {
-	var buildParsed map[string]types.RawJSON
-	var byteCode ethtypes.HexBytes0xPrefix
-	err := json.Unmarshal(buildJSON, &buildParsed)
-	if err == nil {
-		err = json.Unmarshal(buildParsed["bytecode"], &byteCode)
-	}
-	if err != nil {
-		panic(err)
-	}
-	return byteCode
-}
-
-func mustParseABIEntry(abiEntryJSON string) *abi.Entry {
-	var abiEntry abi.Entry
-	err := json.Unmarshal([]byte(abiEntryJSON), &abiEntry)
-	if err != nil {
-		panic(err)
-	}
-	return &abiEntry
-}
-
-func mustEventSignatureHash(a abi.ABI, eventName string) ethtypes.HexBytes0xPrefix {
-	ev := a.Events()[eventName]
-	if ev == nil {
-		panic("missing event " + eventName)
-	}
-	sig, err := ev.SignatureHash()
-	if err != nil {
-		panic(err)
-	}
-	return sig
 }

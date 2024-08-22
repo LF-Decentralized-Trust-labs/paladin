@@ -30,9 +30,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
-func (tb *testbed) initRPC() error {
-	tb.rpcServer.Register(tb.stateStore.RPCModule())
-	tb.rpcServer.Register(rpcserver.NewRPCModule("testbed").
+func (tb *testbed) initRPC() {
+	tb.rpcModule = rpcserver.NewRPCModule("testbed").
 
 		// Deploy a smart contract and get the deployed address
 		Add("testbed_deployBytecode", tb.rpcDeployBytecode()).
@@ -59,9 +58,7 @@ func (tb *testbed) initRPC() error {
 		// - INIT_TRANSACTION     (sender node)
 		// - ASSEMBLE_TRANSACTION (sender node)
 		// - PREPARE_TRANSACTION  (submitter node)
-		Add("testbed_invoke", tb.rpcTestbedInvoke()),
-	)
-	return tb.rpcServer.Start()
+		Add("testbed_invoke", tb.rpcTestbedInvoke())
 }
 
 func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
@@ -73,7 +70,8 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	) (*ethtypes.Address0xHex, error) {
 
 		var constructor ethclient.ABIFunctionClient
-		abic, err := tb.ethClient.ABI(ctx, abi)
+		ec := tb.components.EthClientFactory().HTTPClient()
+		abic, err := ec.ABI(ctx, abi)
 		if err == nil {
 			constructor, err = abic.Constructor(ctx, bytecode)
 		}
@@ -87,7 +85,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 			Input(params).
 			SignAndSend()
 		if err == nil {
-			tx, err = tb.blockindexer.WaitForTransaction(ctx, txHash.String())
+			tx, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to send transaction: %s", err)
