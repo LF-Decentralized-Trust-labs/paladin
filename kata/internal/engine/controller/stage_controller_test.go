@@ -82,7 +82,7 @@ func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactio
 }
 
 func newTestStageController(ctx context.Context) *PaladinStageController {
-	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
+	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
 	return sc
 }
 

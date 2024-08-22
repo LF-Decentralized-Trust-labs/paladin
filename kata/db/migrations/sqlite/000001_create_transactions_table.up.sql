@@ -12,6 +12,7 @@ CREATE TABLE transactions (
   payload_rlp               VARCHAR,
   assembled_round           BIGINT,
   attestation_plan          VARCHAR,
+  attestation_results       VARCHAR,
   pre_req_txs               VARCHAR,
   dispatch_node             VARCHAR,
   dispatch_address          VARCHAR,

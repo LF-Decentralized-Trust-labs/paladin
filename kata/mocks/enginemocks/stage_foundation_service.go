@@ -93,6 +93,26 @@ func (_m *StageFoundationService) StateStore() statestore.StateStore {
 	return r0
 }
 
+// TransportManager provides a mock function with given fields:
+func (_m *StageFoundationService) TransportManager() types.TransportManager {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransportManager")
+	}
+
+	var r0 types.TransportManager
+	if rf, ok := ret.Get(0).(func() types.TransportManager); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.TransportManager)
+		}
+	}
+
+	return r0
+}
+
 // NewStageFoundationService creates a new instance of StageFoundationService. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewStageFoundationService(t interface {

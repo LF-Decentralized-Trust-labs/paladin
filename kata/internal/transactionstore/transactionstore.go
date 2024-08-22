@@ -18,12 +18,14 @@ package transactionstore
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
 type Config struct {
@@ -36,7 +38,11 @@ type TxStateGetters interface {
 	GetSchemaID(ctx context.Context) string
 
 	GetDispatchTxPayload(ctx context.Context) string
+	GetAttestationPlan(ctx context.Context) []*proto.AttestationRequest
+	GetAttestationResults(ctx context.Context) []*proto.AttestationResult
 	GetPayloadJSON(ctx context.Context) string
+
+	IsAttestationCompleted(ctx context.Context) bool
 
 	GetAssembledRound(ctx context.Context) int64
 
@@ -58,16 +64,17 @@ type TxStateManager interface {
 
 type Transaction struct {
 	gorm.Model
-	ID              uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
-	From            string     `gorm:"type:text"`
-	SequenceID      *uuid.UUID `gorm:"type:uuid"`
-	DomainID        string
-	SchemaID        string
-	AssembledRound  int64   `gorm:"type:int"`
-	AttestationPlan *string `gorm:"type:text[]; serializer:json"`
-	Contract        string  `gorm:"type:uuid"`
-	PayloadJSON     *string `gorm:"type:text"`
-	PayloadRLP      *string `gorm:"type:text"`
+	ID                 uuid.UUID  `gorm:"type:uuid;default:uuid_generate_v4()"`
+	From               string     `gorm:"type:text"`
+	SequenceID         *uuid.UUID `gorm:"type:uuid"`
+	DomainID           string
+	SchemaID           string
+	AssembledRound     int64   `gorm:"type:int"`
+	AttestationPlan    string  `gorm:"type:text[]; serializer:json"`
+	AttestationResults string  `gorm:"type:text[]; serializer:json"`
+	Contract           string  `gorm:"type:uuid"`
+	PayloadJSON        *string `gorm:"type:text"`
+	PayloadRLP         *string `gorm:"type:text"`
 
 	PreReqTxs         []string `gorm:"type:text[]; serializer:json"`
 	DispatchNode      string   `gorm:"type:text"`
@@ -78,13 +85,14 @@ type Transaction struct {
 }
 
 type TransactionUpdate struct { // TODO define updatable fields
-	SequenceID      *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
-	DispatchTxID    *string
-	DispatchAddress *string
-	AssembledRound  int64
-	PayloadJSON     string
-	AttestationPlan string
-	AssembleError   string
+	SequenceID         *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
+	DispatchTxID       *string
+	DispatchAddress    *string
+	AssembledRound     int64
+	PayloadJSON        string
+	AttestationPlan    *string
+	AttestationResults *string
+	AssembleError      string
 }
 
 func NewTransactionStageManager(ctx context.Context, txID string) TxStateManager {
@@ -104,12 +112,48 @@ func (t *Transaction) ApplyTxUpdates(ctx context.Context, txUpdates *Transaction
 	if txUpdates.DispatchTxID != nil {
 		t.DispatchTxID = *txUpdates.DispatchTxID
 	}
+
+	if txUpdates.AttestationPlan != nil {
+		t.AttestationPlan = *txUpdates.AttestationPlan
+		t.AttestationResults = "" // reset result when there is a new attestation plan
+	}
+
+	if txUpdates.AttestationResults != nil {
+		t.AttestationResults = *txUpdates.AttestationResults
+	}
 	// TODO, plug in DB persistence
 	// 1. persist to DB first
 	// 2. update in memory object
 }
 func (t *Transaction) GetContract(ctx context.Context) string {
 	return t.Contract
+}
+
+func (t *Transaction) IsAttestationCompleted(ctx context.Context) bool {
+	if t.AttestationPlan == "" {
+		return true
+	} else {
+		// TODO: should used in memory objects directly
+		attPlan := t.GetAttestationPlan(ctx) // not sure whether attestation completeness needs domain specific knowledge, preference is no.
+		if attPlan != nil {
+			attResults := t.GetAttestationResults(ctx)
+			if attResults == nil || len(attResults) < len(attPlan) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (t *Transaction) GetAttestationPlan(ctx context.Context) []*proto.AttestationRequest {
+	var attPlans []*proto.AttestationRequest
+	_ = json.Unmarshal([]byte(t.AttestationPlan), &attPlans)
+	return attPlans
+}
+func (t *Transaction) GetAttestationResults(ctx context.Context) []*proto.AttestationResult {
+	var attResults []*proto.AttestationResult
+	_ = json.Unmarshal([]byte(t.AttestationResults), &attResults)
+	return attResults
 }
 func (t *Transaction) GetDomainID(ctx context.Context) string {
 	return t.DomainID

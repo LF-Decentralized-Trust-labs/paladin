@@ -11,6 +11,7 @@ CREATE TABLE transactions (
   schema_id                 TEXT,
   assembled_round           BIGINT,
   attestation_plan          TEXT,
+  attestation_results       TEXT,
   payload_json              TEXT,
   payload_rlp               TEXT,
   pre_req_txs               TEXT,

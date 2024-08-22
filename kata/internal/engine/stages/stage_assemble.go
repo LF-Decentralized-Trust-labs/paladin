@@ -58,11 +58,12 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 				case proto.AssembleTransactionResponse:
 					if v.AssemblyResult == proto.AssembleTransactionResponse_OK {
 						attPlan, err := json.Marshal(v.AttestationPlan)
+						attPlanStr := string(attPlan)
 						// transaction assembled, store the information into DB
 						txUpdates = &transactionstore.TransactionUpdate{
 							AssembledRound:  tsg.GetAssembledRound(ctx) + 1, // TODO. this should be in the assemble response
 							PayloadJSON:     v.AssembledTransaction.String(),
-							AttestationPlan: string(attPlan),
+							AttestationPlan: &attPlanStr,
 							AssembleError:   err.Error(),
 						}
 					} else {
