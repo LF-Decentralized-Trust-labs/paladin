@@ -65,20 +65,16 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    outputs.dir('mocks/rpcbackendmocks')
-    executable 'bin/mockery'
+task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
+    mockery 'bin/mockery'
     args '--case', 'underscore'
-    args '--dir', "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-    args '--all'
-    args '--outpkg', 'rpcbackendmocks'
-    args '--output', 'mocks/rpcbackendmocks'
+    mock {
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
+    }
 }
-
-task makeMocks(dependsOn: [
-    tasks.makeRPCMocks,
-]) {}
 
 task copyTestContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
@@ -107,16 +103,20 @@ task copyTestbedContracts(type: Copy) {
     includeEmptyDirs = false
 }
 
-task protoc(type:Exec, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
-    workingDir '.'
-    inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
-    outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
-    args "--go_out=${projectDir}"
-    args "--go-grpc_out=${projectDir}"
-    args "--proto_path=${projectDir}"
-    args inputs.files
+task protoc(type: ProtoCompile, dependsOn: [tasks.makeMocks, tasks.copyTestContracts]) {
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
+    }
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'

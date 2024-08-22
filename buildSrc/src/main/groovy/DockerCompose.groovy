@@ -1,54 +1,66 @@
-import org.gradle.api.GradleException
-import org.gradle.api.tasks.Exec
+import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecResult
 
-class DockerCompose extends Exec {
+class DockerCompose extends DefaultTask {
 
-    private List<String> _composeFiles = []
+    @InputFiles
+    List<File> composeFiles = []
 
-    DockerCompose() {
-        ignoreExitValue true
+    @Input
+    @Optional
+    String projectName
+
+    @Input
+    List<String> args = []
+
+    void composeFile(Object f) {
+        composeFiles << project.file(f)
     }
 
-    void composeFile(String f) {
-        _composeFiles += '-f'
-        _composeFiles += f
+    void projectName(String p) {
+        projectName = p
     }
 
-    void dumpLogs(String service = "") {
-        if (service == "") {
-            println "Dumping Docker logs"
+    void args(Object... args) {
+        this.args += [*args]
+    }
+
+    void dumpLogs(String service = '') {
+        List<String> cmd = [*dockerCommand(), 'logs']
+        if (service == '') {
+            println 'Dumping Docker logs'
         } else {
             println "Dumping Docker logs for ${service}"
+            cmd << service
         }
-        "${dockerCommand().join(' ')} logs ${service}"
-            .execute().waitForProcessOutput(System.err, System.err)
+        project.exec { commandLine cmd }
     }
 
-    private List<String> dockerCommand() {
-        if (_composeFiles.size() == 0) {
-            _composeFiles = ['-f', 'docker-compose.yml']
-        }
-        String dockerComposeV2Check = 'docker compose version'.execute().text
-        if (dockerComposeV2Check.contains('Docker Compose')) {
-            return ['docker', 'compose', *_composeFiles]
-        }
-        return ['docker-compose', *_composeFiles]
-    }
-
-    @Override
-    protected void exec() {
-        List<String> cmd = dockerCommand()
-        executable = cmd.remove(0)
-        args = [*cmd, *args]
-
-        super.exec()
-
-        ExecResult execResult = executionResult.get()
+    @TaskAction
+    void exec() {
+        List<String> cmd = [*dockerCommand(), *args]
+        ExecResult execResult = project.exec { commandLine cmd }
         if (execResult.exitValue != 0) {
             dumpLogs()
         }
         execResult.assertNormalExitValue()
+    }
+
+    private List<String> dockerCommand() {
+        String dockerComposeV2Check = 'docker compose version'.execute().text
+        List<String> cmd = dockerComposeV2Check.contains('Docker Compose')
+            ? ['docker', 'compose'] : ['docker-compose']
+        composeFiles.each { f ->
+            cmd += ['-f', f]
+        }
+        if (projectName != null) {
+            cmd += ['-p', projectName]
+        }
+        return cmd
     }
 
 }
