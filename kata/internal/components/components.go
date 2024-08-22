@@ -94,5 +94,7 @@ type AllComponents interface {
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
 	Name() string
-	ManagerLifecycle
+	Init(AllComponents) (*ManagerInitResult, error)
+	Start() error
+	Stop()
 }

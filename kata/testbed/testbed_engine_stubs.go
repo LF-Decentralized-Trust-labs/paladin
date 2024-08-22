@@ -31,12 +31,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-//go:embed abis/IPaladinContract_V0.json
-var iPaladinContractABIJSON []byte
-
-var iPaladinContractABI = mustParseBuildABI(iPaladinContractABIJSON)
-var iPaladinNewSmartContract_V0_Signature = mustEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
-
 type iPaladinNewSmartContract_V0_Type struct {
 	Domain *ethtypes.Address0xHex    `json:"domain"`
 	TXID   ethtypes.HexBytes0xPrefix `json:"txId"`

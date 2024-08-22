@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gopkg.in/yaml.v3"
 )
@@ -130,12 +129,6 @@ func (tb *testbed) run() (err error) {
 		}
 		close(tb.ready)
 	}()
-
-	p, err := persistence.NewPersistence(tb.ctx, &tb.conf.DB)
-	if err != nil {
-		return fmt.Errorf("Persistence init failed: %s", err)
-	}
-	defer p.Close()
 
 	cm := componentmgr.NewComponentManager(tb.ctx, tb.instanceID, tb.conf, tb)
 	err = cm.Start()
