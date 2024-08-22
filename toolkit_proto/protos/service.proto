@@ -19,9 +19,11 @@ package github.com.kaleido_io.paladin.toolkit;
 
 import "to_domain.proto";
 import "from_domain.proto";
+import "transport.proto";
 
 enum PluginType {
   DOMAIN = 0;
+  TRANSPORT = 1;
 }
 
 message Header {
@@ -76,6 +78,31 @@ message DomainMessage {
     
 }
 
+message TransportMessage {
+  Header header = 1;
+
+  oneof request_to_transport {
+    ConfigureTransportRequest configure_transport = 3001;
+    InitTransportRequest init_transport = 3002;
+    SendMessageRequest send_message = 3003;
+  }
+
+  oneof response_from_transport {
+    ConfigureTransportResponse configure_transport_res = 3004;
+    InitTransportResponse init_transport_res = 3005;
+    SendMessageResponse send_message_res = 3006;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_transport {
+    ReceiveMessageRequest receive_message = 3007;
+  }
+
+  oneof response_to_transport {
+    ReceiveMessageResponse receive_message_res = 3008;
+  }
+}
+
 // establishes the long-lived connection
 message PluginLoaderInit {
   string id = 1; // UUID that is unique the plugin loader that it shared with the controller out of band to start the channel
@@ -84,6 +111,7 @@ message PluginLoaderInit {
 message PluginInfo {
   enum PluginType {
     DOMAIN = 0;
+    TRANSPORT = 1;
   }
   string id = 1; // UUID that is unique to this runtime instance of the domain
   string name = 2; // The plugin manager ensures only once instance is loaded with this ID
@@ -117,4 +145,7 @@ service PluginController {
 
   // Connect as a domain plugin establishing the bidirectional stream of communications
   rpc ConnectDomain(stream DomainMessage) returns (stream DomainMessage) {}
+
+  // Connect as a transport plugin establishing the bidirectional stream of communications
+  rpc ConnectTransport(stream TransportMessage) returns (stream TransportMessage) {}
 }

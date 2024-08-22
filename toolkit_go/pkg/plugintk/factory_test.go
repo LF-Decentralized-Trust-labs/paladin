@@ -35,6 +35,7 @@ type testController struct {
 	socketFile string
 
 	fakeDomainController func(grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error
+	fakeTransportController func(grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error
 }
 
 func newTestController(t *testing.T) (context.Context, *testController, func()) {
@@ -64,6 +65,10 @@ func newTestController(t *testing.T) (context.Context, *testController, func()) 
 
 func (tc *testController) ConnectDomain(stream grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error {
 	return tc.fakeDomainController(stream)
+}
+
+func (tc *testController) ConnectTransport(stream grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error {
+	return tc.fakeTransportController(stream)
 }
 
 func tempSocketFile(t *testing.T) string {

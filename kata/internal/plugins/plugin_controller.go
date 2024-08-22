@@ -33,6 +33,7 @@ import (
 
 type Managers interface {
 	DomainRegistration() DomainRegistration
+	TransportRegistration() TransportRegistration
 }
 
 type PluginController interface {
@@ -59,6 +60,9 @@ type pluginController struct {
 	domainManager DomainRegistration
 	domainPlugins map[uuid.UUID]*plugin[prototk.DomainMessage]
 
+	transportManager TransportRegistration
+	transportPlugins map[uuid.UUID]*plugin[prototk.TransportMessage]
+
 	notifyPluginsUpdated chan bool
 	pluginLoaderDone     chan struct{}
 	loadingProgressed    chan *prototk.PluginLoadFailed
@@ -75,6 +79,9 @@ func NewPluginController(bgCtx context.Context, loaderID uuid.UUID, managers Man
 
 		domainManager: managers.DomainRegistration(),
 		domainPlugins: make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
+
+		transportManager: managers.TransportRegistration(),
+		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -190,6 +197,12 @@ func (pc *pluginController) ReloadPluginList() error {
 			return err
 		}
 	}
+	for name, tp := range pc.transportManager.ConfiguredTransports() {
+		if err := initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp); err != nil {
+			return err
+		}
+	}
+	
 	select {
 	case pc.notifyPluginsUpdated <- true:
 	default:
@@ -319,8 +332,14 @@ func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
-		_, notInitializing := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, true)
-		for _, plugin := range notInitializing {
+		_, notInitializingDomains := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, true)
+		for _, plugin := range notInitializingDomains {
+			if err == nil {
+				err = stream.Send(plugin.def)
+			}
+		}
+		_, notInitializingTransports := unloadedPlugins(pc, pc.transportPlugins, prototk.PluginInfo_TRANSPORT, true)
+		for _, plugin := range notInitializingTransports {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}

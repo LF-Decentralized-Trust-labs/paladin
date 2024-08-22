@@ -48,6 +48,7 @@ func tempUDS(t *testing.T) string {
 
 type testManagers struct {
 	testDomainManager *testDomainManager
+	testTransportManager *testTransportManager
 }
 
 func (ts *testManagers) DomainRegistration() DomainRegistration {
@@ -55,6 +56,13 @@ func (ts *testManagers) DomainRegistration() DomainRegistration {
 		ts.testDomainManager = &testDomainManager{}
 	}
 	return ts.testDomainManager
+}
+
+func (ts *testManagers) TransportRegistration() TransportRegistration {
+	if ts.testTransportManager == nil {
+		ts.testTransportManager = &testTransportManager{}
+	}
+	return ts.testTransportManager
 }
 
 func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
@@ -66,6 +74,46 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 }
 
 func newTestDomainPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+
+	udsString := tempUDS(t)
+	loaderId := uuid.New()
+	allPlugins := setup.allPlugins()
+	pc, err := NewPluginController(ctx, loaderId, setup, &PluginControllerConfig{
+		GRPC: GRPCConfig{
+			Address:         udsString,
+			ShutdownTimeout: confutil.P("1ms"),
+		},
+	})
+	assert.NoError(t, err)
+
+	err = pc.Start()
+	assert.NoError(t, err)
+
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tpl.Run()
+	}()
+
+	return ctx, pc.(*pluginController), func() {
+		recovered := recover()
+		if recovered != nil {
+			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
+			panic(recovered)
+		}
+		cancelCtx()
+		pc.Stop()
+		tpl.Stop()
+		<-done
+	}
+
+}
+
+func newTestTransportPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	udsString := tempUDS(t)
