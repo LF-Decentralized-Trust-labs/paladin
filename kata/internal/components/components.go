@@ -92,7 +92,7 @@ type AllComponents interface {
 // - The testbed, which provides a JSON/RPC testing interface for domains in isolation from the engine
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
-	Name() string
+	EngineName() string
 	Init(AllComponents) (*ManagerInitResult, error)
 	Start() error
 	Stop()

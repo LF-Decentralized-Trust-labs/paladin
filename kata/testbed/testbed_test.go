@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -52,7 +53,7 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 	err = <-tb.ready
 	assert.NoError(t, err)
 
-	return fmt.Sprintf("http://%s", tb.rpcServer.HTTPAddr()), tb, func() {
+	return fmt.Sprintf("http://%s", tb.components.RPCServer().HTTPAddr()), tb, func() {
 		select {
 		case tb.sigc <- os.Kill:
 		default:
@@ -96,26 +97,18 @@ func TestBadConfig(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCleanupOldSocketFail(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(path.Join(tempDir, "something.exists"), []byte{}, 0644)
-	assert.NoError(t, err)
-	err = (&testbed{socketFile: tempDir}).cleanupOldSocket()
-	assert.Error(t, err)
-}
-
 func TestTempSocketFileFail(t *testing.T) {
 	tempDir := t.TempDir()
 	thisIsAFile := path.Join(tempDir, "a.file")
 	err := os.WriteFile(thisIsAFile, []byte{}, 0644)
 	assert.NoError(t, err)
-	_, err = (&testbed{conf: &TestBedConfig{TempDir: &thisIsAFile}}).tempSocketFile()
+	_, err = (&testbed{conf: &componentmgr.Config{TempDir: &thisIsAFile}}).tempSocketFile()
 	assert.Error(t, err)
 }
 
 func TestRunCommsBusError(t *testing.T) {
 	tb := newTestBed()
-	tb.conf = &TestBedConfig{
+	tb.conf = &componentmgr.Config{
 		DB: persistence.Config{
 			Type: "sqlite",
 			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
@@ -123,9 +116,9 @@ func TestRunCommsBusError(t *testing.T) {
 				MigrationsDir: "./sqlite.memory.config.yaml",
 			}},
 		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(t.TempDir()),
+		PluginControllerConfig: plugins.PluginControllerConfig{
+			GRPC: plugins.GRPCConfig{
+				Address: "unix:" + t.TempDir(),
 			},
 		},
 	}
@@ -135,7 +128,7 @@ func TestRunCommsBusError(t *testing.T) {
 
 func TestRunRPCError(t *testing.T) {
 	tb := newTestBed()
-	tb.conf = &TestBedConfig{
+	tb.conf = &componentmgr.Config{
 		DB: persistence.Config{
 			Type: "sqlite",
 			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
@@ -143,9 +136,9 @@ func TestRunRPCError(t *testing.T) {
 				MigrationsDir: "./sqlite.memory.config.yaml",
 			}},
 		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
+		PluginControllerConfig: plugins.PluginControllerConfig{
+			GRPC: plugins.GRPCConfig{
+				Address: "unix:" + path.Join(t.TempDir(), "socket.file"),
 			},
 		},
 		RPCServer: rpcserver.Config{
@@ -163,7 +156,7 @@ func TestRunRPCError(t *testing.T) {
 
 func TestRunBlockIndexerError(t *testing.T) {
 	tb := newTestBed()
-	tb.conf = &TestBedConfig{
+	tb.conf = &componentmgr.Config{
 		DB: persistence.Config{
 			Type: "sqlite",
 			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
@@ -171,9 +164,9 @@ func TestRunBlockIndexerError(t *testing.T) {
 				MigrationsDir: "./sqlite.memory.config.yaml",
 			}},
 		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
+		PluginControllerConfig: plugins.PluginControllerConfig{
+			GRPC: plugins.GRPCConfig{
+				Address: "unix:" + path.Join(t.TempDir(), "socket.file"),
 			},
 		},
 		RPCServer: rpcserver.Config{

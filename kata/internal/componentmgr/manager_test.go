@@ -76,7 +76,7 @@ func TestInitOK(t *testing.T) {
 	}
 
 	mockEngine := componentmocks.NewEngine(t)
-	mockEngine.On("Name").Return("utengine")
+	mockEngine.On("EngineName").Return("utengine")
 	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
 	cm := NewComponentManager(context.Background(), uuid.New(), testConfig, mockEngine).(*componentManager)
 	err := cm.Init()

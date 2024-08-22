@@ -142,3 +142,21 @@ func (tb *testbed) run() (err error) {
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
 }
+
+func (tb *testbed) EngineName() string {
+	return "testbed"
+}
+
+func (tb *testbed) Start() error {
+	// we don't have anything additional that runs beyond the components
+	return nil
+}
+
+func (tb *testbed) Stop() {}
+
+func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
+	tb.components = c
+	return &components.ManagerInitResult{
+		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
+	}, nil
+}

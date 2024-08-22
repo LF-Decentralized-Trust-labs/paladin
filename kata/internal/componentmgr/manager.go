@@ -120,7 +120,7 @@ func (cm *componentManager) Init() (err error) {
 
 	// init engine
 	if err == nil {
-		cm.initResults[cm.engine.Name()], err = cm.engine.Init(cm)
+		cm.initResults[cm.engine.EngineName()], err = cm.engine.Init(cm)
 	}
 	return err
 }
