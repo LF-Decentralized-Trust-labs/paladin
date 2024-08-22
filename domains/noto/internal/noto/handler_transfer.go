@@ -162,12 +162,24 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *parse
 	return nil
 }
 
+func (h *transferHandler) validateOwners(tx *parsedTransaction, coins *gatheredCoins) error {
+	for i, coin := range coins.inCoins {
+		if coin.Owner != tx.transaction.From {
+			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].HashId, tx.transaction.From)
+		}
+	}
+	return nil
+}
+
 func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	coins, err := h.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 	if err := h.validateAmounts(coins); err != nil {
+		return nil, err
+	}
+	if err := h.validateOwners(tx, coins); err != nil {
 		return nil, err
 	}
 

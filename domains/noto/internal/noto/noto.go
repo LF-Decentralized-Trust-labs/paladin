@@ -105,10 +105,12 @@ type parsedTransaction struct {
 }
 
 type gatheredCoins struct {
-	inCoins  []*NotoCoin
-	inTotal  *big.Int
-	outCoins []*NotoCoin
-	outTotal *big.Int
+	inCoins   []*NotoCoin
+	inStates  []*pb.StateRef
+	inTotal   *big.Int
+	outCoins  []*NotoCoin
+	outStates []*pb.StateRef
+	outTotal  *big.Int
 }
 
 func loadBuild(buildOutput []byte) SolidityBuild {
@@ -490,34 +492,42 @@ func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 	return sig.RecoverDirect(payload, n.chainID)
 }
 
-func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
+func (h *domainHandler) parseCoinList(label string, states []*pb.EndorsableState) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var err error
-	inCoins := make([]*NotoCoin, len(inputs))
-	inTotal := big.NewInt(0)
-	for i, input := range inputs {
+	coins := make([]*NotoCoin, len(states))
+	refs := make([]*pb.StateRef, len(states))
+	total := big.NewInt(0)
+	for i, input := range states {
 		if input.SchemaId != h.noto.coinSchema.Id {
-			return nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
+			return nil, nil, nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
 		}
-		if inCoins[i], err = h.noto.makeCoin(input.StateDataJson); err != nil {
-			return nil, fmt.Errorf("invalid input[%d] (%s): %s", i, input.HashId, err)
+		if coins[i], err = h.noto.makeCoin(input.StateDataJson); err != nil {
+			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.HashId, err)
 		}
-		inTotal = inTotal.Add(inTotal, inCoins[i].Amount.BigInt())
+		refs[i] = &pb.StateRef{
+			SchemaId: input.SchemaId,
+			HashId:   input.HashId,
+		}
+		total = total.Add(total, coins[i].Amount.BigInt())
 	}
-	outCoins := make([]*NotoCoin, len(outputs))
-	outTotal := big.NewInt(0)
-	for i, output := range outputs {
-		if output.SchemaId != h.noto.coinSchema.Id {
-			return nil, fmt.Errorf("unknown schema ID: %s", output.SchemaId)
-		}
-		if outCoins[i], err = h.noto.makeCoin(output.StateDataJson); err != nil {
-			return nil, fmt.Errorf("invalid output[%d] (%s): %s", i, output.HashId, err)
-		}
-		outTotal = outTotal.Add(outTotal, outCoins[i].Amount.BigInt())
+	return coins, refs, total, nil
+}
+
+func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
+	inCoins, inStates, inTotal, err := h.parseCoinList("input", inputs)
+	if err != nil {
+		return nil, err
+	}
+	outCoins, outStates, outTotal, err := h.parseCoinList("output", outputs)
+	if err != nil {
+		return nil, err
 	}
 	return &gatheredCoins{
-		inCoins:  inCoins,
-		inTotal:  inTotal,
-		outCoins: outCoins,
-		outTotal: outTotal,
+		inCoins:   inCoins,
+		inStates:  inStates,
+		inTotal:   inTotal,
+		outCoins:  outCoins,
+		outStates: outStates,
+		outTotal:  outTotal,
 	}, nil
 }
