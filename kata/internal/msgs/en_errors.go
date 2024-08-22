@@ -204,7 +204,7 @@ var (
 	MsgDomainFactoryAddressInvalid      = ffe("PD011606", "Factory contract address invalid")
 	MsgDomainPrivateAbiJsonInvalid      = ffe("PD011607", "Private contract ABI invalid")
 	MsgDomainInvalidQueryJSON           = ffe("PD011608", "Invalid query JSON")
-	MsgDomainContractNotFoundByAddr     = ffe("PD011609", "Smart contract with address %s has not been indexed")
+	MsgDomainContractNotFoundByAddr     = ffe("PD011609", "A smart contract with address %s has not yet been indexed")
 	MsgDomainInvalidConstructorParams   = ffe("PD011610", "Invalid constructor parameters for %s")
 	MsgDomainInvalidPrepareDeployResult = ffe("PD011611", "Prepare deploy did not result in exactly one of a invoke transaction or a deploy transaction")
 	MsgDomainInvalidFunctionParams      = ffe("PD011612", "Invalid function parameters for %s")

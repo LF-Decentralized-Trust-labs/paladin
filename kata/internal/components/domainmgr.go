@@ -28,6 +28,7 @@ type DomainManager interface {
 	ManagerLifecycle
 	plugins.DomainRegistration
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
+	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
 }
 
 // External interface for other components (engine, testbed) to call against a domain
@@ -35,7 +36,6 @@ type Domain interface {
 	Initialized() bool
 	Name() string
 	Address() *types.EthAddress
-	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
 	Configuration() *prototk.DomainConfig
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error

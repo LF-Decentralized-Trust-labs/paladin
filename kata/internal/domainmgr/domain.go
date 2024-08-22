@@ -25,7 +25,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
@@ -41,12 +40,11 @@ type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf          *DomainConfig
-	dm            *domainManager
-	id            uuid.UUID
-	name          string
-	api           plugins.DomainManagerToDomain
-	contractCache cache.Cache[types.EthAddress, *domainContract]
+	conf *DomainConfig
+	dm   *domainManager
+	id   uuid.UUID
+	name string
+	api  plugins.DomainManagerToDomain
 
 	stateLock              sync.Mutex
 	initialized            atomic.Bool
@@ -65,14 +63,13 @@ type domain struct {
 
 func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugins.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:            dm,
-		conf:          conf,
-		initRetry:     retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:          name,
-		id:            id,
-		api:           toDomain,
-		initDone:      make(chan struct{}),
-		contractCache: cache.NewCache[types.EthAddress, *domainContract](&conf.ContractCache, ContractCacheDefaults),
+		dm:        dm,
+		conf:      conf,
+		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:      name,
+		id:        id,
+		api:       toDomain,
+		initDone:  make(chan struct{}),
 
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),

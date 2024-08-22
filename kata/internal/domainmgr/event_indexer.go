@@ -28,7 +28,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
+func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
 
 	var contracts []*PrivateSmartContract
 
@@ -64,9 +64,20 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 			Create(contracts).
 			Error
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return func() {
+		dm.notifyTransactions(contracts)
+	}, nil
+}
+
+func (dm *domainManager) notifyTransactions(contracts []*PrivateSmartContract) {
+	for _, c := range contracts {
+		inflight := dm.contractWaiter.GetInflight(c.DeployTX)
+		if inflight != nil {
+			inflight.Complete(c)
+		}
+	}
 }

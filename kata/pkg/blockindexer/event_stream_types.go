@@ -91,7 +91,10 @@ type EventDeliveryBatch struct {
 	Events     []*EventWithData `json:"events"`
 }
 
-type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error
+// Post commit callback is invoked after the DB transaction completes (only on success)
+type PostCommit func()
+
+type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error)
 
 type InternalEventStream struct {
 	Definition *EventStream

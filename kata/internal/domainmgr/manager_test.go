@@ -58,8 +58,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 	mc.ethClientFactory.On("ChainID").Return(int64(12345))
 	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
 	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
-	postMocks := componentmocks.NewPostInitComponents(t)
-	postMocks.On("BlockIndexer").Return(mc.blockIndexer)
+	preMocks.On("BlockIndexer").Return(mc.blockIndexer)
 
 	var p persistence.Persistence
 	var err error

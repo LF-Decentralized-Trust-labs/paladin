@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -35,9 +36,6 @@ func (tb *testbed) initRPC() {
 
 		// Deploy a smart contract and get the deployed address
 		Add("testbed_deployBytecode", tb.rpcDeployBytecode()).
-
-		// A simulated configure + init step in one synchronous call
-		Add("testbed_configureInit", tb.rpcTestbedConfigureInit()).
 
 		// Performs a base ethereum transaction deploy using the
 		// simple testbed transaction and key management.
@@ -95,45 +93,23 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	})
 }
 
-func (tb *testbed) rpcTestbedConfigureInit() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod2(func(ctx context.Context,
-		domainName string,
-		domainConfig types.RawJSON,
-	) (bool, error) {
-
-		// First we call configure on the domain
-		var configRes *proto.ConfigureDomainResponse
-		err := syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.ConfigureDomainRequest{
-			Name:       domainName,
-			ConfigYaml: string(domainConfig),
-			ChainId:    tb.ethClient.ChainID(),
-		}, &configRes)
-		if err != nil {
-			return false, err
-		}
-
-		// Then we store all the new domain in the sim registry
-		initReq, err := tb.registerDomain(ctx, domainName, configRes.DomainConfig)
-		if err != nil {
-			return false, err
-		}
-		var initRes *proto.InitDomainResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, initReq, &initRes)
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	})
-}
-
 func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domainName string,
 		constructorParams types.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
-		domain, err := tb.getDomainByName(domainName)
+		domain, err := tb.components.DomainManager().GetDomainByName(ctx, domainName)
+		if err != nil {
+			return nil, err
+		}
+
+		tx := &components.PrivateContractDeploy{
+			ID:     uuid.New(),
+			Domain: domain.Name(),
+			Inputs: constructorParams,
+		}
+		err = domain.InitDeploy(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -145,20 +121,6 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		waiter := domain.txWaiter(ctx, *txID)
 		defer waiter.cancel()
 
-		// Init the deployment transaction
-		var initDeployRes *proto.InitDeployResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitDeployRequest{
-			Transaction: deployTXSpec,
-		}, &initDeployRes)
-		if err != nil {
-			return nil, err
-		}
-
-		// Resolve all the addresses locally in the testbed
-		prepareReq := &proto.PrepareDeployRequest{
-			Transaction:       deployTXSpec,
-			ResolvedVerifiers: make([]*proto.ResolvedVerifier, len(initDeployRes.RequiredVerifiers)),
-		}
 		for i, v := range initDeployRes.RequiredVerifiers {
 			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {

@@ -44,36 +44,15 @@ type domainContract struct {
 	info *PrivateSmartContract
 }
 
-func (d *domain) GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (components.DomainSmartContract, error) {
-	dc, isCached := d.contractCache.Get(addr)
-	if isCached {
-		return dc, nil
-	}
-
-	var contracts []*PrivateSmartContract
-	err := d.dm.persistence.DB().
-		Table("private_smart_contracts").
-		Where("domain_address = ?", d.factoryContractAddress).
-		Where("address = ?", addr).
-		WithContext(ctx).
-		Limit(1).
-		Find(&contracts).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	if len(contracts) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainContractNotFoundByAddr, addr)
-	}
-
-	dc = &domainContract{
+func (d *domain) newSmartContract(def *PrivateSmartContract) *domainContract {
+	dc := &domainContract{
 		dm:   d.dm,
 		d:    d,
 		api:  d.api,
-		info: contracts[0],
+		info: def,
 	}
-	d.contractCache.Set(addr, dc)
-	return dc, nil
+	d.dm.contractCache.Set(dc.info.Address, dc)
+	return dc
 }
 
 func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
