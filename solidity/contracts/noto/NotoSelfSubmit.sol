@@ -11,10 +11,11 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  */
 contract NotoSelfSubmit is Noto {
     constructor(
-        bytes32 txId,
+        bytes32 transactionId,
         address domain,
-        address notary
-    ) Noto(txId, domain, notary) {}
+        address notary,
+        bytes memory data
+    ) Noto(transactionId, domain, notary, data) {}
 
     function transfer(
         bytes32[] memory inputs,

@@ -31,7 +31,7 @@ type DomainEntry struct {
 }
 
 type DomainHandler interface {
-	ParseParams(params string) (interface{}, error)
+	ValidateParams(params string) (interface{}, error)
 	Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
 	Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
 	Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)

@@ -74,14 +74,23 @@ type Noto struct {
 }
 
 type NotoDomainConfig struct {
-	Notary string `json:"notary"`
+	NotaryLookup  string `json:"notaryLookup"`
+	NotaryAddress string `json:"notaryAddress"`
 }
 
 var NotoDomainConfigABI = &abi.ParameterArray{
-	{Name: "notary", Type: "address"},
+	{Name: "notaryLookup", Type: "string"},
+	{Name: "notaryAddress", Type: "address"},
+}
+
+type NotoDeployParams struct {
+	TransactionID string                    `json:"transactionId"`
+	Notary        string                    `json:"notary"`
+	Data          ethtypes.HexBytes0xPrefix `json:"data"`
 }
 
 type parsedTransaction struct {
+	transaction     *pb.TransactionSpecification
 	functionABI     *abi.Entry
 	contractAddress *ethtypes.Address0xHex
 	domainConfig    *NotoDomainConfig
@@ -297,21 +306,40 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		params, err := d.validateDeploy(req.Transaction)
+		_, err := d.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		notary := req.ResolvedVerifiers[0].Verifier
+
+		config := &NotoDomainConfig{
+			NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
+			NotaryAddress: req.ResolvedVerifiers[0].Verifier,
+		}
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		data, err := NotoDomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+		if err != nil {
+			return nil, err
+		}
+
+		params := &NotoDeployParams{
+			TransactionID: req.Transaction.TransactionId,
+			Notary:        config.NotaryAddress,
+			Data:          data,
+		}
+		paramsJSON, err := json.Marshal(params)
+		if err != nil {
+			return nil, err
+		}
 
 		return &pb.PrepareDeployTransactionResponse{
 			Transaction: &pb.BaseLedgerTransaction{
 				FunctionName: "deploy",
-				ParamsJson: fmt.Sprintf(`{
-					"txId": "%s",
-					"notary": "%s"
-				}`, req.Transaction.TransactionId, notary),
+				ParamsJson:   string(paramsJSON),
 			},
-			SigningAddress: params.Notary,
+			SigningAddress: config.NotaryLookup,
 		}, nil
 
 	case *pb.InitTransactionRequest:
@@ -387,7 +415,7 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	if !found {
 		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := parser.handler.ParseParams(tx.FunctionParamsJson)
+	params, err := parser.handler.ValidateParams(tx.FunctionParamsJson)
 	if err != nil {
 		return nil, err
 	}
@@ -411,6 +439,7 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	}
 
 	return &parsedTransaction{
+		transaction:     tx,
 		functionABI:     &functionABI,
 		contractAddress: contractAddress,
 		domainConfig:    domainConfig,
@@ -456,4 +485,22 @@ func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gat
 		outCoins: outCoins,
 		outTotal: outTotal,
 	}, nil
+}
+
+func (h *domainHandler) findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
+	for _, verifier := range verifiers {
+		if verifier.Lookup == lookup {
+			return verifier
+		}
+	}
+	return nil
+}
+
+func (h *domainHandler) findAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
+	for _, attestation := range attestations {
+		if attestation.Name == name {
+			return attestation
+		}
+	}
+	return nil
 }

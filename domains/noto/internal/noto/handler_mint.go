@@ -28,7 +28,7 @@ type mintHandler struct {
 	domainHandler
 }
 
-func (h *mintHandler) ParseParams(params string) (interface{}, error) {
+func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	var mintParams NotoMintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
@@ -43,23 +43,29 @@ func (h *mintHandler) ParseParams(params string) (interface{}, error) {
 }
 
 func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.params.(NotoMintParams)
+	if req.Transaction.From != tx.domainConfig.NotaryLookup {
+		return nil, fmt.Errorf("mint can only be initiated by notary")
+	}
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    tx.domainConfig.Notary,
+				Lookup:    tx.domainConfig.NotaryLookup,
 				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 			},
-			{
-				Lookup:    params.To,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			},
+			// TODO: should we also resolve "To" party?
 		},
 	}, nil
 }
 
 func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(NotoMintParams)
+
+	notary := h.findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
+	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
+		// TODO: do we need to verify every time?
+		return nil, fmt.Errorf("notary resolved to unexpected address")
+	}
+
 	_, outputStates, err := h.noto.prepareOutputs(params.To, params.Amount)
 	if err != nil {
 		return nil, err
@@ -75,9 +81,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-				Parties: []string{
-					"notary", // TODO: why can't we pass notary address here?
-				},
+				Parties:         []string{tx.domainConfig.NotaryLookup},
 			},
 		},
 	}, nil

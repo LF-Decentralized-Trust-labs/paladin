@@ -30,7 +30,7 @@ type transferHandler struct {
 	domainHandler
 }
 
-func (h *transferHandler) ParseParams(params string) (interface{}, error) {
+func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	var transferParams NotoTransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
@@ -48,27 +48,26 @@ func (h *transferHandler) ParseParams(params string) (interface{}, error) {
 }
 
 func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.params.(NotoTransferParams)
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    tx.domainConfig.Notary,
+				Lookup:    tx.domainConfig.NotaryLookup,
 				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 			},
-			{
-				Lookup:    params.From,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			},
-			{
-				Lookup:    params.To,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-			},
+			// TODO: should we also resolve "From"/"To" parties?
 		},
 	}, nil
 }
 
 func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(NotoTransferParams)
+
+	notary := h.findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
+	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
+		// TODO: do we need to verify every time?
+		return nil, fmt.Errorf("notary resolved to unexpected address")
+	}
+
 	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, params.From, params.Amount)
 	if err != nil {
 		return nil, err
@@ -104,17 +103,13 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				AttestationType: pb.AttestationType_SIGN,
 				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 				Payload:         encodedTransfer,
-				Parties: []string{
-					req.Transaction.From,
-				},
+				Parties:         []string{req.Transaction.From},
 			},
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-				Parties: []string{
-					"notary", // TODO: why can't we pass notary address here?
-				},
+				Parties:         []string{tx.domainConfig.NotaryLookup},
 			},
 		},
 	}, nil
@@ -130,19 +125,10 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 		return nil, fmt.Errorf("invalid amount for 'transfer'")
 	}
 
-	var senderSignature *pb.AttestationResult
-	for _, ar := range req.Signatures {
-		if ar.AttestationType == pb.AttestationType_SIGN &&
-			ar.Name == "sender" &&
-			ar.Verifier.Algorithm == api.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
-			senderSignature = ar
-			break
-		}
-	}
+	senderSignature := h.findAttestation("sender", req.Signatures)
 	if senderSignature == nil {
-		return nil, fmt.Errorf("did not find 'sender' attestation result")
+		return nil, fmt.Errorf("did not find 'sender' attestation")
 	}
-
 	encodedTransfer, err := h.noto.encodeTransferData(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
 		return nil, err
