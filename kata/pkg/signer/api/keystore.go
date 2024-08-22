@@ -31,6 +31,7 @@ import (
 type KeyStore interface {
 	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
+	Close()
 }
 
 // Some cryptographic stores are capable of listing their contents in a natural order.

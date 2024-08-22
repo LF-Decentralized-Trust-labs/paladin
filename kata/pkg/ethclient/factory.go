@@ -29,10 +29,11 @@ import (
 // Allows separate components to maintain separate connections/connection-pools to the
 // blockchain, all using a common set of configuration pointing at the same blockchain.
 type EthClientFactory interface {
-	ChainID() int64            // The chain ID (which at construction time is checked for consistency between HTTP and WS)
+	Start() error              // connects the shared websocket and queries the chainID
+	Stop()                     // closes HTTP client and shared WS client
+	ChainID() int64            // available after start
 	HTTPClient() EthClient     // HTTP client
 	SharedWS() EthClient       // WS client with a single long lived socket shared across multiple components
-	Close()                    // closes HTTP client and shared WS client
 	NewWS() (EthClient, error) // created a dedicated socket - which the caller responsible for closing
 }
 
@@ -58,11 +59,11 @@ type ethClientFactory struct {
 // Callers can later
 func NewEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *Config) (_ EthClientFactory, err error) {
 	ecf := &ethClientFactory{
-		bgCtx:  bgCtx,
-		conf:   conf,
-		keymgr: keymgr,
+		bgCtx:   bgCtx,
+		conf:    conf,
+		keymgr:  keymgr,
+		chainID: -1,
 	}
-
 	// Parse the HTTP and build the HTTP client - we only have one of these across the factory
 	// as within the HTTP client there are as many connections as required for parallelism
 	if conf.HTTP.URL == "" {
@@ -87,22 +88,25 @@ func NewEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *Config)
 	if err != nil {
 		return nil, err
 	}
+	return ecf, nil
+}
 
+func (ecf *ethClientFactory) Start() (err error) {
 	// Connect and check the two connections are to the same network
 	ecf.httpClient, err = WrapRPCClient(ecf.bgCtx, ecf.keymgr, ecf.httpRPC, ecf.conf)
 	if err == nil {
 		ecf.sharedWSClient, err = ecf.NewWS()
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	httpChainID := ecf.httpClient.ChainID()
 	wsChainID := ecf.sharedWSClient.ChainID()
 	if wsChainID != httpChainID {
-		return nil, i18n.NewError(bgCtx, msgs.MsgEthClientChainIDMismatch, httpChainID, wsChainID)
+		return i18n.NewError(ecf.bgCtx, msgs.MsgEthClientChainIDMismatch, httpChainID, wsChainID)
 	}
 	ecf.chainID = httpChainID
-	return ecf, err
+	return err
 }
 
 func (ecf *ethClientFactory) NewWS() (ec EthClient, err error) {
@@ -122,7 +126,7 @@ func (ecf *ethClientFactory) SharedWS() EthClient {
 	return ecf.sharedWSClient
 }
 
-func (ecf *ethClientFactory) Close() {
+func (ecf *ethClientFactory) Stop() {
 	ecf.httpClient.Close()
 	ecf.sharedWSClient.Close()
 }

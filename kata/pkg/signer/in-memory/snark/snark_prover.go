@@ -132,22 +132,22 @@ func (sp *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 }
 
 func validateInputs(inputs *pb.ProvingRequestCommon) error {
-	if inputs.InputCommitments == nil || len(inputs.InputCommitments) == 0 {
+	if len(inputs.InputCommitments) == 0 {
 		return errors.New("input commitments are required")
 	}
-	if inputs.InputValues == nil || len(inputs.InputValues) == 0 {
+	if len(inputs.InputValues) == 0 {
 		return errors.New("input values are required")
 	}
-	if inputs.InputSalts == nil || len(inputs.InputSalts) == 0 {
+	if len(inputs.InputSalts) == 0 {
 		return errors.New("input salts are required")
 	}
 	if len(inputs.InputCommitments) != len(inputs.InputValues) || len(inputs.InputCommitments) != len(inputs.InputSalts) {
 		return errors.New("input commitments, values, and salts must have the same length")
 	}
-	if inputs.OutputValues == nil || len(inputs.OutputValues) == 0 {
+	if len(inputs.OutputValues) == 0 {
 		return errors.New("output values are required")
 	}
-	if inputs.OutputOwners == nil || len(inputs.OutputOwners) == 0 {
+	if len(inputs.OutputOwners) == 0 {
 		return errors.New("output owner keys are required")
 	}
 	if len(inputs.OutputValues) != len(inputs.OutputOwners) {

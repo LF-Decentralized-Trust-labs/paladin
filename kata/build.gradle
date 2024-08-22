@@ -129,6 +129,30 @@ task makeBlockIndexerMock(type:Exec, dependsOn: tasks.installTools) {
     args '--output', 'mocks/componentmocks'
 }
 
+task makePluginControllerMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('internal/plugins')
+    outputs.dir('mocks/plugins') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'internal/plugins'
+    args '--name', 'PluginController'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
+task makeRPCServerMocks(type:Exec, dependsOn: tasks.installTools) {
+    inputs.files('bin/mockery')
+    inputs.dir('internal/rpcserver')
+    outputs.dir('mocks/componentmocks') // colocate all the component mocks
+    executable 'bin/mockery'
+    args '--case', 'underscore'
+    args '--dir', 'internal/rpcserver'
+    args '--name', 'RPCServer'
+    args '--outpkg', 'componentmocks'
+    args '--output', 'mocks/componentmocks'
+}
+
 task makeEthClientMocks(type:Exec, dependsOn: tasks.installTools) {
     inputs.files('bin/mockery')
     inputs.dir('pkg/ethclient')
@@ -147,6 +171,8 @@ task makeMocks(dependsOn: [
     tasks.makeStateStoreMock,
     tasks.makeDomainStateInterfaceMock,
     tasks.makeBlockIndexerMock,
+    tasks.makePluginControllerMocks,
+    tasks.makeRPCServerMocks,
     tasks.makeEthClientMocks,
 ]) {}
 

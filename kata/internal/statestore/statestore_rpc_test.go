@@ -34,7 +34,7 @@ import (
 func newTestRPCServer(t *testing.T) (context.Context, rpcbackend.Backend, func()) {
 	ctx, ss, ssDone := newDBTestStateStore(t)
 
-	s, err := rpcserver.NewServer(ctx, &rpcserver.Config{
+	s, err := rpcserver.NewRPCServer(ctx, &rpcserver.Config{
 		HTTP: rpcserver.HTTPEndpointConfig{
 			Config: httpserver.Config{Address: confutil.P("127.0.0.1"), Port: confutil.P(0)},
 		},

@@ -76,11 +76,12 @@ type event_PaladinNewSmartContract_V0 struct {
 	Data   types.HexBytes   `json:"data"`
 }
 
-func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+func (dm *domainManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	dm.persistence = pic.Persistence()
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
 	dm.chainID = dm.ethClientFactory.ChainID()
+	dm.blockIndexer = pic.BlockIndexer()
 	return &components.ManagerInitResult{
 		EventStreams: []*components.ManagerEventStream{
 			{
@@ -89,11 +90,6 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 			},
 		},
 	}, nil
-}
-
-func (dm *domainManager) PostInit(c components.PostInitComponents) error {
-	dm.blockIndexer = c.BlockIndexer()
-	return nil
 }
 
 func (dm *domainManager) Start() error { return nil }

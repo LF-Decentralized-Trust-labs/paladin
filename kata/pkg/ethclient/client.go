@@ -54,6 +54,7 @@ type EthClient interface {
 type KeyManager interface {
 	ResolveKey(ctx context.Context, identifier string, algorithm string) (keyHandle, verifier string, err error)
 	Sign(ctx context.Context, req *proto.SignRequest) (*proto.SignResponse, error)
+	Close()
 }
 
 type ethClient struct {

@@ -50,7 +50,7 @@ type testManagers struct {
 	testDomainManager *testDomainManager
 }
 
-func (ts *testManagers) DomainManager() DomainRegistration {
+func (ts *testManagers) DomainRegistration() DomainRegistration {
 	if ts.testDomainManager == nil {
 		ts.testDomainManager = &testDomainManager{}
 	}
@@ -59,7 +59,7 @@ func (ts *testManagers) DomainManager() DomainRegistration {
 
 func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	testPlugins := make(map[string]plugintk.Plugin)
-	for name, td := range ts.DomainManager().(*testDomainManager).domains {
+	for name, td := range ts.DomainRegistration().(*testDomainManager).domains {
 		testPlugins[name] = td
 	}
 	return testPlugins
@@ -79,7 +79,7 @@ func newTestDomainPluginController(t *testing.T, setup *testManagers) (context.C
 	})
 	assert.NoError(t, err)
 
-	err = pc.Start(context.Background())
+	err = pc.Start()
 	assert.NoError(t, err)
 
 	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
@@ -98,7 +98,7 @@ func newTestDomainPluginController(t *testing.T, setup *testManagers) (context.C
 			panic(recovered)
 		}
 		cancelCtx()
-		pc.Stop(ctx)
+		pc.Stop()
 		tpl.Stop()
 		<-done
 	}
@@ -110,9 +110,9 @@ func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
 		GRPC: GRPCConfig{Address: tempUDS(t)},
 	})
 	assert.NoError(t, err)
-	err = pc.Start(context.Background())
+	err = pc.Start()
 	assert.NoError(t, err)
-	pc.Stop(context.Background())
+	pc.Stop()
 }
 
 func TestInitPluginControllerBadPlugin(t *testing.T) {
@@ -131,7 +131,7 @@ func TestInitPluginControllerBadSocket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = pc.Start(context.Background())
+	err = pc.Start()
 	assert.Regexp(t, "bind", err)
 }
 
@@ -158,7 +158,7 @@ func TestInitPluginControllerTCP4(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = pc.Start(context.Background())
+	err = pc.Start()
 	assert.NoError(t, err)
 	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
@@ -174,7 +174,7 @@ func TestInitPluginControllerTCP6(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = pc.Start(context.Background())
+	err = pc.Start()
 	assert.NoError(t, err)
 	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
@@ -214,7 +214,7 @@ func TestLoaderErrors(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = pc.Start(ctx)
+	err = pc.Start()
 	assert.NoError(t, err)
 
 	conn, err := grpc.NewClient(pc.GRPCTargetURL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -280,7 +280,7 @@ func TestLoaderErrors(t *testing.T) {
 	err = pc.ReloadPluginList()
 	assert.NoError(t, err)
 
-	pc.Stop(ctx)
+	pc.Stop()
 
 	// Also check we don't block on the LoadFailed notification if the channel gets full (which it will after stop)
 	for i := 0; i < 3; i++ {

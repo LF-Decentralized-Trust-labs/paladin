@@ -66,6 +66,10 @@ func (tk *testKeyStoreAll) ListKeys(ctx context.Context, req *proto.ListKeysRequ
 	return tk.listKeys(ctx, req)
 }
 
+func (tk *testKeyStoreAll) Close() {
+
+}
+
 func TestExtensionInitFail(t *testing.T) {
 
 	te := &testExtension{
@@ -162,6 +166,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011415", err)
 
+	sm.Close()
 }
 
 func TestExtensionKeyStoreListFail(t *testing.T) {

@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
@@ -38,7 +39,8 @@ type ComponentManager interface {
 }
 
 type componentManager struct {
-	bgCtx context.Context
+	instanceUUID uuid.UUID
+	bgCtx        context.Context
 	// config
 	conf *Config
 	// pre-init
@@ -46,55 +48,51 @@ type componentManager struct {
 	ethClientFactory ethclient.EthClientFactory
 	persistence      persistence.Persistence
 	stateStore       statestore.StateStore
-	// post-init
 	blockIndexer     blockindexer.BlockIndexer
+	rpcServer        rpcserver.RPCServer
+	// post-init
 	pluginController plugins.PluginController
-	rpcServer        rpcserver.Server
 	// managers
 	domainManager components.DomainManager
 	// engine
 	engine components.Engine
+	// init to start tracking
+	initResults          map[string]*components.ManagerInitResult
+	internalEventStreams []*blockindexer.InternalEventStream
 	// keep track of everything we started
 	started []stoppable
 	opened  []closeable
 }
 
+// things that have a running component that is active in the background and hence "stops"
 type stoppable interface {
 	Stop()
 }
 
+// things that are services used in various places, but need to cleanly disconnect all connections and hence "close"
 type closeable interface {
 	Close()
 }
 
-func NewComponentManager(bgCtx context.Context, conf *Config, engine components.Engine) ComponentManager {
-	return newComponentManager(bgCtx, conf, engine)
-}
-
-// For unit tests we create a component manager from an existing persistence layer
-func NewComponentManagerWithPersistence(bgCtx context.Context, conf *Config, persistence persistence.Persistence, engine components.Engine) ComponentManager {
-	cm := newComponentManager(bgCtx, conf, engine)
-	cm.persistence = persistence
-	return cm
-}
-
-func newComponentManager(bgCtx context.Context, conf *Config, engine components.Engine) *componentManager {
+func NewComponentManager(bgCtx context.Context, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
 	return &componentManager{
-		bgCtx:  bgCtx,
-		conf:   conf,
-		engine: engine,
+		instanceUUID: instanceUUID,
+		bgCtx:        bgCtx,
+		conf:         conf,
+		engine:       engine,
+		initResults:  make(map[string]*components.ManagerInitResult),
 	}
 }
 
-func (cm *componentManager) Start() (err error) {
+func (cm *componentManager) Init() (err error) {
 
 	// pre-init components
 	cm.keyManager, err = ethclient.NewSimpleTestKeyManager(cm.bgCtx, &cm.conf.Signer)
+	cm.addIfOpened(cm.keyManager, err)
 	if err == nil {
 		cm.ethClientFactory, err = ethclient.NewEthClientFactory(cm.bgCtx, cm.keyManager, &cm.conf.Blockchain)
-		cm.addIfOpened(cm.ethClientFactory, err)
 	}
-	if err == nil && cm.persistence == nil {
+	if err == nil {
 		cm.persistence, err = persistence.NewPersistence(cm.bgCtx, &cm.conf.DB)
 		cm.addIfOpened(cm.persistence, err)
 	}
@@ -102,45 +100,44 @@ func (cm *componentManager) Start() (err error) {
 		cm.stateStore = statestore.NewStateStore(cm.bgCtx, &cm.conf.StateStore, cm.persistence)
 		cm.addIfOpened(cm.stateStore, err)
 	}
-
-	// pre-init managers
-	initResults := map[string]*components.ManagerInitResult{}
-	if err == nil {
-		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
-		initResults["domain_mgr"], err = cm.domainManager.PreInit(cm)
-	}
-
-	// pre-init engine
-	if err == nil {
-		initResults[cm.engine.Name()], err = cm.engine.PreInit(cm)
-	}
-
-	// using pre-init of managers, for init of post-init components
 	if err == nil {
 		cm.blockIndexer, err = blockindexer.NewBlockIndexer(cm.bgCtx, &cm.conf.BlockIndexer, &cm.conf.Blockchain.WS, cm.persistence)
 	}
-	var internalEventStreams []*blockindexer.InternalEventStream
 	if err == nil {
-		internalEventStreams, err = cm.buildInternalEventStreams(initResults)
+		cm.rpcServer, err = rpcserver.NewRPCServer(cm.bgCtx, &cm.conf.RPCServer)
+	}
+
+	// init managers
+	if err == nil {
+		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
+		cm.initResults["domain_mgr"], err = cm.domainManager.Init(cm)
+	}
+
+	// using init of managers, for post-init components
+	if err == nil {
+		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
+	}
+
+	// init engine
+	if err == nil {
+		cm.initResults[cm.engine.Name()], err = cm.engine.Init(cm)
+	}
+	return err
+}
+
+func (cm *componentManager) Start() (err error) {
+
+	// start the eth client
+	err = cm.ethClientFactory.Start()
+	cm.addIfStarted(cm.ethClientFactory, err)
+
+	// start the block indexer
+	if err == nil {
+		cm.internalEventStreams, err = cm.buildInternalEventStreams()
 	}
 	if err == nil {
-		err = cm.blockIndexer.Start(internalEventStreams...)
+		err = cm.blockIndexer.Start(cm.internalEventStreams...)
 		cm.addIfStarted(cm.blockIndexer, err)
-	}
-	if err == nil {
-		// note the RPC server is the last thing to actually start, only after we're fully initialized
-		cm.rpcServer, err = rpcserver.NewServer(cm.bgCtx, &cm.conf.RPCServer)
-		cm.registerRPCModules(initResults)
-	}
-
-	// post-init managers
-	if err == nil {
-		err = cm.domainManager.PostInit(cm)
-	}
-
-	// post-init the engine
-	if err == nil {
-		err = cm.engine.PostInit(cm)
 	}
 
 	// start the managers
@@ -149,19 +146,25 @@ func (cm *componentManager) Start() (err error) {
 		cm.addIfStarted(cm.domainManager, err)
 	}
 
+	// start the plugin controller
+	if err == nil {
+		err = cm.pluginController.Start()
+		cm.addIfStarted(cm.pluginController, err)
+	}
+
 	// start the engine
 	if err == nil {
 		err = cm.engine.Start()
 		cm.addIfStarted(cm.engine, err)
 	}
 
-	// start the RPC server
+	// start the RPC server last
 	if err == nil {
+		cm.registerRPCModules()
 		err = cm.rpcServer.Start()
 		cm.addIfStarted(cm.rpcServer, err)
 	}
 
-	// ... and we're done
 	return err
 }
 
@@ -177,9 +180,9 @@ func (cm *componentManager) addIfOpened(c closeable, err error) {
 	}
 }
 
-func (cm *componentManager) buildInternalEventStreams(initResults map[string]*components.ManagerInitResult) ([]*blockindexer.InternalEventStream, error) {
+func (cm *componentManager) buildInternalEventStreams() ([]*blockindexer.InternalEventStream, error) {
 	var streams []*blockindexer.InternalEventStream
-	for shortName, initResult := range initResults {
+	for shortName, initResult := range cm.initResults {
 		for _, initStream := range initResult.EventStreams {
 			// We build a stream name in a way assured to result in a new stream if the ABI changes,
 			// TODO... and in the future with a logical way to clean up defunct streams
@@ -202,8 +205,8 @@ func (cm *componentManager) buildInternalEventStreams(initResults map[string]*co
 	return streams, nil
 }
 
-func (cm *componentManager) registerRPCModules(initResults map[string]*components.ManagerInitResult) {
-	for _, initResult := range initResults {
+func (cm *componentManager) registerRPCModules() {
+	for _, initResult := range cm.initResults {
 		for _, rpcMod := range initResult.RPCModules {
 			cm.rpcServer.Register(rpcMod)
 		}
@@ -237,7 +240,7 @@ func (cm *componentManager) StateStore() statestore.StateStore {
 	return cm.stateStore
 }
 
-func (cm *componentManager) RPCServer() rpcserver.Server {
+func (cm *componentManager) RPCServer() rpcserver.RPCServer {
 	return cm.rpcServer
 }
 
@@ -249,10 +252,14 @@ func (cm *componentManager) DomainManager() components.DomainManager {
 	return cm.domainManager
 }
 
-func (cm *componentManager) Engine() components.Engine {
-	return cm.engine
+func (cm *componentManager) DomainRegistration() plugins.DomainRegistration {
+	return cm.domainManager
 }
 
 func (cm *componentManager) PluginController() plugins.PluginController {
 	return cm.pluginController
+}
+
+func (cm *componentManager) Engine() components.Engine {
+	return cm.engine
 }

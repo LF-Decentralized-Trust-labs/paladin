@@ -40,7 +40,7 @@ type mockEth struct {
 	eth_call                func(context.Context, ethsigner.Transaction, string) (ethtypes.HexBytes0xPrefix, error)
 }
 
-func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) (rpcServer rpcserver.Server, done func()) {
+func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) (rpcServer rpcserver.RPCServer, done func()) {
 	var rpcServerConf *rpcserver.Config
 	if isWS {
 		rpcServerConf = &rpcserver.Config{
@@ -66,7 +66,7 @@ func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) 
 		}
 	}
 
-	rpcServer, err := rpcserver.NewServer(ctx, rpcServerConf)
+	rpcServer, err := rpcserver.NewRPCServer(ctx, rpcServerConf)
 	assert.NoError(t, err)
 
 	if mEth.eth_chainId == nil {
@@ -113,7 +113,8 @@ func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _
 	httpRPCServer, httpServerDone := newTestServer(t, ctx, false, mEth)
 	wsRPCServer, wsServerDone := newTestServer(t, ctx, true, mEth)
 
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
 
 	conf := &Config{
 		HTTP: rpcclient.HTTPConfig{
@@ -128,12 +129,15 @@ func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _
 
 	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
 	assert.NoError(t, err)
+
+	err = ecf.Start()
+	assert.NoError(t, err)
 	assert.Equal(t, int64(12345), ecf.ChainID())
 
 	return ctx, ecf.(*ethClientFactory), func() {
 		httpServerDone()
 		wsServerDone()
-		ecf.Close()
+		ecf.Stop()
 	}
 
 }
@@ -157,13 +161,15 @@ func TestNewEthClientFactoryBadConfig(t *testing.T) {
 }
 
 func TestNewEthClientFactoryMissingURL(t *testing.T) {
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
 	_, err := NewEthClientFactory(context.Background(), kmgr, &Config{})
 	assert.Regexp(t, "PD011511", err)
 }
 
 func TestNewEthClientFactoryBadURL(t *testing.T) {
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
 	_, err := NewEthClientFactory(context.Background(), kmgr, &Config{
 		HTTP: rpcclient.HTTPConfig{
 			URL: "wrong://type",
@@ -179,12 +185,15 @@ func TestNewEthClientFactoryChainIDFail(t *testing.T) {
 	})
 	defer done()
 
-	kmgr := newTestHDWalletKeyManager(t)
-	_, err := NewEthClientFactory(context.Background(), kmgr, &Config{
+	kmgr, kmDone := newTestHDWalletKeyManager(t)
+	defer kmDone()
+	ecf, err := NewEthClientFactory(context.Background(), kmgr, &Config{
 		HTTP: rpcclient.HTTPConfig{
 			URL: fmt.Sprintf("http://%s", rpcServer.HTTPAddr().String()),
 		},
 	})
+	assert.NoError(t, err)
+	err = ecf.Start()
 	assert.Regexp(t, "PD011508.*pop", err)
 
 }
@@ -203,7 +212,8 @@ func TestMismatchedChainID(t *testing.T) {
 	wsRPCServer, wsServerDone := newTestServer(t, ctx, true, mEthWS)
 	defer wsServerDone()
 
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, kmDone := newTestHDWalletKeyManager(t)
+	defer kmDone()
 
 	conf := &Config{
 		HTTP: rpcclient.HTTPConfig{
@@ -216,7 +226,9 @@ func TestMismatchedChainID(t *testing.T) {
 		},
 	}
 
-	_, err := NewEthClientFactory(ctx, kmgr, conf)
+	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
+	assert.NoError(t, err)
+	err = ecf.Start()
 	assert.Regexp(t, "PD011512", err)
 
 }

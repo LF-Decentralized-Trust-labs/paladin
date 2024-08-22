@@ -39,6 +39,8 @@ func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	})
 	assert.NoError(t, err)
 
+	store.Close()
+
 	return ctx, store.(*filesystemStore)
 }
 

@@ -33,10 +33,12 @@ type PreInitComponents interface {
 	EthClientFactory() ethclient.EthClientFactory
 	Persistence() persistence.Persistence
 	StateStore() statestore.StateStore
+	BlockIndexer() blockindexer.BlockIndexer
+	RPCServer() rpcserver.RPCServer
 }
 
 // PostInitComponents depend on instructions/configuration that is initialized by managers
-// to determine their startup, and depend on pre-init components.
+// to determine their initialization
 //
 // However, they are not managers in their own right and can be re-used across managers.
 //
@@ -44,9 +46,7 @@ type PreInitComponents interface {
 // at initialization time, so they can still be independent go packages with their
 // own interfaces (they must not depend on the "components" package themselves).
 type PostInitComponents interface {
-	BlockIndexer() blockindexer.BlockIndexer
 	PluginController() plugins.PluginController
-	RPCServer() rpcserver.Server
 }
 
 // Managers are initialized after base components with access to them, and provide
@@ -63,8 +63,7 @@ type Managers interface {
 
 // All managers conform to a standard lifecycle
 type ManagerLifecycle interface {
-	PreInit(PreInitComponents) (*ManagerInitResult, error)
-	PostInit(PostInitComponents) error
+	Init(PreInitComponents) (*ManagerInitResult, error)
 	Start() error
 	Stop()
 }

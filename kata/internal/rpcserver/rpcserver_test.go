@@ -33,7 +33,7 @@ func newTestServerHTTP(t *testing.T, conf *Config) (string, *rpcServer, func()) 
 	conf.HTTP.Address = confutil.P("127.0.0.1")
 	conf.HTTP.Port = confutil.P(0)
 	conf.WS.Disabled = true
-	s, err := NewServer(context.Background(), conf)
+	s, err := NewRPCServer(context.Background(), conf)
 	assert.NoError(t, err)
 	err = s.Start()
 	assert.NoError(t, err)
@@ -47,7 +47,7 @@ func newTestServerWebSockets(t *testing.T, conf *Config) (string, *rpcServer, fu
 	conf.WS.Address = confutil.P("127.0.0.1")
 	conf.WS.Port = confutil.P(0)
 	conf.HTTP.Disabled = true
-	s, err := NewServer(context.Background(), conf)
+	s, err := NewRPCServer(context.Background(), conf)
 	assert.NoError(t, err)
 	err = s.Start()
 	assert.NoError(t, err)
@@ -68,7 +68,7 @@ func regTestRPC(s *rpcServer, method string, handler RPCHandler) {
 
 func TestBadHTTPConfig(t *testing.T) {
 
-	_, err := NewServer(context.Background(), &Config{
+	_, err := NewRPCServer(context.Background(), &Config{
 		HTTP: HTTPEndpointConfig{
 			Config: httpserver.Config{
 				Address: confutil.P("::::::wrong"),
@@ -82,7 +82,7 @@ func TestBadHTTPConfig(t *testing.T) {
 
 func TestBadWSConfig(t *testing.T) {
 
-	_, err := NewServer(context.Background(), &Config{
+	_, err := NewRPCServer(context.Background(), &Config{
 		WS: WSEndpointConfig{
 			Config: httpserver.Config{
 				Address: confutil.P("::::::wrong"),

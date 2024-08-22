@@ -98,11 +98,9 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 	}
 
 	dm := NewDomainManager(ctx, conf)
-	initInstructions, err := dm.PreInit(preMocks)
+	initInstructions, err := dm.Init(preMocks)
 	assert.NoError(t, err)
 	assert.Len(t, initInstructions.EventStreams, 1)
-	err = dm.PostInit(postMocks)
-	assert.NoError(t, err)
 
 	err = dm.Start()
 	assert.NoError(t, err)

@@ -203,3 +203,7 @@ func (fss *filesystemStore) LoadKeyMaterial(ctx context.Context, keyHandle strin
 	}
 	return wf.PrivateKey(), nil
 }
+
+func (fss *filesystemStore) Close() {
+
+}

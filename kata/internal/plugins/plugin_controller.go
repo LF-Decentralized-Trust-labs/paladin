@@ -32,12 +32,12 @@ import (
 )
 
 type Managers interface {
-	DomainManager() DomainRegistration
+	DomainRegistration() DomainRegistration
 }
 
 type PluginController interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context)
+	Start() error
+	Stop()
 	GRPCTargetURL() string
 	LoaderID() uuid.UUID
 	WaitForInit(ctx context.Context) error
@@ -73,7 +73,7 @@ func NewPluginController(bgCtx context.Context, loaderID uuid.UUID, managers Man
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
-		domainManager: managers.DomainManager(),
+		domainManager: managers.DomainRegistration(),
 		domainPlugins: make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
 
 		serverDone:           make(chan error),
@@ -126,7 +126,8 @@ func (pc *pluginController) parseGRPCAddress(ctx context.Context, serverAddr str
 
 }
 
-func (pc *pluginController) Start(ctx context.Context) (err error) {
+func (pc *pluginController) Start() (err error) {
+	ctx := pc.bgCtx
 	log.L(ctx).Infof("server starting on %s:%s", pc.network, pc.address)
 	pc.listener, err = net.Listen(pc.network, pc.address)
 	if err != nil {
@@ -150,7 +151,8 @@ func (pc *pluginController) runServer(ctx context.Context) {
 	log.L(ctx).Infof("Server ended")
 }
 
-func (pc *pluginController) Stop(ctx context.Context) {
+func (pc *pluginController) Stop() {
+	ctx := pc.bgCtx
 	log.L(ctx).Infof("Stop")
 
 	gracefullyStopped := make(chan struct{})

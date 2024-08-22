@@ -29,7 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
-type Server interface {
+type RPCServer interface {
 	Register(module *RPCModule)
 	Start() error
 	Stop()
@@ -38,7 +38,7 @@ type Server interface {
 	WSAddr() net.Addr
 }
 
-func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
+func NewRPCServer(ctx context.Context, conf *Config) (_ RPCServer, err error) {
 	s := &rpcServer{
 		bgCtx:         ctx,
 		wsConnections: make(map[string]*webSocketConnection),

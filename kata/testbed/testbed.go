@@ -65,7 +65,7 @@ type testbed struct {
 	socketFile       string
 	loaderID         uuid.UUID
 	pluginController plugins.PluginController
-	rpcServer        rpcserver.Server
+	rpcServer        rpcserver.RPCServer
 	stateStore       statestore.StateStore
 	blockindexer     blockindexer.BlockIndexer
 	keyMgr           ethclient.KeyManager
@@ -170,7 +170,7 @@ func (tb *testbed) run() (err error) {
 	}
 
 	tb.stateStore = statestore.NewStateStore(tb.ctx, &tb.conf.StateStore, p)
-	tb.rpcServer, err = rpcserver.NewServer(tb.ctx, &tb.conf.RPCServer)
+	tb.rpcServer, err = rpcserver.NewRPCServer(tb.ctx, &tb.conf.RPCServer)
 	if err == nil {
 		err = tb.initRPC()
 	}
