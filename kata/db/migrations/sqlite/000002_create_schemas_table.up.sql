@@ -6,5 +6,5 @@ CREATE TABLE schemas (
     "signature"      VARCHAR,
     "definition"     VARCHAR,
     "labels"         VARCHAR,
-    PRIMARY KEY ("id")
+    PRIMARY KEY ("domain_id", "id")
 );

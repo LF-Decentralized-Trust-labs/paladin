@@ -226,7 +226,10 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 			err = tx.
 				Table("schemas").
 				Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "id"}},
+					Columns: []clause.Column{
+						{Name: "domain_id"},
+						{Name: "id"},
+					},
 					DoNothing: true, // immutable
 				}).
 				Create(schemas).
