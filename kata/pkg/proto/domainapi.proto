@@ -94,6 +94,7 @@ message EndorseTransactionRequest {
     repeated EndorsableState inputs = 4; // Input states for the transaction
     repeated EndorsableState outputs = 5; // Output states for the transaction
     repeated AttestationResult signatures = 6; // All SIGN attestation results (required from submitting node before endorsement)
+    string name = 7; // Allows correlation of endorsement request to the original attestation request
 }
 
 message EndorseTransactionResponse {
