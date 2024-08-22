@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/engine/dependencies"
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -30,7 +31,7 @@ type Engine interface {
 	NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error)
 	HandleNewTx(ctx context.Context, txID string) error
 	Name() string
-	ManagerLifecycle
+	dependencies.ManagerLifecycle
 }
 
 type engine struct {
@@ -39,7 +40,7 @@ type engine struct {
 }
 
 // Init implements Engine.
-func (e *engine) Init(PreInitComponents) (*ManagerInitResult, error) {
+func (e *engine) Init(dependencies.PreInitComponents) (*dependencies.ManagerInitResult, error) {
 	panic("unimplemented")
 }
 
