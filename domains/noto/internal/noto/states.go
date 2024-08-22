@@ -30,9 +30,9 @@ import (
 )
 
 type NotoCoin struct {
-	Salt   string              `json:"salt"`
-	Owner  string              `json:"owner"`
-	Amount ethtypes.HexInteger `json:"amount"`
+	Salt   string               `json:"salt"`
+	Owner  string               `json:"owner"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -97,7 +97,7 @@ func (d *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
 	}, nil
 }
 
-func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (d *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
@@ -151,7 +151,7 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount ethtypes.
 	}
 }
 
-func (d *Noto) prepareOutputs(owner string, amount ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
+func (d *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &NotoCoin{

@@ -67,7 +67,6 @@ func (d *Noto) getInterface() DomainInterface {
 				Name: "transfer",
 				Type: abi.Function,
 				Inputs: abi.ParameterArray{
-					{Name: "from", Type: "string"},
 					{Name: "to", Type: "string"},
 					{Name: "amount", Type: "uint256"},
 				},
@@ -90,12 +89,11 @@ type NotoConstructorParams struct {
 }
 
 type NotoMintParams struct {
-	To     string              `json:"to"`
-	Amount ethtypes.HexInteger `json:"amount"`
+	To     string               `json:"to"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
 type NotoTransferParams struct {
-	From   string              `json:"from"`
-	To     string              `json:"to"`
-	Amount ethtypes.HexInteger `json:"amount"`
+	To     string               `json:"to"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }

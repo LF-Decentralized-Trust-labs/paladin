@@ -17,7 +17,7 @@ package noto
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -37,6 +37,12 @@ var (
 	recipient1Name = "recipient1"
 	recipient2Name = "recipient2"
 )
+
+func toJSON(t *testing.T, v any) []byte {
+	result, err := json.Marshal(v)
+	assert.NoError(t, err)
+	return result
+}
 
 func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Noto, rpcbackend.Backend) {
 	ctx := context.Background()
@@ -103,10 +109,10 @@ func TestNoto(t *testing.T) {
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["mint"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"to": "%s",
-			"amount": 100
-		}`, notaryName)),
+		Inputs: toJSON(t, &NotoMintParams{
+			To:     notaryName,
+			Amount: ethtypes.NewHexInteger64(100),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -124,10 +130,10 @@ func TestNoto(t *testing.T) {
 		From:     recipient1Name,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["mint"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"to": "%s",
-			"amount": 100
-		}`, recipient1Name)),
+		Inputs: toJSON(t, &NotoMintParams{
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(100),
+		}),
 	})
 	assert.NotNil(t, rpcerr)
 	assert.Error(t, rpcerr.Error(), "mint can only be initiated by notary")
@@ -138,11 +144,10 @@ func TestNoto(t *testing.T) {
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["transfer"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"from": "%s",
-			"to": "%s",
-			"amount": 150
-		}`, notaryName, recipient1Name)),
+		Inputs: toJSON(t, &NotoTransferParams{
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(150),
+		}),
 	})
 	assert.NotNil(t, rpcerr)
 	assert.Regexp(t, "insufficient funds", rpcerr.Error())
@@ -152,11 +157,10 @@ func TestNoto(t *testing.T) {
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["transfer"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"from": "%s",
-			"to": "%s",
-			"amount": 50
-		}`, notaryName, recipient1Name)),
+		Inputs: toJSON(t, &NotoTransferParams{
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(50),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -182,11 +186,10 @@ func TestNoto(t *testing.T) {
 		From:     recipient1Name,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["transfer"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"from": "%s",
-			"to": "%s",
-			"amount": 50
-		}`, recipient1Name, recipient2Name)),
+		Inputs: toJSON(t, &NotoTransferParams{
+			To:     recipient2Name,
+			Amount: ethtypes.NewHexInteger64(50),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -242,10 +245,10 @@ func TestNotoSelfSubmit(t *testing.T) {
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["mint"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"to": "%s",
-			"amount": 100
-		}`, notaryName)),
+		Inputs: toJSON(t, &NotoMintParams{
+			To:     notaryName,
+			Amount: ethtypes.NewHexInteger64(100),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -263,11 +266,10 @@ func TestNotoSelfSubmit(t *testing.T) {
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["transfer"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"from": "%s",
-			"to": "%s",
-			"amount": 50
-		}`, notaryName, recipient1Name)),
+		Inputs: toJSON(t, &NotoTransferParams{
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(50),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -282,11 +284,10 @@ func TestNotoSelfSubmit(t *testing.T) {
 		From:     recipient1Name,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["transfer"].ABI,
-		Inputs: types.RawJSON(fmt.Sprintf(`{
-			"from": "%s",
-			"to": "%s",
-			"amount": 50
-		}`, recipient1Name, recipient2Name)),
+		Inputs: toJSON(t, &NotoTransferParams{
+			To:     recipient2Name,
+			Amount: ethtypes.NewHexInteger64(50),
+		}),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())

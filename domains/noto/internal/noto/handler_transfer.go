@@ -35,9 +35,6 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
 	}
-	if transferParams.From == "" {
-		return nil, fmt.Errorf("parameter 'from' is required")
-	}
 	if transferParams.To == "" {
 		return nil, fmt.Errorf("parameter 'to' is required")
 	}
@@ -68,7 +65,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, params.From, params.Amount)
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, tx.transaction.From, params.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +75,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(params.From, *ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := h.noto.prepareOutputs(tx.transaction.From, ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
