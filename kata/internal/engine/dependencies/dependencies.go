@@ -19,6 +19,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -27,6 +28,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	prototk "github.com/kaleido-io/paladin/kata/pkg/proto/toolkit"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"gorm.io/gorm"
 )
 
@@ -117,6 +120,64 @@ type RPCModule struct {
 // These use generics to avoid you needing to do any messy type mapping in your functions.
 type RPCHandler func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
 
+/* From github.com/kaleido-io/paladin/toolkit/pkg/plugintk*/
+type DomainAPI interface {
+	ConfigureDomain(context.Context, *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error)
+	InitDomain(context.Context, *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error)
+	InitDeploy(context.Context, *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error)
+	PrepareDeploy(context.Context, *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error)
+	InitTransaction(context.Context, *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error)
+	AssembleTransaction(context.Context, *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error)
+	EndorseTransaction(context.Context, *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error)
+	PrepareTransaction(context.Context, *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error)
+}
+
+type DomainCallbacks interface {
+	FindAvailableStates(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
+}
+
+/* From "github.com/kaleido-io/paladin/kata/internal/plugins" */
+type LibraryType string
+
+const (
+	LibraryTypeCShared LibraryType = "c-shared"
+	LibraryTypeJar     LibraryType = "jar"
+)
+
+func (lt LibraryType) Enum() types.Enum[LibraryType] {
+	return types.Enum[LibraryType](lt)
+}
+
+func (pl LibraryType) Options() []string {
+	return []string{
+		string(LibraryTypeCShared),
+		string(LibraryTypeJar),
+	}
+}
+
+type PluginConfig struct {
+	Type     types.Enum[LibraryType]
+	Location string
+}
+
+type DomainManagerToDomain interface {
+	DomainAPI
+	Initialized()
+}
+
+type DomainRegistration interface {
+	ConfiguredDomains() map[string]*PluginConfig
+	DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain DomainCallbacks, err error)
+}
+type PluginController interface {
+	Start() error
+	Stop()
+	GRPCTargetURL() string
+	LoaderID() uuid.UUID
+	WaitForInit(ctx context.Context) error
+	ReloadPluginList() error
+}
+
 /* From "github.com/kaleido-io/paladin/kata/internal/components" */
 type PreInitComponents interface {
 	KeyManager() KeyManager
@@ -126,6 +187,114 @@ type PreInitComponents interface {
 	BlockIndexer() blockindexer.BlockIndexer
 	RPCServer() RPCServer
 }
+type PrivateContractDeploy struct {
+
+	// INPUTS: Items that come in from the submitter of the transaction to send to the constructor
+	ID     uuid.UUID // TODO: == idempotency key?
+	Domain string
+	Inputs types.RawJSON
+
+	// ASSEMBLY PHASE
+	TransactionSpecification *prototk.DeployTransactionSpecification
+	RequiredVerifiers        []*prototk.ResolveVerifierRequest
+	Verifiers                []*prototk.ResolvedVerifier
+
+	// DISPATCH PHASE
+	Signer            string
+	InvokeTransaction *prototk.BaseLedgerTransaction
+	DeployTransaction *prototk.BaseLedgerDeployTransaction
+}
+
+type Domain interface {
+	Initialized() bool
+	Name() string
+	Address() *types.EthAddress
+	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+	Configuration() *prototk.DomainConfig
+
+	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
+	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
+}
+type TransactionInputs struct {
+	Domain   string
+	From     string
+	To       *types.EthAddress
+	Function *abi.Entry
+	Inputs   types.RawJSON
+}
+type TransactionPreAssembly struct {
+	TransactionSpecification *prototk.TransactionSpecification
+	RequiredVerifiers        []*prototk.ResolveVerifierRequest
+	Verifiers                []*prototk.ResolvedVerifier
+}
+
+type FullState struct {
+	ID     types.Bytes32
+	Schema types.Bytes32
+	Data   types.RawJSON
+}
+
+type TransactionPostAssembly struct {
+	AssemblyResult        prototk.AssembleTransactionResponse_Result
+	OutputStatesPotential []*prototk.NewState // the raw result of assembly, before sequence allocation
+	InputStates           []*FullState
+	ReadStates            []*FullState
+	OutputStates          []*FullState
+	AttestationPlan       []*prototk.AttestationRequest
+	Signatures            []*prototk.AttestationResult
+	Endorsements          []*prototk.AttestationResult
+}
+type PrivateTransaction struct {
+	ID uuid.UUID // TODO: == idempotency key?
+
+	// INPUTS: Items that come in from the submitter of the transaction
+	Inputs *TransactionInputs
+
+	// ASSEMBLY PHASE: Items that get added to the transaction as it goes on its journey through
+	// assembly, signing and endorsement (possibly going back through the journey many times)
+	PreAssembly  *TransactionPreAssembly  // the bit of the assembly phase state that can be retained across re-assembly
+	PostAssembly *TransactionPostAssembly // the bit of the assembly phase state that must be completely discarded on re-assembly
+
+	// DISPATCH PHASE: Once the transaction has reached sufficient confidence of success,
+	// we move on to submitting it to the blockchain.
+	PreparedTransaction *prototk.BaseLedgerTransaction
+}
+
+type DomainSmartContract interface {
+	Domain() Domain
+	Address() types.EthAddress
+	ConfigBytes() []byte
+
+	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
+	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
+	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error
+	LockStates(ctx context.Context, tx *PrivateTransaction) error
+	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
+	PrepareTransaction(ctx context.Context, tx *PrivateTransaction) error
+}
+type EndorsementResult struct {
+	Endorser     *prototk.ResolvedVerifier
+	Result       prototk.EndorseTransactionResponse_Result
+	Payload      []byte
+	RevertReason *string
+}
+type DomainManager interface {
+	ManagerLifecycle
+	DomainRegistration
+	GetDomainByName(ctx context.Context, name string) (Domain, error)
+}
+type Managers interface {
+	DomainManager() DomainManager
+}
+type PostInitComponents interface {
+	PluginController() PluginController
+}
+type AllComponents interface {
+	PreInitComponents
+	PostInitComponents
+	Managers
+}
+
 type ManagerEventStream struct {
 	ABI     abi.ABI
 	Handler blockindexer.InternalStreamCallback

@@ -31,7 +31,9 @@ type Engine interface {
 	NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error)
 	HandleNewTx(ctx context.Context, txID string) error
 	Name() string
-	dependencies.ManagerLifecycle
+	Init(dependencies.AllComponents) (*dependencies.ManagerInitResult, error)
+	Start() error
+	Stop()
 }
 
 type engine struct {
@@ -40,7 +42,7 @@ type engine struct {
 }
 
 // Init implements Engine.
-func (e *engine) Init(dependencies.PreInitComponents) (*dependencies.ManagerInitResult, error) {
+func (e *engine) Init(dependencies.AllComponents) (*dependencies.ManagerInitResult, error) {
 	panic("unimplemented")
 }
 

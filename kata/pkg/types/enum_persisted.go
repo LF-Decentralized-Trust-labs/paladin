@@ -27,8 +27,11 @@ import (
 
 type EnumStringOptions interface {
 	~string
-	Default() string
 	Options() []string
+}
+
+type EnumStringDefault interface {
+	Default() string
 }
 
 // Enum is a persistence wrapper for an enum with a set of options
@@ -39,22 +42,31 @@ func (p Enum[O]) V() O {
 }
 
 // Case insensitive validation, with default, returning a string value
-func (p Enum[O]) Validate() (string, error) {
+func (p Enum[O]) Validate() (O, error) {
 	validator := (*new(O))
 	if p == "" {
-		return validator.Default(), nil
+		var iVal any = validator
+		enumDefault, ok := iVal.(EnumStringDefault)
+		if ok {
+			return O(enumDefault.Default()), nil
+		}
 	}
 	for _, o := range validator.Options() {
 		if strings.EqualFold(o, (string)(p)) {
-			return o, nil
+			return O(o), nil
 		}
 	}
 	return "", i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(validator.Options(), ","))
 }
 
+func (p Enum[O]) MapToString() (string, error) {
+	ps, err := p.Validate()
+	return string(ps), err
+}
+
 // SQL valuer returns a string, and only allows the possible values
 func (p Enum[O]) Value() (driver.Value, error) {
-	return p.Validate()
+	return p.MapToString()
 }
 
 // SQL scanner handles strings, bytes, and nil - where nil will be set to the default
