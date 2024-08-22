@@ -1,0 +1,24 @@
+# Extensions to ../testinfra/docker-compose-test.yml
+services:
+  postgres:
+    ports: !reset []
+    expose:
+      - 5432
+  besu:
+    ports: !reset []
+    expose:
+      - 8545
+      - 8546
+  testbed:
+    build:
+      context: ../kata
+      dockerfile: testbed/Dockerfile
+    command: testbed.config.yaml
+    depends_on:
+      besu:
+        condition: service_healthy
+    volumes:
+      - ../domains/zeto/testbed.config.yaml:/usr/src/app/testbed.config.yaml
+    ports:
+      - 49610:49610
+      - 49611:49611
