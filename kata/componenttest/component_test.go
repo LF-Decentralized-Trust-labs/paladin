@@ -68,6 +68,9 @@ func TestRunTransactionSubmission(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to call Listen")
 
+	// TODO: figure out race condition here with listener startup
+	time.Sleep(2 * time.Second)
+
 	submitTransaction := transactionsPB.SubmitTransactionRequest{
 		From:            "fromID",
 		ContractAddress: "contract",
