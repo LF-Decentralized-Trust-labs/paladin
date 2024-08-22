@@ -191,6 +191,7 @@ func (psc *tbPrivateSmartContract) gatherEndorsements(ctx context.Context,
 				}
 				// Build the input
 				endorseReq := &proto.EndorseTransactionRequest{
+					Name:              ar.Name,
 					Transaction:       txSpec,
 					ResolvedVerifiers: resolvedVerifiers,
 					Inputs:            psc.toEndorsableList(inputStates),
