@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package domainmgr
 
 import (
 	"context"
@@ -76,12 +76,12 @@ type event_PaladinNewSmartContract_V0 struct {
 	Data   types.HexBytes   `json:"data"`
 }
 
-func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.InitInstructions, error) {
+func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	dm.persistence = pic.Persistence()
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
 	dm.chainID = dm.ethClientFactory.ChainID()
-	return &components.InitInstructions{
+	return &components.ManagerInitResult{
 		EventStreams: []*components.ManagerEventStream{
 			{
 				ABI:     iPaladinContractABI,

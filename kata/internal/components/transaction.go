@@ -57,8 +57,6 @@ type TransactionPostAssembly struct {
 // PrivateTransaction is the critical exchange object between the engine and the domain manager,
 // as it hops between the states in the state machine (on multiple paladin nodes) to reach
 // a state that it can successfully (and anonymously) submitted it to the blockchain.
-//
-// TODO: Struct or interface?
 type PrivateTransaction struct {
 	ID uuid.UUID // TODO: == idempotency key?
 

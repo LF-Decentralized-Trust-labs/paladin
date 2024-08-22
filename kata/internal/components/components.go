@@ -18,6 +18,7 @@ package components
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -28,6 +29,7 @@ import (
 // PreInit components do not depend on any other components, they hold their
 // own interface in their package.
 type PreInitComponents interface {
+	KeyManager() ethclient.KeyManager // TODO: move to separate component
 	EthClientFactory() ethclient.EthClientFactory
 	Persistence() persistence.Persistence
 	StateStore() statestore.StateStore
@@ -44,6 +46,7 @@ type PreInitComponents interface {
 type PostInitComponents interface {
 	BlockIndexer() blockindexer.BlockIndexer
 	PluginController() plugins.PluginController
+	RPCServer() rpcserver.Server
 }
 
 // Managers are initialized after base components with access to them, and provide
@@ -55,13 +58,12 @@ type PostInitComponents interface {
 // So that they can call each other, their external mockable interfaces provided
 // to the are all defined in this package.
 type Managers interface {
-	AllManagers() []ManagerLifecycle
 	DomainManager() DomainManager
 }
 
 // All managers conform to a standard lifecycle
 type ManagerLifecycle interface {
-	PreInit(PreInitComponents) (*InitInstructions, error)
+	PreInit(PreInitComponents) (*ManagerInitResult, error)
 	PostInit(PostInitComponents) error
 	Start() error
 	Stop()
@@ -75,15 +77,23 @@ type ManagerEventStream struct {
 }
 
 // Managers can instruct the init of some of the PostInitComponents in a generic way
-type InitInstructions struct {
+type ManagerInitResult struct {
 	EventStreams []*ManagerEventStream
+	RPCModules   []*rpcserver.RPCModule
 }
 
-// The Engine starts lasts.
+type AllComponents interface {
+	PreInitComponents
+	PostInitComponents
+	Managers
+}
+
+// The Engine is basically a special manager, which specifies its own name
 // Two examples of an engine exist:
 // - The runtime engine of Paladin, which does real work
 // - The testbed, which provides a JSON/RPC testing interface for domains in isolation from the engine
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
-	//TODO
+	Name() string
+	ManagerLifecycle
 }

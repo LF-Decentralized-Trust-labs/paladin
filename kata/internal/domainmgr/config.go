@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package domainmgr
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"

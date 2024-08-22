@@ -13,9 +13,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package componentmgr
 
 import (
+	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -25,19 +26,14 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
 
-type TestbedDestinationsConfig struct {
-	ToDomain   *string `yaml:"toDomain"`
-	FromDomain *string `yaml:"fromDomain"`
-}
-
-type TestBedConfig struct {
+type Config struct {
+	domainmgr.DomainManagerConfig
 	plugins.PluginControllerConfig
-	Blockchain   ethclient.Config          `yaml:"blockchain"`
-	DB           persistence.Config        `yaml:"db"`
-	RPCServer    rpcserver.Config          `yaml:"rpcServer"`
-	StateStore   statestore.Config         `yaml:"statestore"`
-	BlockIndexer blockindexer.Config       `yaml:"blockIndexer"`
-	Signer       api.Config                `yaml:"signer"`
-	TempDir      *string                   `yaml:"tempDir"`
-	Destinations TestbedDestinationsConfig `yaml:"destinations"`
+	Blockchain   ethclient.Config    `yaml:"blockchain"`
+	DB           persistence.Config  `yaml:"db"`
+	RPCServer    rpcserver.Config    `yaml:"rpcServer"`
+	StateStore   statestore.Config   `yaml:"statestore"`
+	BlockIndexer blockindexer.Config `yaml:"blockIndexer"`
+	Signer       api.Config          `yaml:"signer"`
+	TempDir      *string             `yaml:"tempDir"`
 }
