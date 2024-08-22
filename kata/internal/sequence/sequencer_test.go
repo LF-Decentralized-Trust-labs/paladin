@@ -54,7 +54,55 @@ func TestSequencerGraphOfOne(t *testing.T) {
 	node1SequencerMockDependencies.dispatcherMock.AssertExpectations(t)
 }
 
-func TestSequencerLocalDependency(t *testing.T) {
+func TestSequencerTwoGraphsOfOne(t *testing.T) {
+	// Transactions that are added to a sequencer's graph and have no dependencies on other transactions
+	// are immediately moved to the dispatch stage on the current node as soon as they are endorsed
+	// further transactions that are dependant on dispatched transactions are also dispatched
+	ctx := context.Background()
+	node1ID := uuid.New()
+	txn1ID := uuid.New()
+	txn2ID := uuid.New()
+	stateHash := statestore.HashID{
+		L: uuid.New(),
+		H: uuid.New(),
+	}
+	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
+	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:          node1ID.String(),
+		TransactionId:   txn1ID.String(),
+		OutputStateHash: []string{stateHash.String()},
+	})
+
+	assert.NoError(t, err)
+
+	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
+	assert.NoError(t, err)
+
+	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID}).Return(nil).Once()
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn1ID.String(),
+	})
+	assert.NoError(t, err)
+
+	//now add a second transaction that is dependant on the first (before the first is confirmed)
+	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
+		NodeId:         node1ID.String(),
+		TransactionId:  txn2ID.String(),
+		InputStateHash: []string{stateHash.String()},
+	})
+	assert.NoError(t, err)
+
+	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
+	assert.NoError(t, err)
+
+	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn2ID}).Return(nil).Once()
+	err = node1Sequencer.OnTransactionEndorsed(ctx, &pb.TransactionEndorsedEvent{
+		TransactionId: txn2ID.String(),
+	})
+	assert.NoError(t, err)
+}
+
+func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	// Transactions that are added to a sequencer's graph and have dependencies on other transactions that are also
 	// managed by the same sequencer, will be moved to the dispatch stage as soon as they are endorsed and
 	// all of their dependencies are also endorsed and dispatched

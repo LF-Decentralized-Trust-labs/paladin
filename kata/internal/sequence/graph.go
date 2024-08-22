@@ -32,15 +32,9 @@ func ptrTo[T any](v T) *T {
 type Graph interface {
 	AddTransaction(ctx context.Context, txID string, inputStates []string, outputStates []string) error
 	GetDispatchableTransactions(ctx context.Context) ([]string, error)
+	RemoveTransactions(ctx context.Context, transactionsToRemove []string) error
 	RecordEndorsement(ctx context.Context, txID string) error
 	IncludesTransaction(txID string) bool
-}
-
-type transaction struct {
-	id           string
-	endorsed     bool
-	inputStates  []string
-	outputStates []string
 }
 
 type graph struct {
@@ -212,4 +206,29 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) ([]string, erro
 	}
 
 	return dispatchable, nil
+}
+
+func (g *graph) RemoveTransactions(ctx context.Context, transactionsToRemove []string) error {
+	// no validation performed here
+	// it is valid to remove transactions that have dependants.  In fact that is normal.
+	//Transactions are removed when they are dispatched and dependencies are dispatched before their dependants
+	// also, it is valid to remove transactions that are dependants of other transactions that are not being removed
+	// maybe they got reverted before being endorsed or whatever it is not the concern of the graph to validate this
+	// the graph just gets redrawn based on the dependencies that remain after a transaction is removed
+
+	//Only real validation we do is to throw an error if a transaction to be removed does not exist
+	// TODO - is that really an error?  Should we just ignore it and remove the others?  That would give us some idempotency behaviour that might be useful
+	for _, txID := range transactionsToRemove {
+		if g.allTransactions[txID] == nil {
+			log.L(ctx).Errorf("Transaction %s does not exist", txID)
+			return i18n.NewError(ctx, msgs.MsgSequencerInternalError, fmt.Sprintf("Transaction %s does not exist", txID))
+		}
+		delete(g.allTransactions, txID)
+	}
+	err := g.buildMatrix(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("Error building graph: %s", err)
+		return err
+	}
+	return nil
 }

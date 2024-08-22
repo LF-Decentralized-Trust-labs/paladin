@@ -25,6 +25,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAddTransactions(t *testing.T) {
+	ctx := context.Background()
+
+	testGraph := NewGraph()
+	err := testGraph.AddTransaction(ctx, "tx0", []string{}, []string{"S0"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx1", []string{}, []string{"S1A", "S1B"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx2", []string{}, []string{"S2"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx3", []string{"S0", "S1A"}, []string{"S3"})
+	require.NoError(t, err)
+
+	assert.True(t, testGraph.IncludesTransaction("tx0"))
+	assert.True(t, testGraph.IncludesTransaction("tx1"))
+	assert.True(t, testGraph.IncludesTransaction("tx2"))
+	assert.True(t, testGraph.IncludesTransaction("tx3"))
+
+}
+
+func TestRemoveTransactions(t *testing.T) {
+	ctx := context.Background()
+
+	testGraph := NewGraph()
+	err := testGraph.AddTransaction(ctx, "tx0", []string{}, []string{"S0"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx1", []string{}, []string{"S1A", "S1B"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx2", []string{}, []string{"S2"})
+	require.NoError(t, err)
+
+	err = testGraph.AddTransaction(ctx, "tx3", []string{"S0", "S1A"}, []string{"S3"})
+	require.NoError(t, err)
+
+	err = testGraph.RemoveTransactions(ctx, []string{"tx1", "tx2"})
+	assert.NoError(t, err)
+	assert.True(t, testGraph.IncludesTransaction("tx0"))
+	assert.False(t, testGraph.IncludesTransaction("tx1"))
+	assert.False(t, testGraph.IncludesTransaction("tx2"))
+	assert.True(t, testGraph.IncludesTransaction("tx3"))
+
+}
+
 func TestGetDispatchableTransactions(t *testing.T) {
 	ctx := context.Background()
 
@@ -82,15 +130,9 @@ func TestGetDispatchableTransactions(t *testing.T) {
 	assert.Equal(t, testTransactions[3].id, dispatchableTransactions[2])
 	//transaction 4 has a dependency on 2 so should not be in the dispatchable list
 
-	// dispatched transactions should have been removed so second call should return an empty list
-	//TODO - should this actually be an explit action to remove transactions from the graph?
-	//dispatchableTransactions, err = testGraph.GetDispatchableTransactions(ctx)
-	//assert.NoError(t, err)
-	//require.Len(t, dispatchableTransactions, 0)
-
 }
 
-func TestBuildMatrix(t *testing.T) {
+func TestScenario1(t *testing.T) {
 	// build the matrix by adding transactions
 	ctx := context.Background()
 	testGraph := NewGraph()
@@ -132,5 +174,24 @@ func TestBuildMatrix(t *testing.T) {
 	assert.Equal(t, "tx1", dispatchableTransactions[1])
 	//transaction 2 is not endorsed so should not be in the dispatchable list
 	assert.Equal(t, "tx3", dispatchableTransactions[2])
+
+	// GetDispatchableTransactions is a read only operation so we can call it again and get the same result
+	dispatchableTransactions, err = testGraph.GetDispatchableTransactions(ctx)
+	assert.NoError(t, err)
+	require.Len(t, dispatchableTransactions, 3)
+
+	//make sure they come out in the expected order
+	// stricly speaking, the absolute order does not matter so long as dependencies come before dependants.
+	//However we also check here that the breadth first search is favouring older transactions as expected
+	assert.Equal(t, "tx0", dispatchableTransactions[0])
+	assert.Equal(t, "tx1", dispatchableTransactions[1])
+	assert.Equal(t, "tx3", dispatchableTransactions[2])
+
+	err = testGraph.RemoveTransactions(ctx, dispatchableTransactions)
+	assert.NoError(t, err)
+
+	dispatchableTransactions, err = testGraph.GetDispatchableTransactions(ctx)
+	assert.NoError(t, err)
+	assert.Len(t, dispatchableTransactions, 0)
 
 }

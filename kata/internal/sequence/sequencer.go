@@ -181,7 +181,13 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 		log.L(ctx).Errorf("Error dispatching transaction: %s", err)
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, err)
 	}
-
+	err = s.graph.RemoveTransactions(ctx, dispatchableTransactions)
+	if err != nil {
+		//TODO this is bad.  What can we do?
+		// probably need to add more precise error reporting to RemoveTransactions function
+		log.L(ctx).Errorf("Error dispatching transaction: %s", err)
+		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, err)
+	}
 	return nil
 }
 
