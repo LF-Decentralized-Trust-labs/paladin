@@ -26,6 +26,67 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
+type Engine interface {
+	NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error)
+	HandleNewTx(ctx context.Context, txID string) error
+	Name() string
+	ManagerLifecycle
+}
+
+type engine struct {
+	orchestrators map[string]*orchestrator.Orchestrator
+	stateStore    statestore.StateStore
+}
+
+// Init implements Engine.
+func (e *engine) Init(PreInitComponents) (*ManagerInitResult, error) {
+	panic("unimplemented")
+}
+
+// Name implements Engine.
+func (e *engine) Name() string {
+	return "Kata Engine"
+}
+
+// Start implements Engine.
+func (e *engine) Start() error {
+	panic("unimplemented")
+}
+
+// Stop implements Engine.
+func (e *engine) Stop() {
+	panic("unimplemented")
+}
+
+func NewEngine(stateStore statestore.StateStore) Engine {
+	return &engine{
+		stateStore:    stateStore,
+		orchestrators: make(map[string]*orchestrator.Orchestrator),
+	}
+}
+
+func (e *engine) NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error) {
+	if e.orchestrators[contractAddress] == nil {
+		e.orchestrators[contractAddress] = orchestrator.NewOrchestrator(ctx, contractAddress, config, e.stateStore)
+	}
+	orchestratorDone, err := e.orchestrators[contractAddress].Start(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", contractAddress, err)
+		return nil, err
+	}
+
+	go func() {
+		<-orchestratorDone
+		log.L(ctx).Infof("Orchestrator for contract %s has stopped", contractAddress)
+	}()
+	return e.orchestrators[contractAddress], nil
+}
+
+// HandleNewTx implements Engine.
+func (e *engine) HandleNewTx(ctx context.Context, txID string) error {
+	panic("unimplemented")
+}
+
 // MOCK implementations of engine, plugins etc. Function signatures are just examples
 // no formal interface proposed intentionally in this file
 
