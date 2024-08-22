@@ -127,27 +127,27 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
-	d := &Noto{
+	noto := &Noto{
 		conn:   conn,
 		client: pb.NewKataMessageServiceClient(conn),
 	}
-	d.replies = &replyTracker{
+	noto.replies = &replyTracker{
 		inflight: make(map[string]*inflightRequest),
-		client:   d.client,
+		client:   noto.client,
 	}
-	d.Interface = d.getInterface()
-	return d, d.waitForReady(ctx, 2*time.Second)
+	noto.Interface = noto.getInterface()
+	return noto, noto.waitForReady(ctx, 2*time.Second)
 }
 
-func (d *Noto) waitForReady(ctx context.Context, deadline time.Duration) error {
-	status, err := d.client.Status(ctx, &pb.StatusRequest{})
+func (n *Noto) waitForReady(ctx context.Context, deadline time.Duration) error {
+	status, err := n.client.Status(ctx, &pb.StatusRequest{})
 	end := time.Now().Add(deadline)
 	for !status.GetOk() {
 		time.Sleep(time.Second)
 		if time.Now().After(end) {
 			return fmt.Errorf("server was not ready after %s", deadline)
 		}
-		status, err = d.client.Status(ctx, &pb.StatusRequest{})
+		status, err = n.client.Status(ctx, &pb.StatusRequest{})
 	}
 	if err != nil {
 		return err
@@ -158,58 +158,58 @@ func (d *Noto) waitForReady(ctx context.Context, deadline time.Duration) error {
 	return nil
 }
 
-func (d *Noto) Close() error {
-	if d.stream != nil {
-		if err := d.stream.CloseSend(); err != nil {
+func (n *Noto) Close() error {
+	if n.stream != nil {
+		if err := n.stream.CloseSend(); err != nil {
 			return err
 		}
-		d.done <- true
-		d.stopListener()
+		n.done <- true
+		n.stopListener()
 	}
-	if d.conn != nil {
-		if err := d.conn.Close(); err != nil {
+	if n.conn != nil {
+		if err := n.conn.Close(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d *Noto) Listen(ctx context.Context, dest string) error {
-	d.dest = &dest
-	d.done = make(chan bool, 1)
+func (n *Noto) Listen(ctx context.Context, dest string) error {
+	n.dest = &dest
+	n.done = make(chan bool, 1)
 
 	var err error
 	var listenerContext context.Context
 
-	listenerContext, d.stopListener = context.WithCancel(ctx)
-	d.stream, err = d.client.Listen(listenerContext, &pb.ListenRequest{Destination: dest})
+	listenerContext, n.stopListener = context.WithCancel(ctx)
+	n.stream, err = n.client.Listen(listenerContext, &pb.ListenRequest{Destination: dest})
 	if err != nil {
 		return fmt.Errorf("failed to listen for domain events: %v", err)
 	}
 
 	handlerCtx := log.WithLogField(ctx, "role", "handler")
-	go d.handler(handlerCtx)
+	go n.handler(handlerCtx)
 	return nil
 }
 
-func (d *Noto) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
+func (n *Noto) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
 	body, err := anypb.New(reply)
 	if err == nil {
-		_, err = d.client.SendMessage(ctx, &pb.Message{
+		_, err = n.client.SendMessage(ctx, &pb.Message{
 			Destination:   *message.ReplyTo,
 			CorrelationId: &message.Id,
 			Body:          body,
-			ReplyTo:       d.dest,
+			ReplyTo:       n.dest,
 		})
 	}
 	return err
 }
 
-func (d *Noto) handler(ctx context.Context) {
+func (n *Noto) handler(ctx context.Context) {
 	for {
-		in, err := d.stream.Recv()
+		in, err := n.stream.Recv()
 		select {
-		case <-d.done:
+		case <-n.done:
 			return
 		default:
 			// do nothing
@@ -223,13 +223,13 @@ func (d *Noto) handler(ctx context.Context) {
 		// Cannot be synchronous, as some calls ("assemble") may need to make
 		// their own additional calls ("find states") and receive the results
 		go func() {
-			reply, err := d.handleMessage(ctx, in)
+			reply, err := n.handleMessage(ctx, in)
 			if err != nil {
 				reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
 				err = nil
 			}
 			if reply != nil {
-				if err = d.sendReply(ctx, in, reply); err != nil {
+				if err = n.sendReply(ctx, in, reply); err != nil {
 					log.L(ctx).Errorf("Error sending message reply: %s", err)
 				}
 			}
@@ -237,13 +237,13 @@ func (d *Noto) handler(ctx context.Context) {
 	}
 }
 
-func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply proto.Message, err error) {
+func (n *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply proto.Message, err error) {
 	body, err := message.Body.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
-	inflight := d.replies.getInflight(message.CorrelationId)
+	inflight := n.replies.getInflight(message.CorrelationId)
 	if inflight != nil {
 		inflight.done <- message
 		return nil, nil
@@ -252,59 +252,59 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	switch req := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Received ConfigureDomainRequest")
-		return d.configure(req)
+		return n.configure(req)
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
-		return d.init(req)
+		return n.init(req)
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
-		params, err := d.validateDeploy(req.Transaction)
+		params, err := n.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.initDeploy(params)
+		return n.initDeploy(params)
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		_, err := d.validateDeploy(req.Transaction)
+		_, err := n.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.prepareDeploy(ctx, req)
+		return n.prepareDeploy(ctx, req)
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
-		tx, err := d.validateTransaction(ctx, req.Transaction)
+		tx, err := n.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
+		return n.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
 
 	case *pb.AssembleTransactionRequest:
 		log.L(ctx).Infof("Received AssembleTransactionRequest")
-		tx, err := d.validateTransaction(ctx, req.Transaction)
+		tx, err := n.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
+		return n.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
 
 	case *pb.EndorseTransactionRequest:
 		log.L(ctx).Infof("Received EndorseTransactionRequest")
-		tx, err := d.validateTransaction(ctx, req.Transaction)
+		tx, err := n.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
+		return n.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
 
 	case *pb.PrepareTransactionRequest:
 		log.L(ctx).Infof("Received PrepareTransactionRequest")
-		tx, err := d.validateTransaction(ctx, req.Transaction)
+		tx, err := n.validateTransaction(ctx, req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return d.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
+		return n.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
 
 	case *pb.DomainAPIError:
 		log.L(ctx).Errorf("Received error: %s", req.ErrorMessage)
@@ -316,15 +316,15 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	}
 }
 
-func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
+func (n *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
 	var config Config
 	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 	if err != nil {
 		return nil, err
 	}
 
-	d.config = &config
-	d.chainID = req.ChainId
+	n.config = &config
+	n.chainID = req.ChainId
 
 	var factory SolidityBuild
 	var contract SolidityBuild
@@ -348,7 +348,7 @@ func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 	if err != nil {
 		return nil, err
 	}
-	constructorJSON, err := json.Marshal(d.Interface["constructor"].ABI)
+	constructorJSON, err := json.Marshal(n.Interface["constructor"].ABI)
 	if err != nil {
 		return nil, err
 	}
@@ -368,14 +368,14 @@ func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 	}, nil
 }
 
-func (d *Noto) init(req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
-	d.domainID = req.DomainUuid
-	d.coinSchema = req.AbiStateSchemas[0]
-	log.L(context.TODO()).Infof("Received schema: %s", d.coinSchema)
+func (n *Noto) init(req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
+	n.domainID = req.DomainUuid
+	n.coinSchema = req.AbiStateSchemas[0]
+	log.L(context.TODO()).Infof("Received schema: %s", n.coinSchema)
 	return &pb.InitDomainResponse{}, nil
 }
 
-func (d *Noto) initDeploy(params *NotoConstructorParams) (*pb.InitDeployTransactionResponse, error) {
+func (n *Noto) initDeploy(params *NotoConstructorParams) (*pb.InitDeployTransactionResponse, error) {
 	return &pb.InitDeployTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
@@ -386,7 +386,7 @@ func (d *Noto) initDeploy(params *NotoConstructorParams) (*pb.InitDeployTransact
 	}, nil
 }
 
-func (d *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
+func (n *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
 	config := &NotoDomainConfig{
 		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
 		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
@@ -419,7 +419,7 @@ func (d *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransacti
 	}, nil
 }
 
-func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
+func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
 	configValues, err := NotoDomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
 		return nil, err
@@ -433,20 +433,20 @@ func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*No
 	return &config, err
 }
 
-func (d *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConstructorParams, error) {
+func (n *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConstructorParams, error) {
 	var params NotoConstructorParams
 	err := yaml.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }
 
-func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*parsedTransaction, error) {
+func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*parsedTransaction, error) {
 	var functionABI abi.Entry
 	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
 	if err != nil {
 		return nil, err
 	}
 
-	parser, found := d.Interface[functionABI.Name]
+	parser, found := n.Interface[functionABI.Name]
 	if !found {
 		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
@@ -463,7 +463,7 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
 	}
 
-	domainConfig, err := d.decodeDomainConfig(ctx, tx.ContractConfig)
+	domainConfig, err := n.decodeDomainConfig(ctx, tx.ContractConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -482,12 +482,12 @@ func (d *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	}, nil
 }
 
-func (d *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
+func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
 	sig, err := secp256k1.DecodeCompactRSV(ctx, signature)
 	if err != nil {
 		return nil, err
 	}
-	return sig.RecoverDirect(payload, d.chainID)
+	return sig.RecoverDirect(payload, n.chainID)
 }
 
 func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
