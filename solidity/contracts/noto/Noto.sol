@@ -52,12 +52,7 @@ contract Noto is EIP712, INoto {
         _;
     }
 
-    constructor(
-        bytes32 transactionId,
-        address domain,
-        address notary,
-        bytes memory data
-    ) EIP712("noto", "0.0.1") {
+    constructor(bytes32 transactionId, address domain, address notary, bytes memory data) EIP712("noto", "0.0.1") {
         _notary = notary;
         emit IPaladinContract_V0.PaladinNewSmartContract_V0(
             transactionId,

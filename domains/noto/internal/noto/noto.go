@@ -67,6 +67,7 @@ type SolidityBuild struct {
 type Noto struct {
 	Interface DomainInterface
 
+	config       *Config
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
@@ -316,18 +317,20 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 }
 
 func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
-	d.chainID = req.ChainId
-
 	var config Config
 	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 	if err != nil {
 		return nil, err
 	}
 
+	d.config = &config
+	d.chainID = req.ChainId
+
 	var factory SolidityBuild
 	var contract SolidityBuild
 	switch config.Variant {
 	case "", "Noto":
+		config.Variant = "Noto"
 		factory = loadBuild(notoFactoryJSON)
 		contract = loadBuild(notoJSON)
 	case "NotoSelfSubmit":

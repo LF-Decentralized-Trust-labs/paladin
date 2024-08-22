@@ -45,9 +45,10 @@ var NotoCoinABI = &abi.Parameter{
 	},
 }
 
-var EIP712DomainName = "NotoTransfer"
+var EIP712DomainName = "noto"
 var EIP712DomainVersion = "0.0.1"
-var NotoTransferTypeSet = eip712.TypeSet{
+
+var NotoTransferUnmaskedTypeSet = eip712.TypeSet{
 	"Transfer": {
 		{Name: "inputs", Type: "Coin[]"},
 		{Name: "outputs", Type: "Coin[]"},
@@ -56,6 +57,20 @@ var NotoTransferTypeSet = eip712.TypeSet{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "owner", Type: "string"},
 		{Name: "amount", Type: "uint256"},
+	},
+	eip712.EIP712Domain: {
+		{Name: "name", Type: "string"},
+		{Name: "version", Type: "string"},
+		{Name: "chainId", Type: "uint256"},
+		{Name: "verifyingContract", Type: "address"},
+	},
+}
+
+var NotoTransferMaskedTypeSet = eip712.TypeSet{
+	"Transfer": {
+		{Name: "inputs", Type: "bytes32[]"},
+		{Name: "outputs", Type: "bytes32[]"},
+		{Name: "data", Type: "bytes"},
 	},
 	eip712.EIP712Domain: {
 		{Name: "name", Type: "string"},
@@ -175,7 +190,7 @@ func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error)
 	return coins, err
 }
 
-func (d *Noto) encodeTransferData(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
+func (d *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	messageInputs := make([]interface{}, len(inputs))
 	for i, input := range inputs {
 		messageInputs[i] = map[string]interface{}{
@@ -193,7 +208,7 @@ func (d *Noto) encodeTransferData(ctx context.Context, contract *ethtypes.Addres
 		}
 	}
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
-		Types:       NotoTransferTypeSet,
+		Types:       NotoTransferUnmaskedTypeSet,
 		PrimaryType: "Transfer",
 		Domain: map[string]interface{}{
 			"name":              EIP712DomainName,
@@ -204,6 +219,24 @@ func (d *Noto) encodeTransferData(ctx context.Context, contract *ethtypes.Addres
 		Message: map[string]interface{}{
 			"inputs":  messageInputs,
 			"outputs": messageOutputs,
+		},
+	})
+}
+
+func (d *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []interface{}, data ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
+	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
+		Types:       NotoTransferMaskedTypeSet,
+		PrimaryType: "Transfer",
+		Domain: map[string]interface{}{
+			"name":              EIP712DomainName,
+			"version":           EIP712DomainVersion,
+			"chainId":           d.chainID,
+			"verifyingContract": contract,
+		},
+		Message: map[string]interface{}{
+			"inputs":  inputs,
+			"outputs": outputs,
+			"data":    data,
 		},
 	})
 }

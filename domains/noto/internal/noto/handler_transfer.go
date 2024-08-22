@@ -86,9 +86,47 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	encodedTransfer, err := h.noto.encodeTransferData(ctx, tx.contractAddress, inputCoins, outputCoins)
-	if err != nil {
-		return nil, err
+	var attestation []*pb.AttestationRequest
+	switch h.noto.config.Variant {
+	case "Noto":
+		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.contractAddress, inputCoins, outputCoins)
+		if err != nil {
+			return nil, err
+		}
+		attestation = []*pb.AttestationRequest{
+			// Sender confirms the initial request with a signature
+			{
+				Name:            "sender",
+				AttestationType: pb.AttestationType_SIGN,
+				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Payload:         encodedTransfer,
+				Parties:         []string{req.Transaction.From},
+			},
+			// Notary will endorse the assembled transaction (by submitting to the ledger)
+			{
+				Name:            "notary",
+				AttestationType: pb.AttestationType_ENDORSE,
+				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Parties:         []string{tx.domainConfig.NotaryLookup},
+			},
+		}
+	case "NotoSelfSubmit":
+		attestation = []*pb.AttestationRequest{
+			// Notary will endorse the assembled transaction (by providing a signature)
+			{
+				Name:            "notary",
+				AttestationType: pb.AttestationType_ENDORSE,
+				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Parties:         []string{tx.domainConfig.NotaryLookup},
+			},
+			// Sender will endorse the assembled transaction (by submitting to the ledger)
+			{
+				Name:            "sender",
+				AttestationType: pb.AttestationType_ENDORSE,
+				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Parties:         []string{req.Transaction.From},
+			},
+		}
 	}
 
 	return &pb.AssembleTransactionResponse{
@@ -97,21 +135,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 			SpentStates: inputStates,
 			NewStates:   outputStates,
 		},
-		AttestationPlan: []*pb.AttestationRequest{
-			{
-				Name:            "sender",
-				AttestationType: pb.AttestationType_SIGN,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-				Payload:         encodedTransfer,
-				Parties:         []string{req.Transaction.From},
-			},
-			{
-				Name:            "notary",
-				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.domainConfig.NotaryLookup},
-			},
-		},
+		AttestationPlan: attestation,
 	}, nil
 }
 
@@ -122,20 +146,20 @@ func (h *transferHandler) validateAmounts(coins *gatheredCoins) error {
 	return nil
 }
 
-func (h *transferHandler) validateSignature(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
-	senderSignature := findAttestation("sender", req.Signatures)
-	if senderSignature == nil {
+func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+	signature := findAttestation("sender", req.Signatures)
+	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
 	}
-	encodedTransfer, err := h.noto.encodeTransferData(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
 		return err
 	}
-	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, senderSignature.Payload)
+	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, signature.Payload)
 	if err != nil {
 		return err
 	}
-	if signingAddress.String() != senderSignature.Verifier.Verifier {
+	if signingAddress.String() != signature.Verifier.Verifier {
 		return fmt.Errorf("sender signature does not match")
 	}
 	return nil
@@ -149,12 +173,47 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 	if err := h.validateAmounts(coins); err != nil {
 		return nil, err
 	}
-	if err := h.validateSignature(ctx, tx, req, coins); err != nil {
-		return nil, err
+
+	switch h.noto.config.Variant {
+	case "Noto":
+		if req.Name == "notary" {
+			// Notary checks the signature from the sender, then submits the transaction
+			if err := h.validateSenderSignature(ctx, tx, req, coins); err != nil {
+				return nil, err
+			}
+			return &pb.EndorseTransactionResponse{
+				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
+			}, nil
+		}
+	case "NotoSelfSubmit":
+		if req.Name == "notary" {
+			// Notary provides a signature for the assembled payload (to be verified on base ledger)
+			inputIDs := make([]interface{}, len(req.Inputs))
+			outputIDs := make([]interface{}, len(req.Outputs))
+			for i, state := range req.Inputs {
+				inputIDs[i] = state.HashId
+			}
+			for i, state := range req.Outputs {
+				outputIDs[i] = state.HashId
+			}
+			data := ethtypes.HexBytes0xPrefix("")
+			encodedTransfer, err := h.noto.encodeTransferMasked(ctx, tx.contractAddress, inputIDs, outputIDs, data)
+			if err != nil {
+				return nil, err
+			}
+			return &pb.EndorseTransactionResponse{
+				EndorsementResult: pb.EndorseTransactionResponse_SIGN,
+				Payload:           encodedTransfer,
+			}, nil
+		} else if req.Name == "sender" {
+			// Sender submits the transaction
+			return &pb.EndorseTransactionResponse{
+				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
+			}, nil
+		}
 	}
-	return &pb.EndorseTransactionResponse{
-		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-	}, nil
+
+	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.Name)
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
@@ -167,18 +226,27 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, re
 		outputs[i] = state.HashId
 	}
 
-	var senderSignature ethtypes.HexBytes0xPrefix
-	for _, att := range req.AttestationResult {
-		if att.AttestationType == pb.AttestationType_SIGN && att.Name == "sender" {
-			senderSignature = att.Payload
+	var signature *pb.AttestationResult
+	switch h.noto.config.Variant {
+	case "Noto":
+		// Include the signature from the sender (informational only)
+		signature = findAttestation("sender", req.AttestationResult)
+		if signature == nil {
+			return nil, fmt.Errorf("did not find 'sender' attestation")
+		}
+	case "NotoSelfSubmit":
+		// Include the signature from the notary (will be verified on base ledger)
+		signature = findAttestation("notary", req.AttestationResult)
+		if signature == nil {
+			return nil, fmt.Errorf("did not find 'notary' attestation")
 		}
 	}
 
 	params := map[string]interface{}{
 		"inputs":    inputs,
 		"outputs":   outputs,
-		"signature": senderSignature,
-		"data":      req.Transaction.TransactionId,
+		"signature": ethtypes.HexBytes0xPrefix(signature.Payload),
+		"data":      ethtypes.HexBytes0xPrefix(""),
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

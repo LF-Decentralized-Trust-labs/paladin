@@ -30,11 +30,12 @@ import (
 )
 
 var (
-	toDomain      = "to-domain"
-	testbedAddr   = "http://localhost:49600"
-	grpcAddr      = "dns:localhost:49601"
-	notaryName    = "notary"
-	recipientName = "recipient"
+	toDomain       = "to-domain"
+	testbedAddr    = "http://localhost:49600"
+	grpcAddr       = "dns:localhost:49601"
+	notaryName     = "notary"
+	recipient1Name = "recipient1"
+	recipient2Name = "recipient2"
 )
 
 func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Noto, rpcbackend.Backend) {
@@ -120,13 +121,13 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Attempt mint from non-notary (should fail)")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     recipientName,
+		From:     recipient1Name,
 		To:       types.EthAddress(notoAddress),
 		Function: *noto.Interface["mint"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"to": "%s",
 			"amount": 100
-		}`, recipientName)),
+		}`, recipient1Name)),
 	})
 	assert.NotNil(t, rpcerr)
 	assert.Error(t, rpcerr.Error(), "mint can only be initiated by notary")
@@ -141,12 +142,12 @@ func TestNoto(t *testing.T) {
 			"from": "%s",
 			"to": "%s",
 			"amount": 150
-		}`, notaryName, recipientName)),
+		}`, notaryName, recipient1Name)),
 	})
 	assert.NotNil(t, rpcerr)
 	assert.Regexp(t, "insufficient funds", rpcerr.Error())
 
-	log.L(ctx).Infof("Transfer 50 from notary to recipient")
+	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
@@ -155,7 +156,7 @@ func TestNoto(t *testing.T) {
 			"from": "%s",
 			"to": "%s",
 			"amount": 50
-		}`, notaryName, recipientName)),
+		}`, notaryName, recipient1Name)),
 	})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -172,9 +173,28 @@ func TestNoto(t *testing.T) {
 
 	// These are the expected coins after the transfer
 	assert.Equal(t, int64(50), coins[1].Amount.Int64())
-	assert.Equal(t, recipientName, coins[1].Owner)
+	assert.Equal(t, recipient1Name, coins[1].Owner)
 	assert.Equal(t, int64(50), coins[2].Amount.Int64())
 	assert.Equal(t, notaryName, coins[2].Owner)
+
+	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     recipient1Name,
+		To:       types.EthAddress(notoAddress),
+		Function: *noto.Interface["transfer"].ABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"from": "%s",
+			"to": "%s",
+			"amount": 50
+		}`, recipient1Name, recipient2Name)),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+
+	coins, err = noto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 4) // TODO: verify coins
 }
 
 func TestNotoSelfSubmit(t *testing.T) {
@@ -237,4 +257,42 @@ func TestNotoSelfSubmit(t *testing.T) {
 	assert.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
 	assert.Equal(t, notaryName, coins[0].Owner)
+
+	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     notaryName,
+		To:       types.EthAddress(notoAddress),
+		Function: *noto.Interface["transfer"].ABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"from": "%s",
+			"to": "%s",
+			"amount": 50
+		}`, notaryName, recipient1Name)),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+
+	coins, err = noto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 3) // TODO: verify coins
+
+	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     recipient1Name,
+		To:       types.EthAddress(notoAddress),
+		Function: *noto.Interface["transfer"].ABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"from": "%s",
+			"to": "%s",
+			"amount": 50
+		}`, recipient1Name, recipient2Name)),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+
+	coins, err = noto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 4) // TODO: verify coins
 }
