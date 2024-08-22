@@ -129,7 +129,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		assert.Equal(t, "schema1", req.SchemaId)
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
-				{HashId: "12345"},
+				{Id: "12345"},
 			},
 		}, nil
 	}
@@ -198,7 +198,7 @@ func TestDomainRequestsOK(t *testing.T) {
 	assert.Equal(t, prototk.EndorseTransactionResponse_SIGN, etr.EndorsementResult)
 
 	ptr, err := domainAPI.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
-		Transaction: &prototk.FinalizedTransaction{
+		Transaction: &prototk.TransactionSpecification{
 			TransactionId: "tx2_prepare",
 		},
 	})
@@ -210,5 +210,5 @@ func TestDomainRequestsOK(t *testing.T) {
 		SchemaId: "schema1",
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "12345", fas.States[0].HashId)
+	assert.Equal(t, "12345", fas.States[0].Id)
 }

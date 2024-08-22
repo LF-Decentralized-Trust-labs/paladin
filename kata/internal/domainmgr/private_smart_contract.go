@@ -148,7 +148,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// We hydrate the states on our side of the Manager<->Plugin divide at this point,
 	// which provides back to the engine the full sequence locking information of the
 	// states (inputs, and read)
-	postAssembly.InputStates, err = dc.loadStates(ctx, res.AssembledTransaction.SpentStates)
+	postAssembly.InputStates, err = dc.loadStates(ctx, res.AssembledTransaction.InputStates)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// Note the states at this point are just potential states - depending on the analysis
 	// of the result, and the locking on the input states, the engine might decide to
 	// abandon this attempt and just re-assemble later.
-	postAssembly.OutputStatesPotential = res.AssembledTransaction.NewStates
+	postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
 	return nil
 }
 
@@ -221,6 +221,13 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 // transactions being assembled on the same node.
 func (dc *domainContract) LockStates(ctx context.Context, tx *components.PrivateTransaction) error {
 
+	// Important responsibilities of this function
+	// 1) to ensure all the states have been written (unflushed) to the DB, so that the calling code
+	//    and be confident that at the end of the next successful flush we have reliably recorded
+	//    all these private states in a way that we won't forget them in the future (including across crash/restart)
+	// 2) to ensure all the states have been marked as "locked" for spending in this transaction,
+	//    within this sequence. So that other transactions (on different sequences, or the same sequence)
+	//    will not attempt to spend the same states.
 	postAssembly := tx.PostAssembly
 
 	// Input and output states are locked to the transaction
@@ -260,16 +267,9 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 
 }
 
-func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+// Endorse is a little special, because it returns a payload rather than updating the transaction.
+func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
 
-	// Important responsibilities of this function
-	// 1) to ensure all the states have been written (unflushed) to the DB, so that the calling code
-	//    and be confident that at the end of the next successful flush we have reliably recorded
-	//    all these private states in a way that we won't forget them in the future (including across crash/restart)
-	// 2) to ensure all the states have been marked as "locked" for spending in this transaction,
-	//    within this sequence. So that other transactions (on different sequences, or the same sequence)
-	//    will not attempt to spend the same states.
-	//
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
 	// is being handled as part of an overall sequence of endorsements, and for performance it is
 	// more important to reduce the total number of flushes (rather than focus on the latency of one TX).
@@ -277,12 +277,50 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	// The engine must ensure the flush occurs before returning the endorsement back to the requester,
 	// but for efficiency we can and should start the runtime exercise of endorsement + signing before
 	// waiting for the DB TX to commit.
-	//
 
-	return nil
+	preAssembly := tx.PreAssembly
+	postAssembly := tx.PostAssembly
+
+	// Run the endorsement
+	res, err := dc.api.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
+		Transaction:         preAssembly.TransactionSpecification,
+		ResolvedVerifiers:   preAssembly.Verifiers,
+		Inputs:              dc.toEndorsableList(postAssembly.InputStates),
+		Outputs:             dc.toEndorsableList(postAssembly.OutputStates),
+		Signatures:          postAssembly.Signatures,
+		EndorsementVerifier: endorser,
+	})
+	// We don't do any processing - as the result is not directly processable by us.
+	// It is an instruction to the engine - such as an authority to sign an endorsement,
+	// or a constraint on
+	if err != nil {
+		return nil, err
+	}
+	return &components.EndorsementResult{
+		Endorser:     endorser,
+		Result:       res.EndorsementResult,
+		Payload:      res.Payload,
+		RevertReason: res.RevertReason,
+	}, nil
 }
 
 func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+
+	preAssembly := tx.PreAssembly
+	postAssembly := tx.PostAssembly
+
+	// Run the prepare
+	res, err := dc.api.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
+		Transaction:       preAssembly.TransactionSpecification,
+		InputStates:       dc.toReferenceList(postAssembly.InputStates),
+		OutputStates:      dc.toReferenceList(postAssembly.OutputStates),
+		AttestationResult: postAssembly.AllAttestations,
+	})
+	if err != nil {
+		return err
+	}
+
+	tx.PreparedTransaction = res.Transaction
 	return nil
 }
 
@@ -290,9 +328,9 @@ func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateR
 	rawIDsBySchema := make(map[string][]types.RawJSON)
 	stateIDs := make([]types.Bytes32, len(refs))
 	for i, s := range refs {
-		stateID, err := types.ParseBytes32(ctx, s.HashId)
+		stateID, err := types.ParseBytes32(ctx, s.Id)
 		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.HashId, i)
+			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}
 		rawIDsBySchema[s.SchemaId] = append(rawIDsBySchema[s.SchemaId], types.JSONString(stateID.String()))
 		stateIDs[i] = *stateID
@@ -337,4 +375,27 @@ func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateR
 	}
 	return states, nil
 
+}
+
+func (dc *domainContract) toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
+	endorsableList := make([]*prototk.EndorsableState, len(states))
+	for i, input := range states {
+		endorsableList[i] = &prototk.EndorsableState{
+			Id:            input.ID.String(),
+			SchemaId:      input.Schema.String(),
+			StateDataJson: string(input.Data),
+		}
+	}
+	return endorsableList
+}
+
+func (dc *domainContract) toReferenceList(states []*components.FullState) []*prototk.StateRef {
+	referenceList := make([]*prototk.StateRef, len(states))
+	for i, input := range states {
+		referenceList[i] = &prototk.StateRef{
+			Id:       input.ID.String(),
+			SchemaId: input.Schema.String(),
+		}
+	}
+	return referenceList
 }

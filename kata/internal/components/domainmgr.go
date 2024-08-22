@@ -20,6 +20,7 @@ import (
 
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 // Domain manager is the boundary between the paladin core / testbed and the domains
@@ -43,6 +44,13 @@ type DomainSmartContract interface {
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
 	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error
 	LockStates(ctx context.Context, tx *PrivateTransaction) error
-	EndorseTransaction(ctx context.Context, tx *PrivateTransaction) error
+	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
 	PrepareTransaction(ctx context.Context, tx *PrivateTransaction) error
+}
+
+type EndorsementResult struct {
+	Endorser     *prototk.ResolvedVerifier
+	Result       prototk.EndorseTransactionResponse_Result
+	Payload      []byte
+	RevertReason *string
 }

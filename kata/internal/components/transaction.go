@@ -43,8 +43,7 @@ type FullState struct {
 }
 
 type TransactionPostAssembly struct {
-	AssemblyResult prototk.AssembleTransactionResponse_Result
-	// InputStateRefs        []*prototk.StateRef
+	AssemblyResult        prototk.AssembleTransactionResponse_Result
 	OutputStatesPotential []*prototk.NewState // the raw result of assembly, before sequence allocation
 	InputStates           []*FullState
 	ReadStates            []*FullState
@@ -52,7 +51,7 @@ type TransactionPostAssembly struct {
 	AttestationPlan       []*prototk.AttestationRequest
 	Signatures            []*prototk.AttestationResult
 	Endorsements          []*prototk.AttestationResult
-	FinalizedTransaction  *prototk.FinalizedTransaction
+	AllAttestations       []*prototk.AttestationResult
 }
 
 // PrivateTransaction is the critical exchange object between the engine and the domain manager,

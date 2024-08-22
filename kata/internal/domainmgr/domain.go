@@ -214,7 +214,7 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 	pbStates := make([]*prototk.StoredState, len(states))
 	for i, s := range states {
 		pbStates[i] = &prototk.StoredState{
-			HashId:   s.ID.String(),
+			Id:       s.ID.String(),
 			SchemaId: s.Schema.String(),
 			StoredAt: s.CreatedAt.UnixNano(),
 			DataJson: string(s.Data),
