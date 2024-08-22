@@ -5,7 +5,7 @@ CREATE TABLE states (
     "schema"      VARCHAR,
     "data"        VARCHAR,
     PRIMARY KEY ("id"),
-    FOREIGN KEY ("schema") REFERENCES schemas ("id") ON DELETE CASCADE
+    FOREIGN KEY ("domain_id", "schema") REFERENCES schemas ("domain_id", "id") ON DELETE CASCADE
 );
 
 CREATE TABLE state_labels (
