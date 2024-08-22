@@ -20,6 +20,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -28,6 +29,7 @@ import (
 
 type Config struct {
 	domainmgr.DomainManagerConfig
+	transportmgr.TransportManagerConfig
 	plugins.PluginControllerConfig
 	Blockchain   ethclient.Config    `yaml:"blockchain"`
 	DB           persistence.Config  `yaml:"db"`

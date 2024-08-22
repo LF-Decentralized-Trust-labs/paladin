@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -54,6 +55,7 @@ type componentManager struct {
 	pluginController plugins.PluginController
 	// managers
 	domainManager components.DomainManager
+	transportManager components.TransportManager
 	// engine
 	engine components.Engine
 	// init to start tracking
@@ -113,6 +115,11 @@ func (cm *componentManager) Init() (err error) {
 		cm.initResults["domain_mgr"], err = cm.domainManager.Init(cm)
 	}
 
+	if err == nil {
+		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerConfig)
+		cm.initResults["transports_mgr"], err = cm.transportManager.Init(cm)
+	}
+
 	// using init of managers, for post-init components
 	if err == nil {
 		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
@@ -144,6 +151,11 @@ func (cm *componentManager) Start() (err error) {
 	if err == nil {
 		err = cm.domainManager.Start()
 		cm.addIfStarted(cm.domainManager, err)
+	}
+
+	if err == nil {
+		err = cm.transportManager.Start()
+		cm.addIfStarted(cm.transportManager, err)
 	}
 
 	// start the plugin controller
@@ -254,6 +266,14 @@ func (cm *componentManager) DomainManager() components.DomainManager {
 
 func (cm *componentManager) DomainRegistration() plugins.DomainRegistration {
 	return cm.domainManager
+}
+
+func (cm *componentManager) TransportManager() components.TransportManager {
+	return cm.transportManager
+}
+
+func (cm *componentManager) TransportRegistration() plugins.TransportRegistration {
+	return cm.transportManager
 }
 
 func (cm *componentManager) PluginController() plugins.PluginController {

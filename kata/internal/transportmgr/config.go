@@ -7,10 +7,8 @@ import (
 )
 
 type TransportManagerConfig struct {
-
+	Transports map[string]*TransportConfig `yaml:"transports"`
 }
-
-
 
 type TransportInitConfig struct {
 	Retry retry.Config `yaml:"retry"`

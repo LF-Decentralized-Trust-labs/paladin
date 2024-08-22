@@ -42,168 +42,85 @@ type transportManager struct {
 	conf             *TransportManagerConfig
 
 	transportsByID map[uuid.UUID]*transport
-	transportsByName map[uuid.UUID]*transport
+	transportsByName map[string]*transport
 }
 
-
-
-func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig) components.DomainManager {
-	return &domainManager{
+func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
+	return &transportManager{
 		bgCtx:            bgCtx,
 		conf:             conf,
-		domainsByID:      make(map[uuid.UUID]*domain),
-		domainsByName:    make(map[string]*domain),
-		domainsByAddress: make(map[types.EthAddress]*domain),
 	}
 }
 
-
-
-type event_PaladinNewSmartContract_V0 struct {
-	TXId   types.Bytes32    `json:"txId"`
-	Domain types.EthAddress `json:"domain"`
-	Data   types.HexBytes   `json:"data"`
+func (tm *transportManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+	return nil, nil
 }
 
-func (dm *domainManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
-	dm.persistence = pic.Persistence()
-	dm.stateStore = pic.StateStore()
-	dm.ethClientFactory = pic.EthClientFactory()
-	dm.chainID = dm.ethClientFactory.ChainID()
-	dm.blockIndexer = pic.BlockIndexer()
-	return &components.ManagerInitResult{
-		EventStreams: []*components.ManagerEventStream{
-			{
-				ABI:     iPaladinContractABI,
-				Handler: dm.eventIndexer,
-			},
-		},
-	}, nil
-}
+func (tm *transportManager) Start() error { return nil }
 
-func (dm *domainManager) Start() error { return nil }
-
-func (dm *domainManager) Stop() {
-	dm.mux.Lock()
-	var allDomains []*domain
-	for _, d := range dm.domainsByID {
-		allDomains = append(allDomains, d)
+func (tm *transportManager) Stop() {
+	tm.mux.Lock()
+	var allTransports []*transport
+	for _, t := range tm.transportsByID {
+		allTransports = append(allTransports, t)
 	}
-	dm.mux.Unlock()
-	for _, d := range allDomains {
-		dm.cleanupDomain(d)
+	tm.mux.Unlock()
+	for _, t := range allTransports {
+		tm.cleanupTransport(t)
 	}
 
 }
 
-func (dm *domainManager) cleanupDomain(d *domain) {
-	// must not hold the domain lock when running this
-	d.close()
-	delete(dm.domainsByID, d.id)
-	delete(dm.domainsByName, d.name)
-	if d.factoryContractAddress != nil {
-		delete(dm.domainsByAddress, *d.factoryContractAddress)
-	}
+func (tm *transportManager) cleanupTransport(t *transport) {
+	// must not hold the transport lock when running this
+	t.close()
+	delete(tm.transportsByID, t.id)
+	delete(tm.transportsByName, t.name)
 }
 
-func (dm *domainManager) ConfiguredDomains() map[string]*plugins.PluginConfig {
+func (tm *transportManager) ConfiguredTransports() map[string]*plugins.PluginConfig {
 	pluginConf := make(map[string]*plugins.PluginConfig)
-	for name, conf := range dm.conf.Domains {
+	for name, conf := range tm.conf.Transports {
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
 }
 
-func (dm *domainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugins.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
-	dm.mux.Lock()
-	defer dm.mux.Unlock()
+func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTransport plugins.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+	tm.mux.Lock()
+	defer tm.mux.Unlock()
 
 	// Replaces any previously registered instance
-	existing := dm.domainsByName[name]
+	existing := tm.transportsByName[name]
 	for existing != nil {
 		// Can't hold the lock in cleanup, hence the loop
-		dm.mux.Unlock()
-		dm.cleanupDomain(existing)
-		dm.mux.Lock()
-		existing = dm.domainsByName[name]
+		tm.mux.Unlock()
+		tm.cleanupTransport(existing)
+		tm.mux.Lock()
+		existing = tm.transportsByName[name]
 	}
 
 	// Get the config for this domain
-	conf := dm.conf.Domains[name]
+	conf := tm.conf.Transports[name]
 	if conf == nil {
 		// Shouldn't be possible
-		return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainNotFound, name)
+		return nil, i18n.NewError(tm.bgCtx, msgs.MsgDomainNotFound, name)
 	}
 
 	// Initialize
-	d := dm.newDomain(id, name, conf, toDomain)
-	dm.domainsByID[id] = d
-	dm.domainsByName[name] = d
-	go d.init()
-	return d, nil
+	t := tm.newTransport(id, name, conf, toTransport)
+	tm.transportsByID[id] = t
+	tm.transportsByName[name] = t
+	go t.init()
+	return t, nil
 }
 
-func (dm *domainManager) GetDomainByName(ctx context.Context, name string) (components.Domain, error) {
-	dm.mux.Lock()
-	defer dm.mux.Unlock()
-	d := dm.domainsByName[name]
-	if d == nil {
+func (tm *transportManager) GetTransportByName(ctx context.Context, name string) (components.Transport, error) {
+	tm.mux.Lock()
+	defer tm.mux.Unlock()
+	t := tm.transportsByName[name]
+	if t == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgDomainNotFound, name)
 	}
-	return d, nil
-}
-
-func (dm *domainManager) setDomainAddress(d *domain) {
-	dm.mux.Lock()
-	defer dm.mux.Unlock()
-	dm.domainsByAddress[*d.factoryContractAddress] = d
-}
-
-func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *types.EthAddress) (d *domain, _ error) {
-	dm.mux.Lock()
-	defer dm.mux.Unlock()
-	if addr != nil {
-		d = dm.domainsByAddress[*addr]
-	}
-	if d == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainNotFound, addr)
-	}
-	return d, nil
-}
-
-// If an embedded ABI is broken, we don't even run the tests / start the runtime
-func mustParseEmbeddedBuildABI(abiJSON []byte) abi.ABI {
-	type buildABI struct {
-		ABI abi.ABI `json:"abi"`
-	}
-	var build buildABI
-	err := json.Unmarshal([]byte(abiJSON), &build)
-	if err != nil {
-		panic(err)
-	}
-	return build.ABI
-}
-
-func mustParseEventSoliditySignature(a abi.ABI, eventName string) string {
-	event := a.Events()[eventName]
-	if event == nil {
-		panic("ABI missing " + eventName)
-	}
-	solString, err := event.SolidityStringCtx(context.Background())
-	if err != nil {
-		panic(err)
-	}
-	return solString
-}
-
-func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
-	event := a.Events()[eventName]
-	if event == nil {
-		panic("ABI missing " + eventName)
-	}
-	sig, err := event.SignatureHash()
-	if err != nil {
-		panic(err)
-	}
-	return *types.NewBytes32FromSlice(sig)
+	return t, nil
 }

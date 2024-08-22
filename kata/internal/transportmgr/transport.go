@@ -101,7 +101,7 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) RecieveMessages(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	if err := t.checkInit(ctx); err != nil {
 		return nil, err
 	}
