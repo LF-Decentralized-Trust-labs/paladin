@@ -44,12 +44,19 @@ var notoFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/Noto.json
 var notoJSON []byte // From "gradle copySolidity"
 
+//go:embed abis/NotoSelfSubmitFactory.json
+var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
+
+//go:embed abis/NotoSelfSubmit.json
+var notoSelfSubmitJSON []byte // From "gradle copySolidity"
+
 var (
 	fromDomain = "from-domain"
 )
 
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
+	Variant        string `json:"variant" yaml:"variant"`
 }
 
 type SolidityBuild struct {
@@ -317,8 +324,18 @@ func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 		return nil, err
 	}
 
-	factory := loadBuild(notoFactoryJSON)
-	contract := loadBuild(notoJSON)
+	var factory SolidityBuild
+	var contract SolidityBuild
+	switch config.Variant {
+	case "", "Noto":
+		factory = loadBuild(notoFactoryJSON)
+		contract = loadBuild(notoJSON)
+	case "NotoSelfSubmit":
+		factory = loadBuild(notoSelfSubmitFactoryJSON)
+		contract = loadBuild(notoSelfSubmitJSON)
+	default:
+		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
+	}
 
 	factoryJSON, err := json.Marshal(factory.ABI)
 	if err != nil {

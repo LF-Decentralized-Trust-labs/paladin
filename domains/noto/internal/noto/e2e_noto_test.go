@@ -176,3 +176,65 @@ func TestNoto(t *testing.T) {
 	assert.Equal(t, int64(50), coins[2].Amount.Int64())
 	assert.Equal(t, notaryName, coins[2].Owner)
 }
+
+func TestNotoSelfSubmit(t *testing.T) {
+	log.L(context.Background()).Infof("TestNotoSelfSubmit")
+	ctx, cancel, noto, rpc := newTestDomain(t)
+	defer cancel()
+
+	domainName := "noto_" + types.RandHex(8)
+	log.L(ctx).Infof("Domain name = %s", domainName)
+	factory := loadBuild(notoSelfSubmitFactoryJSON)
+
+	log.L(ctx).Infof("Deploying Noto factory")
+	var factoryAddress string
+	rpcerr := rpc.CallRPC(ctx, &factoryAddress, "testbed_deployBytecode",
+		notaryName, factory.ABI, factory.Bytecode.String(), `{}`)
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
+
+	log.L(ctx).Infof("Configuring Noto domain")
+	var boolResult bool
+	domainConfig := Config{
+		FactoryAddress: factoryAddress,
+		Variant:        "NotoSelfSubmit",
+	}
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
+		domainName, domainConfig)
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	assert.True(t, boolResult)
+
+	log.L(ctx).Infof("Deploying an instance of Noto")
+	var notoAddress ethtypes.Address0xHex
+	rpcerr = rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+		domainName, &NotoConstructorParams{Notary: notaryName})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
+
+	log.L(ctx).Infof("Mint 100 from notary to notary")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     notaryName,
+		To:       types.EthAddress(notoAddress),
+		Function: *noto.Interface["mint"].ABI,
+		Inputs: types.RawJSON(fmt.Sprintf(`{
+			"to": "%s",
+			"amount": 100
+		}`, notaryName)),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	assert.True(t, boolResult)
+
+	coins, err := noto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 1)
+	assert.Equal(t, int64(100), coins[0].Amount.Int64())
+	assert.Equal(t, notaryName, coins[0].Owner)
+}
