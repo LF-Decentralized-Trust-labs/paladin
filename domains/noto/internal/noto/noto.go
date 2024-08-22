@@ -58,9 +58,8 @@ type SolidityBuild struct {
 }
 
 type Noto struct {
-	Factory      SolidityBuild
-	Contract     SolidityBuild
-	Interface    DomainInterface
+	Interface DomainInterface
+
 	conn         *grpc.ClientConn
 	dest         *string
 	client       pb.KataMessageServiceClient
@@ -121,27 +120,24 @@ func New(ctx context.Context, addr string) (*Noto, error) {
 		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
 	}
 	d := &Noto{
-		conn:     conn,
-		client:   pb.NewKataMessageServiceClient(conn),
-		Factory:  loadBuild(notoFactoryJSON),
-		Contract: loadBuild(notoJSON),
+		conn:   conn,
+		client: pb.NewKataMessageServiceClient(conn),
 	}
 	d.replies = &replyTracker{
 		inflight: make(map[string]*inflightRequest),
 		client:   d.client,
 	}
 	d.Interface = d.getInterface()
-	return d, d.waitForReady(ctx)
+	return d, d.waitForReady(ctx, 2*time.Second)
 }
 
-func (d *Noto) waitForReady(ctx context.Context) error {
+func (d *Noto) waitForReady(ctx context.Context, deadline time.Duration) error {
 	status, err := d.client.Status(ctx, &pb.StatusRequest{})
-	delay := 0
+	end := time.Now().Add(deadline)
 	for !status.GetOk() {
 		time.Sleep(time.Second)
-		delay++
-		if delay > 2 {
-			return fmt.Errorf("server was not ready after 2 seconds")
+		if time.Now().After(end) {
+			return fmt.Errorf("server was not ready after %s", deadline)
 		}
 		status, err = d.client.Status(ctx, &pb.StatusRequest{})
 	}
@@ -248,45 +244,11 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 	switch req := body.(type) {
 	case *pb.ConfigureDomainRequest:
 		log.L(ctx).Infof("Received ConfigureDomainRequest")
-		d.chainID = req.ChainId
-
-		var config Config
-		err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
-		if err != nil {
-			return nil, err
-		}
-		factoryJSON, err := json.Marshal(d.Factory.ABI)
-		if err != nil {
-			return nil, err
-		}
-		notoJSON, err := json.Marshal(d.Contract.ABI)
-		if err != nil {
-			return nil, err
-		}
-		constructorJSON, err := json.Marshal(d.Interface["constructor"].ABI)
-		if err != nil {
-			return nil, err
-		}
-		schemaJSON, err := json.Marshal(NotoCoinABI)
-		if err != nil {
-			return nil, err
-		}
-
-		return &pb.ConfigureDomainResponse{
-			DomainConfig: &pb.DomainConfig{
-				FactoryContractAddress: config.FactoryAddress,
-				FactoryContractAbiJson: string(factoryJSON),
-				PrivateContractAbiJson: string(notoJSON),
-				ConstructorAbiJson:     string(constructorJSON),
-				AbiStateSchemasJson:    []string{string(schemaJSON)},
-			},
-		}, nil
+		return d.configure(req)
 
 	case *pb.InitDomainRequest:
 		log.L(ctx).Infof("Received InitDomainRequest")
-		d.domainID = req.DomainUuid
-		d.coinSchema = req.AbiStateSchemas[0]
-		return &pb.InitDomainResponse{}, nil
+		return d.init(req)
 
 	case *pb.InitDeployTransactionRequest:
 		log.L(ctx).Infof("Received InitDeployTransactionRequest")
@@ -294,15 +256,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-
-		return &pb.InitDeployTransactionResponse{
-			RequiredVerifiers: []*pb.ResolveVerifierRequest{
-				{
-					Lookup:    params.Notary,
-					Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
-				},
-			},
-		}, nil
+		return d.initDeploy(params)
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
@@ -310,37 +264,7 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		if err != nil {
 			return nil, err
 		}
-
-		config := &NotoDomainConfig{
-			NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
-			NotaryAddress: req.ResolvedVerifiers[0].Verifier,
-		}
-		configJSON, err := json.Marshal(config)
-		if err != nil {
-			return nil, err
-		}
-		data, err := NotoDomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
-		if err != nil {
-			return nil, err
-		}
-
-		params := &NotoDeployParams{
-			TransactionID: req.Transaction.TransactionId,
-			Notary:        config.NotaryAddress,
-			Data:          data,
-		}
-		paramsJSON, err := json.Marshal(params)
-		if err != nil {
-			return nil, err
-		}
-
-		return &pb.PrepareDeployTransactionResponse{
-			Transaction: &pb.BaseLedgerTransaction{
-				FunctionName: "deploy",
-				ParamsJson:   string(paramsJSON),
-			},
-			SigningAddress: config.NotaryLookup,
-		}, nil
+		return d.prepareDeploy(ctx, req)
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
@@ -382,6 +306,97 @@ func (d *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(req))
 		return nil, nil
 	}
+}
+
+func (d *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
+	d.chainID = req.ChainId
+
+	var config Config
+	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
+	if err != nil {
+		return nil, err
+	}
+
+	factory := loadBuild(notoFactoryJSON)
+	contract := loadBuild(notoJSON)
+
+	factoryJSON, err := json.Marshal(factory.ABI)
+	if err != nil {
+		return nil, err
+	}
+	notoJSON, err := json.Marshal(contract.ABI)
+	if err != nil {
+		return nil, err
+	}
+	constructorJSON, err := json.Marshal(d.Interface["constructor"].ABI)
+	if err != nil {
+		return nil, err
+	}
+	schemaJSON, err := json.Marshal(NotoCoinABI)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ConfigureDomainResponse{
+		DomainConfig: &pb.DomainConfig{
+			FactoryContractAddress: config.FactoryAddress,
+			FactoryContractAbiJson: string(factoryJSON),
+			PrivateContractAbiJson: string(notoJSON),
+			ConstructorAbiJson:     string(constructorJSON),
+			AbiStateSchemasJson:    []string{string(schemaJSON)},
+		},
+	}, nil
+}
+
+func (d *Noto) init(req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
+	d.domainID = req.DomainUuid
+	d.coinSchema = req.AbiStateSchemas[0]
+	log.L(context.TODO()).Infof("Received schema: %s", d.coinSchema)
+	return &pb.InitDomainResponse{}, nil
+}
+
+func (d *Noto) initDeploy(params *NotoConstructorParams) (*pb.InitDeployTransactionResponse, error) {
+	return &pb.InitDeployTransactionResponse{
+		RequiredVerifiers: []*pb.ResolveVerifierRequest{
+			{
+				Lookup:    params.Notary,
+				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+			},
+		},
+	}, nil
+}
+
+func (d *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
+	config := &NotoDomainConfig{
+		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
+		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
+	}
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	data, err := NotoDomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	params := &NotoDeployParams{
+		TransactionID: req.Transaction.TransactionId,
+		Notary:        config.NotaryAddress,
+		Data:          data,
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PrepareDeployTransactionResponse{
+		Transaction: &pb.BaseLedgerTransaction{
+			FunctionName: "deploy",
+			ParamsJson:   string(paramsJSON),
+		},
+		SigningAddress: config.NotaryLookup,
+	}, nil
 }
 
 func (d *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
@@ -485,22 +500,4 @@ func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gat
 		outCoins: outCoins,
 		outTotal: outTotal,
 	}, nil
-}
-
-func (h *domainHandler) findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
-	for _, verifier := range verifiers {
-		if verifier.Lookup == lookup {
-			return verifier
-		}
-	}
-	return nil
-}
-
-func (h *domainHandler) findAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
-	for _, attestation := range attestations {
-		if attestation.Name == name {
-			return attestation
-		}
-	}
-	return nil
 }

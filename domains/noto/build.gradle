@@ -74,7 +74,6 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn startTestbed
-    finalizedBy stopTestbed
 
     ignoreExitValue true
 

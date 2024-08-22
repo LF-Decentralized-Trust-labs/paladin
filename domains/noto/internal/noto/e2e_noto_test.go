@@ -37,12 +37,10 @@ var (
 	recipientName = "recipient"
 )
 
-func TestNoto(t *testing.T) {
+func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Noto, rpcbackend.Backend) {
 	ctx := context.Background()
-
 	domain, err := New(ctx, grpcAddr)
 	assert.NoError(t, err)
-	defer domain.Close()
 
 	log.L(ctx).Infof("Listening for gRPC messages on %s", toDomain)
 	err = domain.Listen(ctx, toDomain)
@@ -52,13 +50,27 @@ func TestNoto(t *testing.T) {
 	rest := ffresty.NewWithConfig(ctx, conf)
 	rpc := rpcbackend.NewRPCClient(rest)
 
-	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	callCtx, cancelCtx := context.WithTimeout(ctx, 10*time.Second)
+	cancel := func() {
+		domain.Close()
+		cancelCtx()
+	}
+	return callCtx, cancel, domain, rpc
+}
+
+func TestNoto(t *testing.T) {
+	log.L(context.Background()).Infof("TestNoto")
+	ctx, cancel, noto, rpc := newTestDomain(t)
 	defer cancel()
+
+	domainName := "noto_" + types.RandHex(8)
+	log.L(ctx).Infof("Domain name = %s", domainName)
+	factory := loadBuild(notoFactoryJSON)
 
 	log.L(ctx).Infof("Deploying Noto factory")
 	var factoryAddress string
-	rpcerr := rpc.CallRPC(callCtx, &factoryAddress, "testbed_deployBytecode",
-		notaryName, domain.Factory.ABI, domain.Factory.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(ctx, &factoryAddress, "testbed_deployBytecode",
+		notaryName, factory.ABI, factory.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
@@ -66,9 +78,11 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Configuring Noto domain")
 	var boolResult bool
-	domainConfig := Config{FactoryAddress: factoryAddress}
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_configureInit",
-		"noto", domainConfig)
+	domainConfig := Config{
+		FactoryAddress: factoryAddress,
+	}
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
+		domainName, domainConfig)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
@@ -76,18 +90,18 @@ func TestNoto(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(callCtx, &notoAddress, "testbed_deploy",
-		"noto", &NotoConstructorParams{Notary: notaryName})
+	rpcerr = rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+		domainName, &NotoConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
 	log.L(ctx).Infof("Mint 100 from notary to notary")
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
-		Function: *domain.Interface["mint"].ABI,
+		Function: *noto.Interface["mint"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"to": "%s",
 			"amount": 100
@@ -98,17 +112,17 @@ func TestNoto(t *testing.T) {
 	}
 	assert.True(t, boolResult)
 
-	coins, err := domain.FindCoins(ctx, "{}")
+	coins, err := noto.FindCoins(ctx, "{}")
 	assert.NoError(t, err)
 	assert.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
 	assert.Equal(t, notaryName, coins[0].Owner)
 
 	log.L(ctx).Infof("Attempt mint from non-notary (should fail)")
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     recipientName,
 		To:       types.EthAddress(notoAddress),
-		Function: *domain.Interface["mint"].ABI,
+		Function: *noto.Interface["mint"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"to": "%s",
 			"amount": 100
@@ -119,10 +133,10 @@ func TestNoto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 150 from notary (should fail)")
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
-		Function: *domain.Interface["transfer"].ABI,
+		Function: *noto.Interface["transfer"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"from": "%s",
 			"to": "%s",
@@ -133,10 +147,10 @@ func TestNoto(t *testing.T) {
 	assert.Regexp(t, "insufficient funds", rpcerr.Error())
 
 	log.L(ctx).Infof("Transfer 50 from notary to recipient")
-	rpcerr = rpc.CallRPC(callCtx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
-		Function: *domain.Interface["transfer"].ABI,
+		Function: *noto.Interface["transfer"].ABI,
 		Inputs: types.RawJSON(fmt.Sprintf(`{
 			"from": "%s",
 			"to": "%s",
@@ -147,7 +161,7 @@ func TestNoto(t *testing.T) {
 		assert.NoError(t, rpcerr.Error())
 	}
 
-	coins, err = domain.FindCoins(ctx, "{}")
+	coins, err = noto.FindCoins(ctx, "{}")
 	assert.NoError(t, err)
 	assert.Len(t, coins, 3)
 

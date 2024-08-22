@@ -60,7 +60,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(NotoMintParams)
 
-	notary := h.findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")

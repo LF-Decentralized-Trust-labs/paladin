@@ -62,7 +62,7 @@ func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *
 func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(NotoTransferParams)
 
-	notary := h.findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
@@ -123,7 +123,7 @@ func (h *transferHandler) validateAmounts(coins *gatheredCoins) error {
 }
 
 func (h *transferHandler) validateSignature(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
-	senderSignature := h.findAttestation("sender", req.Signatures)
+	senderSignature := findAttestation("sender", req.Signatures)
 	if senderSignature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
 	}
