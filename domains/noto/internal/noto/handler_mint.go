@@ -87,20 +87,25 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 	}, nil
 }
 
+func (h *mintHandler) validateAmounts(params *NotoMintParams, coins *gatheredCoins) error {
+	if len(coins.inCoins) > 0 {
+		return fmt.Errorf("invalid inputs to 'mint': %v", coins.inCoins)
+	}
+	if coins.outTotal.Cmp(params.Amount.BigInt()) != 0 {
+		return fmt.Errorf("invalid amount for 'mint'")
+	}
+	return nil
+}
+
 func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	params := tx.params.(NotoMintParams)
 	coins, err := h.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(coins.inCoins) > 0 {
-		return nil, fmt.Errorf("invalid inputs to 'mint': %v", coins.inCoins)
+	if err := h.validateAmounts(&params, coins); err != nil {
+		return nil, err
 	}
-	if coins.outTotal.Cmp(params.Amount.BigInt()) != 0 {
-		return nil, fmt.Errorf("invalid amount for 'mint'")
-	}
-
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil

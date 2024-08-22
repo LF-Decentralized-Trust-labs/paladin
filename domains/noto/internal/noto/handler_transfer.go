@@ -115,32 +115,43 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	}, nil
 }
 
+func (h *transferHandler) validateAmounts(coins *gatheredCoins) error {
+	if coins.inTotal.Cmp(coins.outTotal) != 0 {
+		return fmt.Errorf("invalid amount for 'transfer'")
+	}
+	return nil
+}
+
+func (h *transferHandler) validateSignature(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+	senderSignature := h.findAttestation("sender", req.Signatures)
+	if senderSignature == nil {
+		return fmt.Errorf("did not find 'sender' attestation")
+	}
+	encodedTransfer, err := h.noto.encodeTransferData(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
+	if err != nil {
+		return err
+	}
+	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, senderSignature.Payload)
+	if err != nil {
+		return err
+	}
+	if signingAddress.String() != senderSignature.Verifier.Verifier {
+		return fmt.Errorf("sender signature does not match")
+	}
+	return nil
+}
+
 func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	coins, err := h.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
-
-	if coins.inTotal.Cmp(coins.outTotal) != 0 {
-		return nil, fmt.Errorf("invalid amount for 'transfer'")
-	}
-
-	senderSignature := h.findAttestation("sender", req.Signatures)
-	if senderSignature == nil {
-		return nil, fmt.Errorf("did not find 'sender' attestation")
-	}
-	encodedTransfer, err := h.noto.encodeTransferData(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
-	if err != nil {
+	if err := h.validateAmounts(coins); err != nil {
 		return nil, err
 	}
-	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, senderSignature.Payload)
-	if err != nil {
+	if err := h.validateSignature(ctx, tx, req, coins); err != nil {
 		return nil, err
 	}
-	if signingAddress.String() != senderSignature.Verifier.Verifier {
-		return nil, fmt.Errorf("sender signature does not match")
-	}
-
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
