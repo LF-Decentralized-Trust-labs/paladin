@@ -23,7 +23,7 @@ import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 ///         This allows coordination of DVP with other smart contracts, which could
 ///         be using any model programmable via EVM (not just C-UTXO)
 ///
-contract Noto is EIP712, INoto {
+contract Noto is EIP712, INoto, IPaladinContract_V0 {
     mapping(bytes32 => bool) private _unspent;
     mapping(bytes32 => ApprovalRecord) private _approvals;
     address _notary;
@@ -54,7 +54,7 @@ contract Noto is EIP712, INoto {
 
     constructor(bytes32 transactionId, address domain, address notary, bytes memory data) EIP712("noto", "0.0.1") {
         _notary = notary;
-        emit IPaladinContract_V0.PaladinNewSmartContract_V0(
+        emit PaladinNewSmartContract_V0(
             transactionId,
             domain,
             data
