@@ -74,7 +74,7 @@ type Schema interface {
 }
 
 type labelInfoAccess interface {
-	labelInfo() []*schemaLabelInfo
+	labelInfo() []*SchemaLabelInfo
 }
 
 func schemaCacheKey(domainID string, id *types.Bytes32) string {

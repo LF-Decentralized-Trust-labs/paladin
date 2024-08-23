@@ -20,15 +20,16 @@ require (
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
+	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/tyler-smith/go-bip39 v1.1.0
-	github.com/vektra/mockery/v2 v2.44.1
+	github.com/vektra/mockery/v2 v2.44.2
 	golang.org/x/crypto v0.26.0
 	golang.org/x/text v0.17.0
 	google.golang.org/grpc v1.65.0
-	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.4.0
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
@@ -258,3 +259,5 @@ require (
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 )
+
+replace github.com/kaleido-io/paladin/toolkit => ../toolkit_go

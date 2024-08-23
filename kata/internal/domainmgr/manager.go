@@ -42,7 +42,8 @@ import (
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
-var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
+
+// var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
@@ -282,14 +283,14 @@ func mustParseEventSoliditySignature(a abi.ABI, eventName string) string {
 	return solString
 }
 
-func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
-	event := a.Events()[eventName]
-	if event == nil {
-		panic("ABI missing " + eventName)
-	}
-	sig, err := event.SignatureHash()
-	if err != nil {
-		panic(err)
-	}
-	return *types.NewBytes32FromSlice(sig)
-}
+// func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
+// 	event := a.Events()[eventName]
+// 	if event == nil {
+// 		panic("ABI missing " + eventName)
+// 	}
+// 	sig, err := event.SignatureHash()
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return *types.NewBytes32FromSlice(sig)
+// }

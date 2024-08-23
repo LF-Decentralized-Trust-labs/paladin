@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -43,8 +43,8 @@ func TestDispatchStageMatch(t *testing.T) {
 		DispatchNode: txNodeID,
 		PreReqTxs:    []string{preReqTx.ID.String()},
 	}
-	mSFS := &enginemocks.StageFoundationService{}
-	mIR := &enginemocks.IdentityResolver{}
+	mSFS := &componentmocks.StageFoundationService{}
+	mIR := &componentmocks.IdentityResolver{}
 	mSFS.On("IdentityResolver").Return(mIR)
 	mIR.On("IsCurrentNode", txNodeID).Return(true)
 
@@ -61,7 +61,7 @@ func TestDispatchStageMatch(t *testing.T) {
 	testTx.DispatchTxID = ""
 
 	//
-	mDC := &enginemocks.DependencyChecker{}
+	mDC := &componentmocks.DependencyChecker{}
 	mSFS.On("DependencyChecker").Return(mDC)
 	mDC.On("PreReqsMatchCondition", ctx, nil, mock.Anything).Run(func(args mock.Arguments) {
 		checkFn := args[3].(func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool))
@@ -91,8 +91,8 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 		PreReqTxs:         []string{preReqTx.ID.String()},
 		DispatchTxPayload: "payload",
 	}
-	mSFS := &enginemocks.StageFoundationService{}
-	mIR := &enginemocks.IdentityResolver{}
+	mSFS := &componentmocks.StageFoundationService{}
+	mIR := &componentmocks.IdentityResolver{}
 	mSFS.On("IdentityResolver").Return(mIR)
 	mIR.On("IsCurrentNode", txNodeID).Return(true)
 
@@ -101,7 +101,7 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	assert.Nil(t, txPreReq)
 	testTx.DispatchAddress = txSigningAddress
 
-	mDC := &enginemocks.DependencyChecker{}
+	mDC := &componentmocks.DependencyChecker{}
 	mSFS.On("DependencyChecker").Return(mDC)
 	mDC.On("PreReqsMatchCondition", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
 		checkFn := args[2].(func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool))
@@ -167,12 +167,12 @@ func TestDispatchStageAssignDispatchAddress(t *testing.T) {
 		DispatchTxPayload: "payload",
 		PreReqTxs:         []string{preReqTx.ID.String()},
 	}
-	mSFS := &enginemocks.StageFoundationService{}
-	mIR := &enginemocks.IdentityResolver{}
+	mSFS := &componentmocks.StageFoundationService{}
+	mIR := &componentmocks.IdentityResolver{}
 	mSFS.On("IdentityResolver").Return(mIR)
 	mIR.On("IsCurrentNode", txNodeID).Return(true)
 
-	mDC := &enginemocks.DependencyChecker{}
+	mDC := &componentmocks.DependencyChecker{}
 	mSFS.On("DependencyChecker").Return(mDC)
 
 	// return error when no dispatch address is found
@@ -229,12 +229,12 @@ func TestDispatchStageSubmitTx(t *testing.T) {
 		DispatchAddress:   txSigningAddress,
 		PreReqTxs:         []string{preReqTx.ID.String()},
 	}
-	mSFS := &enginemocks.StageFoundationService{}
-	mIR := &enginemocks.IdentityResolver{}
+	mSFS := &componentmocks.StageFoundationService{}
+	mIR := &componentmocks.IdentityResolver{}
 	mSFS.On("IdentityResolver").Return(mIR)
 	mIR.On("IsCurrentNode", txNodeID).Return(true)
 
-	mDC := &enginemocks.DependencyChecker{}
+	mDC := &componentmocks.DependencyChecker{}
 	mSFS.On("DependencyChecker").Return(mDC)
 
 	// returns error when pre-req not met
@@ -300,7 +300,7 @@ func TestDispatchStageProcessEvents(t *testing.T) {
 		DispatchAddress:   txSigningAddress,
 		PreReqTxs:         []string{preReqTx.ID.String()},
 	}
-	mSFS := &enginemocks.StageFoundationService{}
+	mSFS := &componentmocks.StageFoundationService{}
 	// wait on panic error and return unprocessed events
 	upe, txUpdate, nextStep := ds.ProcessEvents(ctx, testTx, mSFS, []*types.StageEvent{
 		{

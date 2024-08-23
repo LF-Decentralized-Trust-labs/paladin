@@ -22,15 +22,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
-	"github.com/kaleido-io/paladin/kata/mocks/statemocks"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &statemocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
 	testTx := &transactionstore.Transaction{
 		ID: uuid.New(),
 	}
@@ -38,7 +37,7 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	waitForAction := make(chan bool, 1)
 
 	// fake stage controller for testing
-	mSC := enginemocks.StageController{}
+	mSC := componentmocks.StageController{}
 	testOc.StageController = &mSC
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("test")
 	mSC.On("PerformActionForStage", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
@@ -71,7 +70,7 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 
 func TestOrchestratorHandleEvents(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &statemocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
 	testTx := &transactionstore.Transaction{
 		ID: uuid.New(),
 	}
@@ -79,7 +78,7 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	waitForAction := make(chan bool, 1)
 
 	// fake stage controller for testing
-	mSC := enginemocks.StageController{}
+	mSC := componentmocks.StageController{}
 	testOc.StageController = &mSC
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("test")
 	mSC.On("PerformActionForStage", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
@@ -137,7 +136,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &statemocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
 	ocDone, err := testOc.Start(ctx)
 	assert.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
@@ -148,7 +147,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &statemocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
@@ -164,8 +163,8 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 		ID: uuid.New(),
 	}
 
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &statemocks.StateStore{})
-	mSC := enginemocks.StageController{}
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
+	mSC := componentmocks.StageController{}
 	testOc.StageController = &mSC
 
 	ocDone, err := testOc.Start(ctx)
