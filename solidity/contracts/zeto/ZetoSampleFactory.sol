@@ -12,7 +12,7 @@ contract ZetoSampleFactory {
         Groth16Verifier_Anon _verifier,
         bytes memory data
     ) external {
-        new ZetoSample(
+        ZetoSample zeto = new ZetoSample(
             transactionId,
             address(this),
             _depositVerifier,
@@ -20,5 +20,6 @@ contract ZetoSampleFactory {
             _verifier,
             data
         );
+        zeto.transferOwnership(msg.sender);
     }
 }

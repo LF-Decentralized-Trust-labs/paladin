@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
@@ -38,10 +39,10 @@ type DomainHandler interface {
 }
 
 type domainHandler struct {
-	Zeto *Zeto
+	zeto *Zeto
 }
 
-func (d *Zeto) getInterface() DomainInterface {
+func (z *Zeto) getInterface() DomainInterface {
 	iface := DomainInterface{
 		"constructor": {
 			ABI: &abi.Entry{
@@ -54,7 +55,20 @@ func (d *Zeto) getInterface() DomainInterface {
 				},
 			},
 		},
-		// TODO: add methods
+		"mint": {
+			ABI: &abi.Entry{
+				Name: "mint",
+				Type: abi.Function,
+				Inputs: abi.ParameterArray{
+					{Name: "to", Type: "string"},
+					{Name: "amount", Type: "uint256"},
+				},
+			},
+		},
+	}
+
+	iface["mint"].handler = &mintHandler{
+		domainHandler: domainHandler{zeto: z},
 	}
 
 	return iface
@@ -65,4 +79,9 @@ type ZetoConstructorParams struct {
 	Verifier         string `json:"verifier"`
 	DepositVerifier  string `json:"depositVerifier"`
 	WithdrawVerifier string `json:"withdrawVerifier"`
+}
+
+type ZetoMintParams struct {
+	To     string               `json:"to"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }

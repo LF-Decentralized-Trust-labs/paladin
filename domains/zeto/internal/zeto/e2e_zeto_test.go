@@ -17,6 +17,7 @@ package zeto
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -33,7 +34,14 @@ var (
 	testbedAddr    = "http://localhost:49610"
 	grpcAddr       = "dns:localhost:49611"
 	controllerName = "controller"
+	recipient1Name = "recipient1"
 )
+
+func toJSON(t *testing.T, v any) []byte {
+	result, err := json.Marshal(v)
+	assert.NoError(t, err)
+	return result
+}
 
 func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Zeto, rpcbackend.Backend) {
 	ctx := context.Background()
@@ -68,7 +76,7 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityB
 
 func TestZeto(t *testing.T) {
 	log.L(context.Background()).Infof("TestZeto")
-	ctx, cancel, _, rpc := newTestDomain(t)
+	ctx, cancel, zeto, rpc := newTestDomain(t)
 	defer cancel()
 
 	domainName := "zeto_" + types.RandHex(8)
@@ -127,4 +135,40 @@ func TestZeto(t *testing.T) {
 		assert.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
+
+	log.L(ctx).Infof("Mint 100 from controller to controller")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     controllerName,
+		To:       types.EthAddress(zetoAddress),
+		Function: *zeto.Interface["mint"].ABI,
+		Inputs: toJSON(t, &ZetoMintParams{
+			To:     controllerName,
+			Amount: ethtypes.NewHexInteger64(100),
+		}),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	assert.True(t, boolResult)
+
+	coins, err := zeto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 1)
+	assert.Equal(t, int64(100), coins[0].Amount.Int64())
+	assert.Equal(t, controllerName, coins[0].Owner)
+
+	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     recipient1Name,
+		To:       types.EthAddress(zetoAddress),
+		Function: *zeto.Interface["mint"].ABI,
+		Inputs: toJSON(t, &ZetoMintParams{
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(100),
+		}),
+	})
+	assert.NotNil(t, rpcerr)
+	assert.EqualError(t, rpcerr.Error(), "failed to send base ledger transaction: Execution reverted")
+	assert.True(t, boolResult)
+
 }

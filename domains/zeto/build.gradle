@@ -95,6 +95,7 @@ task build {
     dependsOn test
 }
 
-task clean {
+task clean(type: Delete) {
     dependsOn stopTestbed
+    delete 'coverage'
 }
