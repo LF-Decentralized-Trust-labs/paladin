@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type Config struct {
@@ -38,8 +38,8 @@ type TxStateGetters interface {
 	GetSchemaID(ctx context.Context) string
 
 	GetDispatchTxPayload(ctx context.Context) string
-	GetAttestationPlan(ctx context.Context) []*proto.AttestationRequest
-	GetAttestationResults(ctx context.Context) []*proto.AttestationResult
+	GetAttestationPlan(ctx context.Context) []*prototk.AttestationRequest
+	GetAttestationResults(ctx context.Context) []*prototk.AttestationResult
 	GetPayloadJSON(ctx context.Context) string
 
 	IsAttestationCompleted(ctx context.Context) bool
@@ -145,13 +145,13 @@ func (t *Transaction) IsAttestationCompleted(ctx context.Context) bool {
 	return false
 }
 
-func (t *Transaction) GetAttestationPlan(ctx context.Context) []*proto.AttestationRequest {
-	var attPlans []*proto.AttestationRequest
+func (t *Transaction) GetAttestationPlan(ctx context.Context) []*prototk.AttestationRequest {
+	var attPlans []*prototk.AttestationRequest
 	_ = json.Unmarshal([]byte(t.AttestationPlan), &attPlans)
 	return attPlans
 }
-func (t *Transaction) GetAttestationResults(ctx context.Context) []*proto.AttestationResult {
-	var attResults []*proto.AttestationResult
+func (t *Transaction) GetAttestationResults(ctx context.Context) []*prototk.AttestationResult {
+	var attResults []*prototk.AttestationResult
 	_ = json.Unmarshal([]byte(t.AttestationResults), &attResults)
 	return attResults
 }

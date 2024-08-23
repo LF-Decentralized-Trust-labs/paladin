@@ -24,8 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type AssembleStage struct{}
@@ -55,8 +54,8 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case proto.AssembleTransactionResponse:
-					if v.AssemblyResult == proto.AssembleTransactionResponse_OK {
+				case prototk.AssembleTransactionResponse:
+					if v.AssemblyResult == prototk.AssembleTransactionResponse_OK {
 						attPlan, err := json.Marshal(v.AttestationPlan)
 						attPlanStr := string(attPlan)
 						// transaction assembled, store the information into DB
@@ -94,11 +93,11 @@ func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
-	var assembleResponse *proto.AssembleTransactionResponse
+	var assembleResponse *prototk.AssembleTransactionResponse
 
 	assembleErr := sfs.StateStore().RunInDomainContext(tsg.GetDomainID(ctx), func(ctx context.Context, dsi statestore.DomainStateInterface) error {
 		// todo delegate to domain to do state generation
-		assembleResponse = &proto.AssembleTransactionResponse{
+		assembleResponse = &prototk.AssembleTransactionResponse{
 			// dummy empty object for now
 		}
 		return nil
@@ -106,8 +105,8 @@ func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore
 
 	if assembleErr != nil {
 		assembleErrStr := assembleErr.Error()
-		return proto.AssembleTransactionResponse{
-			AssemblyResult: proto.AssembleTransactionResponse_REVERT,
+		return prototk.AssembleTransactionResponse{
+			AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
 			RevertReason:   &assembleErrStr,
 		}, nil
 	} else if assembleResponse == nil {

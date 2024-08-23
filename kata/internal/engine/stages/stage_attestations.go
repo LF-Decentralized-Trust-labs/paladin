@@ -23,7 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type AttestationResult struct {
@@ -60,7 +60,7 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case proto.AttestationResult: // TODO, we need to check the attestation matches the current version
+				case prototk.AttestationResult: // TODO, we need to check the attestation matches the current version
 					if txUpdates == nil {
 						txUpdates = &transactionstore.TransactionUpdate{}
 					}
