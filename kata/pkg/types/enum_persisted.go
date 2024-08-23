@@ -34,6 +34,10 @@ type EnumStringDefault interface {
 	Default() string
 }
 
+type EnumStringDefault interface {
+	Default() string
+}
+
 // Enum is a persistence wrapper for an enum with a set of options
 type Enum[O EnumStringOptions] string
 
@@ -56,9 +60,15 @@ func (p Enum[O]) Validate() (O, error) {
 		if ok {
 			return O(enumDefault.Default()), nil
 		}
+		var iVal any = validator
+		enumDefault, ok := iVal.(EnumStringDefault)
+		if ok {
+			return O(enumDefault.Default()), nil
+		}
 	}
 	for _, o := range validator.Options() {
 		if strings.EqualFold(o, (string)(p)) {
+			return O(o), nil
 			return O(o), nil
 		}
 	}
@@ -89,6 +99,7 @@ func MapEnum[O EnumStringOptions, T any](p Enum[O], mapped map[O]T) (ret T, err 
 
 // SQL valuer returns a string, and only allows the possible values
 func (p Enum[O]) Value() (driver.Value, error) {
+	return p.MapToString()
 	return p.MapToString()
 }
 
