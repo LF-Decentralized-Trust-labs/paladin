@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
-	"github.com/kaleido-io/paladin/kata/mocks/enginedependenciesmocks"
-	"github.com/kaleido-io/paladin/kata/mocks/statemocks"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,13 +41,13 @@ func TestEngine(t *testing.T) {
 }
 
 type engineDependencyMocks struct {
-	mockStateStore    *statemocks.StateStore
-	mockAllComponents *enginedependenciesmocks.AllComponents
+	mockStateStore    *componentmocks.StateStore
+	mockAllComponents *componentmocks.AllComponents
 }
 
 func newEngineForTesting(t *testing.T) (Engine, engineDependencyMocks) {
-	mockStateStore := statemocks.NewStateStore(t)
-	mockAllComponents := enginedependenciesmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents := componentmocks.NewAllComponents(t)
 
 	return NewEngine(mockStateStore),
 		engineDependencyMocks{

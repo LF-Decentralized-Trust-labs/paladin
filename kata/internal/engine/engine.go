@@ -20,29 +20,29 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/engine/dependencies"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
 type Engine interface {
 	NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error)
 	HandleNewTx(ctx context.Context, txID string) error
 	Name() string
-	Init(dependencies.AllComponents) (*dependencies.ManagerInitResult, error)
+	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
 	Stop()
 }
 
 type engine struct {
+	done          chan struct{}
 	orchestrators map[string]*orchestrator.Orchestrator
 	stateStore    statestore.StateStore
 }
 
 // Init implements Engine.
-func (e *engine) Init(dependencies.AllComponents) (*dependencies.ManagerInitResult, error) {
+func (e *engine) Init(components.AllComponents) (*components.ManagerInitResult, error) {
 	panic("unimplemented")
 }
 
@@ -90,61 +90,12 @@ func (e *engine) HandleNewTx(ctx context.Context, txID string) error {
 	panic("unimplemented")
 }
 
-// MOCK implementations of engine, plugins etc. Function signatures are just examples
-// no formal interface proposed intentionally in this file
-
-// Mock Plugin manager
-
-type MockPlugins struct {
-	installedPlugins  map[string]MockPlugin
-	contractInstances map[string]string
-}
-
-type MockPlugin interface {
-	Validate(ctx context.Context, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool
-}
-
-func (mpm *MockPlugins) Validate(ctx context.Context, contractAddress string, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool {
-	return mpm.installedPlugins[mpm.contractInstances[contractAddress]].Validate(ctx, tsg, ss)
-}
-
-type MockPluginProvider interface {
-	Validate(ctx context.Context, contractAddress string, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool
-}
-
-// Mock engine
-
-type MockEngine struct {
-	txStore        transactionstore.TransactionStore
-	stateStore     statestore.StateStore
-	pluginProvider MockPluginProvider
-	done           chan bool
-	ocs            map[string]*orchestrator.Orchestrator
-}
-
-func (me *MockEngine) HandleNewTx(ctx context.Context, txID string) {
-	tx := transactionstore.NewTransactionStageManager(ctx, txID)
-
-	valid := me.pluginProvider.Validate(ctx, tx.GetContract(ctx), tx, me.stateStore)
-	if valid {
-		// TODO how to measure fairness/ per From address / contract address / something else
-		if me.ocs[tx.GetContract(ctx)] == nil {
-			me.ocs[tx.GetContract(ctx)] = orchestrator.NewOrchestrator(ctx, tx.GetContract(ctx) /** TODO: fill in the real plug-ins*/, nil, nil)
-		}
-		oc := me.ocs[tx.GetContract(ctx)]
-		queued := oc.ProcessNewTransaction(ctx, tx)
-		if queued {
-			log.L(ctx).Debugf("Transaction with ID %s queued in database", tx.GetTxID(ctx))
-		}
-	}
-}
-
-func (me *MockEngine) handleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
+func (me *engine) handleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
 
 }
 
-func (me *MockEngine) StartEventListener(ctx context.Context) (done <-chan bool) {
-	me.done = make(chan bool)
+func (me *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
+	me.done = make(chan struct{})
 	mockEvents := make(chan *types.StageEvent)
 	go generateMockEvents(ctx, mockEvents)
 	go me.listenerLoop(ctx, mockEvents)
@@ -168,7 +119,7 @@ func generateMockEvents(ctx context.Context, receiver chan<- *types.StageEvent) 
 	}
 }
 
-func (me *MockEngine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *types.StageEvent) {
+func (me *engine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *types.StageEvent) {
 	defer close(me.done)
 	for {
 		select {
@@ -177,14 +128,5 @@ func (me *MockEngine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToB
 		case <-ctx.Done():
 			return
 		}
-	}
-}
-
-func NewMockEngine(ctx context.Context, txStore transactionstore.TransactionStore, stateStore statestore.StateStore) *MockEngine {
-	return &MockEngine{
-		txStore:        txStore,
-		stateStore:     stateStore,
-		pluginProvider: &MockPlugins{},
-		done:           make(chan bool),
 	}
 }
