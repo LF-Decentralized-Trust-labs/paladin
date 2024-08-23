@@ -42,6 +42,8 @@ type EthClient interface {
 	Close()
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
+	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
+	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
 	ChainID() int64
 

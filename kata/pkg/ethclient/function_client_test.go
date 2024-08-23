@@ -329,14 +329,18 @@ func TestFunctionFail(t *testing.T) {
 	_, err := tABI.Function(ctx, "missing")
 	assert.Regexp(t, "PD011507", err)
 
-	abiFunctionWrong := &abiFunctionClient{ec: ec.HTTPClient().(*ethClient)}
-	_, err = abiFunctionWrong.functionCommon(ctx, &abi.Entry{
+	badFunction := &abi.Entry{
 		Type: "function",
 		Name: "wrong",
 		Inputs: abi.ParameterArray{
 			{Type: "!wrong"},
 		},
-	})
+	}
+	abiFunctionWrong := &abiFunctionClient{ec: ec.HTTPClient().(*ethClient)}
+	_, err = abiFunctionWrong.functionCommon(ctx, badFunction)
+	assert.Regexp(t, "FF22025", err)
+
+	_, err = ec.HTTPClient().ABIFunction(ctx, badFunction)
 	assert.Regexp(t, "FF22025", err)
 
 	assert.Panics(t, func() {
@@ -352,18 +356,42 @@ func TestConstructorFail(t *testing.T) {
 	defaultConstructor := tABI.MustConstructor([]byte{})
 	assert.Equal(t, "()", defaultConstructor.(*abiFunctionClient).inputs.String())
 
-	tABI.(*abiClient).abi = abi.ABI{
-		{
-			Type:   abi.Constructor,
-			Inputs: abi.ParameterArray{{Type: "!wrong"}},
-		},
+	badConstructor := &abi.Entry{
+		Type:   abi.Constructor,
+		Inputs: abi.ParameterArray{{Type: "!wrong"}},
 	}
+	tABI.(*abiClient).abi = abi.ABI{badConstructor}
 	_, err := tABI.Constructor(ctx, []byte{})
+	assert.Regexp(t, "FF22025", err)
+
+	_, err = ec.HTTPClient().ABIConstructor(ctx, badConstructor, []byte{})
 	assert.Regexp(t, "FF22025", err)
 
 	assert.Panics(t, func() {
 		_ = tABI.MustConstructor([]byte{})
 	})
+}
+
+func TestABIFunctionShortcutsOK(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
+	defer done()
+
+	fc, err := ec.HTTPClient().ABIFunction(ctx, &abi.Entry{
+		Type:    abi.Function,
+		Name:    "foo",
+		Inputs:  abi.ParameterArray{},
+		Outputs: abi.ParameterArray{},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, fc)
+
+	cc, err := ec.HTTPClient().ABIConstructor(ctx, &abi.Entry{
+		Type:    abi.Constructor,
+		Inputs:  abi.ParameterArray{},
+		Outputs: abi.ParameterArray{},
+	}, []byte{})
+	assert.NoError(t, err)
+	assert.NotNil(t, cc)
 }
 
 func TestCallFunctionFail(t *testing.T) {

@@ -37,22 +37,19 @@ type iPaladinNewSmartContract_V0_Type struct {
 	Data   ethtypes.HexBytes0xPrefix `json:"data"`
 }
 
-func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.ABI, signer string, txInstruction *prototk.BaseLedgerDeployTransaction) error {
+func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
 	ec := tb.components.EthClientFactory().HTTPClient()
-	abiClient, err := ec.ABI(ctx, abi)
-	if err == nil {
-		abiFunc, err = abiClient.Constructor(ctx, txInstruction.Bytecode)
-	}
+	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, ethtypes.HexBytes0xPrefix(txInstruction.Bytecode))
 	if err != nil {
-		return fmt.Errorf("failed to process ABI constructor: %s", err)
+		return err
 	}
 
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
-		Input(txInstruction.ParamsJson).
+		Input(txInstruction.Params).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
@@ -63,23 +60,21 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, abi abi.
 	return nil
 }
 
-func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, to *ethtypes.Address0xHex, signer string, txInstruction *prototk.BaseLedgerTransaction) error {
+func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string, txInstruction *components.EthTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
 	ec := tb.components.EthClientFactory().HTTPClient()
-	abiClient, err := ec.ABI(ctx, abi)
-	if err == nil {
-		abiFunc, err = abiClient.Function(ctx, txInstruction.FunctionName)
-	}
+	abiFunc, err := ec.ABIFunction(ctx, txInstruction.FunctionABI)
 	if err != nil {
-		return fmt.Errorf("function %q does not exist on base ledger ABI: %s", txInstruction.FunctionName, err)
+		return err
 	}
 
 	// Send the transaction
+	addr := ethtypes.Address0xHex(txInstruction.To)
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
-		To(to).
-		Input(txInstruction.ParamsJson).
+		To(&addr).
+		Input(txInstruction.Params).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
@@ -90,14 +85,14 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, abi abi.ABI, t
 	return nil
 }
 
-func (tb *testbed) gatherSignatures(ctx context.Context, requests []*prototk.AttestationRequest) ([]*prototk.AttestationResult, error) {
-	attestations := []*prototk.AttestationResult{}
-	for _, ar := range requests {
+func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateTransaction) error {
+	tx.PostAssembly.Signatures = []*prototk.AttestationResult{}
+	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_SIGN {
 			for _, partyName := range ar.Parties {
 				keyHandle, verifier, err := tb.components.KeyManager().ResolveKey(ctx, partyName, ar.Algorithm)
 				if err != nil {
-					return nil, fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
+					return fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				signaturePayload, err := tb.components.KeyManager().Sign(ctx, &proto.SignRequest{
 					KeyHandle: keyHandle,
@@ -105,9 +100,9 @@ func (tb *testbed) gatherSignatures(ctx context.Context, requests []*prototk.Att
 					Payload:   ar.Payload,
 				})
 				if err != nil {
-					return nil, fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
+					return fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
 				}
-				attestations = append(attestations, &prototk.AttestationResult{
+				tx.PostAssembly.Signatures = append(tx.PostAssembly.Signatures, &prototk.AttestationResult{
 					Name:            ar.Name,
 					AttestationType: ar.AttestationType,
 					Verifier: &prototk.ResolvedVerifier{
@@ -120,7 +115,7 @@ func (tb *testbed) gatherSignatures(ctx context.Context, requests []*prototk.Att
 			}
 		}
 	}
-	return attestations, nil
+	return nil
 }
 
 func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) (string, error) {

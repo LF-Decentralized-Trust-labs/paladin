@@ -25,7 +25,7 @@ import (
 type TransactionInputs struct {
 	Domain   string
 	From     string
-	To       *types.EthAddress
+	To       types.EthAddress
 	Function *abi.Entry
 	Inputs   types.RawJSON
 }
@@ -40,6 +40,18 @@ type FullState struct {
 	ID     types.Bytes32
 	Schema types.Bytes32
 	Data   types.RawJSON
+}
+
+type EthTransaction struct {
+	FunctionABI *abi.Entry
+	To          types.EthAddress
+	Params      types.RawJSON
+}
+
+type EthDeployTransaction struct {
+	ConstructorABI *abi.Entry
+	Bytecode       types.HexBytes
+	Params         types.RawJSON
 }
 
 type TransactionPostAssembly struct {
@@ -69,7 +81,7 @@ type PrivateTransaction struct {
 
 	// DISPATCH PHASE: Once the transaction has reached sufficient confidence of success,
 	// we move on to submitting it to the blockchain.
-	PreparedTransaction *prototk.BaseLedgerTransaction
+	PreparedTransaction *EthTransaction
 }
 
 // PrivateContractDeploy is a simpler transaction type that constructs new private smart contract instances
@@ -88,6 +100,6 @@ type PrivateContractDeploy struct {
 
 	// DISPATCH PHASE
 	Signer            string
-	InvokeTransaction *prototk.BaseLedgerTransaction
-	DeployTransaction *prototk.BaseLedgerDeployTransaction
+	InvokeTransaction *EthTransaction
+	DeployTransaction *EthDeployTransaction
 }

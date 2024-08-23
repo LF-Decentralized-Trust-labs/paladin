@@ -212,5 +212,6 @@ var (
 	MsgDomainInvalidStateIDFromDomain   = ffe("PD011614", "Domain returned invalid id '%s' for state %d")
 	MsgDomainInputStateNotFound         = ffe("PD011615", "Input state %d [%s] not found")
 	MsgDomainMissingStates              = ffe("PD011616", "Missing in-memory states")
-	MsgEndorsementReverted              = ffe("PD011617", "Endorsement from '%s' reverted: %s")
+	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
+	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
 )

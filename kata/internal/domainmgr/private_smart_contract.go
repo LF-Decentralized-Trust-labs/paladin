@@ -299,7 +299,17 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		return err
 	}
 
-	tx.PreparedTransaction = res.Transaction
+	functionABI := dc.d.privateContractABI.Functions()[res.Transaction.FunctionName]
+	if functionABI == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+	}
+	tx.PreparedTransaction = &components.EthTransaction{
+		FunctionABI: functionABI,
+		To:          dc.Address(),
+		Params:      types.RawJSON(res.Transaction.ParamsJson),
+	}
+
+	tx.PreparedTransaction = &components.EthTransaction{}
 	return nil
 }
 

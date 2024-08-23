@@ -34,17 +34,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
+func newUnitTestbed(t *testing.T, setupConf ...func(*componentmgr.Config)) (url string, tb *testbed, done func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	tb = newTestBed()
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
 
 	assert.NoError(t, err)
-	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
-	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
 	if err != nil {
 		panic(err)
+	}
+	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
+	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	for _, fn := range setupConf {
+		fn(tb.conf)
 	}
 	serverErr := make(chan error)
 	go func() {

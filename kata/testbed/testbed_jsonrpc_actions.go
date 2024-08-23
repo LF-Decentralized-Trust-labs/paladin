@@ -27,8 +27,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 func (tb *testbed) initRPC() {
@@ -97,7 +97,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domainName string,
 		constructorParams types.RawJSON,
-	) (*ethtypes.Address0xHex, error) {
+	) (*types.EthAddress, error) {
 
 		domain, err := tb.components.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
@@ -114,19 +114,14 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		txID, deployTXSpec, err := domain.validateDeploy(ctx, constructorParams)
-		if err != nil {
-			return nil, err
-		}
-		waiter := domain.txWaiter(ctx, *txID)
-		defer waiter.cancel()
-
-		for i, v := range initDeployRes.RequiredVerifiers {
-			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+		keyMgr := tb.components.KeyManager()
+		tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
+		for i, v := range tx.RequiredVerifiers {
+			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
-			prepareReq.ResolvedVerifiers[i] = &proto.ResolvedVerifier{
+			tx.Verifiers[i] = &prototk.ResolvedVerifier{
 				Lookup:    v.Lookup,
 				Algorithm: v.Algorithm,
 				Verifier:  verifier,
@@ -134,17 +129,16 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		}
 
 		// Prepare the deployment transaction
-		var prepareDeployRes *proto.PrepareDeployResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, prepareReq, &prepareDeployRes)
+		err = domain.PrepareDeploy(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
 
 		// Do the deploy - we wait for the transaction here to cover revert failures
-		if prepareDeployRes.Deploy != nil && prepareDeployRes.Transaction == nil {
-			err = tb.execBaseLedgerDeployTransaction(ctx, domain.factoryContractABI, prepareDeployRes.SigningAddress, prepareDeployRes.Deploy)
-		} else if prepareDeployRes.Transaction != nil && prepareDeployRes.Deploy == nil {
-			err = tb.execBaseLedgerTransaction(ctx, domain.factoryContractABI, domain.factoryContractAddress, prepareDeployRes.SigningAddress, prepareDeployRes.Transaction)
+		if tx.DeployTransaction != nil && tx.InvokeTransaction == nil {
+			err = tb.execBaseLedgerDeployTransaction(ctx, tx.Signer, tx.DeployTransaction)
+		} else if tx.InvokeTransaction != nil && tx.DeployTransaction == nil {
+			err = tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.InvokeTransaction)
 		} else {
 			err = fmt.Errorf("must return a transaction to invoke, or a transaction to deploy")
 		}
@@ -154,11 +148,12 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Rather than just inspecting the TX - we wait for the domain to index the event, such that
 		// we know it's in the map by the time we return.
-		psc, err := waiter.wait(ctx)
+		psc, err := tb.components.DomainManager().WaitForDeploy(ctx, tx.ID)
 		if err != nil {
 			return nil, err
 		}
-		return psc.address, nil
+		addr := psc.Address()
+		return &addr, nil
 	})
 }
 
@@ -167,43 +162,36 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		invocation types.PrivateContractInvoke,
 	) (bool, error) {
 
-		/// TODO: Work out testbed simulation of sequence
-		seq := uuid.New()
-
-		psc := tb.getDomainContract(invocation.To.Address0xHex())
-		if psc == nil {
-			return false, fmt.Errorf("smart contract %s unknown", &invocation.To)
-		}
-
-		txID, txSpec, err := psc.validateInvoke(ctx, &invocation)
+		psc, err := tb.components.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
 		if err != nil {
 			return false, err
 		}
-		waiter := psc.domain.txWaiter(ctx, *txID)
-		defer waiter.cancel()
+
+		tx := &components.PrivateTransaction{
+			ID: uuid.New(),
+			Inputs: &components.TransactionInputs{
+				Domain: psc.Domain().Name(),
+				From:   invocation.From,
+				To:     psc.Address(),
+			},
+		}
 
 		// First we call init on the smart contract to:
 		// - validate the transaction ABI is understood by the contract
 		// - get an initial list of verifiers that need to be resolved
-		var initTXRes *proto.InitTransactionResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, &proto.InitTransactionRequest{
-			Transaction: txSpec,
-		}, &initTXRes)
-		if err != nil {
+		if err := psc.InitTransaction(ctx, tx); err != nil {
 			return false, err
 		}
 
 		// Gather the addresses - in the testbed we assume these all to be local
-		assembleReq := &proto.AssembleTransactionRequest{
-			Transaction:       txSpec,
-			ResolvedVerifiers: make([]*proto.ResolvedVerifier, len(initTXRes.RequiredVerifiers)),
-		}
-		for i, v := range initTXRes.RequiredVerifiers {
-			_, verifier, err := tb.keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+		keyMgr := tb.components.KeyManager()
+		tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
+		for i, v := range tx.PreAssembly.RequiredVerifiers {
+			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
 			if err != nil {
 				return false, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
-			assembleReq.ResolvedVerifiers[i] = &proto.ResolvedVerifier{
+			tx.PreAssembly.Verifiers[i] = &prototk.ResolvedVerifier{
 				Lookup:    v.Lookup,
 				Algorithm: v.Algorithm,
 				Verifier:  verifier,
@@ -211,66 +199,43 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 
 		// Now call assemble
-		var assembleTXRes *proto.AssembleTransactionResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, assembleReq, &assembleTXRes)
-		if err != nil {
+		if err := psc.AssembleTransaction(ctx, tx); err != nil {
 			return false, err
 		}
 
 		// The testbed only handles the OK result
-		switch assembleTXRes.AssemblyResult {
-		case proto.AssembleTransactionResponse_OK:
+		switch tx.PostAssembly.AssemblyResult {
+		case prototk.AssembleTransactionResponse_OK:
 		default:
-			return false, fmt.Errorf("assemble result was %s", assembleTXRes.AssemblyResult)
-		}
-
-		// Validate and write the states
-		spentStateRefs := assembleTXRes.AssembledTransaction.SpentStates
-		newStates, newStateRefs, err := psc.validateAndWriteStates(seq, assembleTXRes.AssembledTransaction.NewStates)
-		if err != nil {
-			return false, err
+			return false, fmt.Errorf("assemble result was %s", tx.PostAssembly.AssemblyResult)
 		}
 
 		// Gather signatures
-		attestations := []*proto.AttestationResult{}
-		signatures, err := psc.gatherSignatures(ctx, assembleTXRes.AttestationPlan)
+		if err = tb.gatherSignatures(ctx, tx); err != nil {
+			return false, err
+		}
+
+		// Gather endorsements (this would be a distributed activity across nodes in the real engine)
+		endorserSubmitConstraint, err := tb.gatherEndorsements(ctx, psc, tx)
 		if err != nil {
 			return false, err
 		}
-		attestations = append(attestations, signatures...)
 
-		// Gather endorsements - now logically this would be a distributed activity across nodes
-		endorserSubmitConstraint, inputStates, endorsements, err :=
-			psc.gatherEndorsements(ctx, txSpec, signatures, spentStateRefs, newStates, assembleReq.ResolvedVerifiers, assembleTXRes.AttestationPlan)
-		if err != nil {
-			return false, err
-		}
-		attestations = append(attestations, endorsements...)
-
-		log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d", len(inputStates), len(newStates), len(signatures), len(endorsements))
+		log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d",
+			len(tx.PostAssembly.InputStates), len(tx.PostAssembly.OutputStates), len(tx.PostAssembly.Signatures), len(tx.PostAssembly.Endorsements))
 
 		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
-		signer, err := psc.determineSubmitterIdentity(txSpec, endorserSubmitConstraint, endorsements)
+		signer, err := tb.determineSubmitterIdentity(psc, tx, endorserSubmitConstraint)
 		if err != nil {
 			return false, err
 		}
 
 		// Prepare the transaction
-		prepareTXReq := &proto.PrepareTransactionRequest{
-			Transaction: &proto.FinalizedTransaction{
-				TransactionId: txSpec.TransactionId,
-				SpentStates:   spentStateRefs,
-				NewStates:     newStateRefs,
-			},
-			AttestationResult: attestations,
-		}
-		var prepareTXRes *proto.PrepareTransactionResponse
-		err = syncExchange(ctx, tb, tb.destToDomain, tb.destFromDomain, prepareTXReq, &prepareTXRes)
-		if err != nil {
+		if err := psc.PrepareTransaction(ctx, tx); err != nil {
 			return false, err
 		}
 
-		err = tb.execBaseLedgerTransaction(ctx, psc.domain.privateContractABI, psc.address, signer, prepareTXRes.Transaction)
+		err = tb.execBaseLedgerTransaction(ctx, signer, tx.PreparedTransaction)
 		if err != nil {
 			return false, err
 		}

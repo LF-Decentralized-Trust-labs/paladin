@@ -295,10 +295,27 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 
 	tx.Signer = res.SigningAddress
 	if res.Transaction != nil && res.Deploy == nil {
-		tx.InvokeTransaction = res.Transaction
+		functionABI := d.privateContractABI.Functions()[res.Transaction.FunctionName]
+		if functionABI == nil {
+			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+		}
+		tx.InvokeTransaction = &components.EthTransaction{
+			FunctionABI: functionABI,
+			To:          *d.Address(),
+			Params:      types.RawJSON(res.Transaction.ParamsJson),
+		}
 		tx.DeployTransaction = nil
 	} else if res.Deploy != nil && res.Transaction == nil {
-		tx.DeployTransaction = res.Deploy
+		functionABI := d.privateContractABI.Constructor()
+		if functionABI == nil {
+			// default constructor
+			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
+		}
+		tx.DeployTransaction = &components.EthDeployTransaction{
+			ConstructorABI: functionABI,
+			Bytecode:       res.Deploy.Bytecode,
+			Params:         types.RawJSON(res.Deploy.ParamsJson),
+		}
 		tx.InvokeTransaction = nil
 	} else {
 		// Must specify exactly one of the two types of transaction
