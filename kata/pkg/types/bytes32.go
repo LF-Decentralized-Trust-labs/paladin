@@ -68,10 +68,7 @@ func MustParseBytes32(s string) *Bytes32 {
 }
 
 // Natural string representation is HexString0xPrefix() if non-nil, or empty string if ""
-func (id *Bytes32) String() string {
-	if id == nil {
-		return ""
-	}
+func (id Bytes32) String() string {
 	return id.HexString0xPrefix()
 }
 
@@ -83,6 +80,18 @@ func (id *Bytes32) Equals(id2 *Bytes32) bool {
 		return false
 	}
 	return *id == *id2
+}
+
+// Return the lower 16 bytes as a UUID
+func (id *Bytes32) UUIDLower16() (u uuid.UUID) {
+	copy(u[:], id[0:16])
+	return u
+}
+
+func Bytes32UUIDLower16(u uuid.UUID) *Bytes32 {
+	var v Bytes32
+	copy(v[0:16], u[:])
+	return &v
 }
 
 // JSON representation is lower case hex, with 0x prefix
@@ -97,7 +106,6 @@ func (id *Bytes32) UnmarshalText(text []byte) error {
 		return err
 	}
 	*id = *pID
-	uuid.New()
 	return nil
 }
 

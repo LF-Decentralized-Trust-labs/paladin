@@ -23,18 +23,16 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -44,6 +42,8 @@ type EthClient interface {
 	Close()
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
+	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
+	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
 	ChainID() int64
 
@@ -56,6 +56,7 @@ type EthClient interface {
 type KeyManager interface {
 	ResolveKey(ctx context.Context, identifier string, algorithm string) (keyHandle, verifier string, err error)
 	Sign(ctx context.Context, req *proto.SignRequest) (*proto.SignResponse, error)
+	Close()
 }
 
 type ethClient struct {
@@ -65,38 +66,13 @@ type ethClient struct {
 	keymgr            KeyManager
 }
 
-func NewEthClient(ctx context.Context, keymgr KeyManager, conf *Config) (_ EthClient, err error) {
-	var rpc rpcbackend.RPC
-	if conf.HTTP.URL != "" {
-		// Use HTTP by preference (provides parallelism on performance)
-		rpcConf, err := rpcclient.ParseHTTPConfig(ctx, &conf.HTTP)
-		if err == nil {
-			rpc = rpcbackend.NewRPCClient(rpcConf)
-		}
-	} else {
-		// Otherwise use WS
-		var wsRPC rpcbackend.WebSocketRPCClient
-		var wsConf *wsclient.WSConfig
-		wsConf, err = rpcclient.ParseWSConfig(ctx, &conf.WS)
-		if err == nil {
-			wsRPC = rpcbackend.NewWSRPCClient(wsConf)
-		}
-		if err == nil {
-			err = wsRPC.Connect(ctx)
-		}
-		rpc = wsRPC
-	}
-	if err != nil {
-		return nil, err
-	}
-	return WrapRPCClient(ctx, keymgr, rpc, confutil.Float64Min(conf.GasEstimateFactor, 1.0, *Defaults.GasEstimateFactor))
-}
-
-func WrapRPCClient(ctx context.Context, keymgr KeyManager, rpc rpcbackend.RPC, gasEstimateFactor float64) (EthClient, error) {
+// A direct creation of a dedicated RPC client for things like unit tests outside of Paladin.
+// Within Paladin, use the EthClientFactory instead as passed to your component/manager/engine via the initialization
+func WrapRPCClient(ctx context.Context, keymgr KeyManager, rpc rpcbackend.RPC, conf *Config) (EthClient, error) {
 	ec := &ethClient{
 		keymgr:            keymgr,
 		rpc:               rpc,
-		gasEstimateFactor: gasEstimateFactor,
+		gasEstimateFactor: confutil.Float64Min(conf.GasEstimateFactor, 1.0, *Defaults.GasEstimateFactor),
 	}
 	if err := ec.setupChainID(ctx); err != nil {
 		return nil, err

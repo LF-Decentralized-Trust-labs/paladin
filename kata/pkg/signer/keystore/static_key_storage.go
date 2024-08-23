@@ -113,3 +113,7 @@ func (ils *staticStore) LoadKeyMaterial(ctx context.Context, keyHandle string) (
 	}
 	return key, nil
 }
+
+func (ils *staticStore) Close() {
+
+}

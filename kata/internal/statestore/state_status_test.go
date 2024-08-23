@@ -179,8 +179,8 @@ func TestStateLockingQuery(t *testing.T) {
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, seqQual, 3)
 	checkQuery(`{"eq":[{"field":"color","value":"pink"}]}`, StateStatusAvailable)
 
-	// clear the sequence locks
-	err = ss.ResetSequence(ctx, "domain1", seqID)
+	// clear the transaction locks
+	err = ss.ResetTransaction(ctx, "domain1", seqID)
 	assert.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged

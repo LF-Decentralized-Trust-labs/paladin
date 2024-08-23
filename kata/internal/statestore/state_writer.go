@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -34,16 +34,16 @@ import (
 )
 
 type writeOperation struct {
-	id                  string
-	domain              string
-	done                chan error
-	isShutdown          bool
-	states              []*StateWithLabels
-	stateConfirms       []*StateConfirm
-	stateSpends         []*StateSpend
-	stateLocks          []*StateLock
-	sequenceLockDeletes []uuid.UUID
-	schemas             []*SchemaPersisted
+	id                     string
+	domain                 string
+	done                   chan error
+	isShutdown             bool
+	states                 []*StateWithLabels
+	stateConfirms          []*StateConfirm
+	stateSpends            []*StateSpend
+	stateLocks             []*StateLock
+	transactionLockDeletes []uuid.UUID
+	schemas                []*SchemaPersisted
 }
 
 type stateWriter struct {
@@ -195,7 +195,7 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 	var stateConfirms []*StateConfirm
 	var stateSpends []*StateSpend
 	var stateLocks []*StateLock
-	var sequenceLockDeletes []uuid.UUID
+	var transactionLockDeletes []uuid.UUID
 	for _, op := range b.ops {
 		if len(op.schemas) > 0 {
 			schemas = append(schemas, op.schemas...)
@@ -214,12 +214,12 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 		if len(op.stateLocks) > 0 {
 			stateLocks = append(stateLocks, op.stateLocks...)
 		}
-		if len(op.sequenceLockDeletes) > 0 {
-			sequenceLockDeletes = append(sequenceLockDeletes, op.sequenceLockDeletes...)
+		if len(op.transactionLockDeletes) > 0 {
+			transactionLockDeletes = append(transactionLockDeletes, op.transactionLockDeletes...)
 		}
 	}
 	log.L(ctx).Debugf("Writing state batch schemas=%d states=%d confirms=%d spends=%d locks=%d seqLockDeletes=%d labels=%d int64Labels=%d",
-		len(schemas), len(states), len(stateConfirms), len(stateSpends), len(stateLocks), len(sequenceLockDeletes), len(labels), len(int64Labels))
+		len(schemas), len(states), len(stateConfirms), len(stateSpends), len(stateLocks), len(transactionLockDeletes), len(labels), len(int64Labels))
 
 	err := sw.ss.p.DB().Transaction(func(tx *gorm.DB) (err error) {
 		if len(schemas) > 0 {
@@ -288,9 +288,9 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Table("state_locks").
 				Clauses(clause.OnConflict{
 					Columns: []clause.Column{{Name: "state"}},
-					// locks can move to another sequence
+					// locks can move to another transaction
 					DoUpdates: clause.AssignmentColumns([]string{
-						"sequence",
+						"transaction",
 						"spending",
 						"creating",
 					}),
@@ -298,11 +298,11 @@ func (sw *stateWriter) runBatch(ctx context.Context, b *stateWriterBatch) {
 				Create(stateLocks).
 				Error
 		}
-		if err == nil && len(sequenceLockDeletes) > 0 {
+		if err == nil && len(transactionLockDeletes) > 0 {
 			// locks can be removed
 			err = tx.
 				Table("state_locks").
-				Delete(&State{}, "sequence IN (?)", sequenceLockDeletes).
+				Delete(&State{}, `"transaction" IN (?)`, transactionLockDeletes).
 				Error
 		}
 		return err

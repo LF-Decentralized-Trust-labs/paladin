@@ -1,3 +1,4 @@
 libkata.h
-componenttest/abis
-testbed/abis
+**/abis
+mocks
+!.vscode/settings.json

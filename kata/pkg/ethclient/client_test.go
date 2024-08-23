@@ -22,136 +22,16 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/httpserver"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 
-type mockEth struct {
-	eth_chainId             func(context.Context) (ethtypes.HexUint64, error)
-	eth_getTransactionCount func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
-	eth_estimateGas         func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
-	eth_sendRawTransaction  func(context.Context, ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
-	eth_call                func(context.Context, ethsigner.Transaction, string) (ethtypes.HexBytes0xPrefix, error)
-}
-
-func newTestServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context.Context, rpcServer rpcserver.Server, done func()) {
-	ctx = context.Background()
-
-	var rpcServerConf *rpcserver.Config
-	if isWS {
-		rpcServerConf = &rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{
-				Disabled: true,
-			},
-			WS: rpcserver.WSEndpointConfig{
-				Config: httpserver.Config{
-					Port: confutil.P(0),
-				},
-			},
-		}
-	} else {
-		rpcServerConf = &rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{
-				Config: httpserver.Config{
-					Port: confutil.P(0),
-				},
-			},
-			WS: rpcserver.WSEndpointConfig{
-				Disabled: true,
-			},
-		}
-	}
-
-	rpcServer, err := rpcserver.NewServer(ctx, rpcServerConf)
-	assert.NoError(t, err)
-
-	if mEth.eth_chainId == nil {
-		mEth.eth_chainId = func(ctx context.Context) (ethtypes.HexUint64, error) {
-			return 12345, nil
-		}
-	}
-
-	rpcServer.Register(rpcserver.NewRPCModule("eth").
-		Add("eth_chainId", rpcserver.RPCMethod0(mEth.eth_chainId)).
-		Add("eth_getTransactionCount", rpcserver.RPCMethod2(mEth.eth_getTransactionCount)).
-		Add("eth_estimateGas", rpcserver.RPCMethod1(mEth.eth_estimateGas)).
-		Add("eth_sendRawTransaction", rpcserver.RPCMethod1(mEth.eth_sendRawTransaction)).
-		Add("eth_call", rpcserver.RPCMethod2(mEth.eth_call)),
-	)
-
-	err = rpcServer.Start()
-	assert.NoError(t, err)
-
-	return ctx, rpcServer, func() {
-		rpcServer.Stop()
-	}
-}
-
-func newTestClientAndServer(t *testing.T, isWS bool, mEth *mockEth) (ctx context.Context, ec *ethClient, done func()) {
-	ctx, rpcServer, serverDone := newTestServer(t, isWS, mEth)
-
-	kmgr := newTestHDWalletKeyManager(t)
-
-	if isWS {
-		iec, err := NewEthClient(ctx, kmgr, &Config{
-			WS: rpcclient.WSConfig{
-				HTTPConfig: rpcclient.HTTPConfig{
-					URL: fmt.Sprintf("ws://%s", rpcServer.WSAddr().String()),
-				},
-			},
-		})
-		assert.NoError(t, err)
-		ec = iec.(*ethClient)
-	} else {
-		iec, err := NewEthClient(ctx, kmgr, &Config{
-			HTTP: rpcclient.HTTPConfig{
-				URL: fmt.Sprintf("http://%s", rpcServer.HTTPAddr().String()),
-			},
-		})
-		assert.NoError(t, err)
-		ec = iec.(*ethClient)
-	}
-	assert.Equal(t, int64(12345), ec.ChainID())
-
-	return ctx, ec, func() {
-		serverDone()
-		ec.Close()
-	}
-
-}
-
-func TestNewEthClientBadConfig(t *testing.T) {
-	kmgr, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
-		KeyStore: api.StoreConfig{Type: api.KeyStoreTypeStatic},
-	})
-	assert.NoError(t, err)
-	_, err = NewEthClient(context.Background(), kmgr, &Config{})
-	assert.Regexp(t, "PD011301", err)
-}
-
-func TestNewEthClientChainIDFail(t *testing.T) {
-	ctx, rpcServer, done := newTestServer(t, false, &mockEth{
-		eth_chainId: func(ctx context.Context) (ethtypes.HexUint64, error) { return 0, fmt.Errorf("pop") },
-	})
-	defer done()
-
-	_, err := NewEthClient(ctx, newTestHDWalletKeyManager(t), &Config{
-		HTTP: rpcclient.HTTPConfig{
-			URL: fmt.Sprintf("http://%s", rpcServer.HTTPAddr().String()),
-		},
-	})
-	assert.Regexp(t, "PD011508.*pop", err)
-
-}
-
 func TestResolveKeyFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
+
+	ec := ecf.HTTPClient().(*ethClient)
 
 	ec.keymgr = &mockKeyManager{
 		resolveKey: func(ctx context.Context, identifier, algorithm string) (keyHandle string, verifier string, err error) {
@@ -168,33 +48,33 @@ func TestResolveKeyFail(t *testing.T) {
 }
 
 func TestCallFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
 	defer done()
 
-	_, err := ec.CallContract(ctx, confutil.P("wrong"), &ethsigner.Transaction{}, "latest")
+	_, err := ec.HTTPClient().CallContract(ctx, confutil.P("wrong"), &ethsigner.Transaction{}, "latest")
 	assert.Regexp(t, "pop", err)
 
 }
 
 func TestGetTransactionCountFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexUint64, error) {
 			return 0, fmt.Errorf("pop")
 		},
 	})
 	defer done()
 
-	_, err := ec.BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{})
+	_, err := ec.HTTPClient().BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{})
 	assert.Regexp(t, "pop", err)
 
 }
 
 func TestEstimateGasFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexUint64, error) {
 			return 0, nil
 		},
@@ -204,16 +84,16 @@ func TestEstimateGasFail(t *testing.T) {
 	})
 	defer done()
 
-	_, err := ec.BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{})
+	_, err := ec.HTTPClient().BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{})
 	assert.Regexp(t, "pop", err)
 
 }
 
 func TestBadTXVersion(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
 
-	_, err := ec.BuildRawTransaction(ctx, EthTXVersion("wrong"), "key1", &ethsigner.Transaction{
+	_, err := ec.HTTPClient().BuildRawTransaction(ctx, EthTXVersion("wrong"), "key1", &ethsigner.Transaction{
 		Nonce:    ethtypes.NewHexInteger64(0),
 		GasLimit: ethtypes.NewHexInteger64(100000),
 	})
@@ -222,9 +102,10 @@ func TestBadTXVersion(t *testing.T) {
 }
 
 func TestSignFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{})
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{})
 	defer done()
 
+	ec := ecf.HTTPClient().(*ethClient)
 	ec.keymgr = &mockKeyManager{
 		resolveKey: func(ctx context.Context, identifier, algorithm string) (keyHandle string, verifier string, err error) {
 			return "kh1", "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754", nil
@@ -243,23 +124,23 @@ func TestSignFail(t *testing.T) {
 }
 
 func TestSendRawFail(t *testing.T) {
-	ctx, ec, done := newTestClientAndServer(t, false, &mockEth{
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_sendRawTransaction: func(ctx context.Context, hbp ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
 	defer done()
 
-	rawTx, err := ec.BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{
+	rawTx, err := ec.HTTPClient().BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{
 		Nonce:    ethtypes.NewHexInteger64(0),
 		GasLimit: ethtypes.NewHexInteger64(100000),
 	})
 	assert.NoError(t, err)
 
-	_, err = ec.SendRawTransaction(ctx, rawTx)
+	_, err = ec.HTTPClient().SendRawTransaction(ctx, rawTx)
 	assert.Regexp(t, "pop", err)
 
-	_, err = ec.SendRawTransaction(ctx, ([]byte)("not RLP"))
+	_, err = ec.HTTPClient().SendRawTransaction(ctx, ([]byte)("not RLP"))
 	assert.Regexp(t, "pop", err)
 
 }

@@ -26,9 +26,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -101,8 +101,11 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 		def = &EventStream{}
 	}
 
+	// This will need to open up when we have more externally consumable event streams
+	def.Type = EventStreamTypeInternal.Enum()
+
 	// Validate the name
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -465,7 +468,8 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 
 	// We start a database transaction, run the callback function
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		return true, es.bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
+		var postCommit PostCommit
+		err = es.bi.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
 
 			es.handlerLock.Lock()
 			handler := es.handler
@@ -474,7 +478,7 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 			if handler == nil {
 				return i18n.NewError(es.ctx, msgs.MsgBlockMissingHandler)
 			}
-			err := handler(es.ctx, tx, &batch.EventDeliveryBatch)
+			postCommit, err = handler(es.ctx, tx, &batch.EventDeliveryBatch)
 			if err != nil {
 				return err
 			}
@@ -494,6 +498,10 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 				WithContext(es.ctx).
 				Error
 		})
+		if err == nil && postCommit != nil {
+			postCommit()
+		}
+		return true, err
 	})
 
 }
@@ -625,6 +633,7 @@ func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
 	for _, abiEntry := range es.eventABIs {
 		cv, err := abiEntry.DecodeEventDataCtx(es.ctx, in.Topics, in.Data)
 		if err == nil {
+			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
 			out.Data, err = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
 		}
 		if err == nil {

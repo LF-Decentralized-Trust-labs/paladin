@@ -40,6 +40,7 @@ type SigningModule interface {
 	Resolve(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error)
 	Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error)
 	List(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
+	Close()
 }
 
 type hdDerivation struct {
@@ -86,13 +87,9 @@ func NewSigningModule(ctx context.Context, config *api.Config, extensions ...api
 	keyStoreType := strings.ToLower(config.KeyStore.Type)
 	switch keyStoreType {
 	case "", api.KeyStoreTypeFilesystem:
-		if sm.keyStore, err = keystore.NewFilesystemStore(ctx, config.KeyStore.FileSystem); err != nil {
-			return nil, err
-		}
+		sm.keyStore, err = keystore.NewFilesystemStore(ctx, config.KeyStore.FileSystem)
 	case api.KeyStoreTypeStatic:
-		if sm.keyStore, err = keystore.NewStaticKeyStore(ctx, config.KeyStore.Static); err != nil {
-			return nil, err
-		}
+		sm.keyStore, err = keystore.NewStaticKeyStore(ctx, config.KeyStore.Static)
 	default:
 		for _, ext := range extensions {
 			store, err := ext.KeyStore(ctx, &config.KeyStore)
@@ -105,8 +102,11 @@ func NewSigningModule(ctx context.Context, config *api.Config, extensions ...api
 			}
 		}
 		if sm.keyStore == nil {
-			return nil, i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyStoreType, config.KeyStore.Type)
+			err = i18n.NewError(ctx, msgs.MsgSigningUnsupportedKeyStoreType, config.KeyStore.Type)
 		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	switch config.KeyDerivation.Type {
@@ -281,4 +281,8 @@ func (sm *signingModule) List(ctx context.Context, req *proto.ListKeysRequest) (
 		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyListingNotSupported)
 	}
 	return listableStore.ListKeys(ctx, req)
+}
+
+func (sm *signingModule) Close() {
+	sm.keyStore.Close()
 }

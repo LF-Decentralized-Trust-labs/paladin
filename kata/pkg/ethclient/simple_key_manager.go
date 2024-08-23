@@ -130,3 +130,7 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 func (km *simpleKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
 	return km.signer.Sign(ctx, req)
 }
+
+func (km *simpleKeyManager) Close() {
+	km.signer.Close()
+}

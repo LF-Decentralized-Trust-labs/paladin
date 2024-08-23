@@ -164,6 +164,14 @@ func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ AB
 	return ac.functionCommon(ctx, functionABI)
 }
 
+func (ec *ethClient) ABIFunction(ctx context.Context, functionABI *abi.Entry) (fc ABIFunctionClient, err error) {
+	a, err := ec.ABI(ctx, abi.ABI{functionABI})
+	if err == nil {
+		fc, err = a.Function(ctx, functionABI.Name)
+	}
+	return fc, err
+}
+
 func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (ABIFunctionClient, error) {
 	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode}
 	functionABI := abic.abi.Constructor()
@@ -176,6 +184,14 @@ func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexByt
 		}
 	}
 	return ac.functionCommon(ctx, functionABI)
+}
+
+func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode ethtypes.HexBytes0xPrefix) (fc ABIFunctionClient, err error) {
+	a, err := ec.ABI(ctx, abi.ABI{constructorABI})
+	if err == nil {
+		fc, err = a.Constructor(ctx, bytecode)
+	}
+	return fc, err
 }
 
 func (ac *abiFunctionClient) functionCommon(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error) {

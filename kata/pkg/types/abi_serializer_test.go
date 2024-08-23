@@ -203,6 +203,71 @@ func TestABIsMustMatchExtra(t *testing.T) {
 
 }
 
+func TestABIsMustMatchOrder(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "aaa",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "function",
+			"name": "bbb",
+			"inputs": [
+			  {
+			    "name": "nameInB",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiA)
+	assert.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "bbb",
+			"inputs": [
+			  {
+			    "name": "nameInB",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "function",
+			"name": "aaa",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiB)
+	assert.NoError(t, err)
+
+	err = ABIsMustMatch(context.Background(), abiA, abiB)
+	assert.NoError(t, err)
+	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.NoError(t, err)
+
+	hashA, err := ABISolDefinitionHash(context.Background(), abiA)
+	assert.NoError(t, err)
+	hashB, err := ABISolDefinitionHash(context.Background(), abiB)
+	assert.NoError(t, err)
+	assert.Equal(t, *hashA, *hashB)
+
+}
+
 func TestABIsDeepMisMatchName(t *testing.T) {
 
 	var abiA abi.ABI
@@ -255,6 +320,12 @@ func TestABIsDeepMisMatchName(t *testing.T) {
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
 	assert.Regexp(t, "PD011103.*NestedTypeEvent", err)
 
+	hashA, err := ABISolDefinitionHash(context.Background(), abiA)
+	assert.NoError(t, err)
+	hashB, err := ABISolDefinitionHash(context.Background(), abiB)
+	assert.NoError(t, err)
+	assert.NotEqual(t, *hashA, *hashB)
+
 }
 
 func TestABIsBadTypes(t *testing.T) {
@@ -282,6 +353,8 @@ func TestABIsBadTypes(t *testing.T) {
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
 	assert.Regexp(t, "FF22025", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
+	assert.Regexp(t, "FF22025", err)
+	_, err = ABISolDefinitionHash(context.Background(), abiA)
 	assert.Regexp(t, "FF22025", err)
 
 }
