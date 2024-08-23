@@ -48,7 +48,7 @@ func Bytes32Keccak(b []byte) *Bytes32 {
 }
 
 // Parse a string
-func ParseBytes32(ctx context.Context, s string) (*Bytes32, error) {
+func ParseBytes32Ctx(ctx context.Context, s string) (*Bytes32, error) {
 	h, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgStateInvalidHex, err)
@@ -59,8 +59,16 @@ func ParseBytes32(ctx context.Context, s string) (*Bytes32, error) {
 	return NewBytes32FromSlice(h), nil
 }
 
-func MustParseBytes32(s string) *Bytes32 {
-	h, err := ParseBytes32(context.Background(), s)
+func ParseBytes32(s string) (Bytes32, error) {
+	pB32, err := ParseBytes32Ctx(context.Background(), s)
+	if err != nil {
+		return Bytes32{}, err
+	}
+	return *pB32, nil
+}
+
+func MustParseBytes32(s string) Bytes32 {
+	h, err := ParseBytes32(s)
 	if err != nil {
 		panic(err)
 	}
@@ -83,15 +91,15 @@ func (id *Bytes32) Equals(id2 *Bytes32) bool {
 }
 
 // Return the lower 16 bytes as a UUID
-func (id *Bytes32) UUIDLower16() (u uuid.UUID) {
+func (id Bytes32) UUIDLower16() (u uuid.UUID) {
 	copy(u[:], id[0:16])
 	return u
 }
 
-func Bytes32UUIDLower16(u uuid.UUID) *Bytes32 {
+func Bytes32UUIDLower16(u uuid.UUID) Bytes32 {
 	var v Bytes32
 	copy(v[0:16], u[:])
-	return &v
+	return v
 }
 
 // JSON representation is lower case hex, with 0x prefix
@@ -101,7 +109,7 @@ func (id Bytes32) MarshalText() ([]byte, error) {
 
 // Parses with/without 0x in any case
 func (id *Bytes32) UnmarshalText(text []byte) error {
-	pID, err := ParseBytes32(context.Background(), string(text))
+	pID, err := ParseBytes32Ctx(context.Background(), string(text))
 	if err != nil {
 		return err
 	}
@@ -110,32 +118,23 @@ func (id *Bytes32) UnmarshalText(text []byte) error {
 }
 
 // Get string with 0x prefix - nil is all zeros
-func (id *Bytes32) HexString0xPrefix() string {
-	if id == nil {
-		return (&Bytes32{}).HexString0xPrefix()
-	}
+func (id Bytes32) HexString0xPrefix() string {
 	return fmt.Sprintf("0x%s", hex.EncodeToString(id[:]))
 }
 
 // Get string (without 0x prefix) - nil is all zeros
-func (id *Bytes32) HexString() string {
-	if id == nil {
-		return (&Bytes32{}).HexString()
-	}
+func (id Bytes32) HexString() string {
 	return hex.EncodeToString(id[:])
 }
 
 // Get bytes - or nil
-func (id *Bytes32) Bytes() []byte {
-	if id == nil {
-		return nil
-	}
+func (id Bytes32) Bytes() []byte {
 	return id[:]
 }
 
 // Returns true for either nil, or all-zeros value
-func (id *Bytes32) IsZero() bool {
-	return id == nil || *id == Bytes32{}
+func (id Bytes32) IsZero() bool {
+	return id == Bytes32{}
 }
 
 func (id Bytes32) Value() (driver.Value, error) {
@@ -145,7 +144,7 @@ func (id Bytes32) Value() (driver.Value, error) {
 func (id *Bytes32) Scan(src interface{}) error {
 	switch v := src.(type) {
 	case string:
-		b, err := ParseBytes32(context.Background(), v)
+		b, err := ParseBytes32Ctx(context.Background(), v)
 		if err != nil {
 			return err
 		}
@@ -155,7 +154,7 @@ func (id *Bytes32) Scan(src interface{}) error {
 		if len(v) == 32 {
 			*id = *NewBytes32FromSlice(v)
 		} else if len(v) == 64 || len(v) == 66 {
-			b, err := ParseBytes32(context.Background(), string(v))
+			b, err := ParseBytes32Ctx(context.Background(), string(v))
 			if err != nil {
 				return err
 			}

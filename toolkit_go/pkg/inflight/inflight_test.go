@@ -74,6 +74,7 @@ func TestInFlightCancel(t *testing.T) {
 	id2 := uuid.New()
 	req2 := ifm.AddInflight(context.Background(), id2)
 	assert.Equal(t, id2, req2.ID())
+	assert.Equal(t, ifm.InFlightCount(), 1)
 	_, err = req.Wait()
 	assert.Regexp(t, "PD020100", err)
 }

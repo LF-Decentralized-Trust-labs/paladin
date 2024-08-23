@@ -93,7 +93,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 }
 
 func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 }
 
 func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, transactionID uuid.UUID, creating, spending bool) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}

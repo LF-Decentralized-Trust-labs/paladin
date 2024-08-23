@@ -335,7 +335,7 @@ func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateR
 	rawIDsBySchema := make(map[string][]types.RawJSON)
 	stateIDs := make([]types.Bytes32, len(refs))
 	for i, s := range refs {
-		stateID, err := types.ParseBytes32(ctx, s.Id)
+		stateID, err := types.ParseBytes32Ctx(ctx, s.Id)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}

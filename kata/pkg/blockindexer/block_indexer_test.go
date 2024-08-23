@@ -180,6 +180,7 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
+				Status:          ethtypes.NewHexInteger64(1),
 				Logs: []*LogJSONRPC{
 					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
 					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventBData},
@@ -499,7 +500,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 
 	bi.persistence.DB().Table("indexed_blocks").Create(&IndexedBlock{
 		Number: 12345,
-		Hash:   *types.MustParseBytes32(types.RandHex(32)),
+		Hash:   types.MustParseBytes32(types.RandHex(32)),
 	})
 
 	bi.startOrReset() // do not start block listener
@@ -854,7 +855,7 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	}()
 
 	// Wait for initial query to fail
-	for len(bi.txWaiters) == 0 {
+	for bi.txWaiters.InFlightCount() == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
 
@@ -870,11 +871,53 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 
 	tx, err := bi.WaitForTransaction(ctx, txHash)
 	assert.NoError(t, err)
+	assert.Equal(t, TXResult_SUCCESS, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 	assert.Equal(t, txHash, tx.Hash.String())
 }
 
-func TestWaitForTransactionFailures(t *testing.T) {
+func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
+	ctx, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+
+	blocks, receipts := testBlockArray(t, 5)
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+
+	receipt := receipts[blocks[2].Hash.String()][0]
+	receipt.Status = ethtypes.NewHexInteger64(0) // reverted
+	txHash := receipt.TransactionHash.String()
+	gotTX := make(chan struct{})
+	go func() {
+		defer close(gotTX)
+		tx, err := bi.WaitForTransaction(ctx, txHash)
+		assert.NoError(t, err)
+		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
+		assert.Equal(t, txHash, tx.Hash.String())
+	}()
+
+	// Wait for initial query to fail
+	for bi.txWaiters.InFlightCount() == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	bi.startOrReset() // do not start block listener
+
+	for i := 0; i < len(blocks); i++ {
+		b := <-bi.utBatchNotify
+		assert.Len(t, b.blocks, 1) // We should get one block per batch
+		assert.Equal(t, blocks[i], b.blocks[0])
+	}
+
+	<-gotTX
+
+	tx, err := bi.WaitForTransaction(ctx, txHash)
+	assert.NoError(t, err)
+	assert.Equal(t, TXResult_FAILURE, tx.Result.V())
+	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
+	assert.Equal(t, txHash, tx.Hash.String())
+}
+
+func TestWaitForTransactionErrorCases(t *testing.T) {
 
 	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
@@ -886,20 +929,5 @@ func TestWaitForTransactionFailures(t *testing.T) {
 
 	_, err = bi.WaitForTransaction(ctx, types.RandHex(32))
 	assert.Regexp(t, "pop", err)
-
-	fakeWaiter := &txWaiter{
-		start: time.Now(),
-		done:  make(chan *IndexedTransaction),
-	}
-
-	// Must not block
-	fakeWaiter.notify(&IndexedTransaction{})
-
-	closedCtx, cancelCtx := context.WithCancel(context.Background())
-	cancelCtx()
-
-	// Must return err on cancelled context
-	_, err = fakeWaiter.wait(closedCtx, types.ShortID())
-	assert.Regexp(t, "PD010301", err)
 
 }

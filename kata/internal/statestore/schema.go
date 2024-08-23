@@ -89,7 +89,7 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (Schema, error) {
-	id, err := types.ParseBytes32(ctx, schemaID)
+	id, err := types.ParseBytes32Ctx(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}

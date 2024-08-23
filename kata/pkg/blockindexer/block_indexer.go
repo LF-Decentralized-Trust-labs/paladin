@@ -36,6 +36,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"gorm.io/gorm"
 )
@@ -78,8 +79,7 @@ type blockIndexer struct {
 	retry                      *retry.Retry
 	batchSize                  int
 	batchTimeout               time.Duration
-	txWaiters                  map[string]*txWaiter
-	txWaiterLock               sync.Mutex
+	txWaiters                  *inflight.InflightManager[types.Bytes32, *IndexedTransaction]
 	eventStreams               map[uuid.UUID]*eventStream
 	eventStreamsHeadSet        map[uuid.UUID]*eventStream
 	eventStreamsLock           sync.Mutex
@@ -111,7 +111,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		retry:                      blockListener.retry,
 		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
-		txWaiters:                  make(map[string]*txWaiter),
+		txWaiters:                  inflight.NewInflightManager[types.Bytes32, *IndexedTransaction](types.ParseBytes32),
 		eventStreams:               make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
 		esBlockDispatchQueueLength: confutil.IntMin(config.EventStreams.BlockDispatchQueueLength, 0, *DefaultEventStreamsConfig.BlockDispatchQueueLength),
@@ -501,6 +501,10 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 			Hash:   *types.NewBytes32FromSlice(block.Hash),
 		})
 		for txIndex, r := range batch.receipts[i] {
+			result := TXResult_FAILURE.Enum()
+			if r.Status.BigInt().Int64() == 1 {
+				result = TXResult_SUCCESS.Enum()
+			}
 			transactions = append(transactions, &IndexedTransaction{
 				Hash:             *types.NewBytes32FromSlice(r.TransactionHash),
 				BlockNumber:      int64(r.BlockNumber),
@@ -508,6 +512,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 				From:             (*types.EthAddress)(r.From),
 				To:               (*types.EthAddress)(r.To),
 				ContractAddress:  (*types.EthAddress)(r.ContractAddress),
+				Result:           result,
 			})
 			for _, l := range r.Logs {
 				events = append(events, bi.logToIndexedEvent(l))
@@ -552,15 +557,11 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		if bi.utBatchNotify != nil {
 			bi.utBatchNotify <- batch
 		}
-		bi.txWaiterLock.Lock()
-		for _, w := range bi.txWaiters {
-			for _, t := range transactions {
-				if w.hash.Equals(&t.Hash) {
-					w.notify(t)
-				}
+		for _, t := range transactions {
+			if inflight := bi.txWaiters.GetInflight(t.Hash); inflight != nil {
+				inflight.Complete(t)
 			}
 		}
-		defer bi.txWaiterLock.Unlock()
 	}
 }
 
@@ -684,63 +685,24 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 	return toDispatch
 }
 
-type txWaiter struct {
-	start time.Time
-	hash  *types.Bytes32
-	done  chan *IndexedTransaction
-}
-
-func (w *txWaiter) notify(t *IndexedTransaction) {
-	select {
-	case w.done <- t:
-	default:
-	}
-}
-
-func (w *txWaiter) wait(ctx context.Context, waiterID string) (*IndexedTransaction, error) {
-	select {
-	case tx := <-w.done:
-		log.L(ctx).Infof("TX %s received after [time=%s,waiter=%s]", w.hash, time.Since(w.start), waiterID)
-		return tx, nil
-	case <-ctx.Done():
-		log.L(ctx).Warnf("TX %s not available after [time=%s,waiter=%s]", w.hash, time.Since(w.start), waiterID)
-		return nil, i18n.NewError(ctx, msgs.MsgContextCanceled)
-	}
-}
-
 func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	txHash, err := types.ParseBytes32(ctx, hash)
+	txHash, err := types.ParseBytes32Ctx(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
-	waiterID := types.ShortID()
-	waiter := &txWaiter{
-		start: time.Now(),
-		hash:  txHash,
-		done:  make(chan *IndexedTransaction, 1),
-	}
-	log.L(ctx).Infof("Waiting for TX [time=%s,waiter=%s]", txHash, waiterID)
 
-	bi.txWaiterLock.Lock()
-	bi.txWaiters[waiterID] = waiter
-	bi.txWaiterLock.Unlock()
+	inflight := bi.txWaiters.AddInflight(ctx, *txHash)
+	defer inflight.Cancel()
 
 	tx, err := bi.GetIndexedTransactionByHash(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
 	if tx != nil {
-		log.L(ctx).Infof("TX %s already in DB [time=%s,waiter=%s]", txHash, time.Since(waiter.start), waiterID)
+		log.L(ctx).Infof("TX %s already in DB", txHash)
 		return tx, nil
 	}
-
-	defer func() {
-		bi.txWaiterLock.Lock()
-		delete(bi.txWaiters, waiterID)
-		bi.txWaiterLock.Unlock()
-	}()
-
-	return waiter.wait(ctx, waiterID)
+	return inflight.Wait()
 }
 
 func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error) {
@@ -759,7 +721,7 @@ func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint
 }
 
 func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash string) (*IndexedTransaction, error) {
-	hashID, err := types.ParseBytes32(ctx, hash)
+	hashID, err := types.ParseBytes32Ctx(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -796,7 +758,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 }
 
 func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash string) ([]*IndexedEvent, error) {
-	hashID, err := types.ParseBytes32(ctx, hash)
+	hashID, err := types.ParseBytes32Ctx(ctx, hash)
 	if err != nil {
 		return nil, err
 	}

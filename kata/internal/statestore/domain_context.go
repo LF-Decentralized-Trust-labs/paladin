@@ -399,7 +399,7 @@ func (dc *domainContext) UpsertStates(transactionID *uuid.UUID, stateUpserts []*
 func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []string, setLockState func(*StateLock)) (err error) {
 	stateIDs := make([]*types.Bytes32, len(stateIDStrings))
 	for i, id := range stateIDStrings {
-		stateIDs[i], err = types.ParseBytes32(dc.ctx, id)
+		stateIDs[i], err = types.ParseBytes32Ctx(dc.ctx, id)
 		if err != nil {
 			return err
 		}
