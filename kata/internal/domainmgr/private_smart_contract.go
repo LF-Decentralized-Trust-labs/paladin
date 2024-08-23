@@ -160,7 +160,7 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 	//       and write them directly to the sequence prior to endorsement
 	postAssembly := tx.PostAssembly
 
-	var newStatesToWrite []*statestore.StateUpsert
+	newStatesToWrite := make([]*statestore.StateUpsert, len(postAssembly.OutputStatesPotential))
 	domain := dc.d
 	for i, s := range postAssembly.OutputStatesPotential {
 		schema := domain.schemasByID[s.SchemaId]
