@@ -298,7 +298,7 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tsm transacti
 		} else {
 			oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = controller.NewPaladinTransactionProcessor(ctx, tsm, oc.StageController)
 		}
-		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)].Continue(ctx)
+		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)].Init(ctx)
 	}
 	return false
 }
@@ -315,7 +315,9 @@ func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *types.Stage
 		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = controller.NewPaladinTransactionProcessor(ctx, tsm, oc.StageController)
 		txProc = oc.incompleteTxSProcessMap[stageEvent.TxID]
 	}
-	txProc.AddStageEvent(ctx, stageEvent)
+	go func() {
+		txProc.AddStageEvent(ctx, stageEvent)
+	}()
 }
 
 // this function should only have one running instance at any given time

@@ -31,6 +31,7 @@ import (
 )
 
 type Engine interface {
+	HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
 	Name() string
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
@@ -115,15 +116,21 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	return txInstance.GetTxID(ctx), nil
 }
 
-func (me *engine) handleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
+func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
+	targetOrchestrator := e.orchestrators[stageEvent.ContractAddress]
+	if targetOrchestrator == nil { // this is an event that belongs to a contract that's not in flight, throw it away and rely on the engine to trigger the action again when the orchestrator is wake up. (an enhanced version is to add weight on queueing an orchestrator)
+		log.L(ctx).Warnf("Ignored event for  domain contract %s and transaction %s on stage %s. If this happens a lot, check the orchestrator idle timeout is set to a reasonable number", stageEvent.ContractAddress, stageEvent.TxID, stageEvent.Stage)
+	} else {
+		targetOrchestrator.HandleEvent(ctx, stageEvent)
+	}
 
 }
 
-func (me *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
-	me.done = make(chan struct{})
+func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
+	e.done = make(chan struct{})
 	mockEvents := make(chan *types.StageEvent)
 	go generateMockEvents(ctx, mockEvents)
-	go me.listenerLoop(ctx, mockEvents)
+	go e.listenerLoop(ctx, mockEvents)
 	return done
 }
 
@@ -144,12 +151,12 @@ func generateMockEvents(ctx context.Context, receiver chan<- *types.StageEvent) 
 	}
 }
 
-func (me *engine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *types.StageEvent) {
-	defer close(me.done)
+func (e *engine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *types.StageEvent) {
+	defer close(e.done)
 	for {
 		select {
 		case mevent := <-mockEventsDoesNotHaveToBeAChannel:
-			me.handleNewEvents(ctx, mevent)
+			e.HandleNewEvents(ctx, mevent)
 		case <-ctx.Done():
 			return
 		}

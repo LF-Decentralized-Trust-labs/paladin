@@ -26,13 +26,21 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
+type stageContextAction int
+
+const (
+	resumeStage = iota
+	initStage
+	switchStage
+)
+
 type TxProcessor interface {
 	GetStageContext(ctx context.Context) *StageContext
 	GetStageTriggerError(ctx context.Context) error
 
 	// stage outputs management
 	AddStageEvent(ctx context.Context, stageEvent *types.StageEvent)
-	Continue(ctx context.Context)
+	Init(ctx context.Context)
 }
 
 type StageContext struct {
@@ -52,6 +60,7 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 }
 
 type PaladinTxProcessor struct {
+	stageContextMutex sync.Mutex
 	stageContext      *StageContext
 	stageTriggerError error
 	stageErrorRetry   time.Duration
@@ -63,13 +72,18 @@ type PaladinTxProcessor struct {
 	bufferedStageEvents         []*types.StageEvent
 }
 
-func (ts *PaladinTxProcessor) Continue(ctx context.Context) {
-	if ts.stageContext == nil {
-		ts.initiateStageContext(ctx, true)
-	}
+func (ts *PaladinTxProcessor) Init(ctx context.Context) {
+	ts.createStageContext(ctx, initStage)
 }
 
-func (ts *PaladinTxProcessor) initiateStageContext(ctx context.Context, performAction bool) {
+func (ts *PaladinTxProcessor) createStageContext(ctx context.Context, action stageContextAction) {
+	ts.stageContextMutex.Lock()
+	defer ts.stageContextMutex.Unlock()
+	if action != switchStage && ts.stageContext != nil { // we only override existing stage context when switching stage
+		// stage context already initialized, skip
+		log.L(ctx).Tracef("Transaction with ID %s, on stage %s, no need for new stage context", ts.tsm.GetTxID(ctx), ts.stageContext.Stage)
+		return
+	}
 	nowTime := time.Now() // pin the now time
 	stage := ts.stageController.CalculateStage(ctx, ts.tsm)
 	nextStepContext := &StageContext{
@@ -79,25 +93,25 @@ func (ts *PaladinTxProcessor) initiateStageContext(ctx context.Context, performA
 		ctx:            log.WithLogField(ctx, "stage", string(stage)),
 	}
 	if ts.stageContext != nil {
-		if ts.stageContext.Stage == nextStepContext.Stage {
+		if ts.stageContext.Stage == nextStepContext.Stage { // switching to existing stage ---> this is a retry
 			// redoing the current stage
-			log.L(ctx).Tracef("Transaction with ID %s, already on stage %s for %s", ts.tsm.GetTxID(ctx), stage, time.Since(ts.stageContext.stageEntryTime))
+			log.L(ctx).Warnf("Transaction with ID %s retrying action, already on stage %s for %s", ts.tsm.GetTxID(ctx), stage, time.Since(ts.stageContext.stageEntryTime))
 			nextStepContext.stageEntryTime = ts.stageContext.stageEntryTime
 		} else {
 			log.L(ctx).Tracef("Transaction with ID %s, switching from %s to %s after %s", ts.tsm.GetTxID(ctx), ts.stageContext.Stage, nextStepContext.Stage, time.Since(ts.stageContext.stageEntryTime))
 		}
 	} else {
+		// init succeeded
 		log.L(ctx).Tracef("Transaction with ID %s, initiated on stage %s", ts.tsm.GetTxID(ctx), nextStepContext.Stage)
-
 	}
 	ts.stageContext = nextStepContext
 	ts.stageTriggerError = nil
-
-	if performAction {
+	if action != resumeStage { // if we are resuming a stage when received its action event, don't perf the action again
 		ts.PerformActionForStageAsync(ctx)
 	} else {
 		log.L(ctx).Tracef("Transaction with ID %s, resuming for %s stage", ts.tsm.GetTxID(ctx), stage)
 	}
+
 }
 
 func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
@@ -116,11 +130,15 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 				Stage: stageContext.Stage,
 				Data:  synchronousActionOutput,
 			})
-		} else {
-			// if errored, retry with clean stage context
+		}
+		if err != nil {
+			// if errored, clean stage context
+			ts.stageContextMutex.Lock()
+			ts.stageContext = nil
+			ts.stageContextMutex.Unlock()
+			// retry after the timeout
 			time.Sleep(ts.stageErrorRetry)
-			ts.initiateStageContext(ctx, true)
-
+			ts.createStageContext(ctx, initStage)
 		}
 	}, ctx)
 }
@@ -164,10 +182,8 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 	defer ts.bufferedStageEventsMapMutex.Unlock()
 	ts.bufferedStageEvents = append(ts.bufferedStageEvents, stageEvent)
 
-	if ts.stageContext == nil {
-		ts.initiateStageContext(ctx, false)
-	}
-	// TODO: need to make ProcessEventsForStage blocking safe like the PerformAction function
+	ts.createStageContext(ctx, resumeStage)
+
 	unProcessedBufferedStageEvents, txUpdates, nextStep := ts.stageController.ProcessEventsForStage(ctx, string(ts.stageContext.Stage), ts.tsm, ts.bufferedStageEvents)
 
 	if unProcessedBufferedStageEvents != nil {
@@ -179,8 +195,9 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)
 	}
 	if nextStep == types.NextStepNewStage {
-		ts.initiateStageContext(ctx, true)
+		ts.createStageContext(ctx, switchStage)
 	} else if nextStep == types.NextStepNewAction {
 		ts.PerformActionForStageAsync(ctx)
 	}
+	// other wise, the stage told the processor to wait for async events
 }

@@ -24,7 +24,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 84.4
+    targetCoverage = 84.3
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',

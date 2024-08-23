@@ -60,7 +60,7 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
 	assert.Empty(t, testTx.SequenceID)
 
-	tp.Continue(ctx)
+	tp.Init(ctx)
 	assert.NotEmpty(t, tp.stageContext)
 
 	tp.AddStageEvent(ctx, &types.StageEvent{

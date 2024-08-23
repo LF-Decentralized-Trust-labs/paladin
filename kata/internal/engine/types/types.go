@@ -32,10 +32,11 @@ const (
 )
 
 type StageEvent struct {
-	ID    string      `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
-	Stage string      `json:"stage"`
-	TxID  string      `json:"transactionId"`
-	Data  interface{} `json:"data"` // schema decided by each stage
+	ID              string      `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
+	Stage           string      `json:"stage"`
+	ContractAddress string      `json:"contractAddress"`
+	TxID            string      `json:"transactionId"`
+	Data            interface{} `json:"data"` // schema decided by each stage
 }
 
 type TxProcessPreReq struct {
