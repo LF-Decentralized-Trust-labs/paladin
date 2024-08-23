@@ -104,6 +104,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, psc, psc2)
 
+	<-txNotified
 }
 
 func TestEventIndexingBadEvent(t *testing.T) {

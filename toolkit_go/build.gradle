@@ -57,25 +57,31 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task protoc(type:Exec, dependsOn: [installTools]) {
-    workingDir '.'
-    inputs.files(configurations.toolkitProtoDefinitions)
-    outputs.dir("pkg/prototk")
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
-    args "--go_out=${projectDir}/pkg/prototk"
-    args "--go_opt=paths=source_relative"
-    args "--go-grpc_out=${projectDir}/pkg/prototk"
-    args "--go-grpc_opt=paths=source_relative"
-    fileTree(configurations.toolkitProtoDefinitions.asPath) {
+task protoc(type: ProtoCompile, dependsOn: [installTools]) {
+    protocPath "bin"
+    protoPath configurations.toolkitProtoDefinitions.asPath
+    protoFiles fileTree(configurations.toolkitProtoDefinitions.asPath) {
         include "*.proto"
-    }.each { File file ->
-        args "--go_opt=M${file.name}=pkg/prototk"
-        args "--go-grpc_opt=M${file.name}=pkg/prototk"
     }
-    args "--proto_path=${configurations.toolkitProtoDefinitions.asPath}"
-    args fileTree(configurations.toolkitProtoDefinitions.asPath) {
-        include "*.proto"
+    plugins {
+        go {
+            out projectDir
+            opt 'paths=source_relative'
+            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+               include "*.proto"
+            }.each { File file ->
+                opt "M${file.name}=pkg/prototk"
+            }
+        }
+        go_grpc {
+            out projectDir
+            opt 'paths=source_relative'
+            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+               include "*.proto"
+            }.each { File file ->
+                opt "M${file.name}=pkg/prototk"
+            }
+        }
     }
 }
 
