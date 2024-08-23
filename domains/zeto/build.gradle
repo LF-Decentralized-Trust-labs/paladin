@@ -98,4 +98,5 @@ task build {
 task clean(type: Delete) {
     dependsOn stopTestbed
     delete 'coverage'
+    delete 'internal/zeto/abis'
 }

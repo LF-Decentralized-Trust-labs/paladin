@@ -69,6 +69,7 @@ task test(type: Exec, dependsOn: compile) {
 task build(dependsOn: test) {}
 
 task clean(type: Delete) {
+    delete "node_modules"
     delete buildOutput, "cache", "typechain-types"
     delete testResults
 }
