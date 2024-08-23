@@ -65,6 +65,16 @@ func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Noto, rp
 	return callCtx, cancel, domain, rpc
 }
 
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
+	var addr string
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
+		notaryName, build.ABI, build.Bytecode.String(), `{}`)
+	if rpcerr != nil {
+		return "", rpcerr.Error()
+	}
+	return addr, nil
+}
+
 func TestNoto(t *testing.T) {
 	log.L(context.Background()).Infof("TestNoto")
 	ctx, cancel, noto, rpc := newTestDomain(t)
@@ -75,12 +85,8 @@ func TestNoto(t *testing.T) {
 	factory := loadBuild(notoFactoryJSON)
 
 	log.L(ctx).Infof("Deploying Noto factory")
-	var factoryAddress string
-	rpcerr := rpc.CallRPC(ctx, &factoryAddress, "testbed_deployBytecode",
-		notaryName, factory.ABI, factory.Bytecode.String(), `{}`)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
+	factoryAddress, err := deployBytecode(ctx, rpc, factory)
+	assert.NoError(t, err)
 	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
 
 	log.L(ctx).Infof("Configuring Noto domain")
@@ -88,7 +94,7 @@ func TestNoto(t *testing.T) {
 	domainConfig := Config{
 		FactoryAddress: factoryAddress,
 	}
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
+	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
 		domainName, domainConfig)
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())

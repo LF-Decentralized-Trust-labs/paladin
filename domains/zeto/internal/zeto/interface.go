@@ -47,7 +47,10 @@ func (d *Zeto) getInterface() DomainInterface {
 			ABI: &abi.Entry{
 				Type: abi.Constructor,
 				Inputs: abi.ParameterArray{
-					{Name: "notary", Type: "string"},
+					{Name: "from", Type: "string"},
+					{Name: "depositVerifier", Type: "address"},
+					{Name: "withdrawVerifier", Type: "address"},
+					{Name: "verifier", Type: "address"},
 				},
 			},
 		},
@@ -58,5 +61,8 @@ func (d *Zeto) getInterface() DomainInterface {
 }
 
 type ZetoConstructorParams struct {
-	Notary string `json:"notary"`
+	From             string `json:"from"`
+	Verifier         string `json:"verifier"`
+	DepositVerifier  string `json:"depositVerifier"`
+	WithdrawVerifier string `json:"withdrawVerifier"`
 }

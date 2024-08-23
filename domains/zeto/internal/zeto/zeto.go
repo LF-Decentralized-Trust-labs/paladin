@@ -18,15 +18,16 @@ package zeto
 import (
 	"context"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -37,6 +38,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//go:embed abis/Commonlib.json
+var commonLibJSON []byte // From "gradle copySolidity"
+
+//go:embed abis/Groth16Verifier_Anon.json
+var Groth16Verifier_Anon []byte // From "gradle copySolidity"
+
+//go:embed abis/Groth16Verifier_CheckHashesValue.json
+var Groth16Verifier_CheckHashesValue []byte // From "gradle copySolidity"
+
+//go:embed abis/Groth16Verifier_CheckInputsOutputsValue.json
+var Groth16Verifier_CheckInputsOutputsValue []byte // From "gradle copySolidity"
+
 //go:embed abis/ZetoSampleFactory.json
 var zetoFactoryJSON []byte // From "gradle copySolidity"
 
@@ -44,12 +57,24 @@ var zetoFactoryJSON []byte // From "gradle copySolidity"
 var zetoJSON []byte // From "gradle copySolidity"
 
 type Config struct {
-	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
+	FactoryAddress string            `json:"factoryAddress" yaml:"factoryAddress"`
+	Libraries      map[string]string `json:"libraries" yaml:"libraries"`
 }
 
 type SolidityBuild struct {
 	ABI      abi.ABI                   `json:"abi"`
 	Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
+}
+
+type SolidityBuildWithLinks struct {
+	ABI            abi.ABI                                       `json:"abi"`
+	Bytecode       string                                        `json:"bytecode"`
+	LinkReferences map[string]map[string][]SolidityLinkReference `json:"linkReferences"`
+}
+
+type SolidityLinkReference struct {
+	Start  int `json:"start"`
+	Length int `json:"length"`
 }
 
 type Zeto struct {
@@ -68,19 +93,16 @@ type Zeto struct {
 }
 
 type ZetoDomainConfig struct {
-	NotaryLookup  string `json:"notaryLookup"`
-	NotaryAddress string `json:"notaryAddress"`
 }
 
-var ZetoDomainConfigABI = &abi.ParameterArray{
-	{Name: "notaryLookup", Type: "string"},
-	{Name: "notaryAddress", Type: "address"},
-}
+var ZetoDomainConfigABI = &abi.ParameterArray{}
 
 type ZetoDeployParams struct {
-	TransactionID string                    `json:"transactionId"`
-	Notary        string                    `json:"notary"`
-	Data          ethtypes.HexBytes0xPrefix `json:"data"`
+	TransactionID    string                    `json:"transactionId"`
+	Data             ethtypes.HexBytes0xPrefix `json:"data"`
+	Verifier         string                    `json:"_verifier"`
+	DepositVerifier  string                    `json:"_depositVerifier"`
+	WithdrawVerifier string                    `json:"_withdrawVerifier"`
 }
 
 type parsedTransaction struct {
@@ -98,6 +120,43 @@ func loadBuild(buildOutput []byte) SolidityBuild {
 		panic(err)
 	}
 	return build
+}
+
+func loadBuildLinked(buildOutput []byte, libraries map[string]string) SolidityBuild {
+	var build SolidityBuildWithLinks
+	err := json.Unmarshal(buildOutput, &build)
+	if err != nil {
+		panic(err)
+	}
+	bytecode, err := linkBytecode(build, libraries)
+	if err != nil {
+		panic(err)
+	}
+	return SolidityBuild{
+		ABI:      build.ABI,
+		Bytecode: bytecode,
+	}
+}
+
+// linkBytecode: performs linking by replacing placeholders with deployed addresses
+// Based on a workaround from Hardhat team here:
+// https://github.com/nomiclabs/hardhat/issues/611#issuecomment-638891597
+func linkBytecode(artifact SolidityBuildWithLinks, libraries map[string]string) (ethtypes.HexBytes0xPrefix, error) {
+	bytecode := artifact.Bytecode
+	for _, fileReferences := range artifact.LinkReferences {
+		for libName, fixups := range fileReferences {
+			addr, found := libraries[libName]
+			if !found {
+				continue
+			}
+			for _, fixup := range fixups {
+				start := 2 + fixup.Start*2
+				end := start + fixup.Length*2
+				bytecode = bytecode[0:start] + addr[2:] + bytecode[end:]
+			}
+		}
+	}
+	return hex.DecodeString(strings.TrimPrefix(bytecode, "0x"))
 }
 
 func New(ctx context.Context, addr string) (*Zeto, error) {
@@ -248,11 +307,11 @@ func (n *Zeto) handleMessage(ctx context.Context, message *pb.Message) (reply pr
 
 	case *pb.PrepareDeployTransactionRequest:
 		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		_, err := n.validateDeploy(req.Transaction)
+		params, err := n.validateDeploy(req.Transaction)
 		if err != nil {
 			return nil, err
 		}
-		return n.prepareDeploy(ctx, req)
+		return n.prepareDeploy(params, req)
 
 	case *pb.InitTransactionRequest:
 		log.L(ctx).Infof("Received InitTransactionRequest")
@@ -306,8 +365,8 @@ func (n *Zeto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 	n.config = &config
 	n.chainID = req.ChainId
 
-	factory := loadBuild(zetoFactoryJSON)
-	contract := loadBuild(zetoJSON)
+	factory := loadBuildLinked(zetoFactoryJSON, config.Libraries)
+	contract := loadBuildLinked(zetoJSON, config.Libraries)
 
 	factoryJSON, err := json.Marshal(factory.ABI)
 	if err != nil {
@@ -342,33 +401,22 @@ func (n *Zeto) initDeploy(params *ZetoConstructorParams) (*pb.InitDeployTransact
 	return &pb.InitDeployTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    params.Notary,
+				Lookup:    params.From,
 				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 			},
 		},
 	}, nil
 }
 
-func (n *Zeto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
-	config := &ZetoDomainConfig{
-		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
-		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
+func (n *Zeto) prepareDeploy(params *ZetoConstructorParams, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
+	deployParams := &ZetoDeployParams{
+		TransactionID:    req.Transaction.TransactionId,
+		Data:             ethtypes.HexBytes0xPrefix(""),
+		DepositVerifier:  params.DepositVerifier,
+		WithdrawVerifier: params.WithdrawVerifier,
+		Verifier:         params.Verifier,
 	}
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
-	}
-	data, err := ZetoDomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
-	if err != nil {
-		return nil, err
-	}
-
-	params := &ZetoDeployParams{
-		TransactionID: req.Transaction.TransactionId,
-		Notary:        config.NotaryAddress,
-		Data:          data,
-	}
-	paramsJSON, err := json.Marshal(params)
+	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +426,7 @@ func (n *Zeto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransacti
 			FunctionName: "deploy",
 			ParamsJson:   string(paramsJSON),
 		},
-		SigningAddress: config.NotaryLookup,
+		SigningAddress: req.ResolvedVerifiers[0].Verifier,
 	}, nil
 }
 
@@ -443,12 +491,4 @@ func (n *Zeto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		domainConfig:    domainConfig,
 		params:          params,
 	}, nil
-}
-
-func (n *Zeto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
-	sig, err := secp256k1.DecodeCompactRSV(ctx, signature)
-	if err != nil {
-		return nil, err
-	}
-	return sig.RecoverDirect(payload, n.chainID)
 }

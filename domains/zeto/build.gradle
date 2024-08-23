@@ -35,6 +35,10 @@ task copySolidity(type: Copy) {
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/zeto/ZetoSample.sol/ZetoSample.json'
         include 'contracts/zeto/ZetoSampleFactory.sol/ZetoSampleFactory.json'
+        include 'zeto/contracts/lib/common.sol/Commonlib.json'
+        include 'zeto/contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
+        include 'zeto/contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
+        include 'zeto/contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
     }
     into 'internal/zeto/abis'
 
