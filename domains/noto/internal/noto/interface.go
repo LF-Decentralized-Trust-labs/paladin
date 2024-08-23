@@ -42,7 +42,7 @@ type domainHandler struct {
 	noto *Noto
 }
 
-func (d *Noto) getInterface() DomainInterface {
+func (n *Noto) getInterface() DomainInterface {
 	iface := DomainInterface{
 		"constructor": {
 			ABI: &abi.Entry{
@@ -75,10 +75,10 @@ func (d *Noto) getInterface() DomainInterface {
 	}
 
 	iface["mint"].handler = &mintHandler{
-		domainHandler: domainHandler{noto: d},
+		domainHandler: domainHandler{noto: n},
 	}
 	iface["transfer"].handler = &transferHandler{
-		domainHandler: domainHandler{noto: d},
+		domainHandler: domainHandler{noto: n},
 	}
 
 	return iface

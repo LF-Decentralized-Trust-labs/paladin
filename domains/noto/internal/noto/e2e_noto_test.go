@@ -142,7 +142,7 @@ func TestNoto(t *testing.T) {
 		}),
 	})
 	assert.NotNil(t, rpcerr)
-	assert.Error(t, rpcerr.Error(), "mint can only be initiated by notary")
+	assert.EqualError(t, rpcerr.Error(), "mint can only be initiated by notary")
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 150 from notary (should fail)")

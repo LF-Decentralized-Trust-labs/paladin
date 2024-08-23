@@ -16,8 +16,6 @@
 package noto
 
 import (
-	_ "embed"
-
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 

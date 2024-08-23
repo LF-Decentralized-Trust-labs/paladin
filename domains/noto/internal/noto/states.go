@@ -80,24 +80,24 @@ var NotoTransferMaskedTypeSet = eip712.TypeSet{
 	},
 }
 
-func (d *Noto) makeCoin(stateData string) (*NotoCoin, error) {
+func (n *Noto) makeCoin(stateData string) (*NotoCoin, error) {
 	coin := &NotoCoin{}
 	err := json.Unmarshal([]byte(stateData), &coin)
 	return coin, err
 }
 
-func (d *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
+func (n *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
 	coinJSON, err := json.Marshal(coin)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.NewState{
-		SchemaId:      d.coinSchema.Id,
+		SchemaId:      n.coinSchema.Id,
 		StateDataJson: string(coinJSON),
 	}, nil
 }
 
-func (d *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
@@ -125,7 +125,7 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 			return nil, nil, nil, err
 		}
 
-		states, err := d.findAvailableStates(ctx, string(queryJSON))
+		states, err := n.findAvailableStates(ctx, string(queryJSON))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -134,7 +134,7 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 		}
 		for _, state := range states {
 			lastStateTimestamp = state.StoredAt
-			coin, err := d.makeCoin(state.DataJson)
+			coin, err := n.makeCoin(state.DataJson)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
 			}
@@ -151,7 +151,7 @@ func (d *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 	}
 }
 
-func (d *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
+func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &NotoCoin{
@@ -159,38 +159,38 @@ func (d *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*Not
 		Owner:  owner,
 		Amount: amount,
 	}
-	newState, err := d.makeNewState(newCoin)
+	newState, err := n.makeNewState(newCoin)
 	return []*NotoCoin{newCoin}, []*pb.NewState{newState}, err
 }
 
-func (d *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
+func (n *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
 	req := &pb.FindAvailableStatesRequest{
-		DomainUuid: d.domainID,
-		SchemaId:   d.coinSchema.Id,
+		DomainUuid: n.domainID,
+		SchemaId:   n.coinSchema.Id,
 		QueryJson:  query,
 	}
 
 	res := &pb.FindAvailableStatesResponse{}
-	err := requestReply(ctx, d.replies, fromDomain, *d.dest, req, &res)
+	err := requestReply(ctx, n.replies, fromDomain, *n.dest, req, &res)
 	return res.States, err
 }
 
-func (d *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
-	states, err := d.findAvailableStates(ctx, query)
+func (n *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
+	states, err := n.findAvailableStates(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
 	coins := make([]*NotoCoin, len(states))
 	for i, state := range states {
-		if coins[i], err = d.makeCoin(state.DataJson); err != nil {
+		if coins[i], err = n.makeCoin(state.DataJson); err != nil {
 			return nil, err
 		}
 	}
 	return coins, err
 }
 
-func (d *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	messageInputs := make([]interface{}, len(inputs))
 	for i, input := range inputs {
 		messageInputs[i] = map[string]interface{}{
@@ -213,7 +213,7 @@ func (d *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Ad
 		Domain: map[string]interface{}{
 			"name":              EIP712DomainName,
 			"version":           EIP712DomainVersion,
-			"chainId":           d.chainID,
+			"chainId":           n.chainID,
 			"verifyingContract": contract,
 		},
 		Message: map[string]interface{}{
@@ -223,14 +223,14 @@ func (d *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Ad
 	})
 }
 
-func (d *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []interface{}, data ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []interface{}, data ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferMaskedTypeSet,
 		PrimaryType: "Transfer",
 		Domain: map[string]interface{}{
 			"name":              EIP712DomainName,
 			"version":           EIP712DomainVersion,
-			"chainId":           d.chainID,
+			"chainId":           n.chainID,
 			"verifyingContract": contract,
 		},
 		Message: map[string]interface{}{
