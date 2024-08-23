@@ -17,11 +17,13 @@ package componentmgr
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
@@ -148,7 +150,9 @@ func TestStartOK(t *testing.T) {
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine
 
-	err := cm.Start()
+	err := cm.StartComponents()
+	assert.NoError(t, err)
+	err = cm.CompleteStart()
 	assert.NoError(t, err)
 
 	cm.Stop()
@@ -169,5 +173,17 @@ func TestBuildInternalEventStreamsError(t *testing.T) {
 
 	_, err := cm.buildInternalEventStreams()
 	assert.Regexp(t, "FF22025", err)
+
+}
+
+func TestErrorWrapping(t *testing.T) {
+	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
+
+	mockKeyManager := componentmocks.NewKeyManager(t)
+	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
+
+	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened(mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
+	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted(mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
+	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
 
 }

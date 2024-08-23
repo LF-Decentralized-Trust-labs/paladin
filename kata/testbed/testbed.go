@@ -127,18 +127,28 @@ func (tb *testbed) run() (err error) {
 		close(tb.done)
 		if !ready {
 			tb.ready <- err
+			close(tb.ready)
 		}
-		close(tb.ready)
 	}()
 
 	cm := componentmgr.NewComponentManager(tb.ctx, tb.instanceID, tb.conf, tb)
 	err = cm.Init()
 	if err == nil {
-		err = cm.Start()
+		err = cm.StartComponents()
+	}
+	for _, fn := range tb.initFunctions {
+		if err == nil {
+			err = fn(cm)
+		}
+	}
+	if err == nil {
+		err = cm.CompleteStart()
 	}
 	if err != nil {
 		return fmt.Errorf("Initialization failed: %s", err)
 	}
+	ready = true
+	close(tb.ready)
 
 	log.L(tb.ctx).Info("Testbed started")
 	tb.listenTerm()
@@ -160,11 +170,6 @@ func (tb *testbed) Stop() {}
 
 func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
 	tb.components = c
-	for _, fn := range tb.initFunctions {
-		if err := fn(c); err != nil {
-			return nil, err
-		}
-	}
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
 	}, nil

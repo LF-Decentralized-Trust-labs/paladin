@@ -11,6 +11,9 @@ rpcServer:
   ws:
     disabled: true
 blockchain:
+  http:
+    url: http://localhost:8545
+    initialConnectAttempts: 25
   ws:
     url: ws://localhost:8546
     initialConnectAttempts: 25

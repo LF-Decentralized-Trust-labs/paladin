@@ -31,9 +31,13 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
@@ -61,26 +65,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	simDomainABI := mustParseBuildABI(simDomainBuild)
 	simTokenABI := mustParseBuildABI(simTokenBuild)
 
-	var deployTXHash ethtypes.HexBytes0xPrefix
-	url, tb, done := newUnitTestbed(t, func(c components.AllComponents) error {
-		// Deploy the factory
-		ec, err := c.EthClientFactory().HTTPClient().ABI(ctx, simDomainABI)
-		assert.NoError(t, err)
-
-		cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simDomainBuild))
-		assert.NoError(t, err)
-
-		deployTXHash, err = cc.R(ctx).
-			Signer("domain1_admin").
-			Input(`{}`).
-			SignAndSend()
-		assert.NoError(t, err)
-
-		// We have to wait until start to know the address
-		return nil
-	})
-	defer done()
-
+	var blockIndexer blockindexer.BlockIndexer
+	var ec ethclient.EthClient
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
 		"inputs": [
@@ -335,8 +321,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
 				chainID = req.ChainId
 
-				// We're started now, get the address
-				deployTx, err := tb.components.BlockIndexer().WaitForTransaction(ctx, string(deployTXHash))
+				// In this test we deploy the factory in-line
+				ec, err := ec.ABI(ctx, simDomainABI)
+				assert.NoError(t, err)
+
+				cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simDomainBuild))
+				assert.NoError(t, err)
+
+				deployTXHash, err := cc.R(ctx).
+					Signer("domain1_admin").
+					Input(`{}`).
+					SignAndSend()
+				assert.NoError(t, err)
+
+				deployTx, err := blockIndexer.WaitForTransaction(ctx, string(deployTXHash))
 				assert.NoError(t, err)
 
 				return &prototk.ConfigureDomainResponse{
@@ -590,22 +588,36 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		}}
 	})
 
-	pc := tb.components.PluginController()
-	pl, err := plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
-		"fakecoin": fakeCoinDomain,
-	})
-	assert.NoError(t, err)
+	var pl plugins.UnitTestPluginLoader
+	url, _, done := newUnitTestbed(t,
+		func(conf *componentmgr.Config) {
+			conf.DomainManagerConfig.Domains = map[string]*domainmgr.DomainConfig{
+				"domain1": {
+					Plugin: plugins.PluginConfig{
+						Type:     plugins.LibraryTypeCShared.Enum(),
+						Location: "loaded/via/unit/test/loader",
+					},
+				},
+			}
+		},
+		func(c components.AllComponents) (err error) {
+			ec = c.EthClientFactory().HTTPClient()
+			blockIndexer = c.BlockIndexer()
+			pc := c.PluginController()
+			pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
+				"domain1": fakeCoinDomain,
+			})
+			assert.NoError(t, err)
+			go pl.Run()
+			return nil
+		})
+	defer done()
 	defer pl.Stop()
 
 	tbRPC := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	rpcErr := tbRPC.CallRPC(ctx, types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
-		"some": "config"
-	}`))
-	assert.Nil(t, rpcErr)
-
 	var contractAddr ethtypes.Address0xHex
-	rpcErr = tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
+	rpcErr := tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
 		"notary": "domain1/contract1/notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"

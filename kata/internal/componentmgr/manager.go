@@ -20,8 +20,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -34,9 +36,9 @@ import (
 type ComponentManager interface {
 	components.AllComponents
 	Init() error
-	Start() error
+	StartComponents() error
+	CompleteStart() error
 	Stop()
-	Engine() components.Engine
 }
 
 type componentManager struct {
@@ -89,48 +91,54 @@ func (cm *componentManager) Init() (err error) {
 
 	// pre-init components
 	cm.keyManager, err = ethclient.NewSimpleTestKeyManager(cm.bgCtx, &cm.conf.Signer)
-	cm.addIfOpened(cm.keyManager, err)
+	err = cm.addIfOpened(cm.keyManager, err, msgs.MsgComponentKeyManagerInitError)
 	if err == nil {
 		cm.ethClientFactory, err = ethclient.NewEthClientFactory(cm.bgCtx, cm.keyManager, &cm.conf.Blockchain)
+		err = cm.wrapIfErr(err, msgs.MsgComponentEthClientInitError)
 	}
 	if err == nil {
 		cm.persistence, err = persistence.NewPersistence(cm.bgCtx, &cm.conf.DB)
-		cm.addIfOpened(cm.persistence, err)
+		err = cm.addIfOpened(cm.persistence, err, msgs.MsgComponentDBInitError)
 	}
 	if err == nil {
 		cm.stateStore = statestore.NewStateStore(cm.bgCtx, &cm.conf.StateStore, cm.persistence)
-		cm.addIfOpened(cm.stateStore, err)
+		err = cm.addIfOpened(cm.stateStore, err, msgs.MsgComponentStateStoreInitError)
 	}
 	if err == nil {
 		cm.blockIndexer, err = blockindexer.NewBlockIndexer(cm.bgCtx, &cm.conf.BlockIndexer, &cm.conf.Blockchain.WS, cm.persistence)
+		err = cm.wrapIfErr(err, msgs.MsgComponentBlockIndexerInitError)
 	}
 	if err == nil {
 		cm.rpcServer, err = rpcserver.NewRPCServer(cm.bgCtx, &cm.conf.RPCServer)
+		err = cm.wrapIfErr(err, msgs.MsgComponentRPCServerInitError)
 	}
 
 	// init managers
 	if err == nil {
 		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
 		cm.initResults["domain_mgr"], err = cm.domainManager.Init(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDomainInitError)
 	}
 
 	// using init of managers, for post-init components
 	if err == nil {
 		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
+		err = cm.wrapIfErr(err, msgs.MsgComponentPluginCtrlInitError)
 	}
 
 	// init engine
 	if err == nil {
 		cm.initResults[cm.engine.EngineName()], err = cm.engine.Init(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentEngineInitError)
 	}
 	return err
 }
 
-func (cm *componentManager) Start() (err error) {
+func (cm *componentManager) StartComponents() (err error) {
 
 	// start the eth client
 	err = cm.ethClientFactory.Start()
-	cm.addIfStarted(cm.ethClientFactory, err)
+	err = cm.addIfStarted(cm.ethClientFactory, err, msgs.MsgComponentEthClientStartError)
 
 	// start the block indexer
 	if err == nil {
@@ -138,58 +146,72 @@ func (cm *componentManager) Start() (err error) {
 	}
 	if err == nil {
 		err = cm.blockIndexer.Start(cm.internalEventStreams...)
-		cm.addIfStarted(cm.blockIndexer, err)
+		err = cm.addIfStarted(cm.blockIndexer, err, msgs.MsgComponentBlockIndexerStartError)
 	}
 	if err == nil {
 		// we wait until the block indexer has connected and established the block height
 		// this is for the edge case that on first start, when using "latest" for listeners,
 		// we can't possibly submit any transactions before the block height is known
 		_, err = cm.blockIndexer.GetBlockListenerHeight(cm.bgCtx)
+		err = cm.wrapIfErr(err, msgs.MsgComponentBlockIndexerStartError)
 	}
 
 	// start the managers
 	if err == nil {
 		err = cm.domainManager.Start()
-		cm.addIfStarted(cm.domainManager, err)
+		err = cm.addIfStarted(cm.domainManager, err, msgs.MsgComponentDomainStartError)
 	}
 
 	// start the plugin controller
 	if err == nil {
 		err = cm.pluginController.Start()
-		cm.addIfStarted(cm.pluginController, err)
+		err = cm.addIfStarted(cm.pluginController, err, msgs.MsgComponentPluginCtrlStartError)
 	}
+	return err
+}
 
+func (cm *componentManager) CompleteStart() error {
 	// Wait for the plugins to all start
-	if err == nil {
-		err = cm.pluginController.WaitForInit(cm.bgCtx)
-	}
+	err := cm.pluginController.WaitForInit(cm.bgCtx)
+	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
 
 	// start the engine
 	if err == nil {
 		err = cm.engine.Start()
-		cm.addIfStarted(cm.engine, err)
+		err = cm.addIfStarted(cm.engine, err, msgs.MsgComponentEngineStartError)
 	}
 
 	// start the RPC server last
 	if err == nil {
 		cm.registerRPCModules()
 		err = cm.rpcServer.Start()
-		cm.addIfStarted(cm.rpcServer, err)
+		err = cm.addIfStarted(cm.rpcServer, err, msgs.MsgComponentRPCServerStartError)
 	}
 
 	return err
 }
 
-func (cm *componentManager) addIfStarted(c stoppable, err error) {
-	if err == nil {
-		cm.started = append(cm.started, c)
+func (cm *componentManager) wrapIfErr(err error, failMsg i18n.ErrorMessageKey) error {
+	if err != nil {
+		return i18n.WrapError(cm.bgCtx, err, failMsg)
 	}
+	return nil
 }
 
-func (cm *componentManager) addIfOpened(c closeable, err error) {
-	if err == nil {
-		cm.opened = append(cm.opened, c)
+func (cm *componentManager) addIfStarted(c stoppable, err error, failMsg i18n.ErrorMessageKey) error {
+	if err != nil {
+		return i18n.WrapError(cm.bgCtx, err, failMsg)
 	}
+	cm.started = append(cm.started, c)
+	return nil
+}
+
+func (cm *componentManager) addIfOpened(c closeable, err error, failMsg i18n.ErrorMessageKey) error {
+	if err != nil {
+		return i18n.WrapError(cm.bgCtx, err, failMsg)
+	}
+	cm.opened = append(cm.opened, c)
+	return nil
 }
 
 func (cm *componentManager) buildInternalEventStreams() ([]*blockindexer.InternalEventStream, error) {
@@ -202,7 +224,7 @@ func (cm *componentManager) buildInternalEventStreams() ([]*blockindexer.Interna
 			if err != nil {
 				return nil, err
 			}
-			streamName := fmt.Sprintf(".internal/%s/%s", shortName, streamHash)
+			streamName := fmt.Sprintf("i_%s_%s", shortName, streamHash)
 			streams = append(streams, &blockindexer.InternalEventStream{
 				Definition: &blockindexer.EventStream{
 					Name: streamName,

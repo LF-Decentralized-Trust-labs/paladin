@@ -250,7 +250,7 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	plugin := &plugin[CB]{pc: pc, id: uuid.New(), name: name}
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, name, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, name, types.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
 	plugin.def = &prototk.PluginLoad{

@@ -105,7 +105,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 

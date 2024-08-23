@@ -38,7 +38,7 @@ type testPluginLoader struct {
 	plugins      map[string]plugintk.Plugin
 	conn         *grpc.ClientConn
 	loaderStream grpc.ServerStreamingClient[prototk.PluginLoad]
-	done         chan struct{}
+	wg           sync.WaitGroup
 }
 
 // Provides a convenient way for unit tests (in this package, and in the test bed)
@@ -49,7 +49,6 @@ func NewUnitTestPluginLoader(targetURL, loaderID string, plugins map[string]plug
 		targetURL: targetURL,
 		loaderID:  loaderID,
 		plugins:   plugins,
-		done:      make(chan struct{}),
 	}
 	tpl.ctx, tpl.cancelCtx = context.WithCancel(context.Background())
 
@@ -69,14 +68,13 @@ func (tpl *testPluginLoader) Stop() {
 	for _, p := range tpl.plugins {
 		p.Stop()
 	}
-	<-tpl.done
+	tpl.wg.Wait()
 }
 
 func (tpl *testPluginLoader) Run() {
-	wg := new(sync.WaitGroup)
+	tpl.wg.Add(1)
 	defer func() {
-		wg.Wait()
-		close(tpl.done)
+		tpl.wg.Done()
 	}()
 
 	// We just run until the stream is closed
@@ -88,9 +86,9 @@ func (tpl *testPluginLoader) Run() {
 		}
 		tp := tpl.plugins[msg.Plugin.Name]
 		if tp != nil {
-			wg.Add(1)
+			tpl.wg.Add(1)
 			go func() {
-				defer wg.Done()
+				defer tpl.wg.Done()
 				tp.Run(msg.Plugin.Id, tpl.targetURL)
 			}()
 		}

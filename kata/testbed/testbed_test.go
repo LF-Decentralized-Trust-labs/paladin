@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T, initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
+func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	tb = newTestBed(initFunctions...)
@@ -47,6 +47,7 @@ func newUnitTestbed(t *testing.T, initFunctions ...func(c components.AllComponen
 	}
 	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
 	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	setConf(tb.conf)
 	serverErr := make(chan error)
 	go func() {
 		serverErr <- tb.run()
