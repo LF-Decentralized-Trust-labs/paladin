@@ -212,7 +212,7 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateConfirms = []*StateConfirm{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -227,7 +227,7 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateSpends = []*StateSpend{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -242,7 +242,7 @@ func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, 
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateLocks = []*StateLock{
-		{State: *id, Transaction: transactionID, Creating: creating, Spending: spending},
+		{State: id, Transaction: transactionID, Creating: creating, Spending: spending},
 	}
 
 	ss.writer.queue(ctx, op)

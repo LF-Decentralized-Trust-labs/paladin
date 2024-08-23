@@ -83,15 +83,17 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidFunctionParams, txi.Function.SolString())
 	}
 
-	txSpec := &prototk.TransactionSpecification{}
+	txSpec := &prototk.TransactionSpecification{
+		TransactionId:      types.Bytes32UUIDLower16(tx.ID).String(),
+		ContractAddress:    dc.info.Address.String(),
+		ContractConfig:     dc.info.ConfigBytes,
+		From:               txi.From,
+		FunctionAbiJson:    string(abiJSON),
+		FunctionParamsJson: string(paramsJSON),
+		FunctionSignature:  txi.Function.SolString(), // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
+		BaseBlock:          int64(confirmedBlockHeight),
+	}
 	preAssembly.TransactionSpecification = txSpec
-	txSpec.TransactionId = types.Bytes32UUIDLower16(tx.ID).String()
-	txSpec.ContractAddress = dc.info.Address.String()
-	txSpec.ContractConfig = dc.info.ConfigBytes
-	txSpec.FunctionAbiJson = string(abiJSON)
-	txSpec.FunctionParamsJson = string(paramsJSON)
-	txSpec.FunctionSignature = txi.Function.SolString() // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
-	txSpec.BaseBlock = int64(confirmedBlockHeight)
 
 	// Do the request with the domain
 	res, err := dc.api.InitTransaction(ctx, &prototk.InitTransactionRequest{
@@ -139,6 +141,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// We need to pass the assembly result back - it needs to be assigned to a sequence
 	// before anything interesting can happen with the result here
 	postAssembly.AssemblyResult = res.AssemblyResult
+	postAssembly.AttestationPlan = res.AttestationPlan
 	// Note the states at this point are just potential states - depending on the analysis
 	// of the result, and the locking on the input states, the engine might decide to
 	// abandon this attempt and just re-assemble later.
@@ -308,8 +311,6 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		To:          dc.Address(),
 		Params:      types.RawJSON(res.Transaction.ParamsJson),
 	}
-
-	tx.PreparedTransaction = &components.EthTransaction{}
 	return nil
 }
 
@@ -340,7 +341,7 @@ func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateR
 			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}
 		rawIDsBySchema[s.SchemaId] = append(rawIDsBySchema[s.SchemaId], types.JSONString(stateID.String()))
-		stateIDs[i] = *stateID
+		stateIDs[i] = stateID
 	}
 	statesByID := make(map[types.Bytes32]*statestore.State)
 	err := dc.dm.stateStore.RunInDomainContext(dc.d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) error {

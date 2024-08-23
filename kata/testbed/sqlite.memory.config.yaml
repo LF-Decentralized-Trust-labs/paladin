@@ -1,5 +1,10 @@
 db:
-  type: sqlite
+  type: postgres
+  postgres:
+    uri: 'postgres://postgres:my-secret@localhost:5432/testbed?sslmode=disable'
+    autoMigrate: true
+    migrationsDir: './db/migrations/postgres'
+    debugQueries: true
   sqlite:
     uri: ':memory:'
     autoMigrate: true

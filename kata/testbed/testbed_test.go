@@ -47,6 +47,7 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initF
 	}
 	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
 	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	tb.conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
 	setConf(tb.conf)
 	serverErr := make(chan error)
 	go func() {

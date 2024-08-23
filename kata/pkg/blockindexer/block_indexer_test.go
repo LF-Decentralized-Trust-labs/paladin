@@ -342,13 +342,13 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		assert.Equal(t, blocks[i].Hash.String(), indexedBlock.Hash.String())
 
 		// Get the transaction
-		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, receipts[blocks[i].Hash.String()][0].TransactionHash.String())
+		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, types.Bytes32(receipts[blocks[i].Hash.String()][0].TransactionHash))
 		assert.NoError(t, err)
 		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTX.Hash.String())
 
 		// Get the events
 		tx0 := receipts[blocks[i].Hash.String()][0]
-		txEvents, err := bi.GetTransactionEventsByHash(ctx, tx0.TransactionHash.String())
+		txEvents, err := bi.GetTransactionEventsByHash(ctx, types.Bytes32(tx0.TransactionHash))
 		assert.NoError(t, err)
 		assert.Len(t, txEvents, 3)
 		assert.Equal(t, topicA.String(), txEvents[0].Signature.String())
@@ -811,29 +811,16 @@ func TestGetIndexedTransactionByHashErrors(t *testing.T) {
 	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
 
-	_, err := bi.GetIndexedTransactionByHash(ctx, "wrong")
-	assert.Regexp(t, "PD010100", err)
-
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	res, err := bi.GetIndexedTransactionByHash(ctx, types.RandHex(32))
+	res, err := bi.GetIndexedTransactionByHash(ctx, types.Bytes32(types.RandBytes(32)))
 	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err = bi.GetIndexedTransactionByHash(ctx, types.RandHex(32))
+	_, err = bi.GetIndexedTransactionByHash(ctx, types.Bytes32(types.RandBytes(32)))
 	assert.Regexp(t, "pop", err)
-
-}
-
-func TestGetTransactionEventsByHashErrors(t *testing.T) {
-
-	ctx, bi, _, _, done := newMockBlockIndexer(t, &Config{})
-	defer done()
-
-	_, err := bi.GetTransactionEventsByHash(ctx, "wrong")
-	assert.Regexp(t, "PD010100", err)
 
 }
 
@@ -844,14 +831,14 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	blocks, receipts := testBlockArray(t, 5)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
-	txHash := receipts[blocks[2].Hash.String()][0].TransactionHash.String()
+	txHash := types.Bytes32(receipts[blocks[2].Hash.String()][0].TransactionHash)
 	gotTX := make(chan struct{})
 	go func() {
 		defer close(gotTX)
 		tx, err := bi.WaitForTransaction(ctx, txHash)
 		assert.NoError(t, err)
 		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
-		assert.Equal(t, txHash, tx.Hash.String())
+		assert.Equal(t, txHash, tx.Hash)
 	}()
 
 	// Wait for initial query to fail
@@ -873,7 +860,7 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, TXResult_SUCCESS, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
-	assert.Equal(t, txHash, tx.Hash.String())
+	assert.Equal(t, txHash, tx.Hash)
 }
 
 func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
@@ -885,14 +872,14 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 
 	receipt := receipts[blocks[2].Hash.String()][0]
 	receipt.Status = ethtypes.NewHexInteger64(0) // reverted
-	txHash := receipt.TransactionHash.String()
+	txHash := types.Bytes32(receipt.TransactionHash)
 	gotTX := make(chan struct{})
 	go func() {
 		defer close(gotTX)
 		tx, err := bi.WaitForTransaction(ctx, txHash)
 		assert.NoError(t, err)
 		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
-		assert.Equal(t, txHash, tx.Hash.String())
+		assert.Equal(t, txHash, tx.Hash)
 	}()
 
 	// Wait for initial query to fail
@@ -914,7 +901,7 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, TXResult_FAILURE, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
-	assert.Equal(t, txHash, tx.Hash.String())
+	assert.Equal(t, txHash, tx.Hash)
 }
 
 func TestWaitForTransactionErrorCases(t *testing.T) {
@@ -922,12 +909,9 @@ func TestWaitForTransactionErrorCases(t *testing.T) {
 	ctx, bi, _, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
 
-	_, err := bi.WaitForTransaction(ctx, "wrong")
-	assert.Regexp(t, "PD010100", err)
-
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err = bi.WaitForTransaction(ctx, types.RandHex(32))
+	_, err := bi.WaitForTransaction(ctx, types.Bytes32(types.RandBytes(32)))
 	assert.Regexp(t, "pop", err)
 
 }

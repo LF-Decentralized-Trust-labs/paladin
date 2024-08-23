@@ -397,7 +397,7 @@ func (dc *domainContext) UpsertStates(transactionID *uuid.UUID, stateUpserts []*
 }
 
 func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []string, setLockState func(*StateLock)) (err error) {
-	stateIDs := make([]*types.Bytes32, len(stateIDStrings))
+	stateIDs := make([]types.Bytes32, len(stateIDStrings))
 	for i, id := range stateIDStrings {
 		stateIDs[i], err = types.ParseBytes32Ctx(dc.ctx, id)
 		if err != nil {
@@ -415,7 +415,7 @@ func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []st
 	// Update an existing un-flushed record, or add a new one.
 	// Note we might fail on a clash (and the caller should then reset this transaction)
 	for _, id := range stateIDs {
-		if _, err := dc.setUnFlushedLock(transactionID, *id, setLockState); err != nil {
+		if _, err := dc.setUnFlushedLock(transactionID, id, setLockState); err != nil {
 			return err
 		}
 	}

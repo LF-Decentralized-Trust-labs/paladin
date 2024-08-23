@@ -33,28 +33,28 @@ import (
 type Bytes32 [32]byte
 
 // No checking in this function on length
-func NewBytes32FromSlice(bytes []byte) *Bytes32 {
+func NewBytes32FromSlice(bytes []byte) Bytes32 {
 	h := Bytes32{}
 	copy(h[:], bytes[:])
-	return &h
+	return h
 }
 
-func Bytes32Keccak(b []byte) *Bytes32 {
+func Bytes32Keccak(b []byte) Bytes32 {
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(b)
 	var h32 Bytes32
 	_ = hash.Sum(h32[0:0])
-	return &h32
+	return h32
 }
 
 // Parse a string
-func ParseBytes32Ctx(ctx context.Context, s string) (*Bytes32, error) {
+func ParseBytes32Ctx(ctx context.Context, s string) (Bytes32, error) {
 	h, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
 	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgStateInvalidHex, err)
+		return Bytes32{}, i18n.NewError(ctx, msgs.MsgStateInvalidHex, err)
 	}
 	if len(h) != 32 {
-		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidHexBytes32, len(h))
+		return Bytes32{}, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidHexBytes32, len(h))
 	}
 	return NewBytes32FromSlice(h), nil
 }
@@ -64,7 +64,7 @@ func ParseBytes32(s string) (Bytes32, error) {
 	if err != nil {
 		return Bytes32{}, err
 	}
-	return *pB32, nil
+	return pB32, nil
 }
 
 func MustParseBytes32(s string) Bytes32 {
@@ -113,7 +113,7 @@ func (id *Bytes32) UnmarshalText(text []byte) error {
 	if err != nil {
 		return err
 	}
-	*id = *pID
+	*id = pID
 	return nil
 }
 
@@ -148,17 +148,17 @@ func (id *Bytes32) Scan(src interface{}) error {
 		if err != nil {
 			return err
 		}
-		*id = *b
+		*id = b
 		return nil
 	case []byte:
 		if len(v) == 32 {
-			*id = *NewBytes32FromSlice(v)
+			*id = NewBytes32FromSlice(v)
 		} else if len(v) == 64 || len(v) == 66 {
 			b, err := ParseBytes32Ctx(context.Background(), string(v))
 			if err != nil {
 				return err
 			}
-			*id = *b
+			*id = b
 		} else {
 			return i18n.NewError(context.Background(), msgs.MsgFiltersValueInvalidHexBytes32, len(v))
 		}

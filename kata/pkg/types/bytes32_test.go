@@ -51,9 +51,9 @@ func TestBytes32Static(t *testing.T) {
 	checkFixedOK(&id2)
 
 	id3 := NewBytes32FromSlice(id2.Bytes())
-	checkFixedOK(id3)
+	checkFixedOK(&id3)
 
-	assert.True(t, id2.Equals(id3))
+	assert.True(t, id2.Equals(&id3))
 	assert.False(t, id2.Equals(nil))
 	assert.True(t, (*Bytes32)(nil).Equals(nil))
 	assert.False(t, (*Bytes32)(nil).Equals(&id2))

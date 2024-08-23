@@ -68,7 +68,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
@@ -160,7 +160,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{

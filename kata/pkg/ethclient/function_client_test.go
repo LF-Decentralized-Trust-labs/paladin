@@ -131,8 +131,8 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 			assert.False(t, gasLimit)
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
-			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, rawTX, 12345)
+		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			assert.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
 			assert.Equal(t, int64(10), tx.Nonce.Int64())
@@ -209,7 +209,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var key1 string
 	var err error
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
+		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (types.HexBytes, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
 			} else if withBlockRef {
@@ -396,7 +396,7 @@ func TestABIFunctionShortcutsOK(t *testing.T) {
 
 func TestCallFunctionFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -411,7 +411,7 @@ func TestCallFunctionFail(t *testing.T) {
 
 func TestSignAndSendMissingFrom(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -521,8 +521,8 @@ func TestInvokeConstructor(t *testing.T) {
 		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
-			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, rawTX, 12345)
+		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			assert.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
 			assert.Equal(t, int64(10), tx.Nonce.Int64())

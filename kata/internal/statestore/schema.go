@@ -77,7 +77,7 @@ type labelInfoAccess interface {
 	labelInfo() []*schemaLabelInfo
 }
 
-func schemaCacheKey(domainID string, id *types.Bytes32) string {
+func schemaCacheKey(domainID string, id types.Bytes32) string {
 	return domainID + "/" + id.String()
 }
 
@@ -96,7 +96,7 @@ func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, 
 	return ss.getSchemaByID(ctx, domainID, id, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID *types.Bytes32, failNotFound bool) (Schema, error) {
+func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID types.Bytes32, failNotFound bool) (Schema, error) {
 
 	cacheKey := schemaCacheKey(domainID, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -146,7 +146,7 @@ func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results
 	}
 	results = make([]Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, domainID, &id.ID, true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, domainID, id.ID, true); err != nil {
 			return nil, err
 		}
 	}

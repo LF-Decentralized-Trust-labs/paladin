@@ -84,6 +84,9 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 
 	// Parse all the schemas
 	d.config = confRes.DomainConfig
+	if d.config.BaseLedgerSubmitConfig == nil {
+		return nil, i18n.NewError(d.ctx, msgs.MsgDomainBaseLedgerSubmitInvalid)
+	}
 	abiSchemas := make([]*abi.Parameter, len(d.config.AbiStateSchemasJson))
 	for i, schemaJSON := range d.config.AbiStateSchemasJson {
 		if err := json.Unmarshal([]byte(schemaJSON), &abiSchemas[i]); err != nil {
@@ -151,7 +154,7 @@ func (d *domain) init() {
 		confYAML, _ := yaml.Marshal(&d.conf.Config)
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
 			Name:       d.name,
-			ChainId:    d.dm.chainID,
+			ChainId:    d.dm.ethClientFactory.ChainID(),
 			ConfigYaml: string(confYAML),
 		})
 		if err != nil {
@@ -295,7 +298,7 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 
 	tx.Signer = res.SigningAddress
 	if res.Transaction != nil && res.Deploy == nil {
-		functionABI := d.privateContractABI.Functions()[res.Transaction.FunctionName]
+		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
 		if functionABI == nil {
 			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 		}
@@ -306,7 +309,7 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 		tx.DeployTransaction = nil
 	} else if res.Deploy != nil && res.Transaction == nil {
-		functionABI := d.privateContractABI.Constructor()
+		functionABI := d.factoryContractABI.Constructor()
 		if functionABI == nil {
 			// default constructor
 			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}

@@ -49,7 +49,7 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcbackend.RPCReques
 
 	startTime := time.Now()
 	log.L(ctx).Debugf("RPC-> %s", rpcReq.Method)
-	rpcRes := handler(ctx, rpcReq)
+	rpcRes := handler.Handle(ctx, rpcReq)
 	durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
 	if rpcRes.Error != nil {
 		log.L(ctx).Errorf("<!RPC %s (%.2fms): %s", rpcReq.Method, durationMS, rpcRes.Error.Message)

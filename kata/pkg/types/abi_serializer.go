@@ -112,6 +112,6 @@ func ABISolDefinitionHash(ctx context.Context, a abi.ABI) (*Bytes32, error) {
 	for _, solDef := range solDefs {
 		hash.Write([]byte(solDef))
 	}
-	h := hash.Sum(nil)
-	return NewBytes32FromSlice(h), nil
+	h := Bytes32(hash.Sum(nil))
+	return &h, nil
 }

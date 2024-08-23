@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,7 +50,7 @@ func TestResolveKeyFail(t *testing.T) {
 
 func TestCallFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (ethtypes.HexBytes0xPrefix, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -125,7 +126,7 @@ func TestSignFail(t *testing.T) {
 
 func TestSendRawFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_sendRawTransaction: func(ctx context.Context, hbp ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
+		eth_sendRawTransaction: func(ctx context.Context, hbp types.HexBytes) (types.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})

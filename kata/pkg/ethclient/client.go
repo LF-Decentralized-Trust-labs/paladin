@@ -43,14 +43,14 @@ type EthClient interface {
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
-	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error)
+	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode types.HexBytes) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
 	ChainID() int64
 
 	// Below are raw functions that the ABI() above provides wrappers for
-	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error)
-	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error)
-	SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
+	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error)
+	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error)
+	SendRawTransaction(ctx context.Context, rawTX types.HexBytes) (*types.Bytes32, error)
 }
 
 type KeyManager interface {
@@ -101,7 +101,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	return nil
 }
 
-func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data ethtypes.HexBytes0xPrefix, err error) {
+func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error) {
 
 	if from != nil {
 		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
@@ -120,7 +120,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 
 }
 
-func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (ethtypes.HexBytes0xPrefix, error) {
+func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
 	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
@@ -167,7 +167,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	signature, err := ec.keymgr.Sign(ctx, &proto.SignRequest{
 		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 		KeyHandle: keyHandle,
-		Payload:   ethtypes.HexBytes0xPrefix(hash.Sum(nil)),
+		Payload:   types.HexBytes(hash.Sum(nil)),
 	})
 	var sig *secp256k1.SignatureData
 	if err == nil {
@@ -191,12 +191,12 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	return rawTX, nil
 }
 
-func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error) {
+func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX types.HexBytes) (*types.Bytes32, error) {
 
 	// Submit
-	var txHash ethtypes.HexBytes0xPrefix
-	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", ethtypes.HexBytes0xPrefix(rawTX)); rpcErr != nil {
-		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, rawTX, ec.chainID)
+	var txHash types.Bytes32
+	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", types.HexBytes(rawTX)); rpcErr != nil {
+		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), ec.chainID)
 		if err != nil {
 			log.L(ctx).Errorf("Invalid transaction build during signing: %s", err)
 		} else {
@@ -209,7 +209,7 @@ func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX ethtypes.HexB
 	// - to wait for completion see BlockIndexer.WaitForTransaction()
 	// - to query events for that completed transaction see BlockIndexer.ListTransactionEvents()
 	// - to stream events in order (whether you submitted them or not) see BlockIndexer.TODO()
-	return txHash, nil
+	return &txHash, nil
 }
 
 func logJSON(v interface{}) string {

@@ -68,7 +68,6 @@ type domainManager struct {
 	stateStore       statestore.StateStore
 	blockIndexer     blockindexer.BlockIndexer
 	ethClientFactory ethclient.EthClientFactory
-	chainID          int64
 
 	domainsByID      map[uuid.UUID]*domain
 	domainsByName    map[string]*domain
@@ -88,7 +87,6 @@ func (dm *domainManager) Init(pic components.PreInitComponents) (*components.Man
 	dm.persistence = pic.Persistence()
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
-	dm.chainID = dm.ethClientFactory.ChainID()
 	dm.blockIndexer = pic.BlockIndexer()
 	return &components.ManagerInitResult{
 		EventStreams: []*components.ManagerEventStream{
@@ -291,5 +289,5 @@ func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
 	if err != nil {
 		panic(err)
 	}
-	return *types.NewBytes32FromSlice(sig)
+	return types.NewBytes32FromSlice(sig)
 }

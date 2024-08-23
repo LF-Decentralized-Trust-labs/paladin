@@ -392,7 +392,7 @@ func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
 		states: []*StateWithLabels{s1},
 		stateLocks: []*StateLock{
 			s1.Locked,
-			{State: *types.Bytes32Keccak(([]byte)("another")), Spending: true},
+			{State: types.Bytes32Keccak(([]byte)("another")), Spending: true},
 		},
 	}
 
@@ -563,6 +563,6 @@ func TestDSIResetWithMixed(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Len(t, dc.unFlushed.stateLocks, 1)
-	assert.Equal(t, dc.unFlushed.stateLocks[0].State, *state2)
+	assert.Equal(t, dc.unFlushed.stateLocks[0].State, state2)
 
 }
