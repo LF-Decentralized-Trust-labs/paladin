@@ -110,6 +110,7 @@ func TestStartOK(t *testing.T) {
 
 	mockPluginController := componentmocks.NewPluginController(t)
 	mockPluginController.On("Start").Return(nil)
+	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
 	mockPluginController.On("Stop").Return()
 
 	mockDomainManager := componentmocks.NewDomainManager(t)

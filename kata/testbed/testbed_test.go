@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
@@ -34,10 +35,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T, setupConf ...func(*componentmgr.Config)) (url string, tb *testbed, done func()) {
+func newUnitTestbed(t *testing.T, initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
-	tb = newTestBed()
+	tb = newTestBed(initFunctions...)
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
 
 	assert.NoError(t, err)
@@ -46,9 +47,6 @@ func newUnitTestbed(t *testing.T, setupConf ...func(*componentmgr.Config)) (url 
 	}
 	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
 	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
-	for _, fn := range setupConf {
-		fn(tb.conf)
-	}
 	serverErr := make(chan error)
 	go func() {
 		serverErr <- tb.run()

@@ -31,12 +31,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type iPaladinNewSmartContract_V0_Type struct {
-	Domain *ethtypes.Address0xHex    `json:"domain"`
-	TXID   ethtypes.HexBytes0xPrefix `json:"txId"`
-	Data   ethtypes.HexBytes0xPrefix `json:"data"`
-}
-
 func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
@@ -137,6 +131,9 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					Algorithm: ar.Algorithm,
 					Verifier:  verifier,
 				})
+				if err != nil {
+					return "", err
+				}
 				result := &prototk.AttestationResult{
 					Name:            ar.Name,
 					AttestationType: ar.AttestationType,
@@ -226,16 +223,4 @@ func mustParseABIEntry(abiEntryJSON string) *abi.Entry {
 		panic(err)
 	}
 	return &abiEntry
-}
-
-func mustEventSignatureHash(a abi.ABI, eventName string) ethtypes.HexBytes0xPrefix {
-	ev := a.Events()[eventName]
-	if ev == nil {
-		panic("missing event " + eventName)
-	}
-	sig, err := ev.SignatureHash()
-	if err != nil {
-		panic(err)
-	}
-	return sig
 }

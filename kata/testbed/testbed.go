@@ -51,9 +51,9 @@ type testbed struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	// TODO: Remove once testbed gets started by the module loader
+	initFunctions []func(c components.AllComponents) error
+
 	sigc       chan os.Signal
-	socketFile string
 	instanceID uuid.UUID
 
 	conf       *componentmgr.Config
@@ -64,12 +64,13 @@ type testbed struct {
 	done  chan struct{}
 }
 
-func newTestBed() (tb *testbed) {
+func newTestBed(initFunctions ...func(c components.AllComponents) error) (tb *testbed) {
 	tb = &testbed{
-		sigc:       make(chan os.Signal, 1),
-		instanceID: uuid.New(),
-		ready:      make(chan error, 1),
-		done:       make(chan struct{}),
+		sigc:          make(chan os.Signal, 1),
+		instanceID:    uuid.New(),
+		ready:         make(chan error, 1),
+		initFunctions: initFunctions,
+		done:          make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	tb.initRPC()
@@ -131,7 +132,10 @@ func (tb *testbed) run() (err error) {
 	}()
 
 	cm := componentmgr.NewComponentManager(tb.ctx, tb.instanceID, tb.conf, tb)
-	err = cm.Start()
+	err = cm.Init()
+	if err == nil {
+		err = cm.Start()
+	}
 	if err != nil {
 		return fmt.Errorf("Initialization failed: %s", err)
 	}
@@ -156,6 +160,11 @@ func (tb *testbed) Stop() {}
 
 func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
 	tb.components = c
+	for _, fn := range tb.initFunctions {
+		if err := fn(c); err != nil {
+			return nil, err
+		}
+	}
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
 	}, nil

@@ -33,6 +33,7 @@ import (
 
 type ComponentManager interface {
 	components.AllComponents
+	Init() error
 	Start() error
 	Stop()
 	Engine() components.Engine
@@ -156,6 +157,11 @@ func (cm *componentManager) Start() (err error) {
 	if err == nil {
 		err = cm.pluginController.Start()
 		cm.addIfStarted(cm.pluginController, err)
+	}
+
+	// Wait for the plugins to all start
+	if err == nil {
+		err = cm.pluginController.WaitForInit(cm.bgCtx)
 	}
 
 	// start the engine

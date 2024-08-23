@@ -31,6 +31,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
@@ -56,11 +57,29 @@ func toJSONString(t *testing.T, v interface{}) string {
 // Example of how someone might use this testbed externally
 func TestDemoNotarizedCoinSelection(t *testing.T) {
 
-	url, tb, done := newUnitTestbed(t)
-	defer done()
-
+	ctx := context.Background()
 	simDomainABI := mustParseBuildABI(simDomainBuild)
 	simTokenABI := mustParseBuildABI(simTokenBuild)
+
+	var deployTXHash ethtypes.HexBytes0xPrefix
+	url, tb, done := newUnitTestbed(t, func(c components.AllComponents) error {
+		// Deploy the factory
+		ec, err := c.EthClientFactory().HTTPClient().ABI(ctx, simDomainABI)
+		assert.NoError(t, err)
+
+		cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simDomainBuild))
+		assert.NoError(t, err)
+
+		deployTXHash, err = cc.R(ctx).
+			Signer("domain1_admin").
+			Input(`{}`).
+			SignAndSend()
+		assert.NoError(t, err)
+
+		// We have to wait until start to know the address
+		return nil
+	})
+	defer done()
 
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
@@ -166,7 +185,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	fakeCoinDomain := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 
-		var factoryAddr ethtypes.Address0xHex
 		var fakeCoinSchemaID string
 		var chainID int64
 
@@ -316,10 +334,15 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
 				assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
 				chainID = req.ChainId
+
+				// We're started now, get the address
+				deployTx, err := tb.components.BlockIndexer().WaitForTransaction(ctx, string(deployTXHash))
+				assert.NoError(t, err)
+
 				return &prototk.ConfigureDomainResponse{
 					DomainConfig: &prototk.DomainConfig{
 						ConstructorAbiJson:     fakeCoinConstructorABI,
-						FactoryContractAddress: factoryAddr.String(), // note this requires testbed_deployBytecode to have completed
+						FactoryContractAddress: deployTx.ContractAddress.String(),
 						FactoryContractAbiJson: toJSONString(t, simDomainABI),
 						PrivateContractAbiJson: toJSONString(t, simTokenABI),
 						AbiStateSchemasJson:    []string{fakeCoinStateSchema},
@@ -568,46 +591,41 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	})
 
 	pc := tb.components.PluginController()
-	plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
+	pl, err := plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
 		"fakecoin": fakeCoinDomain,
 	})
+	assert.NoError(t, err)
+	defer pl.Stop()
 
-	ctx := context.Background()
 	tbRPC := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	var factoryAddr types.EthAddress
-	rpcErr := tbRPC.CallRPC(ctx, &factoryAddr, "testbed_deployBytecode", "domain1_admin",
-		mustParseBuildABI(simDomainBuild), mustParseBuildBytecode(simDomainBuild),
-		types.RawJSON(`{}`)) // no params on constructor
+	rpcErr := tbRPC.CallRPC(ctx, types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
+		"some": "config"
+	}`))
 	assert.Nil(t, rpcErr)
 
-	// err = rpcCall(types.RawJSON{}, "testbed_configureInit", "domain1", types.RawJSON(`{
-	// 	"some": "config"
-	// }`))
-	// assert.NoError(t, err)
+	var contractAddr ethtypes.Address0xHex
+	rpcErr = tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
+		"notary": "domain1/contract1/notary",
+		"name": "FakeToken1",
+		"symbol": "FT1"
+	}`))
+	assert.Nil(t, rpcErr)
 
-	// var contractAddr ethtypes.Address0xHex
-	// err = rpcCall(&contractAddr, "testbed_deploy", "domain1", types.RawJSON(`{
-	// 	"notary": "domain1/contract1/notary",
-	// 	"name": "FakeToken1",
-	// 	"symbol": "FT1"
-	// }`))
-	// assert.NoError(t, err)
+	rpcErr = tbRPC.CallRPC(ctx, types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     "wallets/org1/aaaaaa",
+		To:       types.EthAddress(contractAddr),
+		Function: *mustParseABIEntry(fakeCoinTransferABI),
+		Inputs:   types.RawJSON(fakeTransferMintPayload),
+	})
+	assert.Nil(t, rpcErr)
 
-	// err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
-	// 	From:     "wallets/org1/aaaaaa",
-	// 	To:       types.EthAddress(contractAddr),
-	// 	Function: *mustParseABIEntry(fakeCoinTransferABI),
-	// 	Inputs:   types.RawJSON(fakeTransferMintPayload),
-	// })
-	// assert.NoError(t, err)
-
-	// err = rpcCall(types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
-	// 	From:     "wallets/org1/aaaaaa",
-	// 	To:       types.EthAddress(contractAddr),
-	// 	Function: *mustParseABIEntry(fakeCoinTransferABI),
-	// 	Inputs:   types.RawJSON(fakeTransferPayload1),
-	// })
-	// assert.NoError(t, err)
+	rpcErr = tbRPC.CallRPC(ctx, types.RawJSON{}, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     "wallets/org1/aaaaaa",
+		To:       types.EthAddress(contractAddr),
+		Function: *mustParseABIEntry(fakeCoinTransferABI),
+		Inputs:   types.RawJSON(fakeTransferPayload1),
+	})
+	assert.Nil(t, rpcErr)
 
 }
