@@ -31,17 +31,21 @@ func TestDispatchStageMatch(t *testing.T) {
 	ctx := context.Background()
 	txNodeID := "current_node_id"
 
-	preReqTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	preReqTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: uuid.New(),
+		},
 	}
 
 	ds := &DispatchStage{}
 	assert.Equal(t, "dispatch", ds.Name())
 
-	testTx := &transactionstore.Transaction{
-		ID:           uuid.New(),
-		DispatchNode: txNodeID,
-		PreReqTxs:    []string{preReqTx.ID.String()},
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:           uuid.New(),
+			DispatchNode: txNodeID,
+			PreReqTxs:    []string{preReqTx.GetTxID(ctx)},
+		},
 	}
 	mSFS := &componentmocks.StageFoundationService{}
 	mIR := &componentmocks.IdentityResolver{}
@@ -77,19 +81,22 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	txDifferentSigningAddr := "0xCfcEcEFf128aE953a272A05Ea43969c9E5ba87dB"
 	testTxHash := "0x5c7f2a3d5e77b95e0dbb8d2b6b9b58ec19356f7096e50904b36baac6d0f11a89"
 
-	preReqTx := &transactionstore.Transaction{
-		ID:           uuid.New(),
-		DispatchNode: txNodeID,
+	preReqTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:           uuid.New(),
+			DispatchNode: txNodeID,
+		},
 	}
-
 	ds := &DispatchStage{}
 	assert.Equal(t, "dispatch", ds.Name())
 
-	testTx := &transactionstore.Transaction{
-		ID:                uuid.New(),
-		DispatchNode:      txNodeID,
-		PreReqTxs:         []string{preReqTx.ID.String()},
-		DispatchTxPayload: "payload",
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:                uuid.New(),
+			DispatchNode:      txNodeID,
+			PreReqTxs:         []string{preReqTx.GetTxID(ctx)},
+			DispatchTxPayload: "payload",
+		},
 	}
 	mSFS := &componentmocks.StageFoundationService{}
 	mIR := &componentmocks.IdentityResolver{}
@@ -106,7 +113,7 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	mDC.On("PreReqsMatchCondition", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
 		checkFn := args[2].(func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool))
 		assert.False(t, checkFn(preReqTx))
-	}).Return([]string{preReqTx.ID.String()})
+	}).Return([]string{preReqTx.GetTxID(ctx)})
 
 	// PreReq transaction dispatched by the same address
 	preReqTx.DispatchAddress = txSigningAddress
@@ -114,7 +121,7 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	txPreReq = ds.GetIncompletePreReqTxIDs(ctx, testTx, mSFS)
 	assert.NotNil(t, txPreReq)
 	assert.Equal(t, 1, len(txPreReq.TxIDs))
-	assert.Equal(t, preReqTx.ID.String(), txPreReq.TxIDs[0])
+	assert.Equal(t, preReqTx.GetTxID(ctx), txPreReq.TxIDs[0])
 
 	// return nil, when preReqTx has nonce allocated
 	preReqTx.DispatchTxID = uuid.NewString()
@@ -131,11 +138,11 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	mDC.On("PreReqsMatchCondition", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
 		checkFn := args[2].(func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool))
 		assert.False(t, checkFn(preReqTx))
-	}).Return([]string{preReqTx.ID.String()})
+	}).Return([]string{preReqTx.GetTxID(ctx)})
 	txPreReq = ds.GetIncompletePreReqTxIDs(ctx, testTx, mSFS)
 	assert.NotNil(t, txPreReq)
 	assert.Equal(t, 1, len(txPreReq.TxIDs))
-	assert.Equal(t, preReqTx.ID.String(), txPreReq.TxIDs[0])
+	assert.Equal(t, preReqTx.GetTxID(ctx), txPreReq.TxIDs[0])
 
 	// return nil, when preReqTx has been confirmed
 	preReqTx.ConfirmedTxHash = testTxHash
@@ -154,18 +161,22 @@ func TestDispatchStageAssignDispatchAddress(t *testing.T) {
 
 	ds := &DispatchStage{}
 	assert.Equal(t, "dispatch", ds.Name())
-	preReqTx := &transactionstore.Transaction{
-		ID:              uuid.New(),
-		DispatchNode:    txNodeID,
-		DispatchAddress: txSigningAddress,
-		DispatchTxID:    uuid.NewString(),
+	preReqTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:              uuid.New(),
+			DispatchNode:    txNodeID,
+			DispatchAddress: txSigningAddress,
+			DispatchTxID:    uuid.NewString(),
+		},
 	}
 
-	testTx := &transactionstore.Transaction{
-		ID:                uuid.New(),
-		DispatchNode:      txNodeID,
-		DispatchTxPayload: "payload",
-		PreReqTxs:         []string{preReqTx.ID.String()},
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:                uuid.New(),
+			DispatchNode:      txNodeID,
+			DispatchTxPayload: "payload",
+			PreReqTxs:         []string{preReqTx.GetTxID(ctx)},
+		},
 	}
 	mSFS := &componentmocks.StageFoundationService{}
 	mIR := &componentmocks.IdentityResolver{}
@@ -197,7 +208,7 @@ func TestDispatchStageAssignDispatchAddress(t *testing.T) {
 		{
 			ID:    uuid.NewString(),
 			Stage: ds.Name(),
-			TxID:  testTx.ID.String(),
+			TxID:  testTx.GetTxID(ctx),
 			Data:  actionOutput,
 		},
 	})
@@ -215,19 +226,23 @@ func TestDispatchStageSubmitTx(t *testing.T) {
 
 	ds := &DispatchStage{}
 	assert.Equal(t, "dispatch", ds.Name())
-	preReqTx := &transactionstore.Transaction{
-		ID:              uuid.New(),
-		DispatchNode:    txNodeID,
-		DispatchAddress: txSigningAddress,
-		DispatchTxID:    uuid.NewString(),
+	preReqTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:              uuid.New(),
+			DispatchNode:    txNodeID,
+			DispatchAddress: txSigningAddress,
+			DispatchTxID:    uuid.NewString(),
+		},
 	}
 
-	testTx := &transactionstore.Transaction{
-		ID:                uuid.New(),
-		DispatchNode:      txNodeID,
-		DispatchTxPayload: "payload",
-		DispatchAddress:   txSigningAddress,
-		PreReqTxs:         []string{preReqTx.ID.String()},
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:                uuid.New(),
+			DispatchNode:      txNodeID,
+			DispatchTxPayload: "payload",
+			DispatchAddress:   txSigningAddress,
+			PreReqTxs:         []string{preReqTx.GetTxID(ctx)},
+		},
 	}
 	mSFS := &componentmocks.StageFoundationService{}
 	mIR := &componentmocks.IdentityResolver{}
@@ -238,7 +253,7 @@ func TestDispatchStageSubmitTx(t *testing.T) {
 	mSFS.On("DependencyChecker").Return(mDC)
 
 	// returns error when pre-req not met
-	mDC.On("PreReqsMatchCondition", ctx, mock.Anything, mock.Anything).Once().Return([]string{preReqTx.ID.String()})
+	mDC.On("PreReqsMatchCondition", ctx, mock.Anything, mock.Anything).Once().Return([]string{preReqTx.GetTxID(ctx)})
 	actionOutput, actionErr := ds.PerformAction(ctx, testTx, mSFS)
 	assert.Regexp(t, "PD010303", actionErr.Error())
 	assert.Nil(t, actionOutput)
@@ -254,7 +269,7 @@ func TestDispatchStageSubmitTx(t *testing.T) {
 		{
 			ID:    uuid.NewString(),
 			Stage: ds.Name(),
-			TxID:  testTx.ID.String(),
+			TxID:  testTx.GetTxID(ctx),
 			Data: TxSubmissionOutput{
 				TransactionID: dispatchTxID,
 			},
@@ -271,7 +286,7 @@ func TestDispatchStageSubmitTx(t *testing.T) {
 		{
 			ID:    uuid.NewString(),
 			Stage: ds.Name(),
-			TxID:  testTx.ID.String(),
+			TxID:  testTx.GetTxID(ctx),
 			Data: TxSubmissionOutput{
 				ErrorMessage: "submission error",
 			},
@@ -289,16 +304,20 @@ func TestDispatchStageProcessEvents(t *testing.T) {
 
 	ds := &DispatchStage{}
 	assert.Equal(t, "dispatch", ds.Name())
-	preReqTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	preReqTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: uuid.New(),
+		},
 	}
 
-	testTx := &transactionstore.Transaction{
-		ID:                uuid.New(),
-		DispatchNode:      txNodeID,
-		DispatchTxPayload: "payload",
-		DispatchAddress:   txSigningAddress,
-		PreReqTxs:         []string{preReqTx.ID.String()},
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:                uuid.New(),
+			DispatchNode:      txNodeID,
+			DispatchTxPayload: "payload",
+			DispatchAddress:   txSigningAddress,
+			PreReqTxs:         []string{preReqTx.GetTxID(ctx)},
+		},
 	}
 	mSFS := &componentmocks.StageFoundationService{}
 	// wait on panic error and return unprocessed events
@@ -306,11 +325,11 @@ func TestDispatchStageProcessEvents(t *testing.T) {
 		{
 			ID:    uuid.NewString(),
 			Stage: ds.Name(),
-			TxID:  testTx.ID.String(),
+			TxID:  testTx.GetTxID(ctx),
 		}, {
 			ID:    uuid.NewString(),
 			Stage: "different",
-			TxID:  testTx.ID.String(),
+			TxID:  testTx.GetTxID(ctx),
 			Data:  12,
 		},
 	})

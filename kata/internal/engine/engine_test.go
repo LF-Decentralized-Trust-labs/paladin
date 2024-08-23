@@ -19,10 +19,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,13 +33,32 @@ import (
 
 func TestEngine(t *testing.T) {
 	ctx := context.Background()
-	engine, mcmps := newEngineForTesting(t)
-	mcmps.On("StateStore").Once().Return(nil)
+
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+	domainAddressString := domainAddress.String()
+
+	engine, mComponents := newEngineForTesting(t)
+	mDomainAPI := &componentmocks.DomainSmartContract{}
+	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Once().Return(nil)
+	mDomainMgr := &componentmocks.DomainManager{}
+	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainAPI, nil)
+	mStateStore := &componentmocks.StateStore{}
+	mComponents.On("StateStore").Once().Return(mStateStore)
+	mComponents.On("DomainManager").Once().Return(mDomainMgr)
 	assert.Equal(t, "Kata Engine", engine.Name())
 
-	orchestrator, err := engine.NewOrchestrator(ctx, "0x1234", &orchestrator.OrchestratorConfig{})
+	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
+	// no input domain should err
+	assert.Regexp(t, "PD011700", err)
+	assert.Empty(t, txID)
+	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
+		Inputs: &components.TransactionInputs{
+			Domain: domainAddressString,
+		},
+	})
+
 	assert.NoError(t, err)
-	require.NotNil(t, orchestrator)
+	require.NotNil(t, txID)
 
 }
 

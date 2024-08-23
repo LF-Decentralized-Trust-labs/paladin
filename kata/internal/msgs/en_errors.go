@@ -239,4 +239,7 @@ var (
 	MsgDomainMissingStates              = ffe("PD011616", "Missing in-memory states")
 	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
 	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
+
+	// Engine PD0117XX
+	MsgDomainNotProvided = ffe("PD011700", "Domain not found in the transaction input")
 )

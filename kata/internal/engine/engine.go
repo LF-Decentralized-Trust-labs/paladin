@@ -19,15 +19,19 @@ import (
 	"context"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+
+	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type Engine interface {
-	NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error)
-	HandleNewTx(ctx context.Context, txID string) error
+	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
 	Name() string
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
@@ -71,26 +75,44 @@ func NewEngine() Engine {
 	}
 }
 
-func (e *engine) NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error) {
-	if e.orchestrators[contractAddress] == nil {
-		e.orchestrators[contractAddress] = orchestrator.NewOrchestrator(ctx, contractAddress, config, e.components.StateStore())
-	}
-	orchestratorDone, err := e.orchestrators[contractAddress].Start(ctx)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", contractAddress, err)
-		return nil, err
-	}
-
-	go func() {
-		<-orchestratorDone
-		log.L(ctx).Infof("Orchestrator for contract %s has stopped", contractAddress)
-	}()
-	return e.orchestrators[contractAddress], nil
-}
-
 // HandleNewTx implements Engine.
-func (e *engine) HandleNewTx(ctx context.Context, txID string) error {
-	panic("unimplemented")
+func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error) { // TODO: this function currently assumes another layer initialize transactions and store them into DB
+	if tx.Inputs == nil || tx.Inputs.Domain == "" {
+		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
+	}
+	contractAddr, err := ptypes.ParseEthAddress(tx.Inputs.Domain)
+	if err != nil {
+		return "", err
+	}
+	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, *contractAddr)
+	if err != nil {
+		return "", err
+	}
+	err = domainAPI.InitTransaction(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
+	// TODO how to measure fairness/ per From address / contract address / something else
+	if e.orchestrators[txInstance.GetContractAddress(ctx)] == nil {
+		e.orchestrators[txInstance.GetContractAddress(ctx)] = orchestrator.NewOrchestrator(ctx, txInstance.GetContractAddress(ctx) /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components.StateStore(), domainAPI)
+		orchestratorDone, err := e.orchestrators[txInstance.GetContractAddress(ctx)].Start(ctx)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", txInstance.GetContractAddress(ctx), err)
+			return "", err
+		}
+
+		go func() {
+			<-orchestratorDone
+			log.L(ctx).Infof("Orchestrator for contract %s has stopped", txInstance.GetContractAddress(ctx))
+		}()
+	}
+	oc := e.orchestrators[txInstance.GetContractAddress(ctx)]
+	queued := oc.ProcessNewTransaction(ctx, txInstance)
+	if queued {
+		log.L(ctx).Debugf("Transaction with ID %s queued in database", txInstance.GetTxID(ctx))
+	}
+	return txInstance.GetTxID(ctx), nil
 }
 
 func (me *engine) handleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {

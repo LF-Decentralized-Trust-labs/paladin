@@ -23,7 +23,7 @@ import (
 
 func TestForTypesAndMocks(t *testing.T) {
 
-	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil)
+	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil)
 	assert.Nil(t, pfs.DependencyChecker())
 	assert.Nil(t, pfs.IdentityResolver())
 	assert.Nil(t, pfs.StateStore())

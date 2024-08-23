@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
@@ -137,7 +138,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore, domainAPI components.DomainSmartContract) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -158,9 +159,11 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		stopProcess:                  make(chan bool, 1),
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
+		&stages.AssembleStage{},
+		&stages.AttestationStage{},
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
@@ -308,7 +311,7 @@ func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *types.Stage
 		// TODO: is bypassing max concurrent process correct?
 		// or throw the event away and waste another cycle to redo the actions
 		// (doesn't feel right, maybe for some events only persistence is needed)
-		tsm := transactionstore.NewTransactionStageManager(ctx, stageEvent.TxID)
+		tsm := transactionstore.NewTransactionStageManagerByTxID(ctx, stageEvent.TxID)
 		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = controller.NewPaladinTransactionProcessor(ctx, tsm, oc.StageController)
 		txProc = oc.incompleteTxSProcessMap[stageEvent.TxID]
 	}

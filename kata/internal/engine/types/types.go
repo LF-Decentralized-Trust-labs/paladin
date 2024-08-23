@@ -18,6 +18,7 @@ package types
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
@@ -87,6 +88,7 @@ type StageFoundationService interface {
 	IdentityResolver() IdentityResolver
 	DependencyChecker() DependencyChecker
 	Sequencer() Sequencer
+	DomainAPI() components.DomainSmartContract
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
 }
 
@@ -100,6 +102,7 @@ type PaladinStageFoundationService struct {
 	stateStore          statestore.StateStore
 	nodeAndWalletLookUp IdentityResolver
 	sequencer           Sequencer
+	domainAPI           components.DomainSmartContract
 	transport           TransportManager
 }
 
@@ -123,13 +126,18 @@ func (psfs *PaladinStageFoundationService) TransportManager() TransportManager {
 	return psfs.transport
 }
 
+func (psfs *PaladinStageFoundationService) DomainAPI() components.DomainSmartContract {
+	return psfs.domainAPI
+}
+
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 	stateStore statestore.StateStore,
-	nodeAndWalletLookUp IdentityResolver, transport TransportManager) StageFoundationService {
+	nodeAndWalletLookUp IdentityResolver, transport TransportManager, domainAPI components.DomainSmartContract) StageFoundationService {
 	return &PaladinStageFoundationService{
 		dependencyChecker:   dependencyChecker,
 		stateStore:          stateStore,
 		nodeAndWalletLookUp: nodeAndWalletLookUp,
 		transport:           transport,
+		domainAPI:           domainAPI,
 	}
 }

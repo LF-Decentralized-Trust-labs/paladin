@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/stretchr/testify/assert"
@@ -27,8 +28,14 @@ import (
 
 func TestTransactionProcessor(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
 	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
@@ -38,9 +45,14 @@ func TestTransactionProcessor(t *testing.T) {
 
 func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID:       uuid.New(),
-		Contract: "continue",
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
 	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
@@ -72,9 +84,14 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 
 func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID:       uuid.New(),
-		Contract: "continue",
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
 	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)

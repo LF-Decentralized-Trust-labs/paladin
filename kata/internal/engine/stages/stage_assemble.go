@@ -84,8 +84,9 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 }
 
 func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
-	assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: deal with a tx in multiple sequences
-	return tsg.GetAssembledRound(ctx) != assembleRound || tsg.GetPayloadJSON(ctx) == ""
+	// assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: deal with a tx in multiple sequences
+	// return tsg.GetAssembledRound(ctx) != assembleRound || tsg.GetPayloadJSON(ctx) == ""
+	return tsg.GetPayloadJSON(ctx) == ""
 }
 
 func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {

@@ -68,9 +68,9 @@ func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactio
 	return
 }
 func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
-	if tsg.GetContract(ctx) == "error" {
+	if tsg.GetContractAddress(ctx) == "0x000000error" {
 		return nil, errors.New("pop")
-	} else if tsg.GetContract(ctx) == "complete" {
+	} else if tsg.GetContractAddress(ctx) == "0x000complete" {
 		return &testActionOutput{
 			Message: "complete",
 		}, nil
@@ -82,16 +82,18 @@ func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactio
 }
 
 func newTestStageController(ctx context.Context) *PaladinStageController {
-	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
+	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
 	return sc
 }
 
 func TestBasicStageController(t *testing.T) {
 	ctx := context.Background()
 	sc := newTestStageController(ctx)
-	testTx := &transactionstore.Transaction{
-		ID:       uuid.New(),
-		Contract: "complete",
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID:       uuid.New(),
+			Contract: "0x000complete",
+		},
 	}
 	// TODO: replace dummy checks with real implementation
 	// test function works with test processor

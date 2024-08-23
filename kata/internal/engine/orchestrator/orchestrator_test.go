@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
@@ -29,9 +30,15 @@ import (
 
 func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
-	testTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
 
 	waitForAction := make(chan bool, 1)
@@ -70,9 +77,15 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 
 func TestOrchestratorHandleEvents(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
-	testTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
 
 	waitForAction := make(chan bool, 1)
@@ -105,7 +118,7 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	testOc.HandleEvent(ctx, &types.StageEvent{
 		ID:    uuid.NewString(),
 		Stage: "test",
-		TxID:  testTx.ID.String(),
+		TxID:  testTx.GetTxID(ctx),
 		Data:  "test",
 	})
 	<-waitForProcessEvent
@@ -123,7 +136,7 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	testOc.HandleEvent(ctx, &types.StageEvent{
 		ID:    uuid.NewString(),
 		Stage: "test",
-		TxID:  testTx.ID.String(),
+		TxID:  testTx.GetTxID(ctx),
 		Data:  "test",
 	})
 	<-waitForProcessEvent
@@ -136,7 +149,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
 	ocDone, err := testOc.Start(ctx)
 	assert.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
@@ -147,7 +160,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
@@ -159,11 +172,16 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
-
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{})
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
 	mSC := componentmocks.StageController{}
 	testOc.StageController = &mSC
 
