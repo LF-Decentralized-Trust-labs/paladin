@@ -23,7 +23,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 )
 
 type Engine interface {
@@ -36,14 +35,17 @@ type Engine interface {
 }
 
 type engine struct {
+	ctx           context.Context
+	ctxCancel     func()
 	done          chan struct{}
 	orchestrators map[string]*orchestrator.Orchestrator
-	stateStore    statestore.StateStore
+	components    components.AllComponents
 }
 
 // Init implements Engine.
-func (e *engine) Init(components.AllComponents) (*components.ManagerInitResult, error) {
-	panic("unimplemented")
+func (e *engine) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
+	e.components = c
+	return nil, nil
 }
 
 // Name implements Engine.
@@ -53,7 +55,9 @@ func (e *engine) Name() string {
 
 // Start implements Engine.
 func (e *engine) Start() error {
-	panic("unimplemented")
+	e.ctx, e.ctxCancel = context.WithCancel(context.Background())
+	e.StartEventListener(e.ctx)
+	return nil
 }
 
 // Stop implements Engine.
@@ -61,16 +65,15 @@ func (e *engine) Stop() {
 	panic("unimplemented")
 }
 
-func NewEngine(stateStore statestore.StateStore) Engine {
+func NewEngine() Engine {
 	return &engine{
-		stateStore:    stateStore,
 		orchestrators: make(map[string]*orchestrator.Orchestrator),
 	}
 }
 
 func (e *engine) NewOrchestrator(ctx context.Context, contractAddress string, config *orchestrator.OrchestratorConfig) (*orchestrator.Orchestrator, error) {
 	if e.orchestrators[contractAddress] == nil {
-		e.orchestrators[contractAddress] = orchestrator.NewOrchestrator(ctx, contractAddress, config, e.stateStore)
+		e.orchestrators[contractAddress] = orchestrator.NewOrchestrator(ctx, contractAddress, config, e.components.StateStore())
 	}
 	orchestratorDone, err := e.orchestrators[contractAddress].Start(ctx)
 	if err != nil {

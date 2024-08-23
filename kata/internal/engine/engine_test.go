@@ -31,7 +31,8 @@ import (
 
 func TestEngine(t *testing.T) {
 	ctx := context.Background()
-	engine, _ := newEngineForTesting(t)
+	engine, mcmps := newEngineForTesting(t)
+	mcmps.On("StateStore").Once().Return(nil)
 	assert.Equal(t, "Kata Engine", engine.Name())
 
 	orchestrator, err := engine.NewOrchestrator(ctx, "0x1234", &orchestrator.OrchestratorConfig{})
@@ -40,19 +41,12 @@ func TestEngine(t *testing.T) {
 
 }
 
-type engineDependencyMocks struct {
-	mockStateStore    *componentmocks.StateStore
-	mockAllComponents *componentmocks.AllComponents
-}
-
-func newEngineForTesting(t *testing.T) (Engine, engineDependencyMocks) {
-	mockStateStore := componentmocks.NewStateStore(t)
+func newEngineForTesting(t *testing.T) (Engine, *componentmocks.AllComponents) {
 	mockAllComponents := componentmocks.NewAllComponents(t)
-
-	return NewEngine(mockStateStore),
-		engineDependencyMocks{
-			mockAllComponents: mockAllComponents,
-			mockStateStore:    mockStateStore,
-		}
+	e := NewEngine()
+	r, err := e.Init(mockAllComponents)
+	assert.Nil(t, r)
+	assert.NoError(t, err)
+	return e, mockAllComponents
 
 }
