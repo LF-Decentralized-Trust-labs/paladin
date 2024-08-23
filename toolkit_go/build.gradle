@@ -20,7 +20,7 @@ ext {
     goFiles = fileTree(".") {
         include "pkg/**/*.go"
     }
-    targetCoverage = 97
+    targetCoverage = 98
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/toolkit/pkg/prototk',

@@ -70,7 +70,82 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
+task copyTestContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
+    }
+    into 'componenttest/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task copyTestbedContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/testbed_sim/SIMDomain.sol/SIMDomain.json'
+        include 'contracts/testbed_sim/SIMToken.sol/SIMToken.json'
+        include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
+        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+    }
+    into 'testbed/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task copyDomainManagerContracts(type: Copy) {
+    inputs.files(configurations.compiledContracts)
+    from fileTree(configurations.compiledContracts.asPath) {
+        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+    }
+    into 'internal/domainmgr/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
+task copyContracts(dependsOn:[
+    copyTestContracts,
+    copyTestbedContracts,
+    copyDomainManagerContracts,
+])
+
+task protoc(type: ProtoCompile, dependsOn: [
+        ":toolkit_go:protoc",
+        tasks.copyTestContracts,
+    ]) {
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
+    }
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
+}
+
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
+    workingDir '.'
+
+    inputs.files('go.mod')
+    inputs.files(goFiles)
+    outputs.files('go.sum')
+
+    executable 'go'
+    args 'get'
+}
+
+task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
     mockery 'bin/mockery'
     args '--case', 'underscore'
     mock {
@@ -123,71 +198,6 @@ task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
     }    
 }
 
-task copyTestContracts(type: Copy) {
-    inputs.files(configurations.compiledContracts)
-    from fileTree(configurations.compiledContracts.asPath) {
-        include 'contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json'
-    }
-    into 'componenttest/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
-}
-
-task copyTestbedContracts(type: Copy) {
-    inputs.files(configurations.compiledContracts)
-    from fileTree(configurations.compiledContracts.asPath) {
-        include 'contracts/testbed_sim/SIMDomain.sol/SIMDomain.json'
-        include 'contracts/testbed_sim/SIMToken.sol/SIMToken.json'
-        include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
-        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
-    }
-    into 'testbed/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
-}
-
-task copyDomainManagerContracts(type: Copy) {
-    inputs.files(configurations.compiledContracts)
-    from fileTree(configurations.compiledContracts.asPath) {
-        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
-    }
-    into 'internal/domainmgr/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
-}
-
-task copyContracts(dependsOn:[
-    copyTestContracts,
-    copyTestbedContracts,
-    copyDomainManagerContracts,
-])
-
-task protoc(type: ProtoCompile, dependsOn: [
-        ":toolkit_go:protoc",
-        tasks.makeMocks,
-        tasks.copyTestContracts,
-    ]) {
-    protocPath "bin"
-    protoPath projectDir
-    protoFiles fileTree("pkg/proto") {
-        include "**/*.proto"
-    }
-    plugins {
-        go {
-            out projectDir
-        }
-        go_grpc {
-            out projectDir
-        }
-    }
-}
-
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
@@ -196,21 +206,11 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dyli
         include "**/*.pb.go"
     }
     delete 'coverage'
+    delete 'mocks'
     delete 'componenttest/abis'
 }
 
-task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts]) {
-    workingDir '.'
-
-    inputs.files('go.mod')
-    inputs.files(goFiles)
-    outputs.files('go.sum')
-
-    executable 'go'
-    args 'get'
-}
-
-task lint(type: Exec, dependsOn:[tasks.protoc, tasks.copyContracts]) {
+task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles);
@@ -353,7 +353,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts]) {
+task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
