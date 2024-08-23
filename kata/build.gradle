@@ -49,7 +49,7 @@ dependencies {
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
 }
 
-task installTools(type:Exec) {
+task installTools(type:Exec, dependsOn: ':toolkit_go:protoc') {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
@@ -181,7 +181,6 @@ task copyContracts(dependsOn:[
 ])
 
 task protoc(type: ProtoCompile, dependsOn: [
-    ":toolkit_go:test",
     tasks.makeMocks, 
     tasks.copyTestContracts
     ]) {
