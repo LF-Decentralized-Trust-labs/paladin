@@ -500,6 +500,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			EndorseTransaction: func(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 				contractAddr, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
 				senderAddr, fromAddr, toAddr := extractTransferVerifiers(req.Transaction, txInputs, req.ResolvedVerifiers)
+				assert.Equal(t, req.EndorsementVerifier.Lookup, req.EndorsementRequest.Parties[0])
 				assert.Equal(t, req.EndorsementVerifier.Lookup, notaryLocator)
 
 				inCoins := make([]*fakeCoinParser, len(req.Inputs))

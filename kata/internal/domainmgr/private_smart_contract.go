@@ -250,7 +250,7 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 }
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
-func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
+func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
 	// is being handled as part of an overall sequence of endorsements, and for performance it is
@@ -270,6 +270,7 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 		Inputs:              dc.toEndorsableList(postAssembly.InputStates),
 		Outputs:             dc.toEndorsableList(postAssembly.OutputStates),
 		Signatures:          postAssembly.Signatures,
+		EndorsementRequest:  endorsement,
 		EndorsementVerifier: endorser,
 	})
 	// We don't do any processing - as the result is not directly processable by us.

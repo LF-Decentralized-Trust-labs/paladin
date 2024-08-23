@@ -126,7 +126,7 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					return "", fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				// Invoke the domain
-				endorseRes, err := psc.EndorseTransaction(ctx, tx, &prototk.ResolvedVerifier{
+				endorseRes, err := psc.EndorseTransaction(ctx, tx, ar, &prototk.ResolvedVerifier{
 					Lookup:    partyName,
 					Algorithm: ar.Algorithm,
 					Verifier:  verifier,

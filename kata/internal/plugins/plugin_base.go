@@ -96,7 +96,7 @@ func (p *plugin[CB]) notifyInitialized() {
 	p.pc.mux.Lock()
 	p.initialized = true
 	p.pc.mux.Unlock()
-	log.L(p.pc.bgCtx).Errorf("Plugin load %s [%s] (type=%s) completed", p.def.Plugin, p.id, p.def.Plugin.PluginType)
+	log.L(p.pc.bgCtx).Infof("Plugin load %s [%s] (type=%s) completed", p.def.Plugin, p.id, p.def.Plugin.PluginType)
 	p.pc.tapLoadingProgressed()
 }
 
@@ -105,7 +105,7 @@ func (p *plugin[CB]) notifyStopped() {
 	p.registered = false
 	p.initialized = false
 	p.pc.mux.Unlock()
-	log.L(p.pc.bgCtx).Errorf("Plugin stopped %s [%s] (type=%s)", p.def.Plugin, p.id, p.def.Plugin.PluginType)
+	log.L(p.pc.bgCtx).Infof("Plugin stopped %s [%s] (type=%s)", p.def.Plugin, p.id, p.def.Plugin.PluginType)
 	p.pc.tapLoadingProgressed()
 }
 
