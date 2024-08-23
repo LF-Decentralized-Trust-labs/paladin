@@ -18,8 +18,11 @@ package engine
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 
@@ -38,13 +41,19 @@ func TestEngine(t *testing.T) {
 	domainAddressString := domainAddress.String()
 
 	engine, mComponents := newEngineForTesting(t)
+	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
 	mDomainAPI := &componentmocks.DomainSmartContract{}
-	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Once().Return(nil)
+	mDomainAPI = componentmocks.NewDomainSmartContract(t)
+	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Return(nil)
 	mDomainMgr := &componentmocks.DomainManager{}
 	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainAPI, nil)
 	mStateStore := &componentmocks.StateStore{}
 	mComponents.On("StateStore").Once().Return(mStateStore)
-	mComponents.On("DomainManager").Once().Return(mDomainMgr)
+	mComponents.On("DomainManager").Once().Return(mDomainMgr).Maybe()
+	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+		fn := args.Get(1).(statestore.DomainContextFunction)
+		fn(ctx, mDomainStateInterface)
+	}).Once().Return(nil)
 	assert.Equal(t, "Kata Engine", engine.Name())
 
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
@@ -52,10 +61,21 @@ func TestEngine(t *testing.T) {
 	assert.Regexp(t, "PD011700", err)
 	assert.Empty(t, txID)
 	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
+		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
 			Domain: domainAddressString,
 		},
 	})
+
+	//poll until the transaction is processed
+	for {
+		status, err := engine.GetTxStatus(ctx, txID)
+		require.NoError(t, err)
+		if status.Status == "completed" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
 	assert.NoError(t, err)
 	require.NotNil(t, txID)

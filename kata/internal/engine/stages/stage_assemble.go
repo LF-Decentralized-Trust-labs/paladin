@@ -30,11 +30,15 @@ import (
 type AssembleStage struct{}
 
 func (as *AssembleStage) Name() string {
-	return "dispatch"
+	return "assemble"
 }
 
 func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
-	sequencePreReqsToCheck := tsg.GetPreReqTransactions(ctx)                            // only get the pre-req in the sequence
+	sequencePreReqsToCheck := tsg.GetPreReqTransactions(ctx) // only get the pre-req in the sequence
+	if sfs.Sequencer() == nil {
+		// no sequencer, no need to check pre-reqs
+		return nil
+	}
 	assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: doesn't work when a tx is in multiple sequences and rounds need to checked for all sequences
 	preReqsPending := sfs.DependencyChecker().PreReqsMatchCondition(ctx, sequencePreReqsToCheck, func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool) {
 		return preReqTx.GetAssembledRound(ctx) == assembleRound // only treat pre-req in the sequence as assembled when their assembled record matches the newest assemble round,

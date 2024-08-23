@@ -33,6 +33,7 @@ import (
 type Engine interface {
 	HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
+	GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error)
 	Name() string
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
@@ -114,6 +115,13 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 		log.L(ctx).Debugf("Transaction with ID %s queued in database", txInstance.GetTxID(ctx))
 	}
 	return txInstance.GetTxID(ctx), nil
+}
+
+func (e *engine) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
+	return types.TxStatus{
+		TxID:   txID,
+		Status: "initialized",
+	}, nil
 }
 
 func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {

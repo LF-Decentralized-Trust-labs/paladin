@@ -32,7 +32,7 @@ type AttestationResult struct {
 type AttestationStage struct{}
 
 func (as *AttestationStage) Name() string {
-	return "dispatch"
+	return "attestation"
 }
 
 func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {

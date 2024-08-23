@@ -212,6 +212,9 @@ func (t *TransactionWrapper) GetDispatchTxPayload(ctx context.Context) string {
 }
 
 func (t *TransactionWrapper) GetPayloadJSON(ctx context.Context) string {
+	if t.PayloadJSON == nil {
+		return ""
+	}
 	return *t.PayloadJSON
 }
 

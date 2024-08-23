@@ -43,6 +43,11 @@ type TxProcessPreReq struct {
 	TxIDs []string `json:"transactionIds,omitempty"`
 }
 
+type TxStatus struct {
+	TxID   string `json:"transactionId"`
+	Status string `json:"status"`
+}
+
 // defines the methods for checking whether a transaction's dependents matches a specific criteria
 type DependencyChecker interface {
 	PreReqsMatchCondition(ctx context.Context, preReqTxIDs []string, conditionFunc func(tsg transactionstore.TxStateGetters) (preReqComplete bool)) (filteredPreReqTxIDs []string)
