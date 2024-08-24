@@ -240,4 +240,7 @@ var (
 	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
 	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
 	MsgDomainBaseLedgerSubmitInvalid    = ffe("PD011619", "Base ledger submission config is invalid")
+
+	// Engine PD0117XX
+	MsgDomainNotProvided = ffe("PD011700", "Domain not found in the transaction input")
 )
