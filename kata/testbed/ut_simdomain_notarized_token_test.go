@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	_ "embed"
@@ -44,6 +45,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed abis/SIMDomain.json
@@ -65,7 +67,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	simDomainABI := mustParseBuildABI(simDomainBuild)
 	simTokenABI := mustParseBuildABI(simTokenBuild)
 
-	var blockIndexer blockindexer.BlockIndexer
+	var blockIndexer atomic.Pointer[blockindexer.BlockIndexer]
 	var ec ethclient.EthClient
 	fakeCoinConstructorABI := `{
 		"type": "constructor",
@@ -144,22 +146,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}
 
 	type fakeCoinParser struct {
-		Salt   ethtypes.HexBytes0xPrefix `json:"salt"`
-		Owner  ethtypes.Address0xHex     `json:"owner"`
-		Amount *ethtypes.HexInteger      `json:"amount"`
+		Salt   types.HexBytes        `json:"salt"`
+		Owner  ethtypes.Address0xHex `json:"owner"`
+		Amount *ethtypes.HexInteger  `json:"amount"`
 	}
-
-	fakeTransferMintPayload := `{
-		"from": "",
-		"to": "wallets/org1/aaaaaa",
-		"amount": "123000000000000000000"
-	}`
-
-	fakeTransferPayload1 := `{
-		"from": "wallets/org1/aaaaaa",
-		"to": "wallets/org2/bbbbbb",
-		"amount": "23000000000000000000"
-	}`
 
 	contractDataABI := &abi.ParameterArray{
 		{Name: "notaryLocator", Type: "string"},
@@ -231,7 +221,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 		validateTransferTransactionInput := func(tx *prototk.TransactionSpecification) (*ethtypes.Address0xHex, string, *fakeTransferParser) {
 			assert.JSONEq(t, fakeCoinTransferABI, tx.FunctionAbiJson)
-			assert.Equal(t, "transfer(string,string,uint256)", tx.FunctionSignature)
+			assert.Equal(t, "function transfer(string memory from, string memory to, uint256 amount) external { }", tx.FunctionSignature)
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(tx.FunctionParamsJson), &inputs)
 			assert.NoError(t, err)
@@ -249,8 +239,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return contractAddr, config.NotaryLocator, &inputs
 		}
 
-		extractTransferVerifiers := func(txInputs *fakeTransferParser, verifiers []*prototk.ResolvedVerifier) (fromAddr, toAddr *ethtypes.Address0xHex) {
+		extractTransferVerifiers := func(txSpec *prototk.TransactionSpecification, txInputs *fakeTransferParser, verifiers []*prototk.ResolvedVerifier) (senderAddr, fromAddr, toAddr *ethtypes.Address0xHex) {
 			for _, v := range verifiers {
+				if txSpec.From != "" && v.Lookup == txSpec.From {
+					senderAddr = ethtypes.MustNewAddress(v.Verifier)
+				}
 				if txInputs.From != "" && v.Lookup == txInputs.From {
 					fromAddr = ethtypes.MustNewAddress(v.Verifier)
 				}
@@ -263,7 +256,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			return
 		}
 
-		typedDataV4TransferWithSalts := func(contract *ethtypes.Address0xHex, inputs, outputs []*fakeCoinParser) (ethtypes.HexBytes0xPrefix, error) {
+		typedDataV4TransferWithSalts := func(contract *ethtypes.Address0xHex, inputs, outputs []*fakeCoinParser) (types.HexBytes, error) {
 			typeSet := eip712.TypeSet{
 				"FakeTransfer": {
 					{Name: "inputs", Type: "Coin[]"},
@@ -297,7 +290,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					"amount": output.Amount.String(),
 				}
 			}
-			return eip712.EncodeTypedDataV4(context.Background(), &eip712.TypedData{
+			tdv4, err := eip712.EncodeTypedDataV4(context.Background(), &eip712.TypedData{
 				Types:       typeSet,
 				PrimaryType: "FakeTransfer",
 				Domain: map[string]interface{}{
@@ -311,6 +304,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					"outputs": messageOutputs,
 				},
 			})
+			return types.HexBytes(tdv4), err
 		}
 
 		return &plugintk.DomainAPIBase{Functions: &plugintk.DomainAPIFunctions{
@@ -334,11 +328,18 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					SignAndSend()
 				assert.NoError(t, err)
 
-				deployTx, err := blockIndexer.WaitForTransaction(ctx, string(deployTXHash))
+				bi := *blockIndexer.Load()
+				deployTx, err := bi.WaitForTransaction(ctx, *deployTXHash)
 				assert.NoError(t, err)
+				if deployTx.Result.V() != blockindexer.TXResult_SUCCESS {
+					return nil, fmt.Errorf("Transaction %s reverted", deployTx.Hash)
+				}
 
 				return &prototk.ConfigureDomainResponse{
 					DomainConfig: &prototk.DomainConfig{
+						BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+							SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
+						},
 						ConstructorAbiJson:     fakeCoinConstructorABI,
 						FactoryContractAddress: deployTx.ContractAddress.String(),
 						FactoryContractAbiJson: toJSONString(t, simDomainABI),
@@ -399,6 +400,10 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				// execute the transaction. See notes above about this.
 				requiredVerifiers := []*prototk.ResolveVerifierRequest{
 					{
+						Lookup:    req.Transaction.From,
+						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+					},
+					{
 						Lookup:    notaryLocator,
 						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
 					},
@@ -422,7 +427,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 			AssembleTransaction: func(ctx context.Context, req *prototk.AssembleTransactionRequest) (_ *prototk.AssembleTransactionResponse, err error) {
 				contractAddr, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
-				fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
+				_, fromAddr, toAddr := extractTransferVerifiers(req.Transaction, txInputs, req.ResolvedVerifiers)
 				amount := txInputs.Amount.BigInt()
 				toKeep := new(big.Int)
 				coinsToSpend := []*fakeCoinParser{}
@@ -494,7 +499,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 			EndorseTransaction: func(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 				contractAddr, notaryLocator, txInputs := validateTransferTransactionInput(req.Transaction)
-				fromAddr, toAddr := extractTransferVerifiers(txInputs, req.ResolvedVerifiers)
+				senderAddr, fromAddr, toAddr := extractTransferVerifiers(req.Transaction, txInputs, req.ResolvedVerifiers)
+				assert.Equal(t, req.EndorsementVerifier.Lookup, req.EndorsementRequest.Parties[0])
 				assert.Equal(t, req.EndorsementVerifier.Lookup, notaryLocator)
 
 				inCoins := make([]*fakeCoinParser, len(req.Inputs))
@@ -535,6 +541,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 				// Check the math
 				if fromAddr != nil && toAddr != nil {
+					assert.Equal(t, senderAddr, fromAddr)
 					inTotal := big.NewInt(0)
 					for _, c := range inCoins {
 						inTotal = inTotal.Add(inTotal, c.Amount.BigInt())
@@ -545,6 +552,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					}
 					assert.True(t, inTotal.Cmp(outTotal) == 0)
 				} else {
+					// NOTE: No minting controls in this demo example
 					if fromAddr == nil {
 						assert.Len(t, inCoins, 0)
 					}
@@ -559,7 +567,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			},
 
 			PrepareTransaction: func(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-				var signerSignature ethtypes.HexBytes0xPrefix
+				var signerSignature types.HexBytes
 				for _, att := range req.AttestationResult {
 					if att.AttestationType == prototk.AttestationType_SIGN && att.Name == "sender" {
 						signerSignature = att.Payload
@@ -597,12 +605,14 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						Type:     plugins.LibraryTypeCShared.Enum(),
 						Location: "loaded/via/unit/test/loader",
 					},
+					Config: yamlNode(`{"some":"config"}`),
 				},
 			}
 		},
 		func(c components.AllComponents) (err error) {
 			ec = c.EthClientFactory().HTTPClient()
-			blockIndexer = c.BlockIndexer()
+			bi := c.BlockIndexer()
+			blockIndexer.Store(&bi)
 			pc := c.PluginController()
 			pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
 				"domain1": fakeCoinDomain,
@@ -628,7 +638,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		From:     "wallets/org1/aaaaaa",
 		To:       types.EthAddress(contractAddr),
 		Function: *mustParseABIEntry(fakeCoinTransferABI),
-		Inputs:   types.RawJSON(fakeTransferMintPayload),
+		Inputs: types.RawJSON(`{
+			"from": "",
+			"to": "wallets/org1/aaaaaa",
+			"amount": "123000000000000000000"
+		}`),
 	})
 	assert.Nil(t, rpcErr)
 
@@ -636,8 +650,17 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		From:     "wallets/org1/aaaaaa",
 		To:       types.EthAddress(contractAddr),
 		Function: *mustParseABIEntry(fakeCoinTransferABI),
-		Inputs:   types.RawJSON(fakeTransferPayload1),
+		Inputs: types.RawJSON(`{
+			"from": "wallets/org1/aaaaaa",
+			"to": "wallets/org2/bbbbbb",
+			"amount": "23000000000000000000"
+		}`),
 	})
 	assert.Nil(t, rpcErr)
 
+}
+
+func yamlNode(s string) (yn yaml.Node) {
+	_ = yaml.Unmarshal([]byte(s), &yn)
+	return yn
 }

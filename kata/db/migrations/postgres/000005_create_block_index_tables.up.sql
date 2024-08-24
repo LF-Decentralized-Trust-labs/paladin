@@ -13,6 +13,7 @@ CREATE TABLE indexed_transactions (
     "from"              CHAR(40)  NOT NULL,
     "to"                CHAR(40),
     "contract_address"  CHAR(40),
+    "result"            TEXT,
     PRIMARY KEY ("block_number", "transaction_index"),
     FOREIGN KEY ("block_number") REFERENCES indexed_blocks ("number") ON DELETE CASCADE
 );

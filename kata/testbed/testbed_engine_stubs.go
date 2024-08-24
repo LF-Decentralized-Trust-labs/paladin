@@ -35,7 +35,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 
 	var abiFunc ethclient.ABIFunctionClient
 	ec := tb.components.EthClientFactory().HTTPClient()
-	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, ethtypes.HexBytes0xPrefix(txInstruction.Bytecode))
+	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, types.HexBytes(txInstruction.Bytecode))
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 		Input(txInstruction.Params).
 		SignAndSend()
 	if err == nil {
-		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
+		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to send base deploy ledger transaction: %s", err)
@@ -71,7 +71,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 		Input(txInstruction.Params).
 		SignAndSend()
 	if err == nil {
-		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
+		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to send base ledger transaction: %s", err)
@@ -126,7 +126,7 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					return "", fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				// Invoke the domain
-				endorseRes, err := psc.EndorseTransaction(ctx, tx, &prototk.ResolvedVerifier{
+				endorseRes, err := psc.EndorseTransaction(ctx, tx, ar, &prototk.ResolvedVerifier{
 					Lookup:    partyName,
 					Algorithm: ar.Algorithm,
 					Verifier:  verifier,
@@ -203,9 +203,9 @@ func mustParseBuildABI(buildJSON []byte) abi.ABI {
 	return buildABI
 }
 
-func mustParseBuildBytecode(buildJSON []byte) ethtypes.HexBytes0xPrefix {
+func mustParseBuildBytecode(buildJSON []byte) types.HexBytes {
 	var buildParsed map[string]types.RawJSON
-	var byteCode ethtypes.HexBytes0xPrefix
+	var byteCode types.HexBytes
 	err := json.Unmarshal(buildJSON, &buildParsed)
 	if err == nil {
 		err = json.Unmarshal(buildParsed["bytecode"], &byteCode)

@@ -130,17 +130,20 @@ package domainmgr
 // 	<-tp.d.initDone
 // }
 
-// func goodDomainConf() *prototk.DomainConfig {
-// 	return &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	}
-// }
+func goodDomainConf() *prototk.DomainConfig {
+	return &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+			SubmitMode: prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
+		},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	}
+}
 
 // func TestDomainInitStates(t *testing.T) {
 
@@ -186,127 +189,135 @@ package domainmgr
 
 // }
 
-// func TestDomainInitBadSchemas(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			`!!! Wrong`,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011602", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitBadSchemas(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			`!!! Wrong`,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011602", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitBadConstructor(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `!!!wrong`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011603", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitBadConstructor(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     `!!!wrong`,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011603", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitBadConstructorType(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `{"type":"event"}`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitBadConstructorType(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     `{"type":"event"}`,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitSchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `{"type":"event"}`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitSchemaStoreFail(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     `{"type":"event"}`,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitBadAddress(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: `!wrong`,
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011606", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitBadAddress(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: `!wrong`,
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011606", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitFactoryABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `!!!wrong`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011605", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitFactoryABIInvalid(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `!!!wrong`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011605", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitPrivateABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `!!!wrong`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011607", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitPrivateABIInvalid(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `!!!wrong`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	})
+	defer done()
+	assert.Regexp(t, "PD011607", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
-// func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	}, func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "pop", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
+	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
+		ConstructorAbiJson:     fakeCoinConstructorABI,
+		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAbiJson: `[]`,
+		PrivateContractAbiJson: `[]`,
+		AbiStateSchemasJson: []string{
+			fakeCoinStateSchema,
+		},
+	}, func(mc *mockComponents) {
+		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
+	})
+	defer done()
+	assert.Regexp(t, "pop", *tp.d.initError.Load())
+	assert.False(t, tp.initialized.Load())
+}
 
 // func TestDomainConfigureFail(t *testing.T) {
 

@@ -53,37 +53,37 @@ package domainmgr
 // 		assert.Equal(t, contractAddr, sc.Address())
 // 	}()
 
-// 	// Index an event indicating deployment of a new smart contract instance
-// 	var pc blockindexer.PostCommit
-// 	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
-// 		pc, err = dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
-// 			StreamID:   uuid.New(),
-// 			StreamName: "name_given_by_component_mgr",
-// 			BatchID:    uuid.New(),
-// 			Events: []*blockindexer.EventWithData{
-// 				{
-// 					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
-// 					Address:           contractAddr,
-// 					IndexedEvent: &blockindexer.IndexedEvent{
-// 						BlockNumber:      12345,
-// 						TransactionIndex: 0,
-// 						LogIndex:         0,
-// 						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
-// 						Signature:        eventSig_PaladinNewSmartContract_V0,
-// 					},
-// 					Data: types.RawJSON(`{
-// 						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
-// 						"domain": "` + tp.d.factoryContractAddress.String() + `",
-// 						"data": "0xfeedbeef"
-// 					}`),
-// 				},
-// 			},
-// 		})
-// 		return err
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.NotNil(t, pc)
-// 	pc()
+	// Index an event indicating deployment of a new smart contract instance
+	var pc blockindexer.PostCommit
+	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
+		pc, err = dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
+			StreamID:   uuid.New(),
+			StreamName: "name_given_by_component_mgr",
+			BatchID:    uuid.New(),
+			Events: []*blockindexer.EventWithData{
+				{
+					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
+					Address:           contractAddr,
+					IndexedEvent: &blockindexer.IndexedEvent{
+						BlockNumber:      12345,
+						TransactionIndex: 0,
+						LogIndex:         0,
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						Signature:        eventSig_PaladinNewSmartContract_V0,
+					},
+					Data: types.RawJSON(`{
+						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
+						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"data": "0xfeedbeef"
+					}`),
+				},
+			},
+		})
+		return err
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, pc)
+	pc()
 
 // 	// Lookup the instance against the domain
 // 	psc, err := dm.GetSmartContractByAddress(ctx, contractAddr)
@@ -104,7 +104,8 @@ package domainmgr
 // 	assert.NoError(t, err)
 // 	assert.Equal(t, psc, psc2)
 
-// }
+	<-txNotified
+}
 
 // func TestEventIndexingBadEvent(t *testing.T) {
 
@@ -145,34 +146,34 @@ package domainmgr
 // 	})
 // 	defer done()
 
-// 	contractAddr := types.EthAddress(types.RandBytes(20))
-// 	deployTX := uuid.New()
-// 	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
-// 		_, err := dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
-// 			StreamID:   uuid.New(),
-// 			StreamName: "name_given_by_component_mgr",
-// 			BatchID:    uuid.New(),
-// 			Events: []*blockindexer.EventWithData{
-// 				{
-// 					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
-// 					Address:           contractAddr,
-// 					IndexedEvent: &blockindexer.IndexedEvent{
-// 						BlockNumber:      12345,
-// 						TransactionIndex: 0,
-// 						LogIndex:         0,
-// 						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
-// 						Signature:        eventSig_PaladinNewSmartContract_V0,
-// 					},
-// 					Data: types.RawJSON(`{
-// 						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
-// 						"domain": "` + tp.d.factoryContractAddress.String() + `",
-// 						"data": "0xfeedbeef"
-// 					}`),
-// 				},
-// 			},
-// 		})
-// 		return err
-// 	})
-// 	assert.Regexp(t, "pop", err)
+	contractAddr := types.EthAddress(types.RandBytes(20))
+	deployTX := uuid.New()
+	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
+		_, err := dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
+			StreamID:   uuid.New(),
+			StreamName: "name_given_by_component_mgr",
+			BatchID:    uuid.New(),
+			Events: []*blockindexer.EventWithData{
+				{
+					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
+					Address:           contractAddr,
+					IndexedEvent: &blockindexer.IndexedEvent{
+						BlockNumber:      12345,
+						TransactionIndex: 0,
+						LogIndex:         0,
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						Signature:        eventSig_PaladinNewSmartContract_V0,
+					},
+					Data: types.RawJSON(`{
+						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
+						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"data": "0xfeedbeef"
+					}`),
+				},
+			},
+		})
+		return err
+	})
+	assert.Regexp(t, "pop", err)
 
 // }

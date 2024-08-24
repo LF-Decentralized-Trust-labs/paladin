@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,8 +37,8 @@ type mockEth struct {
 	eth_chainId             func(context.Context) (ethtypes.HexUint64, error)
 	eth_getTransactionCount func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
 	eth_estimateGas         func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
-	eth_sendRawTransaction  func(context.Context, ethtypes.HexBytes0xPrefix) (ethtypes.HexBytes0xPrefix, error)
-	eth_call                func(context.Context, ethsigner.Transaction, string) (ethtypes.HexBytes0xPrefix, error)
+	eth_sendRawTransaction  func(context.Context, types.HexBytes) (types.HexBytes, error)
+	eth_call                func(context.Context, ethsigner.Transaction, string) (types.HexBytes, error)
 }
 
 func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) (rpcServer rpcserver.RPCServer, done func()) {
@@ -95,7 +96,7 @@ func checkNil[T any](v T, fn func(T) rpcserver.RPCHandler) rpcserver.RPCHandler 
 	if !reflect.ValueOf(v).IsNil() {
 		return fn(v)
 	}
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return rpcserver.HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		return &rpcbackend.RPCResponse{
 			JSONRpc: "2.0",
 			ID:      req.ID,
@@ -104,7 +105,7 @@ func checkNil[T any](v T, fn func(T) rpcserver.RPCHandler) rpcserver.RPCHandler 
 				Message: "not implemented by test",
 			},
 		}
-	}
+	})
 }
 
 func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _ *ethClientFactory, done func()) {

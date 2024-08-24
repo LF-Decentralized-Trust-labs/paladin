@@ -28,8 +28,8 @@ ext {
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
-        'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/toolkit/prototk',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
         'github.com/kaleido-io/paladin/kata/testbed',
     ]
@@ -54,7 +54,7 @@ task installTools(type:Exec, dependsOn: ':toolkit_go:protoc') {
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
     args 'install'
-    inputs.files(['go.mod','go.sum'])
+    inputs.files('go.mod','go.sum')
     outputs.files(
         "bin/protoc-gen-go",
         "bin/protoc-gen-go-grpc",
@@ -181,8 +181,9 @@ task copyContracts(dependsOn:[
 ])
 
 task protoc(type: ProtoCompile, dependsOn: [
-    tasks.makeMocks, 
-    tasks.copyTestContracts
+        ":toolkit_go:protoc",
+        tasks.installTools,
+        tasks.copyTestContracts,
     ]) {
     protocPath "bin"
     protoPath projectDir
@@ -199,18 +200,7 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
-    delete fileTree("bin") {
-        exclude "README.md", ".gitignore"
-    }
-    delete fileTree(".") {
-        include "**/*.pb.go"
-    }
-    delete 'coverage'
-    delete 'componenttest/abis'
-}
-
-task goGet(type:Exec, dependsOn:[tasks.protoc, tasks.copyDomainManagerContracts]) {
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -221,7 +211,72 @@ task goGet(type:Exec, dependsOn:[tasks.protoc, tasks.copyDomainManagerContracts]
     args 'get'
 }
 
-task lint(type: Exec, dependsOn:[tasks.protoc, tasks.copyDomainManagerContracts]) {
+task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
+    mockery 'bin/mockery'
+    args '--case', 'underscore'
+    mock {
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
+    }
+    mock {
+        inputDir 'internal/components'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'StateStore'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'DomainStateInterface'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/blockindexer'
+        name 'BlockIndexer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/plugins'
+        name 'PluginController'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/rpcserver'
+        name 'RPCServer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/ethclient'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }    
+}
+
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
+    delete 'mocks'
+    delete 'componenttest/abis'
+}
+
+task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles);
@@ -234,7 +289,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc, tasks.copyDomainManagerContracts]
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
+task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     workingDir '.'
 
     def libName;
@@ -258,7 +313,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyContracts]) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)
@@ -342,7 +397,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/..."
+        args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
@@ -364,7 +419,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: [tasks.protoc, tasks.copyDomainManagerContracts]) {
+task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {

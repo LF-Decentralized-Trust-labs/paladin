@@ -52,13 +52,13 @@ package domainmgr
 // 		ethClientFactory:     componentmocks.NewEthClientFactory(t),
 // 	}
 
-// 	// Blockchain stuff is always mocked
-// 	preMocks := componentmocks.NewPreInitComponents(t)
-// 	preMocks.On("EthClientFactory").Return(mc.ethClientFactory)
-// 	mc.ethClientFactory.On("ChainID").Return(int64(12345))
-// 	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
-// 	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
-// 	preMocks.On("BlockIndexer").Return(mc.blockIndexer)
+	// Blockchain stuff is always mocked
+	preMocks := componentmocks.NewPreInitComponents(t)
+	preMocks.On("EthClientFactory").Return(mc.ethClientFactory)
+	mc.ethClientFactory.On("ChainID").Return(int64(12345)).Maybe()
+	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
+	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
+	preMocks.On("BlockIndexer").Return(mc.blockIndexer)
 
 // 	var p persistence.Persistence
 // 	var err error

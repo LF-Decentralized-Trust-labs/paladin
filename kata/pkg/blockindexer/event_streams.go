@@ -202,7 +202,7 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
-			sig := *types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+			sig := types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 			sigStr := sig.String()
 			es.eventABIs = append(es.eventABIs, abiEntry)
 			if _, dup := es.signatures[sigStr]; !dup {

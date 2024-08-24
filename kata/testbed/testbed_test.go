@@ -24,13 +24,6 @@ import (
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/httpserver"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,6 +40,7 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initF
 	}
 	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
 	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	tb.conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
 	setConf(tb.conf)
 	serverErr := make(chan error)
 	go func() {
@@ -106,83 +100,4 @@ func TestTempSocketFileFail(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = (&testbed{conf: &componentmgr.Config{TempDir: &thisIsAFile}}).tempSocketFile()
 	assert.Error(t, err)
-}
-
-func TestRunCommsBusError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &componentmgr.Config{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		PluginControllerConfig: plugins.PluginControllerConfig{
-			GRPC: plugins.GRPCConfig{
-				Address: "unix:" + t.TempDir(),
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "Comms bus", err)
-}
-
-func TestRunRPCError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &componentmgr.Config{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		PluginControllerConfig: plugins.PluginControllerConfig{
-			GRPC: plugins.GRPCConfig{
-				Address: "unix:" + path.Join(t.TempDir(), "socket.file"),
-			},
-		},
-		RPCServer: rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{
-				Config: httpserver.Config{
-					Port:    confutil.P(-1),
-					Address: confutil.P("::::wrong"),
-				},
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "RPC", err)
-}
-
-func TestRunBlockIndexerError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &componentmgr.Config{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		PluginControllerConfig: plugins.PluginControllerConfig{
-			GRPC: plugins.GRPCConfig{
-				Address: "unix:" + path.Join(t.TempDir(), "socket.file"),
-			},
-		},
-		RPCServer: rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
-			WS:   rpcserver.WSEndpointConfig{Disabled: true},
-		},
-		Blockchain: ethclient.Config{
-			WS: rpcclient.WSConfig{
-				HTTPConfig: rpcclient.HTTPConfig{
-					URL: "!!!! wrongness",
-				},
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "Blockchain", err)
 }

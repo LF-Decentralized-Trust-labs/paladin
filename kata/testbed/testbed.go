@@ -114,8 +114,7 @@ func (tb *testbed) setupConfig(args []string) error {
 	if err = yaml.Unmarshal(configBytes, &tb.conf); err != nil {
 		return err
 	}
-
-	if tb.conf.GRPC.Address == "" {
+	if err == nil && tb.conf.GRPC.Address == "" {
 		tb.conf.GRPC.Address, err = tb.tempSocketFile()
 	}
 	if err != nil {

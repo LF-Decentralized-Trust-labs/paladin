@@ -28,26 +28,26 @@ package kata
 // 	"testing"
 // 	"time"
 
-// 	"github.com/hyperledger/firefly-signer/pkg/abi"
-// 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-// 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
-// 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-// 	"github.com/kaleido-io/paladin/kata/pkg/kata"
-// 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-// 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-// 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
-// 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-// 	"github.com/kaleido-io/paladin/kata/pkg/types"
-// 	"github.com/sirupsen/logrus"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/require"
-// 	"google.golang.org/grpc"
-// 	"google.golang.org/grpc/credentials/insecure"
-// 	"google.golang.org/protobuf/types/known/anypb"
-// 	"google.golang.org/protobuf/types/known/wrapperspb"
-// 	"gopkg.in/yaml.v3"
-// 	"gorm.io/gorm"
-// )
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
+)
 
 // //go:embed abis/SimpleStorage.json
 // var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
@@ -108,49 +108,43 @@ package kata
 // 	ctx := context.Background()
 // 	logrus.SetLevel(logrus.DebugLevel)
 
-// 	// This is a placeholder for when we have the TX engine in place with full
-// 	// JSON/RPC commands on the main Paladin engine to invoke this over HTTP
-// 	type testConfigType struct {
-// 		Persistence persistence.Config  `yaml:"persistence"`
-// 		Eth         ethclient.Config    `yaml:"eth"`
-// 		Indexer     blockindexer.Config `yaml:"indexer"`
-// 		Keys        api.Config          `yaml:"keys"`
-// 	}
-// 	var testConfig testConfigType
+	var testConfig componentmgr.Config
 
-// 	err := yaml.Unmarshal([]byte(`
-// persistence:
-//   type: sqlite
-//   sqlite:
-//     uri:           ":memory:"
-//     autoMigrate:   true
-//     migrationsDir: ../db/migrations/sqlite
-//     debugQueries:  true
-// eth:
-//     ws:
-//         url: ws://localhost:8546
-//         initialConnectAttempts: 25
-// keys:
-//     keyDerivation:
-//       type: bip32
-//     keyStore:
-//       type: static
-//       static:
-//         keys:
-//           seed:
-//             encoding: none
-//             inline: polar mechanic crouch jungle field room dry sure machine brisk seed bulk student total ethics
-// `), &testConfig)
-// 	assert.NoError(t, err)
+	err := yaml.Unmarshal([]byte(`
+db:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: ../db/migrations/sqlite
+    debugQueries:  true
+blockchain:
+  http:
+    url: http://localhost:8545
+  ws:
+    url: ws://localhost:8546
+    initialConnectAttempts: 25
+signer:
+    keyDerivation:
+      type: bip32
+    keyStore:
+      type: static
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: polar mechanic crouch jungle field room dry sure machine brisk seed bulk student total ethics
+`), &testConfig)
+	assert.NoError(t, err)
 
-// 	p, err := persistence.NewPersistence(ctx, &testConfig.Persistence)
-// 	assert.NoError(t, err)
-// 	defer p.Close()
+	p, err := persistence.NewPersistence(ctx, &testConfig.DB)
+	assert.NoError(t, err)
+	defer p.Close()
 
-// 	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
-// 		FromBlock: types.RawJSON(`"latest"`), // don't want earlier events
-// 	}, &testConfig.Eth.WS, p)
-// 	assert.NoError(t, err)
+	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
+		FromBlock: types.RawJSON(`"latest"`), // don't want earlier events
+	}, &testConfig.Blockchain.WS, p)
+	assert.NoError(t, err)
 
 // 	type solBuild struct {
 // 		ABI      abi.ABI                   `json:"abi"`
@@ -160,53 +154,56 @@ package kata
 // 	err = json.Unmarshal(simpleStorageBuildJSON, &simpleStorageBuild)
 // 	assert.NoError(t, err)
 
-// 	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
-// 	err = indexer.Start(&blockindexer.InternalEventStream{
-// 		Handler: func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) error {
-// 			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
-// 			for _, e := range batch.Events {
-// 				select {
-// 				case eventStreamEvents <- e:
-// 				default:
-// 					assert.Fail(t, "more than expected number of events received")
-// 				}
-// 			}
-// 			return nil
-// 		},
-// 		Definition: &blockindexer.EventStream{
-// 			Name: "unittest",
-// 			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
-// 		},
-// 	})
-// 	assert.NoError(t, err)
-// 	defer indexer.Stop()
+	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
+	err = indexer.Start(&blockindexer.InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
+			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
+			for _, e := range batch.Events {
+				select {
+				case eventStreamEvents <- e:
+				default:
+					assert.Fail(t, "more than expected number of events received")
+				}
+			}
+			return nil, nil
+		},
+		Definition: &blockindexer.EventStream{
+			Name: "unittest",
+			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
+		},
+	})
+	assert.NoError(t, err)
+	defer indexer.Stop()
 
-// 	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Keys)
-// 	assert.NoError(t, err)
+	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Signer)
+	assert.NoError(t, err)
 
-// 	ethClient, err := ethclient.NewEthClient(ctx, keyMgr, &testConfig.Eth)
-// 	assert.NoError(t, err)
-// 	defer ethClient.Close()
+	ecf, err := ethclient.NewEthClientFactory(ctx, keyMgr, &testConfig.Blockchain)
+	assert.NoError(t, err)
+	err = ecf.Start()
+	assert.NoError(t, err)
+	defer ecf.Stop()
+	ethClient := ecf.HTTPClient()
 
 // 	simpleStorage, err := ethClient.ABI(ctx, simpleStorageBuild.ABI)
 // 	assert.NoError(t, err)
 
-// 	txHash1, err := simpleStorage.MustConstructor(simpleStorageBuild.Bytecode).R(ctx).
-// 		Signer("key1").Input(`{"x":11223344}`).SignAndSend()
-// 	assert.NoError(t, err)
-// 	deployTX, err := indexer.WaitForTransaction(ctx, txHash1.String())
-// 	assert.NoError(t, err)
-// 	contractAddr := deployTX.ContractAddress.Address0xHex()
+	txHash1, err := simpleStorage.MustConstructor(types.HexBytes(simpleStorageBuild.Bytecode)).R(ctx).
+		Signer("key1").Input(`{"x":11223344}`).SignAndSend()
+	assert.NoError(t, err)
+	deployTX, err := indexer.WaitForTransaction(ctx, *txHash1)
+	assert.NoError(t, err)
+	contractAddr := deployTX.ContractAddress.Address0xHex()
 
 // 	getX1, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
 // 	assert.NoError(t, err)
 // 	assert.JSONEq(t, `{"x":"11223344"}`, string(getX1))
 
-// 	txHash2, err := simpleStorage.MustFunction("set").R(ctx).
-// 		Signer("key1").To(contractAddr).Input(`{"_x":99887766}`).SignAndSend()
-// 	assert.NoError(t, err)
-// 	_, err = indexer.WaitForTransaction(ctx, txHash2.String())
-// 	assert.NoError(t, err)
+	txHash2, err := simpleStorage.MustFunction("set").R(ctx).
+		Signer("key1").To(contractAddr).Input(`{"_x":99887766}`).SignAndSend()
+	assert.NoError(t, err)
+	_, err = indexer.WaitForTransaction(ctx, *txHash2)
+	assert.NoError(t, err)
 
 // 	getX2, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
 // 	assert.NoError(t, err)

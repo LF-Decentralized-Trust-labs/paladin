@@ -165,9 +165,9 @@ var (
 	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
 	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
 	MsgPluginBadRequestBody    = ffe("PD011203", "Invalid request body %T")
-	MsgPluginBadResponseBody   = ffe("PD011204", "Invalid response body %T")
-	MsgPluginUDSPathTooLong    = ffe("PD011205", "Unix domain socket path too log (len=%d,limit=100)")
-	MsgPluginError             = ffe("PD011206", "Plugin returned error: %s")
+	MsgPluginUDSPathTooLong    = ffe("PD011204", "Unix domain socket path too log (len=%d,limit=100)")
+	MsgPluginBadResponseBody   = ffe("PD011205", "%s %s returned invalid response body %T")
+	MsgPluginError             = ffe("PD011206", "%s %s returned error: %s")
 	MsgPluginLoadFailed        = ffe("PD011207", "Plugin load failed: %s")
 
 	// BlockIndexer PD0113XX
@@ -239,7 +239,5 @@ var (
 	MsgDomainMissingStates              = ffe("PD011616", "Missing in-memory states")
 	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
 	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
-
-	// Engine PD0117XX
-	MsgDomainNotProvided = ffe("PD011700", "Domain not found in the transaction input")
+	MsgDomainBaseLedgerSubmitInvalid    = ffe("PD011619", "Base ledger submission config is invalid")
 )

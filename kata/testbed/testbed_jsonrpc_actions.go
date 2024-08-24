@@ -63,7 +63,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
 		abi abi.ABI,
-		bytecode ethtypes.HexBytes0xPrefix,
+		bytecode types.HexBytes,
 		params types.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
@@ -83,7 +83,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 			Input(params).
 			SignAndSend()
 		if err == nil {
-			tx, err = tb.components.BlockIndexer().WaitForTransaction(ctx, txHash.String())
+			tx, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to send transaction: %s", err)
@@ -170,9 +170,11 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		tx := &components.PrivateTransaction{
 			ID: uuid.New(),
 			Inputs: &components.TransactionInputs{
-				Domain: psc.Domain().Name(),
-				From:   invocation.From,
-				To:     psc.Address(),
+				Function: &invocation.Function,
+				Domain:   psc.Domain().Name(),
+				From:     invocation.From,
+				To:       psc.Address(),
+				Inputs:   invocation.Inputs,
 			},
 		}
 
@@ -208,6 +210,13 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		case prototk.AssembleTransactionResponse_OK:
 		default:
 			return false, fmt.Errorf("assemble result was %s", tx.PostAssembly.AssemblyResult)
+		}
+
+		// The testbed always chooses to take the assemble output and progress to endorse
+		// (no complex sequence selection routine that might result in abandonment).
+		// So just write the states
+		if err := psc.WritePotentialStates(ctx, tx); err != nil {
+			return false, err
 		}
 
 		// Gather signatures

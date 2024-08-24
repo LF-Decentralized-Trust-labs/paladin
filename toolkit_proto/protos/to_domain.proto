@@ -87,12 +87,13 @@ message AssembleTransactionResponse {
 
 // **ENDORSE** step happens upon instruction from the attestation plan output from ASSEMBLE
 message EndorseTransactionRequest {
-  ResolvedVerifier endorsement_verifier = 1; // The resolved verifier requested to be used for endorsement
-  TransactionSpecification transaction = 2; // The transaction specified by the user
-  repeated ResolvedVerifier resolved_verifiers = 3; // The list of resovled verifiers
-  repeated EndorsableState inputs = 4; // Input states for the transaction
-  repeated EndorsableState outputs = 5; // Output states for the transaction
-  repeated AttestationResult signatures = 6; // All SIGN attestation results (required from submitting node before endorsement)
+  AttestationRequest endorsement_request = 1; // The attestation request from the attestation plan
+  ResolvedVerifier endorsement_verifier = 2; // The resolved verifier requested to be used for endorsement
+  TransactionSpecification transaction = 3; // The transaction specified by the user
+  repeated ResolvedVerifier resolved_verifiers = 4; // The list of resovled verifiers
+  repeated EndorsableState inputs = 5; // Input states for the transaction
+  repeated EndorsableState outputs = 6; // Output states for the transaction
+  repeated AttestationResult signatures = 7; // All SIGN attestation results (required from submitting node before endorsement)
 }
 
 message EndorseTransactionResponse {

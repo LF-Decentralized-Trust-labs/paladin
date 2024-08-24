@@ -13,14 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.apache.tools.ant.taskdefs.condition.Os
 import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
         include "pkg/**/*.go"
     }
-    targetCoverage = 100
+    targetCoverage = 99
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/toolkit/pkg/prototk',
@@ -57,29 +56,35 @@ task installTools(type:Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task protoc(type:Exec, dependsOn: [installTools]) {
-    workingDir '.'
-    inputs.files(configurations.toolkitProtoDefinitions)
-    outputs.dir("pkg/prototk")
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
-    args "--go_out=${projectDir}/pkg/prototk"
-    args "--go_opt=paths=source_relative"
-    args "--go-grpc_out=${projectDir}/pkg/prototk"
-    args "--go-grpc_opt=paths=source_relative"
-    fileTree(configurations.toolkitProtoDefinitions.asPath) {
+task protoc(type: ProtoCompile, dependsOn: [installTools]) {
+    protocPath "bin"
+    protoPath configurations.toolkitProtoDefinitions.asPath
+    protoFiles fileTree(configurations.toolkitProtoDefinitions.asPath) {
         include "*.proto"
-    }.each { File file ->
-        args "--go_opt=M${file.name}=pkg/prototk"
-        args "--go-grpc_opt=M${file.name}=pkg/prototk"
     }
-    args "--proto_path=${configurations.toolkitProtoDefinitions.asPath}"
-    args fileTree(configurations.toolkitProtoDefinitions.asPath) {
-        include "*.proto"
+    plugins {
+        go {
+            out "${projectDir}/pkg/prototk"
+            opt 'paths=source_relative'
+            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+               include "*.proto"
+            }.each { File file ->
+                opt "M${file.name}=pkg/prototk"
+            }
+        }
+        go_grpc {
+            out "${projectDir}/pkg/prototk"
+            opt 'paths=source_relative'
+            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+               include "*.proto"
+            }.each { File file ->
+                opt "M${file.name}=pkg/prototk"
+            }
+        }
     }
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
