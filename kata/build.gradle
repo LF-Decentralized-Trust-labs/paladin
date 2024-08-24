@@ -24,13 +24,12 @@ ext {
         include "mocks/**/*.go"
     }
 
-    // targetCoverage = 94
-    targetCoverage = 76 // TODO ON PETER TO RECOVER THIS AS PART OF POST-MERGE OF PULL #83
+    targetCoverage = 94
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
-        'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/toolkit/prototk',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
         'github.com/kaleido-io/paladin/kata/testbed',
     ]
@@ -332,7 +331,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/..."
+        args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
