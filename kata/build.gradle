@@ -211,58 +211,7 @@ task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:g
     args 'get'
 }
 
-task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
-    mockery 'bin/mockery'
-    args '--case', 'underscore'
-    mock {
-        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-        includeAll true
-        outputPackage 'rpcbackendmocks'
-        outputDir 'mocks/rpcbackendmocks'
-    }
-    mock {
-        inputDir 'internal/components'
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'internal/statestore'
-        name 'StateStore'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'internal/statestore'
-        name 'DomainStateInterface'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'pkg/blockindexer'
-        name 'BlockIndexer'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'internal/plugins'
-        name 'PluginController'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'internal/rpcserver'
-        name 'RPCServer'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir 'pkg/ethclient'
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }    
-}
+
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
