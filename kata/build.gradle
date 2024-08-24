@@ -69,71 +69,6 @@ task installTools(type:Exec, dependsOn: ':toolkit_go:protoc') {
     args 'github.com/vektra/mockery/v2'
 }
 
-task makeMocks(type: Mockery, dependsOn: tasks.installTools) {
-    mockery 'bin/mockery'
-    args '--case', 'underscore'
-    mock {
-        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-        includeAll true
-        outputPackage 'rpcbackendmocks'
-        outputDir 'mocks/rpcbackendmocks'
-    }
-    mock {
-        inputDir "internal/engine"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/statestore"
-        name "StateStore"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-
-    mock {
-        inputDir "internal/statestore"
-        name "DomainStateInterface"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/commsbus"
-        includeAll true
-        outputPackage 'commsbusmocks'
-        outputDir 'mocks/commsbusmocks'
-    }
-    mock {
-        inputDir "internal/components"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "pkg/blockindexer"
-        name "BlockIndexer"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/plugins"
-        name "PluginController"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/rpcserver"
-        name "RPCServer"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "pkg/ethclient"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-}
 
 task copyTestContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
@@ -200,7 +135,74 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
+
+task makeMocks(type: Mockery, dependsOn: [tasks.protoc, tasks.installTools]) {
+    mockery 'bin/mockery'
+    args '--case', 'underscore'
+    mock {
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
+    }
+    mock {
+        inputDir "internal/engine"
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "internal/statestore"
+        name "StateStore"
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+
+    mock {
+        inputDir "internal/statestore"
+        name "DomainStateInterface"
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "internal/commsbus"
+        includeAll true
+        outputPackage 'commsbusmocks'
+        outputDir 'mocks/commsbusmocks'
+    }
+    mock {
+        inputDir "internal/components"
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "pkg/blockindexer"
+        name "BlockIndexer"
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "internal/plugins"
+        name "PluginController"
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "internal/rpcserver"
+        name "RPCServer"
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir "pkg/ethclient"
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+}
+
+task goGet(type:Exec, dependsOn:[tasks.makeMocks,tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
