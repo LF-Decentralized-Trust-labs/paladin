@@ -18,6 +18,7 @@ package orchestrator
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
@@ -199,6 +200,8 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 	assert.False(t, testOc.ProcessNewTransaction(ctx, testTx))
 	<-waitForAction                        // no events emitted as no synchronous output was returned
 	testOc.TriggerOrchestratorEvaluation() // this should remove the process from the pool
+	//workaround timing condition
+	time.Sleep(100 * time.Millisecond)
 	testOc.Stop()
 	testOc.Stop() // do a second stop to ensure at least one stop has gone through as the channel has buffer size 1
 	<-ocDone
