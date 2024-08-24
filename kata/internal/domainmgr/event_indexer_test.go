@@ -72,7 +72,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
-						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
 						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"data": "0xfeedbeef"
 					}`),
@@ -165,7 +165,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
-						"txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
 						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"data": "0xfeedbeef"
 					}`),

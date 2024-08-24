@@ -23,8 +23,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
 )
@@ -168,7 +168,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 		ec = ecf.HTTPClient()
 	}
 
-	_, key1, err := ecf.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, key1, err := ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	assert.NoError(t, err)
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
@@ -247,7 +247,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	defer done()
 
 	if withFrom {
-		_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+		_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 		assert.NoError(t, err)
 	}
 
@@ -543,7 +543,7 @@ func TestInvokeConstructor(t *testing.T) {
 	})
 	defer done()
 
-	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	assert.NoError(t, err)
 
 	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)

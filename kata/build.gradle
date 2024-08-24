@@ -168,6 +168,12 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
     }
     mock {
         inputDir 'internal/statestore'
+        name 'Schema'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
         name 'DomainStateInterface'
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'

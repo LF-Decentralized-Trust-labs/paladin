@@ -250,6 +250,9 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 }
 
 func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {
+	if tx.Inputs == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteInitDeploy)
+	}
 
 	// Build the init request
 	var abiJSON []byte
@@ -268,7 +271,7 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 
 	txSpec := &prototk.DeployTransactionSpecification{}
 	tx.TransactionSpecification = txSpec
-	txSpec.TransactionId = types.Bytes32UUIDLower16(tx.ID).String()
+	txSpec.TransactionId = types.Bytes32UUIDFirst16(tx.ID).String()
 	txSpec.ConstructorAbi = string(abiJSON)
 	txSpec.ConstructorParamsJson = string(paramsJSON)
 
@@ -286,6 +289,10 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 }
 
 func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {
+	if tx.Inputs == nil || tx.TransactionSpecification == nil || tx.Verifiers == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompletePrepareDeploy)
+	}
+
 	// All the work is done for us by the engine in resolving the verifiers
 	// after InitDeploy, so we just pass it along
 	res, err := d.api.PrepareDeploy(ctx, &prototk.PrepareDeployRequest{
@@ -296,28 +303,46 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		return err
 	}
 
-	tx.Signer = res.SigningAddress
+	if res.Signer != nil && *res.Signer != "" {
+		tx.Signer = *res.Signer
+	} else {
+		switch d.config.BaseLedgerSubmitConfig.SubmitMode {
+		case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
+			tx.Signer = d.config.BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String()
+		default:
+			log.L(ctx).Errorf("Signer mode %s and no signer returned", d.config.BaseLedgerSubmitConfig.SubmitMode)
+			return i18n.NewError(ctx, msgs.MsgDomainDeployNoSigner)
+		}
+	}
 	if res.Transaction != nil && res.Deploy == nil {
 		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
 		if functionABI == nil {
 			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 		}
+		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
+		if err != nil {
+			return err
+		}
+		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
 			FunctionABI: functionABI,
 			To:          *d.Address(),
-			Params:      types.RawJSON(res.Transaction.ParamsJson),
+			Inputs:      inputs,
 		}
-		tx.DeployTransaction = nil
 	} else if res.Deploy != nil && res.Transaction == nil {
 		functionABI := d.factoryContractABI.Constructor()
 		if functionABI == nil {
 			// default constructor
 			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
 		}
+		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Deploy.ParamsJson))
+		if err != nil {
+			return err
+		}
 		tx.DeployTransaction = &components.EthDeployTransaction{
 			ConstructorABI: functionABI,
 			Bytecode:       res.Deploy.Bytecode,
-			Params:         types.RawJSON(res.Deploy.ParamsJson),
+			Inputs:         inputs,
 		}
 		tx.InvokeTransaction = nil
 	} else {
@@ -325,6 +350,13 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		return i18n.NewError(ctx, msgs.MsgDomainInvalidPrepareDeployResult)
 	}
 	return nil
+}
+
+func emptyJSONIfBlank(js string) []byte {
+	if len(js) == 0 {
+		return []byte(`{}`)
+	}
+	return []byte(js)
 }
 
 func (d *domain) close() {

@@ -56,10 +56,9 @@ func (d *domain) newSmartContract(def *PrivateSmartContract) *domainContract {
 }
 
 func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
-
-	// We are responsible for building the PreAssembly
-	preAssembly := &components.TransactionPreAssembly{}
-	tx.PreAssembly = preAssembly
+	if tx.Inputs == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteInitTransaction)
+	}
 
 	// Query the base block height to inform the assembly step that comes later
 	confirmedBlockHeight, err := dc.dm.blockIndexer.GetConfirmedBlockHeight(ctx)
@@ -84,7 +83,7 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	}
 
 	txSpec := &prototk.TransactionSpecification{
-		TransactionId:      types.Bytes32UUIDLower16(tx.ID).String(),
+		TransactionId:      types.Bytes32UUIDFirst16(tx.ID).String(),
 		ContractAddress:    dc.info.Address.String(),
 		ContractConfig:     dc.info.ConfigBytes,
 		From:               txi.From,
@@ -93,8 +92,6 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		FunctionSignature:  txi.Function.SolString(), // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
 		BaseBlock:          int64(confirmedBlockHeight),
 	}
-	preAssembly.TransactionSpecification = txSpec
-
 	// Do the request with the domain
 	res, err := dc.api.InitTransaction(ctx, &prototk.InitTransactionRequest{
 		Transaction: txSpec,
@@ -104,7 +101,11 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	}
 
 	// Store the response back on the TX
-	preAssembly.RequiredVerifiers = res.RequiredVerifiers
+	preAssembly := &components.TransactionPreAssembly{
+		TransactionSpecification: txSpec,
+		RequiredVerifiers:        res.RequiredVerifiers,
+	}
+	tx.PreAssembly = preAssembly
 	return nil
 }
 
@@ -113,8 +114,6 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// Clear any previous assembly state out, as it's considered completely invalid
 	// at this point if we're re-assembling.
 	preAssembly := tx.PreAssembly
-	postAssembly := &components.TransactionPostAssembly{}
-	tx.PostAssembly = postAssembly
 
 	// Now we have the required verifiers, we can ask the domain to do the heavy lifting
 	// and assemble the transaction (using the state store interface we provide)
@@ -126,6 +125,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 		return err
 	}
 
+	postAssembly := &components.TransactionPostAssembly{}
 	// We hydrate the states on our side of the Manager<->Plugin divide at this point,
 	// which provides back to the engine the full sequence locking information of the
 	// states (inputs, and read)
@@ -146,6 +146,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// of the result, and the locking on the input states, the engine might decide to
 	// abandon this attempt and just re-assemble later.
 	postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
+	tx.PostAssembly = postAssembly
 	return nil
 }
 
@@ -307,12 +308,44 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	if functionABI == nil {
 		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 	}
+	inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
+	if err != nil {
+		return err
+	}
 	tx.PreparedTransaction = &components.EthTransaction{
 		FunctionABI: functionABI,
 		To:          dc.Address(),
-		Params:      types.RawJSON(res.Transaction.ParamsJson),
+		Inputs:      inputs,
 	}
 	return nil
+}
+
+func (dc *domainContract) ResolveDispatchSigner(ctx context.Context, tx *components.PrivateTransaction) error {
+	config := dc.d.Configuration()
+	switch config.BaseLedgerSubmitConfig.SubmitMode {
+	case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
+		tx.Signer = config.BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String()
+		return nil
+	case prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION:
+		for _, ar := range tx.PostAssembly.Endorsements {
+			for _, c := range ar.Constraints {
+				if c == prototk.AttestationResult_ENDORSER_MUST_SUBMIT {
+					if tx.Signer != "" {
+						// Multiple endorsers claiming it is an error
+						return i18n.NewError(ctx, msgs.MsgDomainMultipleEndorsersSubmit)
+					}
+					tx.Signer = ar.Verifier.Lookup
+				}
+			}
+		}
+		if tx.Signer == "" {
+			return i18n.NewError(ctx, msgs.MsgDomainNoEndorserSubmit)
+		}
+		return nil
+	default:
+		return i18n.NewError(ctx, msgs.MsgDomainInvalidSubmissionConfig, config.BaseLedgerSubmitConfig.SubmitMode)
+	}
+
 }
 
 func (dc *domainContract) Domain() components.Domain {
