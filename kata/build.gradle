@@ -223,7 +223,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContract
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.buildSharedLibrary]) {
+task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     workingDir '.'
 
     def libName;
