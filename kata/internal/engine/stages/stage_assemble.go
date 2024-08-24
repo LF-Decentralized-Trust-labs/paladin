@@ -17,14 +17,12 @@ package stages
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type AssembleStage struct{}
@@ -34,89 +32,37 @@ func (as *AssembleStage) Name() string {
 }
 
 func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
-	sequencePreReqsToCheck := tsg.GetPreReqTransactions(ctx) // only get the pre-req in the sequence
-	if sfs.Sequencer() == nil {
-		// no sequencer, no need to check pre-reqs
-		return nil
-	}
-	assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: doesn't work when a tx is in multiple sequences and rounds need to checked for all sequences
-	preReqsPending := sfs.DependencyChecker().PreReqsMatchCondition(ctx, sequencePreReqsToCheck, func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool) {
-		return preReqTx.GetAssembledRound(ctx) == assembleRound // only treat pre-req in the sequence as assembled when their assembled record matches the newest assemble round,
-	})
-	if len(preReqsPending) > 0 {
-		return &types.TxProcessPreReq{
-			TxIDs: preReqsPending,
-		}
-	}
+	//TODO for now we don't have any pre-reqs for assemble stage
+
 	return nil
 }
 
 func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
-	unprocessedStageEvents = []*types.StageEvent{}
-	nextStep = types.NextStepWait
-	for _, se := range stageEvents {
-		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
-			if se.Data != nil {
-				switch v := se.Data.(type) {
-				case prototk.AssembleTransactionResponse:
-					if v.AssemblyResult == prototk.AssembleTransactionResponse_OK {
-						attPlan, err := json.Marshal(v.AttestationPlan)
-						attPlanStr := string(attPlan)
-						// transaction assembled, store the information into DB
-						txUpdates = &transactionstore.TransactionUpdate{
-							AssembledRound:  tsg.GetAssembledRound(ctx) + 1, // TODO. this should be in the assemble response
-							PayloadJSON:     v.AssembledTransaction.String(),
-							AttestationPlan: &attPlanStr,
-							AssembleError:   err.Error(),
-						}
-					} else {
-						txUpdates = &transactionstore.TransactionUpdate{
-							AssembledRound: tsg.GetAssembledRound(ctx) + 1, // TODO. this should be in the assemble response
-							PayloadJSON:    "",                             // wipe the previous assemble response as they are no longer valid
-							AssembleError:  *v.RevertReason,
-						}
-					}
-				}
-			}
-			//TODO: panic error, retry when data is nil?
-
-		} else {
-			unprocessedStageEvents = append(unprocessedStageEvents, se)
-		}
+	if len(stageEvents) > 0 {
+		log.L(ctx).Errorf("Assemble stage does not expect any events, but got %d", len(stageEvents))
+		return stageEvents, nil, types.NextStepWait
 	}
-	return
+	return nil, nil, types.NextStepWait
 }
 
 func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
-	// assembleRound := sfs.Sequencer().GetLatestAssembleRoundForTx(ctx, tsg.GetTxID(ctx)) // TODO: deal with a tx in multiple sequences
-	// return tsg.GetAssembledRound(ctx) != assembleRound || tsg.GetPayloadJSON(ctx) == ""
-	return tsg.GetPayloadJSON(ctx) == ""
+
+	// if we have a private transaction but do not have a post assemble payload, we are in the assemble stage
+	return tsg.HACKGetPrivateTx() != nil && tsg.HACKGetPrivateTx().PostAssembly == nil
+
 }
 
 func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+	//TODO assembly must be single threaded ( at least single thread per domain contract)
+	// can we assume that we are already on a single thread or do we need to delegate to a single thread here
 	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
-	var assembleResponse *prototk.AssembleTransactionResponse
-
-	assembleErr := sfs.StateStore().RunInDomainContext(tsg.GetDomainID(ctx), func(ctx context.Context, dsi statestore.DomainStateInterface) error {
-		// todo delegate to domain to do state generation
-		assembleResponse = &prototk.AssembleTransactionResponse{
-			// dummy empty object for now
-		}
-		return nil
-	})
-
-	if assembleErr != nil {
-		assembleErrStr := assembleErr.Error()
-		return prototk.AssembleTransactionResponse{
-			AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
-			RevertReason:   &assembleErrStr,
-		}, nil
-	} else if assembleResponse == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorEmptyAssembledResult, tsg.GetTxID(ctx))
-	} else {
-		return assembleResponse, nil
+	err := sfs.DomainAPI().AssembleTransaction(ctx, tsg.HACKGetPrivateTx())
+	if err != nil {
+		log.L(ctx).Errorf("AssembleTransaction failed: %s", err)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgEngineAssembleError)
 	}
+	return nil, nil
 }

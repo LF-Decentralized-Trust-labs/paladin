@@ -242,5 +242,6 @@ var (
 	MsgDomainBaseLedgerSubmitInvalid    = ffe("PD011619", "Base ledger submission config is invalid")
 
 	// Engine PD0117XX
-	MsgDomainNotProvided = ffe("PD011700", "Domain not found in the transaction input")
+	MsgDomainNotProvided   = ffe("PD011700", "Domain not found in the transaction input")
+	MsgEngineAssembleError = ffe("PD011701", "Error assembling transaction")
 )
