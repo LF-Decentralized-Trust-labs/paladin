@@ -13,14 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import org.apache.tools.ant.taskdefs.condition.Os
 import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
         include "pkg/**/*.go"
     }
-    targetCoverage = 98
+    targetCoverage = 99
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/toolkit/pkg/prototk',
@@ -85,7 +84,7 @@ task protoc(type: ProtoCompile, dependsOn: [installTools]) {
     }
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }

@@ -54,7 +54,7 @@ task installTools(type:Exec) {
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
     args 'install'
-    inputs.files(['go.mod','go.sum'])
+    inputs.files('go.mod','go.sum')
     outputs.files(
         "bin/protoc-gen-go",
         "bin/protoc-gen-go-grpc",
