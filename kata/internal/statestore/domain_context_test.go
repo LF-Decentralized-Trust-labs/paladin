@@ -93,7 +93,7 @@ func TestStateFlushAsync(t *testing.T) {
 
 	// Run a 2nd handler that depends on that schema being available
 	err = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
-		states, err := dsi.CreateNewStates(uuid.New(), []*NewState{
+		states, err := dsi.UpsertStates(nil, []*StateUpsert{
 			{
 				SchemaID: schemaID,
 				Data:     types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, types.RandHex(32))),
@@ -112,34 +112,37 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	_, ss, done := newDBTestStateStore(t)
 	defer done()
 
-	sequenceID := uuid.New()
+	transactionID := uuid.New()
 	var schemaID string
 
-	err := ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		// Pop in our widget ABI
 		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
 		assert.Len(t, schemas, 1)
 		schemaID = schemas[0].IDString()
 
-		// Flush as ABI schemas only available after a flush
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		// Need to flush for the schemas to be available
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		// Store some states
-		tx1states, err := dsi.CreateNewStates(sequenceID, []*NewState{
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
+		tx1states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
+			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
+			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
+			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, tx1states, 3)
 
-		// Mark an in-memory read - doesn't affect it's availability, but will be locked to that sequence
-		err = dsi.MarkStatesRead(sequenceID, []string{tx1states[0].ID.String()})
+		// Mark an in-memory read - doesn't affect it's availability, but will be locked to that transaction
+		err = dsi.MarkStatesRead(transactionID, []string{tx1states[0].ID.String()})
 		assert.NoError(t, err)
 
-		// We can't arbitrarily move it to another sequence (would need to reset the first sequence)
+		// We can't arbitrarily move it to another transaction (would need to reset the first transaction)
 		err = dsi.MarkStatesRead(uuid.New(), []string{tx1states[0].ID.String()})
 		assert.Regexp(t, "PD010118", err)
 		err = dsi.MarkStatesSpending(uuid.New(), []string{tx1states[0].ID.String()})
@@ -157,21 +160,28 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(10), parseFakeCoin(t, states[0]).Amount.Int64())
 		assert.Equal(t, int64(75), parseFakeCoin(t, states[1]).Amount.Int64())
 		assert.Equal(t, int64(100), parseFakeCoin(t, states[2]).Amount.Int64())
-		assert.True(t, states[0].Locked.Creating)              // should be marked creating
-		assert.Equal(t, sequenceID, states[0].Locked.Sequence) // for the sequence we specified
+		assert.True(t, states[0].Locked.Creating)                    // should be marked creating
+		assert.Equal(t, transactionID, states[0].Locked.Transaction) // for the transaction we specified
 
 		// Simulate a transaction where we spend two states, and create 2 new ones
-		err = dsi.MarkStatesSpending(sequenceID, []string{
+		err = dsi.MarkStatesSpending(transactionID, []string{
 			states[0].ID.String(), // 10 +
 			states[1].ID.String(), // 75
 		})
 		assert.NoError(t, err)
-		tx2states, err := dsi.CreateNewStates(sequenceID, []*NewState{
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, types.RandHex(32)))},
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
-		})
-		assert.NoError(t, err)
-		assert.Len(t, tx2states, 2)
+
+		// Do a quick check on upsert semantics with un-flushed updates, to make sure the unflushed list doesn't dup
+		tx2Salts := []string{types.RandHex(32), types.RandHex(32)}
+		for dup := 0; dup < 2; dup++ {
+			tx2states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
+				{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tx2Salts[0])), Creating: true},
+				{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tx2Salts[1])), Creating: true},
+			})
+			assert.NoError(t, err)
+			assert.Len(t, tx2states, 2)
+			assert.Equal(t, len(dsi.(*domainContext).unFlushed.states), 5)
+			assert.Equal(t, len(dsi.(*domainContext).unFlushed.stateLocks), 5)
+		}
 
 		// Query the states on the first address
 		states, err = dsi.FindAvailableStates(schemaID, toQuery(t, `{
@@ -193,11 +203,13 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(50), parseFakeCoin(t, states[0]).Amount.Int64())
 
 		// Flush the states to the database
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		// Check the DB persisted state is what we expect
-		states, err = dsi.FindAvailableStates(schemaID, toQuery(t, `{
+		states, err := dsi.FindAvailableStates(schemaID, toQuery(t, `{
 			"sort": [ "owner", "amount" ]
 		}`))
 		assert.NoError(t, err)
@@ -206,20 +218,20 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Equal(t, int64(35), parseFakeCoin(t, states[1]).Amount.Int64())
 		assert.Equal(t, int64(100), parseFakeCoin(t, states[2]).Amount.Int64())
 
-		// Mark a persisted one read - doesn't affect it's availability, but will be locked to that sequence
-		err = dsi.MarkStatesRead(sequenceID, []string{
+		// Mark a persisted one read - doesn't affect it's availability, but will be locked to that transaction
+		err = dsi.MarkStatesRead(transactionID, []string{
 			states[1].ID.String(),
 		})
 		assert.NoError(t, err)
 
 		// Write another transaction that splits a coin to two
-		err = dsi.MarkStatesSpending(sequenceID, []string{
+		err = dsi.MarkStatesSpending(transactionID, []string{
 			states[0].ID.String(), // 50
 		})
 		assert.NoError(t, err)
-		tx3states, err := dsi.CreateNewStates(sequenceID, []*NewState{
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
-			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32)))},
+		tx3states, err := dsi.UpsertStates(&transactionID, []*StateUpsert{
+			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))), Creating: true},
+			{SchemaID: schemaID, Data: types.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, types.RandHex(32))), Creating: true},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, tx3states, 2)
@@ -244,19 +256,22 @@ func TestStateContextMintSpendMint(t *testing.T) {
 		assert.Len(t, states, 1)
 		assert.Equal(t, int64(20), parseFakeCoin(t, states[0]).Amount.Int64())
 
-		// Reset the sequence - this will clear the in-memory state,
+		// Reset the transaction - this will clear the in-memory state,
 		// and remove the locks from the DB. It will not remove the states
 		// themselves
-		err = dsi.ResetSequence(sequenceID)
+		err = dsi.ResetTransaction(transactionID)
 		assert.NoError(t, err)
 
 		// None of the states will be returned to available after the flush
 		// - but before then the DB ones will be
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		// Confirm
-		states, err = dsi.FindAvailableStates(schemaID, toQuery(t, `{}`))
+		states, err := dsi.FindAvailableStates(schemaID, toQuery(t, `{}`))
 		assert.NoError(t, err)
 		assert.Empty(t, states)
 
@@ -304,12 +319,15 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		dc.flushResult <- fmt.Errorf("pop")
 	}
 
-	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	var schemas []Schema
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) (err error) {
+		schemas, err = dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
+		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
-		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
-		assert.NoError(t, err)
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
 		dc := dsi.(*domainContext)
 
@@ -328,7 +346,7 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
-		_, err = dsi.CreateNewStates(uuid.New(), nil)
+		_, err = dsi.UpsertStates(nil, nil)
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
@@ -340,7 +358,7 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
-		err = dsi.ResetSequence(uuid.New())
+		err = dsi.ResetTransaction(uuid.New())
 		assert.Regexp(t, "pop", err)
 
 		fakeFlushError(dc)
@@ -350,6 +368,7 @@ func TestDSIFlushErrorCapture(t *testing.T) {
 		return nil
 
 	})
+	assert.NoError(t, err)
 
 }
 
@@ -367,13 +386,13 @@ func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
 		types.RandHex(32))))
 	assert.NoError(t, err)
-	s1.Locked = &StateLock{State: s1.ID, Sequence: uuid.New(), Creating: true}
+	s1.Locked = &StateLock{State: s1.ID, Transaction: uuid.New(), Creating: true}
 
 	dc.flushing = &writeOperation{
 		states: []*StateWithLabels{s1},
 		stateLocks: []*StateLock{
 			s1.Locked,
-			{State: *types.Bytes32Keccak(([]byte)("another")), Spending: true},
+			{State: types.Bytes32Keccak(([]byte)("another")), Spending: true},
 		},
 	}
 
@@ -472,29 +491,31 @@ func TestDSIFindBadQueryAndInsert(t *testing.T) {
 	_, ss, done := newDBTestStateStore(t)
 	defer done()
 
-	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
+	var schemas []Schema
+	var schemaID string
+	err := ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) (err error) {
 
-		schemas, err := dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
+		schemas, err = dsi.EnsureABISchemas([]*abi.Parameter{testABIParam(t, fakeCoinABI)})
 		assert.NoError(t, err)
-		schemaID := schemas[0].IDString()
+		schemaID = schemas[0].IDString()
 		assert.Equal(t, "type=FakeCoin(bytes32 salt,address owner,uint256 amount),labels=[owner,amount]", schemas[0].Signature())
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
+		return nil
+	})
+	assert.NoError(t, err)
 
-		err = dsi.(DomainStateInterfaceUT).UnitTestFlushSync()
-		assert.NoError(t, err)
-
+	err = ss.RunInDomainContextFlush("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 		_, err = dsi.FindAvailableStates(schemaID, toQuery(t,
 			`{"sort":["wrong"]}`))
 		assert.Regexp(t, "PD010700", err)
 
-		_, err = dsi.CreateNewStates(uuid.New(), []*NewState{
+		_, err = dsi.UpsertStates(nil, []*StateUpsert{
 			{SchemaID: schemaID, Data: types.RawJSON(`"wrong"`)},
 		})
 		assert.Regexp(t, "FF22038", err)
 
 		return nil
 	})
+	assert.NoError(t, err)
 
 }
 
@@ -505,7 +526,7 @@ func TestDSIBadIDs(t *testing.T) {
 
 	_ = ss.RunInDomainContext("domain1", func(ctx context.Context, dsi DomainStateInterface) error {
 
-		_, err := dsi.CreateNewStates(uuid.New(), []*NewState{
+		_, err := dsi.UpsertStates(nil, []*StateUpsert{
 			{SchemaID: "wrong"},
 		})
 		assert.Regexp(t, "PD010100", err)
@@ -529,19 +550,19 @@ func TestDSIResetWithMixed(t *testing.T) {
 	dc := ss.getDomainContext("domain1")
 
 	state1 := types.Bytes32Keccak(([]byte)("state1"))
-	sequenceID1 := uuid.New()
-	err := dc.MarkStatesRead(sequenceID1, []string{state1.String()})
+	transactionID1 := uuid.New()
+	err := dc.MarkStatesRead(transactionID1, []string{state1.String()})
 	assert.NoError(t, err)
 
 	state2 := types.Bytes32Keccak(([]byte)("state2"))
-	sequenceID2 := uuid.New()
-	err = dc.MarkStatesSpending(sequenceID2, []string{state2.String()})
+	transactionID2 := uuid.New()
+	err = dc.MarkStatesSpending(transactionID2, []string{state2.String()})
 	assert.NoError(t, err)
 
-	err = dc.ResetSequence(sequenceID1)
+	err = dc.ResetTransaction(transactionID1)
 	assert.NoError(t, err)
 
 	assert.Len(t, dc.unFlushed.stateLocks, 1)
-	assert.Equal(t, dc.unFlushed.stateLocks[0].State, *state2)
+	assert.Equal(t, dc.unFlushed.stateLocks[0].State, state2)
 
 }

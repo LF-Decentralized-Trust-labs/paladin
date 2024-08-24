@@ -41,7 +41,11 @@ func (mkm *mockKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (*p
 	return mkm.sign(ctx, req)
 }
 
-func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
+func (mkm *mockKeyManager) Close() {
+
+}
+
+func newTestHDWalletKeyManager(t *testing.T) (*simpleKeyManager, func()) {
 	kmgr, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
 		KeyDerivation: api.KeyDerivationConfig{
 			Type: api.KeyDerivationTypeBIP32,
@@ -59,7 +63,7 @@ func newTestHDWalletKeyManager(t *testing.T) *simpleKeyManager {
 		},
 	})
 	assert.NoError(t, err)
-	return kmgr.(*simpleKeyManager)
+	return kmgr.(*simpleKeyManager), kmgr.Close
 }
 
 func TestSimpleKeyManagerInitFail(t *testing.T) {
@@ -76,7 +80,8 @@ func TestSimpleKeyManagerInitFail(t *testing.T) {
 }
 
 func TestGenerateIndexes(t *testing.T) {
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
 	for iFolder := 0; iFolder < 10; iFolder++ {
 		for iKey := 0; iKey < 10; iKey++ {
 			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
@@ -102,7 +107,8 @@ func TestKeyManagerResolveFail(t *testing.T) {
 
 func TestKeyManagerResolveConflict(t *testing.T) {
 
-	kmgr := newTestHDWalletKeyManager(t)
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
 
 	kmgr.rootFolder.Keys = map[string]*keyMapping{
 		"key1": {

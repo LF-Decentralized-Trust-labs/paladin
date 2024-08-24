@@ -26,15 +26,13 @@ import (
 
 func TestBytes32Static(t *testing.T) {
 
-	var id1 *Bytes32
-	assert.Equal(t, "", id1.String())
+	var id1 Bytes32
 	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", id1.HexString0xPrefix())
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", id1.HexString())
-	assert.Nil(t, id1.Bytes())
 	assert.True(t, id1.IsZero()) // nil returns true for isZero (as Bytes32 would give zero)
 
 	ctx := context.Background()
-	_, err := ParseBytes32(ctx, "0xfeedbeef")
+	_, err := ParseBytes32Ctx(ctx, "0xfeedbeef")
 	assert.Regexp(t, "PD010719.*32.*4", err)
 
 	assert.Panics(t, func() {
@@ -45,19 +43,22 @@ func TestBytes32Static(t *testing.T) {
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.String())
 		assert.Equal(t, "0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString0xPrefix())
 		assert.Equal(t, "512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414", id.HexString())
+		assert.Equal(t, "512d0e59-5c71-863c-47e8-03c565562f92", id.UUIDLower16().String())
+		assert.Equal(t, "512d0e595c71863c47e803c565562f9200000000000000000000000000000000", Bytes32UUIDLower16(id.UUIDLower16()).HexString())
 	}
 
 	id2 := MustParseBytes32("0x512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")
-	checkFixedOK(id2)
+	checkFixedOK(&id2)
 
 	id3 := NewBytes32FromSlice(id2.Bytes())
-	checkFixedOK(id3)
+	checkFixedOK(&id3)
 
-	assert.True(t, id2.Equals(id3))
+	assert.True(t, id2.Equals(&id3))
 	assert.False(t, id2.Equals(nil))
 	assert.True(t, (*Bytes32)(nil).Equals(nil))
-	assert.False(t, (*Bytes32)(nil).Equals(id2))
-	assert.True(t, (*Bytes32)(id2).Equals(MustParseBytes32("512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")))
+	assert.False(t, (*Bytes32)(nil).Equals(&id2))
+	id4 := MustParseBytes32("512d0e595c71863c47e803c565562f9284a48ee8984f4f9b55323eed72cf1414")
+	assert.True(t, (*Bytes32)(&id2).Equals(&id4))
 
 }
 

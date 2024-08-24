@@ -134,7 +134,7 @@ func TestFindStatesFail(t *testing.T) {
 	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
-		SchemaPersisted: &SchemaPersisted{ID: *schemaID},
+		SchemaPersisted: &SchemaPersisted{ID: schemaID},
 		definition:      &abi.Parameter{},
 	})
 

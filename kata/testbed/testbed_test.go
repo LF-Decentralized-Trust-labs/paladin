@@ -22,29 +22,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
-	"github.com/kaleido-io/paladin/kata/internal/httpserver"
-	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
+func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
-	tb = newTestBed()
+	tb = newTestBed(initFunctions...)
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
 
 	assert.NoError(t, err)
-	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
-	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
 	if err != nil {
 		panic(err)
 	}
+	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
+	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
+	tb.conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
+	setConf(tb.conf)
 	serverErr := make(chan error)
 	go func() {
 		serverErr <- tb.run()
@@ -52,7 +49,7 @@ func newUnitTestbed(t *testing.T) (url string, tb *testbed, done func()) {
 	err = <-tb.ready
 	assert.NoError(t, err)
 
-	return fmt.Sprintf("http://%s", tb.rpcServer.HTTPAddr()), tb, func() {
+	return fmt.Sprintf("http://%s", tb.components.RPCServer().HTTPAddr()), tb, func() {
 		select {
 		case tb.sigc <- os.Kill:
 		default:
@@ -96,98 +93,11 @@ func TestBadConfig(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCleanupOldSocketFail(t *testing.T) {
-	tempDir := t.TempDir()
-	err := os.WriteFile(path.Join(tempDir, "something.exists"), []byte{}, 0644)
-	assert.NoError(t, err)
-	err = (&testbed{socketFile: tempDir}).cleanupOldSocket()
-	assert.Error(t, err)
-}
-
 func TestTempSocketFileFail(t *testing.T) {
 	tempDir := t.TempDir()
 	thisIsAFile := path.Join(tempDir, "a.file")
 	err := os.WriteFile(thisIsAFile, []byte{}, 0644)
 	assert.NoError(t, err)
-	_, err = (&testbed{conf: &TestBedConfig{TempDir: &thisIsAFile}}).tempSocketFile()
+	_, err = (&testbed{conf: &componentmgr.Config{TempDir: &thisIsAFile}}).tempSocketFile()
 	assert.Error(t, err)
-}
-
-func TestRunCommsBusError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &TestBedConfig{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(t.TempDir()),
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "Comms bus", err)
-}
-
-func TestRunRPCError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &TestBedConfig{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
-			},
-		},
-		RPCServer: rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{
-				Config: httpserver.Config{
-					Port:    confutil.P(-1),
-					Address: confutil.P("::::wrong"),
-				},
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "RPC", err)
-}
-
-func TestRunBlockIndexerError(t *testing.T) {
-	tb := newTestBed()
-	tb.conf = &TestBedConfig{
-		DB: persistence.Config{
-			Type: "sqlite",
-			SQLite: persistence.SQLiteConfig{SQLDBConfig: persistence.SQLDBConfig{
-				URI:           ":memory:",
-				MigrationsDir: "./sqlite.memory.config.yaml",
-			}},
-		},
-		CommsBus: commsbus.Config{
-			GRPC: commsbus.GRPCConfig{
-				SocketAddress: confutil.P(path.Join(t.TempDir(), "socket.file")),
-			},
-		},
-		RPCServer: rpcserver.Config{
-			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
-			WS:   rpcserver.WSEndpointConfig{Disabled: true},
-		},
-		Blockchain: ethclient.Config{
-			WS: rpcclient.WSConfig{
-				HTTPConfig: rpcclient.HTTPConfig{
-					URL: "!!!! wrongness",
-				},
-			},
-		},
-	}
-	err := tb.run()
-	assert.Regexp(t, "Blockchain", err)
 }

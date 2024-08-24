@@ -20,10 +20,10 @@ contract AribtraryWidgets {
     Widget[] widgets;
   }
 
-  event Invoiced(Customer customer, Widget[] widgets);
+  event Invoiced(Customer customer, Widget[] widgets, address indexed account);
 
   function invoice(Invoice calldata _invoice) external payable {
-    emit Invoiced(_invoice.customer, _invoice.widgets);
+    emit Invoiced(_invoice.customer, _invoice.widgets, _invoice.customer.owner);
   }
 
 }

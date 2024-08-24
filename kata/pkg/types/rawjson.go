@@ -29,7 +29,7 @@ import (
 // Just like types.RawJSON, but with ability to SQL serialize to string as well
 type RawJSON []byte
 
-func JSONString(s string) RawJSON {
+func JSONString(s any) RawJSON {
 	b, _ := json.Marshal(s)
 	return b
 }

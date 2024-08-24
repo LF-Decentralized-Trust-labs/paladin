@@ -27,10 +27,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/mocks/rpcbackendmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -67,8 +67,9 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 
 	// Do a full start now with an internal event listener
 	var esID string
+	calledPostCommit := false
 	err := bi.Start(&InternalEventStream{
-		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
 			if esID == "" {
 				esID = batch.StreamID.String()
 			} else {
@@ -83,7 +84,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 				case <-ctx.Done():
 				}
 			}
-			return nil
+			return func() { calledPostCommit = true }, nil
 		},
 		Definition: &EventStream{
 			Name: "unit_test",
@@ -119,6 +120,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 				blockNumber), string(e.Data))
 		}
 	}
+	assert.True(t, calledPostCommit)
 
 }
 
@@ -136,7 +138,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 	// Set up our handler, even though it won't be driven with anything yet
 	eventCollector := make(chan *EventWithData)
 	var esID string
-	handler := func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+	handler := func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
 		if esID == "" {
 			esID = batch.StreamID.String()
 		} else {
@@ -151,7 +153,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 			case <-ctx.Done():
 			}
 		}
-		return nil
+		return nil, nil
 	}
 
 	// Do a full start now without a block listener, and wait for the ut notification of all the blocks
@@ -534,9 +536,9 @@ func TestDispatcherDispatchClosed(t *testing.T) {
 		batchTimeout:   1 * time.Microsecond, // but not going to wait
 		dispatch:       make(chan *eventDispatch),
 		dispatcherDone: make(chan struct{}),
-		handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+		handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
 			called = true
-			return fmt.Errorf("pop")
+			return nil, fmt.Errorf("pop")
 		},
 	}
 	go func() {
@@ -585,9 +587,9 @@ func TestDispatcherRunLateHandler(t *testing.T) {
 	}()
 
 	time.Sleep(1 * time.Millisecond)
-	es.attachHandler(func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error {
+	es.attachHandler(func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
 		called = true
-		return fmt.Errorf("pop")
+		return nil, fmt.Errorf("pop")
 	})
 
 	es.dispatch <- &eventDispatch{

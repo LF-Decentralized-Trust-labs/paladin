@@ -34,11 +34,11 @@ import (
 
 type abiSchema struct {
 	*SchemaPersisted
-	tc          abi.TypeComponent
-	definition  *abi.Parameter
-	primaryType string
-	typeSet     eip712.TypeSet
-	labelInfo   []*schemaLabelInfo
+	tc           abi.TypeComponent
+	definition   *abi.Parameter
+	primaryType  string
+	typeSet      eip712.TypeSet
+	abiLabelInfo []*schemaLabelInfo
 }
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
@@ -59,7 +59,7 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.ID = *types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
+		as.ID = types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -98,8 +98,8 @@ func (as *abiSchema) Persisted() *SchemaPersisted {
 	return as.SchemaPersisted
 }
 
-func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
-	return as.labelInfo
+func (as *abiSchema) labelInfo() []*schemaLabelInfo {
+	return as.abiLabelInfo
 }
 
 // Build the TypedDataV4 signature of the struct, from the ABI definition
@@ -136,7 +136,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
 			if err != nil {
 				return err
 			}
-			as.labelInfo = append(as.labelInfo, &schemaLabelInfo{
+			as.abiLabelInfo = append(as.abiLabelInfo, &schemaLabelInfo{
 				label:         p.Name,
 				virtualColumn: fmt.Sprintf("l%d", labelIndex),
 				labelType:     labelType,
@@ -344,7 +344,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 		return nil, err
 	}
 
-	hashID := *types.NewBytes32FromSlice(hash)
+	hashID := types.NewBytes32FromSlice(hash)
 	for i := range psd.labels {
 		psd.labels[i].State = hashID
 	}

@@ -24,9 +24,9 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,6 +64,10 @@ func (tk *testKeyStoreAll) Sign_secp256k1(ctx context.Context, keyHandle string,
 
 func (tk *testKeyStoreAll) ListKeys(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
 	return tk.listKeys(ctx, req)
+}
+
+func (tk *testKeyStoreAll) Close() {
+
 }
 
 func TestExtensionInitFail(t *testing.T) {
@@ -162,6 +166,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011415", err)
 
+	sm.Close()
 }
 
 func TestExtensionKeyStoreListFail(t *testing.T) {

@@ -18,6 +18,8 @@ package types
 
 import (
 	"context"
+	"crypto/sha256"
+	"sort"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -92,4 +94,24 @@ func ABIBySolDefinition(ctx context.Context, a abi.ABI) (map[string]*abi.Entry, 
 		byDefs[solString] = e
 	}
 	return byDefs, nil
+}
+
+func ABISolDefinitionHash(ctx context.Context, a abi.ABI) (*Bytes32, error) {
+	hash := sha256.New()
+	bySolDef, err := ABIBySolDefinition(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	// Sort the strings to avoid ordering mattering in the hash
+	solDefs := make([]string, 0, len(bySolDef))
+	for solDef := range bySolDef {
+		solDefs = append(solDefs, solDef)
+	}
+	sort.Strings(solDefs)
+	// Hash the sorted strings
+	for _, solDef := range solDefs {
+		hash.Write([]byte(solDef))
+	}
+	h := Bytes32(hash.Sum(nil))
+	return &h, nil
 }

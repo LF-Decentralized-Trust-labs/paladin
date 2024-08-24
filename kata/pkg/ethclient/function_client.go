@@ -44,8 +44,8 @@ type ABIClient interface {
 	ABI() abi.ABI
 	Function(ctx context.Context, nameOrFullSig string) (_ ABIFunctionClient, err error)
 	MustFunction(nameOrFullSig string) ABIFunctionClient
-	Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (_ ABIFunctionClient, err error)
-	MustConstructor(bytecode ethtypes.HexBytes0xPrefix) ABIFunctionClient
+	Constructor(ctx context.Context, bytecode types.HexBytes) (_ ABIFunctionClient, err error)
+	MustConstructor(bytecode types.HexBytes) ABIFunctionClient
 }
 
 type ABIFunctionRequestBuilder interface {
@@ -66,8 +66,8 @@ type ABIFunctionRequestBuilder interface {
 	BuildCallData() (err error)
 	Call() (err error)
 	CallJSON() (jsonData []byte, err error)
-	RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error)
-	SignAndSend() (txHash ethtypes.HexBytes0xPrefix, err error)
+	RawTransaction() (rawTX types.HexBytes, err error)
+	SignAndSend() (txHash *types.Bytes32, err error)
 }
 
 type BlockRef string
@@ -88,7 +88,7 @@ type abiClient struct {
 
 type abiFunctionClient struct {
 	ec          *ethClient
-	bytecode    ethtypes.HexBytes0xPrefix
+	bytecode    types.HexBytes
 	signature   string
 	selector    []byte
 	inputCount  int
@@ -164,7 +164,15 @@ func (abic *abiClient) Function(ctx context.Context, nameOrFullSig string) (_ AB
 	return ac.functionCommon(ctx, functionABI)
 }
 
-func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexBytes0xPrefix) (ABIFunctionClient, error) {
+func (ec *ethClient) ABIFunction(ctx context.Context, functionABI *abi.Entry) (fc ABIFunctionClient, err error) {
+	a, err := ec.ABI(ctx, abi.ABI{functionABI})
+	if err == nil {
+		fc, err = a.Function(ctx, functionABI.Name)
+	}
+	return fc, err
+}
+
+func (abic *abiClient) Constructor(ctx context.Context, bytecode types.HexBytes) (ABIFunctionClient, error) {
 	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode}
 	functionABI := abic.abi.Constructor()
 	if functionABI == nil {
@@ -176,6 +184,14 @@ func (abic *abiClient) Constructor(ctx context.Context, bytecode ethtypes.HexByt
 		}
 	}
 	return ac.functionCommon(ctx, functionABI)
+}
+
+func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode types.HexBytes) (fc ABIFunctionClient, err error) {
+	a, err := ec.ABI(ctx, abi.ABI{constructorABI})
+	if err == nil {
+		fc, err = a.Constructor(ctx, bytecode)
+	}
+	return fc, err
 }
 
 func (ac *abiFunctionClient) functionCommon(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error) {
@@ -202,7 +218,7 @@ func (abic *abiClient) MustFunction(nameOrFullSig string) ABIFunctionClient {
 	return ac
 }
 
-func (abic *abiClient) MustConstructor(bytecode ethtypes.HexBytes0xPrefix) ABIFunctionClient {
+func (abic *abiClient) MustConstructor(bytecode types.HexBytes) ABIFunctionClient {
 	ac, err := abic.Constructor(context.Background(), bytecode)
 	if err != nil {
 		panic(err)
@@ -352,7 +368,7 @@ func (ac *abiFunctionRequestBuilder) CallJSON() (jsonData []byte, err error) {
 	return jsonData, err
 }
 
-func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX ethtypes.HexBytes0xPrefix, err error) {
+func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX types.HexBytes, err error) {
 	if ac.tx.Data == nil {
 		if err := ac.BuildCallData(); err != nil {
 			return nil, err
@@ -364,7 +380,7 @@ func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX ethtypes.HexBytes0x
 	return ac.ec.BuildRawTransaction(ac.ctx, ac.txVersion, *ac.fromStr, &ac.tx)
 }
 
-func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash ethtypes.HexBytes0xPrefix, err error) {
+func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash *types.Bytes32, err error) {
 	rawTX, err := ac.RawTransaction()
 	if err != nil {
 		return nil, err

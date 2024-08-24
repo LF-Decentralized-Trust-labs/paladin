@@ -1,0 +1,236 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+syntax = "proto3";
+
+package github.com.kaleido_io.paladin.toolkit;
+
+// **CONFIGURE** happens once when the domain is loaded into Paladin
+message ConfigureDomainRequest {
+  string name = 1; // The name
+  string config_yaml = 2; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
+  int64 chain_id = 3; // The chain_id of the underlying base ledger on which all smart contracts are deployed
+}
+
+message ConfigureDomainResponse {
+  DomainConfig domain_config = 1; // Information that Paladin will use to govern its behavior with repspect to this domain
+}
+
+// **INIT** happens once when the domain is loaded into Paladin, after the result of ConfigureDomain has been processed
+message InitDomainRequest {
+  string domain_uuid = 1; // A runtime instance UUID of this domain, that it must supply on all requests
+  repeated StateSchema abi_state_schemas = 2; // The deterministically hashed identifiers of the same array of schemas provied to Paladin in the DomainConfig
+}
+
+message InitDomainResponse {    
+}
+
+// **INIT DEPLOY** step for a deploy transasctio happens in-line with the deploy being accepted by Paladin from the application. Should verify the transaction is a valid request and build the list of required verifiers for the prepare phase.
+message InitDeployRequest {
+  DeployTransactionSpecification transaction = 1;
+}
+
+message InitDeployResponse {
+  repeated ResolveVerifierRequest required_verifiers = 1; // the list of verifiers that need to be resolved in order to prepare the transaction (such as issuers/notaries that have privledge in the smart contract)
+}
+
+// **PREPARE DEPLOY** once the verifiers have been resolved, the deploy transaction can be prepared directly (no private state proposals or proofs)
+message PrepareDeployRequest {
+  DeployTransactionSpecification transaction = 1; // The instruction for submission to the base ledger
+  repeated ResolvedVerifier resolved_verifiers = 2; // The list of resovled verifiers
+}
+
+message PrepareDeployResponse {
+  string signing_address = 1; // The identifier of a signing address to use to submit the transaction to the chain
+  optional BaseLedgerTransaction transaction = 2; // The instruction for a tranaction to submit to the base ledger
+  optional BaseLedgerDeployTransaction deploy = 3; // The instruction for deploy request to submit to the base ledger
+}
+
+// **INIT** step for a business transaction happens in-line with the tranaction being accepted by Paladin from the application. Should verify the transaction is a valid request and build a list of required verifiers, but not resolve whether sufficient states exist to execute the transaction.
+message InitTransactionRequest {
+  TransactionSpecification transaction = 1; // The transaction to plan
+}
+
+message InitTransactionResponse {
+  repeated ResolveVerifierRequest required_verifiers = 1; // the list of verifiers that need to be resolved in order to prepare the transaction (such as issuers/notaries that have privledge in the smart contract)
+}
+
+// **ASSEMBLE** step happens after plan, once any verifiers specified as needing pre-emptive resolution by the owning Paladin nodes have been resolved successfully. At this step the state store should be queried to determine if sufficient states exist to execute
+message AssembleTransactionRequest {
+  TransactionSpecification transaction = 1; // The transaction to assemble
+  repeated ResolvedVerifier resolved_verifiers = 2; // A list of transaction signatures/proofs that have been resolved, so the transaction can be assembled
+}
+
+message AssembleTransactionResponse {
+  enum Result {
+      OK = 0; // the transaction was assembled successfuly, and the 
+      PARK = 1; // the states necessary to resolve the transaction are not currently available, so this transaction must be parked until states become available
+      REVERT = 2; // enough states were obtained to execute the transaction according to the business rules, but there was a revert/error condition raised during execution that means this transaction cannot succeed
+  }    
+  Result assembly_result = 1; 
+  optional AssembledTransaction assembled_transaction = 2; // the assembled transaction
+  repeated AttestationRequest attestation_plan = 3; // the plan that needs to be executed to gather attestations before preparation - that might include resolving more verifiers and re-verifying assembly
+  optional string revert_reason = 4; // if the result was REVERT
+}
+
+// **ENDORSE** step happens upon instruction from the attestation plan output from ASSEMBLE
+message EndorseTransactionRequest {
+  AttestationRequest endorsement_request = 1; // The attestation request from the attestation plan
+  ResolvedVerifier endorsement_verifier = 2; // The resolved verifier requested to be used for endorsement
+  TransactionSpecification transaction = 3; // The transaction specified by the user
+  repeated ResolvedVerifier resolved_verifiers = 4; // The list of resovled verifiers
+  repeated EndorsableState inputs = 5; // Input states for the transaction
+  repeated EndorsableState outputs = 6; // Output states for the transaction
+  repeated AttestationResult signatures = 7; // All SIGN attestation results (required from submitting node before endorsement)
+}
+
+message EndorseTransactionResponse {
+  enum Result {
+      SIGN = 0; // the endorsement resulted in a signature
+      ENDORSER_SUBMIT = 1; // the endorsement resulted in a local approval, and a requirement that the endorsement verifier identity must submit the underlying base ledger TX
+      REVERT = 2; // the edorsement failed
+  }
+  Result endorsement_result = 1;
+  optional bytes payload = 2;
+  optional string revert_reason = 3; // if the result was REVERT
+}
+
+// **PREPARE** step for a transaction 
+message PrepareTransactionRequest {
+  TransactionSpecification transaction = 1;
+  repeated StateRef input_states = 2; // The list of input states
+  repeated StateRef output_states = 3; // The list of output states
+  repeated AttestationResult attestation_result = 4; // The results of any proofs/attestations that came out of the endorsement phase
+}
+
+message PrepareTransactionResponse {
+  BaseLedgerTransaction transaction = 1; // The instruction for submission to the base ledger
+}
+
+message DomainConfig {
+  string constructor_abi_json = 1; // Each domain can have a single constructor signature, that all deploy requests from callers must adhere to
+  string factory_contract_address = 2;  // The address of the factory smart contract to invoke when the user requests deployment of a new private smart contract in this domain
+  string factory_contract_abi_json = 3; // The ABI of the factory function the domain will translate the constructor_abi_json inputs into (the function MUST emit the Paladin defined event)
+  string private_contract_abi_json = 4; // The ABI of the base ledger private smart contract that is deployed for each instance (via the factory, or via direct bytecode deployment)
+  repeated string abi_state_schemas_json = 5; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
+  BaseLedgerSubmitConfig base_ledger_submit_config = 6; // Describe the requirements of this domain for how submission happens
+}
+
+message BaseLedgerSubmitConfig {
+  enum Mode {
+      ONE_TIME_USE_KEYS = 0; // every TX is submitted by a different key, with a HD wallet path from the UUID of the TX itself
+      ENDORSER_SUBMISSION = 1; // one of the endorsers of the transaction should submit the TX (that endorser might specify ENDORSER_SUBMIT)
+      SUBMITTER_LIST = 2; // TODO: a bank of submitters are provided by the domain config/runtime as candidates to submit transactions
+  }
+  Mode submit_mode = 1;
+  string one_time_use_prefix = 2;
+}
+
+message StateSchema {
+  string id = 1; // A hash derived schema identifier
+  string signature = 2; // A readable signature for the schema
+}
+
+message DeployTransactionSpecification {
+  string transaction_id = 1; // A UUID for the transaction generated by the Paladin node when accepting the request from the caller
+  string constructor_abi = 2; // This is the ABI the domain returned during ConfigureDomain
+  string constructor_params_json = 3; // The parameters supplied in the invocation in normalized JSON format, after validation against the ABI the caller supplied
+}
+
+message TransactionSpecification {
+  string transaction_id = 1; // A UUID for the transaction generated by the Paladin node when accepting the request from the caller
+  string from = 2; // The unresolved sender identity - the instruction for how to resolve it will be an output of the TX init from 
+  string contract_address = 3; // The private smart contract address
+  bytes contract_config = 4; // Binary config emitted by the constructor event of the contract that is persisted by Paladin and provided on all calls
+  string function_signature = 5; // The calculated signature of the function ABI the caller is attempting to invoke
+  string function_abi_json = 6; // The function ABI (asserted by the caller) they wish to inovoke on the smart contract
+  string function_params_json = 7; // The parameters supplied in the invocation in normalized JSON format, after validation against the ABI the caller supplied
+  int64 base_block = 8; // The block number on the base ledger, upon which this transaction is being assembled
+  // string sequence_id = 6; // The ID of the sequence this transaction is in (this sequence is guaranteed not the change during the execution of the domain call)
+  // int32 sequence_length = 7; // The length of the chain of transactions in the sequence before this tranasction - the domain can query information about these transactions if required
+}
+
+message AssembledTransaction {
+  repeated StateRef input_states = 1; // A list of the state IDs that the transaction spends - these might include ones being minted on other sequences, resulting in an instruction to the TX manager to re-allocate the transaction to another sequence
+  repeated StateRef read_states = 2; // A list of state IDs that the execution of the transaction depends on being unspent on the chain (but will not spend). Also could be being minted on other sequences.
+  repeated NewState output_states = 3; // A list of new states the domain will create as an output from this transaction, if it is executed and confirmed
+}
+
+message StateRef {
+  string id = 1;
+  string schema_id = 3;
+}
+
+message NewState {
+  string schema_id = 1; // The id from the schema, which must be one of the ones established during the ConfigDomain+InitDomain phase
+  string state_data_json = 2; // The data for this state that will be recorded by Paladin, and uniquely identified by Paladin using a hash (which might be additional to any hashing done in a unique way by the domain)
+  repeated string distibution_list = 3; // A list of Paladin recipients that should receive a copy of this state in parallel to transaction submission, once it has been successfully prepared
+}
+
+message EndorsableState {
+  string id = 1; // The hash id calculated by the local node for this state
+  string schema_id = 2; // The id from the schema
+  string state_data_json = 3; // The data for this state that will be ensured to be committed to the local DB before sending an edorsement confirmations
+}
+
+// The attestation types must occur in the order listed here, in the attestation_plan
+enum AttestationType {
+  SIGN = 0; // Occurs before the transaction is considered fully assembled - gathers a signature against the state inputs+outputs of the transaction, including proof of knowledge of the private data. Use to authenticate an action, such as a transfer, that will be endorsed by other parties
+  ENDORSE = 1; // A verification of the validity of the transaction that occurs with a full copy of all the data, by one or more parties.
+  GENERATE_PROOF = 2; // The generation of a cyprographic zero-knowledge proof (ZKP) using a full copy of all the data, that allows verification of the transaction by any party without that private data
+}
+
+message AttestationRequest {
+  string name = 1; // Allows correlation of attestation requests, to attestation results in the domain code
+  AttestationType attestation_type = 2; // The type of attestation, which instructs the Paladin engine how to coordinate and submit it
+  string algorithm = 3; // An algorithm string to pass to the proof/siging technology to instruct it's operation
+  bool resolve_verifier = 4; // Whether the verfier for this party must be known to the assembler, in order to assemble the transaction
+  bytes payload = 5; // A payload (encoded to string) in a format that the proof/signing technology is expecting for the given algorithm string
+  repeated string parties = 6; // The recipient for this attestation request (might be local to the Paladin node, or remote)
+  optional int32 threshold = 7; // The minimum number of parties that must produce the attestation to proceed from the assemble to the prepare stage (default is the number of parties)
+}
+
+message ResolveVerifierRequest {
+  string lookup = 1; // The string to use to look up this party
+  string algorithm = 2; // The algorithm for which the verifier is required
+}
+
+message ResolvedVerifier {
+  string lookup = 1; // The string that was used to look up this verifier
+  string algorithm = 2; // The algorithm for which the verifier has been resolved
+  string verifier = 3; // The algorithm specific public key identifier (address or other cryptographically significant identifier) that was used by the party to perform the attestation
+}
+
+message AttestationResult {
+  string name = 1; // The name of the AttestationRequest, so the domain knows the detail of how to process this result
+  AttestationType attestation_type = 2; // The type of attestation, which instructs the Paladin engine how to coordinate and submit it
+  ResolvedVerifier verifier = 3; // The resolved verifier
+  optional bytes payload = 4; // If the attestation is available
+}
+
+message BaseLedgerTransaction {
+  string function_name = 1; // The name of the function to invoke on the base smart contract, based on processing the user's constructor parameters in the private smart contract layer
+  string params_json = 2; // The parameters to pass to the base smart contract function, in JSON format. Paladin will submit this tranaction to the base blockchain
+}
+
+message BaseLedgerDeployTransaction {
+  bytes bytecode = 1; // The contract bytecode
+  string params_json = 2; // The parameters to pass to the base smart contract constructor, in JSON format. Paladin will submit this tranaction to the base blockchain
+  string signing_address = 3; // The identifier of a signing address to use to submit the transaction to the chain. Uses standard Paladin resolution of signing addresses (including dynamic allocation, if for example the transaction_id is supplied as part of the string to require a different key for each TX)
+}
+
+message DomainAPIError {
+  string error_message = 1;
+}

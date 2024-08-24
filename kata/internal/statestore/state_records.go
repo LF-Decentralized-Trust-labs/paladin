@@ -37,12 +37,12 @@ type StateSpend struct {
 	Transaction uuid.UUID     `json:"transaction"`
 }
 
-// State locks record which sequence a state is being locked to, either
+// State locks record which transaction a state is being locked to, either
 // spending a previously confirmed state, or an optimistic record of creating
 // (and maybe later spending) a state that is yet to be confirmed.
 type StateLock struct {
-	State    types.Bytes32 `json:"-"                gorm:"primaryKey"`
-	Sequence uuid.UUID     `json:"sequence"`
-	Creating bool          `json:"creating"`
-	Spending bool          `json:"spending"`
+	State       types.Bytes32 `json:"-"                gorm:"primaryKey"`
+	Transaction uuid.UUID     `json:"transaction"`
+	Creating    bool          `json:"creating"`
+	Spending    bool          `json:"spending"`
 }

@@ -18,19 +18,29 @@ package types
 
 import (
 	"context"
-	"regexp"
+	"unicode"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 )
 
-var (
-	name64SafeCharsStartEndAlphaNumeric = regexp.MustCompile(`^[0-9a-zA-Z]([0-9a-zA-Z._-]{0,62}[0-9a-zA-Z])?$`)
-)
+const DefaultNameMaxLen = 128
 
-func Validate64SafeCharsStartEndAlphaNum(ctx context.Context, val, fieldName string) error {
-	if !name64SafeCharsStartEndAlphaNumeric.MatchString(val) {
-		return i18n.NewError(ctx, msgs.MsgTypesInvalidName64SafeCharAlphaBoxed, fieldName)
+func ValidateSafeCharsStartEndAlphaNum(ctx context.Context, val string, maxLen int, fieldName string) error {
+	valid := len(val) > 0 && len(val) <= maxLen
+	for i, c := range val {
+		if !valid {
+			break
+		}
+		switch {
+		case c <= unicode.MaxASCII && (unicode.IsLetter(c) || unicode.IsNumber(c)):
+		case i != 0 && i != (len(val)-1) && (c == '.' || c == '_' || c == '-'):
+		default:
+			valid = false
+		}
+	}
+	if !valid {
+		return i18n.NewError(ctx, msgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
 	}
 	return nil
 }

@@ -25,13 +25,32 @@ type IndexedBlock struct {
 	Hash   types.Bytes32 `json:"hash"                                     gorm:"primaryKey"`
 }
 
+type EthTransactionResult string
+
+const (
+	TXResult_FAILURE EthTransactionResult = "failure"
+	TXResult_SUCCESS EthTransactionResult = "success"
+)
+
+func (lt EthTransactionResult) Enum() types.Enum[EthTransactionResult] {
+	return types.Enum[EthTransactionResult](lt)
+}
+
+func (pl EthTransactionResult) Options() []string {
+	return []string{
+		string(TXResult_FAILURE),
+		string(TXResult_SUCCESS),
+	}
+}
+
 type IndexedTransaction struct {
-	Hash             types.Bytes32     `json:"hash"                      gorm:"primaryKey"`
-	BlockNumber      int64             `json:"blockNumber"`
-	TransactionIndex int64             `json:"transactionIndex"`
-	From             *types.EthAddress `json:"from"`
-	To               *types.EthAddress `json:"to,omitempty"`
-	ContractAddress  *types.EthAddress `json:"contractAddress,omitempty"`
+	Hash             types.Bytes32                    `json:"hash"                      gorm:"primaryKey"`
+	BlockNumber      int64                            `json:"blockNumber"`
+	TransactionIndex int64                            `json:"transactionIndex"`
+	From             *types.EthAddress                `json:"from"`
+	To               *types.EthAddress                `json:"to,omitempty"`
+	ContractAddress  *types.EthAddress                `json:"contractAddress,omitempty"`
+	Result           types.Enum[EthTransactionResult] `json:"result,omitempty"`
 }
 
 type IndexedEvent struct {

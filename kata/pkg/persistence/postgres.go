@@ -26,7 +26,7 @@ import (
 	// Import pq driver
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 var PostgresDefaults = &SQLDBConfig{

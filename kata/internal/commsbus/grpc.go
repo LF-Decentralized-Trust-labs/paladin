@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -51,7 +52,7 @@ type GRPCConfig struct {
 func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCServer, error) {
 	if conf == nil || conf.SocketAddress == nil {
 		log.L(ctx).Error("missing grpc config in config")
-		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "socketAddress")
+		return nil, i18n.NewError(ctx, tkmsgs.MsgConfigFileMissingMandatoryValue, "socketAddress")
 	}
 	socketAddress := *conf.SocketAddress
 	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
