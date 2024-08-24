@@ -117,6 +117,7 @@ task copyContracts(dependsOn:[
 
 task protoc(type: ProtoCompile, dependsOn: [
         ":toolkit_go:protoc",
+        tasks.installTools,
         tasks.copyTestContracts,
     ]) {
     protocPath "bin"
@@ -247,7 +248,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyContracts]) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)

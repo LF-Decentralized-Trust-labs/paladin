@@ -65,7 +65,7 @@ task protoc(type: ProtoCompile, dependsOn: [installTools]) {
     }
     plugins {
         go {
-            out projectDir
+            out "${projectDir}/pkg/prototk"
             opt 'paths=source_relative'
             fileTree(configurations.toolkitProtoDefinitions.asPath) {
                include "*.proto"
@@ -74,7 +74,7 @@ task protoc(type: ProtoCompile, dependsOn: [installTools]) {
             }
         }
         go_grpc {
-            out projectDir
+            out "${projectDir}/pkg/prototk"
             opt 'paths=source_relative'
             fileTree(configurations.toolkitProtoDefinitions.asPath) {
                include "*.proto"

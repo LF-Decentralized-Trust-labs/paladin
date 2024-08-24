@@ -88,7 +88,7 @@ class ProtoCompile extends DefaultTask {
         @Nested
         Plugin getGo_grpc() {
             if (go_grpc == null) {
-                go_grpc = new Plugin('go-grpc')
+                go_grpc = new Plugin('go-grpc', '**/*_grpc.pb.go')
             }
             return go_grpc
         }
