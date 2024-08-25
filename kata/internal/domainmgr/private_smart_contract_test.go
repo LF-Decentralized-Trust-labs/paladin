@@ -23,6 +23,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/components"
@@ -315,6 +316,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	// state2 & state4 still exist
 	// state5 is new
 	// The order should be deterministic based on crate time (even before written to DB)
+	log.L(ctx).Infof("STATES %+v", stillAvailable.States)
 	assert.Contains(t, stillAvailable.States[0].DataJson, state2.Salt.String())
 	assert.Contains(t, stillAvailable.States[1].DataJson, state4.Salt.String())
 	assert.Contains(t, stillAvailable.States[2].DataJson, state5.Salt.String())
