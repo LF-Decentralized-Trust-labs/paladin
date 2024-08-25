@@ -43,8 +43,7 @@ func TestEngine(t *testing.T) {
 
 	engine, mComponents := newEngineForTesting(t)
 	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
-	mDomainAPI := &componentmocks.DomainSmartContract{}
-	mDomainAPI = componentmocks.NewDomainSmartContract(t)
+	mDomainAPI := componentmocks.NewDomainSmartContract(t)
 	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Return(nil)
 	mDomainMgr := &componentmocks.DomainManager{}
 	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainAPI, nil)
@@ -53,7 +52,7 @@ func TestEngine(t *testing.T) {
 	mComponents.On("DomainManager").Once().Return(mDomainMgr).Maybe()
 	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
-		fn(ctx, mDomainStateInterface)
+		_ = fn(ctx, mDomainStateInterface)
 	}).Once().Return(nil)
 	assert.Equal(t, "Kata Engine", engine.Name())
 

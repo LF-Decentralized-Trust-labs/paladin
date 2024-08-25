@@ -15,38 +15,38 @@
 
 package domainmgr
 
-// import (
-// 	"fmt"
-// 	"testing"
+import (
+	"fmt"
+	"testing"
 
-// 	"github.com/DATA-DOG/go-sqlmock"
-// 	"github.com/kaleido-io/paladin/kata/pkg/types"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/mock"
-// )
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
 
-// func TestPrivateSmartContractQueryFail(t *testing.T) {
+func TestPrivateSmartContractQueryFail(t *testing.T) {
 
-// 	ctx, dm, _, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, nil)
-// 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
-// 	})
-// 	defer done()
+	ctx, dm, _, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
+		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, nil)
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
+	})
+	defer done()
 
-// 	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
-// 	assert.Regexp(t, "pop", err)
+	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	assert.Regexp(t, "pop", err)
 
-// }
+}
 
-// func TestPrivateSmartContractQueryNoResult(t *testing.T) {
+func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 
-// 	ctx, dm, _, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, nil)
-// 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
-// 	})
-// 	defer done()
+	ctx, dm, _, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
+		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, nil)
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
+	})
+	defer done()
 
-// 	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
-// 	assert.Regexp(t, "PD011609", err)
+	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	assert.Regexp(t, "PD011609", err)
 
-// }
+}

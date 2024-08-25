@@ -24,7 +24,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 92.5
+    targetCoverage = 93.1
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
@@ -135,8 +135,18 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
+    workingDir '.'
 
-task makeMocks(type: Mockery, dependsOn: [tasks.protoc, tasks.installTools]) {
+    inputs.files('go.mod')
+    inputs.files(goFiles)
+    outputs.files('go.sum')
+
+    executable 'go'
+    args 'get'
+}
+
+task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
     mockery 'bin/mockery'
     args '--case', 'underscore'
     mock {
@@ -201,19 +211,6 @@ task makeMocks(type: Mockery, dependsOn: [tasks.protoc, tasks.installTools]) {
         outputDir 'mocks/componentmocks'
     }
 }
-
-task goGet(type:Exec, dependsOn:[tasks.makeMocks,tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
-    workingDir '.'
-
-    inputs.files('go.mod')
-    inputs.files(goFiles)
-    outputs.files('go.sum')
-
-    executable 'go'
-    args 'get'
-}
-
-
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
@@ -364,7 +361,7 @@ abstract class ComponentTest extends Exec {
                     println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
                     println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
                 }
-                // execResult.assertNormalExitValue(); TODO: restore the error exit when tests are passing again
+                execResult.assertNormalExitValue(); TODO: restore the error exit when tests are passing again
             }
         }
     }
@@ -461,7 +458,7 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 
 task build {
     dependsOn tasks.buildTestbed
-    // dependsOn tasks.lint
+    dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage
     dependsOn tasks.checkCoverage
