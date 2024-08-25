@@ -30,17 +30,23 @@ tasks.named('compileJava') {
 }
 
 configurations {
-    protocFilesImport
+    toolkitProtoDefinitions {
+        canBeConsumed = false
+    }
 }
 
 dependencies {
-    protocFilesImport project(path: ':kata', configuration: 'protocFiles')
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
 }
 
 tasks.register('collectProtocFiles', Copy) {
-    from zipTree(configurations.protocFilesImport.getFiles()[0])
+    from configurations.toolkitProtoDefinitions.asFileTree
     into "src/main/proto"
     dependsOn(':kata:zipProtocFiles')
+}
+
+tasks.register('cleanProto', Delete) {
+    delete 'src/main/proto'
 }
 
 tasks.named('generateProto') {
@@ -53,6 +59,10 @@ tasks.named('processResources') {
 
 tasks.named('processResources') {
     dependsOn ':kata:protoc'
+}
+
+tasks.named('clean') {
+    dependsOn tasks.cleanProto
 }
 
 def grpcVersion = '1.65.0'

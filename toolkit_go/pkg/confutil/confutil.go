@@ -26,8 +26,8 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -148,19 +148,19 @@ func ByteSize(sVal *string, min int64, def string) int64 {
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		log.L(ctx).Errorf("file not found: %s", filePath)
+		logrus.Errorf("file not found: %s", filePath)
 		return i18n.NewError(ctx, tkmsgs.MsgConfigFileMissing, filePath)
 	}
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.L(ctx).Errorf("failed to read file: %v", err)
+		logrus.Errorf("failed to read file: %v", err)
 		return i18n.NewError(ctx, tkmsgs.MsgConfigFileReadError, filePath, err.Error())
 	}
 
 	err = yaml.Unmarshal(data, config)
 	if err != nil {
-		log.L(ctx).Errorf("failed to parse file: %v", err)
+		logrus.Errorf("failed to parse file: %v", err)
 		return i18n.NewError(ctx, tkmsgs.MsgConfigFileParseError, err.Error())
 	}
 

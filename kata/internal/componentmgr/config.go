@@ -24,11 +24,13 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type Config struct {
 	domainmgr.DomainManagerConfig
 	plugins.PluginControllerConfig
+	Log          log.Config          `yaml:"log"`
 	Blockchain   ethclient.Config    `yaml:"blockchain"`
 	DB           persistence.Config  `yaml:"db"`
 	RPCServer    rpcserver.Config    `yaml:"rpcServer"`

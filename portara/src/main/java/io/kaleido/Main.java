@@ -16,7 +16,6 @@ package io.kaleido;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        System.out.println("TODO - start all the components");
         System.out.println("DYLD_LIBRARY_PATH: " + System.getenv("DYLD_LIBRARY_PATH"));
 
         String kataConfigFilePath = System.getenv("KATA_CONFIG_FILE");

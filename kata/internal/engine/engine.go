@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 // MOCK implementations of engine, plugins etc. Function signatures are just examples

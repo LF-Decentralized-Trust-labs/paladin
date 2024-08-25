@@ -30,7 +30,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type writeOperation struct {

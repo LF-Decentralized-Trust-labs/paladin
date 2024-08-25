@@ -22,8 +22,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))

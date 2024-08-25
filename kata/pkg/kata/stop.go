@@ -18,7 +18,7 @@ package kata
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 func Stop(ctx context.Context, socketAddress string) {

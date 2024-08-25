@@ -64,8 +64,10 @@ package kata
 
 import (
 	"context"
+	"os"
+	"strconv"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 
 	"github.com/kaleido-io/paladin/kata/internal/commsbus"
 	"github.com/kaleido-io/paladin/kata/internal/transaction"
@@ -81,7 +83,7 @@ type Config struct {
 var commsBus commsbus.CommsBus
 
 func Run(ctx context.Context, configFilePath string) {
-	//ctx := log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
+	ctx = log.WithLogField(ctx, "pid", strconv.Itoa(os.Getpid()))
 
 	log.L(ctx).Infof("Kata Run: %s", configFilePath)
 	config := Config{}

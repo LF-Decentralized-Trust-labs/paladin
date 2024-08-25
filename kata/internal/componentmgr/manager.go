@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type ComponentManager interface {
@@ -78,6 +79,9 @@ type closeable interface {
 }
 
 func NewComponentManager(bgCtx context.Context, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
+	// init logging immediately
+	log.InitConfig(&conf.Log)
+
 	return &componentManager{
 		instanceUUID: instanceUUID,
 		bgCtx:        bgCtx,
@@ -88,7 +92,6 @@ func NewComponentManager(bgCtx context.Context, instanceUUID uuid.UUID, conf *Co
 }
 
 func (cm *componentManager) Init() (err error) {
-
 	// pre-init components
 	cm.keyManager, err = ethclient.NewSimpleTestKeyManager(cm.bgCtx, &cm.conf.Signer)
 	err = cm.addIfOpened(cm.keyManager, err, msgs.MsgComponentKeyManagerInitError)

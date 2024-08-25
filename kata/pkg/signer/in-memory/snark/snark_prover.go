@@ -23,7 +23,6 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -32,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"google.golang.org/protobuf/proto"
 )
 
