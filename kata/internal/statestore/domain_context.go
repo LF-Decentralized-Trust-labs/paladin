@@ -290,11 +290,8 @@ func (dc *domainContext) mergeInMemoryMatches(schema Schema, states []*State, ex
 		}
 	}
 
-	// Sort it in place
+	// Sort it in place - note we ensure we always have a sort instruction on the DB
 	sortInstructions := query.Sort
-	if len(sortInstructions) == 0 {
-		sortInstructions = []string{".created"}
-	}
 	if err = filters.SortValueSetInPlace(dc.ctx, dc.ss.labelSetFor(schema), fullList, sortInstructions...); err != nil {
 		return nil, err
 	}

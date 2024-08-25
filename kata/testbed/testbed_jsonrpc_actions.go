@@ -225,8 +225,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 
 		// Gather endorsements (this would be a distributed activity across nodes in the real engine)
-		endorserSubmitConstraint, err := tb.gatherEndorsements(ctx, psc, tx)
-		if err != nil {
+		if err := tb.gatherEndorsements(ctx, psc, tx); err != nil {
 			return false, err
 		}
 
@@ -234,8 +233,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			len(tx.PostAssembly.InputStates), len(tx.PostAssembly.OutputStates), len(tx.PostAssembly.Signatures), len(tx.PostAssembly.Endorsements))
 
 		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
-		signer, err := tb.determineSubmitterIdentity(psc, tx, endorserSubmitConstraint)
-		if err != nil {
+		if err := psc.ResolveDispatch(ctx, tx); err != nil {
 			return false, err
 		}
 
@@ -244,7 +242,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			return false, err
 		}
 
-		err = tb.execBaseLedgerTransaction(ctx, signer, tx.PreparedTransaction)
+		err = tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.PreparedTransaction)
 		if err != nil {
 			return false, err
 		}

@@ -17,7 +17,9 @@ package domainmgr
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
@@ -182,4 +184,54 @@ func TestMustParseLoaders(t *testing.T) {
 	assert.Panics(t, func() {
 		_ = mustParseEventSignatureHash(abi.ABI{badEvent}, "broken")
 	})
+}
+
+func TestWaitForDeployQueryError(t *testing.T) {
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{},
+	}, func(mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
+	})
+	defer done()
+
+	_, err := dm.WaitForDeploy(ctx, uuid.New())
+	assert.Regexp(t, "pop", err)
+}
+
+func TestWaitForDeployDomainNotFound(t *testing.T) {
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{},
+	}, func(mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
+	})
+	defer done()
+
+	reqID := uuid.New()
+
+	received := make(chan struct{})
+	go func() {
+		_, err := dm.WaitForDeploy(ctx, reqID)
+		assert.Regexp(t, "PD011600", err)
+		close(received)
+	}()
+
+	for dm.contractWaiter.InFlightCount() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	dm.contractWaiter.GetInflight(reqID).Complete(&PrivateSmartContract{})
+
+	<-received
+
+}
+
+func TestWaitForDeployTimeout(t *testing.T) {
+	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{},
+	})
+	defer done()
+
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := dm.waitAndEnrich(cancelled, dm.contractWaiter.AddInflight(cancelled, uuid.New()))
+	assert.Regexp(t, "PD020100", err)
 }

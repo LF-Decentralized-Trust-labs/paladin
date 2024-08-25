@@ -43,7 +43,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
-		Input(txInstruction.Params).
+		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
@@ -68,7 +68,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
 		To(&addr).
-		Input(txInstruction.Params).
+		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
@@ -112,18 +112,17 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 	return nil
 }
 
-func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) (string, error) {
+func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) error {
 
 	keyMgr := tb.components.KeyManager()
 	attestations := []*prototk.AttestationResult{}
-	endorserSubmitConstraint := ""
 	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, partyName := range ar.Parties {
 				// Look up the endorser
 				keyHandle, verifier, err := keyMgr.ResolveKey(ctx, partyName, ar.Algorithm)
 				if err != nil {
-					return "", fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
+					return fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				// Invoke the domain
 				endorseRes, err := psc.EndorseTransaction(ctx, tx, ar, &prototk.ResolvedVerifier{
@@ -132,7 +131,7 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					Verifier:  verifier,
 				})
 				if err != nil {
-					return "", err
+					return err
 				}
 				result := &prototk.AttestationResult{
 					Name:            ar.Name,
@@ -145,7 +144,7 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					if endorseRes.RevertReason != nil {
 						revertReason = *endorseRes.RevertReason
 					}
-					return "", fmt.Errorf("reverted: %s", revertReason)
+					return fmt.Errorf("reverted: %s", revertReason)
 				case prototk.EndorseTransactionResponse_SIGN:
 					// Build the signature
 					signaturePayload, err := keyMgr.Sign(ctx, &proto.SignRequest{
@@ -154,40 +153,18 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 						Payload:   endorseRes.Payload,
 					})
 					if err != nil {
-						return "", fmt.Errorf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
+						return fmt.Errorf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
 					}
 					result.Payload = signaturePayload.Payload
 				case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
-					if endorserSubmitConstraint != "" {
-						return "", fmt.Errorf("duplicate ENDORSER_SUBMIT responses from %s and %s", endorserSubmitConstraint, partyName)
-					}
-					endorserSubmitConstraint = partyName
+					result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 				}
 				attestations = append(attestations, result)
 			}
 		}
 	}
 	tx.PostAssembly.Endorsements = attestations
-	return endorserSubmitConstraint, nil
-}
-
-func (tb *testbed) determineSubmitterIdentity(psc components.DomainSmartContract, tx *components.PrivateTransaction, endorserSubmitConstraint string) (string, error) {
-	if endorserSubmitConstraint != "" {
-		return endorserSubmitConstraint, nil
-	}
-	switch psc.Domain().Configuration().BaseLedgerSubmitConfig.SubmitMode {
-	case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
-		return psc.Domain().Configuration().BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String(), nil
-	case prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION:
-		for _, ar := range tx.PostAssembly.Endorsements {
-			if ar.AttestationType == prototk.AttestationType_ENDORSE {
-				return ar.Verifier.Lookup, nil
-			}
-		}
-		return "", fmt.Errorf("endorser submission requested by domain %s config, but no endorsements were obtained", psc.Domain().Name())
-	default:
-		return "", fmt.Errorf("unsupported base ledger submit config: %s", psc.Domain().Configuration().BaseLedgerSubmitConfig.SubmitMode)
-	}
+	return nil
 }
 
 func mustParseBuildABI(buildJSON []byte) abi.ABI {

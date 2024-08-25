@@ -90,13 +90,13 @@ func (id *Bytes32) Equals(id2 *Bytes32) bool {
 	return *id == *id2
 }
 
-// Return the lower 16 bytes as a UUID
-func (id Bytes32) UUIDLower16() (u uuid.UUID) {
+// Return the first 16 bytes as a UUID
+func (id Bytes32) UUIDFirst16() (u uuid.UUID) {
 	copy(u[:], id[0:16])
 	return u
 }
 
-func Bytes32UUIDLower16(u uuid.UUID) Bytes32 {
+func Bytes32UUIDFirst16(u uuid.UUID) Bytes32 {
 	var v Bytes32
 	copy(v[0:16], u[:])
 	return v

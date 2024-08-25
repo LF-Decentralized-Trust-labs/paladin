@@ -184,7 +184,10 @@ func (dm *domainManager) WaitForDeploy(ctx context.Context, txID uuid.UUID) (com
 		// contract was already indexed
 		return dc, nil
 	}
+	return dm.waitAndEnrich(ctx, req)
+}
 
+func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *PrivateSmartContract]) (components.DomainSmartContract, error) {
 	// wait until the event gets indexed (or the context expires)
 	def, err := req.Wait()
 	if err != nil {

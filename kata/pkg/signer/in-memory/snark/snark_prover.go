@@ -30,6 +30,7 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"google.golang.org/protobuf/proto"
@@ -55,7 +56,7 @@ func Register(ctx context.Context, config api.SnarkProverConfig, registry map[st
 	if err != nil {
 		return err
 	}
-	registry[api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES] = signer
+	registry[algorithms.ZKP_BABYJUBJUB_PLAINBYTES] = signer
 	return nil
 }
 
