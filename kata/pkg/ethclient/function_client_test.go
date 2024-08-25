@@ -494,16 +494,22 @@ func TestBuildCallData(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 
-	err = req.Input(map[string]any{
+	inMap := map[string]any{
 		"widget": map[string]any{
 			"id":       "0x9fF786fEf6742c066c5c0d7b12d264C7b390c37b",
 			"sku":      12345,
 			"features": []string{},
 		},
-	}).BuildCallData()
+	}
+	err = req.Input(inMap).BuildCallData()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 
+	cv, err := newWidget.ABIEntry().Inputs.ParseExternalData(inMap)
+	assert.NoError(t, err)
+	err = req.Input(cv).BuildCallData()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, req.TX().Data)
 }
 
 func TestInvokeConstructor(t *testing.T) {

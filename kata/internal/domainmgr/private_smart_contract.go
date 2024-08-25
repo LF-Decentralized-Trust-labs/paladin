@@ -110,6 +110,9 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 }
 
 func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteAssembleTransaction)
+	}
 
 	// Clear any previous assembly state out, as it's considered completely invalid
 	// at this point if we're re-assembling.
@@ -152,6 +155,11 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 
 // Happens only on the sequencing node
 func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.OutputStatesPotential == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteWritePotentialStates)
+	}
+
 	// Now we're confident enough about this transaction to (on the sequencer) to have allocated
 	// it to a sequence, and we want to write the OutputStatesPotential array:
 	// 1) Writing them to the DB (unflushed at this point)
@@ -203,6 +211,10 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 // Happens on all nodes that are aware of the transaction and want to mask input states from other
 // transactions being assembled on the same node.
 func (dc *domainContract) LockStates(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.InputStates == nil || tx.PostAssembly.OutputStates == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteLockStates)
+	}
 
 	// Important responsibilities of this function
 	// 1) to ensure all the states have been written (unflushed) to the DB, so that the calling code
@@ -252,6 +264,10 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
 func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.InputStates == nil || tx.PostAssembly.OutputStates == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgDomainTXIncompleteEndorseTransaction)
+	}
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
 	// is being handled as part of an overall sequence of endorsements, and for performance it is
@@ -276,7 +292,7 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	})
 	// We don't do any processing - as the result is not directly processable by us.
 	// It is an instruction to the engine - such as an authority to sign an endorsement,
-	// or a constraint on
+	// or a constraint on submission to the chain
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +304,46 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	}, nil
 }
 
+func (dc *domainContract) ResolveDispatch(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.Endorsements == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteResolveDispatch)
+	}
+
+	for _, ar := range tx.PostAssembly.Endorsements {
+		for _, c := range ar.Constraints {
+			if c == prototk.AttestationResult_ENDORSER_MUST_SUBMIT {
+				if tx.Signer != "" {
+					// Multiple endorsers claiming it is an error
+					return i18n.NewError(ctx, msgs.MsgDomainMultipleEndorsersSubmit)
+				}
+				tx.Signer = ar.Verifier.Lookup
+			}
+		}
+	}
+	if tx.Signer != "" {
+		return nil
+	}
+
+	config := dc.d.Configuration()
+	switch config.BaseLedgerSubmitConfig.SubmitMode {
+	case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
+		tx.Signer = config.BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String()
+		return nil
+	case prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION:
+		// if there was an endorser, we'd have it above
+		return i18n.NewError(ctx, msgs.MsgDomainNoEndorserSubmit)
+	default:
+		return i18n.NewError(ctx, msgs.MsgDomainInvalidSubmissionConfig, config.BaseLedgerSubmitConfig.SubmitMode)
+	}
+
+}
+
 func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.Signer == "" {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompletePrepareTransaction)
+	}
 
 	preAssembly := tx.PreAssembly
 	postAssembly := tx.PostAssembly
@@ -320,34 +375,6 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	return nil
 }
 
-func (dc *domainContract) ResolveDispatchSigner(ctx context.Context, tx *components.PrivateTransaction) error {
-	config := dc.d.Configuration()
-	switch config.BaseLedgerSubmitConfig.SubmitMode {
-	case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
-		tx.Signer = config.BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String()
-		return nil
-	case prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION:
-		for _, ar := range tx.PostAssembly.Endorsements {
-			for _, c := range ar.Constraints {
-				if c == prototk.AttestationResult_ENDORSER_MUST_SUBMIT {
-					if tx.Signer != "" {
-						// Multiple endorsers claiming it is an error
-						return i18n.NewError(ctx, msgs.MsgDomainMultipleEndorsersSubmit)
-					}
-					tx.Signer = ar.Verifier.Lookup
-				}
-			}
-		}
-		if tx.Signer == "" {
-			return i18n.NewError(ctx, msgs.MsgDomainNoEndorserSubmit)
-		}
-		return nil
-	default:
-		return i18n.NewError(ctx, msgs.MsgDomainInvalidSubmissionConfig, config.BaseLedgerSubmitConfig.SubmitMode)
-	}
-
-}
-
 func (dc *domainContract) Domain() components.Domain {
 	return dc.d
 }
@@ -356,7 +383,7 @@ func (dc *domainContract) Address() types.EthAddress {
 	return dc.info.Address
 }
 
-func (dc *domainContract) ConfigBytes() []byte {
+func (dc *domainContract) ConfigBytes() types.HexBytes {
 	return dc.info.ConfigBytes
 }
 

@@ -233,8 +233,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			len(tx.PostAssembly.InputStates), len(tx.PostAssembly.OutputStates), len(tx.PostAssembly.Signatures), len(tx.PostAssembly.Endorsements))
 
 		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
-		err := tb.determineSubmitterIdentity(psc, tx, endorserSubmitConstraint)
-		if err != nil {
+		if err := psc.ResolveDispatch(ctx, tx); err != nil {
 			return false, err
 		}
 
@@ -243,7 +242,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			return false, err
 		}
 
-		err = tb.execBaseLedgerTransaction(ctx, signer, tx.PreparedTransaction)
+		err = tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.PreparedTransaction)
 		if err != nil {
 			return false, err
 		}

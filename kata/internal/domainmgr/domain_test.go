@@ -97,19 +97,19 @@ const fakeCoinPrivateABI = `[
 	},
 	{
 		"type": "function",
-		"name": "transfer",
+		"name": "execute",
 		"inputs": [
 			{
-				"name": "from",
-				"type": "address"
+				"name": "inputs",
+				"type": "bytes32[]"
 			},
 			{
-				"name": "to",
-				"type": "address"
+				"name": "outputs",
+				"type": "bytes32[]"
 			},
 			{
-				"name": "amount",
-				"type": "uint256"
+				"name": "data",
+				"type": "bytes"
 			}
 		],
 		"outputs": null
@@ -145,25 +145,6 @@ const fakeCoinFactoryABI = `[
 			}
 		],
 		"outputs": null
-	},
-	{
-		"type": "function",
-		"name": "execute",
-		"inputs": [
-			{
-				"name": "inputs",
-				"type": "[]bytes32"
-			},
-			{
-				"name": "outputs",
-				"type": "[]bytes32"
-			},
-			{
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"outputs": null
 	}
 ]`
 
@@ -171,6 +152,12 @@ type fakeState struct {
 	Salt   types.Bytes32        `json:"salt"`
 	Owner  types.EthAddress     `json:"owner"`
 	Amount *ethtypes.HexInteger `json:"amount"`
+}
+
+type fakeExecute struct {
+	Inputs  []types.Bytes32 `json:"inputs"`
+	Outputs []types.Bytes32 `json:"outputs"`
+	Data    types.HexBytes  `json:"data"`
 }
 
 type testPlugin struct {

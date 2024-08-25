@@ -97,6 +97,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 	}, dc.info)
 	assert.Equal(t, contractAddr, psc.Address())
 	assert.Equal(t, "test1", psc.Domain().Name())
+	assert.Equal(t, "0xfeedbeef", psc.ConfigBytes().String())
 	assert.Equal(t, tp.d.factoryContractAddress, psc.Domain().Address())
 
 	// Get cached

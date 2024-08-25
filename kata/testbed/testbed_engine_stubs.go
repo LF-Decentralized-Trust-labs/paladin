@@ -43,7 +43,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 	// Send the transaction
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
-		Input(txInstruction.Params).
+		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
@@ -68,7 +68,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 	txHash, err := abiFunc.R(ctx).
 		Signer(signer).
 		To(&addr).
-		Input(txInstruction.Params).
+		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
 		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
@@ -116,7 +116,6 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 
 	keyMgr := tb.components.KeyManager()
 	attestations := []*prototk.AttestationResult{}
-	endorserSubmitConstraint := ""
 	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, partyName := range ar.Parties {
@@ -158,17 +157,14 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					}
 					result.Payload = signaturePayload.Payload
 				case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
-					if endorserSubmitConstraint != "" {
-						return fmt.Errorf("duplicate ENDORSER_SUBMIT responses from %s and %s", endorserSubmitConstraint, partyName)
-					}
-					endorserSubmitConstraint = partyName
+					result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 				}
 				attestations = append(attestations, result)
 			}
 		}
 	}
 	tx.PostAssembly.Endorsements = attestations
-	return endorserSubmitConstraint, nil
+	return nil
 }
 
 func mustParseBuildABI(buildJSON []byte) abi.ABI {
