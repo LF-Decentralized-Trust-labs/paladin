@@ -42,6 +42,11 @@ func TestSettingErrorLevel(t *testing.T) {
 	assert.Equal(t, logrus.ErrorLevel, logrus.GetLevel())
 }
 
+func TestSettingWarnLevel(t *testing.T) {
+	SetLevel("WARNING")
+	assert.Equal(t, logrus.WarnLevel, logrus.GetLevel())
+}
+
 func TestSettingDebugLevel(t *testing.T) {
 	SetLevel("DEBUG")
 	assert.Equal(t, logrus.DebugLevel, logrus.GetLevel())
@@ -69,6 +74,22 @@ func TestSetFormatting(t *testing.T) {
 		UTC:          confutil.P(true),
 	})
 	L(context.Background()).Infof("time in UTC")
+}
+
+func TestSetFormattingStderr(t *testing.T) {
+	defer func() { InitConfig(&Config{}) /* reinstae defaults for other tests */ }()
+	InitConfig(&Config{
+		Output: confutil.P("stderr"),
+	})
+	L(context.Background()).Infof("code info included")
+}
+
+func TestSetFormattingStdout(t *testing.T) {
+	defer func() { InitConfig(&Config{}) /* reinstae defaults for other tests */ }()
+	InitConfig(&Config{
+		Output: confutil.P("stdout"),
+	})
+	L(context.Background()).Infof("code info included")
 }
 
 func TestSetFormattingIncludeCodeInfo(t *testing.T) {

@@ -12,45 +12,23 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido;
+package io.kaleido.paladin;
 
 import com.sun.jna.Native;
 import com.sun.jna.Library;
 
 public class KataJNA {
 
-    private Thread kataThread;
-
     private PaladinGo paladinGo;
 
     interface PaladinGo extends Library {
-        void Run(String socketAddressPtr);
-        void Stop(String socketAddressPtr);
+        int Run(String socketAddress, String engineName, String loaderUUID, String configFile) ;
+        void Stop();
     }
 
-    public KataJNA() {
+    public static PaladinGo Load() {
         System.setProperty("jna.debug_load", "true");
-        paladinGo = Native.load("kata", PaladinGo.class);
-    }
-
-    public synchronized void start(final String configFilePath) {
-        kataThread = new Thread(() -> paladinGo.Run(configFilePath));
-        kataThread.start();
-    }
-
-    public synchronized void stop(final String socketAddress) {
-        if (kataThread == null) {
-            return;
-        }
-        paladinGo.Stop(socketAddress);
-        try {
-            kataThread.join(60000);
-        } catch(InterruptedException e) {
-            System.out.println("interrupted awaiting termination");
-        }
-        if (kataThread.isAlive()) {
-            throw new RuntimeException("stop timed out");
-        }
+        return Native.load("kata", PaladinGo.class);
     }
 
 }

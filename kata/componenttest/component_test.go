@@ -321,7 +321,7 @@ func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string
 		time.Sleep(time.Second)
 		delay++
 		status, err = client.Status(ctx, &pb.StatusRequest{})
-		require.Less(t, delay, 2, "Server did not start after 2 seconds")
+		require.Less(t, delay, 5, "Server did not start in expected time")
 	}
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())

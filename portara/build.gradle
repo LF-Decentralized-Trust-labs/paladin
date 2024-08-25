@@ -25,24 +25,24 @@ test {
     systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath
 }
 
-tasks.named('compileJava') {
-    dependsOn ':kata:buildSharedLibrary'
-}
-
 configurations {
     toolkitProtoDefinitions {
+        canBeConsumed = false
+    }
+    kataSharedLibrary {
         canBeConsumed = false
     }
 }
 
 dependencies {
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
+
+    testImplementation project(path: ":kata", configuration: "kataSharedLibrary")
 }
 
 tasks.register('collectProtocFiles', Copy) {
     from configurations.toolkitProtoDefinitions.asFileTree
     into "src/main/proto"
-    dependsOn(':kata:zipProtocFiles')
 }
 
 tasks.register('cleanProto', Delete) {
@@ -76,6 +76,9 @@ dependencies {
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
     implementation 'io.netty:netty-all:4.1.111.Final' // supports Java 16 UDS natively since Netty 4.4.110
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2'
+
+    implementation 'org.apache.logging.log4j:log4j-core:2.23.1'
 
     implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'

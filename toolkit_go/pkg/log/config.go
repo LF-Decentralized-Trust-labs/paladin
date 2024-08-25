@@ -68,7 +68,7 @@ type JSONConfig struct {
 var LogDefaults = &Config{
 	Level:        confutil.P("info"),
 	Format:       confutil.P("simple"),
-	Output:       confutil.P("stdout"),
+	Output:       confutil.P("stderr"),
 	ForceColor:   confutil.P(false),
 	DisableColor: confutil.P(false),
 	TimeFormat:   confutil.P("2006-01-02T15:04:05.000Z07:00"),

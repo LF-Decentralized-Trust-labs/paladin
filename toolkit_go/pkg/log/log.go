@@ -19,6 +19,7 @@ package log
 import (
 	"context"
 	"math"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -61,7 +62,10 @@ func InitConfig(conf *Config) {
 			Compress:   confutil.Bool(conf.File.Compress, *LogDefaults.File.Compress),
 		}
 		logrus.SetOutput(lumberjack)
+	case "stderr":
+		logrus.SetOutput(os.Stderr)
 	case "stdout":
+		logrus.SetOutput(os.Stdout)
 		fallthrough
 	default:
 	}
@@ -117,6 +121,8 @@ func SetLevel(level string) {
 	switch strings.ToLower(level) {
 	case "error":
 		logrus.SetLevel(logrus.ErrorLevel)
+	case "warn", "warning":
+		logrus.SetLevel(logrus.WarnLevel)
 	case "debug":
 		logrus.SetLevel(logrus.DebugLevel)
 	case "trace":

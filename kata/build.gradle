@@ -42,6 +42,10 @@ configurations {
     toolkitProtoDefinitions {
         canBeConsumed = false
     }
+    kataSharedLibrary {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
 
 dependencies {
@@ -210,7 +214,8 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
     }    
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -473,4 +478,12 @@ artifacts {
 
 dependencies {
     libkata files(buildSharedLibrary)
+}
+
+artifacts {
+    kataSharedLibrary(projectDir) {
+        fileTree() {
+            include '*.dylib', '*.so', '*.dll', 'libkata.h'
+        }
+    }
 }
