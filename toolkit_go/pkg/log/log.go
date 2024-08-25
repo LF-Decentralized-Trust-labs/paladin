@@ -20,6 +20,7 @@ import (
 	"context"
 	"math"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
@@ -33,6 +34,8 @@ var (
 
 	// L accesses the current logger from the context
 	L = loggerFromContext
+
+	initAtLeastOnce atomic.Bool
 )
 
 type (
@@ -40,6 +43,8 @@ type (
 )
 
 func InitConfig(conf *Config) {
+	initAtLeastOnce.Store(true) // must store before SetLevel
+
 	level := confutil.StringNotEmpty(conf.Level, *LogDefaults.Level)
 	SetLevel(level)
 
@@ -75,13 +80,23 @@ func InitConfig(conf *Config) {
 	})
 }
 
+func ensureInit() {
+	// Called at a couple of strategic points to check we get log initialize in things like unit tests
+	// However NOT guaranteed to be called because we can't afford to do atomic load on every log line
+	if !initAtLeastOnce.Load() {
+		InitConfig(&Config{})
+	}
+}
+
 // WithLogger adds the specified logger to the context
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
+	ensureInit()
 	return context.WithValue(ctx, ctxLogKey{}, logger)
 }
 
 // WithLogField adds the specified field to the logger in the context
 func WithLogField(ctx context.Context, key, value string) context.Context {
+	ensureInit()
 	if len(value) > 61 {
 		value = value[0:61] + "..."
 	}
@@ -98,6 +113,7 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 func SetLevel(level string) {
+	ensureInit()
 	switch strings.ToLower(level) {
 	case "error":
 		logrus.SetLevel(logrus.ErrorLevel)
