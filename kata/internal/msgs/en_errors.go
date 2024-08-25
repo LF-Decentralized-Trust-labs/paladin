@@ -248,4 +248,7 @@ var (
 	MsgDomainTXIncompleteEndorseTransaction   = ffe("PD011630", "Transaction is incomplete for phase EndorseTransaction")
 	MsgDomainTXIncompleteResolveDispatch      = ffe("PD011631", "Transaction is incomplete for phase ResolveDispatch")
 	MsgDomainTXIncompletePrepareTransaction   = ffe("PD011632", "Transaction is incomplete for phase PrepareTransaction")
+
+	// Entrypoint PD0117XX
+	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")
 )

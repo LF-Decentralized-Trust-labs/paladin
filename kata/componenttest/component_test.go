@@ -135,7 +135,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
@@ -281,7 +281,7 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go kata.Run(ctx, configFile.Name())
+	go kata.TestCommsBusRun(ctx, configFile.Name())
 
 	// Wait until the engine is listening - otherwise our messages will be discarded
 	// TODO: This is a temporary situation as the transactional model of the engine forms
@@ -398,7 +398,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -532,5 +532,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }

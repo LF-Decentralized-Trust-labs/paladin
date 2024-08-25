@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package testbed
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ import (
 func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
 	logrus.SetLevel(logrus.DebugLevel)
 
-	tb = newTestBed(initFunctions...)
+	tb = NewTestBed(initFunctions...)
 	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
 
 	assert.NoError(t, err)
@@ -39,8 +39,8 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initF
 		panic(err)
 	}
 	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
-	tb.conf.DB.SQLite.MigrationsDir = "../db/migrations/sqlite"
-	tb.conf.DB.Postgres.MigrationsDir = "../db/migrations/postgres"
+	tb.conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
+	tb.conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
 	setConf(tb.conf)
 	serverErr := make(chan error)
 	go func() {
@@ -64,32 +64,8 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initF
 
 }
 
-func TestCommandLineRunFail(t *testing.T) {
-	var exitCode int
-	exitProcess = func(code int) { exitCode = code }
-	origArgs := os.Args
-	defer func() {
-		os.Args = origArgs
-	}()
-
-	failConfig := path.Join(t.TempDir(), "broken.config.yaml")
-	os.Args = []string{"unittestbed", failConfig}
-	err := os.WriteFile(failConfig, ([]byte)(`{
-		"rpc": {
-	    	http: {
-				"host": ":::::::wrong",
-				"port": -12345
-			}
-		}
-	}`), 0644)
-	assert.NoError(t, err)
-
-	main()
-	assert.Equal(t, 1, exitCode)
-}
-
 func TestBadConfig(t *testing.T) {
-	err := newTestBed().setupConfig([]string{"unittestbed", t.TempDir()})
+	err := NewTestBed().setupConfig([]string{"unittestbed", t.TempDir()})
 	assert.Error(t, err)
 }
 

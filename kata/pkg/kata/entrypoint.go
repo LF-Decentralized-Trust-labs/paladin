@@ -15,18 +15,21 @@
 
 package kata
 
-import (
-	"context"
+import "sync/atomic"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-)
+var running atomic.Pointer[instance]
 
-func Stop(ctx context.Context, socketAddress string) {
-	log.L(ctx).Infof("Stop: %s", socketAddress)
-	if commsBus != nil {
-		err := commsBus.GRPCServer().Stop(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("Failed to stop GRPC server: %s", err)
-		}
+func Run(socketAddress, engineName, loaderUUID, configFile string) {
+	inst := newInstance(socketAddress, engineName, loaderUUID, configFile)
+	if !running.CompareAndSwap(nil, inst) {
+		panic("double started")
+	}
+	inst.run()
+}
+
+func Stop() {
+	inst := running.Load()
+	if inst != nil {
+		inst.stop()
 	}
 }

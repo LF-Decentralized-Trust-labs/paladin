@@ -18,24 +18,24 @@ import (
 	"C"
 )
 import (
-	"context"
-	"os"
-	"strconv"
-
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
-	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
-
+// Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function
+//
 //export Run
-func Run(socketAddressPtr *C.char) {
-	kata.Run(rootCtx, C.GoString(socketAddressPtr))
+func Run(socketAddressPtr, engineNamePtr, loaderUUIDPtr, configFilePtr *C.char) {
+	kata.Run(
+		C.GoString(engineNamePtr),
+		C.GoString(socketAddressPtr),
+		C.GoString(loaderUUIDPtr),
+		C.GoString(configFilePtr),
+	)
 }
 
 //export Stop
-func Stop(socketAddressPtr *C.char) {
-	kata.Stop(rootCtx, C.GoString(socketAddressPtr))
+func Stop() {
+	kata.Stop()
 }
 
 func main() {}

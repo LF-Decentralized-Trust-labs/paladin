@@ -17,19 +17,18 @@
 package confutil
 
 import (
-	"context"
 	"io/fs"
 	"math"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/docker/go-units"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
+
+/*********** THIS FILE CONTAINS VERY SIMPLE HELPER FUNCTIONS FOR ACCESSING CONFIG AND DUPLICATING CODE **************/
+// It shouldn't be confused with a full configuration processing system - that's separate (see "componentmgr")
+// Most packages depend on this package, including the "log" package - so we can't use the logging framework.
+// For that reason avoid placing any heavy lifting code here.
 
 func Int(iVal *int, def int) int {
 	if iVal == nil {
@@ -144,27 +143,6 @@ func ByteSize(sVal *string, min int64, def string) int64 {
 		iVal = &i
 	}
 	return *iVal
-}
-
-func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		logrus.Errorf("file not found: %s", filePath)
-		return i18n.NewError(ctx, tkmsgs.MsgConfigFileMissing, filePath)
-	}
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		logrus.Errorf("failed to read file: %v", err)
-		return i18n.NewError(ctx, tkmsgs.MsgConfigFileReadError, filePath, err.Error())
-	}
-
-	err = yaml.Unmarshal(data, config)
-	if err != nil {
-		logrus.Errorf("failed to parse file: %v", err)
-		return i18n.NewError(ctx, tkmsgs.MsgConfigFileParseError, err.Error())
-	}
-
-	return nil
 }
 
 func P[T any](v T) *T {

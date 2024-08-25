@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package testbed
 
 import (
 	"context"
@@ -30,22 +30,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"gopkg.in/yaml.v3"
 )
-
-var exitProcess = os.Exit
-
-// The domain testbed runs a comms bus, and hosts a Domain State Interface
-// It provides RPC functions to invoke the domain directly
-func main() {
-	tb := newTestBed()
-	err := tb.setupConfig(os.Args)
-	if err == nil {
-		err = tb.run()
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		exitProcess(1)
-	}
-}
 
 type testbed struct {
 	ctx       context.Context
@@ -64,7 +48,7 @@ type testbed struct {
 	done  chan struct{}
 }
 
-func newTestBed(initFunctions ...func(c components.AllComponents) error) (tb *testbed) {
+func NewTestBed(initFunctions ...func(c components.AllComponents) error) (tb *testbed) {
 	tb = &testbed{
 		sigc:          make(chan os.Signal, 1),
 		instanceID:    uuid.New(),
