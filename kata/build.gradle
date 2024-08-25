@@ -18,6 +18,7 @@ import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
+        include "kata.go"
         include "internal/**/*.go"
         include "pkg/**/*.go"
         include "componenttest/**/*.go"
@@ -42,11 +43,16 @@ configurations {
     toolkitProtoDefinitions {
         canBeConsumed = false
     }
-    kataSharedLibrary {
+    libkata {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    protocFiles {
         canBeConsumed = true
         canBeResolved = false
     }
 }
+
 
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
@@ -451,14 +457,6 @@ task build {
     dependsOn tasks.checkCoverage
 }
 
-configurations {
-    libkata
-    protocFiles {
-        canBeConsumed = true
-        canBeResolved = false
-    }
-}
-
 tasks.register('zipProtocFiles', Zip) {  
     from fileTree("pkg") {
         include "**/*.proto"
@@ -480,10 +478,3 @@ dependencies {
     libkata files(buildSharedLibrary)
 }
 
-artifacts {
-    kataSharedLibrary(projectDir) {
-        fileTree() {
-            include '*.dylib', '*.so', '*.dll', 'libkata.h'
-        }
-    }
-}

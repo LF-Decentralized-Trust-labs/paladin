@@ -39,9 +39,9 @@ public class Main {
 
             return KataJNA.Load().Run(
                     runtimeInfo.socketFilename(),
-                    engineName,
                     runtimeInfo.instanceUUID(),
-                    configFile
+                    configFile,
+                    engineName
             );
         } catch(Throwable e) {
             throw new RuntimeException(e.getMessage(), e);

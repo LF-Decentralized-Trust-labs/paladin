@@ -33,7 +33,7 @@ func setupTestConfig(t *testing.T, mockers ...func(mockCM *componentmocks.Compon
 	id := uuid.New()
 	origCMFactory := componentManagerFactory
 	mockCM := componentmocks.NewComponentManager(t)
-	componentManagerFactory = func(bgCtx context.Context, instanceUUID uuid.UUID, conf *componentmgr.Config, engine components.Engine) componentmgr.ComponentManager {
+	componentManagerFactory = func(bgCtx context.Context, socketAddress string, instanceUUID uuid.UUID, conf *componentmgr.Config, engine components.Engine) componentmgr.ComponentManager {
 		assert.Equal(t, id, instanceUUID)
 		assert.Equal(t, "http://localhost:8545", conf.Blockchain.HTTP.URL)
 		return mockCM

@@ -18,19 +18,34 @@ import (
 	"C"
 )
 import (
+	"fmt"
+	"os"
+	"runtime/debug"
+
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
 )
 
 // Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function
 //
 //export Run
-func Run(socketAddressPtr, engineNamePtr, loaderUUIDPtr, configFilePtr *C.char) {
-	kata.Run(
-		C.GoString(engineNamePtr),
+func Run(socketAddressPtr, loaderUUIDPtr, configFilePtr, engineNamePtr *C.char) (rc int) {
+	defer func() {
+		panicked := recover()
+		if panicked != nil {
+			// print the stack
+			fmt.Fprintf(os.Stderr, "%s\n", debug.Stack())
+			// set the rc
+			rc = 1
+		}
+	}()
+	kRC := kata.Run(
 		C.GoString(socketAddressPtr),
 		C.GoString(loaderUUIDPtr),
 		C.GoString(configFilePtr),
+		C.GoString(engineNamePtr),
 	)
+	rc = int(kRC)
+	return
 }
 
 //export Stop

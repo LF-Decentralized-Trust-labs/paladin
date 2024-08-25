@@ -65,7 +65,11 @@ type pluginController struct {
 	serverDone           chan error
 }
 
-func NewPluginController(bgCtx context.Context, loaderID uuid.UUID, managers Managers, conf *PluginControllerConfig) (_ PluginController, err error) {
+func NewPluginController(bgCtx context.Context,
+	socketFile string, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
+	loaderID uuid.UUID,
+	managers Managers,
+	conf *PluginControllerConfig) (_ PluginController, err error) {
 
 	pc := &pluginController{
 		bgCtx: bgCtx,
@@ -85,7 +89,7 @@ func NewPluginController(bgCtx context.Context, loaderID uuid.UUID, managers Man
 		return nil, err
 	}
 
-	if err := pc.parseGRPCAddress(bgCtx, conf.GRPC.Address); err != nil {
+	if err := pc.parseGRPCAddress(bgCtx, socketFile); err != nil {
 		return nil, err
 	}
 	return pc, nil

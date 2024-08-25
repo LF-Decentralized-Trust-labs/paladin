@@ -19,12 +19,12 @@ import "sync/atomic"
 
 var running atomic.Pointer[instance]
 
-func Run(socketAddress, engineName, loaderUUID, configFile string) {
-	inst := newInstance(socketAddress, engineName, loaderUUID, configFile)
+func Run(socketAddress, loaderUUID, configFile, engineName string) RC {
+	inst := newInstance(socketAddress, loaderUUID, configFile, engineName)
 	if !running.CompareAndSwap(nil, inst) {
 		panic("double started")
 	}
-	inst.run()
+	return inst.run()
 }
 
 func Stop() {

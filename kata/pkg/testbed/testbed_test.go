@@ -50,10 +50,7 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initF
 	assert.NoError(t, err)
 
 	return fmt.Sprintf("http://%s", tb.components.RPCServer().HTTPAddr()), tb, func() {
-		select {
-		case tb.sigc <- os.Kill:
-		default:
-		}
+		tb.Stop()
 		select {
 		case err := <-serverErr:
 			assert.NoError(t, err)

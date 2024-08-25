@@ -44,7 +44,10 @@ public class YamlConfig {
         if (!tempDir.isDirectory()) {
             throw new IOException(String.format("%s is not a directory", tempDir.getAbsolutePath()));
         }
-        File socketFile = new File(tempDir, String.format("paladin.%s.socket", uuid.toString()));
+        String uStr = uuid.toString();
+        // Socket files have to be quite small
+        File socketFile = new File(tempDir, String.format("p.%s.sock", uStr.substring(uStr.length()-6)));
+        LOGGER.info("instance={} uds={}", uStr, socketFile.getAbsolutePath());
         return new RuntimeInfo(uuid.toString(), socketFile.getAbsolutePath());
     }
 

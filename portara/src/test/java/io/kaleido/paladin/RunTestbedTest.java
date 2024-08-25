@@ -28,8 +28,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.sql.Time;
+import java.time.Duration;
 import java.time.LocalTime;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,11 +57,24 @@ db:
     autoMigrate:   true
     migrationsDir: %s
     debugQueries:  true
+signer:
+  keyStore:
+    type: static
+    static:
+      keys:
+        seed:
+          encoding: none
+          inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
 rpcServer:
-   port: %s
+  http:
+    port: %s
+  ws:
+    disabled: true
 blockchain:
    http:
      url: http://localhost:8545
+   ws:
+     url: ws://localhost:8546
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort);
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
@@ -78,6 +93,7 @@ blockchain:
             final URI testbedRPC = new URI(String.format("http://127.0.0.1:%d", availableRPCPort));
             try (HttpClient rpcClient = HttpClient.newBuilder().build()) {
                 HttpRequest req = HttpRequest.newBuilder()
+                    .timeout(Duration.ofSeconds(1))
                     .uri(testbedRPC)
                         .POST(HttpRequest.BodyPublishers.ofString("""
                             {
@@ -93,11 +109,10 @@ blockchain:
             } catch(IOException e) {
                 System.err.printf("Waiting to connect: %s\n", e);
             }
+            assertTrue(System.currentTimeMillis()-startTime < 5000, "Test ran too long");
             if (rc.isDone()) {
                 assertEquals(0, rc.get());
             }
-            long running = System.currentTimeMillis()-startTime;
-            assertTrue(running < 5000);
             Thread.sleep(250);
         }
     }

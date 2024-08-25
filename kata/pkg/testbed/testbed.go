@@ -19,8 +19,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
@@ -37,39 +35,29 @@ type testbed struct {
 
 	initFunctions []func(c components.AllComponents) error
 
-	sigc       chan os.Signal
+	socketFile string
 	instanceID uuid.UUID
 
 	conf       *componentmgr.Config
 	rpcModule  *rpcserver.RPCModule
 	components components.AllComponents
 
-	ready chan error
-	done  chan struct{}
+	ready   chan error
+	stopped chan struct{}
+	done    chan struct{}
 }
 
 func NewTestBed(initFunctions ...func(c components.AllComponents) error) (tb *testbed) {
 	tb = &testbed{
-		sigc:          make(chan os.Signal, 1),
 		instanceID:    uuid.New(),
 		ready:         make(chan error, 1),
 		initFunctions: initFunctions,
+		stopped:       make(chan struct{}),
 		done:          make(chan struct{}),
 	}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	tb.initRPC()
 	return tb
-}
-
-func (tb *testbed) listenTerm() {
-	signal.Notify(tb.sigc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	<-tb.sigc
-	tb.stop()
-}
-
-func (tb *testbed) stop() {
-	log.L(tb.ctx).Infof("Testbed shutting down")
-	tb.cancelCtx()
 }
 
 func (tb *testbed) tempSocketFile() (fileName string, err error) {
@@ -95,9 +83,6 @@ func (tb *testbed) setupConfig(args []string) error {
 	if err == nil {
 		err = yaml.Unmarshal(configBytes, &tb.conf)
 	}
-	if err == nil && tb.conf.GRPC.Address == "" {
-		tb.conf.GRPC.Address, err = tb.tempSocketFile()
-	}
 	if err != nil {
 		return err
 	}
@@ -115,7 +100,7 @@ func (tb *testbed) run() (err error) {
 		}
 	}()
 
-	cm := componentmgr.NewComponentManager(tb.ctx, tb.instanceID, tb.conf, tb)
+	cm := componentmgr.NewComponentManager(tb.ctx, tb.socketFile, tb.instanceID, tb.conf, tb)
 	err = cm.Init()
 	if err == nil {
 		err = cm.StartComponents()
@@ -135,7 +120,7 @@ func (tb *testbed) run() (err error) {
 	close(tb.ready)
 
 	log.L(tb.ctx).Info("Testbed started")
-	tb.listenTerm()
+	<-tb.stopped
 	cm.Stop()
 	log.L(tb.ctx).Info("Testbed shutdown")
 	return err
@@ -150,7 +135,9 @@ func (tb *testbed) Start() error {
 	return nil
 }
 
-func (tb *testbed) Stop() {}
+func (tb *testbed) Stop() {
+	close(tb.stopped)
+}
 
 func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
 	tb.components = c

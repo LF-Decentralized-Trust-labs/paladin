@@ -29,15 +29,14 @@ configurations {
     toolkitProtoDefinitions {
         canBeConsumed = false
     }
-    kataSharedLibrary {
+    libkata {
         canBeConsumed = false
     }
 }
 
 dependencies {
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
-
-    testImplementation project(path: ":kata", configuration: "kataSharedLibrary")
+    testImplementation project(path: ":kata", configuration: "libkata")
 }
 
 tasks.register('collectProtocFiles', Copy) {

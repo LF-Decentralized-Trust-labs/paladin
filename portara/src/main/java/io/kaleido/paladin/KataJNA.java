@@ -22,7 +22,7 @@ public class KataJNA {
     private PaladinGo paladinGo;
 
     interface PaladinGo extends Library {
-        int Run(String socketAddress, String engineName, String loaderUUID, String configFile) ;
+        int Run(String socketAddress, String loaderUUID, String configFile, String engineName) ;
         void Stop();
     }
 

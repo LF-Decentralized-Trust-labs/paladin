@@ -56,12 +56,19 @@ type instance struct {
 	done      chan struct{}
 }
 
-func newInstance(socketAddress, engineName, loaderUUID, configFile string) *instance {
+type RC int
+
+const (
+	RC_OK   RC = 0
+	RC_FAIL RC = 1
+)
+
+func newInstance(socketAddress, loaderUUID, configFile, engineName string) *instance {
 	i := &instance{
 		socketAddress: socketAddress,
-		engineName:    engineName,
 		loaderUUID:    loaderUUID,
 		configFile:    configFile,
+		engineName:    engineName,
 		signals:       make(chan os.Signal),
 		done:          make(chan struct{}),
 	}
@@ -78,7 +85,7 @@ func (i *instance) signalHandler() {
 	}
 }
 
-func (i *instance) run() {
+func (i *instance) run() RC {
 	defer func() {
 		close(i.done)
 		running.Store(nil)
@@ -88,22 +95,26 @@ func (i *instance) run() {
 	id, err := uuid.Parse(i.loaderUUID)
 	if err != nil {
 		log.L(i.ctx).Errorf("Invalid loader UUID %q: %s", i.loaderUUID, err)
-		return
+		return RC_FAIL
 	}
 
 	var conf componentmgr.Config
 	if err = componentmgr.ReadAndParseYAMLFile(i.ctx, i.configFile, &conf); err != nil {
 		log.L(i.ctx).Error(err.Error())
-		return
+		return RC_FAIL
 	}
 
 	engine, err := engineFactory(i.ctx, i.engineName)
 	if err != nil {
 		log.L(i.ctx).Error(err.Error())
-		return
+		return RC_FAIL
 	}
 
-	cm := componentManagerFactory(i.ctx, id, &conf, engine)
+	cm := componentManagerFactory(i.ctx, i.socketAddress, id, &conf, engine)
+	// From this point need to ensure we stop the component manager
+	defer cm.Stop()
+
+	// Start it up
 	err = cm.Init()
 	if err == nil {
 		err = cm.StartComponents()
@@ -113,15 +124,13 @@ func (i *instance) run() {
 	}
 	if err != nil {
 		log.L(i.ctx).Error(err.Error())
-		return
+		return RC_FAIL
 	}
 
 	// We're started... we just wait for the request to stop
 	<-i.ctx.Done()
 
-	// And stop the component manager
-	cm.Stop()
-
+	return RC_OK
 }
 
 func (i *instance) stop() {
