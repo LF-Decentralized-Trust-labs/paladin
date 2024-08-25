@@ -249,8 +249,24 @@ commsBus:
 	// Start the server
 	go kata.Run(ctx, configFile.Name())
 
-	// todo do we really need to sleep here?
-	time.Sleep(time.Second * 2)
+	// Wait until the engine is listening - otherwise our messages will be discarded
+	// TODO: This is a temporary situation as the transactional model of the engine forms
+waitForEngine:
+	for {
+		commsBus := kata.CommsBus()
+		time.Sleep(10 * time.Millisecond)
+		if commsBus == nil {
+			continue
+		}
+		destinations, err := commsBus.Broker().ListDestinations(ctx)
+		assert.NoError(t, err)
+		for _, d := range destinations {
+			if d == "kata-txn-engine" {
+				// The engine is listening
+				break waitForEngine
+			}
+		}
+	}
 
 	return socketAddress, func() {
 		os.Remove(configFile.Name())
