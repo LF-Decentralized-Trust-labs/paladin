@@ -203,6 +203,18 @@ func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *prot
 	}, nil
 }
 
+func (s *KataMessageService) UnsubscribeFromTopic(ctx context.Context, request *proto.UnsubscribeFromTopicRequest) (*proto.UnsubscribeFromTopicResponse, error) {
+	log.L(ctx).Info("UnsubscribeFromTopic")
+
+	err := s.messageBroker.UnsubscribeFromTopic(ctx, request.Topic, request.Destination)
+	if err != nil {
+		log.L(ctx).Error("Error unsubscribing from topic", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.UnsubscribeFromTopicResponse{}, nil
+}
+
 // TODO should we implement a handshake to prevent clients from listening to arbitrary destinations?
 // Listen implements the Listen RPC method of KataService which is the main entry point for sending messages to plugins
 func (s *KataMessageService) Listen(listenRequest *proto.ListenRequest, stream proto.KataMessageService_ListenServer) error {
