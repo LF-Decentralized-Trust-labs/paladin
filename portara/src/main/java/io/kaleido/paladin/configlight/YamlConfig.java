@@ -55,8 +55,9 @@ public class YamlConfig {
         String uStr = uuid.toString();
         // Socket files have to be quite small
         File socketFile = new File(tempDir, String.format("p.%s.sock", uStr.substring(uStr.length()-6)));
-        LOGGER.info("instance={} uds={}", uStr, socketFile.getAbsolutePath());
-        return new RuntimeInfo(uuid.toString(), socketFile.getAbsolutePath());
+        String grpcTarget = "unix:" + socketFile.getAbsolutePath();
+        LOGGER.info("instance={} grpcTarget={}", uStr, grpcTarget);
+        return new RuntimeInfo(uuid, grpcTarget);
     }
 
     void setupLogging() {

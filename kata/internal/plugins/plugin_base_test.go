@@ -45,8 +45,8 @@ type mockPlugin struct {
 func (tp *mockPlugin) Conf() *PluginConfig {
 	if tp.conf == nil {
 		tp.conf = &PluginConfig{
-			Type:     types.Enum[LibraryType](LibraryTypeCShared),
-			Location: "/any/where",
+			Type:    types.Enum[LibraryType](LibraryTypeCShared),
+			Library: "/any/where",
 		}
 	}
 	return tp.conf

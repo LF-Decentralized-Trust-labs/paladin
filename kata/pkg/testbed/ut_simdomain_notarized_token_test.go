@@ -602,8 +602,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			conf.DomainManagerConfig.Domains = map[string]*domainmgr.DomainConfig{
 				"domain1": {
 					Plugin: plugins.PluginConfig{
-						Type:     plugins.LibraryTypeCShared.Enum(),
-						Location: "loaded/via/unit/test/loader",
+						Type:    plugins.LibraryTypeCShared.Enum(),
+						Library: "loaded/via/unit/test/loader",
 					},
 					Config: yamlNode(`{"some":"config"}`),
 				},

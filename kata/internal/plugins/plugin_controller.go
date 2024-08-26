@@ -16,6 +16,7 @@ package plugins
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -263,7 +264,8 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map
 			Name:       name,
 			PluginType: pType,
 		},
-		Location: conf.Location,
+		LibLocation: conf.Library,
+		Class:       conf.Class,
 	}
 	plugin.def.LibType, err = types.MapEnum(conf.Type, golangToProtoLibTypeMap)
 	pluginMap[plugin.id] = plugin
@@ -280,7 +282,9 @@ func (pc *pluginController) tapLoadingProgressed() {
 func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType prototk.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
-	for _, plugin := range pluginMap {
+	pluginList := []string{}
+	for name, plugin := range pluginMap {
+		pluginList = append(pluginList, fmt.Sprintf("%s:%s", plugin.def.Plugin.PluginType, name))
 		if !plugin.initialized {
 			if !plugin.initializing {
 				notInitializing = append(notInitializing, plugin)
@@ -294,7 +298,7 @@ func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plug
 	if len(unloaded) > 0 {
 		log.L(pc.bgCtx).Debugf("%d of %d %s plugins loaded", len(pluginMap)-len(unloaded), len(pluginMap), pbType)
 	} else {
-		log.L(pc.bgCtx).Infof("All plugins loaded")
+		log.L(pc.bgCtx).Infof("All plugins loaded %v", pluginList)
 	}
 	return unloaded, notInitializing
 }

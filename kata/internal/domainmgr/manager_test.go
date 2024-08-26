@@ -124,8 +124,8 @@ func TestConfiguredDomains(t *testing.T) {
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Plugin: plugins.PluginConfig{
-					Type:     plugins.LibraryTypeCShared.Enum(),
-					Location: "some/where",
+					Type:    plugins.LibraryTypeCShared.Enum(),
+					Library: "some/where",
 				},
 			},
 		},
@@ -134,8 +134,8 @@ func TestConfiguredDomains(t *testing.T) {
 
 	assert.Equal(t, map[string]*plugins.PluginConfig{
 		"test1": {
-			Type:     plugins.LibraryTypeCShared.Enum(),
-			Location: "some/where",
+			Type:    plugins.LibraryTypeCShared.Enum(),
+			Library: "some/where",
 		},
 	}, dm.ConfiguredDomains())
 }

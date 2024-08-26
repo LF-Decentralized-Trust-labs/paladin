@@ -56,6 +56,7 @@ var golangToProtoLibTypeMap = map[LibraryType]prototk.PluginLoad_LibType{
 }
 
 type PluginConfig struct {
-	Type     types.Enum[LibraryType]
-	Location string
+	Type    types.Enum[LibraryType] `yaml:"type"`
+	Library string                  `yaml:"library"`
+	Class   *string                 `yaml:"class,omitempty"`
 }

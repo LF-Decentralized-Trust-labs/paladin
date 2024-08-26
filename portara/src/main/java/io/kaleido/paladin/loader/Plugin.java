@@ -12,19 +12,28 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package io.kaleido.paladin.loader;
 
-package io.kaleido.paladin.configlight;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import github.com.kaleido_io.paladin.toolkit.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.config.Configurator;
-
-import java.io.File;
-import java.io.IOException;
 import java.util.UUID;
 
+abstract class Plugin implements Runnable {
 
-public record RuntimeInfo(UUID instanceUUID, String socketFilename) {}
+   protected final String grpcTarget;
+   protected final PluginInfo info;
+
+   Plugin(String grpcTarget, PluginInfo info) {
+      this.grpcTarget = grpcTarget;
+      this.info = info;
+   }
+
+   abstract void stop();
+
+   public PluginInfo getInfo() {
+      return info;
+   }
+
+}
