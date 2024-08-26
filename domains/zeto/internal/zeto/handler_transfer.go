@@ -44,6 +44,12 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	if transferParams.To == "" {
 		return nil, fmt.Errorf("parameter 'to' is required")
 	}
+	if transferParams.SenderKey == "" {
+		return nil, fmt.Errorf("parameter 'senderKey' is required")
+	}
+	if transferParams.RecipientKey == "" {
+		return nil, fmt.Errorf("parameter 'recipientKey' is required")
+	}
 	if transferParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
@@ -67,6 +73,56 @@ func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *
 	}, nil
 }
 
+func (h *transferHandler) loadBabyJubKey(payload []byte) (*babyjub.PublicKey, error) {
+	var keyCompressed babyjub.PublicKeyComp
+	if err := keyCompressed.UnmarshalText(payload); err != nil {
+		return nil, err
+	}
+	return keyCompressed.Decompress()
+}
+
+func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCoin) ([]byte, error) {
+	inputs = make([]string, len(inputCoins))
+	inputCommitments := make([]string, len(inputCoins))
+	inputValueInts := make([]uint64, len(inputCoins))
+	inputSalts := make([]string, len(inputCoins))
+	var inputOwner string
+	for i, coin := range inputCoins {
+		inputCommitments[i] = coin.Hash.BigInt().Text(16)
+		inputs[i] = coin.Hash.String()
+		inputValueInts[i] = coin.Amount.Uint64()
+		inputSalts[i] = coin.Salt.BigInt().Text(16)
+		inputOwner = coin.OwnerKey.String()
+	}
+
+	outputs = make([]string, len(outputCoins))
+	outputCommitments := make([]string, len(outputCoins))
+	outputValueInts := make([]uint64, len(outputCoins))
+	outputSalts := make([]string, len(outputCoins))
+	outputOwners := make([]string, len(outputCoins))
+	for i, coin := range outputCoins {
+		outputCommitments[i] = coin.Hash.BigInt().Text(16)
+		outputs[i] = coin.Hash.String()
+		outputValueInts[i] = coin.Amount.Uint64()
+		outputSalts[i] = coin.Salt.BigInt().Text(16)
+		outputOwners[i] = coin.OwnerKey.String()
+	}
+
+	payload := &pb.ProvingRequest{
+		CircuitId: "anon",
+		Common: &pb.ProvingRequestCommon{
+			InputCommitments: inputCommitments,
+			InputValues:      inputValueInts,
+			InputSalts:       inputSalts,
+			InputOwner:       inputOwner,
+			OutputValues:     outputValueInts,
+			OutputSalts:      outputSalts,
+			OutputOwners:     outputOwners,
+		},
+	}
+	return proto.Marshal(payload)
+}
+
 func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(ZetoTransferParams)
 
@@ -79,20 +135,11 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 		return nil, fmt.Errorf("failed to resolve: %s", params.RecipientKey)
 	}
 
-	var senderKeyCompressed babyjub.PublicKeyComp
-	if err := senderKeyCompressed.UnmarshalText([]byte(resolvedSender.Verifier)); err != nil {
-		return nil, err
-	}
-	senderKey, err := senderKeyCompressed.Decompress()
+	senderKey, err := h.loadBabyJubKey([]byte(resolvedSender.Verifier))
 	if err != nil {
 		return nil, err
 	}
-
-	var recipientKeyCompressed babyjub.PublicKeyComp
-	if err = recipientKeyCompressed.UnmarshalText([]byte(resolvedRecipient.Verifier)); err != nil {
-		return nil, err
-	}
-	recipientKey, err := recipientKeyCompressed.Decompress()
+	recipientKey, err := h.loadBabyJubKey([]byte(resolvedRecipient.Verifier))
 	if err != nil {
 		return nil, err
 	}
@@ -115,43 +162,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	inputs = make([]string, len(inputCoins))
-	inputCommitments := make([]string, len(inputCoins))
-	inputValueInts := make([]uint64, len(inputCoins))
-	inputSalts := make([]string, len(inputCoins))
-	for i, coin := range inputCoins {
-		inputCommitments[i] = coin.Hash.BigInt().Text(16)
-		inputs[i] = coin.Hash.String()
-		inputValueInts[i] = coin.Amount.Uint64()
-		inputSalts[i] = coin.Salt.BigInt().Text(16)
-	}
-
-	outputs = make([]string, len(outputCoins))
-	outputCommitments := make([]string, len(outputCoins))
-	outputValueInts := make([]uint64, len(outputCoins))
-	outputSalts := make([]string, len(outputCoins))
-	outputOwners := make([]string, len(outputCoins))
-	for i, coin := range outputCoins {
-		outputCommitments[i] = coin.Hash.BigInt().Text(16)
-		outputs[i] = coin.Hash.String()
-		outputValueInts[i] = coin.Amount.Uint64()
-		outputSalts[i] = coin.Salt.BigInt().Text(16)
-		outputOwners[i] = coin.OwnerKey.String()
-	}
-
-	payload := &pb.ProvingRequest{
-		CircuitId: "anon",
-		Common: &pb.ProvingRequestCommon{
-			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
-			InputSalts:       inputSalts,
-			InputOwner:       senderKey.String(),
-			OutputValues:     outputValueInts,
-			OutputSalts:      outputSalts,
-			OutputOwners:     outputOwners,
-		},
-	}
-	payloadBytes, err := proto.Marshal(payload)
+	payloadBytes, err := h.formatProvingRequest(inputCoins, outputCoins)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +205,11 @@ func (h *transferHandler) encodeProof(proof *pb.SnarkProof) map[string]interface
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	var proof pb.SnarkProof
-	err := proto.Unmarshal(req.AttestationResult[0].Payload, &proof)
-	if err != nil {
+	result := findAttestation("sender", req.AttestationResult)
+	if result == nil {
+		return nil, fmt.Errorf("did not find 'sender' attestation")
+	}
+	if err := proto.Unmarshal(result.Payload, &proof); err != nil {
 		return nil, err
 	}
 

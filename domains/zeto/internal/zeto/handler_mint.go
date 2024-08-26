@@ -37,6 +37,9 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	if mintParams.To == "" {
 		return nil, fmt.Errorf("parameter 'to' is required")
 	}
+	if mintParams.RecipientKey == "" {
+		return nil, fmt.Errorf("parameter 'recipientKey' is required")
+	}
 	if mintParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}

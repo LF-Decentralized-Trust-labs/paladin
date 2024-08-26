@@ -27,3 +27,12 @@ func findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedV
 	}
 	return nil
 }
+
+func findAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
+	for _, attestation := range attestations {
+		if attestation.Name == name {
+			return attestation
+		}
+	}
+	return nil
+}
