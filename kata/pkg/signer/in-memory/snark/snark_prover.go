@@ -159,10 +159,10 @@ func validateInputs(inputs *pb.ProvingRequestCommon) error {
 func serializeProof(proof *types.ZKProof) ([]byte, error) {
 	snark := pb.SnarkProof{}
 	snark.A = proof.Proof.A
-	snark.B = make([]*pb.B_Item, len(proof.Proof.B))
+	snark.B = make([]*pb.B_Item, 0, len(proof.Proof.B))
 	for _, p := range proof.Proof.B {
 		bItems := pb.B_Item{}
-		bItems.Items = p
+		bItems.Items = append(bItems.Items, p...)
 		snark.B = append(snark.B, &bItems)
 	}
 	snark.C = proof.Proof.C
