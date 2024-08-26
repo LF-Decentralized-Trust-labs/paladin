@@ -16,61 +16,34 @@
 package testbed
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path"
 	"testing"
-	"time"
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/sirupsen/logrus"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), initFunctions ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
-	logrus.SetLevel(logrus.DebugLevel)
+func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), pluginInit ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
+	ctx := context.Background()
+	log.SetLevel("debug")
 
-	tb = NewTestBed(initFunctions...)
-	err := tb.setupConfig([]string{"unittestbed", "./sqlite.memory.config.yaml"})
-
+	var conf *componentmgr.Config
+	err := componentmgr.ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
 	assert.NoError(t, err)
-	if err != nil {
-		panic(err)
-	}
-	// Tweak config to work from in test dir, while leaving it so it still works for commandline on disk
-	tb.conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
-	tb.conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
-	setConf(tb.conf)
-	serverErr := make(chan error)
-	go func() {
-		serverErr <- tb.run()
-	}()
-	err = <-tb.ready
+	// For running in this unit test the dirs are different to the sample config
+	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
+	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
+	setConf(conf)
+
+	tb = NewTestBed()
+	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, pluginInit...)
 	assert.NoError(t, err)
 
-	return fmt.Sprintf("http://%s", tb.components.RPCServer().HTTPAddr()), tb, func() {
-		tb.Stop()
-		select {
-		case err := <-serverErr:
-			assert.NoError(t, err)
-		case <-time.After(2 * time.Second):
-			assert.Fail(t, "timeout on shutdown")
-		}
+	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), tb, func() {
+		cm.Stop()
 	}
 
-}
-
-func TestBadConfig(t *testing.T) {
-	err := NewTestBed().setupConfig([]string{"unittestbed", t.TempDir()})
-	assert.Error(t, err)
-}
-
-func TestTempSocketFileFail(t *testing.T) {
-	tempDir := t.TempDir()
-	thisIsAFile := path.Join(tempDir, "a.file")
-	err := os.WriteFile(thisIsAFile, []byte{}, 0644)
-	assert.NoError(t, err)
-	_, err = (&testbed{conf: &componentmgr.Config{TempDir: &thisIsAFile}}).tempSocketFile()
-	assert.Error(t, err)
 }

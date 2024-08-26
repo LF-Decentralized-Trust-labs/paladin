@@ -210,3 +210,27 @@ func TestErrorWrapping(t *testing.T) {
 	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
 
 }
+
+func TestUnitTestStart(t *testing.T) {
+	ctx := context.Background()
+
+	var conf *Config
+	err := ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
+	assert.NoError(t, err)
+	// For running in this unit test the dirs are different to the sample config
+	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
+	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
+
+	mockEngine := componentmocks.NewEngine(t)
+	mockEngine.On("EngineName").Return("unittest_engine")
+	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
+	mockEngine.On("Start").Return(nil)
+	mockEngine.On("Stop").Return()
+
+	cm, err := UnitTestStart(ctx, conf, mockEngine, func(c components.AllComponents) error {
+		return nil
+	})
+	assert.NoError(t, err)
+
+	defer cm.Stop()
+}

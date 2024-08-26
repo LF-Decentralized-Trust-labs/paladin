@@ -68,7 +68,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	) (*ethtypes.Address0xHex, error) {
 
 		var constructor ethclient.ABIFunctionClient
-		ec := tb.components.EthClientFactory().HTTPClient()
+		ec := tb.c.EthClientFactory().HTTPClient()
 		abic, err := ec.ABI(ctx, abi)
 		if err == nil {
 			constructor, err = abic.Constructor(ctx, bytecode)
@@ -83,7 +83,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 			Input(params).
 			SignAndSend()
 		if err == nil {
-			tx, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+			tx, err = tb.c.BlockIndexer().WaitForTransaction(ctx, *txHash)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to send transaction: %s", err)
@@ -99,7 +99,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		constructorParams types.RawJSON,
 	) (*types.EthAddress, error) {
 
-		domain, err := tb.components.DomainManager().GetDomainByName(ctx, domainName)
+		domain, err := tb.c.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		keyMgr := tb.components.KeyManager()
+		keyMgr := tb.c.KeyManager()
 		tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 		for i, v := range tx.RequiredVerifiers {
 			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
@@ -148,7 +148,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Rather than just inspecting the TX - we wait for the domain to index the event, such that
 		// we know it's in the map by the time we return.
-		psc, err := tb.components.DomainManager().WaitForDeploy(ctx, tx.ID)
+		psc, err := tb.c.DomainManager().WaitForDeploy(ctx, tx.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		invocation types.PrivateContractInvoke,
 	) (bool, error) {
 
-		psc, err := tb.components.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
+		psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
 		if err != nil {
 			return false, err
 		}
@@ -186,7 +186,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 
 		// Gather the addresses - in the testbed we assume these all to be local
-		keyMgr := tb.components.KeyManager()
+		keyMgr := tb.c.KeyManager()
 		tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
 		for i, v := range tx.PreAssembly.RequiredVerifiers {
 			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)

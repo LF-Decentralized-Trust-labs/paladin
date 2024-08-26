@@ -18,6 +18,7 @@ package componentmgr
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -321,4 +322,38 @@ func (cm *componentManager) PluginController() plugins.PluginController {
 
 func (cm *componentManager) Engine() components.Engine {
 	return cm.engine
+}
+
+func UnitTestStart(ctx context.Context, conf *Config, engine components.Engine, pluginInit ...func(c components.AllComponents) error) (cm ComponentManager, err error) {
+	socketFile, err := unitTestSocketFile()
+	if err == nil {
+		cm = NewComponentManager(ctx, socketFile, uuid.New(), conf, engine)
+		err = cm.Init()
+	}
+	if err == nil {
+		err = cm.StartComponents()
+	}
+	for _, fn := range pluginInit {
+		if err == nil {
+			err = fn(cm)
+		}
+	}
+	if err == nil {
+		err = cm.CompleteStart()
+	}
+	return cm, err
+}
+
+func unitTestSocketFile() (fileName string, err error) {
+	f, err := os.CreateTemp("", "testbed.paladin.*.sock")
+	if err == nil {
+		fileName = f.Name()
+	}
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		err = os.Remove(fileName)
+	}
+	return
 }

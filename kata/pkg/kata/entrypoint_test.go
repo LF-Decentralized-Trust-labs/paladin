@@ -76,14 +76,14 @@ func TestEntrypointOK(t *testing.T) {
 		defer func() {
 			completed <- recover()
 		}()
-		Run(socketFile, "unittest", loaderUUID, configFile)
+		Run(socketFile, loaderUUID, configFile, "unittest")
 	}()
 
 	<-cmStarted
 
 	// Double start should panic
 	assert.Panics(t, func() {
-		Run(socketFile, "unittest", loaderUUID, configFile)
+		Run(socketFile, loaderUUID, configFile, "unittest")
 	})
 
 	Stop()

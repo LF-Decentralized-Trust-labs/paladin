@@ -55,7 +55,7 @@ func TestSignalHandlerStop(t *testing.T) {
 		defer func() {
 			completed <- recover()
 		}()
-		Run(socketFile, "unittest", loaderUUID, configFile)
+		Run(socketFile, loaderUUID, configFile, "unittest")
 	}()
 
 	<-cmStarted
@@ -73,7 +73,7 @@ func TestBadLoaderID(t *testing.T) {
 	socketFile, _, configFile, done := setupTestConfig(t)
 	defer done()
 
-	Run(socketFile, "unittest", "wrong", configFile)
+	Run(socketFile, "wrong", configFile, "unittest")
 
 }
 
@@ -82,7 +82,7 @@ func TestBadConfigFile(t *testing.T) {
 	socketFile, loaderUUID, _, done := setupTestConfig(t)
 	defer done()
 
-	Run(socketFile, "unittest", loaderUUID, path.Join(t.TempDir(), "wrong.yaml"))
+	Run(socketFile, loaderUUID, path.Join(t.TempDir(), "wrong.yaml"), "unittest")
 
 }
 
@@ -95,7 +95,7 @@ func TestEngineFactoryFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	Run(socketFile, "unittest", loaderUUID, configFile)
+	Run(socketFile, loaderUUID, configFile, "unittest")
 
 }
 
@@ -105,9 +105,10 @@ func TestComponentManagerStartFail(t *testing.T) {
 		mockCM.On("Init").Return(nil)
 		mockCM.On("StartComponents").Return(nil)
 		mockCM.On("CompleteStart").Return(fmt.Errorf("pop"))
+		mockCM.On("Stop").Return()
 	})
 	defer done()
 
-	Run(socketFile, "unittest", loaderUUID, configFile)
+	Run(socketFile, loaderUUID, configFile, "unittest")
 
 }

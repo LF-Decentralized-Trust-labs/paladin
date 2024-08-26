@@ -34,7 +34,7 @@ import (
 func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
-	ec := tb.components.EthClientFactory().HTTPClient()
+	ec := tb.c.EthClientFactory().HTTPClient()
 	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, types.HexBytes(txInstruction.Bytecode))
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
-		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+		_, err = tb.c.BlockIndexer().WaitForTransaction(ctx, *txHash)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to send base deploy ledger transaction: %s", err)
@@ -57,7 +57,7 @@ func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer s
 func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string, txInstruction *components.EthTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
-	ec := tb.components.EthClientFactory().HTTPClient()
+	ec := tb.c.EthClientFactory().HTTPClient()
 	abiFunc, err := ec.ABIFunction(ctx, txInstruction.FunctionABI)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 		Input(txInstruction.Inputs).
 		SignAndSend()
 	if err == nil {
-		_, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+		_, err = tb.c.BlockIndexer().WaitForTransaction(ctx, *txHash)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to send base ledger transaction: %s", err)
@@ -84,11 +84,11 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_SIGN {
 			for _, partyName := range ar.Parties {
-				keyHandle, verifier, err := tb.components.KeyManager().ResolveKey(ctx, partyName, ar.Algorithm)
+				keyHandle, verifier, err := tb.c.KeyManager().ResolveKey(ctx, partyName, ar.Algorithm)
 				if err != nil {
 					return fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
-				signaturePayload, err := tb.components.KeyManager().Sign(ctx, &proto.SignRequest{
+				signaturePayload, err := tb.c.KeyManager().Sign(ctx, &proto.SignRequest{
 					KeyHandle: keyHandle,
 					Algorithm: ar.Algorithm,
 					Payload:   ar.Payload,
@@ -114,7 +114,7 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 
 func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) error {
 
-	keyMgr := tb.components.KeyManager()
+	keyMgr := tb.c.KeyManager()
 	attestations := []*prototk.AttestationResult{}
 	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_ENDORSE {
