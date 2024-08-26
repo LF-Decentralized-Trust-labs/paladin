@@ -266,7 +266,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 		// Validate and write the states
 		spentStateRefs := assembleTXRes.AssembledTransaction.SpentStates
-		newStates, newStateRefs, err := psc.validateAndWriteStates(seq, assembleTXRes.AssembledTransaction.NewStates)
+		newStates, _, err := psc.validateAndWriteStates(seq, assembleTXRes.AssembledTransaction.NewStates)
 		if err != nil {
 			return false, err
 		}
@@ -295,13 +295,30 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 			return false, err
 		}
 
+		finalSpentStates := make([]*proto.EndorsableState, len(inputStates))
+		for i, state := range inputStates {
+			finalSpentStates[i] = &proto.EndorsableState{
+				SchemaId:      state.Schema.String(),
+				HashId:        state.ID.String(),
+				StateDataJson: state.Data.String(),
+			}
+		}
+		finalNewStates := make([]*proto.EndorsableState, len(newStates))
+		for i, state := range newStates {
+			finalNewStates[i] = &proto.EndorsableState{
+				SchemaId:      state.Schema.String(),
+				HashId:        state.ID.String(),
+				StateDataJson: state.Data.String(),
+			}
+		}
+
 		// Prepare the transaction
 		prepareTXReq := &proto.PrepareTransactionRequest{
 			Transaction: txSpec,
 			FinalizedTransaction: &proto.FinalizedTransaction{
 				TransactionId: txSpec.TransactionId,
-				SpentStates:   spentStateRefs,
-				NewStates:     newStateRefs,
+				SpentStates:   finalSpentStates,
+				NewStates:     finalNewStates,
 			},
 			AttestationResult: attestations,
 		}

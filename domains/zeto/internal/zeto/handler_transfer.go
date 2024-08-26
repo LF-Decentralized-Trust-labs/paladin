@@ -28,10 +28,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TODO: what is the best way to pass the hashes from Assemble to Prepare?
-var inputs []string
-var outputs []string
-
 type transferHandler struct {
 	domainHandler
 }
@@ -82,27 +78,23 @@ func (h *transferHandler) loadBabyJubKey(payload []byte) (*babyjub.PublicKey, er
 }
 
 func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCoin) ([]byte, error) {
-	inputs = make([]string, len(inputCoins))
 	inputCommitments := make([]string, len(inputCoins))
 	inputValueInts := make([]uint64, len(inputCoins))
 	inputSalts := make([]string, len(inputCoins))
 	var inputOwner string
 	for i, coin := range inputCoins {
 		inputCommitments[i] = coin.Hash.BigInt().Text(16)
-		inputs[i] = coin.Hash.String()
 		inputValueInts[i] = coin.Amount.Uint64()
 		inputSalts[i] = coin.Salt.BigInt().Text(16)
 		inputOwner = coin.OwnerKey.String()
 	}
 
-	outputs = make([]string, len(outputCoins))
 	outputCommitments := make([]string, len(outputCoins))
 	outputValueInts := make([]uint64, len(outputCoins))
 	outputSalts := make([]string, len(outputCoins))
 	outputOwners := make([]string, len(outputCoins))
 	for i, coin := range outputCoins {
 		outputCommitments[i] = coin.Hash.BigInt().Text(16)
-		outputs[i] = coin.Hash.String()
 		outputValueInts[i] = coin.Amount.Uint64()
 		outputSalts[i] = coin.Salt.BigInt().Text(16)
 		outputOwners[i] = coin.OwnerKey.String()
@@ -211,6 +203,23 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, re
 	}
 	if err := proto.Unmarshal(result.Payload, &proof); err != nil {
 		return nil, err
+	}
+
+	inputs := make([]string, len(req.FinalizedTransaction.SpentStates))
+	for i, state := range req.FinalizedTransaction.SpentStates {
+		coin, err := h.zeto.makeCoin(state.StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		inputs[i] = coin.Hash.String()
+	}
+	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
+	for i, state := range req.FinalizedTransaction.NewStates {
+		coin, err := h.zeto.makeCoin(state.StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		outputs[i] = coin.Hash.String()
 	}
 
 	params := map[string]interface{}{

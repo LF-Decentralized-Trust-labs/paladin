@@ -76,14 +76,9 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 		return nil, err
 	}
 
-	outputCoins, outputStates, err := h.zeto.prepareOutputs(params.To, recipientKey, params.Amount)
+	_, outputStates, err := h.zeto.prepareOutputs(params.To, recipientKey, params.Amount)
 	if err != nil {
 		return nil, err
-	}
-
-	outputs = make([]string, len(outputCoins))
-	for i, coin := range outputCoins {
-		outputs[i] = coin.Hash.String()
 	}
 
 	return &pb.AssembleTransactionResponse{
@@ -109,6 +104,15 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
+	for i, state := range req.FinalizedTransaction.NewStates {
+		coin, err := h.zeto.makeCoin(state.StateDataJson)
+		if err != nil {
+			return nil, err
+		}
+		outputs[i] = coin.Hash.String()
+	}
+
 	params := map[string]interface{}{
 		"utxos": outputs,
 	}
