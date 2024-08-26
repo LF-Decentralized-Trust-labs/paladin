@@ -138,6 +138,7 @@ func TestSnarkProve(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -150,7 +151,7 @@ func TestSnarkProve(t *testing.T) {
 		Payload:   payload,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, 38, len(res.Payload))
+	assert.Equal(t, 34, len(res.Payload))
 }
 
 func TestSnarkProveError(t *testing.T) {
@@ -201,6 +202,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     []uint64{32, 38},
+			OutputSalts:      []string{"salt1", "salt2"},
 			OutputOwners:     []string{"bob", "alice"},
 		},
 	}
@@ -468,6 +470,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -488,6 +491,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}

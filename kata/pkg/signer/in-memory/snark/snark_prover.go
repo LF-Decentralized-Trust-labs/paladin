@@ -175,16 +175,19 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 	outputCommitments := make([]*big.Int, len(commonInputs.OutputValues))
 	outputSalts := make([]*big.Int, len(commonInputs.OutputValues))
 	outputOwnerPublicKeys := make([][]*big.Int, len(commonInputs.OutputValues))
+	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
 
-	// TODO: how to tell the domain how to construct the UTXO?
 	for i, value := range commonInputs.OutputValues {
-		salt := utxo.NewSalt()
-		outputSalts[i] = salt
 		ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
 		if err != nil {
 			return nil, err
 		}
 		outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
+		salt, ok := new(big.Int).SetString(commonInputs.OutputSalts[i], 16)
+		if !ok {
+			return nil, errors.New("failed to parse output salt")
+		}
+		outputSalts[i] = salt
 
 		u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
 		hash, err := u.GetHash()
@@ -192,6 +195,7 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 			return nil, err
 		}
 		outputCommitments[i] = hash
+		outputValues[i] = new(big.Int).SetUint64(value)
 	}
 
 	inputCommitments := make([]*big.Int, len(commonInputs.InputCommitments))
@@ -204,15 +208,11 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 		}
 		inputCommitments[i] = commitment
 		inputValues[i] = new(big.Int).SetUint64(commonInputs.InputValues[i])
-		v, ok := new(big.Int).SetString(commonInputs.InputSalts[i], 16)
+		salt, ok := new(big.Int).SetString(commonInputs.InputSalts[i], 16)
 		if !ok {
 			return nil, errors.New("failed to parse input salt")
 		}
-		inputSalts[i] = v
-	}
-	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
-	for i, v := range commonInputs.OutputValues {
-		outputValues[i] = new(big.Int).SetUint64(v)
+		inputSalts[i] = salt
 	}
 
 	witnessInputs := map[string]interface{}{
