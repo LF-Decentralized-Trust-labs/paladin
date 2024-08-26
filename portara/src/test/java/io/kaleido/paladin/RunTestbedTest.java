@@ -98,13 +98,14 @@ blockchain:
                         .POST(HttpRequest.BodyPublishers.ofString("""
                             {
                                "jsonrpc": "2.0",
-                               "method": "testbed_status",
+                               "id": 1,
+                               "method": "testbed_listDomains",
                                "params": []
                             }
                         """))
                         .build();
                 HttpResponse<String> res = rpcClient.send(req, HttpResponse.BodyHandlers.ofString());
-                assertEquals(200, res.statusCode());
+                assertEquals(200, res.statusCode(), res.body());
                 connected = true;
             } catch(IOException e) {
                 System.err.printf("Waiting to connect: %s\n", e);

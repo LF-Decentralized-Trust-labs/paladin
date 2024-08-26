@@ -35,6 +35,9 @@ func (tb *testbed) initRPC() {
 	tb.rpcModule = rpcserver.NewRPCModule("testbed").
 
 		// Deploy a smart contract and get the deployed address
+		Add("testbed_listDomains", tb.rpcListDomains()).
+
+		// Deploy a smart contract and get the deployed address
 		Add("testbed_deployBytecode", tb.rpcDeployBytecode()).
 
 		// Performs a base ethereum transaction deploy using the
@@ -57,6 +60,16 @@ func (tb *testbed) initRPC() {
 		// - ASSEMBLE_TRANSACTION (sender node)
 		// - PREPARE_TRANSACTION  (submitter node)
 		Add("testbed_invoke", tb.rpcTestbedInvoke())
+}
+
+func (tb *testbed) rpcListDomains() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod0(func(ctx context.Context) ([]string, error) {
+		res := []string{}
+		for name := range tb.c.DomainManager().ConfiguredDomains() {
+			res = append(res, name)
+		}
+		return res, nil
+	})
 }
 
 func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
