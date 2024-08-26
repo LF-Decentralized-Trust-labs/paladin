@@ -122,3 +122,20 @@ func TestKeyManagerResolveConflict(t *testing.T) {
 	_, _, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	assert.Regexp(t, "PD011509", err)
 }
+
+func TestKeyManagerResolveSameKeyTwoAlgorithms(t *testing.T) {
+
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
+
+	kmgr.rootFolder.Keys = map[string]*keyMapping{}
+
+	keyHandle1, verifier1, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	assert.NoError(t, err)
+
+	keyHandle2, verifier2, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ZKP_BABYJUBJUB_PLAINBYTES)
+	assert.NoError(t, err)
+
+	assert.Equal(t, keyHandle1, keyHandle2)
+	assert.NotEqual(t, verifier1, verifier2)
+}

@@ -231,10 +231,10 @@ func (sm *signingModule) Resolve(ctx context.Context, req *proto.ResolveKeyReque
 		return sm.hd.resolveHDWalletKey(ctx, req)
 	}
 	if len(req.Algorithms) == 1 && req.Algorithms[0] == algorithms.ECDSA_SECP256K1_PLAINBYTES {
-		// found a key store signer configured which does not expose private key materials
-		// but encapsulates the signing logic. delegate further handling to the signer
 		keyStoreSigner, ok := sm.keyStore.(KeyStoreSigner_secp256k1)
 		if ok {
+			// found a key store signer configured which does not expose private key materials
+			// but encapsulates the signing logic. delegate further handling to the signer
 			return sm.resolveKeystoreSECP256K1(ctx, req, keyStoreSigner)
 		}
 	}
