@@ -31,7 +31,7 @@ public class PluginJNA extends Plugin {
     private final PluginCShared lib;
 
     interface PluginCShared extends Library {
-        void Run(String grpcTarget, String pluginUUID);
+        int Run(String grpcTarget, String pluginUUID);
         void Stop();
     }
 
@@ -49,6 +49,9 @@ public class PluginJNA extends Plugin {
 
     @Override
     public void run() {
-        lib.Run(this.grpcTarget, info.instanceUUID().toString());
+        int rc = lib.Run(this.grpcTarget, info.instanceUUID().toString());
+        if (rc != 0) {
+            throw new RuntimeException("Plugin returned RC=%d".formatted(rc));
+        }
     }
 }

@@ -79,7 +79,7 @@ domains:
   domain1:
      plugin:
         type: c-shared
-        library: libnoto
+        library: starter
      config: {}
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort);
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
@@ -93,7 +93,7 @@ domains:
                 }));
 
         // Spin trying to connect to the RPC endpoint
-//        long startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis();
         boolean connected = false;
         while (!connected) {
             final URI testbedRPC = new URI(String.format("http://127.0.0.1:%d", availableRPCPort));
@@ -116,7 +116,7 @@ domains:
             } catch(IOException e) {
                 System.err.printf("Waiting to connect: %s\n", e);
             }
-//            assertTrue(System.currentTimeMillis()-startTime < 5000, "Test ran too long");
+            assertTrue(System.currentTimeMillis()-startTime < 5000, "Test ran too long");
             if (rc.isDone()) {
                 assertEquals(0, rc.get());
             }

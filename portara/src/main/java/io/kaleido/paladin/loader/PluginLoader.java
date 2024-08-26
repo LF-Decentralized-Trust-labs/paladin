@@ -69,7 +69,9 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     public synchronized void shutdown() {
         shuttingDown = true;
-        channel.shutdownNow();
+        if (channel != null) {
+            channel.shutdownNow();
+        }
         for (UUID instanceUUID: plugins.keySet()) {
             PluginInfo info = plugins.get(instanceUUID).info;
             LOGGER.info("stopping {} {} [{}]", info.pluginType(), info.name(), instanceUUID);

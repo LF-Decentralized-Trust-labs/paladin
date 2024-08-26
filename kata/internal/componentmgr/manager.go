@@ -44,9 +44,9 @@ type ComponentManager interface {
 }
 
 type componentManager struct {
-	socketAddress string
-	instanceUUID  uuid.UUID
-	bgCtx         context.Context
+	grpcTarget   string
+	instanceUUID uuid.UUID
+	bgCtx        context.Context
 	// config
 	conf *Config
 	// pre-init
@@ -80,17 +80,17 @@ type closeable interface {
 	Close()
 }
 
-func NewComponentManager(bgCtx context.Context, socketAddress string, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
+func NewComponentManager(bgCtx context.Context, grpcTarget string, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
 	log.InitConfig(&conf.Log)
 	return &componentManager{
-		socketAddress: socketAddress, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
-		instanceUUID:  instanceUUID,
-		bgCtx:         bgCtx,
-		conf:          conf,
-		engine:        engine,
-		initResults:   make(map[string]*components.ManagerInitResult),
-		started:       make(map[string]stoppable),
-		opened:        make(map[string]closeable),
+		grpcTarget:   grpcTarget, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
+		instanceUUID: instanceUUID,
+		bgCtx:        bgCtx,
+		conf:         conf,
+		engine:       engine,
+		initResults:  make(map[string]*components.ManagerInitResult),
+		started:      make(map[string]stoppable),
+		opened:       make(map[string]closeable),
 	}
 }
 
@@ -128,7 +128,7 @@ func (cm *componentManager) Init() (err error) {
 
 	// using init of managers, for post-init components
 	if err == nil {
-		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.socketAddress, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
+		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
 		err = cm.wrapIfErr(err, msgs.MsgComponentPluginCtrlInitError)
 	}
 

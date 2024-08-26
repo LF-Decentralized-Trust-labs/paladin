@@ -22,7 +22,7 @@ repositories {
 
 test {
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/kata:${rootDir}/toolkit_go").absolutePath
 }
 
 configurations {
@@ -32,11 +32,15 @@ configurations {
     libkata {
         canBeConsumed = false
     }
+    libstarter {
+        canBeConsumed = false
+    }
 }
 
 dependencies {
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
     testImplementation project(path: ":kata", configuration: "libkata")
+    testImplementation project(path: ":toolkit_go", configuration: "libstarter")
 }
 
 tasks.register('collectProtocFiles', Copy) {
@@ -87,6 +91,7 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation project(path: ':toolkit_go', configuration: 'libstarter')
 
 }
 

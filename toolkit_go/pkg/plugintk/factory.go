@@ -26,7 +26,7 @@ import (
 type PluginBase interface {
 	// Run on the base is called by the Run() of the specific implementation.
 	// Blocks the caller until stopped.
-	Run(pluginID, connString string)
+	Run(grpcTarget, pluginID string)
 	Stop()
 }
 
@@ -80,9 +80,9 @@ func (pf *pluginFactory[M]) instanceList() []*pluginInstance[M] {
 	return list
 }
 
-func (pf *pluginFactory[M]) Run(pluginID, connString string) {
+func (pf *pluginFactory[M]) Run(connString, pluginID string) {
 	log.L(context.Background()).Infof("%s plugin factory starting", pf.pluginType)
-	inst := newPluginInstance(pf, pluginID, connString)
+	inst := newPluginInstance(pf, connString, pluginID)
 	pf.instanceStarted(inst)
 	defer pf.instanceStopped(inst)
 	inst.run()
