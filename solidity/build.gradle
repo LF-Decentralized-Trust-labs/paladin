@@ -28,7 +28,7 @@ configurations {
 task install(type: Exec) {
     executable 'npm'
     args 'install'
-    inputs.files("package.json", "package-lock.json")
+    inputs.files("package.json")
     outputs.files("package-lock.json")
     outputs.dir("node_modules")
 }

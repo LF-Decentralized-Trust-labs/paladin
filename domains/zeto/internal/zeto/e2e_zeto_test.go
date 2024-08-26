@@ -30,11 +30,13 @@ import (
 )
 
 var (
-	toDomain       = "to-domain"
-	testbedAddr    = "http://localhost:49610"
-	grpcAddr       = "dns:localhost:49611"
-	controllerName = "controller"
-	recipient1Name = "recipient1"
+	toDomain          = "to-domain"
+	testbedAddr       = "http://localhost:49610"
+	grpcAddr          = "dns:localhost:49611"
+	controllerEth     = "controller:eth"
+	controllerBabyJub = "controller:babyjub"
+	recipient1Eth     = "recipient1:eth"
+	recipient1BabyJub = "recipient1:babyjub"
 )
 
 func toJSON(t *testing.T, v any) []byte {
@@ -67,7 +69,7 @@ func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Zeto, rp
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-		controllerName, build.ABI, build.Bytecode.String(), `{}`)
+		controllerEth, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		return "", rpcerr.Error()
 	}
@@ -85,7 +87,7 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Deploying Zeto libraries")
 	commonLibAddress, err := deployBytecode(ctx, rpc, loadBuild(commonLibJSON))
 	assert.NoError(t, err)
-	log.L(ctx).Infof("Commonlib deployed to %s", commonLibAddress)
+	log.L(ctx).Infof("commonlib deployed to %s", commonLibAddress)
 
 	verifierAddress, err := deployBytecode(ctx, rpc, loadBuild(Groth16Verifier_Anon))
 	assert.NoError(t, err)
@@ -126,7 +128,7 @@ func TestZeto(t *testing.T) {
 	var zetoAddress ethtypes.Address0xHex
 	rpcerr = rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{
-			From:             controllerName,
+			From:             controllerEth,
 			Verifier:         verifierAddress,
 			DepositVerifier:  depositVerifierAddress,
 			WithdrawVerifier: withdrawVerifierAddress,
@@ -136,14 +138,15 @@ func TestZeto(t *testing.T) {
 	}
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
-	log.L(ctx).Infof("Mint 100 from controller to controller")
+	log.L(ctx).Infof("Mint 10 from controller to controller")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     controllerName,
+		From:     controllerEth,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["mint"].ABI,
 		Inputs: toJSON(t, &ZetoMintParams{
-			To:     controllerName,
-			Amount: ethtypes.NewHexInteger64(100),
+			To:           controllerEth,
+			RecipientKey: controllerBabyJub,
+			Amount:       ethtypes.NewHexInteger64(10),
 		}),
 	})
 	if rpcerr != nil {
@@ -154,21 +157,61 @@ func TestZeto(t *testing.T) {
 	coins, err := zeto.FindCoins(ctx, "{}")
 	assert.NoError(t, err)
 	assert.Len(t, coins, 1)
-	assert.Equal(t, int64(100), coins[0].Amount.Int64())
-	assert.Equal(t, controllerName, coins[0].Owner)
+	assert.Equal(t, int64(10), coins[0].Amount.Int64())
+	assert.Equal(t, controllerEth, coins[0].Owner)
 
-	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
+	log.L(ctx).Infof("Mint 20 from controller to controller")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     recipient1Name,
+		From:     controllerEth,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["mint"].ABI,
 		Inputs: toJSON(t, &ZetoMintParams{
-			To:     recipient1Name,
-			Amount: ethtypes.NewHexInteger64(100),
+			To:           controllerEth,
+			RecipientKey: controllerBabyJub,
+			Amount:       ethtypes.NewHexInteger64(20),
+		}),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	assert.True(t, boolResult)
+
+	coins, err = zeto.FindCoins(ctx, "{}")
+	assert.NoError(t, err)
+	assert.Len(t, coins, 2)
+	assert.Equal(t, int64(10), coins[0].Amount.Int64())
+	assert.Equal(t, controllerEth, coins[0].Owner)
+	assert.Equal(t, int64(20), coins[1].Amount.Int64())
+	assert.Equal(t, controllerEth, coins[1].Owner)
+
+	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     recipient1Eth,
+		To:       types.EthAddress(zetoAddress),
+		Function: *zeto.Interface["mint"].ABI,
+		Inputs: toJSON(t, &ZetoMintParams{
+			To:           recipient1Eth,
+			RecipientKey: recipient1BabyJub,
+			Amount:       ethtypes.NewHexInteger64(10),
 		}),
 	})
 	assert.NotNil(t, rpcerr)
 	assert.EqualError(t, rpcerr.Error(), "failed to send base ledger transaction: Execution reverted")
 	assert.True(t, boolResult)
 
+	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+		From:     controllerEth,
+		To:       types.EthAddress(zetoAddress),
+		Function: *zeto.Interface["transfer"].ABI,
+		Inputs: toJSON(t, &ZetoTransferParams{
+			To:           recipient1Eth,
+			SenderKey:    controllerBabyJub,
+			RecipientKey: recipient1BabyJub,
+			Amount:       ethtypes.NewHexInteger64(25),
+		}),
+	})
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
 }

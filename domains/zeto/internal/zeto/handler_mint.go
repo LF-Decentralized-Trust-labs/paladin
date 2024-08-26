@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/iden3/go-iden3-crypto/babyjub"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 )
@@ -43,9 +44,14 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 }
 
 func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.params.(ZetoMintParams)
+
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
-			// TODO: should we resolve anything?
+			{
+				Lookup:    params.RecipientKey,
+				Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+			},
 		},
 	}, nil
 }
@@ -53,9 +59,28 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(ZetoMintParams)
 
-	_, outputStates, err := h.zeto.prepareOutputs(params.To, params.Amount)
+	resolvedRecipient := findVerifier(params.RecipientKey, req.ResolvedVerifiers)
+	if resolvedRecipient == nil {
+		return nil, fmt.Errorf("failed to resolve: %s", params.RecipientKey)
+	}
+
+	var recipientKeyCompressed babyjub.PublicKeyComp
+	if err := recipientKeyCompressed.UnmarshalText([]byte(resolvedRecipient.Verifier)); err != nil {
+		return nil, err
+	}
+	recipientKey, err := recipientKeyCompressed.Decompress()
 	if err != nil {
 		return nil, err
+	}
+
+	outputCoins, outputStates, err := h.zeto.prepareOutputs(params.To, recipientKey, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs = make([]string, len(outputCoins))
+	for i, coin := range outputCoins {
+		outputs[i] = coin.Hash.String()
 	}
 
 	return &pb.AssembleTransactionResponse{
@@ -81,11 +106,6 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
-	for i, state := range req.FinalizedTransaction.NewStates {
-		outputs[i] = state.HashId
-	}
-
 	params := map[string]interface{}{
 		"utxos": outputs,
 	}

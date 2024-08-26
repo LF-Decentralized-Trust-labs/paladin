@@ -17,6 +17,8 @@ ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
     }
+    jsCircuits = "${rootDir}/zeto/zkp/circuits"
+    zkpOut = "${projectDir}/zkp"
 }
 
 configurations {
@@ -45,6 +47,34 @@ task copySolidity(type: Copy) {
     // Flatten all paths into the destination folder
     eachFile { path = name }
     includeEmptyDirs = false
+}
+
+// TODO: should circuits logic move to a separate project?
+task circuitsInstall(type: Exec) {
+    executable 'npm'
+    args 'install'
+    workingDir "${rootDir}/zeto/zkp/circuits"
+
+    inputs.files("package.json", "package-lock.json")
+    outputs.files("package-lock.json")
+    outputs.dir("node_modules")
+}
+
+task circuitsGen(type: Exec, dependsOn: circuitsInstall) {
+    executable 'npm'
+    args 'run', 'gen'
+    args '--', '-c', 'anon'
+    workingDir "${rootDir}/zeto/zkp/circuits"
+
+    environment "CIRCUITS_ROOT", zkpOut
+    environment "PROVING_KEYS_ROOT", zkpOut
+    environment "PTAU_DOWNLOAD_PATH", zkpOut
+    doFirst {
+        mkdir(zkpOut)
+    }
+
+    inputs.dir(workingDir)
+    outputs.dir(zkpOut)
 }
 
 task startTestbed(type: DockerCompose) {
@@ -78,6 +108,7 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn startTestbed
+    dependsOn circuitsGen
 
     ignoreExitValue true
 
@@ -99,4 +130,5 @@ task clean(type: Delete) {
     dependsOn stopTestbed
     delete 'coverage'
     delete 'internal/zeto/abis'
+    delete zkpOut
 }

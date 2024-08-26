@@ -19,6 +19,7 @@ services:
         condition: service_healthy
     volumes:
       - ../domains/zeto/testbed.config.yaml:/usr/src/app/testbed.config.yaml
+      - ../domains/zeto/zkp:/usr/src/app/zkp
     ports:
       - 49610:49610
       - 49611:49611
