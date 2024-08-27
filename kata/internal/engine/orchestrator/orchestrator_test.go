@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -45,7 +46,7 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	waitForAction := make(chan bool, 1)
 
 	// fake stage controller for testing
-	mSC := componentmocks.StageController{}
+	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("test")
 	mSC.On("PerformActionForStage", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
@@ -92,7 +93,7 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	waitForAction := make(chan bool, 1)
 
 	// fake stage controller for testing
-	mSC := componentmocks.StageController{}
+	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("test")
 	mSC.On("PerformActionForStage", ctx, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
@@ -183,7 +184,7 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 		},
 	}
 	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
-	mSC := componentmocks.StageController{}
+	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 
 	ocDone, err := testOc.Start(ctx)

@@ -166,6 +166,12 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/rpcbackendmocks'
     }
     mock {
+        inputDir 'internal/engine'
+        includeAll true
+        outputPackage 'enginemocks'
+        outputDir 'mocks/enginemocks'
+    }
+    mock {
         inputDir 'internal/components'
         includeAll true
         outputPackage 'componentmocks'
@@ -197,10 +203,10 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir 'internal/commsbus'
-        includeAll true
-        outputPackage 'commsbusmocks'
-        outputDir 'mocks/commsbusmocks'
+        inputDir 'internal/statestore'
+        name 'DomainStateInterface'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
     }
     mock {
         inputDir 'internal/components'
