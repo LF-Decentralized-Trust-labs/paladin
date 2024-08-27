@@ -111,7 +111,6 @@ var (
 	MsgFiltersValueInvalidForInt64        = ffe("PD010703", "Value '%s' cannot be parsed as a 64bit signed integer")
 	MsgFiltersValueInvalidForBool         = ffe("PD010704", "Value '%s' cannot be parsed as a boolean")
 	MsgFiltersValueInvalidForString       = ffe("PD010705", "Value '%s' cannot be parsed as a string")
-	MsgFiltersValueInvalidForBigInt       = ffe("PD010706", "Type '%T' cannot be converted to a big integer")
 	MsgFiltersValueIntStringParseFail     = ffe("PD010707", "Value '%s' cannot be converted to a big integer")
 	MsgFiltersValueMissing                = ffe("PD010708", "Value missing for filter field '%s'")
 	MsgFiltersMustBeBuiltUnscoped         = ffe("PD010709", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
