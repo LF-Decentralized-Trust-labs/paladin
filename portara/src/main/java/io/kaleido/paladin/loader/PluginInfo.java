@@ -12,24 +12,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package io.kaleido.paladin.loader;
 
-package kata
+import java.util.UUID;
 
-import "sync/atomic"
-
-var running atomic.Pointer[instance]
-
-func Run(grpcTarget, loaderUUID, configFile, engineName string) RC {
-	inst := newInstance(grpcTarget, loaderUUID, configFile, engineName)
-	if !running.CompareAndSwap(nil, inst) {
-		panic("double started")
-	}
-	return inst.run()
-}
-
-func Stop() {
-	inst := running.Load()
-	if inst != nil {
-		inst.stop()
-	}
-}
+record PluginInfo(String grpcTarget, String pluginType, String name, UUID instanceUUID) {}

@@ -12,24 +12,28 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package io.kaleido.paladin.loader;
 
-package kata
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import github.com.kaleido_io.paladin.toolkit.Service;
 
-import "sync/atomic"
+import java.util.UUID;
 
-var running atomic.Pointer[instance]
+abstract class Plugin implements Runnable {
 
-func Run(grpcTarget, loaderUUID, configFile, engineName string) RC {
-	inst := newInstance(grpcTarget, loaderUUID, configFile, engineName)
-	if !running.CompareAndSwap(nil, inst) {
-		panic("double started")
-	}
-	return inst.run()
-}
+   protected final String grpcTarget;
+   protected final PluginInfo info;
 
-func Stop() {
-	inst := running.Load()
-	if inst != nil {
-		inst.stop()
-	}
+   Plugin(String grpcTarget, PluginInfo info) {
+      this.grpcTarget = grpcTarget;
+      this.info = info;
+   }
+
+   abstract void stop();
+
+   public PluginInfo getInfo() {
+      return info;
+   }
+
 }

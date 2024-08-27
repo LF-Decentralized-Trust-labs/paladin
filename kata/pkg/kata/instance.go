@@ -44,10 +44,10 @@ var engineFactory = func(ctx context.Context, engineName string) (components.Eng
 var componentManagerFactory = componentmgr.NewComponentManager
 
 type instance struct {
-	socketAddress string
-	engineName    string
-	loaderUUID    string
-	configFile    string
+	grpcTarget string
+	engineName string
+	loaderUUID string
+	configFile string
 
 	ctx       context.Context
 	cancelCtx context.CancelFunc
@@ -63,14 +63,14 @@ const (
 	RC_FAIL RC = 1
 )
 
-func newInstance(socketAddress, loaderUUID, configFile, engineName string) *instance {
+func newInstance(grpcTarget, loaderUUID, configFile, engineName string) *instance {
 	i := &instance{
-		socketAddress: socketAddress,
-		loaderUUID:    loaderUUID,
-		configFile:    configFile,
-		engineName:    engineName,
-		signals:       make(chan os.Signal),
-		done:          make(chan struct{}),
+		grpcTarget: grpcTarget,
+		loaderUUID: loaderUUID,
+		configFile: configFile,
+		engineName: engineName,
+		signals:    make(chan os.Signal),
+		done:       make(chan struct{}),
 	}
 	i.ctx, i.cancelCtx = context.WithCancel(log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid())))
 	return i
@@ -110,7 +110,7 @@ func (i *instance) run() RC {
 		return RC_FAIL
 	}
 
-	cm := componentManagerFactory(i.ctx, i.socketAddress, id, &conf, engine)
+	cm := componentManagerFactory(i.ctx, i.grpcTarget, id, &conf, engine)
 	// From this point need to ensure we stop the component manager
 	defer cm.Stop()
 

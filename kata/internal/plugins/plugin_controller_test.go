@@ -198,8 +198,8 @@ func TestLoaderErrors(t *testing.T) {
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin{
 				conf: &PluginConfig{
-					Type:     LibraryTypeCShared.Enum(),
-					Location: "some/where",
+					Type:    LibraryTypeCShared.Enum(),
+					Library: "some/where",
 				},
 			},
 		},
@@ -272,8 +272,8 @@ func TestLoaderErrors(t *testing.T) {
 	tdm.domains = map[string]plugintk.Plugin{
 		"domain2": &mockPlugin{
 			conf: &PluginConfig{
-				Type:     LibraryTypeJar.Enum(),
-				Location: "some/where/else",
+				Type:    LibraryTypeJar.Enum(),
+				Library: "some/where/else",
 			},
 		},
 	}

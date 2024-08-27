@@ -34,16 +34,16 @@ import (
 )
 
 type Config struct {
-	domainmgr.DomainManagerConfig
-	plugins.PluginControllerConfig
-	Log          log.Config          `yaml:"log"`
-	Blockchain   ethclient.Config    `yaml:"blockchain"`
-	DB           persistence.Config  `yaml:"db"`
-	RPCServer    rpcserver.Config    `yaml:"rpcServer"`
-	StateStore   statestore.Config   `yaml:"statestore"`
-	BlockIndexer blockindexer.Config `yaml:"blockIndexer"`
-	Signer       api.Config          `yaml:"signer"`
-	TempDir      *string             `yaml:"tempDir"`
+	domainmgr.DomainManagerConfig  `yaml:",inline"`
+	plugins.PluginControllerConfig `yaml:",inline"`
+	Log                            log.Config          `yaml:"log"`
+	Blockchain                     ethclient.Config    `yaml:"blockchain"`
+	DB                             persistence.Config  `yaml:"db"`
+	RPCServer                      rpcserver.Config    `yaml:"rpcServer"`
+	StateStore                     statestore.Config   `yaml:"statestore"`
+	BlockIndexer                   blockindexer.Config `yaml:"blockIndexer"`
+	Signer                         api.Config          `yaml:"signer"`
+	TempDir                        *string             `yaml:"tempDir"`
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

@@ -16,6 +16,7 @@ package io.kaleido.paladin;
 
 import io.kaleido.paladin.configlight.RuntimeInfo;
 import io.kaleido.paladin.configlight.YamlConfig;
+import io.kaleido.paladin.loader.PluginLoader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -24,6 +25,7 @@ public class Main {
     private static final Logger LOGGER = LogManager.getLogger(Main.class);
 
     static int run(String[] args) {
+        PluginLoader loader = null;
 
         if (args.length < 2) {
             throw new Error("usage: <config.paladin.yaml> <node|testbed>");
@@ -37,14 +39,20 @@ public class Main {
             // and to initialize the Java logging framework.
             RuntimeInfo runtimeInfo = new YamlConfig(configFile).getRuntimeInfo();
 
+            loader = new PluginLoader(runtimeInfo.socketFilename(), runtimeInfo.instanceUUID());
+
             return KataJNA.Load().Run(
                     runtimeInfo.socketFilename(),
-                    runtimeInfo.instanceUUID(),
+                    runtimeInfo.instanceUUID().toString(),
                     configFile,
                     engineName
             );
         } catch(Throwable e) {
             throw new RuntimeException(e.getMessage(), e);
+        } finally {
+            if (loader != null) {
+                loader.shutdown();
+            }
         }
     }
 

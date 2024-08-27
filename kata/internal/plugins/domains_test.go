@@ -35,8 +35,8 @@ func (tp *testDomainManager) ConfiguredDomains() map[string]*PluginConfig {
 	pluginMap := make(map[string]*PluginConfig)
 	for name := range tp.domains {
 		pluginMap[name] = &PluginConfig{
-			Type:     LibraryTypeCShared.Enum(),
-			Location: "/tmp/not/applicable",
+			Type:    LibraryTypeCShared.Enum(),
+			Library: "/tmp/not/applicable",
 		}
 	}
 	return pluginMap

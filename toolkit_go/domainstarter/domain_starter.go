@@ -18,39 +18,27 @@ import (
 	"C"
 )
 import (
-	"fmt"
-	"os"
-	"runtime/debug"
-
-	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/toolkit/domainstarter/starter"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
-// Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function
-//
+var ple = plugintk.NewPluginLibraryEntrypoint(func() plugintk.PluginBase {
+	return plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+		return starter.NewStarter(callbacks)
+	})
+})
+
 //export Run
-func Run(grpcTargetPtr, loaderUUIDPtr, configFilePtr, engineNamePtr *C.char) (rc int) {
-	defer func() {
-		panicked := recover()
-		if panicked != nil {
-			// print the stack
-			fmt.Fprintf(os.Stderr, "%s\n", debug.Stack())
-			// set the rc
-			rc = 1
-		}
-	}()
-	kRC := kata.Run(
+func Run(grpcTargetPtr, pluginUUIDPtr *C.char) int {
+	return ple.Run(
 		C.GoString(grpcTargetPtr),
-		C.GoString(loaderUUIDPtr),
-		C.GoString(configFilePtr),
-		C.GoString(engineNamePtr),
+		C.GoString(pluginUUIDPtr),
 	)
-	rc = int(kRC)
-	return
 }
 
 //export Stop
-func Stop() {
-	kata.Stop()
+func Stop(pluginUUIDPtr *C.char) {
+	ple.Stop(C.GoString(pluginUUIDPtr))
 }
 
 func main() {}

@@ -74,6 +74,12 @@ blockchain:
      url: http://localhost:8545
    ws:
      url: ws://localhost:8546
+domains:
+  domain1:
+     plugin:
+        type: c-shared
+        library: starter
+     config: {}
 loader:
   debug: true
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort);

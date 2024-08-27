@@ -54,8 +54,9 @@ public class YamlConfig {
         String uStr = uuid.toString();
         // Allocate a socket file with our pid used to make it unique
         File socketFile = new File(tempDir, String.format("p.%d.sock", ProcessHandle.current().pid()));
-        LOGGER.info("instance={} uds={}", uStr, socketFile.getAbsolutePath());
-        return new RuntimeInfo(uuid.toString(), socketFile.getAbsolutePath());
+        String grpcTarget = "unix:" + socketFile.getAbsolutePath();
+        LOGGER.info("instance={} grpcTarget={}", uStr, grpcTarget);
+        return new RuntimeInfo(uuid, grpcTarget);
     }
 
     void setupLogging() {
