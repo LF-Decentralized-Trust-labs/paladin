@@ -15,7 +15,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915
 	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.14-0.20240820224751-0fe396789f6a
+	github.com/hyperledger/firefly-signer v1.1.14-0.20240827185235-2fe278d0353f
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
@@ -254,7 +254,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 	honnef.co/go/tools v0.5.0 // indirect
 	mvdan.cc/gofumpt v0.6.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect

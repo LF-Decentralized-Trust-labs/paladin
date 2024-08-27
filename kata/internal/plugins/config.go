@@ -25,7 +25,6 @@ type PluginControllerConfig struct {
 }
 
 type GRPCConfig struct {
-	Address         string  `yaml:"address"` // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
 	ShutdownTimeout *string `yaml:"shutdownTimeout"`
 }
 
@@ -57,6 +56,7 @@ var golangToProtoLibTypeMap = map[LibraryType]prototk.PluginLoad_LibType{
 }
 
 type PluginConfig struct {
-	Type     types.Enum[LibraryType]
-	Location string
+	Type    types.Enum[LibraryType] `yaml:"type"`
+	Library string                  `yaml:"library"`
+	Class   *string                 `yaml:"class,omitempty"`
 }

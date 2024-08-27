@@ -18,6 +18,8 @@ package componentmgr
 import (
 	"context"
 	"errors"
+	"net"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -80,7 +82,7 @@ func TestInitOK(t *testing.T) {
 	mockEngine := componentmocks.NewEngine(t)
 	mockEngine.On("EngineName").Return("utengine")
 	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
-	cm := NewComponentManager(context.Background(), uuid.New(), testConfig, mockEngine).(*componentManager)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig, mockEngine).(*componentManager)
 	err := cm.Init()
 	assert.NoError(t, err)
 
@@ -97,6 +99,24 @@ func TestInitOK(t *testing.T) {
 
 	cm.Stop()
 
+}
+
+func tempSocketFile(t *testing.T) (fileName string) {
+	f, err := os.CreateTemp("", "p.*.sock")
+	if err == nil {
+		fileName = f.Name()
+	}
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		err = os.Remove(fileName)
+	}
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.Remove(fileName)
+	})
+	return
 }
 
 func TestStartOK(t *testing.T) {
@@ -126,12 +146,15 @@ func TestStartOK(t *testing.T) {
 	mockRPCServer.On("Start").Return(nil)
 	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
 	mockRPCServer.On("Stop").Return()
+	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
+	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
 
 	mockEngine := componentmocks.NewEngine(t)
 	mockEngine.On("Start").Return(nil)
+	mockEngine.On("EngineName").Return("unittest_engine")
 	mockEngine.On("Stop").Return()
 
-	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, mockEngine).(*componentManager)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, mockEngine).(*componentManager)
 	cm.ethClientFactory = mockEthClientFactory
 	cm.initResults = map[string]*components.ManagerInitResult{
 		"utengine": {
@@ -160,7 +183,7 @@ func TestStartOK(t *testing.T) {
 }
 
 func TestBuildInternalEventStreamsError(t *testing.T) {
-	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, nil).(*componentManager)
 	cm.initResults = map[string]*components.ManagerInitResult{
 		"utengine": {
 			EventStreams: []*components.ManagerEventStream{
@@ -177,13 +200,37 @@ func TestBuildInternalEventStreamsError(t *testing.T) {
 }
 
 func TestErrorWrapping(t *testing.T) {
-	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, nil).(*componentManager)
 
 	mockKeyManager := componentmocks.NewKeyManager(t)
 	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
 
-	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened(mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
-	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted(mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
+	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened("key_manager", mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
+	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted("engine", mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
 	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
 
+}
+
+func TestUnitTestStart(t *testing.T) {
+	ctx := context.Background()
+
+	var conf *Config
+	err := ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
+	assert.NoError(t, err)
+	// For running in this unit test the dirs are different to the sample config
+	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
+	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
+
+	mockEngine := componentmocks.NewEngine(t)
+	mockEngine.On("EngineName").Return("unittest_engine")
+	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
+	mockEngine.On("Start").Return(nil)
+	mockEngine.On("Stop").Return()
+
+	cm, err := UnitTestStart(ctx, conf, mockEngine, func(c components.AllComponents) error {
+		return nil
+	})
+	assert.NoError(t, err)
+
+	defer cm.Stop()
 }

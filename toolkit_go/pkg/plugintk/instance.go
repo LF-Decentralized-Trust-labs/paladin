@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"google.golang.org/grpc"
@@ -51,14 +51,14 @@ type pluginRun[M any] struct {
 	senderDone chan struct{}
 }
 
-func newPluginInstance[M any](pf *pluginFactory[M], pluginID, connString string) *pluginInstance[M] {
+func newPluginInstance[M any](pf *pluginFactory[M], connString, pluginID string) *pluginInstance[M] {
 	pi := &pluginInstance[M]{
 		pluginType: pf.pluginType.String(),
 		factory:    pf,
 		connector:  pf.connector,
 		impl:       pf.impl,
-		id:         pluginID,
 		connString: connString,
+		id:         pluginID,
 		retry:      retry.NewRetryIndefinite(&retry.Defaults.Config),
 		done:       make(chan struct{}),
 	}

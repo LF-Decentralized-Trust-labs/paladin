@@ -160,6 +160,10 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*idOnly) (schema Schema, s []*State, err error) {
+	if len(query.Sort) == 0 {
+		query.Sort = []string{".created"}
+	}
+
 	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, nil, err

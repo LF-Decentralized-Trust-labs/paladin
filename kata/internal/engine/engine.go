@@ -19,13 +19,28 @@ import (
 	"context"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+)
+
+// MOCK implementations of engine, plugins etc. Function signatures are just examples
+// no formal interface proposed intentionally in this file
+
+// Mock Plugin manager
+
+type MockPlugins struct {
+	installedPlugins  map[string]MockPlugin
+	contractInstances map[string]string
+}
+
+type MockPlugin interface {
+	Validate(ctx context.Context, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool
+}
+
+func (mpm *MockPlugins) Validate(ctx context.Context, contractAddress string, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool {
+	return mpm.installedPlugins[mpm.contractInstances[contractAddress]].Validate(ctx, tsg, ss)
 
 	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 )

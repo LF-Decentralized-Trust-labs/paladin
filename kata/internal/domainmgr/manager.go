@@ -35,6 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"gorm.io/gorm"
 )
@@ -49,6 +50,11 @@ var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPa
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
 func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig) components.DomainManager {
+	allDomains := []string{}
+	for name := range conf.Domains {
+		allDomains = append(allDomains, name)
+	}
+	log.L(bgCtx).Infof("Domains configured: %v", allDomains)
 	return &domainManager{
 		bgCtx:            bgCtx,
 		conf:             conf,
@@ -185,7 +191,10 @@ func (dm *domainManager) WaitForDeploy(ctx context.Context, txID uuid.UUID) (com
 		// contract was already indexed
 		return dc, nil
 	}
+	return dm.waitAndEnrich(ctx, req)
+}
 
+func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *PrivateSmartContract]) (components.DomainSmartContract, error) {
 	// wait until the event gets indexed (or the context expires)
 	def, err := req.Wait()
 	if err != nil {

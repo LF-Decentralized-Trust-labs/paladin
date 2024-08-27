@@ -18,7 +18,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/grpc"
@@ -33,7 +33,7 @@ type UnitTestPluginLoader interface {
 type testPluginLoader struct {
 	ctx          context.Context
 	cancelCtx    context.CancelFunc
-	targetURL    string
+	grpcTarget   string
 	loaderID     string
 	plugins      map[string]plugintk.Plugin
 	conn         *grpc.ClientConn
@@ -44,15 +44,15 @@ type testPluginLoader struct {
 // Provides a convenient way for unit tests (in this package, and in the test bed)
 // to load up Go coded plugins in-process, without having to first compile them
 // to a C-Shared library.
-func NewUnitTestPluginLoader(targetURL, loaderID string, plugins map[string]plugintk.Plugin) (_ UnitTestPluginLoader, err error) {
+func NewUnitTestPluginLoader(grpcTarget, loaderID string, plugins map[string]plugintk.Plugin) (_ UnitTestPluginLoader, err error) {
 	tpl := &testPluginLoader{
-		targetURL: targetURL,
-		loaderID:  loaderID,
-		plugins:   plugins,
+		grpcTarget: grpcTarget,
+		loaderID:   loaderID,
+		plugins:    plugins,
 	}
 	tpl.ctx, tpl.cancelCtx = context.WithCancel(context.Background())
 
-	tpl.conn, err = grpc.NewClient(tpl.targetURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	tpl.conn, err = grpc.NewClient(tpl.grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err == nil {
 		client := prototk.NewPluginControllerClient(tpl.conn)
 		tpl.loaderStream, err = client.InitLoader(tpl.ctx, &prototk.PluginLoaderInit{
@@ -89,7 +89,7 @@ func (tpl *testPluginLoader) Run() {
 			tpl.wg.Add(1)
 			go func() {
 				defer tpl.wg.Done()
-				tp.Run(msg.Plugin.Id, tpl.targetURL)
+				tp.Run(tpl.grpcTarget, msg.Plugin.Id)
 			}()
 		}
 	}

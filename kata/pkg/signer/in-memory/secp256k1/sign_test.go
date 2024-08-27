@@ -22,6 +22,7 @@ import (
 	k1 "github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +38,7 @@ func TestNewSigner(t *testing.T) {
 	signer := &sepc256k1Signer{}
 	res, err := signer.Sign(context.Background(), keypair.PrivateKeyBytes(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.NoError(t, err)

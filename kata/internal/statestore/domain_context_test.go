@@ -400,7 +400,9 @@ func TestDSIMergedUnFlushedWhileFlushing(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, spending, 1)
 
-	states, err := dc.mergedUnFlushed(schema, []*State{}, &filters.QueryJSON{})
+	states, err := dc.mergedUnFlushed(schema, []*State{}, &filters.QueryJSON{
+		Sort: []string{".created"},
+	})
 	assert.NoError(t, err)
 	assert.Len(t, states, 1)
 

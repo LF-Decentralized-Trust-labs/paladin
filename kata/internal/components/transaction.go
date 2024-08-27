@@ -45,13 +45,13 @@ type FullState struct {
 type EthTransaction struct {
 	FunctionABI *abi.Entry
 	To          types.EthAddress
-	Params      types.RawJSON
+	Inputs      *abi.ComponentValue
 }
 
 type EthDeployTransaction struct {
 	ConstructorABI *abi.Entry
 	Bytecode       types.HexBytes
-	Params         types.RawJSON
+	Inputs         *abi.ComponentValue
 }
 
 type TransactionPostAssembly struct {
@@ -81,6 +81,7 @@ type PrivateTransaction struct {
 
 	// DISPATCH PHASE: Once the transaction has reached sufficient confidence of success,
 	// we move on to submitting it to the blockchain.
+	Signer              string
 	PreparedTransaction *EthTransaction
 }
 
