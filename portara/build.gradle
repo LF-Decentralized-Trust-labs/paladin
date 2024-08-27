@@ -13,7 +13,8 @@ version = '1.0-SNAPSHOT'
 task wrapper(type: Wrapper){}
 
 application {
-    applicationDefaultJvmArgs = ["-Djna.library.path=" + file("${rootDir}/kata").absolutePath]
+    applicationDefaultJvmArgs = ["-Djna.library.path=" +
+        file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath ]
 }
 
 repositories {
@@ -22,7 +23,7 @@ repositories {
 
 test {
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/kata:${rootDir}/toolkit_go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
 }
 
 configurations {

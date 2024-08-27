@@ -15,13 +15,11 @@
 
 package io.kaleido.paladin.configlight;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.UUID;
 
 import org.apache.logging.log4j.Level;
@@ -39,6 +37,7 @@ public class YamlConfig {
         final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         this.loadedConfig = mapper.readValue(new File(configFile), YamlRootConfig.class);
         setupLogging();
+        setupLoaderDebug();
         LOGGER.debug("Loaded config {}", configFile);
     }
 
@@ -53,40 +52,37 @@ public class YamlConfig {
             throw new IOException(String.format("%s is not a directory", tempDir.getAbsolutePath()));
         }
         String uStr = uuid.toString();
-        // Socket files have to be quite small
-        File socketFile = new File(tempDir, String.format("p.%s.sock", uStr.substring(uStr.length()-6)));
+        // Allocate a socket file with our pid used to make it unique
+        File socketFile = new File(tempDir, String.format("p.%d.sock", ProcessHandle.current().pid()));
         String grpcTarget = "unix:" + socketFile.getAbsolutePath();
         LOGGER.info("instance={} grpcTarget={}", uStr, grpcTarget);
         return new RuntimeInfo(uuid, grpcTarget);
     }
 
     void setupLogging() {
-        YamlLogConfig logConfig = loadedConfig.logConfig();
+        YamlLogConfig logConfig = loadedConfig.log();
         if (logConfig == null) {
             logConfig = new YamlLogConfig("info");
         }
 
-        Level level;
-        switch (logConfig.level()) {
-            case "error":
-                level = Level.ERROR;
-                break;
-            case "warn":
-            case "warning":
-                level = Level.WARN;
-                break;
-            case "debug":
-                level = Level.DEBUG;
-                break;
-            case "trace":
-                level = Level.TRACE;
-                break;
-            case "info":
-            default:
-                level = Level.INFO;
-                break;
-        }
+        Level level = switch (logConfig.level()) {
+            case "error" -> Level.ERROR;
+            case "warn", "warning" -> Level.WARN;
+            case "debug" -> Level.DEBUG;
+            case "trace" -> Level.TRACE;
+            default -> Level.INFO;
+        };
         Configurator.setAllLevels("io.kaleido.paladin", level);
+    }
+
+    void setupLoaderDebug() {
+        YamlLoaderConfig loaderConfig = loadedConfig.loader();
+        if (loaderConfig == null) {
+            loaderConfig = new YamlLoaderConfig(false);
+        }
+        if (loaderConfig.debug()) {
+            System.setProperty("jna.debug_load", "true");
+        }
     }
 
 }
