@@ -21,7 +21,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 record YamlRootConfig(
         @JsonProperty
-        YamlLogConfig logConfig,
+        YamlLogConfig log,
+        @JsonProperty
+        YamlLoaderConfig loader,
         @JsonProperty
         String tempDir
 ) {}

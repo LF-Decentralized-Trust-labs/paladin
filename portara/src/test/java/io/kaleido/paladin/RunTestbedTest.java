@@ -43,7 +43,6 @@ public class RunTestbedTest {
         System.out.println(System.getProperty("os.name"));
         System.out.println(System.getProperty("os.arch"));
         System.out.println(System.getProperty("java.library.path"));
-        System.setProperty("jna.debug_load", "true");
 
         // Generate config that listens on an available RPC port
         ServerSocket s = new ServerSocket(0);
@@ -75,6 +74,8 @@ blockchain:
      url: http://localhost:8545
    ws:
      url: ws://localhost:8546
+loader:
+  debug: true
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort);
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
