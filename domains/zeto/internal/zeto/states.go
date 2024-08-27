@@ -30,6 +30,9 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 )
 
+var INPUT_COUNT = 2
+var OUTPUT_COUNT = 2
+
 type ZetoCoin struct {
 	Salt     *ethtypes.HexInteger   `json:"salt"`
 	Owner    string                 `json:"owner"`
@@ -116,6 +119,9 @@ func (z *Zeto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 			coins = append(coins, coin)
 			if total.Cmp(amount.BigInt()) >= 0 {
 				return coins, stateRefs, total, nil
+			}
+			if len(stateRefs) >= INPUT_COUNT {
+				return nil, nil, nil, fmt.Errorf("could not find suitable coins")
 			}
 		}
 	}

@@ -78,26 +78,34 @@ func (h *transferHandler) loadBabyJubKey(payload []byte) (*babyjub.PublicKey, er
 }
 
 func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCoin) ([]byte, error) {
-	inputCommitments := make([]string, len(inputCoins))
-	inputValueInts := make([]uint64, len(inputCoins))
-	inputSalts := make([]string, len(inputCoins))
-	var inputOwner string
-	for i, coin := range inputCoins {
-		inputCommitments[i] = coin.Hash.BigInt().Text(16)
-		inputValueInts[i] = coin.Amount.Uint64()
-		inputSalts[i] = coin.Salt.BigInt().Text(16)
-		inputOwner = coin.OwnerKey.String()
+	inputCommitments := make([]string, INPUT_COUNT)
+	inputValueInts := make([]uint64, INPUT_COUNT)
+	inputSalts := make([]string, INPUT_COUNT)
+	inputOwner := inputCoins[0].OwnerKey.String()
+	for i := 0; i < INPUT_COUNT; i++ {
+		if i < len(inputCoins) {
+			coin := inputCoins[i]
+			inputCommitments[i] = coin.Hash.BigInt().Text(16)
+			inputValueInts[i] = coin.Amount.Uint64()
+			inputSalts[i] = coin.Salt.BigInt().Text(16)
+		} else {
+			inputCommitments[i] = "0"
+			inputSalts[i] = "0"
+		}
 	}
 
-	outputCommitments := make([]string, len(outputCoins))
-	outputValueInts := make([]uint64, len(outputCoins))
-	outputSalts := make([]string, len(outputCoins))
-	outputOwners := make([]string, len(outputCoins))
-	for i, coin := range outputCoins {
-		outputCommitments[i] = coin.Hash.BigInt().Text(16)
-		outputValueInts[i] = coin.Amount.Uint64()
-		outputSalts[i] = coin.Salt.BigInt().Text(16)
-		outputOwners[i] = coin.OwnerKey.String()
+	outputValueInts := make([]uint64, OUTPUT_COUNT)
+	outputSalts := make([]string, OUTPUT_COUNT)
+	outputOwners := make([]string, OUTPUT_COUNT)
+	for i := 0; i < OUTPUT_COUNT; i++ {
+		if i < len(outputCoins) {
+			coin := outputCoins[i]
+			outputValueInts[i] = coin.Amount.Uint64()
+			outputSalts[i] = coin.Salt.BigInt().Text(16)
+			outputOwners[i] = coin.OwnerKey.String()
+		} else {
+			outputSalts[i] = "0"
+		}
 	}
 
 	payload := &pb.ProvingRequest{
@@ -205,21 +213,31 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, re
 		return nil, err
 	}
 
-	inputs := make([]string, len(req.FinalizedTransaction.SpentStates))
-	for i, state := range req.FinalizedTransaction.SpentStates {
-		coin, err := h.zeto.makeCoin(state.StateDataJson)
-		if err != nil {
-			return nil, err
+	inputs := make([]string, INPUT_COUNT)
+	for i := 0; i < INPUT_COUNT; i++ {
+		if i < len(req.FinalizedTransaction.SpentStates) {
+			state := req.FinalizedTransaction.SpentStates[i]
+			coin, err := h.zeto.makeCoin(state.StateDataJson)
+			if err != nil {
+				return nil, err
+			}
+			inputs[i] = coin.Hash.String()
+		} else {
+			inputs[i] = "0"
 		}
-		inputs[i] = coin.Hash.String()
 	}
-	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
-	for i, state := range req.FinalizedTransaction.NewStates {
-		coin, err := h.zeto.makeCoin(state.StateDataJson)
-		if err != nil {
-			return nil, err
+	outputs := make([]string, OUTPUT_COUNT)
+	for i := 0; i < OUTPUT_COUNT; i++ {
+		if i < len(req.FinalizedTransaction.NewStates) {
+			state := req.FinalizedTransaction.NewStates[i]
+			coin, err := h.zeto.makeCoin(state.StateDataJson)
+			if err != nil {
+				return nil, err
+			}
+			outputs[i] = coin.Hash.String()
+		} else {
+			outputs[i] = "0"
 		}
-		outputs[i] = coin.Hash.String()
 	}
 
 	params := map[string]interface{}{

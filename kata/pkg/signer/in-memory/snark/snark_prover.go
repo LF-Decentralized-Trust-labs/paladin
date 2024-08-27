@@ -177,25 +177,32 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 	outputOwnerPublicKeys := make([][]*big.Int, len(commonInputs.OutputValues))
 	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
 
-	for i, value := range commonInputs.OutputValues {
-		ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
-		if err != nil {
-			return nil, err
-		}
-		outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
+	for i := 0; i < len(commonInputs.OutputSalts); i++ {
 		salt, ok := new(big.Int).SetString(commonInputs.OutputSalts[i], 16)
 		if !ok {
 			return nil, errors.New("failed to parse output salt")
 		}
 		outputSalts[i] = salt
 
-		u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
-		hash, err := u.GetHash()
-		if err != nil {
-			return nil, err
+		if salt.Cmp(big.NewInt(0)) == 0 {
+			outputOwnerPublicKeys[i] = []*big.Int{big.NewInt(0), big.NewInt(0)}
+			outputValues[i] = big.NewInt(0)
+			outputCommitments[i] = big.NewInt(0)
+		} else {
+			ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
+			if err != nil {
+				return nil, err
+			}
+			outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
+			value := commonInputs.OutputValues[i]
+			outputValues[i] = new(big.Int).SetUint64(value)
+			u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
+			hash, err := u.GetHash()
+			if err != nil {
+				return nil, err
+			}
+			outputCommitments[i] = hash
 		}
-		outputCommitments[i] = hash
-		outputValues[i] = new(big.Int).SetUint64(value)
 	}
 
 	inputCommitments := make([]*big.Int, len(commonInputs.InputCommitments))
