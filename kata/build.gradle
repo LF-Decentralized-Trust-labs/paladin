@@ -202,12 +202,6 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir 'internal/components'
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
         inputDir 'pkg/blockindexer'
         name 'BlockIndexer'
         outputPackage 'componentmocks'
