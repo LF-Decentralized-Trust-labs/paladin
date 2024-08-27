@@ -17,6 +17,7 @@ package plugins
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +36,7 @@ import (
 // functions are used rather than types to set the request/reply inputs, due to specifics
 // of the way typing works in the go protobuf codegen library
 type managerToPlugin[M any] interface {
-	RequestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error
+	RequestReply(ctx context.Context, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error
 }
 
 // pluginToManager is the inverse interface where requests are received from plugins, and need
@@ -81,14 +82,21 @@ type pluginHandler[M any] struct {
 	senderDone chan struct{}
 
 	// Plugin gets bound late after the stream is started
+	pluginInfo      atomic.Pointer[pluginInfo]
 	pluginToManager pluginToManager[M]
+}
+
+type pluginInfo struct {
+	pluginType string
+	name       string
+	instanceID string
 }
 
 func (p *plugin[CB]) notifyInitialized() {
 	p.pc.mux.Lock()
 	p.initialized = true
 	p.pc.mux.Unlock()
-	log.L(p.pc.bgCtx).Errorf("Plugin load %s [%s] (type=%s) completed", p.def.Plugin, p.id, p.def.Plugin.PluginType)
+	log.L(p.pc.bgCtx).Infof("Plugin load %s [%s] (type=%s) completed", p.def.Plugin, p.id, p.def.Plugin.PluginType)
 	p.pc.tapLoadingProgressed()
 }
 
@@ -97,7 +105,7 @@ func (p *plugin[CB]) notifyStopped() {
 	p.registered = false
 	p.initialized = false
 	p.pc.mux.Unlock()
-	log.L(p.pc.bgCtx).Errorf("Plugin stopped %s [%s] (type=%s)", p.def.Plugin, p.id, p.def.Plugin.PluginType)
+	log.L(p.pc.bgCtx).Infof("Plugin stopped %s [%s] (type=%s)", p.def.Plugin, p.id, p.def.Plugin.PluginType)
 	p.pc.tapLoadingProgressed()
 }
 
@@ -125,6 +133,7 @@ func (ph *pluginHandler[M]) serve() error {
 
 	serverCtx := ph.stream.Context()
 	var plugin *plugin[M]
+	var pi *pluginInfo
 	defer func() {
 		// If we got to the point we've initialized, then we're unregistered & uninitialized when we return
 		if plugin != nil {
@@ -133,7 +142,6 @@ func (ph *pluginHandler[M]) serve() error {
 		ph.close()
 	}()
 	// We are the receiving routine for the gRPC stream (we do NOT send)
-	pluginId := "" // plugin ID not known until it registers
 	for {
 		iMsg, err := ph.stream.Recv()
 		if err != nil {
@@ -142,7 +150,7 @@ func (ph *pluginHandler[M]) serve() error {
 		}
 		msg := ph.wrapper.Wrap(iMsg)
 		header := msg.Header()
-		if plugin == nil && header.MessageType != prototk.Header_REGISTER {
+		if pi == nil && header.MessageType != prototk.Header_REGISTER {
 			log.L(serverCtx).Warnf("Plugin sent request before registration: %s", plugintk.PluginMessageToJSON(msg))
 			continue
 		}
@@ -163,7 +171,12 @@ func (ph *pluginHandler[M]) serve() error {
 			ph.ctx = log.WithLogField(ph.ctx, "plugin", debugInfo) // dirty write - as it's just debug info being added
 			serverCtx = log.WithLogField(serverCtx, "plugin", debugInfo)
 			// We now have the plugin ready for use
-			pluginId = plugin.id.String()
+			pi = &pluginInfo{
+				pluginType: plugin.def.Plugin.PluginType.String(),
+				instanceID: plugin.id.String(),
+				name:       plugin.name,
+			}
+			ph.pluginInfo.Store(pi) // to pass to other go routines (we have it locally)
 			ph.pluginToManager, err = ph.bridgeFactory(plugin, ph)
 			if err != nil {
 				log.L(serverCtx).Errorf("Plugin factory failed %s: %s", header.PluginId, err)
@@ -184,8 +197,7 @@ func (ph *pluginHandler[M]) serve() error {
 			}
 			req.Complete(msg)
 		case prototk.Header_REQUEST_FROM_PLUGIN:
-			// We can't block the stream for this processing, so kick it off to a go routine for the handler
-			go ph.handleRequestFromPlugin(serverCtx, pluginId, msg)
+			go ph.handleRequestFromPlugin(serverCtx, pi, msg)
 		}
 
 	}
@@ -223,7 +235,7 @@ func (ph *pluginHandler[M]) close() {
 }
 
 // Go routine started for each request
-func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pluginId string, req plugintk.PluginMessage[M]) {
+func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pi *pluginInfo, req plugintk.PluginMessage[M]) {
 	// Call the manager
 	startTime := time.Now()
 	log.L(ctx).Infof("[%s] ==> %T", req.Header().MessageId, req.RequestToPlugin())
@@ -233,7 +245,7 @@ func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pluginI
 	replyID := uuid.NewString()
 	res := ph.wrapper.Wrap(new(M))
 	header := res.Header()
-	header.PluginId = pluginId
+	header.PluginId = pi.instanceID
 	header.MessageId = replyID
 	header.CorrelationId = &req.Header().MessageId
 	if err != nil {
@@ -249,7 +261,7 @@ func (ph *pluginHandler[M]) handleRequestFromPlugin(ctx context.Context, pluginI
 	ph.send(res)
 }
 
-func (ph *pluginHandler[M]) RequestReply(ctx context.Context, pluginId string, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error {
+func (ph *pluginHandler[M]) RequestReply(ctx context.Context, reqFn func(plugintk.PluginMessage[M]), resFn func(plugintk.PluginMessage[M]) (ok bool)) error {
 	// Log under our context so we get the plugin ID
 	reqID := uuid.New()
 	l := log.L(ph.ctx)
@@ -259,8 +271,9 @@ func (ph *pluginHandler[M]) RequestReply(ctx context.Context, pluginId string, r
 	reqFn(req)
 
 	// We are responsible for the header
+	pi := ph.pluginInfo.Load()
 	header := req.Header()
-	header.PluginId = pluginId
+	header.PluginId = pi.instanceID
 	header.CorrelationId = nil
 	header.MessageId = reqID.String()
 	header.MessageType = prototk.Header_REQUEST_TO_PLUGIN
@@ -288,13 +301,13 @@ func (ph *pluginHandler[M]) RequestReply(ctx context.Context, pluginId string, r
 			errMessage = plugintk.PluginMessageToJSON(res)
 		}
 		l.Errorf("[%s] <== ERROR [%s]: %s", reqID, inflight.Age(), errMessage)
-		return i18n.NewError(ctx, msgs.MsgPluginError, errMessage)
+		return i18n.NewError(ctx, msgs.MsgPluginError, pi.pluginType, pi.name, errMessage)
 	}
 
 	responseOk := resFn(res)
 	if !responseOk {
 		l.Errorf("[%s] <== BAD_RESPONSE [%s]: %T", reqID, inflight.Age(), res.ResponseFromPlugin())
-		return i18n.NewError(ctx, msgs.MsgPluginBadResponseBody, res.ResponseFromPlugin())
+		return i18n.NewError(ctx, msgs.MsgPluginBadResponseBody, pi.pluginType, pi.name, res.ResponseFromPlugin())
 	}
 
 	l.Infof("[%s] <== [%s] %T [%s]", reqID, res.Header().MessageId, req.ResponseFromPlugin(), inflight.Age())

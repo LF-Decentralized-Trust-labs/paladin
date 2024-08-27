@@ -25,14 +25,18 @@ import (
 
 // Intended to be embedded at root level of paladin config
 type DomainManagerConfig struct {
-	Domains map[string]*DomainConfig `yaml:"domains"`
+	Domains       map[string]*DomainConfig   `yaml:"domains"`
+	DomainManager DomainManagerManagerConfig `yaml:"domainManager"`
+}
+
+type DomainManagerManagerConfig struct {
+	ContractCache cache.Config `yaml:"contractCache"`
 }
 
 type DomainConfig struct {
-	Init          DomainInitConfig     `yaml:"init"`
-	ContractCache cache.Config         `yaml:"contractCache"`
-	Plugin        plugins.PluginConfig `yaml:"plugin"`
-	Config        yaml.Node            `yaml:"config"`
+	Init   DomainInitConfig     `yaml:"init"`
+	Plugin plugins.PluginConfig `yaml:"plugin"`
+	Config yaml.Node            `yaml:"config"`
 }
 
 var ContractCacheDefaults = &cache.Config{

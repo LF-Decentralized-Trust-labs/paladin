@@ -91,6 +91,12 @@ func (ifm *InflightManager[K, T]) waitInFlight(req *InflightRequest[K, T]) (T, e
 	}
 }
 
+func (ifm *InflightManager[K, T]) InFlightCount() int {
+	ifm.lock.Lock()
+	defer ifm.lock.Unlock()
+	return len(ifm.requests)
+}
+
 func (ifm *InflightManager[K, T]) cancelInFlight(req *InflightRequest[K, T]) {
 	ifm.lock.Lock()
 	defer ifm.lock.Unlock()

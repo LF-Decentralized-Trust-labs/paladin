@@ -132,6 +132,9 @@ func registerTestDomain(t *testing.T, dm *domainManager, tp *testPlugin) {
 
 func goodDomainConf() *prototk.DomainConfig {
 	return &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+			SubmitMode: prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
+		},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -188,6 +191,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -203,6 +207,7 @@ func TestDomainInitBadSchemas(t *testing.T) {
 
 func TestDomainInitBadConstructor(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `!!!wrong`,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -218,6 +223,7 @@ func TestDomainInitBadConstructor(t *testing.T) {
 
 func TestDomainInitBadConstructorType(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -233,6 +239,7 @@ func TestDomainInitBadConstructorType(t *testing.T) {
 
 func TestDomainInitSchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -248,6 +255,7 @@ func TestDomainInitSchemaStoreFail(t *testing.T) {
 
 func TestDomainInitBadAddress(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: `!wrong`,
 		FactoryContractAbiJson: `[]`,
@@ -263,6 +271,7 @@ func TestDomainInitBadAddress(t *testing.T) {
 
 func TestDomainInitFactoryABIInvalid(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `!!!wrong`,
@@ -278,6 +287,7 @@ func TestDomainInitFactoryABIInvalid(t *testing.T) {
 
 func TestDomainInitPrivateABIInvalid(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
@@ -293,6 +303,7 @@ func TestDomainInitPrivateABIInvalid(t *testing.T) {
 
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,

@@ -294,7 +294,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 	domainAPI := <-waitForRegister
 
 	_, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{})
-	assert.Regexp(t, "PD011204", err)
+	assert.Regexp(t, "PD011205", err)
 
 }
 

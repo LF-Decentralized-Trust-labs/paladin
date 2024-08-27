@@ -93,7 +93,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return nil, err
 	}
@@ -205,14 +205,14 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateConfirms = []*StateConfirm{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -220,14 +220,14 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 }
 
 func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateSpends = []*StateSpend{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -235,14 +235,14 @@ func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, t
 }
 
 func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, transactionID uuid.UUID, creating, spending bool) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateLocks = []*StateLock{
-		{State: *id, Transaction: transactionID, Creating: creating, Spending: spending},
+		{State: id, Transaction: transactionID, Creating: creating, Spending: spending},
 	}
 
 	ss.writer.queue(ctx, op)

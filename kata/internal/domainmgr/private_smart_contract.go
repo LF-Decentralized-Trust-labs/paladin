@@ -44,36 +44,15 @@ type domainContract struct {
 	info *PrivateSmartContract
 }
 
-func (d *domain) GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (components.DomainSmartContract, error) {
-	dc, isCached := d.contractCache.Get(addr)
-	if isCached {
-		return dc, nil
-	}
-
-	var contracts []*PrivateSmartContract
-	err := d.dm.persistence.DB().
-		Table("private_smart_contracts").
-		Where("domain_address = ?", d.factoryContractAddress).
-		Where("address = ?", addr).
-		WithContext(ctx).
-		Limit(1).
-		Find(&contracts).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	if len(contracts) == 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainContractNotFoundByAddr, addr)
-	}
-
-	dc = &domainContract{
+func (d *domain) newSmartContract(def *PrivateSmartContract) *domainContract {
+	dc := &domainContract{
 		dm:   d.dm,
 		d:    d,
 		api:  d.api,
-		info: contracts[0],
+		info: def,
 	}
-	d.contractCache.Set(addr, dc)
-	return dc, nil
+	d.dm.contractCache.Set(dc.info.Address, dc)
+	return dc
 }
 
 func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
@@ -104,15 +83,17 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidFunctionParams, txi.Function.SolString())
 	}
 
-	txSpec := &prototk.TransactionSpecification{}
+	txSpec := &prototk.TransactionSpecification{
+		TransactionId:      types.Bytes32UUIDLower16(tx.ID).String(),
+		ContractAddress:    dc.info.Address.String(),
+		ContractConfig:     dc.info.ConfigBytes,
+		From:               txi.From,
+		FunctionAbiJson:    string(abiJSON),
+		FunctionParamsJson: string(paramsJSON),
+		FunctionSignature:  txi.Function.SolString(), // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
+		BaseBlock:          int64(confirmedBlockHeight),
+	}
 	preAssembly.TransactionSpecification = txSpec
-	txSpec.TransactionId = types.Bytes32UUIDLower16(tx.ID).String()
-	txSpec.ContractAddress = dc.info.Address.String()
-	txSpec.ContractConfig = dc.info.ConfigBytes
-	txSpec.FunctionAbiJson = string(abiJSON)
-	txSpec.FunctionParamsJson = string(paramsJSON)
-	txSpec.FunctionSignature = txi.Function.SolString() // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
-	txSpec.BaseBlock = int64(confirmedBlockHeight)
 
 	// Do the request with the domain
 	res, err := dc.api.InitTransaction(ctx, &prototk.InitTransactionRequest{
@@ -160,6 +141,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// We need to pass the assembly result back - it needs to be assigned to a sequence
 	// before anything interesting can happen with the result here
 	postAssembly.AssemblyResult = res.AssemblyResult
+	postAssembly.AttestationPlan = res.AttestationPlan
 	// Note the states at this point are just potential states - depending on the analysis
 	// of the result, and the locking on the input states, the engine might decide to
 	// abandon this attempt and just re-assemble later.
@@ -178,7 +160,7 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 	//       and write them directly to the sequence prior to endorsement
 	postAssembly := tx.PostAssembly
 
-	var newStatesToWrite []*statestore.StateUpsert
+	newStatesToWrite := make([]*statestore.StateUpsert, len(postAssembly.OutputStatesPotential))
 	domain := dc.d
 	for i, s := range postAssembly.OutputStatesPotential {
 		schema := domain.schemasByID[s.SchemaId]
@@ -268,7 +250,7 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 }
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
-func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
+func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
 	// is being handled as part of an overall sequence of endorsements, and for performance it is
@@ -288,6 +270,7 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 		Inputs:              dc.toEndorsableList(postAssembly.InputStates),
 		Outputs:             dc.toEndorsableList(postAssembly.OutputStates),
 		Signatures:          postAssembly.Signatures,
+		EndorsementRequest:  endorsement,
 		EndorsementVerifier: endorser,
 	})
 	// We don't do any processing - as the result is not directly processable by us.
@@ -314,26 +297,52 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		Transaction:       preAssembly.TransactionSpecification,
 		InputStates:       dc.toReferenceList(postAssembly.InputStates),
 		OutputStates:      dc.toReferenceList(postAssembly.OutputStates),
-		AttestationResult: postAssembly.AllAttestations,
+		AttestationResult: dc.allAttestations(tx),
 	})
 	if err != nil {
 		return err
 	}
 
-	tx.PreparedTransaction = res.Transaction
+	functionABI := dc.d.privateContractABI.Functions()[res.Transaction.FunctionName]
+	if functionABI == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+	}
+	tx.PreparedTransaction = &components.EthTransaction{
+		FunctionABI: functionABI,
+		To:          dc.Address(),
+		Params:      types.RawJSON(res.Transaction.ParamsJson),
+	}
 	return nil
+}
+
+func (dc *domainContract) Domain() components.Domain {
+	return dc.d
+}
+
+func (dc *domainContract) Address() types.EthAddress {
+	return dc.info.Address
+}
+
+func (dc *domainContract) ConfigBytes() []byte {
+	return dc.info.ConfigBytes
+}
+
+func (dc *domainContract) allAttestations(tx *components.PrivateTransaction) []*prototk.AttestationResult {
+	attestations := append([]*prototk.AttestationResult{}, tx.PostAssembly.Signatures...)
+	attestations = append(attestations, tx.PostAssembly.Endorsements...)
+	return attestations
 }
 
 func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateRef) ([]*components.FullState, error) {
 	rawIDsBySchema := make(map[string][]types.RawJSON)
 	stateIDs := make([]types.Bytes32, len(refs))
 	for i, s := range refs {
-		stateID, err := types.ParseBytes32(ctx, s.Id)
+		stateID, err := types.ParseBytes32Ctx(ctx, s.Id)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}
 		rawIDsBySchema[s.SchemaId] = append(rawIDsBySchema[s.SchemaId], types.JSONString(stateID.String()))
-		stateIDs[i] = *stateID
+		stateIDs[i] = stateID
 	}
 	statesByID := make(map[types.Bytes32]*statestore.State)
 	err := dc.dm.stateStore.RunInDomainContext(dc.d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) error {

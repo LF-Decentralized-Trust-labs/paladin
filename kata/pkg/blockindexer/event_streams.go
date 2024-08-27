@@ -105,7 +105,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
-	if err := types.Validate64SafeCharsStartEndAlphaNum(ctx, def.Name, "name"); err != nil {
+	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, types.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -202,7 +202,7 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
-			sig := *types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+			sig := types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 			sigStr := sig.String()
 			es.eventABIs = append(es.eventABIs, abiEntry)
 			if _, dup := es.signatures[sigStr]; !dup {
@@ -468,7 +468,8 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 
 	// We start a database transaction, run the callback function
 	return es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		return true, es.bi.persistence.DB().Transaction(func(tx *gorm.DB) error {
+		var postCommit PostCommit
+		err = es.bi.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
 
 			es.handlerLock.Lock()
 			handler := es.handler
@@ -477,7 +478,7 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 			if handler == nil {
 				return i18n.NewError(es.ctx, msgs.MsgBlockMissingHandler)
 			}
-			err := handler(es.ctx, tx, &batch.EventDeliveryBatch)
+			postCommit, err = handler(es.ctx, tx, &batch.EventDeliveryBatch)
 			if err != nil {
 				return err
 			}
@@ -497,6 +498,10 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 				WithContext(es.ctx).
 				Error
 		})
+		if err == nil && postCommit != nil {
+			postCommit()
+		}
+		return true, err
 	})
 
 }

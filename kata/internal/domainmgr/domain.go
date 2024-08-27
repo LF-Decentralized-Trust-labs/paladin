@@ -25,7 +25,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
@@ -41,12 +40,11 @@ type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf          *DomainConfig
-	dm            *domainManager
-	id            uuid.UUID
-	name          string
-	api           plugins.DomainManagerToDomain
-	contractCache cache.Cache[types.EthAddress, *domainContract]
+	conf *DomainConfig
+	dm   *domainManager
+	id   uuid.UUID
+	name string
+	api  plugins.DomainManagerToDomain
 
 	stateLock              sync.Mutex
 	initialized            atomic.Bool
@@ -65,14 +63,13 @@ type domain struct {
 
 func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugins.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:            dm,
-		conf:          conf,
-		initRetry:     retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:          name,
-		id:            id,
-		api:           toDomain,
-		initDone:      make(chan struct{}),
-		contractCache: cache.NewCache[types.EthAddress, *domainContract](&conf.ContractCache, ContractCacheDefaults),
+		dm:        dm,
+		conf:      conf,
+		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:      name,
+		id:        id,
+		api:       toDomain,
+		initDone:  make(chan struct{}),
 
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
@@ -87,6 +84,9 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 
 	// Parse all the schemas
 	d.config = confRes.DomainConfig
+	if d.config.BaseLedgerSubmitConfig == nil {
+		return nil, i18n.NewError(d.ctx, msgs.MsgDomainBaseLedgerSubmitInvalid)
+	}
 	abiSchemas := make([]*abi.Parameter, len(d.config.AbiStateSchemasJson))
 	for i, schemaJSON := range d.config.AbiStateSchemasJson {
 		if err := json.Unmarshal([]byte(schemaJSON), &abiSchemas[i]); err != nil {
@@ -154,7 +154,7 @@ func (d *domain) init() {
 		confYAML, _ := yaml.Marshal(&d.conf.Config)
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
 			Name:       d.name,
-			ChainId:    d.dm.chainID,
+			ChainId:    d.dm.ethClientFactory.ChainID(),
 			ConfigYaml: string(confYAML),
 		})
 		if err != nil {
@@ -188,6 +188,22 @@ func (d *domain) checkInit(ctx context.Context) error {
 		return i18n.NewError(ctx, msgs.MsgDomainNotInitialized)
 	}
 	return nil
+}
+
+func (d *domain) Initialized() bool {
+	return d.initialized.Load()
+}
+
+func (d *domain) Name() string {
+	return d.name
+}
+
+func (d *domain) Address() *types.EthAddress {
+	return d.factoryContractAddress
+}
+
+func (d *domain) Configuration() *prototk.DomainConfig {
+	return d.config
 }
 
 // Domain callback to query the state store
@@ -282,10 +298,27 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 
 	tx.Signer = res.SigningAddress
 	if res.Transaction != nil && res.Deploy == nil {
-		tx.InvokeTransaction = res.Transaction
+		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
+		if functionABI == nil {
+			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+		}
+		tx.InvokeTransaction = &components.EthTransaction{
+			FunctionABI: functionABI,
+			To:          *d.Address(),
+			Params:      types.RawJSON(res.Transaction.ParamsJson),
+		}
 		tx.DeployTransaction = nil
 	} else if res.Deploy != nil && res.Transaction == nil {
-		tx.DeployTransaction = res.Deploy
+		functionABI := d.factoryContractABI.Constructor()
+		if functionABI == nil {
+			// default constructor
+			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
+		}
+		tx.DeployTransaction = &components.EthDeployTransaction{
+			ConstructorABI: functionABI,
+			Bytecode:       res.Deploy.Bytecode,
+			Params:         types.RawJSON(res.Deploy.ParamsJson),
+		}
 		tx.InvokeTransaction = nil
 	} else {
 		// Must specify exactly one of the two types of transaction

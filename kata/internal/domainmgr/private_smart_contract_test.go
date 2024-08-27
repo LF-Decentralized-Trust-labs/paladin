@@ -33,10 +33,7 @@ func TestPrivateSmartContractQueryFail(t *testing.T) {
 	})
 	defer done()
 
-	domain, err := dm.GetDomainByName(ctx, "test1")
-	assert.NoError(t, err)
-
-	_, err = domain.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
 	assert.Regexp(t, "pop", err)
 
 }
@@ -49,10 +46,7 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 	})
 	defer done()
 
-	domain, err := dm.GetDomainByName(ctx, "test1")
-	assert.NoError(t, err)
-
-	_, err = domain.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
 	assert.Regexp(t, "PD011609", err)
 
 }

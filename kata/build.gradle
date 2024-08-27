@@ -28,8 +28,8 @@ ext {
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
-        'github.com/kaleido-io/paladin/kata/pkg/proto/plugin',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/toolkit/prototk',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
         'github.com/kaleido-io/paladin/kata/testbed',
     ]
@@ -54,7 +54,7 @@ task installTools(type:Exec) {
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
     args 'install'
-    inputs.files(['go.mod','go.sum'])
+    inputs.files('go.mod','go.sum')
     outputs.files(
         "bin/protoc-gen-go",
         "bin/protoc-gen-go-grpc",
@@ -68,113 +68,6 @@ task installTools(type:Exec) {
     args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
     args 'github.com/vektra/mockery/v2'
 }
-
-task makeRPCMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files(['bin/mockery', 'go.sum'])
-    outputs.dir('mocks/rpcbackendmocks')
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-    args '--all'
-    args '--outpkg', 'rpcbackendmocks'
-    args '--output', 'mocks/rpcbackendmocks'
-}
-
-task makeComponentMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('internal/components')
-    outputs.dir('mocks/componentmocks')
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'internal/components'
-    args '--all'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makeStateStoreMock(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('internal/statestore')
-    outputs.dir('mocks/componentmocks') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'internal/statestore'
-    args '--name', 'StateStore'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makeDomainStateInterfaceMock(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('internal/statestore')
-    outputs.dir('mocks/componentmocks') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'internal/statestore'
-    args '--name', 'DomainStateInterface'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-
-task makeBlockIndexerMock(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('pkg/blockindexer')
-    outputs.dir('mocks/componentmocks') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'pkg/blockindexer'
-    args '--name', 'BlockIndexer'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makePluginControllerMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('internal/plugins')
-    outputs.dir('mocks/plugins') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'internal/plugins'
-    args '--name', 'PluginController'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makeRPCServerMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('internal/rpcserver')
-    outputs.dir('mocks/componentmocks') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'internal/rpcserver'
-    args '--name', 'RPCServer'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makeEthClientMocks(type:Exec, dependsOn: tasks.installTools) {
-    inputs.files('bin/mockery')
-    inputs.dir('pkg/ethclient')
-    outputs.dir('mocks/componentmocks') // colocate all the component mocks
-    executable 'bin/mockery'
-    args '--case', 'underscore'
-    args '--dir', 'pkg/ethclient'
-    args '--all'
-    args '--outpkg', 'componentmocks'
-    args '--output', 'mocks/componentmocks'
-}
-
-task makeMocks(dependsOn: [
-    tasks.makeRPCMocks,
-    tasks.makeComponentMocks,
-    tasks.makeStateStoreMock,
-    tasks.makeDomainStateInterfaceMock,
-    tasks.makeBlockIndexerMock,
-    tasks.makePluginControllerMocks,
-    tasks.makeRPCServerMocks,
-    tasks.makeEthClientMocks,
-]) {}
 
 task copyTestContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
@@ -221,34 +114,27 @@ task copyContracts(dependsOn:[
     copyDomainManagerContracts,
 ])
 
-task protoc(type:Exec, dependsOn: [
+task protoc(type: ProtoCompile, dependsOn: [
         ":toolkit_go:protoc",
-        tasks.makeMocks,
-        tasks.copyContracts
+        tasks.installTools,
+        tasks.copyTestContracts,
     ]) {
-    workingDir '.'
-    inputs.files(fileTree("pkg/proto") { include "**/*.proto" })
-    outputs.files(fileTree("pkg/proto") { include "**/*.pb.go" })
-    environment 'PATH', "${projectDir}/bin" + File.pathSeparator + System.getenv('PATH')
-    executable 'protoc'
-    args "--go_out=${projectDir}"
-    args "--go-grpc_out=${projectDir}"
-    args "--proto_path=${projectDir}"
-    args inputs.files
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
+    }
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
-    delete fileTree("bin") {
-        exclude "README.md", ".gitignore"
-    }
-    delete fileTree(".") {
-        include "**/*.pb.go"
-    }
-    delete 'coverage'
-    delete 'componenttest/abis'
-}
-
-task goGet(type:Exec, dependsOn:[tasks.protoc]) {
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -259,7 +145,72 @@ task goGet(type:Exec, dependsOn:[tasks.protoc]) {
     args 'get'
 }
 
-task lint(type: Exec, dependsOn:[tasks.protoc]) {
+task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
+    mockery 'bin/mockery'
+    args '--case', 'underscore'
+    mock {
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
+    }
+    mock {
+        inputDir 'internal/components'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'StateStore'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'DomainStateInterface'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/blockindexer'
+        name 'BlockIndexer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/plugins'
+        name 'PluginController'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/rpcserver'
+        name 'RPCServer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/ethclient'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }    
+}
+
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete fileTree("bin") {
+        exclude "README.md", ".gitignore"
+    }
+    delete fileTree(".") {
+        include "**/*.pb.go"
+    }
+    delete 'coverage'
+    delete 'mocks'
+    delete 'componenttest/abis'
+}
+
+task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles);
@@ -272,7 +223,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc]) {
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
+task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     workingDir '.'
 
     def libName;
@@ -296,7 +247,7 @@ task buildSharedLibrary(type:Exec, dependsOn:tasks.goGet) {
     args 'kata.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.copyContracts]) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)
@@ -380,7 +331,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/..."
+        args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         args "-test.gocoverdir=${getProject().projectDir}/coverage"
@@ -402,7 +353,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: [tasks.protoc]) {
+task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {

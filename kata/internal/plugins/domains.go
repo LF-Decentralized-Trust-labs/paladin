@@ -90,7 +90,6 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 
 func (br *domainBridge) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (res *prototk.ConfigureDomainResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_ConfigureDomain{ConfigureDomain: req}
 		},
@@ -106,7 +105,6 @@ func (br *domainBridge) ConfigureDomain(ctx context.Context, req *prototk.Config
 
 func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (res *prototk.InitDomainResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDomain{InitDomain: req}
 		},
@@ -122,7 +120,6 @@ func (br *domainBridge) InitDomain(ctx context.Context, req *prototk.InitDomainR
 
 func (br *domainBridge) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (res *prototk.InitDeployResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitDeploy{InitDeploy: req}
 		},
@@ -138,7 +135,6 @@ func (br *domainBridge) InitDeploy(ctx context.Context, req *prototk.InitDeployR
 
 func (br *domainBridge) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (res *prototk.PrepareDeployResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareDeploy{PrepareDeploy: req}
 		},
@@ -154,7 +150,6 @@ func (br *domainBridge) PrepareDeploy(ctx context.Context, req *prototk.PrepareD
 
 func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (res *prototk.InitTransactionResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_InitTransaction{InitTransaction: req}
 		},
@@ -170,7 +165,6 @@ func (br *domainBridge) InitTransaction(ctx context.Context, req *prototk.InitTr
 
 func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (res *prototk.AssembleTransactionResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_AssembleTransaction{AssembleTransaction: req}
 		},
@@ -186,7 +180,6 @@ func (br *domainBridge) AssembleTransaction(ctx context.Context, req *prototk.As
 
 func (br *domainBridge) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (res *prototk.EndorseTransactionResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_EndorseTransaction{EndorseTransaction: req}
 		},
@@ -202,7 +195,6 @@ func (br *domainBridge) EndorseTransaction(ctx context.Context, req *prototk.End
 
 func (br *domainBridge) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (res *prototk.PrepareTransactionResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.DomainMessage]) {
 			dm.Message().RequestToDomain = &prototk.DomainMessage_PrepareTransaction{PrepareTransaction: req}
 		},

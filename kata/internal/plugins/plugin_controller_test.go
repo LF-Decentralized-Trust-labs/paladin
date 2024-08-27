@@ -192,7 +192,7 @@ func TestInitPluginControllerUDSTooLong(t *testing.T) {
 	_, err := NewPluginController(context.Background(), uuid.New(), &testManagers{}, &PluginControllerConfig{
 		GRPC: GRPCConfig{Address: string(longerThanUDSSafelySupportsCrossPlatform)},
 	})
-	assert.Regexp(t, "PD011205", err)
+	assert.Regexp(t, "PD011204", err)
 }
 
 func TestInitPluginControllerTCP4(t *testing.T) {

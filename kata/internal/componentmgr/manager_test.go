@@ -17,11 +17,13 @@ package componentmgr
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
@@ -76,7 +78,7 @@ func TestInitOK(t *testing.T) {
 	}
 
 	mockEngine := componentmocks.NewEngine(t)
-	mockEngine.On("Name").Return("utengine")
+	mockEngine.On("EngineName").Return("utengine")
 	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
 	cm := NewComponentManager(context.Background(), uuid.New(), testConfig, mockEngine).(*componentManager)
 	err := cm.Init()
@@ -107,10 +109,12 @@ func TestStartOK(t *testing.T) {
 
 	mockBlockIndexer := componentmocks.NewBlockIndexer(t)
 	mockBlockIndexer.On("Start", mock.AnythingOfType("*blockindexer.InternalEventStream")).Return(nil)
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
 	mockBlockIndexer.On("Stop").Return()
 
 	mockPluginController := componentmocks.NewPluginController(t)
 	mockPluginController.On("Start").Return(nil)
+	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
 	mockPluginController.On("Stop").Return()
 
 	mockDomainManager := componentmocks.NewDomainManager(t)
@@ -120,6 +124,9 @@ func TestStartOK(t *testing.T) {
 	mockTransportManager := componentmocks.NewTransportManager(t)
 	mockTransportManager.On("Start").Return(nil)
 	mockTransportManager.On("Stop").Return()
+	
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
 
 	mockRPCServer := componentmocks.NewRPCServer(t)
 	mockRPCServer.On("Start").Return(nil)
@@ -146,10 +153,13 @@ func TestStartOK(t *testing.T) {
 	cm.pluginController = mockPluginController
 	cm.domainManager = mockDomainManager
 	cm.transportManager = mockTransportManager
+	cm.stateStore = mockStateStore
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine
 
-	err := cm.Start()
+	err := cm.StartComponents()
+	assert.NoError(t, err)
+	err = cm.CompleteStart()
 	assert.NoError(t, err)
 
 	cm.Stop()
@@ -170,5 +180,17 @@ func TestBuildInternalEventStreamsError(t *testing.T) {
 
 	_, err := cm.buildInternalEventStreams()
 	assert.Regexp(t, "FF22025", err)
+
+}
+
+func TestErrorWrapping(t *testing.T) {
+	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
+
+	mockKeyManager := componentmocks.NewKeyManager(t)
+	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
+
+	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened(mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
+	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted(mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
+	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
 
 }

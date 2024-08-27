@@ -39,6 +39,26 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 }
 
 var (
+	// Components PD0100XX
+	MsgComponentKeyManagerInitError    = ffe("PD010000", "Error initializing key manager")
+	MsgComponentKeyManagerStartError   = ffe("PD010001", "Error starting key manager")
+	MsgComponentEthClientInitError     = ffe("PD010002", "Error initializing ethereum client")
+	MsgComponentEthClientStartError    = ffe("PD010003", "Error starting ethereum client")
+	MsgComponentDBInitError            = ffe("PD010004", "Error initializing database")
+	MsgComponentDBStartError           = ffe("PD010005", "Error starting database")
+	MsgComponentStateStoreInitError    = ffe("PD010006", "Error initializing state store")
+	MsgComponentStateStoreStartError   = ffe("PD010007", "Error starting state store")
+	MsgComponentBlockIndexerInitError  = ffe("PD010008", "Error initializing block indexer")
+	MsgComponentBlockIndexerStartError = ffe("PD010009", "Error starting block indexer ")
+	MsgComponentRPCServerInitError     = ffe("PD010010", "Error initializing RPC server")
+	MsgComponentRPCServerStartError    = ffe("PD010011", "Error starting RPC server ")
+	MsgComponentDomainInitError        = ffe("PD010012", "Error initializing domains")
+	MsgComponentDomainStartError       = ffe("PD010013", "Error starting domain manager")
+	MsgComponentPluginCtrlInitError    = ffe("PD010014", "Error initializing plugin controller")
+	MsgComponentPluginCtrlStartError   = ffe("PD010015", "Error starting plugin controller ")
+	MsgComponentWaitPluginStartError   = ffe("PD010016", "Error waiting for plugins to start")
+	MsgComponentEngineInitError        = ffe("PD010017", "Error initializing engine")
+	MsgComponentEngineStartError       = ffe("PD010018", "Error starting engine")
 
 	// States PD0101XX
 	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")
@@ -129,20 +149,20 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil                    = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail                        = ffe("PD011101", "Unable to scan type %T into type %T")
-	MsgTypesEnumValueInvalid                = ffe("PD011102", "Value must be one of %s")
-	MsgTypesABIDefNotInBothStructs          = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
-	MsgTypesInvalidName64SafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-64 characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric")
+	MsgTypesUnmarshalNil                  = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                      = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
 
 	// Plugin controller PD0112XX
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
 	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
 	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
 	MsgPluginBadRequestBody    = ffe("PD011203", "Invalid request body %T")
-	MsgPluginBadResponseBody   = ffe("PD011204", "Invalid response body %T")
-	MsgPluginUDSPathTooLong    = ffe("PD011205", "Unix domain socket path too log (len=%d,limit=100)")
-	MsgPluginError             = ffe("PD011206", "Plugin returned error: %s")
+	MsgPluginUDSPathTooLong    = ffe("PD011204", "Unix domain socket path too log (len=%d,limit=100)")
+	MsgPluginBadResponseBody   = ffe("PD011205", "%s %s returned invalid response body %T")
+	MsgPluginError             = ffe("PD011206", "%s %s returned error: %s")
 	MsgPluginLoadFailed        = ffe("PD011207", "Plugin load failed: %s")
 
 	// BlockIndexer PD0113XX
@@ -204,7 +224,7 @@ var (
 	MsgDomainFactoryAddressInvalid      = ffe("PD011606", "Factory contract address invalid")
 	MsgDomainPrivateAbiJsonInvalid      = ffe("PD011607", "Private contract ABI invalid")
 	MsgDomainInvalidQueryJSON           = ffe("PD011608", "Invalid query JSON")
-	MsgDomainContractNotFoundByAddr     = ffe("PD011609", "Smart contract with address %s has not been indexed")
+	MsgDomainContractNotFoundByAddr     = ffe("PD011609", "A smart contract with address %s has not yet been indexed")
 	MsgDomainInvalidConstructorParams   = ffe("PD011610", "Invalid constructor parameters for %s")
 	MsgDomainInvalidPrepareDeployResult = ffe("PD011611", "Prepare deploy did not result in exactly one of a invoke transaction or a deploy transaction")
 	MsgDomainInvalidFunctionParams      = ffe("PD011612", "Invalid function parameters for %s")
@@ -212,5 +232,7 @@ var (
 	MsgDomainInvalidStateIDFromDomain   = ffe("PD011614", "Domain returned invalid id '%s' for state %d")
 	MsgDomainInputStateNotFound         = ffe("PD011615", "Input state %d [%s] not found")
 	MsgDomainMissingStates              = ffe("PD011616", "Missing in-memory states")
-	MsgEndorsementReverted              = ffe("PD011617", "Endorsement from '%s' reverted: %s")
+	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
+	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
+	MsgDomainBaseLedgerSubmitInvalid    = ffe("PD011619", "Base ledger submission config is invalid")
 )

@@ -18,6 +18,7 @@ package components
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -28,11 +29,16 @@ type DomainManager interface {
 	ManagerLifecycle
 	plugins.DomainRegistration
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
+	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+	WaitForDeploy(ctx context.Context, txID uuid.UUID) (DomainSmartContract, error)
 }
 
 // External interface for other components (engine, testbed) to call against a domain
 type Domain interface {
-	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+	Initialized() bool
+	Name() string
+	Address() *types.EthAddress
+	Configuration() *prototk.DomainConfig
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
 	PrepareDeploy(ctx context.Context, tx *PrivateContractDeploy) error
@@ -40,11 +46,15 @@ type Domain interface {
 
 // External interface for other components to call against a private smart contract
 type DomainSmartContract interface {
+	Domain() Domain
+	Address() types.EthAddress
+	ConfigBytes() []byte
+
 	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
 	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error
 	LockStates(ctx context.Context, tx *PrivateTransaction) error
-	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
+	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
 	PrepareTransaction(ctx context.Context, tx *PrivateTransaction) error
 }
 

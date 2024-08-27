@@ -59,7 +59,7 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.ID = *types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
+		as.ID = types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -344,7 +344,7 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 		return nil, err
 	}
 
-	hashID := *types.NewBytes32FromSlice(hash)
+	hashID := types.NewBytes32FromSlice(hash)
 	for i := range psd.labels {
 		psd.labels[i].State = hashID
 	}

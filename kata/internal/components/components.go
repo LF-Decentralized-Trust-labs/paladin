@@ -88,12 +88,13 @@ type AllComponents interface {
 	Managers
 }
 
-// The Engine is basically a special manager, which specifies its own name
 // Two examples of an engine exist:
 // - The runtime engine of Paladin, which does real work
 // - The testbed, which provides a JSON/RPC testing interface for domains in isolation from the engine
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
-	Name() string
-	ManagerLifecycle
+	EngineName() string
+	Init(AllComponents) (*ManagerInitResult, error)
+	Start() error
+	Stop()
 }

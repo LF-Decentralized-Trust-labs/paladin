@@ -42,11 +42,21 @@ func TestEventIndexingWithDB(t *testing.T) {
 	ctx, dm, tp, done := newTestDomain(t, true /* real DB */, goodDomainConf())
 	defer done()
 
-	// Index an event indicating deployment of a new smart contract instance
-	contractAddr := types.EthAddress(types.RandBytes(20))
 	deployTX := uuid.New()
-	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
-		return dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
+	contractAddr := types.EthAddress(types.RandBytes(20))
+
+	txNotified := make(chan struct{})
+	go func() {
+		defer close(txNotified)
+		sc, err := dm.WaitForDeploy(ctx, deployTX)
+		assert.NoError(t, err)
+		assert.Equal(t, contractAddr, sc.Address())
+	}()
+
+	// Index an event indicating deployment of a new smart contract instance
+	var pc blockindexer.PostCommit
+	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) (err error) {
+		pc, err = dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
@@ -58,7 +68,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
@@ -69,11 +79,14 @@ func TestEventIndexingWithDB(t *testing.T) {
 				},
 			},
 		})
+		return err
 	})
 	assert.NoError(t, err)
+	assert.NotNil(t, pc)
+	pc()
 
 	// Lookup the instance against the domain
-	psc, err := tp.d.GetSmartContractByAddress(ctx, contractAddr)
+	psc, err := dm.GetSmartContractByAddress(ctx, contractAddr)
 	assert.NoError(t, err)
 	dc := psc.(*domainContract)
 	assert.Equal(t, &PrivateSmartContract{
@@ -82,14 +95,16 @@ func TestEventIndexingWithDB(t *testing.T) {
 		Address:       contractAddr,
 		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
 	}, dc.info)
-	assert.Equal(t, tp.d, dc.d)
-	assert.Equal(t, dm, dc.dm)
+	assert.Equal(t, contractAddr, psc.Address())
+	assert.Equal(t, "test1", psc.Domain().Name())
+	assert.Equal(t, tp.d.factoryContractAddress, psc.Domain().Address())
 
 	// Get cached
-	psc2, err := tp.d.GetSmartContractByAddress(ctx, contractAddr)
+	psc2, err := dm.GetSmartContractByAddress(ctx, contractAddr)
 	assert.NoError(t, err)
 	assert.Equal(t, psc, psc2)
 
+	<-txNotified
 }
 
 func TestEventIndexingBadEvent(t *testing.T) {
@@ -102,7 +117,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 	defer done()
 
 	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
-		return dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
+		_, err := dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
@@ -115,6 +130,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 				},
 			},
 		})
+		return err
 	})
 	assert.NoError(t, err)
 
@@ -133,7 +149,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 	contractAddr := types.EthAddress(types.RandBytes(20))
 	deployTX := uuid.New()
 	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
-		return dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
+		_, err := dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
 			StreamID:   uuid.New(),
 			StreamName: "name_given_by_component_mgr",
 			BatchID:    uuid.New(),
@@ -145,7 +161,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  *types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
@@ -156,6 +172,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 				},
 			},
 		})
+		return err
 	})
 	assert.Regexp(t, "pop", err)
 
