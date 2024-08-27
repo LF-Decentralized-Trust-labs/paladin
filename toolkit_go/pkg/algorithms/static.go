@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package api
+package algorithms
 
 // TODO: More work on algorithm taxonomy. These could become very dynamic strings,
 // as we specify complex dynamic payloads for ZKP proof generation
@@ -23,5 +23,5 @@ package api
 // - ECDSA algorithm
 // - SECP256K1 curve
 // - Plain bytes-in, bytes-out (caller is responsible for generating/formatting/hashing the payload such as Eth TX at some version, or EIP-712 etc. prior to signing)
-const Algorithm_ECDSA_SECP256K1_PLAINBYTES = "ecdsa_secp256k1_plainbytes"
-const Algorithm_ZKP_BABYJUBJUB_PLAINBYTES = "zkp_babyjubjub_plainbytes"
+const ECDSA_SECP256K1_PLAINBYTES = "ecdsa_secp256k1_plainbytes"
+const ZKP_BABYJUBJUB_PLAINBYTES = "zkp_babyjubjub_plainbytes"

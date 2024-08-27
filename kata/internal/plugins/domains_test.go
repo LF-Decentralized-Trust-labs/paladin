@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -77,7 +78,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		PrepareDeploy: func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 			assert.Equal(t, "deploy_tx1_prepare", pdr.Transaction.TransactionId)
 			return &prototk.PrepareDeployResponse{
-				SigningAddress: "signing1",
+				Signer: confutil.P("signing1"),
 			}, nil
 		},
 		InitTransaction: func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
@@ -171,7 +172,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "signing1", pdr.SigningAddress)
+	assert.Equal(t, "signing1", *pdr.Signer)
 
 	itr, err := domainAPI.InitTransaction(ctx, &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{

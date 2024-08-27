@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/tyler-smith/go-bip39"
@@ -54,7 +55,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 		Index:      0,
 	})
@@ -64,7 +65,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)
@@ -90,7 +91,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "50'",
 		Index:      0,
 		Path: []*proto.ResolveKeyPathSegment{
@@ -116,14 +117,14 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 		Index:      0,
 	})
 	assert.Regexp(t, "PD011413", err)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "2147483648", // too big
 		Index:      0,
 	})
@@ -174,7 +175,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "E82D5A3F-D154-4C5B-A297-F8D49528DA73",
 		Index:      0x7FFFFFFF, // largest possible - not in hardened range
 		Path: []*proto.ResolveKeyPathSegment{
@@ -214,7 +215,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	resSign, err := sm.Sign(ctx, &proto.SignRequest{
 		KeyHandle: res.KeyHandle,
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
 	assert.NoError(t, err)

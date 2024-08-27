@@ -39,8 +39,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -363,7 +363,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 						{
 							Lookup:    "domain1/contract1/notary",
-							Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+							Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 						},
 					},
 				}, nil
@@ -377,11 +377,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					"symbol": "FT1"
 				}`, req.Transaction.ConstructorParamsJson)
 				assert.Len(t, req.ResolvedVerifiers, 1)
-				assert.Equal(t, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
+				assert.Equal(t, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
 				assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
-					SigningAddress: fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId),
+					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
 					Transaction: &prototk.BaseLedgerTransaction{
 						FunctionName: "newSIMTokenNotarized",
 						ParamsJson: fmt.Sprintf(`{
@@ -401,23 +401,23 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				requiredVerifiers := []*prototk.ResolveVerifierRequest{
 					{
 						Lookup:    req.Transaction.From,
-						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					},
 					{
 						Lookup:    notaryLocator,
-						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					},
 				}
 				if txInputs.From != "" {
 					requiredVerifiers = append(requiredVerifiers, &prototk.ResolveVerifierRequest{
 						Lookup:    txInputs.From,
-						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					})
 				}
 				if txInputs.To != "" && (txInputs.From == "" || txInputs.From != txInputs.To) {
 					requiredVerifiers = append(requiredVerifiers, &prototk.ResolveVerifierRequest{
 						Lookup:    txInputs.To,
-						Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+						Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					})
 				}
 				return &prototk.InitTransactionResponse{
@@ -478,7 +478,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						{
 							Name:            "sender",
 							AttestationType: prototk.AttestationType_SIGN,
-							Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+							Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 							Payload:         eip712Payload,
 							Parties: []string{
 								req.Transaction.From,
@@ -488,7 +488,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 							Name:            "notary",
 							AttestationType: prototk.AttestationType_ENDORSE,
 							// we expect an endorsement is of the form ENDORSER_SUBMIT - so we need an eth signing key to exist
-							Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+							Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 							Parties: []string{
 								notaryLocator,
 							},
@@ -525,7 +525,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				for _, ar := range req.Signatures {
 					if ar.AttestationType == prototk.AttestationType_SIGN &&
 						ar.Name == "sender" &&
-						ar.Verifier.Algorithm == api.Algorithm_ECDSA_SECP256K1_PLAINBYTES {
+						ar.Verifier.Algorithm == algorithms.ECDSA_SECP256K1_PLAINBYTES {
 						signerVerification = ar
 						break
 					}
