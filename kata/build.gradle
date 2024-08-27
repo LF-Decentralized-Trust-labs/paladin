@@ -166,7 +166,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/rpcbackendmocks'
     }
     mock {
-        inputDir "internal/engine"
+        inputDir 'internal/components'
         includeAll true
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
@@ -178,8 +178,8 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "internal/statestore"
-        name "StateStore"
+        inputDir 'internal/statestore'
+        name 'StateStore'
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
@@ -197,37 +197,37 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "internal/commsbus"
+        inputDir 'internal/commsbus'
         includeAll true
         outputPackage 'commsbusmocks'
         outputDir 'mocks/commsbusmocks'
     }
     mock {
-        inputDir "internal/components"
+        inputDir 'internal/components'
         includeAll true
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "pkg/blockindexer"
-        name "BlockIndexer"
+        inputDir 'pkg/blockindexer'
+        name 'BlockIndexer'
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "internal/plugins"
-        name "PluginController"
+        inputDir 'internal/plugins'
+        name 'PluginController'
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "internal/rpcserver"
-        name "RPCServer"
+        inputDir 'internal/rpcserver'
+        name 'RPCServer'
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir "pkg/ethclient"
+        inputDir 'pkg/ethclient'
         includeAll true
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
