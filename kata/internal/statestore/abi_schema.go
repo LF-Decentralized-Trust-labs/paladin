@@ -38,7 +38,7 @@ type abiSchema struct {
 	definition   *abi.Parameter
 	primaryType  string
 	typeSet      eip712.TypeSet
-	abiLabelInfo []*SchemaLabelInfo
+	abiLabelInfo []*schemaLabelInfo
 }
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
@@ -98,7 +98,7 @@ func (as *abiSchema) Persisted() *SchemaPersisted {
 	return as.SchemaPersisted
 }
 
-func (as *abiSchema) labelInfo() []*SchemaLabelInfo {
+func (as *abiSchema) labelInfo() []*schemaLabelInfo {
 	return as.abiLabelInfo
 }
 
@@ -136,7 +136,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
 			if err != nil {
 				return err
 			}
-			as.abiLabelInfo = append(as.abiLabelInfo, &SchemaLabelInfo{
+			as.abiLabelInfo = append(as.abiLabelInfo, &schemaLabelInfo{
 				label:         p.Name,
 				virtualColumn: fmt.Sprintf("l%d", labelIndex),
 				labelType:     labelType,

@@ -53,7 +53,7 @@ type SchemaPersisted struct {
 	Labels     []string        `json:"labels"      gorm:"type:text[]; serializer:json"`
 }
 
-type SchemaLabelInfo struct {
+type schemaLabelInfo struct {
 	label         string
 	virtualColumn string
 	labelType     labelType
@@ -74,7 +74,7 @@ type Schema interface {
 }
 
 type labelInfoAccess interface {
-	labelInfo() []*SchemaLabelInfo
+	labelInfo() []*schemaLabelInfo
 }
 
 func schemaCacheKey(domainID string, id types.Bytes32) string {
