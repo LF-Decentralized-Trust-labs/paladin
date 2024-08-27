@@ -140,7 +140,3 @@ func (t *transport) close() {
 	t.cancelCtx()
 	<-t.initDone
 }
-
-
-// Send(ctx context.Context, message TransportMessage, identity string, component string) error
-// 	Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error

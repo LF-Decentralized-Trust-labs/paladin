@@ -171,7 +171,7 @@ func (cm *componentManager) StartComponents() (err error) {
 
 	if err == nil {
 		err = cm.transportManager.Start()
-		cm.addIfStarted(cm.transportManager, err)
+		cm.addIfStarted(cm.transportManager, err, msgs.MsgComponentDomainStartError)
 	}
 
 	// start the plugin controller

@@ -90,7 +90,6 @@ func (br *TransportBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plu
 
 func (br *TransportBridge) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (res *prototk.ConfigureTransportResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_ConfigureTransport{ConfigureTransport: req}
 		},
@@ -106,7 +105,6 @@ func (br *TransportBridge) ConfigureTransport(ctx context.Context, req *prototk.
 
 func (br *TransportBridge) InitTransport(ctx context.Context, req *prototk.InitTransportRequest) (res *prototk.InitTransportResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_InitTransport{InitTransport: req}
 		},
@@ -122,7 +120,6 @@ func (br *TransportBridge) InitTransport(ctx context.Context, req *prototk.InitT
 
 func (br *TransportBridge) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (res *prototk.SendMessageResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
-		br.pluginId,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
 			dm.Message().RequestToTransport = &prototk.TransportMessage_SendMessage{SendMessage: req}
 		},
