@@ -95,11 +95,11 @@ message TransportMessage {
 
   // Request/reply exchanges initiated by the transport, to the paladin node
   oneof request_from_transport {
-    ReceiveMessageRequest receive_message = 3007;
+    ReceiveMessageRequest recieve = 3007;
   }
 
   oneof response_to_transport {
-    ReceiveMessageResponse receive_message_res = 3008;
+    ReceiveMessageResponse receive_res = 3008;
   }
 }
 

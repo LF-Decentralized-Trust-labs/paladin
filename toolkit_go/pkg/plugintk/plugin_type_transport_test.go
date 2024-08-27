@@ -65,12 +65,12 @@ func TestTransportCallback_ReceiveMessage(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
 	defer done()
 
-	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_ReceiveMessage{})] = func(dm *prototk.TransportMessage) {
-		dm.ResponseToTransport = &prototk.TransportMessage_ReceiveMessageRes{
-			ReceiveMessageRes: &prototk.ReceiveMessageResponse{},
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_Recieve{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_ReceiveRes{
+			ReceiveRes: &prototk.ReceiveMessageResponse{},
 		}
 	}
-	_, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{})
+	_, err := callbacks.Receive(ctx, &prototk.ReceiveMessageRequest{})
 	assert.NoError(t, err)
 }
 

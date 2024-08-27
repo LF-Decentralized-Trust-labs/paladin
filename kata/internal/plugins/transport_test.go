@@ -27,7 +27,7 @@ import (
 type testTransportManager struct {
 	transports          map[string]plugintk.Plugin
 	transportRegistered func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
-	recieveMessage      func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
+	receive             func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
 func (tp *testTransportManager) ConfiguredTransports() map[string]*PluginConfig {
@@ -41,8 +41,8 @@ func (tp *testTransportManager) ConfiguredTransports() map[string]*PluginConfig 
 	return pluginMap
 }
 
-func (tp *testTransportManager) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	return tp.recieveMessage(ctx, req)
+func (tp *testTransportManager) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+	return tp.receive(ctx, req)
 }
 
 func (tdm *testTransportManager) TransportRegistered(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
@@ -82,7 +82,7 @@ func TestTransportRequestsOK(t *testing.T) {
 		return tdm, nil
 	}
 
-	tdm.recieveMessage = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+	tdm.receive = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 		return &prototk.ReceiveMessageResponse{
 			// States: []*prototk.StoredState{
 			// 	{Id: "12345"},
@@ -97,8 +97,7 @@ func TestTransportRequestsOK(t *testing.T) {
 
 	transportAPI := <-waitForAPI
 
-	_, err := transportAPI.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{
-	})
+	_, err := transportAPI.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{})
 	assert.NoError(t, err)
 
 	_, err = transportAPI.InitTransport(ctx, &prototk.InitTransportRequest{

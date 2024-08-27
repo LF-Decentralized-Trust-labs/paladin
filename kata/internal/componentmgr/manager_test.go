@@ -90,6 +90,8 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.BlockIndexer())
 	assert.NotNil(t, cm.DomainManager())
 	assert.NotNil(t, cm.DomainRegistration())
+	assert.NotNil(t, cm.TransportManager())
+	assert.NotNil(t, cm.TransportRegistration())
 	assert.NotNil(t, cm.PluginController())
 	assert.NotNil(t, cm.Engine())
 
@@ -115,6 +117,10 @@ func TestStartOK(t *testing.T) {
 	mockDomainManager.On("Start").Return(nil)
 	mockDomainManager.On("Stop").Return()
 
+	mockTransportManager := componentmocks.NewTransportManager(t)
+	mockTransportManager.On("Start").Return(nil)
+	mockTransportManager.On("Stop").Return()
+
 	mockRPCServer := componentmocks.NewRPCServer(t)
 	mockRPCServer.On("Start").Return(nil)
 	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
@@ -139,6 +145,7 @@ func TestStartOK(t *testing.T) {
 	cm.blockIndexer = mockBlockIndexer
 	cm.pluginController = mockPluginController
 	cm.domainManager = mockDomainManager
+	cm.transportManager = mockTransportManager
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine
 

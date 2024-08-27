@@ -19,16 +19,24 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
+
+type TransportMessage struct {
+	MessageType string
+	Payload     string
+}
 
 type TransportManager interface {
 	ManagerLifecycle
 	plugins.TransportRegistration
 	GetTransportByName(ctx context.Context, name string) (Transport, error)
+
+	Send(ctx context.Context, message TransportMessage, identity string, component string) error
+	Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
 }
 
-// TODO: What is the input type here? Is it some form of serialised struct? Is it protobuf?
 type Transport interface {
-	Send(ctx context.Context, msg *any) error
-	ReceiveMessage(ctx context.Context, destination string, newMessageHandler func(chan *any))
+	Send(ctx context.Context, message string, transportDetails string, component string) error
+	Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }

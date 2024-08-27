@@ -31,7 +31,7 @@ type TransportAPI interface {
 }
 
 type TransportCallbacks interface {
-	ReceiveMessage(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
+	Receive(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
 type TransportFactory func(callbacks TransportCallbacks) TransportAPI
@@ -133,14 +133,14 @@ func (th *TransportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 	return th.Wrap(res), err
 }
 
-func (th *TransportHandler) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (th *TransportHandler) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	res, err := th.proxy.RequestFromPlugin(ctx, th.Wrap(&prototk.TransportMessage{
-		RequestFromTransport: &prototk.TransportMessage_ReceiveMessage{
-			ReceiveMessage: req,
+		RequestFromTransport: &prototk.TransportMessage_Recieve{
+			Recieve: req,
 		},
 	}))
-	return responseToPluginAs(ctx, res, err, func(msg *prototk.TransportMessage_ReceiveMessageRes) *prototk.ReceiveMessageResponse {
-		return msg.ReceiveMessageRes
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.TransportMessage_ReceiveRes) *prototk.ReceiveMessageResponse {
+		return msg.ReceiveRes
 	})
 }
 

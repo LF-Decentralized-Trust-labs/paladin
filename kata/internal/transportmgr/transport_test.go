@@ -49,8 +49,8 @@ package transportmgr
 // 	}
 // }
 
-// func newTestTransport(t *testing.T, transportConfig *prototk.TransportConfig) (context.Context, *transportManager, *testPlugin, func()) {
-// 	ctx, dm, _, done := newTestDomainManager(t, realDB, &DomainManagerConfig{
+// func newTestTe(t *testing.T, transportConfig *prototk.TransportConfig) (context.Context, *transportManager, *testPlugin, func()) {
+// 	ctx, dm, _, done := newTestTrans(t, realDB, &DomainManagerConfig{
 // 		Domains: map[string]*DomainConfig{
 // 			"test1": {
 // 				Config: yamlNode(t, `{"some":"conf"}`),

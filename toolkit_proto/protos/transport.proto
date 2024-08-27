@@ -29,22 +29,24 @@ message ConfigureTransportResponse {
 }
 
 message SendMessageRequest {
-    string transport_details = 1;
-    google.protobuf.Any body = 2;
+    string component = 1;
+    string transport_details = 2;
+    string body = 3;
 }
 
 message SendMessageResponse {
 }
 
 message ReceiveMessageRequest {
-    google.protobuf.Any body = 1;
+    string component = 1;
+    string body = 2;
 }
 
 message ReceiveMessageResponse {
 }
 
 message InitTransportRequest {
-    string transport_uuid = 1; // A runtime instance UUID of this domain, that it must supply on all requests
+    string transport_uuid = 1; // A runtime instance UUID of this transport, that it must supply on all requests
 }
 
 message InitTransportResponse {

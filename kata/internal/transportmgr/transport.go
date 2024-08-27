@@ -17,12 +17,14 @@ package transportmgr
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -34,16 +36,16 @@ type transport struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf          *TransportConfig
-	tm            *transportManager
-	id            uuid.UUID
-	name          string
-	api           plugins.TransportManagerToTransport
+	conf *TransportConfig
+	tm   *transportManager
+	id   uuid.UUID
+	name string
+	api  plugins.TransportManagerToTransport
 
-	stateLock              sync.Mutex
-	initialized            atomic.Bool
-	initRetry              *retry.Retry
-	config                 *prototk.TransportConfig
+	stateLock   sync.Mutex
+	initialized atomic.Bool
+	initRetry   *retry.Retry
+	config      *prototk.TransportConfig
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -51,13 +53,13 @@ type transport struct {
 
 func (tm *transportManager) newTransport(id uuid.UUID, name string, conf *TransportConfig, toTransport plugins.TransportManagerToTransport) *transport {
 	t := &transport{
-		tm:            tm,
-		conf:          conf,
-		initRetry:     retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:          name,
-		id:            id,
-		api:           toTransport,
-		initDone:      make(chan struct{}),
+		tm:        tm,
+		conf:      conf,
+		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:      name,
+		id:        id,
+		api:       toTransport,
+		initDone:  make(chan struct{}),
 	}
 	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "domain", t.name))
 	return t
@@ -101,11 +103,36 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (t *transport) Send(ctx context.Context, serializedMessage string, transportDetails string, component string) error {
+	if err := t.checkInit(ctx); err != nil {
+		return err
+	}
+
+	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
+		Body:             serializedMessage,
+		TransportDetails: transportDetails,
+		Component:        component,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Transport callback to the transport manager when a message is recieved
+func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	if err := t.checkInit(ctx); err != nil {
 		return nil, err
 	}
 
+	transportMessage := &components.TransportMessage{}
+	err := json.Unmarshal([]byte(req.Body), transportMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	t.tm.recieveExternalMessage(req.Component, *transportMessage)
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
@@ -113,3 +140,7 @@ func (t *transport) close() {
 	t.cancelCtx()
 	<-t.initDone
 }
+
+
+// Send(ctx context.Context, message TransportMessage, identity string, component string) error
+// 	Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error

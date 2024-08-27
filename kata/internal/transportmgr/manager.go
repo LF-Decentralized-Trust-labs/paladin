@@ -20,18 +20,11 @@ import (
 	"encoding/json"
 	"sync"
 
-
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
@@ -39,20 +32,25 @@ type transportManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf             *TransportManagerConfig
+	conf *TransportManagerConfig
 
-	transportsByID map[uuid.UUID]*transport
+	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
+
+	recvMessages map[string]chan components.TransportMessage
 }
 
 func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
 	return &transportManager{
-		bgCtx:            bgCtx,
-		conf:             conf,
+		bgCtx: bgCtx,
+		conf:  conf,
 	}
 }
 
 func (tm *transportManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+	// TransportManager does not rely on any other components during the pre-init phase (at the moment)
+	// for QoS we may need persistence in the future, and this will be the plug point for the registry
+	// when we have it
 	return nil, nil
 }
 
@@ -100,7 +98,7 @@ func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTra
 		existing = tm.transportsByName[name]
 	}
 
-	// Get the config for this domain
+	// Get the config for this transport
 	conf := tm.conf.Transports[name]
 	if conf == nil {
 		// Shouldn't be possible
@@ -124,3 +122,56 @@ func (tm *transportManager) GetTransportByName(ctx context.Context, name string)
 	}
 	return t, nil
 }
+
+// Internal callback method from the transports to the manager
+func (tm *transportManager) recieveExternalMessage(component string, msg components.TransportMessage) {
+	if tm.recvMessages[component] == nil {
+		tm.recvMessages[component] = make(chan components.TransportMessage)
+	}
+
+	tm.recvMessages[component] <- msg
+}
+
+// Send implements TransportManager
+func (tm *transportManager) Send(ctx context.Context, message components.TransportMessage, identity string, component string) error {
+	// TODO: Plug point for calling through to the registry
+	// TODO: Plugin determination
+
+	knownPlugin := "grpc"
+	transport, err := tm.GetTransportByName(ctx, knownPlugin)
+
+	serializedMessage, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Transport Details
+	err = transport.Send(ctx, string(serializedMessage), "", component)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Send implements TransportManager
+func (tm *transportManager) Recieve(component string, onMessage func(ctx context.Context, message components.TransportMessage) error) error {
+	if tm.recvMessages[component] == nil {
+		tm.recvMessages[component] = make(chan components.TransportMessage)
+	}
+
+	go func() {
+		for {
+			select {
+			case <-tm.bgCtx.Done():
+				return
+			case message := <-tm.recvMessages[component]:
+				{
+					onMessage(tm.bgCtx, message)
+				}
+			}
+		}
+	}()
+
+	return nil
+} 
