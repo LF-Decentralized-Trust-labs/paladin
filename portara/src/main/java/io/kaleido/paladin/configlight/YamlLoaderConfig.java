@@ -12,22 +12,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido.paladin;
 
-import com.sun.jna.Native;
-import com.sun.jna.Library;
+package io.kaleido.paladin.configlight;
 
-public class KataJNA {
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-    private PaladinGo paladinGo;
-
-    interface PaladinGo extends Library {
-        int Run(String socketAddress, String loaderUUID, String configFile, String engineName) ;
-        void Stop();
-    }
-
-    public static PaladinGo Load() {
-        return Native.load("kata", PaladinGo.class);
-    }
-
-}
+record YamlLoaderConfig(
+        @JsonProperty
+        Boolean debug
+) {}
