@@ -170,7 +170,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
     }
-        mock {
+    mock {
         inputDir 'internal/componentmgr'
         name 'ComponentManager'
         outputPackage 'componentmocks'
