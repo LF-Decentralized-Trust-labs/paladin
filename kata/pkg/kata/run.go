@@ -115,3 +115,7 @@ func Run(ctx context.Context, configFilePath string) {
 	}
 
 }
+
+func CommsBus() commsbus.CommsBus {
+	return commsBus
+}

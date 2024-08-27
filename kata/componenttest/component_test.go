@@ -25,9 +25,11 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
@@ -67,6 +69,38 @@ func TestRunTransactionSubmission(t *testing.T) {
 		Destination: testDestination,
 	})
 	require.NoError(t, err, "failed to call Listen")
+
+	// TODO: Currently the comms bus only functions correctly if you know your
+	// destination actually exists on the server side - but the `Listen()` is
+	// an async stream so you have no idea when it's been created.
+	//
+	// This workaround is the only way currently to find out your destination exists.
+	// By trying to subscribe to it, you get the same error below that the
+	// sender of your replies would, until the destination is set up:
+	// Error sending response: PD010600: Destination not found: test-destination
+	//
+	// If we continue to have a model for destinations like this in the future, we
+	// need a robust way to "create" destinations so you know they exist before you
+	// perform a request/reply exchange with them.
+	for {
+		_, err = client.SubscribeToTopic(ctx, &pb.SubscribeToTopicRequest{
+			Topic:       "anything-it-does-not-matter",
+			Destination: "test-destination",
+		})
+		if err != nil && strings.Contains(err.Error(), "PD010600") {
+			log.L(ctx).Infof("Destination still creating: %s", err)
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		assert.NoError(t, err)
+		break
+	}
+	// We just unsubscribe straight away
+	_, err = client.UnsubscribeFromTopic(ctx, &pb.UnsubscribeFromTopicRequest{
+		Topic:       "anything-it-does-not-matter",
+		Destination: "test-destination",
+	})
+	assert.NoError(t, err)
 
 	submitTransaction := transactionsPB.SubmitTransactionRequest{
 		From:            "fromID",
@@ -249,8 +283,24 @@ commsBus:
 	// Start the server
 	go kata.Run(ctx, configFile.Name())
 
-	// todo do we really need to sleep here?
-	time.Sleep(time.Second * 2)
+	// Wait until the engine is listening - otherwise our messages will be discarded
+	// TODO: This is a temporary situation as the transactional model of the engine forms
+waitForEngine:
+	for {
+		commsBus := kata.CommsBus()
+		time.Sleep(10 * time.Millisecond)
+		if commsBus == nil {
+			continue
+		}
+		destinations, err := commsBus.Broker().ListDestinations(ctx)
+		assert.NoError(t, err)
+		for _, d := range destinations {
+			if d == "kata-txn-engine" {
+				// The engine is listening
+				break waitForEngine
+			}
+		}
+	}
 
 	return socketAddress, func() {
 		os.Remove(configFile.Name())
