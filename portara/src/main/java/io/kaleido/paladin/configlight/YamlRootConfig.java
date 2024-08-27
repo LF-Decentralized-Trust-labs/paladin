@@ -13,9 +13,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- 
-package io.kaleido.kata;
-import github.com.kaleido_io.paladin.kata.Kata;
-public interface ResponseHandler {
-    void onResponse(Kata.Message response);
-}
+package io.kaleido.paladin.configlight;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+record YamlRootConfig(
+        @JsonProperty
+        YamlLogConfig log,
+        @JsonProperty
+        YamlLoaderConfig loader,
+        @JsonProperty
+        String tempDir
+) {}

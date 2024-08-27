@@ -12,21 +12,22 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package io.kaleido.paladin;
 
-package kata
+import com.sun.jna.Native;
+import com.sun.jna.Library;
 
-import (
-	"context"
+public class KataJNA {
 
-	"github.com/hyperledger/firefly-common/pkg/log"
-)
+    private PaladinGo paladinGo;
 
-func Stop(ctx context.Context, socketAddress string) {
-	log.L(ctx).Infof("Stop: %s", socketAddress)
-	if commsBus != nil {
-		err := commsBus.GRPCServer().Stop(ctx)
-		if err != nil {
-			log.L(ctx).Errorf("Failed to stop GRPC server: %s", err)
-		}
-	}
+    interface PaladinGo extends Library {
+        int Run(String socketAddress, String loaderUUID, String configFile, String engineName) ;
+        void Stop();
+    }
+
+    public static PaladinGo Load() {
+        return Native.load("kata", PaladinGo.class);
+    }
+
 }

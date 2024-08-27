@@ -18,6 +18,7 @@ import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
+        include "kata.go"
         include "internal/**/*.go"
         include "pkg/**/*.go"
         include "componenttest/**/*.go"
@@ -31,7 +32,7 @@ ext {
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
         'github.com/kaleido-io/paladin/toolkit/prototk',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/kata/testbed',
+        'github.com/kaleido-io/paladin/kata/pkg/testbed',
     ]
 }
 
@@ -42,7 +43,16 @@ configurations {
     toolkitProtoDefinitions {
         canBeConsumed = false
     }
+    libkata {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    protocFiles {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
+
 
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
@@ -89,7 +99,7 @@ task copyTestbedContracts(type: Copy) {
         include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
         include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
     }
-    into 'testbed/abis'
+    into 'pkg/testbed/abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }
@@ -161,6 +171,12 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
+        inputDir 'internal/componentmgr'
+        name 'ComponentManager'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
         inputDir 'internal/statestore'
         name 'StateStore'
         outputPackage 'componentmocks'
@@ -204,7 +220,8 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
     }    
 }
 
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -251,21 +268,6 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
-}
-
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
-    workingDir '.'
-
-    inputs.files(goFiles)
-    inputs.dir("testbed")
-    outputs.dir("bin")
-
-    environment("CGO_ENABLED", "1")
-
-    executable 'go'
-    args 'build'
-    args '-o', 'bin/'
-    args './testbed'
 }
 
 task buildTestPluginsSharedLibraryA(type:Exec) {
@@ -335,7 +337,7 @@ abstract class ComponentTest extends Exec {
         workingDir '.'
         executable 'go'
         args 'test'
-        args './componenttest', './testbed'
+        args './componenttest', './pkg/testbed'
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
@@ -449,19 +451,10 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
-    dependsOn tasks.buildTestbed
     dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage
     dependsOn tasks.checkCoverage
-}
-
-configurations {
-    libkata
-    protocFiles {
-        canBeConsumed = true
-        canBeResolved = false
-    }
 }
 
 tasks.register('zipProtocFiles', Zip) {  
@@ -484,3 +477,4 @@ artifacts {
 dependencies {
     libkata files(buildSharedLibrary)
 }
+

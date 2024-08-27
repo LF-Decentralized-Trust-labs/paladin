@@ -18,24 +18,39 @@ import (
 	"C"
 )
 import (
-	"context"
+	"fmt"
 	"os"
-	"strconv"
+	"runtime/debug"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
 )
 
-var rootCtx = log.WithLogField(context.Background(), "pid", strconv.Itoa(os.Getpid()))
-
+// Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function
+//
 //export Run
-func Run(socketAddressPtr *C.char) {
-	kata.Run(rootCtx, C.GoString(socketAddressPtr))
+func Run(socketAddressPtr, loaderUUIDPtr, configFilePtr, engineNamePtr *C.char) (rc int) {
+	defer func() {
+		panicked := recover()
+		if panicked != nil {
+			// print the stack
+			fmt.Fprintf(os.Stderr, "%s\n", debug.Stack())
+			// set the rc
+			rc = 1
+		}
+	}()
+	kRC := kata.Run(
+		C.GoString(socketAddressPtr),
+		C.GoString(loaderUUIDPtr),
+		C.GoString(configFilePtr),
+		C.GoString(engineNamePtr),
+	)
+	rc = int(kRC)
+	return
 }
 
 //export Stop
-func Stop(socketAddressPtr *C.char) {
-	kata.Stop(rootCtx, C.GoString(socketAddressPtr))
+func Stop() {
+	kata.Stop()
 }
 
 func main() {}

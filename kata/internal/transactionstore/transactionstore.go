@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"

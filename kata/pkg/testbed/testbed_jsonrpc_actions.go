@@ -13,14 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package main
+package testbed
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/components"
@@ -28,11 +27,15 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 func (tb *testbed) initRPC() {
 	tb.rpcModule = rpcserver.NewRPCModule("testbed").
+
+		// Deploy a smart contract and get the deployed address
+		Add("testbed_listDomains", tb.rpcListDomains()).
 
 		// Deploy a smart contract and get the deployed address
 		Add("testbed_deployBytecode", tb.rpcDeployBytecode()).
@@ -59,6 +62,16 @@ func (tb *testbed) initRPC() {
 		Add("testbed_invoke", tb.rpcTestbedInvoke())
 }
 
+func (tb *testbed) rpcListDomains() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod0(func(ctx context.Context) ([]string, error) {
+		res := []string{}
+		for name := range tb.c.DomainManager().ConfiguredDomains() {
+			res = append(res, name)
+		}
+		return res, nil
+	})
+}
+
 func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
@@ -68,7 +81,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	) (*ethtypes.Address0xHex, error) {
 
 		var constructor ethclient.ABIFunctionClient
-		ec := tb.components.EthClientFactory().HTTPClient()
+		ec := tb.c.EthClientFactory().HTTPClient()
 		abic, err := ec.ABI(ctx, abi)
 		if err == nil {
 			constructor, err = abic.Constructor(ctx, bytecode)
@@ -83,7 +96,7 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 			Input(params).
 			SignAndSend()
 		if err == nil {
-			tx, err = tb.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+			tx, err = tb.c.BlockIndexer().WaitForTransaction(ctx, *txHash)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to send transaction: %s", err)
@@ -99,7 +112,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		constructorParams types.RawJSON,
 	) (*types.EthAddress, error) {
 
-		domain, err := tb.components.DomainManager().GetDomainByName(ctx, domainName)
+		domain, err := tb.c.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +127,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		keyMgr := tb.components.KeyManager()
+		keyMgr := tb.c.KeyManager()
 		tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 		for i, v := range tx.RequiredVerifiers {
 			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
@@ -148,7 +161,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 		// Rather than just inspecting the TX - we wait for the domain to index the event, such that
 		// we know it's in the map by the time we return.
-		psc, err := tb.components.DomainManager().WaitForDeploy(ctx, tx.ID)
+		psc, err := tb.c.DomainManager().WaitForDeploy(ctx, tx.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +175,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		invocation types.PrivateContractInvoke,
 	) (bool, error) {
 
-		psc, err := tb.components.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
+		psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
 		if err != nil {
 			return false, err
 		}
@@ -186,7 +199,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		}
 
 		// Gather the addresses - in the testbed we assume these all to be local
-		keyMgr := tb.components.KeyManager()
+		keyMgr := tb.c.KeyManager()
 		tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
 		for i, v := range tx.PreAssembly.RequiredVerifiers {
 			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)

@@ -13,11 +13,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-syntax = "proto3";
+package io.kaleido.paladin.configlight;
 
-package github.com.kaleido_io.paladin.kata;
-option go_package = "pkg/proto/plugins";
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 
-message CreateInstance {
-    string messageDestination = 1;
-}
+import java.io.File;
+import java.io.IOException;
+
+
+public record RuntimeInfo(String instanceUUID, String socketFilename) {}

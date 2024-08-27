@@ -24,9 +24,9 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type RPCServer interface {

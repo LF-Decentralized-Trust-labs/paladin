@@ -62,7 +62,7 @@ plugins:
 	configFile.Close()
 
 	// Start the server
-	go kata.Run(ctx, configFile.Name())
+	go kata.TestCommsBusRun(ctx, configFile.Name())
 
 	// todo do we really need to sleep here?
 	time.Sleep(time.Second * 2)

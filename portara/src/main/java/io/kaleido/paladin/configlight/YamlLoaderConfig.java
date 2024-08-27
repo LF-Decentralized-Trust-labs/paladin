@@ -13,27 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-syntax = "proto3";
+package io.kaleido.paladin.configlight;
 
-package github.com.kaleido_io.paladin.kata.transaction;
-option go_package = "pkg/proto/transaction";
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-message SubmitTransactionRequest {
-    string from = 1;
-    string contractAddress = 2;
-    string idempotencyKey = 3;
-    oneof payload {
-      string payloadJSON = 16;
-      string payloadRLP = 17;
-    }
-}
-
-message SubmitTransactionResponse {
-    string id = 1;
-}
-
-message SubmitTransactionError {
-    string id = 1;
-    string code = 2;
-    string reason = 3;
-}
+record YamlLoaderConfig(
+        @JsonProperty
+        Boolean debug
+) {}

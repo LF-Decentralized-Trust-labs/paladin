@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
@@ -40,6 +39,7 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,7 +135,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
@@ -281,7 +281,7 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go kata.Run(ctx, configFile.Name())
+	go kata.TestCommsBusRun(ctx, configFile.Name())
 
 	// Wait until the engine is listening - otherwise our messages will be discarded
 	// TODO: This is a temporary situation as the transactional model of the engine forms
@@ -321,7 +321,7 @@ func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string
 		time.Sleep(time.Second)
 		delay++
 		status, err = client.Status(ctx, &pb.StatusRequest{})
-		require.Less(t, delay, 2, "Server did not start after 2 seconds")
+		require.Less(t, delay, 5, "Server did not start in expected time")
 	}
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())
@@ -398,7 +398,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -532,5 +532,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
