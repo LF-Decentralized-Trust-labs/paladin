@@ -1,0 +1,37 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+syntax = "proto3";
+
+package github.com.kaleido_io.paladin.kata.engine;
+option go_package = "pkg/proto/engine";
+import "google/protobuf/any.proto";
+
+//A message that pertains to a specific contract orchestrator in the engine
+message ContractMessage {
+    string id = 1;
+    string contractAddress = 2;
+    string transactionId = 3;
+    google.protobuf.Any data = 4;
+}
+
+//A message that pertains to a specific stage in the engine
+message StageMessage {
+    string id = 1;
+    string contractAddress = 2;
+    string transactionId = 3;
+    string stage = 4;
+    google.protobuf.Any data = 5;
+}

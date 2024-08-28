@@ -160,7 +160,7 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		stopProcess:                  make(chan bool, 1),
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, components.TransportManager(), domainAPI), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
 		&stages.AttestationStage{},

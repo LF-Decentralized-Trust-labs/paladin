@@ -79,18 +79,8 @@ type IdentityResolver interface {
 	GetDispatchAddress(preferredAddresses []string) string
 }
 
-type MockTransportManager struct {
-}
-
-func (mtm *MockTransportManager) SyncExchange() {
-}
-
-type TransportManager interface {
-	SyncExchange()
-}
-
 type StageFoundationService interface {
-	TransportManager() TransportManager
+	TransportManager() components.TransportManager
 	IdentityResolver() IdentityResolver
 	DependencyChecker() DependencyChecker
 	Sequencer() Sequencer
@@ -109,7 +99,7 @@ type PaladinStageFoundationService struct {
 	nodeAndWalletLookUp IdentityResolver
 	sequencer           Sequencer
 	domainAPI           components.DomainSmartContract
-	transport           TransportManager
+	transport           components.TransportManager
 }
 
 func (psfs *PaladinStageFoundationService) DependencyChecker() DependencyChecker {
@@ -128,7 +118,7 @@ func (psfs *PaladinStageFoundationService) Sequencer() Sequencer {
 	return psfs.sequencer
 }
 
-func (psfs *PaladinStageFoundationService) TransportManager() TransportManager {
+func (psfs *PaladinStageFoundationService) TransportManager() components.TransportManager {
 	return psfs.transport
 }
 
@@ -138,7 +128,7 @@ func (psfs *PaladinStageFoundationService) DomainAPI() components.DomainSmartCon
 
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 	stateStore statestore.StateStore,
-	nodeAndWalletLookUp IdentityResolver, transport TransportManager, domainAPI components.DomainSmartContract) StageFoundationService {
+	nodeAndWalletLookUp IdentityResolver, transport components.TransportManager, domainAPI components.DomainSmartContract) StageFoundationService {
 	return &PaladinStageFoundationService{
 		dependencyChecker:   dependencyChecker,
 		stateStore:          stateStore,

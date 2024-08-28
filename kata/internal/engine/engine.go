@@ -17,7 +17,6 @@ package engine
 
 import (
 	"context"
-	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
@@ -26,6 +25,8 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	pbEngine "github.com/kaleido-io/paladin/kata/pkg/proto/engine"
+	"google.golang.org/protobuf/proto"
 
 	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -154,42 +155,55 @@ func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEve
 	} else {
 		targetOrchestrator.HandleEvent(ctx, stageEvent)
 	}
-
 }
 
 func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
 	e.done = make(chan struct{})
-	mockEvents := make(chan *types.StageEvent)
-	go generateMockEvents(ctx, mockEvents)
-	go e.listenerLoop(ctx, mockEvents)
+
+	err := e.components.TransportManager().RegisterReceiver(func(ctx context.Context, message components.TransportMessage) error {
+		//Send the event to the orchestrator for the contract and any transaction manager for the signing key
+		messagePayload := message.Payload
+		stageMessage := &pbEngine.StageMessage{}
+
+		err := proto.Unmarshal(messagePayload, stageMessage)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal message payload: %s", err)
+			return i18n.WrapError(ctx, err, msgs.MsgEngineParseFailed)
+		}
+		if stageMessage.ContractAddress == "" {
+			log.L(ctx).Errorf("Invalid message: contract address is empty")
+			return i18n.NewError(ctx, msgs.MsgEngineInvalidMessage)
+		}
+
+		dataProto, err := stageMessage.Data.UnmarshalNew()
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal from any: %s", err)
+			return i18n.WrapError(ctx, err, msgs.MsgEngineParseFailed)
+		}
+		orchestrator, ok := e.orchestrators[stageMessage.ContractAddress]
+		if !ok {
+			//TODO should attempt to load the orchestrator from the database if it's not in memory
+			log.L(ctx).Errorf("No orchestrator found for contract address %s", stageMessage.ContractAddress)
+			return i18n.NewError(ctx, msgs.MsgEngineInternalError)
+		}
+
+		orchestrator.HandleEvent(ctx, &types.StageEvent{
+			ContractAddress: stageMessage.ContractAddress,
+			TxID:            stageMessage.TransactionId,
+			Stage:           stageMessage.Stage,
+			Data:            dataProto,
+		})
+
+		return nil
+	})
+	if err != nil {
+		log.L(ctx).Errorf("Failed to start event listener: %s", err)
+		panic(err)
+	}
+
+	go func() {
+		<-done
+		//TODO do we need to tell the transport manager that we are done listening?
+	}()
 	return done
-}
-
-func generateMockEvents(ctx context.Context, receiver chan<- *types.StageEvent) {
-	tick := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-tick.C:
-			receiver <- &types.StageEvent{
-				// TODO: figure out how to mock UUID of the event
-				Stage: "test",
-				TxID:  "test",
-				Data:  "test",
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (e *engine) listenerLoop(ctx context.Context, mockEventsDoesNotHaveToBeAChannel <-chan *types.StageEvent) {
-	defer close(e.done)
-	for {
-		select {
-		case mevent := <-mockEventsDoesNotHaveToBeAChannel:
-			e.HandleNewEvents(ctx, mevent)
-		case <-ctx.Done():
-			return
-		}
-	}
 }

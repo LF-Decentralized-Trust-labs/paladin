@@ -24,11 +24,14 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	pbEngine "github.com/kaleido-io/paladin/kata/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Attempt to assert the behaviour of the Engine as a whole component in isolation from the rest of the system
@@ -83,6 +86,22 @@ func TestEngine(t *testing.T) {
 	mDomainMgr := componentmocks.NewDomainManager(t)
 	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainSmartContract, nil)
 
+	mTransportManager := componentmocks.NewTransportManager(t)
+	sentEndorsementRequest := make(chan struct{}, 1)
+	mTransportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		sentEndorsementRequest <- struct{}{}
+	}).Return(nil).Maybe()
+
+	onMessage := func(ctx context.Context, message components.TransportMessage) error {
+		assert.Fail(t, "onMessage has not been set")
+		return nil
+	}
+	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
+	mTransportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
+
+	}).Return(nil).Maybe()
+
 	mStateStore := componentmocks.NewStateStore(t)
 	//TODO do we need this?
 	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
@@ -93,6 +112,7 @@ func TestEngine(t *testing.T) {
 
 	mComponents.On("StateStore").Return(mStateStore).Maybe()
 	mComponents.On("DomainManager").Return(mDomainMgr).Maybe()
+	mComponents.On("TransportManager").Return(mTransportManager).Maybe()
 
 	err := engine.Start()
 	assert.NoError(t, err)
@@ -111,7 +131,7 @@ func TestEngine(t *testing.T) {
 
 	//poll until the transaction is initialised
 	select {
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(100000 * time.Millisecond):
 		assert.Fail(t, "Timed out waiting for transaction to be initialised")
 	case <-initialised:
 		break
@@ -119,11 +139,68 @@ func TestEngine(t *testing.T) {
 
 	//poll until the transaction is assembled
 	select {
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(100000 * time.Millisecond):
 		assert.Fail(t, "Timed out waiting for transaction to be assembled")
 	case <-assembled:
 		break
 	}
+
+	//poll until the endorsement request has been sent
+	select {
+	case <-time.After(100000 * time.Millisecond):
+		assert.Fail(t, "Timed out waiting for endorsement request to be sent")
+	case <-sentEndorsementRequest:
+		break
+	}
+
+	attestationResult := prototk.AttestationResult{
+		Name:            "notary",
+		AttestationType: prototk.AttestationType_ENDORSE,
+		Payload:         types.RandBytes(32),
+	}
+
+	attestationResultAny, err := anypb.New(&attestationResult)
+	assert.NoError(t, err)
+
+	//for now, while endorsement is a stage, we will send the endorsement back as a stage message
+	engineMessage := pbEngine.StageMessage{
+		ContractAddress: domainAddressString,
+		TransactionId:   txID,
+		Data:            attestationResultAny,
+		Stage:           "attestation",
+	}
+
+	engineMessageBytes, err := proto.Marshal(&engineMessage)
+	assert.NoError(t, err)
+
+	//now send the endorsement back
+	err = onMessage(ctx, components.TransportMessage{
+		MessageType: "endorsement",
+		Payload:     engineMessageBytes,
+	})
+	assert.NoError(t, err)
+
+	timeout := time.After(2 * time.Second)
+	tick := time.Tick(100 * time.Millisecond)
+
+	status := func() string {
+		for {
+			select {
+			case <-timeout:
+				// Timeout reached, exit the loop
+				assert.Fail(t, "Timed out waiting for transaction to be endorsed")
+				return "timeout"
+			case <-tick:
+				s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
+				if s.Status == "endorsed" {
+					return s.Status
+				}
+				assert.NoError(t, err)
+			}
+		}
+	}()
+
+	assert.Equal(t, status, "endorsed")
 
 }
 
