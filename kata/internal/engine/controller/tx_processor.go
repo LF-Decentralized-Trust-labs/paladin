@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
@@ -41,6 +43,7 @@ type TxProcessor interface {
 	// stage outputs management
 	AddStageEvent(ctx context.Context, stageEvent *types.StageEvent)
 	Init(ctx context.Context)
+	GetTxStatus(ctx context.Context) (types.TxStatus, error)
 }
 
 type StageContext struct {
@@ -200,4 +203,32 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 		ts.PerformActionForStageAsync(ctx)
 	}
 	// other wise, the stage told the processor to wait for async events
+}
+
+func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (types.TxStatus, error) {
+	stageContext := ts.GetStageContext(ctx)
+	if stageContext != nil {
+		var status string
+		switch stageContext.Stage {
+		case "assemble":
+			status = "assembling"
+		case "attestation":
+			tx := ts.tsm.HACKGetPrivateTx()
+			//temporary status calculation until we have a sequence incorporated and its handover to the dispatcher
+			if tx.PostAssembly != nil && len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan) {
+				status = "endorsing"
+			} else {
+				status = "endorsed"
+			}
+		case "dispatch":
+			status = "dispatching"
+		}
+
+		return types.TxStatus{
+			TxID:   ts.tsm.GetTxID(ctx),
+			Status: status,
+		}, nil
+	}
+	//TODO what error condition can cause this?
+	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }

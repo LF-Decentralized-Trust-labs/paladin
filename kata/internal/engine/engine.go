@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+
 	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
@@ -51,7 +52,7 @@ func (mpm *MockPlugins) Validate(ctx context.Context, contractAddress string, ts
 type Engine interface {
 	HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
-	GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error)
+	GetTxStatus(ctx context.Context, domainAddress string, txID string) (status types.TxStatus, err error)
 	Name() string
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
@@ -114,20 +115,20 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	}
 	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
 	// TODO how to measure fairness/ per From address / contract address / something else
-	if e.orchestrators[txInstance.GetContractAddress(ctx)] == nil {
-		e.orchestrators[txInstance.GetContractAddress(ctx)] = orchestrator.NewOrchestrator(ctx, txInstance.GetContractAddress(ctx) /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components, domainAPI)
-		orchestratorDone, err := e.orchestrators[txInstance.GetContractAddress(ctx)].Start(ctx)
+	if e.orchestrators[contractAddr.String()] == nil {
+		e.orchestrators[contractAddr.String()] = orchestrator.NewOrchestrator(ctx, contractAddr.String() /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components, domainAPI)
+		orchestratorDone, err := e.orchestrators[contractAddr.String()].Start(ctx)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", txInstance.GetContractAddress(ctx), err)
+			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", contractAddr.String(), err)
 			return "", err
 		}
 
 		go func() {
 			<-orchestratorDone
-			log.L(ctx).Infof("Orchestrator for contract %s has stopped", txInstance.GetContractAddress(ctx))
+			log.L(ctx).Infof("Orchestrator for contract %s has stopped", contractAddr.String())
 		}()
 	}
-	oc := e.orchestrators[txInstance.GetContractAddress(ctx)]
+	oc := e.orchestrators[contractAddr.String()]
 	queued := oc.ProcessNewTransaction(ctx, txInstance)
 	if queued {
 		log.L(ctx).Debugf("Transaction with ID %s queued in database", txInstance.GetTxID(ctx))
@@ -135,11 +136,15 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	return txInstance.GetTxID(ctx), nil
 }
 
-func (e *engine) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
-	return types.TxStatus{
-		TxID:   txID,
-		Status: "initialized",
-	}, nil
+func (e *engine) GetTxStatus(ctx context.Context, domainAddress string, txID string) (status types.TxStatus, err error) {
+	targetOrchestrator := e.orchestrators[domainAddress]
+	if targetOrchestrator == nil {
+		//TODO should be valid to query the status of a transaction that belongs to a domain instance that is not currently active
+		return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
+	} else {
+		return targetOrchestrator.GetTxStatus(ctx, txID)
+	}
+
 }
 
 func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {

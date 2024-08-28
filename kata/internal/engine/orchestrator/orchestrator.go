@@ -21,10 +21,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
@@ -360,4 +362,14 @@ func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
 	case oc.orchestrationEvalRequestChan <- true:
 	default:
 	}
+}
+
+func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
+	oc.incompleteTxProcessMapMutex.Lock()
+	defer oc.incompleteTxProcessMapMutex.Unlock()
+	if txProc, ok := oc.incompleteTxSProcessMap[txID]; ok {
+		return txProc.GetTxStatus(ctx)
+	}
+	//TODO should be possible to query the status of a transaction that is not inflight
+	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }
