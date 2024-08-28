@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type AssembleStage struct{}
@@ -37,32 +38,56 @@ func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg trans
 	return nil
 }
 
+type assembleComplete struct {
+}
+
 func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+
+	unprocessedStageEvents = []*types.StageEvent{}
 	if len(stageEvents) > 0 {
-		log.L(ctx).Errorf("Assemble stage does not expect any events, but got %d", len(stageEvents))
-		return stageEvents, nil, types.NextStepWait
+		for _, event := range stageEvents {
+
+			switch event.Data.(type) {
+			case assembleComplete:
+				return nil, nil, types.NextStepNewStage
+			default:
+				unprocessedStageEvents = append(unprocessedStageEvents, event)
+			}
+		}
+		return stageEvents, nil, types.NextStepNewStage
 	}
 	return nil, nil, types.NextStepWait
 }
 
 func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+	tx := tsg.HACKGetPrivateTx()
 
 	// if we have a private transaction but do not have a post assemble payload, we are in the assemble stage
-	return tsg.HACKGetPrivateTx() != nil && tsg.HACKGetPrivateTx().PostAssembly == nil
+	return tx != nil && tx.PostAssembly == nil
 
 }
 
 func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+	// temporary hack.  components.PrivateTx should be passed in as a parameter
+	tx := tsg.HACKGetPrivateTx()
 	//TODO assembly must be single threaded ( at least single thread per domain contract)
 	// can we assume that we are already on a single thread or do we need to delegate to a single thread here
 	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
-	err := sfs.DomainAPI().AssembleTransaction(ctx, tsg.HACKGetPrivateTx())
+	err := sfs.DomainAPI().AssembleTransaction(ctx, tx)
 	if err != nil {
 		log.L(ctx).Errorf("AssembleTransaction failed: %s", err)
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEngineAssembleError)
 	}
-	return nil, nil
+	switch tx.PostAssembly.AssemblyResult {
+	case prototk.AssembleTransactionResponse_OK:
+		return assembleComplete{}, nil
+
+	default:
+		log.L(ctx).Errorf("assemble result was %s", tx.PostAssembly.AssemblyResult)
+		return nil, i18n.NewError(ctx, msgs.MsgEngineAssembleError, tx.PostAssembly.AssemblyResult)
+
+	}
 }
