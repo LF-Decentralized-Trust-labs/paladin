@@ -224,12 +224,13 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 		if sc != nil {
 			if sc.Stage == "remove" {
 				// no longer in an incomplete stage
-				delete(oc.incompleteTxSProcessMap, txID)
 				oc.totalCompleted = oc.totalCompleted + 1
 				// hasActivity = true
 				log.L(ctx).Debugf("Orchestrator evaluate and process, marking %s as complete.", txID)
+				break
 			} else if sc.Stage == "suspend" {
 				log.L(ctx).Debugf("Orchestrator evaluate and process, removed suspended tx %s", txID)
+				break
 			} else {
 				stageCounts[sc.Stage] = stageCounts[sc.Stage] + 1
 			}
@@ -237,6 +238,7 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 			stageCounts["queued"] = stageCounts["queued"] + 1
 
 		}
+		oc.incompleteTxSProcessMap[txID] = txp
 	}
 
 	log.L(ctx).Debugf("Orchestrator evaluate and process, stage counts: %+v", stageCounts)
