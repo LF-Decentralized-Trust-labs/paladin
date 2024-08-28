@@ -25,7 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
@@ -138,7 +137,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore, domainAPI components.DomainSmartContract) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.AllComponents, domainAPI components.DomainSmartContract) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -159,7 +158,7 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		stopProcess:                  make(chan bool, 1),
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
 		&stages.AttestationStage{},
