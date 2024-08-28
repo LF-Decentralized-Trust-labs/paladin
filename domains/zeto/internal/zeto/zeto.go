@@ -21,19 +21,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"gopkg.in/yaml.v2"
 )
 
@@ -83,17 +78,11 @@ type SolidityLinkReference struct {
 type Zeto struct {
 	Interface DomainInterface
 
-	config       *Config
-	conn         *grpc.ClientConn
-	dest         *string
-	client       pb.KataMessageServiceClient
-	stream       pb.KataMessageService_ListenClient
-	stopListener context.CancelFunc
-	done         chan bool
-	chainID      int64
-	domainID     string
-	coinSchema   *pb.StateSchema
-	replies      *replyTracker
+	config     *Config
+	callbacks  plugintk.DomainCallbacks
+	chainID    int64
+	domainID   string
+	coinSchema *pb.StateSchema
 }
 
 type ZetoDomainConfig struct {
@@ -163,203 +152,15 @@ func linkBytecode(artifact SolidityBuildWithLinks, libraries map[string]string) 
 	return hex.DecodeString(strings.TrimPrefix(bytecode, "0x"))
 }
 
-func New(ctx context.Context, addr string) (*Zeto, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	conn, err := grpc.NewClient(addr, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
-	}
+func New(callbacks plugintk.DomainCallbacks) *Zeto {
 	zeto := &Zeto{
-		conn:   conn,
-		client: pb.NewKataMessageServiceClient(conn),
-	}
-	zeto.replies = &replyTracker{
-		inflight: make(map[string]*inflightRequest),
-		client:   zeto.client,
+		callbacks: callbacks,
 	}
 	zeto.Interface = zeto.getInterface()
-	return zeto, zeto.waitForReady(ctx, 2*time.Second)
+	return zeto
 }
 
-func (z *Zeto) waitForReady(ctx context.Context, deadline time.Duration) error {
-	status, err := z.client.Status(ctx, &pb.StatusRequest{})
-	end := time.Now().Add(deadline)
-	for !status.GetOk() {
-		time.Sleep(time.Second)
-		if time.Now().After(end) {
-			return fmt.Errorf("server was not ready after %s", deadline)
-		}
-		status, err = z.client.Status(ctx, &pb.StatusRequest{})
-	}
-	if err != nil {
-		return err
-	}
-	if !status.GetOk() {
-		return fmt.Errorf("got non-OK status from server")
-	}
-	return nil
-}
-
-func (z *Zeto) Close() error {
-	if z.stream != nil {
-		if err := z.stream.CloseSend(); err != nil {
-			return err
-		}
-		z.done <- true
-		z.stopListener()
-	}
-	if z.conn != nil {
-		if err := z.conn.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (z *Zeto) Listen(ctx context.Context, dest string) error {
-	z.dest = &dest
-	z.done = make(chan bool, 1)
-
-	var err error
-	var listenerContext context.Context
-
-	listenerContext, z.stopListener = context.WithCancel(ctx)
-	z.stream, err = z.client.Listen(listenerContext, &pb.ListenRequest{Destination: dest})
-	if err != nil {
-		return fmt.Errorf("failed to listen for domain events: %v", err)
-	}
-
-	handlerCtx := log.WithLogField(ctx, "role", "handler")
-	go z.handler(handlerCtx)
-	return nil
-}
-
-func (z *Zeto) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
-	body, err := anypb.New(reply)
-	if err == nil {
-		_, err = z.client.SendMessage(ctx, &pb.Message{
-			Destination:   *message.ReplyTo,
-			CorrelationId: &message.Id,
-			Body:          body,
-			ReplyTo:       z.dest,
-		})
-	}
-	return err
-}
-
-func (z *Zeto) handler(ctx context.Context) {
-	for {
-		in, err := z.stream.Recv()
-		select {
-		case <-z.done:
-			return
-		default:
-			// do nothing
-		}
-		if err != nil {
-			log.L(ctx).Errorf("Error receiving message - terminating handler loop: %v", err)
-			return
-		}
-
-		// TODO: should probably have a finite number of workers?
-		// Cannot be synchronous, as some calls ("assemble") may need to make
-		// their own additional calls ("find states") and receive the results
-		go func() {
-			reply, err := z.handleMessage(ctx, in)
-			if err != nil {
-				reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
-				err = nil
-			}
-			if reply != nil {
-				if err = z.sendReply(ctx, in, reply); err != nil {
-					log.L(ctx).Errorf("Error sending message reply: %s", err)
-				}
-			}
-		}()
-	}
-}
-
-func (z *Zeto) handleMessage(ctx context.Context, message *pb.Message) (reply proto.Message, err error) {
-	body, err := message.Body.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	inflight := z.replies.getInflight(message.CorrelationId)
-	if inflight != nil {
-		inflight.done <- message
-		return nil, nil
-	}
-
-	switch req := body.(type) {
-	case *pb.ConfigureDomainRequest:
-		log.L(ctx).Infof("Received ConfigureDomainRequest")
-		return z.configure(req)
-
-	case *pb.InitDomainRequest:
-		log.L(ctx).Infof("Received InitDomainRequest")
-		return z.init(req)
-
-	case *pb.InitDeployTransactionRequest:
-		log.L(ctx).Infof("Received InitDeployTransactionRequest")
-		_, err := z.validateDeploy(req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.initDeploy()
-
-	case *pb.PrepareDeployTransactionRequest:
-		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		params, err := z.validateDeploy(req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.prepareDeploy(params, req)
-
-	case *pb.InitTransactionRequest:
-		log.L(ctx).Infof("Received InitTransactionRequest")
-		tx, err := z.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
-
-	case *pb.AssembleTransactionRequest:
-		log.L(ctx).Infof("Received AssembleTransactionRequest")
-		tx, err := z.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
-
-	case *pb.EndorseTransactionRequest:
-		log.L(ctx).Infof("Received EndorseTransactionRequest")
-		tx, err := z.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
-
-	case *pb.PrepareTransactionRequest:
-		log.L(ctx).Infof("Received PrepareTransactionRequest")
-		tx, err := z.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return z.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
-
-	case *pb.DomainAPIError:
-		log.L(ctx).Errorf("Received error: %s", req.ErrorMessage)
-		return nil, nil
-
-	default:
-		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(req))
-		return nil, nil
-	}
-}
-
-func (z *Zeto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
+func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
 	var config Config
 	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 	if err != nil {
@@ -396,25 +197,36 @@ func (z *Zeto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 			PrivateContractAbiJson: string(zetoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
+			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
+				SubmitMode: pb.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
+			},
 		},
 	}, nil
 }
 
-func (z *Zeto) init(req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
+func (z *Zeto) InitDomain(ctx context.Context, req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
 	z.domainID = req.DomainUuid
 	z.coinSchema = req.AbiStateSchemas[0]
 	return &pb.InitDomainResponse{}, nil
 }
 
-func (z *Zeto) initDeploy() (*pb.InitDeployTransactionResponse, error) {
-	return &pb.InitDeployTransactionResponse{
+func (z *Zeto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.InitDeployResponse, error) {
+	_, err := z.validateDeploy(req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.InitDeployResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			// TODO: should we resolve anything?
 		},
 	}, nil
 }
 
-func (z *Zeto) prepareDeploy(params *ZetoConstructorParams, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
+func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
+	params, err := z.validateDeploy(req.Transaction)
+	if err != nil {
+		return nil, err
+	}
 	deployParams := &ZetoDeployParams{
 		TransactionID:    req.Transaction.TransactionId,
 		Data:             ethtypes.HexBytes0xPrefix(""),
@@ -427,13 +239,44 @@ func (z *Zeto) prepareDeploy(params *ZetoConstructorParams, req *pb.PrepareDeplo
 		return nil, err
 	}
 
-	return &pb.PrepareDeployTransactionResponse{
+	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
 			FunctionName: "deploy",
 			ParamsJson:   string(paramsJSON),
 		},
-		SigningAddress: params.From,
+		Signer: &params.From,
 	}, nil
+}
+func (z *Zeto) InitTransaction(ctx context.Context, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	tx, err := z.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return z.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
+}
+
+func (z *Zeto) AssembleTransaction(ctx context.Context, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	tx, err := z.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return z.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
+}
+
+func (z *Zeto) EndorseTransaction(ctx context.Context, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+	tx, err := z.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return z.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
+}
+
+func (z *Zeto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+	tx, err := z.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return z.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
 }
 
 func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ZetoDomainConfig, error) {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type DomainInterface map[string]*DomainEntry

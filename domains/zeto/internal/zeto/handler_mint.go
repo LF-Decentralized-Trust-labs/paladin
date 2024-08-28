@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type mintHandler struct {
@@ -53,7 +53,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    params.RecipientKey,
-				Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 		},
 	}, nil
@@ -84,13 +84,13 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 	return &pb.AssembleTransactionResponse{
 		AssemblyResult: pb.AssembleTransactionResponse_OK,
 		AssembledTransaction: &pb.AssembledTransaction{
-			NewStates: outputStates,
+			OutputStates: outputStates,
 		},
 		AttestationPlan: []*pb.AttestationRequest{
 			{
 				Name:            "submitter",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Parties:         []string{tx.transaction.From},
 			},
 		},
@@ -104,8 +104,8 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
-	for i, state := range req.FinalizedTransaction.NewStates {
+	outputs := make([]string, len(req.OutputStates))
+	for i, state := range req.OutputStates {
 		coin, err := h.zeto.makeCoin(state.StateDataJson)
 		if err != nil {
 			return nil, err

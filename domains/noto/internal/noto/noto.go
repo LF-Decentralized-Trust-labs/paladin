@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
@@ -116,7 +114,7 @@ func New(callbacks plugintk.DomainCallbacks) *Noto {
 	return noto
 }
 
-func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
 	var config Config
 	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 	if err != nil {
@@ -164,20 +162,20 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 			PrivateContractAbiJson: string(notoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
-			BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
-				SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
+			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
+				SubmitMode: pb.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
 			},
 		},
 	}, nil
 }
 
-func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+func (n *Noto) InitDomain(ctx context.Context, req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
 	n.domainID = req.DomainUuid
 	n.coinSchema = req.AbiStateSchemas[0]
 	return &pb.InitDomainResponse{}, nil
 }
 
-func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
+func (n *Noto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.InitDeployResponse, error) {
 	params, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
@@ -192,7 +190,7 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 	}, nil
 }
 
-func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
 	_, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
@@ -229,7 +227,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	}, nil
 }
 
-func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+func (n *Noto) InitTransaction(ctx context.Context, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	tx, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -237,7 +235,7 @@ func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransaction
 	return n.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
 }
 
-func (n *Noto) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+func (n *Noto) AssembleTransaction(ctx context.Context, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	tx, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -245,7 +243,7 @@ func (n *Noto) AssembleTransaction(ctx context.Context, req *prototk.AssembleTra
 	return n.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
 }
 
-func (n *Noto) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+func (n *Noto) EndorseTransaction(ctx context.Context, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	tx, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
@@ -253,7 +251,7 @@ func (n *Noto) EndorseTransaction(ctx context.Context, req *prototk.EndorseTrans
 	return n.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
 }
 
-func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+func (n *Noto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	tx, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err

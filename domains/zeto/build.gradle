@@ -22,14 +22,25 @@ ext {
 }
 
 configurations {
-    // Resolvable configurations (inputs)
-    contractCompile { canBeConsumed = false }
-    protocCompile { canBeConsumed = false }
+    // Resolvable configurations
+    contractCompile {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    toolkitProtoCompiled {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    kataProtoCompiled {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
-    protocCompile project(path: ":kata", configuration: "protocCompile")
+    toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
+    kataProtoCompiled project(path: ":kata", configuration: "protoCompiled")
 }
 
 task copySolidity(type: Copy) {
@@ -77,23 +88,9 @@ task circuitsGen(type: Exec, dependsOn: circuitsInstall) {
     outputs.dir(zkpOut)
 }
 
-task startTestbed(type: DockerCompose) {
-    dependsOn ':testinfra:besuBootstrapTool' // TODO fix?
-    composeFile '../../testinfra/docker-compose-test.yml'
-    composeFile 'docker-compose-test.yml'
-    projectName 'paladin-zeto'
-    args 'up', '-d', '--build'
-}
-
-task stopTestbed(type: DockerCompose) {
-    composeFile '../../testinfra/docker-compose-test.yml'
-    composeFile 'docker-compose-test.yml'
-    projectName 'paladin-zeto'
-    args 'down'
-}
-
 task test(type: Exec) {
-    inputs.files(configurations.protocCompile)
+    inputs.files(configurations.toolkitProtoCompiled)
+    inputs.files(configurations.kataProtoCompiled)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
@@ -107,8 +104,8 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn startTestbed
     dependsOn circuitsGen
+    dependsOn ':testinfra:startTestInfra'
 
     ignoreExitValue true
 
@@ -127,7 +124,6 @@ task build {
 }
 
 task clean(type: Delete) {
-    dependsOn stopTestbed
     delete 'coverage'
     delete 'internal/zeto/abis'
     delete zkpOut

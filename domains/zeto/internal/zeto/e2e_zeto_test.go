@@ -19,20 +19,20 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"gopkg.in/yaml.v3"
+
+	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/pkg/testbed"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	toDomain          = "to-domain"
-	testbedAddr       = "http://localhost:49610"
-	grpcAddr          = "dns:localhost:49611"
 	controllerEth     = "controller:eth"
 	controllerBabyJub = "controller:babyjub"
 	recipient1Eth     = "recipient1:eth"
@@ -45,25 +45,44 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Zeto, rpcbackend.Backend) {
-	ctx := context.Background()
-	domain, err := New(ctx, grpcAddr)
+func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
+	configYAML, err := yaml.Marshal(&config)
 	assert.NoError(t, err)
-
-	log.L(ctx).Infof("Listening for gRPC messages on %s", toDomain)
-	err = domain.Listen(ctx, toDomain)
+	err = yaml.Unmarshal(configYAML, &yn)
 	assert.NoError(t, err)
+	return yn
+}
 
-	conf := ffresty.Config{URL: testbedAddr}
-	rest := ffresty.NewWithConfig(ctx, conf)
-	rpc := rpcbackend.NewRPCClient(rest)
+func deployFactory(ctx context.Context, t *testing.T, factory SolidityBuild) string {
+	tb := testbed.NewTestBed()
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	assert.NoError(t, err)
+	defer done()
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	callCtx, cancelCtx := context.WithTimeout(ctx, 10*time.Second)
-	cancel := func() {
-		domain.Close()
-		cancelCtx()
-	}
-	return callCtx, cancel, domain, rpc
+	log.L(ctx).Infof("Deploying Noto factory")
+	factoryAddress, err := deployBytecode(ctx, rpc, factory)
+	assert.NoError(t, err)
+	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
+	return factoryAddress
+}
+
+func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
+	var domain *Zeto
+	tb := testbed.NewTestBed()
+	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+		domain = New(callbacks)
+		return domain
+	})
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
+		domainName: {
+			Config: yamlConfig(t, config),
+			Plugin: plugin,
+		},
+	})
+	assert.NoError(t, err)
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+	return done, domain, rpc
 }
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
@@ -77,39 +96,37 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityB
 }
 
 func TestZeto(t *testing.T) {
-	log.L(context.Background()).Infof("TestZeto")
-	ctx, cancel, zeto, rpc := newTestDomain(t)
-	defer cancel()
-
-	domainName := "zeto_" + types.RandHex(8)
+	ctx := context.Background()
+	log.L(ctx).Infof("TestZeto")
+	domainName := "noto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
 	log.L(ctx).Infof("Deploying Zeto libraries")
-	commonLibAddress, err := deployBytecode(ctx, rpc, loadBuild(commonLibJSON))
-	assert.NoError(t, err)
+	commonLibAddress := deployFactory(ctx, t, loadBuild(commonLibJSON))
 	log.L(ctx).Infof("commonlib deployed to %s", commonLibAddress)
 
-	verifierAddress, err := deployBytecode(ctx, rpc, loadBuild(Groth16Verifier_Anon))
-	assert.NoError(t, err)
+	verifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_Anon))
 	log.L(ctx).Infof("verifier deployed to %s", verifierAddress)
 
-	depositVerifierAddress, err := deployBytecode(ctx, rpc, loadBuild(Groth16Verifier_CheckHashesValue))
-	assert.NoError(t, err)
+	depositVerifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_CheckHashesValue))
 	log.L(ctx).Infof("depositVerifier deployed to %s", depositVerifierAddress)
 
-	withdrawVerifierAddress, err := deployBytecode(ctx, rpc, loadBuild(Groth16Verifier_CheckInputsOutputsValue))
-	assert.NoError(t, err)
+	withdrawVerifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_CheckInputsOutputsValue))
 	log.L(ctx).Infof("withdrawVerifier deployed to %s", withdrawVerifierAddress)
 
 	libraries := map[string]string{
 		"Commonlib": commonLibAddress,
 	}
-	factory := loadBuildLinked(zetoFactoryJSON, libraries)
 
 	log.L(ctx).Infof("Deploying Zeto factory")
-	factoryAddress, err := deployBytecode(ctx, rpc, factory)
-	assert.NoError(t, err)
+	factory := loadBuildLinked(zetoFactoryJSON, libraries)
+	factoryAddress := deployFactory(ctx, t, factory)
 	log.L(ctx).Infof("Zeto factory deployed to %s", factoryAddress)
+
+	done, zeto, rpc := newTestDomain(t, domainName, &Config{
+		FactoryAddress: factoryAddress,
+	})
+	defer done()
 
 	log.L(ctx).Infof("Configuring Zeto domain")
 	var boolResult bool

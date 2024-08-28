@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 var INPUT_COUNT = 2
@@ -109,12 +109,12 @@ func (z *Zeto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 			lastStateTimestamp = state.StoredAt
 			coin, err := z.makeCoin(state.DataJson)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.Id, err)
 			}
 			total = total.Add(total, coin.Amount.BigInt())
 			stateRefs = append(stateRefs, &pb.StateRef{
 				SchemaId: state.SchemaId,
-				HashId:   state.HashId,
+				Id:       state.Id,
 			})
 			coins = append(coins, coin)
 			if total.Cmp(amount.BigInt()) >= 0 {
@@ -162,14 +162,14 @@ func (z *Zeto) prepareOutputs(owner string, ownerKey *babyjub.PublicKey, amount 
 
 func (z *Zeto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
 	req := &pb.FindAvailableStatesRequest{
-		DomainUuid: z.domainID,
-		SchemaId:   z.coinSchema.Id,
-		QueryJson:  query,
+		SchemaId:  z.coinSchema.Id,
+		QueryJson: query,
 	}
-
-	res := &pb.FindAvailableStatesResponse{}
-	err := requestReply(ctx, z.replies, fromDomain, *z.dest, req, &res)
-	return res.States, err
+	res, err := z.callbacks.FindAvailableStates(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return res.States, nil
 }
 
 func (z *Zeto) FindCoins(ctx context.Context, query string) ([]*ZetoCoin, error) {

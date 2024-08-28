@@ -16,7 +16,7 @@
 package zeto
 
 import (
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 func findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
