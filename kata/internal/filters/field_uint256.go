@@ -19,10 +19,10 @@ package filters
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/json"
 	"math/big"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type Uint256Field string
@@ -39,12 +39,7 @@ func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (d
 	if jsonValue.IsNil() {
 		return nil, nil
 	}
-	var jsonResult interface{}
-	err := json.Unmarshal(jsonValue, &jsonResult)
-	if err != nil {
-		return nil, err
-	}
-	bi, err := jsonResultToBigInt(ctx, jsonResult)
+	bi, err := ethtypes.UnmarshalBigInt(ctx, jsonValue)
 	if err != nil {
 		return "", err
 	}

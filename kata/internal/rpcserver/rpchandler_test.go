@@ -25,7 +25,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -235,7 +235,7 @@ func TestRPCHandleIOError(t *testing.T) {
 	_, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	iRPCResponse, ok := s.rpcHandler(context.Background(), iotest.ErrReader(fmt.Errorf("pop")))
+	iRPCResponse, ok := s.rpcHandler(context.Background(), iotest.ErrReader(fmt.Errorf("pop")), nil)
 	assert.False(t, ok)
 	jsonResponse := iRPCResponse.(*rpcbackend.RPCResponse)
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)
@@ -248,7 +248,7 @@ func TestRPCBadArrayError(t *testing.T) {
 	_, s, done := newTestServerHTTP(t, &Config{})
 	defer done()
 
-	iRPCResponse, ok := s.rpcHandler(context.Background(), strings.NewReader("[... this is not an array"))
+	iRPCResponse, ok := s.rpcHandler(context.Background(), strings.NewReader("[... this is not an array"), nil)
 	assert.False(t, ok)
 	jsonResponse := iRPCResponse.(*rpcbackend.RPCResponse)
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)

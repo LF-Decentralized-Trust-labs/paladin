@@ -24,20 +24,21 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/internal/httpserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-type Server interface {
+type RPCServer interface {
 	Register(module *RPCModule)
 	Start() error
 	Stop()
+	EthPublish(eventType string, result interface{}) // Note this is an `eth_` specific extension, with no ack or reliability
 	HTTPAddr() net.Addr
 	WSAddr() net.Addr
 }
 
-func NewServer(ctx context.Context, conf *Config) (_ Server, err error) {
+func NewRPCServer(ctx context.Context, conf *Config) (_ RPCServer, err error) {
 	s := &rpcServer{
 		bgCtx:         ctx,
 		wsConnections: make(map[string]*webSocketConnection),
@@ -97,7 +98,7 @@ func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body)
+	rpcRes, isOK := s.rpcHandler(req.Context(), req.Body, nil /* not websockets */)
 
 	res.Header().Set("Content-Type", "application/json; charset=utf-8")
 	status := http.StatusOK

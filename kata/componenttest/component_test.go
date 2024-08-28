@@ -21,22 +21,38 @@ package kata
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/kata"
-
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 )
+
+//go:embed abis/SimpleStorage.json
+var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
 
 func TestRunTransactionSubmission(t *testing.T) {
 	ctx := context.Background()
@@ -53,6 +69,38 @@ func TestRunTransactionSubmission(t *testing.T) {
 		Destination: testDestination,
 	})
 	require.NoError(t, err, "failed to call Listen")
+
+	// TODO: Currently the comms bus only functions correctly if you know your
+	// destination actually exists on the server side - but the `Listen()` is
+	// an async stream so you have no idea when it's been created.
+	//
+	// This workaround is the only way currently to find out your destination exists.
+	// By trying to subscribe to it, you get the same error below that the
+	// sender of your replies would, until the destination is set up:
+	// Error sending response: PD010600: Destination not found: test-destination
+	//
+	// If we continue to have a model for destinations like this in the future, we
+	// need a robust way to "create" destinations so you know they exist before you
+	// perform a request/reply exchange with them.
+	for {
+		_, err = client.SubscribeToTopic(ctx, &pb.SubscribeToTopicRequest{
+			Topic:       "anything-it-does-not-matter",
+			Destination: "test-destination",
+		})
+		if err != nil && strings.Contains(err.Error(), "PD010600") {
+			log.L(ctx).Infof("Destination still creating: %s", err)
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		assert.NoError(t, err)
+		break
+	}
+	// We just unsubscribe straight away
+	_, err = client.UnsubscribeFromTopic(ctx, &pb.UnsubscribeFromTopicRequest{
+		Topic:       "anything-it-does-not-matter",
+		Destination: "test-destination",
+	})
+	assert.NoError(t, err)
 
 	submitTransaction := transactionsPB.SubmitTransactionRequest{
 		From:            "fromID",
@@ -87,7 +135,120 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
+}
+
+func TestRunSimpleStorageEthTransaction(t *testing.T) {
+	ctx := context.Background()
+	logrus.SetLevel(logrus.DebugLevel)
+
+	var testConfig componentmgr.Config
+
+	err := yaml.Unmarshal([]byte(`
+db:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: ../db/migrations/sqlite
+    debugQueries:  true
+blockchain:
+  http:
+    url: http://localhost:8545
+  ws:
+    url: ws://localhost:8546
+    initialConnectAttempts: 25
+signer:
+    keyDerivation:
+      type: bip32
+    keyStore:
+      type: static
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: polar mechanic crouch jungle field room dry sure machine brisk seed bulk student total ethics
+`), &testConfig)
+	assert.NoError(t, err)
+
+	p, err := persistence.NewPersistence(ctx, &testConfig.DB)
+	assert.NoError(t, err)
+	defer p.Close()
+
+	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
+		FromBlock: types.RawJSON(`"latest"`), // don't want earlier events
+	}, &testConfig.Blockchain.WS, p)
+	assert.NoError(t, err)
+
+	type solBuild struct {
+		ABI      abi.ABI                   `json:"abi"`
+		Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
+	}
+	var simpleStorageBuild solBuild
+	err = json.Unmarshal(simpleStorageBuildJSON, &simpleStorageBuild)
+	assert.NoError(t, err)
+
+	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
+	err = indexer.Start(&blockindexer.InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
+			// With SQLite we cannot hang in here with a DB TX - as there's only one per process.
+			for _, e := range batch.Events {
+				select {
+				case eventStreamEvents <- e:
+				default:
+					assert.Fail(t, "more than expected number of events received")
+				}
+			}
+			return nil, nil
+		},
+		Definition: &blockindexer.EventStream{
+			Name: "unittest",
+			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
+		},
+	})
+	assert.NoError(t, err)
+	defer indexer.Stop()
+
+	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Signer)
+	assert.NoError(t, err)
+
+	ecf, err := ethclient.NewEthClientFactory(ctx, keyMgr, &testConfig.Blockchain)
+	assert.NoError(t, err)
+	err = ecf.Start()
+	assert.NoError(t, err)
+	defer ecf.Stop()
+	ethClient := ecf.HTTPClient()
+
+	simpleStorage, err := ethClient.ABI(ctx, simpleStorageBuild.ABI)
+	assert.NoError(t, err)
+
+	txHash1, err := simpleStorage.MustConstructor(types.HexBytes(simpleStorageBuild.Bytecode)).R(ctx).
+		Signer("key1").Input(`{"x":11223344}`).SignAndSend()
+	assert.NoError(t, err)
+	deployTX, err := indexer.WaitForTransaction(ctx, *txHash1)
+	assert.NoError(t, err)
+	contractAddr := deployTX.ContractAddress.Address0xHex()
+
+	getX1, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"x":"11223344"}`, string(getX1))
+
+	txHash2, err := simpleStorage.MustFunction("set").R(ctx).
+		Signer("key1").To(contractAddr).Input(`{"_x":99887766}`).SignAndSend()
+	assert.NoError(t, err)
+	_, err = indexer.WaitForTransaction(ctx, *txHash2)
+	assert.NoError(t, err)
+
+	getX2, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"x":"99887766"}`, string(getX2))
+
+	// Expect our event listener to be queued up with two Changed events
+	event1 := <-eventStreamEvents
+	assert.JSONEq(t, `{"x":"11223344"}`, string(event1.Data))
+	event2 := <-eventStreamEvents
+	assert.JSONEq(t, `{"x":"99887766"}`, string(event2.Data))
+
 }
 
 func runServiceForTesting(ctx context.Context, t *testing.T) (string, func()) {
@@ -120,10 +281,26 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go kata.Run(ctx, configFile.Name())
+	go kata.TestCommsBusRun(ctx, configFile.Name())
 
-	// todo do we really need to sleep here?
-	time.Sleep(time.Second * 2)
+	// Wait until the engine is listening - otherwise our messages will be discarded
+	// TODO: This is a temporary situation as the transactional model of the engine forms
+waitForEngine:
+	for {
+		commsBus := kata.CommsBus()
+		time.Sleep(10 * time.Millisecond)
+		if commsBus == nil {
+			continue
+		}
+		destinations, err := commsBus.Broker().ListDestinations(ctx)
+		assert.NoError(t, err)
+		for _, d := range destinations {
+			if d == "kata-txn-engine" {
+				// The engine is listening
+				break waitForEngine
+			}
+		}
+	}
 
 	return socketAddress, func() {
 		os.Remove(configFile.Name())
@@ -144,7 +321,7 @@ func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string
 		time.Sleep(time.Second)
 		delay++
 		status, err = client.Status(ctx, &pb.StatusRequest{})
-		require.Less(t, delay, 2, "Server did not start after 2 seconds")
+		require.Less(t, delay, 5, "Server did not start in expected time")
 	}
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())
@@ -221,7 +398,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -355,5 +532,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }

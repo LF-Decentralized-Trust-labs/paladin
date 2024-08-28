@@ -39,6 +39,26 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 }
 
 var (
+	// Components PD0100XX
+	MsgComponentKeyManagerInitError    = ffe("PD010000", "Error initializing key manager")
+	MsgComponentKeyManagerStartError   = ffe("PD010001", "Error starting key manager")
+	MsgComponentEthClientInitError     = ffe("PD010002", "Error initializing ethereum client")
+	MsgComponentEthClientStartError    = ffe("PD010003", "Error starting ethereum client")
+	MsgComponentDBInitError            = ffe("PD010004", "Error initializing database")
+	MsgComponentDBStartError           = ffe("PD010005", "Error starting database")
+	MsgComponentStateStoreInitError    = ffe("PD010006", "Error initializing state store")
+	MsgComponentStateStoreStartError   = ffe("PD010007", "Error starting state store")
+	MsgComponentBlockIndexerInitError  = ffe("PD010008", "Error initializing block indexer")
+	MsgComponentBlockIndexerStartError = ffe("PD010009", "Error starting block indexer ")
+	MsgComponentRPCServerInitError     = ffe("PD010010", "Error initializing RPC server")
+	MsgComponentRPCServerStartError    = ffe("PD010011", "Error starting RPC server ")
+	MsgComponentDomainInitError        = ffe("PD010012", "Error initializing domains")
+	MsgComponentDomainStartError       = ffe("PD010013", "Error starting domain manager")
+	MsgComponentPluginCtrlInitError    = ffe("PD010014", "Error initializing plugin controller")
+	MsgComponentPluginCtrlStartError   = ffe("PD010015", "Error starting plugin controller ")
+	MsgComponentWaitPluginStartError   = ffe("PD010016", "Error waiting for plugins to start")
+	MsgComponentEngineInitError        = ffe("PD010017", "Error initializing engine")
+	MsgComponentEngineStartError       = ffe("PD010018", "Error starting engine")
 
 	// States PD0101XX
 	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")
@@ -58,8 +78,8 @@ var (
 	MsgStateABITypeMustBeTuple        = ffe("PD010114", "ABI type definition must be a tuple parameter with an internalType such as 'struct StructName'")
 	MsgStateLabelFieldNotUnique       = ffe("PD010115", "Label field with index %d has a duplicate name '%s'")
 	MsgStateInvalidValue              = ffe("PD010116", "Invalid value")
-	MsgStateInvalidQualifier          = ffe("PD010117", "Status must be one of 'available','confirmed','unconfirmed','spent','locked','all' or the UUID of a sequence")
-	MsgStateLockConflictUnexpected    = ffe("PD010118", "Pending lock for sequence %s found when attempting to lock to sequence %s")
+	MsgStateInvalidQualifier          = ffe("PD010117", "Status must be one of 'available','confirmed','unconfirmed','spent','locked','all' or the UUID of a transaction")
+	MsgStateLockConflictUnexpected    = ffe("PD010118", "Pending lock for transaction %s found when attempting to lock to transaction %s")
 	MsgStateFlushFailedDomainReset    = ffe("PD010119", "Flush of state for domain %s has failed, and the domain has been reset")
 
 	// Persistence PD0102XX
@@ -70,18 +90,18 @@ var (
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 
 	// Transaction Processor PD0103XX
-	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
+	MsgTransactionProcessorInvalidStage         = ffe("PD010300", "Invalid stage: %s")
+	MsgContextCanceled                          = ffe("PD010301", "Context canceled")
+	MsgTransactionProcessorActionFailed         = ffe("PD010302", "Action for transaction with ID: %s at stage %s failed")
+	MsgTransactionProcessorBlockedOnDependency  = ffe("PD010303", "Transaction with ID: %s cannot be processed by %s stage due to dependent transactions.")
+	MsgTransactionProcessorUndeterminedStage    = ffe("PD010304", "Cannot determine a processing stage for transaction with ID: %s")
+	MsgTransactionProcessorEmptyAssembledResult = ffe("PD010305", "No transaction was assembled for transaction with ID: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
-	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
-	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
-
-	// Config PD0105XX
-	MsgConfigFileMissing               = ffe("PD010500", "Config file not found at path: %s")
-	MsgConfigFileReadError             = ffe("PD010501", "Failed to read config file %s with error: %s")
-	MsgConfigFileParseError            = ffe("PD010502", "Failed to parse config file %s with error: %s")
-	MsgConfigFileMissingMandatoryValue = ffe("PD010503", "Mandatory config field %s missing ")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError           = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionInvalidTransactionID = ffe("PD010403", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Comms bus PD0106XX
 	MsgDestinationNotFound     = ffe("PD010600", "Destination not found: %s")
@@ -96,7 +116,6 @@ var (
 	MsgFiltersValueInvalidForInt64        = ffe("PD010703", "Value '%s' cannot be parsed as a 64bit signed integer")
 	MsgFiltersValueInvalidForBool         = ffe("PD010704", "Value '%s' cannot be parsed as a boolean")
 	MsgFiltersValueInvalidForString       = ffe("PD010705", "Value '%s' cannot be parsed as a string")
-	MsgFiltersValueInvalidForBigInt       = ffe("PD010706", "Type '%T' cannot be converted to a big integer")
 	MsgFiltersValueIntStringParseFail     = ffe("PD010707", "Value '%s' cannot be converted to a big integer")
 	MsgFiltersValueMissing                = ffe("PD010708", "Value missing for filter field '%s'")
 	MsgFiltersMustBeBuiltUnscoped         = ffe("PD010709", "Scoped SQL builder (rather than DB) incorrect passed into filter builder")
@@ -109,6 +128,7 @@ var (
 	MsgFiltersFieldTypeDoesNotSupportLike = ffe("PD010716", "Field does not support LIKE comparison (%T)")
 	MsgFiltersTypeErrorDuringCompare      = ffe("PD010717", "Mismatched types during compare t1=%T t2=%T")
 	MsgFiltersMissingSortField            = ffe("PD010718", "Must specify at least one sort field")
+	MsgFiltersValueInvalidHexBytes32      = ffe("PD010719", "Failed to parse value as 32 byte hex string (parsedBytes=%d)")
 
 	// HTTPServer PD0108XX
 	MsgHTTPServerStartFailed        = ffe("PD010800", "Failed to start server on '%s'")
@@ -133,16 +153,114 @@ var (
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
 
 	// Types PD0111XX
-	MsgTypesUnmarshalNil = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail     = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesUnmarshalNil                  = ffe("PD011100", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                      = ffe("PD011101", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
 
-	// Plugin registry PD0112XX
-	MsgPluginRegistryInternalError = ffe("PD011200", "Plugin registry internal error %s, ")
-	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
-	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
-	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+	// Plugin controller PD0112XX
+	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
+	MsgPluginLoaderAlreadyInit = ffe("PD011201", "Plugin loader already initialized")
+	MsgPluginUUIDNotFound      = ffe("PD011202", "Plugin runtime instance of type %s with UUID %s does not exist")
+	MsgPluginBadRequestBody    = ffe("PD011203", "Invalid request body %T")
+	MsgPluginUDSPathTooLong    = ffe("PD011204", "Unix domain socket path too log (len=%d,limit=100)")
+	MsgPluginBadResponseBody   = ffe("PD011205", "%s %s returned invalid response body %T")
+	MsgPluginError             = ffe("PD011206", "%s %s returned error: %s")
+	MsgPluginLoadFailed        = ffe("PD011207", "Plugin load failed: %s")
+
+	// BlockIndexer PD0113XX
+	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed")
+	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
+	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")
+	MsgBlockIndexerInvalidEventStreamType   = ffe("PD011306", "Unsupported event stream type: %s")
+	MsgBlockMissingHandler                  = ffe("PD011307", "Handler not registered for stream")
+	MsgBlockIndexerNoBlocksIndexed          = ffe("PD011308", "No confirmed blocks have yet been indexed")
+
+	// Signing module PD0114XX
+	MsgSigningModuleBadPathError                = ffe("PD011400", "Path '%s' does not exist, or it is not a directory")
+	MsgSigningModuleBadKeyFile                  = ffe("PD011401", "Key file '%s' does not exist")
+	MsgSigningModuleBadPassFile                 = ffe("PD011402", "Password file '%s' does not exist")
+	MsgSigningModuleBadKeyHandle                = ffe("PD011403", "Invalid key handle")
+	MsgSigningModuleFSError                     = ffe("PD011404", "Filesystem error")
+	MsgSigningModuleKeyHandleClash              = ffe("PD011405", "Invalid key handle (clash)")
+	MsgSigningModuleKeyNotExist                 = ffe("PD011406", "Key '%s' does not exist")
+	MsgSigningUnsupportedKeyStoreType           = ffe("PD011407", "Unsupported key store type: '%s'")
+	MsgSigningHierarchicalRequiresLoading       = ffe("PD011408", "Signing module has been configured to disallow in-memory key material. Hierarchical Deterministic (HD) wallet function implemented in the signing module requires in-memory key material")
+	MsgSigningStoreRequiresKeyLoadingForAlgo    = ffe("PD011409", "Signing module has been configured to disallow in-memory key material. In-memory signing is required for algorithms %s")
+	MsgSigningUnsupportedAlgoForInMemorySigning = ffe("PD011410", "Unsupported algorithm for in-memory signing: %s")
+	MsgSigningMustSpecifyAlgorithms             = ffe("PD011411", "Must specify at least one algorithm for key resolution")
+	MsgSigningHDSeedMustBe32BytesOrMnemonic     = ffe("PD011412", "Seed key material for HD Wallet must be either a 32byte value, or a BIP-39 compliant mnemonic seed phrase")
+	MsgSignerBIP44DerivationInvalid             = ffe("PD011413", "Invalid key handle - BIP44 key identifier expected (invalid derivation: '%s')")
+	MsgSingerBIP32DerivationTooLarge            = ffe("PD011414", "BIP-32 key index must be between 0 and 2^31-1 at each level in the hierarchy")
+	MsgSigningKeyListingNotSupported            = ffe("PD011415", "Listing keys in the key store is not supported by this signing module")
+	MsgSigningStaticKeyInvalid                  = ffe("PD011416", "Statically configured key with handle %s is invalid")
+	MsgSigningStaticBadEncoding                 = ffe("PD011417", "Statically configured key with handle %s has invalid encoding (must be one of 'none', 'hex', 'base64') '%s'")
+	MsgSigningKeyCannotBeResolved               = ffe("PD011418", "No key exists that matches the request")
+	MsgSigningUnsupportedKeyDerivationType      = ffe("PD011419", "Unsupported key derivation type: '%s'")
+	MsgSigningKeyCannotBeEmpty                  = ffe("PD011420", "Cannot resolve a signing key for the empty string")
+
+	// EthClient module PD0115XX
+	MsgEthClientInvalidInput        = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
+	MsgEthClientMissingFrom         = ffe("PD011501", "Signer (from) missing")
+	MsgEthClientMissingTo           = ffe("PD011502", "To missing")
+	MsgEthClientMissingInput        = ffe("PD011503", "Input missing")
+	MsgEthClientMissingOutput       = ffe("PD011504", "Output missing")
+	MsgEthClientInvalidTXVersion    = ffe("PD011505", "Invalid TX Version (%s)")
+	MsgEthClientABIJson             = ffe("PD011506", "JSON ABI parsing failed")
+	MsgEthClientFunctionNotFound    = ffe("PD011507", "Function %q not found on ABI")
+	MsgEthClientChainIDFailed       = ffe("PD011508", "Failed to query chain ID")
+	MsgEthClientKeyMismatch         = ffe("PD011509", "Resolved %q to different key handle expected=%q received=%q")
+	MsgEthClientToWithConstructor   = ffe("PD011510", "To address cannot be specified for constructor")
+	MsgEthClientHTTPURLMissing      = ffe("PD011511", "HTTP URL missing in configuration")
+	MsgEthClientChainIDMismatch     = ffe("PD011512", "ChainID mismatch between HTTP and WebSocket JSON/RPC connections http=%d ws=%d")
+	MsgEthClientInvalidWebSocketURL = ffe("PD011513", "Invalid WebSocket URL: %s")
+	MsgEthClientInvalidHTTPURL      = ffe("PD011514", "Invalid HTTP URL: %s")
+
+	// DomainManager module PD0116XX
+	MsgDomainNotFound                         = ffe("PD011600", "Domain %q not found")
+	MsgDomainNotInitialized                   = ffe("PD011601", "Domain not initialized")
+	MsgDomainInvalidSchema                    = ffe("PD011602", "Domain schema %d is invalid")
+	MsgDomainConstructorAbiJsonInvalid        = ffe("PD011603", "Constructor ABI function definition invalid")
+	MsgDomainConstructorABITypeWrong          = ffe("PD011604", "Constructor ABI function definition has wrong type: %s")
+	MsgDomainFactoryAbiJsonInvalid            = ffe("PD011605", "Factory contract ABI invalid")
+	MsgDomainFactoryAddressInvalid            = ffe("PD011606", "Factory contract address invalid")
+	MsgDomainPrivateAbiJsonInvalid            = ffe("PD011607", "Private contract ABI invalid")
+	MsgDomainInvalidQueryJSON                 = ffe("PD011608", "Invalid query JSON")
+	MsgDomainContractNotFoundByAddr           = ffe("PD011609", "A smart contract with address %s has not yet been indexed")
+	MsgDomainInvalidConstructorParams         = ffe("PD011610", "Invalid constructor parameters for %s")
+	MsgDomainInvalidPrepareDeployResult       = ffe("PD011611", "Prepare deploy did not result in exactly one of a invoke transaction or a deploy transaction")
+	MsgDomainInvalidFunctionParams            = ffe("PD011612", "Invalid function parameters for %s")
+	MsgDomainUnknownSchema                    = ffe("PD011613", "Unknown schema %s")
+	MsgDomainInvalidStateIDFromDomain         = ffe("PD011614", "Domain returned invalid id '%s' for state %d")
+	MsgDomainInputStateNotFound               = ffe("PD011615", "Input state %d [%s] not found")
+	MsgDomainMissingStates                    = ffe("PD011616", "Missing in-memory states")
+	MsgDomainEndorsementReverted              = ffe("PD011617", "Endorsement from '%s' reverted: %s")
+	MsgDomainFunctionNotFound                 = ffe("PD011618", "Function with name '%s' not found on ABI")
+	MsgDomainBaseLedgerSubmitInvalid          = ffe("PD011619", "Base ledger submission config is invalid")
+	MsgDomainTXIncompleteInitDeploy           = ffe("PD011620", "Transaction is incomplete for phase InitDeploy")
+	MsgDomainTXIncompletePrepareDeploy        = ffe("PD011621", "Transaction is incomplete for phase PrepareDeploy")
+	MsgDomainDeployNoSigner                   = ffe("PD011622", "Domain did not provide a signer for base ledger transaction to deploy the private smart contract")
+	MsgDomainMultipleEndorsersSubmit          = ffe("PD011623", "Multiple endorsers of the transaction specified a submission constraint")
+	MsgDomainNoEndorserSubmit                 = ffe("PD011624", "Domain is configured for endorser submission, and no endorser specified a submission constraint")
+	MsgDomainInvalidSubmissionConfig          = ffe("PD011625", "Domain specified an unexpected base ledger submission config: %s")
+	MsgDomainTXIncompleteInitTransaction      = ffe("PD011626", "Transaction is incomplete for phase InitTransaction")
+	MsgDomainTXIncompleteAssembleTransaction  = ffe("PD011627", "Transaction is incomplete for phase AssembleTransaction")
+	MsgDomainTXIncompleteWritePotentialStates = ffe("PD011628", "Transaction is incomplete for phase WritePotentialStates")
+	MsgDomainTXIncompleteLockStates           = ffe("PD011629", "Transaction is incomplete for phase LockStates")
+	MsgDomainTXIncompleteEndorseTransaction   = ffe("PD011630", "Transaction is incomplete for phase EndorseTransaction")
+	MsgDomainTXIncompleteResolveDispatch      = ffe("PD011631", "Transaction is incomplete for phase ResolveDispatch")
+	MsgDomainTXIncompletePrepareTransaction   = ffe("PD011632", "Transaction is incomplete for phase PrepareTransaction")
+
+	// Entrypoint PD0117XX
+	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")
 
 	// Engine PD0118XX
-	// TODO find all instances of MsgSequencerInternalError and decide if they should be more specific
-	MsgSequencerInternalError = ffe("PD011810", "Sequencer internal error %s, ")
+	MsgDomainNotProvided      = ffe("PD011800", "Domain not found in the transaction input")
+	MsgEngineInternalError    = ffe("PD011801", "Unexpected error in engine")
+	MsgEngineAssembleError    = ffe("PD011802", "Error assembling transaction")
+	MsgEngineParseFailed      = ffe("PD011803", "Failed to parse message")
+	MsgEngineInvalidMessage   = ffe("PD011804", "Invalid message recieved from transport")
+	MsgSequencerInternalError = ffe("PD011805", "Sequencer internal error %s, ")
 )

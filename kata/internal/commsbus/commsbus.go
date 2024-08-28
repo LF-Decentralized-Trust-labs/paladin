@@ -20,14 +20,13 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
-
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type Config struct {
-	Broker *BrokerConfig `yaml:"broker"`
-	GRPC   *GRPCConfig   `yaml:"grpc"`
+	Broker BrokerConfig `yaml:"broker"`
+	GRPC   GRPCConfig   `yaml:"grpc"`
 }
 
 type CommsBus interface {
@@ -39,18 +38,18 @@ func NewCommsBus(ctx context.Context, conf *Config) (CommsBus, error) {
 
 	if conf == nil {
 		log.L(ctx).Error("Missing comms bus config")
-		return nil, i18n.NewError(ctx, msgs.MsgConfigFileMissingMandatoryValue, "commsBus")
+		return nil, i18n.NewError(ctx, tkmsgs.MsgConfigFileMissingMandatoryValue, "commsBus")
 	}
 
-	broker, err := newBroker(ctx, conf.Broker)
+	broker, err := newBroker()
 	if err != nil {
 		log.L(ctx).Error("Failed to create broker", err)
 		return nil, err
 	}
 
-	grpcServer, err := newGRPCServer(ctx, broker, conf.GRPC)
+	grpcServer, err := newGRPCServer(ctx, broker, &conf.GRPC)
 	if err != nil {
-		log.L(ctx).Error("Failed to create grpc server", err)
+		log.L(ctx).Errorf("Failed to create grpc server: %s", err)
 		return nil, err
 	}
 

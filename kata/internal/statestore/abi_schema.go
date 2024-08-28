@@ -29,21 +29,21 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type abiSchema struct {
-	*Schema
-	tc          abi.TypeComponent
-	definition  *abi.Parameter
-	primaryType string
-	typeSet     eip712.TypeSet
-	labelInfo   []*schemaLabelInfo
+	*SchemaPersisted
+	tc           abi.TypeComponent
+	definition   *abi.Parameter
+	primaryType  string
+	typeSet      eip712.TypeSet
+	abiLabelInfo []*schemaLabelInfo
 }
 
 func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*abiSchema, error) {
 	as := &abiSchema{
-		Schema: &Schema{
+		SchemaPersisted: &SchemaPersisted{
 			DomainID: domainID,
 			Type:     SchemaTypeABI,
 			Labels:   []string{},
@@ -56,10 +56,10 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		err = as.typedDataV4Setup(ctx, true)
 	}
 	if err == nil {
-		as.Signature, err = as.FullSignature(ctx)
+		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.Hash = *HashIDKeccak([]byte(as.Signature))
+		as.ID = types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -67,9 +67,9 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 	return as, nil
 }
 
-func newABISchemaFromDB(ctx context.Context, persisted *Schema) (*abiSchema, error) {
+func newABISchemaFromDB(ctx context.Context, persisted *SchemaPersisted) (*abiSchema, error) {
 	as := &abiSchema{
-		Schema: persisted,
+		SchemaPersisted: persisted,
 	}
 	err := json.Unmarshal(persisted.Definition, &as.definition)
 	if err != nil {
@@ -86,12 +86,20 @@ func (as *abiSchema) Type() SchemaType {
 	return SchemaTypeABI
 }
 
-func (as *abiSchema) Persisted() *Schema {
-	return as.Schema
+func (as *abiSchema) IDString() string {
+	return as.SchemaPersisted.ID.String()
 }
 
-func (as *abiSchema) LabelInfo() []*schemaLabelInfo {
-	return as.labelInfo
+func (as *abiSchema) Signature() string {
+	return as.SchemaPersisted.Signature
+}
+
+func (as *abiSchema) Persisted() *SchemaPersisted {
+	return as.SchemaPersisted
+}
+
+func (as *abiSchema) labelInfo() []*schemaLabelInfo {
+	return as.abiLabelInfo
 }
 
 // Build the TypedDataV4 signature of the struct, from the ABI definition
@@ -128,7 +136,7 @@ func (as *abiSchema) labelSetup(ctx context.Context, isNew bool) error {
 			if err != nil {
 				return err
 			}
-			as.labelInfo = append(as.labelInfo, &schemaLabelInfo{
+			as.abiLabelInfo = append(as.abiLabelInfo, &schemaLabelInfo{
 				label:         p.Name,
 				virtualColumn: fmt.Sprintf("l%d", labelIndex),
 				labelType:     labelType,
@@ -330,34 +338,31 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	// - Standardize formatting of all the data elements so domains do not need to worry
 	var jsonData []byte
 	if err == nil {
-		jsonData, err = abi.NewSerializer().
-			SetFormattingMode(abi.FormatAsObjects).
-			SetIntSerializer(abi.Base10StringIntSerializer).
-			SetFloatSerializer(abi.Base10StringFloatSerializer).
-			SetByteSerializer(abi.HexByteSerializer0xPrefix).
-			SerializeJSONCtx(ctx, psd.cv)
+		jsonData, err = types.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	hashID := *NewHashIDSlice32(hash)
+	hashID := types.NewBytes32FromSlice(hash)
 	for i := range psd.labels {
 		psd.labels[i].State = hashID
 	}
 	for i := range psd.int64Labels {
 		psd.int64Labels[i].State = hashID
 	}
+	now := types.TimestampNow()
 	return &StateWithLabels{
 		State: &State{
-			Hash:        hashID,
+			ID:          hashID,
+			CreatedAt:   now,
 			DomainID:    as.DomainID,
-			Schema:      as.Hash,
+			Schema:      as.ID,
 			Data:        jsonData,
 			Labels:      psd.labels,
 			Int64Labels: psd.int64Labels,
 		},
-		LabelValues: psd.labelValues,
+		LabelValues: addStateBaseLabels(psd.labelValues, hashID, now),
 	}, nil
 }
 
@@ -368,6 +373,6 @@ func (as *abiSchema) RecoverLabels(ctx context.Context, s *State) (*StateWithLab
 	}
 	return &StateWithLabels{
 		State:       s,
-		LabelValues: psd.labelValues,
+		LabelValues: addStateBaseLabels(psd.labelValues, s.ID, s.CreatedAt),
 	}, nil
 }

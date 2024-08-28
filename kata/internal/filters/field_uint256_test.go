@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,7 +32,7 @@ func TestUint256Field(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = Uint256Field("test").SQLValue(ctx, (types.RawJSON)(`[]`))
-	assert.Regexp(t, "PD010706", err)
+	assert.Regexp(t, "FF22091", err)
 
 	vBigPos, err := Uint256Field("test").SQLValue(ctx, (types.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
 	assert.NoError(t, err)

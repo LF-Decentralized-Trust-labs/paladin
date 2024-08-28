@@ -22,7 +22,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 func (ss *stateStore) RPCModule() *rpcserver.RPCModule {
@@ -41,7 +41,7 @@ func (ss *stateStore) rpcStoreABISchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domain string,
 		abiParam abi.Parameter,
-	) (SchemaCommon, error) {
+	) (Schema, error) {
 		s, err := newABISchema(ctx, domain, &abiParam)
 		if err == nil {
 			err = ss.PersistSchema(ctx, s)
@@ -53,7 +53,7 @@ func (ss *stateStore) rpcStoreABISchema() rpcserver.RPCHandler {
 func (ss *stateStore) rpcListSchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		domain string,
-	) ([]SchemaCommon, error) {
+	) ([]Schema, error) {
 		return ss.ListSchemas(ctx, domain)
 	})
 }

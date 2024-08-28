@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type ValueSet interface {
@@ -134,7 +134,7 @@ func (t *inlineEval) BuildOr(ot ...*inlineEval) Traverser[*inlineEval] {
 	return t
 }
 
-func (t *inlineEval) doCompare(e *FilterJSONBase, fieldName string, field FieldResolver, testValue driver.Value,
+func (t *inlineEval) doCompare(e *Op, fieldName string, field FieldResolver, testValue driver.Value,
 	compareStrings func(caseInsensitive bool, s1, s2 string) bool,
 	compareInt64 func(s1, s2 int64) bool,
 ) *inlineEval {
@@ -177,11 +177,11 @@ func (t *inlineEval) doCompare(e *FilterJSONBase, fieldName string, field FieldR
 	return t
 }
 
-func (t *inlineEval) IsEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.isEqual(&e.FilterJSONBase, fieldName, field, testValue)
+func (t *inlineEval) IsEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.isEqual(&e.Op, fieldName, field, testValue)
 }
 
-func (t *inlineEval) isEqual(e *FilterJSONBase, fieldName string, field FieldResolver, testValue driver.Value) *inlineEval {
+func (t *inlineEval) isEqual(e *Op, fieldName string, field FieldResolver, testValue driver.Value) *inlineEval {
 	return t.doCompare(e, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			if caseInsensitive {
@@ -195,8 +195,8 @@ func (t *inlineEval) isEqual(e *FilterJSONBase, fieldName string, field FieldRes
 	)
 }
 
-func (t *inlineEval) IsLike(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
+func (t *inlineEval) IsLike(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.doCompare(&e.Op, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			re, err := t.convertLike(s2, caseInsensitive)
 			if err != nil {
@@ -215,7 +215,7 @@ func (t *inlineEval) int64LikeNotSupported(s1, s2 int64) bool {
 	return false
 }
 
-func (t *inlineEval) IsNull(e *FilterJSONBase, fieldName string, field FieldResolver) Traverser[*inlineEval] {
+func (t *inlineEval) IsNull(e *Op, fieldName string, field FieldResolver) Traverser[*inlineEval] {
 	var valMatches bool
 	actualValue, err := t.valueSet.GetValue(t.ctx, fieldName, field)
 	if err != nil {
@@ -230,8 +230,8 @@ func (t *inlineEval) IsNull(e *FilterJSONBase, fieldName string, field FieldReso
 	return t
 }
 
-func (t *inlineEval) IsLessThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
+func (t *inlineEval) IsLessThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.doCompare(&e.Op, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			return strings.Compare(s1, s2) < 0
 		},
@@ -241,8 +241,8 @@ func (t *inlineEval) IsLessThan(e *FilterJSONKeyValue, fieldName string, field F
 	)
 }
 
-func (t *inlineEval) IsLessThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
+func (t *inlineEval) IsLessThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.doCompare(&e.Op, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			return strings.Compare(s1, s2) <= 0
 		},
@@ -252,8 +252,8 @@ func (t *inlineEval) IsLessThanOrEqual(e *FilterJSONKeyValue, fieldName string, 
 	)
 }
 
-func (t *inlineEval) IsGreaterThan(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
+func (t *inlineEval) IsGreaterThan(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.doCompare(&e.Op, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			return strings.Compare(s1, s2) > 0
 		},
@@ -263,8 +263,8 @@ func (t *inlineEval) IsGreaterThan(e *FilterJSONKeyValue, fieldName string, fiel
 	)
 }
 
-func (t *inlineEval) IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
-	return t.doCompare(&e.FilterJSONBase, fieldName, field, testValue,
+func (t *inlineEval) IsGreaterThanOrEqual(e *OpSingleVal, fieldName string, field FieldResolver, testValue driver.Value) Traverser[*inlineEval] {
+	return t.doCompare(&e.Op, fieldName, field, testValue,
 		func(caseInsensitive bool, s1, s2 string) bool {
 			return strings.Compare(s1, s2) >= 0
 		},
@@ -274,9 +274,9 @@ func (t *inlineEval) IsGreaterThanOrEqual(e *FilterJSONKeyValue, fieldName strin
 	)
 }
 
-func (t *inlineEval) IsIn(e *FilterJSONKeyValues, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[*inlineEval] {
+func (t *inlineEval) IsIn(e *OpMultiVal, fieldName string, field FieldResolver, testValues []driver.Value) Traverser[*inlineEval] {
 	// Do not negate the check in the individual compares
-	withoutNegate := e.FilterJSONBase
+	withoutNegate := e.Op
 	withoutNegate.Not = false
 
 	isIn := false

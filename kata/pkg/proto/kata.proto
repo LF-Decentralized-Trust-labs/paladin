@@ -30,6 +30,8 @@ service KataMessageService {
   // to recieve events on the given topic
   rpc SubscribeToTopic(SubscribeToTopicRequest) returns (SubscribeToTopicResponse) {}
 
+  rpc UnsubscribeFromTopic(UnsubscribeFromTopicRequest) returns (UnsubscribeFromTopicResponse) {}
+
   // Simple RPC to Send a message to a specified destination
   rpc SendMessage(Message) returns (SendMessageResponse) {}
 
@@ -100,6 +102,15 @@ enum SUBSCRIBE_TO_TOPIC_RESULT {
 message SubscribeToTopicRequest {
   string topic = 1;
   string destination = 2;
+}
+
+message UnsubscribeFromTopicRequest {
+  string topic = 1;
+  string destination = 2;
+}
+
+message UnsubscribeFromTopicResponse {
+
 }
 
 message SubscribeToTopicResponse {

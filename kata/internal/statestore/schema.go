@@ -22,7 +22,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
 
 type SchemaType string
@@ -43,8 +43,8 @@ const (
 	labelTypeBool
 )
 
-type Schema struct {
-	Hash       HashID          `json:"hash"        gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+type SchemaPersisted struct {
+	ID         types.Bytes32   `json:"id"          gorm:"primaryKey"`
 	CreatedAt  types.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
 	DomainID   string          `json:"domain"`
 	Type       SchemaType      `json:"type"`
@@ -60,57 +60,61 @@ type schemaLabelInfo struct {
 	resolver      filters.FieldResolver
 }
 
-type hashIDOnly struct {
-	HashID HashID `gorm:"primaryKey;embedded;embeddedPrefix:hash_;"`
+type idOnly struct {
+	ID types.Bytes32 `gorm:"primaryKey"`
 }
 
-type SchemaCommon interface {
+type Schema interface {
 	Type() SchemaType
-	Persisted() *Schema
-	LabelInfo() []*schemaLabelInfo
+	IDString() string
+	Signature() string
+	Persisted() *SchemaPersisted
 	ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
 }
 
-func schemaCacheKey(domainID string, hash *HashID) string {
-	return domainID + "/" + hash.String()
+type labelInfoAccess interface {
+	labelInfo() []*schemaLabelInfo
 }
 
-func (ss *stateStore) PersistSchema(ctx context.Context, s SchemaCommon) error {
+func schemaCacheKey(domainID string, id types.Bytes32) string {
+	return domainID + "/" + id.String()
+}
+
+func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 	op := ss.writer.newWriteOp(s.Persisted().DomainID)
-	op.schemas = []*Schema{s.Persisted()}
+	op.schemas = []*SchemaPersisted{s.Persisted()}
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (SchemaCommon, error) {
-	schemaHash, err := ParseHashID(ctx, schemaID)
+func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (Schema, error) {
+	id, err := types.ParseBytes32Ctx(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
-	return ss.getSchemaByHash(ctx, domainID, schemaHash, failNotFound)
+	return ss.getSchemaByID(ctx, domainID, id, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, schemaHash *HashID, failNotFound bool) (SchemaCommon, error) {
+func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID types.Bytes32, failNotFound bool) (Schema, error) {
 
-	cacheKey := schemaCacheKey(domainID, schemaHash)
+	cacheKey := schemaCacheKey(domainID, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
 	if cached {
 		return s, nil
 	}
 
-	var results []*Schema
+	var results []*SchemaPersisted
 	err := ss.p.DB().
 		Table("schemas").
 		Where("domain_id = ?", domainID).
-		Where("hash_l = ?", schemaHash.L.String()).
-		Where("hash_h = ?", schemaHash.H.String()).
+		Where("id = ?", schemaID).
 		Limit(1).
 		Find(&results).
 		Error
 	if err != nil || len(results) == 0 {
 		if err == nil && failNotFound {
-			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, schemaHash)
+			return nil, i18n.NewError(ctx, msgs.MsgStateSchemaNotFound, schemaID)
 		}
 		return s, err
 	}
@@ -129,20 +133,20 @@ func (ss *stateStore) getSchemaByHash(ctx context.Context, domainID string, sche
 	return s, nil
 }
 
-func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results []SchemaCommon, err error) {
-	var ids []*hashIDOnly
+func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results []Schema, err error) {
+	var ids []*idOnly
 	err = ss.p.DB().
 		Table("schemas").
-		Select("hash_l", "hash_h").
+		Select("id").
 		Where("domain_id = ?", domainID).
 		Find(&ids).
 		Error
 	if err != nil {
 		return nil, err
 	}
-	results = make([]SchemaCommon, len(ids))
+	results = make([]Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByHash(ctx, domainID, &id.HashID, true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, domainID, id.ID, true); err != nil {
 			return nil, err
 		}
 	}

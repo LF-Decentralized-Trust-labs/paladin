@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -695,8 +695,8 @@ func TestEvalQueryLikeFail(t *testing.T) {
 		},
 		matches: true,
 	}
-	res := eval.NewRoot().IsLike(&FilterJSONKeyValue{
-		FilterJSONBase: FilterJSONBase{Field: "stringField"},
+	res := eval.NewRoot().IsLike(&OpSingleVal{
+		Op: Op{Field: "stringField"},
 	}, "stringField", StringField("string_field"), "any")
 	assert.Regexp(t, "PD010715", res.Error())
 

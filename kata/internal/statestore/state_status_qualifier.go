@@ -27,7 +27,7 @@ import (
 )
 
 // Queries against the state store can be made in the context of a
-// sequence UUID, or one of the standard qualifiers
+// transaction UUID, or one of the standard qualifiers
 // (confirmed/unconfirmed/spent/all)
 type StateStatusQualifier string
 
@@ -66,7 +66,7 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 			Where(`"Locked"."spending" IS NOT TRUE`). // not being spent - catches null case
 			Where(db.
 				Or(`"Confirmed"."transaction" IS NOT NULL`). // confirmed by the blockchain
-				Or(`"Locked"."creating" = TRUE`),            // being minted on a sequence
+				Or(`"Locked"."creating" = TRUE`),            // being minted on a transaction
 			)
 	case StateStatusConfirmed:
 		return db.
@@ -77,15 +77,15 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 			Where(`"Confirmed"."transaction" IS NULL`)
 	case StateStatusLocked:
 		return db.
-			Where(`"Locked"."sequence" IS NOT NULL`)
+			Where(`"Locked"."transaction" IS NOT NULL`)
 	case StateStatusSpent:
 		return db.
 			Where(`"Spent"."transaction" IS NOT NULL`)
 	case StateStatusAll:
 		return db.Where("TRUE")
 	default:
-		// Querying in the context of a sequence, gives you only states locked specifically into
-		// that sequence - NOT the ones available for that sequence to use.
+		// Querying in the context of a transaction, gives you only states locked specifically into
+		// that transaction - NOT the ones available for that transaction to use.
 		//
 		// The assembler routine provides that facility to domains during the assemble call using
 		// in-memory state as well as database state.
@@ -93,6 +93,6 @@ func (q StateStatusQualifier) whereClause(db *gorm.DB /* must be the DB not the 
 		// TODO: Determine if we need to move the JSON/RPC call to be the more obvious thing
 		//       of the same thing as the assembler (once we've implemented that)
 		return db.
-			Where(`"Locked"."sequence" = ?`, q)
+			Where(`"Locked"."transaction" = ?`, q)
 	}
 }

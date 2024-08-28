@@ -38,10 +38,10 @@ func TestBroker_ListenOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create 2 listeners.  The first listener subscribes for new listerer events
+	// Create 2 listeners.  The first listener subscribes for new listener events
 	// and then they will see that the 2nd listener has been created
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	// Create a channel to signal test completion
@@ -93,7 +93,7 @@ func TestBroker_SendMessageOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	// Create a channel to signal test completion
@@ -151,7 +151,7 @@ func TestBroker_SendMessageHandlerTimeout(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	_, err = testBroker.Listen(ctx, "test.destination")
@@ -183,7 +183,7 @@ func TestBroker_Unlisten(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	handler, err := testBroker.Listen(ctx, "test.destination")
@@ -227,7 +227,7 @@ func TestBroker_ListDestinationsOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	_, err = testBroker.Listen(ctx, "test.destination.1")
@@ -247,7 +247,7 @@ func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	// Create a channel to signal test completion
@@ -306,7 +306,7 @@ func TestBroker_UnSubscribeToTopicsOK(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	handler, err := testBroker.Listen(ctx, "test.destination.1")
@@ -349,7 +349,7 @@ func TestBroker_DoubleSubscribeFail(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	_, err = testBroker.Listen(ctx, "test.destination.1")
@@ -368,7 +368,7 @@ func TestBroker_SubscribeUnknownDestinationFail(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testBroker, err := newBroker(ctx, &BrokerConfig{})
+	testBroker, err := newBroker()
 	require.NoError(t, err)
 
 	_, err = testBroker.Listen(ctx, "test.destination.1")
