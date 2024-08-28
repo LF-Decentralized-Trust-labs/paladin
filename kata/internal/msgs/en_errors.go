@@ -141,4 +141,8 @@ var (
 	MsgPluginLoadError             = ffe("PD011201", "Failed to load plugin with binding %s from %s")
 	MsgPluginNotFound              = ffe("PD011202", "Plugin %s not found")
 	MsgPluginBindingNotSupported   = ffe("PD011203", "Binding %s not supported")
+
+	// Engine PD0118XX
+	// TODO find all instances of MsgSequencerInternalError and decide if they should be more specific
+	MsgSequencerInternalError = ffe("PD011810", "Sequencer internal error %s, ")
 )
