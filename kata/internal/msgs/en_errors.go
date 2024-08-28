@@ -90,13 +90,18 @@ var (
 	MsgPersistenceMissingMigrationDir = ffe("PD010204", "Missing database migration directory for autoMigrate")
 
 	// Transaction Processor PD0103XX
-	MsgTransactionProcessorInvalidStage = ffe("PD010300", "Invalid stage: %s")
-	MsgContextCanceled                  = ffe("PD010301", "Context canceled")
+	MsgTransactionProcessorInvalidStage         = ffe("PD010300", "Invalid stage: %s")
+	MsgContextCanceled                          = ffe("PD010301", "Context canceled")
+	MsgTransactionProcessorActionFailed         = ffe("PD010302", "Action for transaction with ID: %s at stage %s failed")
+	MsgTransactionProcessorBlockedOnDependency  = ffe("PD010303", "Transaction with ID: %s cannot be processed by %s stage due to dependent transactions.")
+	MsgTransactionProcessorUndeterminedStage    = ffe("PD010304", "Cannot determine a processing stage for transaction with ID: %s")
+	MsgTransactionProcessorEmptyAssembledResult = ffe("PD010305", "No transaction was assembled for transaction with ID: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField   = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
-	MsgTransactionParseError     = ffe("PD010401", "Failed to parse transaction message.")
-	MsgTransactionSerializeError = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionParseError           = ffe("PD010401", "Failed to parse transaction message.")
+	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionInvalidTransactionID = ffe("PD010403", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Comms bus PD0106XX
 	MsgDestinationNotFound     = ffe("PD010600", "Destination not found: %s")
@@ -250,4 +255,11 @@ var (
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")
+
+	// Engine PD0118XX
+	MsgDomainNotProvided    = ffe("PD011800", "Domain not found in the transaction input")
+	MsgEngineInternalError  = ffe("PD011801", "Unexpected error in engine")
+	MsgEngineAssembleError  = ffe("PD011802", "Error assembling transaction")
+	MsgEngineParseFailed    = ffe("PD011803", "Failed to parse message")
+	MsgEngineInvalidMessage = ffe("PD011804", "Invalid message recieved from transport")
 )

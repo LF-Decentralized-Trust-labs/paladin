@@ -13,23 +13,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package controller
 
 import (
 	"context"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTransactionProcessor(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID: uuid.New(),
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
@@ -37,21 +45,26 @@ func TestTransactionProcessor(t *testing.T) {
 
 func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID:       uuid.New(),
-		Contract: "continue",
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
 	assert.Empty(t, testTx.SequenceID)
 
-	tp.Continue(ctx)
+	tp.Init(ctx)
 	assert.NotEmpty(t, tp.stageContext)
 
-	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+	tp.AddStageEvent(ctx, &types.StageEvent{
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},
@@ -60,8 +73,8 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 	assert.NotEmpty(t, testTx.SequenceID)
 
 	testTx.Contract = "complete"
-	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+	tp.AddStageEvent(ctx, &types.StageEvent{
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},
@@ -71,11 +84,16 @@ func TestTransactionProcessorPersistTxUpdates(t *testing.T) {
 
 func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 	ctx := context.Background()
-	testTx := &transactionstore.Transaction{
-		ID:       uuid.New(),
-		Contract: "continue",
+	newTxID := uuid.New()
+	testTx := &transactionstore.TransactionWrapper{
+		Transaction: transactionstore.Transaction{
+			ID: newTxID,
+		},
+		PrivateTransaction: &components.PrivateTransaction{
+			ID: newTxID,
+		},
 	}
-	tp := NewPaladinTransactionProcessor(ctx, testTx).(*PaladinTxProcessor)
+	tp := NewPaladinTransactionProcessor(ctx, testTx, newTestStageController(ctx)).(*PaladinTxProcessor)
 	tp.stageController = newTestStageController(ctx)
 	assert.Nil(t, tp.GetStageContext(ctx))
 	assert.Nil(t, tp.GetStageTriggerError(ctx))
@@ -83,8 +101,8 @@ func TestTransactionProcessorInitiateOnEvent(t *testing.T) {
 
 	assert.Empty(t, tp.stageContext)
 
-	tp.AddStageEvent(ctx, &StageEvent{
-		Type: testStage,
+	tp.AddStageEvent(ctx, &types.StageEvent{
+		Stage: testStage,
 		Data: &testActionOutput{
 			Message: "continue",
 		},

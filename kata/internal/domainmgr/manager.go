@@ -43,6 +43,7 @@ import (
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
+
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
 

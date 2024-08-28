@@ -38,7 +38,6 @@ public class RunTestbedTest {
         System.out.println(System.getProperty("os.name"));
         System.out.println(System.getProperty("os.arch"));
         System.out.println(System.getProperty("java.library.path"));
-        System.setProperty("jna.debug_load", "true");
 
         // Generate config that listens on an available RPC port
         ServerSocket s = new ServerSocket(0);
@@ -82,7 +81,7 @@ domains:
         class: %s
      config: {}
 loader:
-  debug: true     
+  debug: true
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort, TestDomainFactory.class.getName());
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);

@@ -12,22 +12,28 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido.paladin;
 
-import com.sun.jna.Native;
-import com.sun.jna.Library;
+package types
 
-public class KataJNA {
+import (
+	"testing"
 
-    private PaladinGo paladinGo;
+	"github.com/stretchr/testify/assert"
+)
 
-    interface PaladinGo extends Library {
-        int Run(String socketAddress, String loaderUUID, String configFile, String engineName) ;
-        void Stop();
-    }
+func TestForTypesAndMocks(t *testing.T) {
 
-    public static PaladinGo Load() {
-        return Native.load("kata", PaladinGo.class);
-    }
+	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil)
+	assert.Nil(t, pfs.DependencyChecker())
+	assert.Nil(t, pfs.IdentityResolver())
+	assert.Nil(t, pfs.StateStore())
 
+	// mock object tests for coverage:
+	mIR := &MockIdentityResolver{}
+
+	assert.NoError(t, mIR.ConnectToBaseLeger())
+	assert.True(t, mIR.IsCurrentNode("current-node"))
+	assert.False(t, mIR.IsCurrentNode("not-current-node"))
+	assert.Empty(t, mIR.GetDispatchAddress(nil))
+	assert.Equal(t, "test", mIR.GetDispatchAddress([]string{"test"}))
 }
