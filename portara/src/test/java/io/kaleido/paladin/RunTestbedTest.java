@@ -15,23 +15,18 @@
 
 package io.kaleido.paladin;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
-import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.sql.Time;
 import java.time.Duration;
-import java.time.LocalTime;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,7 +76,12 @@ domains:
         type: c-shared
         library: starter
      config: {}
-""".formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort);
+  domain2:
+     plugin:
+        type: jar
+        class: %s
+     config: {}
+""".formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort, TestDomainFactory.class.getName());
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
 

@@ -49,8 +49,8 @@ public class PluginJAR extends Plugin {
         }
         Class<?> clazz = Class.forName(className);
         pluginImpl = clazz.getDeclaredConstructor().newInstance();
-        Method startInstanceMethod = clazz.getDeclaredMethod("startInstance", String.class, String.class);
-        stopInstanceMethod = clazz.getDeclaredMethod("stopInstance", String.class);
+        Method startInstanceMethod = clazz.getMethod("startInstance", String.class, String.class);
+        stopInstanceMethod = clazz.getMethod("stopInstance", String.class);
         startInstanceMethod.invoke(pluginImpl, grpcTarget, info.instanceId());
     }
 
