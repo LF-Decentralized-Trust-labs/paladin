@@ -126,8 +126,8 @@ func TestEventIndexingBadEvent(t *testing.T) {
 				{
 					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
 					Data: types.RawJSON(`{
-						"data": "cannot parse this"
-					}`),
+						 "data": "cannot parse this"
+					 }`),
 				},
 			},
 		})

@@ -37,23 +37,23 @@ import (
 )
 
 const fakeCoinConstructorABI = `{
-	"type": "constructor",
-	"inputs": [
-	  {
-		"name": "notary",
-		"type": "string"
-	  },
-	  {
-		"name": "name",
-		"type": "string"
-	  },
-	  {
-		"name": "symbol",
-		"type": "string"
-	  }
-	],
-	"outputs": null
-}`
+	 "type": "constructor",
+	 "inputs": [
+	   {
+		 "name": "notary",
+		 "type": "string"
+	   },
+	   {
+		 "name": "name",
+		 "type": "string"
+	   },
+	   {
+		 "name": "symbol",
+		 "type": "string"
+	   }
+	 ],
+	 "outputs": null
+ }`
 
 const fakeCoinStateSchema = `{
 	"type": "tuple",

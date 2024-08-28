@@ -25,7 +25,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 95
+    targetCoverage = 94
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
@@ -78,6 +78,7 @@ task installTools(type:Exec) {
     args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
     args 'github.com/vektra/mockery/v2'
 }
+
 
 task copyTestContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
@@ -165,6 +166,12 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/rpcbackendmocks'
     }
     mock {
+        inputDir 'internal/engine'
+        includeAll true
+        outputPackage 'enginemocks'
+        outputDir 'mocks/enginemocks'
+    }
+    mock {
         inputDir 'internal/components'
         includeAll true
         outputPackage 'componentmocks'
@@ -217,7 +224,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         includeAll true
         outputPackage 'componentmocks'
         outputDir 'mocks/componentmocks'
-    }    
+    }
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {

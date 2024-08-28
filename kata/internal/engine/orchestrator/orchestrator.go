@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package engine
+package orchestrator
 
 import (
 	"context"
@@ -21,6 +21,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
+	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
@@ -35,6 +40,7 @@ import (
 //    a. events through a buffered channel for back-pressure to drive the pace
 //    b. fetching from DB as a fallback mechanism when events are missed
 // 1. Provide transaction data access for stage processing with a consistent cache for efficiency
+// 1. Provide an efficient lookup for pre req tx check
 
 // TBD: decide whether this generic logic should be reused by the following levels of orchestrations:
 // 1. Transactions in a chain
@@ -97,6 +103,8 @@ type Orchestrator struct {
 	stageRetryTimeout       time.Duration
 	persistenceRetryTimeout time.Duration
 
+	StageController controller.StageController
+
 	// each orchestrator has its own go routine
 	initiated       time.Time     // when orchestrator is created
 	evalInterval    time.Duration // between how long the orchestrator will do an evaluation to check & remove transactions that missed events
@@ -104,7 +112,7 @@ type Orchestrator struct {
 
 	maxConcurrentProcess        int
 	incompleteTxProcessMapMutex sync.Mutex
-	incompleteTxSProcessMap     map[string]TxProcessor // a map of all known transactions that are not completed
+	incompleteTxSProcessMap     map[string]controller.TxProcessor // a map of all known transactions that are not completed
 
 	processedTxIDs       map[string]bool // an internal record of completed transactions to handle persistence delays that causes reprocessing
 	orchestratorLoopDone chan struct{}
@@ -118,8 +126,8 @@ type Orchestrator struct {
 	state          OrchestratorState
 	stateEntryTime time.Time // when the orchestrator entered the current state
 
-	staleTimeout     time.Duration
-	lastActivityTime time.Time
+	staleTimeout time.Duration
+	// lastActivityTime time.Time
 }
 
 var orchestratorConfigDefault = OrchestratorConfig{
@@ -130,7 +138,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore, domainAPI components.DomainSmartContract) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -141,7 +149,7 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		state:                OrchestratorStateNew,
 		stateEntryTime:       time.Now(),
 
-		// in-flight transaction configs
+		incompleteTxSProcessMap: make(map[string]controller.TxProcessor),
 		stageRetryTimeout:       confutil.DurationMin(oc.StageRetry, 1*time.Millisecond, *orchestratorConfigDefault.StageRetry),
 		persistenceRetryTimeout: confutil.DurationMin(oc.PersistenceRetryTimeout, 1*time.Millisecond, *orchestratorConfigDefault.PersistenceRetryTimeout),
 
@@ -150,6 +158,13 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
 	}
+
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
+		// for now, assume all orchestrators have same stages and register all the stages here
+		&stages.DispatchStage{},
+		&stages.AssembleStage{},
+		&stages.AttestationStage{},
+	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
 
@@ -188,34 +203,39 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 	evalStart := time.Now()
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
-	hasActivity := false
+	// hasActivity := false
 
 	oldIncompleteMap := oc.incompleteTxSProcessMap
-	oc.incompleteTxSProcessMap = make(map[string]TxProcessor, len(oldIncompleteMap))
+	oc.incompleteTxSProcessMap = make(map[string]controller.TxProcessor, len(oldIncompleteMap))
 
 	stageCounts := make(map[string]int)
-	for _, stageName := range AllIncompleteTxStages {
+	for _, stageName := range oc.StageController.GetAllStages() {
 		// map for saving number of known incomplete transactions per stage
 		stageCounts[stageName] = 0
 	}
+
+	// TODO: how to distinguish the engine states below
+	stageCounts["remove"] = 0
+	stageCounts["suspend"] = 0
+	stageCounts["queued"] = 0
 
 	for txID, txp := range oldIncompleteMap {
 		oc.processedTxIDs[txID] = true
 		sc := txp.GetStageContext(ctx)
 		if sc != nil {
-			if sc.Stage == TxStageComplete {
+			if sc.Stage == "remove" {
 				// no longer in an incomplete stage
 				delete(oc.incompleteTxSProcessMap, txID)
 				oc.totalCompleted = oc.totalCompleted + 1
-				hasActivity = true
+				// hasActivity = true
 				log.L(ctx).Debugf("Orchestrator evaluate and process, marking %s as complete.", txID)
-			} else if sc.Stage == TxStageSuspend {
+			} else if sc.Stage == "suspend" {
 				log.L(ctx).Debugf("Orchestrator evaluate and process, removed suspended tx %s", txID)
 			} else {
-				stageCounts[string(sc.Stage)] = stageCounts[string(sc.Stage)] + 1
+				stageCounts[sc.Stage] = stageCounts[sc.Stage] + 1
 			}
 		} else {
-			stageCounts[string(TxStageQueued)] = stageCounts[string(TxStageQueued)] + 1
+			stageCounts["queued"] = stageCounts["queued"] + 1
 
 		}
 	}
@@ -229,40 +249,40 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 	// check and evaluate new transactions from the persistence if we can handle more
 	// If we are not at maximum, then query if there are more candidates now
 
-	spaces := oc.maxConcurrentProcess - oldTotal
-	if spaces > 0 {
-		completedTxIDsStillBeingPersisted := make(map[string]bool)
-		// TODO: evaluate and put kick off stage processing for transactions
-		oc.processedTxIDs = completedTxIDsStillBeingPersisted
-		newTotal = len(oc.incompleteTxSProcessMap)
-		added = newTotal - oldTotal
-		if added > 0 {
-			log.L(ctx).Infof("Evaluation loop added %d new transactions", added)
-		}
-		// TODO: emit metrics
-	}
+	// spaces := oc.maxConcurrentProcess - oldTotal
+	// if spaces > 0 {
+	// 	completedTxIDsStillBeingPersisted := make(map[string]bool)
+	// 	// TODO: evaluate and put kick off stage processing for transactions
+	// 	oc.processedTxIDs = completedTxIDsStillBeingPersisted
+	// 	newTotal = len(oc.incompleteTxSProcessMap)
+	// 	added = newTotal - oldTotal
+	// 	if added > 0 {
+	// 		log.L(ctx).Infof("Evaluation loop added %d new transactions", added)
+	// 	}
+	// 	// TODO: emit metrics
+	// }
 	log.L(ctx).Debugf("Orchestrator evaluate from DB took %s", time.Since(evalStart))
 	// now check and process each transaction
 
-	if newTotal > 0 {
-		blockedByPreReq := oc.ProcessIncompleteTransactions(ctx, oc.incompleteTxSProcessMap)
-		if hasActivity {
-			oc.lastActivityTime = time.Now()
-		}
-		if time.Since(oc.lastActivityTime) > oc.staleTimeout && oc.state != OrchestratorStateStale {
-			oc.state = OrchestratorStateStale
-			oc.stateEntryTime = time.Now()
-		} else if blockedByPreReq && oc.state != OrchestratorStateWaiting {
-			oc.state = OrchestratorStateWaiting
-			oc.stateEntryTime = time.Now()
-		} else if oc.state != OrchestratorStateRunning {
-			oc.state = OrchestratorStateRunning
-			oc.stateEntryTime = time.Now()
-		}
-	} else if oc.state != OrchestratorStateIdle {
-		oc.state = OrchestratorStateIdle
-		oc.stateEntryTime = time.Now()
-	}
+	// if newTotal > 0 {
+	// 	blockedByPreReq := oc.ProcessIncompleteTransactions(ctx, oc.incompleteTxSProcessMap)
+	// 	if hasActivity {
+	// 		oc.lastActivityTime = time.Now()
+	// 	}
+	// 	if time.Since(oc.lastActivityTime) > oc.staleTimeout && oc.state != OrchestratorStateStale {
+	// 		oc.state = OrchestratorStateStale
+	// 		oc.stateEntryTime = time.Now()
+	// 	} else if blockedByPreReq && oc.state != OrchestratorStateWaiting {
+	// 		oc.state = OrchestratorStateWaiting
+	// 		oc.stateEntryTime = time.Now()
+	// 	} else if oc.state != OrchestratorStateRunning {
+	// 		oc.state = OrchestratorStateRunning
+	// 		oc.stateEntryTime = time.Now()
+	// 	}
+	// } else if oc.state != OrchestratorStateIdle {
+	// 	oc.state = OrchestratorStateIdle
+	// 	oc.stateEntryTime = time.Now()
+	// }
 	log.L(ctx).Debugf("Orchestrator process loop took %s", time.Since(evalStart))
 	return added, newTotal
 }
@@ -270,34 +290,38 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tsm transactionstore.TxStateManager) (queued bool) {
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
-	if len(oc.incompleteTxSProcessMap) >= oc.maxConcurrentProcess {
-		// TODO: decide how this map is managed, it shouldn't track the entire lifecycle
-		// tx processing pool is full, queue the item
-		return true
-	} else {
-		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = NewPaladinTransactionProcessor(ctx, tsm)
-		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)].Continue(ctx)
-		return false
-	}
-}
-
-func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *StageEvent) (queued bool) {
-	oc.incompleteTxProcessMapMutex.Lock()
-	defer oc.incompleteTxProcessMapMutex.Unlock()
-	txProc := oc.incompleteTxSProcessMap[stageEvent.TxID]
-	if txProc == nil {
-		// TODO: decide what to do here,bypass max concurrent process check?
-		// or throw the event away and waste another cycle to redo the actions
-		// (doesn't feel right, maybe for some events only persistence is needed)
-		return true
-	} else {
-		txProc.AddStageEvent(ctx, stageEvent)
+	if oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] == nil {
+		if len(oc.incompleteTxSProcessMap) >= oc.maxConcurrentProcess {
+			// TODO: decide how this map is managed, it shouldn't track the entire lifecycle
+			// tx processing pool is full, queue the item
+			return true
+		} else {
+			oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = controller.NewPaladinTransactionProcessor(ctx, tsm, oc.StageController)
+		}
+		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)].Init(ctx)
 	}
 	return false
 }
 
+func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *types.StageEvent) {
+	oc.incompleteTxProcessMapMutex.Lock()
+	defer oc.incompleteTxProcessMapMutex.Unlock()
+	txProc := oc.incompleteTxSProcessMap[stageEvent.TxID]
+	if txProc == nil {
+		// TODO: is bypassing max concurrent process correct?
+		// or throw the event away and waste another cycle to redo the actions
+		// (doesn't feel right, maybe for some events only persistence is needed)
+		tsm := transactionstore.NewTransactionStageManagerByTxID(ctx, stageEvent.TxID)
+		oc.incompleteTxSProcessMap[tsm.GetTxID(ctx)] = controller.NewPaladinTransactionProcessor(ctx, tsm, oc.StageController)
+		txProc = oc.incompleteTxSProcessMap[stageEvent.TxID]
+	}
+	go func() {
+		txProc.AddStageEvent(ctx, stageEvent)
+	}()
+}
+
 // this function should only have one running instance at any given time
-func (oc *Orchestrator) ProcessIncompleteTransactions(ctx context.Context, txStages map[string]TxProcessor) (blockedByPreReq bool) {
+func (oc *Orchestrator) ProcessIncompleteTransactions(ctx context.Context, txStages map[string]controller.TxProcessor) (blockedByPreReq bool) {
 	processStart := time.Now()
 	blockedByPreReq = false
 	log.L(ctx).Debugf("%s ProcessIncompleteTransactions entry for contract address %s", processStart.String(), oc.contractAddress)
