@@ -21,20 +21,20 @@ import org.apache.logging.log4j.Logger;
 import java.util.HashMap;
 import java.util.Map;
 
-public abstract class PluginBase<MSG extends CommonMessage> {
+abstract class PluginBase<MSG> {
 
     private static final Logger LOGGER = LogManager.getLogger(PluginBase.class);
 
-    protected abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceUUID);
+    abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceId);
 
     private final Map<String, PluginInstance<MSG>> instances = new HashMap<>();
 
-    public synchronized void startInstance(String grpcTarget, String instanceUUID) {
-        instances.put(instanceUUID, newPluginInstance(grpcTarget, instanceUUID));
+    public synchronized void startInstance(String grpcTarget, String instanceId) {
+        instances.put(instanceId, newPluginInstance(grpcTarget, instanceId));
     }
 
-    public synchronized void stopInstance(String instanceUUID) {
-        PluginInstance<MSG> instance = instances.remove(instanceUUID);
+    public synchronized void stopInstance(String instanceId) {
+        PluginInstance<MSG> instance = instances.remove(instanceId);
         if (instance != null) {
             instance.shutdown();
         }

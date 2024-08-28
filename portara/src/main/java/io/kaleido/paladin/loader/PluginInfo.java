@@ -16,4 +16,4 @@ package io.kaleido.paladin.loader;
 
 import java.util.UUID;
 
-record PluginInfo(String grpcTarget, String pluginType, String name, UUID instanceUUID) {}
+record PluginInfo(String grpcTarget, String pluginType, String name, String instanceId) {}

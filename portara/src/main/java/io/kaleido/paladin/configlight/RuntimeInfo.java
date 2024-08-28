@@ -27,4 +27,4 @@ import java.io.IOException;
 import java.util.UUID;
 
 
-public record RuntimeInfo(UUID instanceUUID, String socketFilename) {}
+public record RuntimeInfo(UUID instanceId, String socketFilename) {}

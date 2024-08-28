@@ -54,15 +54,13 @@ public class InFlight<K, V> {
         return req;
      }
 
-     public synchronized boolean completeRequest(K id, V value) {
+     public synchronized void completeRequest(K id, V value) {
         CompletableFuture<V> req = requests.remove(id);
         if (req == null) {
             LOGGER.warn("notified after cancel for request {}", id);
-            return false;
         } else {
             LOGGER.debug("completed request {}", id);
             req.complete(value);
-            return true;
         }
      }
 

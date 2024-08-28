@@ -39,11 +39,11 @@ public class Main {
             // and to initialize the Java logging framework.
             RuntimeInfo runtimeInfo = new YamlConfig(configFile).getRuntimeInfo();
 
-            loader = new PluginLoader(runtimeInfo.socketFilename(), runtimeInfo.instanceUUID());
+            loader = new PluginLoader(runtimeInfo.socketFilename(), runtimeInfo.instanceId());
 
             return KataJNA.Load().Run(
                     runtimeInfo.socketFilename(),
-                    runtimeInfo.instanceUUID().toString(),
+                    runtimeInfo.instanceId().toString(),
                     configFile,
                     engineName
             );

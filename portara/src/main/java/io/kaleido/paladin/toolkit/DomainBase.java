@@ -16,7 +16,20 @@
 package io.kaleido.paladin.toolkit;
 
 import github.com.kaleido_io.paladin.toolkit.Service;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-public interface CommonMessage {
-    public Service.Header getHeader();
+import java.util.HashMap;
+import java.util.Map;
+
+public abstract class DomainBase extends PluginBase<Service.DomainMessage> {
+    private static final Logger LOGGER = LogManager.getLogger(DomainBase.class);
+
+    protected abstract DomainInstance newDomainInstance(String grpcTarget, String instanceId);
+
+    @Override
+    final PluginInstance<Service.DomainMessage> newPluginInstance(String grpcTarget, String instanceId) {
+        LOGGER.info("Starting new domain instance {} connecting to {}", instanceId, grpcTarget);
+        return newDomainInstance(grpcTarget, instanceId);
+    }
 }

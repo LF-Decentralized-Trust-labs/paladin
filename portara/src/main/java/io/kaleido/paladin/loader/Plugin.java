@@ -14,23 +14,26 @@
  */
 package io.kaleido.paladin.loader;
 
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import github.com.kaleido_io.paladin.toolkit.Service;
-
-import java.util.UUID;
-
-abstract class Plugin implements Runnable {
+abstract class Plugin  {
 
    protected final String grpcTarget;
    protected final PluginInfo info;
 
-   Plugin(String grpcTarget, PluginInfo info) {
-      this.grpcTarget = grpcTarget;
-      this.info = info;
+   interface PluginStopped {
+      void pluginStopped(String instanceId, Plugin plugin, Throwable t);
    }
 
-   abstract void stop();
+   final PluginStopped onStop;
+
+   Plugin(String grpcTarget, PluginInfo info, PluginStopped onStop) {
+      this.grpcTarget = grpcTarget;
+      this.info = info;
+      this.onStop = onStop;
+   }
+
+   abstract void loadAndStart() throws Exception;
+
+   abstract void stop() throws Exception;
 
    public PluginInfo getInfo() {
       return info;

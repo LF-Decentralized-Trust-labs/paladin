@@ -27,7 +27,6 @@ import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -43,7 +42,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     private final String grpcTarget;
 
-    private final UUID instanceUUID;
+    private final String instanceId;
 
     private ManagedChannel channel;
 
@@ -51,15 +50,15 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     private boolean shuttingDown;
 
-    private final Map<UUID, Plugin> plugins = new HashMap<>();
+    private final Map<String, Plugin> plugins = new HashMap<>();
 
     private int reconnectCount = 0;
 
     private CompletableFuture<Void> reconnect;
 
-    public PluginLoader(String grpcTarget, UUID instanceUUID) {
+    public PluginLoader(String grpcTarget, String instanceId) {
         this.grpcTarget = grpcTarget;
-        this.instanceUUID = instanceUUID;
+        this.instanceId = instanceId;
         scheduleConnect();
     }
 
@@ -68,10 +67,18 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         if (channel != null) {
             channel.shutdownNow();
         }
-        for (UUID instanceUUID: plugins.keySet()) {
-            PluginInfo info = plugins.get(instanceUUID).info;
-            LOGGER.info("stopping {} {} [{}]", info.pluginType(), info.name(), instanceUUID);
-            plugins.get(instanceUUID).stop();
+        for (String instanceId: plugins.keySet()) {
+            Plugin plugin = plugins.get(instanceId);
+            // Run the stops in parallel in the background (not holding the mutex)
+            CompletableFuture.runAsync(() -> {
+                LOGGER.info("stopping {} {} [{}]", plugin.info.pluginType(), plugin.info.name(), instanceId);
+                try {
+                    plugin.stop();
+                } catch (Throwable t) {
+                    // Don't block exit if we fail
+                    pluginStopped(instanceId, plugin, t);
+                }
+            });
         }
         while (!plugins.isEmpty()) {
             try {
@@ -95,7 +102,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
                 stub = PluginControllerGrpc.newStub(channel);
             }
             Service.PluginLoaderInit req = Service.PluginLoaderInit.newBuilder().
-                    setId(instanceUUID.toString()).
+                    setId(instanceId.toString()).
                     build();
             stub.initLoader(req, this);
         } catch(Throwable t) {
@@ -127,11 +134,10 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     @Override
     public void onNext(PluginLoad loadInstruction) {
-        UUID instanceUUID = UUID.fromString(loadInstruction.getPlugin().getId());
         PluginInfo info = new PluginInfo(grpcTarget, loadInstruction.getPlugin().getPluginType().toString(),
-                loadInstruction.getPlugin().getName(), instanceUUID);
+                loadInstruction.getPlugin().getName(), loadInstruction.getPlugin().getId());
         LOGGER.info("load instruction for {} {} [{}] libType={} location={} class={}",
-                info.pluginType(), info.name(), instanceUUID,
+                info.pluginType(), info.name(), instanceId,
                 loadInstruction.getLibType(), loadInstruction.getLibLocation(), loadInstruction.getClass_());
         switch (loadInstruction.getLibType()) {
             case JAR -> loadJAR(info, loadInstruction);
@@ -164,12 +170,13 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         reconnectCount = 0;
     }
 
-    private synchronized void loadJNA(PluginInfo info, PluginLoad loadInstruction) {
-        Plugin plugin;
+    private synchronized void loadPlugin(PluginLoad loadInstruction, Plugin plugin) {
         try {
-            plugin = new PluginJNA(grpcTarget, info, loadInstruction.getLibLocation());
+            plugins.put(instanceId, plugin);
+            plugin.loadAndStart();
+            resetReconnectCount();
         } catch(Throwable t) {
-            LOGGER.error(new FormattedMessage("JNA load {} failed", loadInstruction.getLibLocation()), t);
+            LOGGER.error("plugin load failed", t);
             stub.loadFailed(Service.PluginLoadFailed.newBuilder()
                             .setPlugin(loadInstruction.getPlugin())
                             .setErrorMessage(t.getMessage())
@@ -179,40 +186,25 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         }
         // We've got a success
         resetReconnectCount();
-        plugins.put(instanceUUID, plugin);
-        runPlugin(instanceUUID, plugin);
+        plugins.put(instanceId, plugin);
+    }
+
+    private synchronized void loadJNA(PluginInfo info, PluginLoad loadInstruction) {
+        Plugin plugin = new PluginJNA(grpcTarget, info, this::pluginStopped, loadInstruction.getLibLocation());
+        loadPlugin(loadInstruction, plugin);
     }
 
     private synchronized void loadJAR(PluginInfo info, PluginLoad loadInstruction) {
-//        Plugin plugin;
-        try {
-            throw new UnsupportedOperationException("TODO: Implement");
-        } catch(Throwable t) {
-            LOGGER.error(new FormattedMessage("JAR load jar={} class={} failed",
-                    loadInstruction.getLibLocation(),
-                    loadInstruction.getClass_()
-            ), t);
-            stub.loadFailed(Service.PluginLoadFailed.newBuilder()
-                            .setPlugin(loadInstruction.getPlugin())
-                            .setErrorMessage(t.getMessage())
-                            .build(),
-                    new LoggingObserver<>("loadFailed"));
-//            return;
+        Plugin plugin = new PluginJAR(grpcTarget, info, this::pluginStopped, loadInstruction.getLibLocation(), loadInstruction.getClass_());
+        loadPlugin(loadInstruction, plugin);
+    }
+
+
+    synchronized void pluginStopped(String instanceId, Plugin plugin, Throwable t) {
+        if (t != null) {
+            LOGGER.error(new FormattedMessage("exception from plugin {} {} [{}]", plugin.info.pluginType(), plugin.info.name(), instanceId), t);
         }
-//        // We've got a success
-//        resetReconnectCount();
-//        plugins.put(instanceUUID, plugin);
-//        runPlugin(instanceUUID, plugin);
-    }
-
-    private void runPlugin(UUID instanceUUID, Plugin plugin) {
-        PluginInfo info = plugin.info;
-        LOGGER.info("starting {} {} [{}]", info.pluginType(), info.name(), instanceUUID);
-        CompletableFuture.runAsync(plugin).thenRun(() -> pluginStopped(instanceUUID, plugin));
-    }
-
-    private synchronized void pluginStopped(UUID instanceUUID, Plugin plugin) {
-        plugins.remove(instanceUUID, plugin);
+        plugins.remove(instanceId, plugin);
         this.notifyAll();
     }
 
