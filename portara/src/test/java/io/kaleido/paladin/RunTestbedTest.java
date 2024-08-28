@@ -81,6 +81,8 @@ domains:
         type: jar
         class: %s
      config: {}
+loader:
+  debug: true     
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort, TestDomainFactory.class.getName());
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
