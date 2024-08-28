@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
@@ -36,48 +38,29 @@ func (as *AttestationStage) Name() string {
 }
 
 func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
-	txsToCheck := tsg.GetPreReqTransactions(ctx)
-	if tsg.GetDispatchAddress(ctx) == "" {
-		// no dispatch address selected yet, continue to assign one
-		return nil
-	}
-	preReqsPending := sfs.DependencyChecker().PreReqsMatchCondition(ctx, txsToCheck, func(preReqTx transactionstore.TxStateGetters) (preReqComplete bool) {
-		return preReqTx.IsAttestationCompleted(ctx) // TODO: need to do a better check here
 
-	})
-	if len(preReqsPending) > 0 {
-		return &types.TxProcessPreReq{
-			TxIDs: preReqsPending,
-		}
-	}
 	return nil
 }
 
 func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+	tx := tsg.HACKGetPrivateTx()
+
 	unprocessedStageEvents = []*types.StageEvent{}
 	nextStep = types.NextStepWait
 	for _, se := range stageEvents {
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case prototk.AttestationResult: // TODO, we need to check the attestation matches the current version
+				case *prototk.AttestationResult: // TODO, we need to check the attestation matches the current version
 					if txUpdates == nil {
 						txUpdates = &transactionstore.TransactionUpdate{}
 					}
-					existingAttResults := tsg.GetAttestationResults(ctx)
-					existingAttResults = append(existingAttResults, &v)
-					attResultBytes, err := json.Marshal(existingAttResults)
-					attResultStr := string(attResultBytes)
-					if err != nil {
-						// stage retry needed
-						nextStep = types.NextStepNewStage
-						break
-					}
-					txUpdates.AttestationResults = &attResultStr
-					if len(existingAttResults) == len(tsg.GetAttestationPlan(ctx)) {
-						nextStep = types.NextStepNewStage
-					} else {
+					tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, v)
+
+					if len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan) {
 						nextStep = types.NextStepWait
+					} else {
+						nextStep = types.NextStepNewStage
 					}
 				}
 			}
@@ -92,15 +75,22 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 
 func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
-	return tx.PostAssembly != nil && tx.PostAssembly.AttestationPlan != nil && len(tx.PostAssembly.AttestationPlan) > len(tx.PostAssembly.Endorsements)
+	return tx.PostAssembly != nil &&
+		tx.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_OK &&
+		len(tx.PostAssembly.AttestationPlan) > 0 //&&
+	//len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan)
+
 }
 
 func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
-	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
+	tx := tsg.HACKGetPrivateTx()
+
+	if tx.PostAssembly == nil {
+		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
+		return nil, i18n.NewError(ctx, msgs.MsgEngineInternalError, "")
 	}
-	attPlan := tsg.GetAttestationPlan(ctx)
-	attResults := tsg.GetAttestationResults(ctx)
+	attPlan := tx.PostAssembly.AttestationPlan
+	attResults := tx.PostAssembly.Endorsements
 	for _, ap := range attPlan {
 		toBeComplete := true
 		for _, ar := range attResults {
@@ -110,8 +100,29 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 			}
 		}
 		if toBeComplete {
-			// TODO: emit the attestation request in a separate go routine
-			sfs.TransportManager().SyncExchange() // this should be async.
+			for _, party := range ap.GetParties() {
+				message := types.StageEvent{
+					Stage:           as.Name(),
+					Data:            ap.GetPayload(),
+					ContractAddress: tx.Inputs.Domain,
+					TxID:            tx.ID.String(),
+				}
+				messageBytes, err := json.Marshal(message)
+				if err != nil {
+					//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+					log.L(ctx).Errorf("Failed to marshal message payload: %s", err)
+					return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+				}
+				err = sfs.TransportManager().Send(ctx, components.TransportMessage{
+					MessageType: "endorsementRequest",
+					Payload:     messageBytes,
+				}, party)
+				if err != nil {
+					//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+					log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
+					return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+				}
+			}
 		}
 	}
 	return nil, nil
