@@ -38,8 +38,6 @@ require (
 
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../toolkit_go
-
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
 	4d63.com/gochecknoglobals v0.2.1 // indirect
