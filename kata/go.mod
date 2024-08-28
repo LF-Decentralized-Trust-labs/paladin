@@ -38,6 +38,8 @@ require (
 
 )
 
+require github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b // indirect
+
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
 	4d63.com/gochecknoglobals v0.2.1 // indirect
