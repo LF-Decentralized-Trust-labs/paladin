@@ -34,16 +34,10 @@ public class PluginJAR extends Plugin {
     private Object pluginImpl;
     private Method stopInstanceMethod;
 
-    PluginJAR(String grpcTarget, PluginInfo info, PluginStopped onStop, String libName, String className) throws MalformedURLException, NoSuchMethodException, ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    PluginJAR(String grpcTarget, PluginInfo info, PluginStopped onStop, String libName, String className) {
         super(grpcTarget, info, onStop);
         this.libName = libName;
         this.className = className;
-    }
-
-
-    @Override
-    public synchronized void stop() throws Exception {
-        stopInstanceMethod.invoke(pluginImpl, info.instanceId());
     }
 
     @Override
@@ -59,4 +53,11 @@ public class PluginJAR extends Plugin {
         stopInstanceMethod = clazz.getDeclaredMethod("stopInstance", String.class);
         startInstanceMethod.invoke(pluginImpl, grpcTarget, info.instanceId());
     }
+
+    @Override
+    public synchronized void stop() throws Exception {
+        stopInstanceMethod.invoke(pluginImpl, info.instanceId());
+        onStop.pluginStopped(info.instanceId(), this, null);
+    }
+
 }

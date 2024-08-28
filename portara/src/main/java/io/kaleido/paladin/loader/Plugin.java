@@ -35,8 +35,4 @@ abstract class Plugin  {
 
    abstract void stop() throws Exception;
 
-   public PluginInfo getInfo() {
-      return info;
-   }
-
 }

@@ -27,6 +27,7 @@ import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -42,7 +43,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     private final String grpcTarget;
 
-    private final String instanceId;
+    private final UUID instanceId;
 
     private ManagedChannel channel;
 
@@ -56,7 +57,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     private CompletableFuture<Void> reconnect;
 
-    public PluginLoader(String grpcTarget, String instanceId) {
+    public PluginLoader(String grpcTarget, UUID instanceId) {
         this.grpcTarget = grpcTarget;
         this.instanceId = instanceId;
         scheduleConnect();
@@ -172,7 +173,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
 
     private synchronized void loadPlugin(PluginLoad loadInstruction, Plugin plugin) {
         try {
-            plugins.put(instanceId, plugin);
+            plugins.put(loadInstruction.getPlugin().getId(), plugin);
             plugin.loadAndStart();
             resetReconnectCount();
         } catch(Throwable t) {
@@ -186,7 +187,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         }
         // We've got a success
         resetReconnectCount();
-        plugins.put(instanceId, plugin);
+        plugins.put(loadInstruction.getPlugin().getId(), plugin);
     }
 
     private synchronized void loadJNA(PluginInfo info, PluginLoad loadInstruction) {
