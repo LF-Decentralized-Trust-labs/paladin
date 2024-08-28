@@ -15,33 +15,29 @@
 
 package io.kaleido.paladin.toolkit;
 
-import github.com.kaleido_io.paladin.toolkit.PluginControllerGrpc;
-import github.com.kaleido_io.paladin.toolkit.Service;
-import github.com.kaleido_io.paladin.toolkit.Service.PluginLoad;
-import io.grpc.ManagedChannel;
-import io.grpc.netty.NettyChannelBuilder;
-import io.grpc.stub.StreamObserver;
-import io.kaleido.paladin.loader.LoggingObserver;
-import io.kaleido.paladin.loader.Plugin;
-import io.kaleido.paladin.loader.PluginInfo;
-import io.kaleido.paladin.loader.PluginJNA;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.message.FormattedMessage;
 
-import java.net.UnixDomainSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
-public abstract class PluginBase {
+public abstract class PluginBase<MSG extends CommonMessage> {
 
     private static final Logger LOGGER = LogManager.getLogger(PluginBase.class);
 
-    protected abstract PluginInstance NewPluginInstance(String grpcTarget, String instanceUUID);
+    protected abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceUUID);
+
+    private final Map<String, PluginInstance<MSG>> instances = new HashMap<>();
+
+    public synchronized void startInstance(String grpcTarget, String instanceUUID) {
+        instances.put(instanceUUID, newPluginInstance(grpcTarget, instanceUUID));
+    }
+
+    public synchronized void stopInstance(String instanceUUID) {
+        PluginInstance<MSG> instance = instances.remove(instanceUUID);
+        if (instance != null) {
+            instance.shutdown();
+        }
+    }
 
 }

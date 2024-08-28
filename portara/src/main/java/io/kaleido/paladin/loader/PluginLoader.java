@@ -18,17 +18,13 @@ package io.kaleido.paladin.loader;
 import github.com.kaleido_io.paladin.toolkit.PluginControllerGrpc;
 import github.com.kaleido_io.paladin.toolkit.Service;
 import github.com.kaleido_io.paladin.toolkit.Service.PluginLoad;
-import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioDomainSocketChannel;
+import io.kaleido.paladin.toolkit.GRPCTargetConnector;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
-import java.net.UnixDomainSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -87,31 +83,25 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         }
     }
 
-    private synchronized void connect() {
+    private synchronized void connectAndInit() {
         LOGGER.info("Plugin loader connecting to {}", grpcTarget);
         if (reconnect != null) {
             reconnect.cancel(false);
             reconnect = null;
         }
-        if (channel == null || channel.isShutdown()) {
-            NettyChannelBuilder channelBuilder;
-            if (grpcTarget.startsWith("unix:")) {
-                String socketFile = grpcTarget.replaceFirst("unix:", "");
-                channelBuilder = NettyChannelBuilder.forAddress(UnixDomainSocketAddress.of(socketFile));
-            } else {
-                channelBuilder = NettyChannelBuilder.forTarget(grpcTarget);
+        try {
+            if (channel == null || channel.isShutdown()) {
+                channel = GRPCTargetConnector.connect(grpcTarget);
+                stub = PluginControllerGrpc.newStub(channel);
             }
-            channel = channelBuilder
-                    .eventLoopGroup(new NioEventLoopGroup())
-                    .channelType(NioDomainSocketChannel.class)
-                    .usePlaintext()
-                    .build();
-            stub = PluginControllerGrpc.newStub(channel);
+            Service.PluginLoaderInit req = Service.PluginLoaderInit.newBuilder().
+                    setId(instanceUUID.toString()).
+                    build();
+            stub.initLoader(req, this);
+        } catch(Throwable t) {
+            LOGGER.error("Connect and init failed", t);
+            scheduleConnect();
         }
-        Service.PluginLoaderInit req = Service.PluginLoaderInit.newBuilder().
-                setId(instanceUUID.toString()).
-                build();
-        stub.initLoader(req, this);
     }
 
     /** Every time our connection state changes on the stream, or the channel, we go through
@@ -131,7 +121,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         LOGGER.info("Scheduling loader connect in {}ms", delay);
         reconnectCount++;
         reconnect = new CompletableFuture<>();
-        reconnect.completeAsync(() -> { connect(); return null; },
+        reconnect.completeAsync(() -> { connectAndInit(); return null; },
                 CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS));
     }
 
