@@ -98,7 +98,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.NotNil(t, as.definition)
 	assert.Equal(t, "type=MyStruct(uint256 field1,string field2,int64 field3,bool field4,address field5,int256 field6,bytes field7,uint32 field8,string field9),labels=[field1,field2,field3,field4,field5,field6,field7,field8]", as.Persisted().Signature)
 	cacheKey := "domain1/0xcf41493c8bb9652d1483ee6cb5122efbec6fbdf67cc27363ba5b030b59244cad"
-	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, &as.Persisted().ID))
+	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, as.Persisted().ID))
 
 	err = ss.PersistSchema(ctx, as)
 	assert.NoError(t, err)

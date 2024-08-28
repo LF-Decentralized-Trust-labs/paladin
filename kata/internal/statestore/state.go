@@ -40,9 +40,11 @@ type State struct {
 	Locked      *StateLock         `json:"locked,omitempty"    gorm:"foreignKey:state;references:id;"`
 }
 
-type NewState struct {
+type StateUpsert struct {
 	SchemaID string
 	Data     types.RawJSON
+	Creating bool
+	Spending bool
 }
 
 // StateWithLabels is a newly prepared state that has not yet been persisted
@@ -91,7 +93,7 @@ func (ss *stateStore) PersistState(ctx context.Context, domainID string, schemaI
 }
 
 func (ss *stateStore) GetState(ctx context.Context, domainID, stateID string, failNotFound, withLabels bool) (*State, error) {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +148,7 @@ func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 
 func (ss *stateStore) labelSetFor(schema Schema) *trackingLabelSet {
 	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
-	for _, fi := range schema.LabelInfo() {
+	for _, fi := range schema.(labelInfoAccess).labelInfo() {
 		tls.labels[fi.label] = fi
 	}
 	return &tls
@@ -158,6 +160,10 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*idOnly) (schema Schema, s []*State, err error) {
+	if len(query.Sort) == 0 {
+		query.Sort = []string{".created"}
+	}
+
 	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, nil, err
@@ -183,7 +189,7 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 
 	q = q.Joins("Confirmed", db.Select("transaction")).
 		Joins("Spent", db.Select("transaction")).
-		Joins("Locked", db.Select("sequence")).
+		Joins("Locked", db.Select("transaction")).
 		Where("domain_id = ?", domainID).
 		Where("schema = ?", schema.Persisted().ID)
 
@@ -203,14 +209,14 @@ func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateConfirms = []*StateConfirm{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
@@ -218,38 +224,38 @@ func (ss *stateStore) MarkConfirmed(ctx context.Context, domainID, stateID strin
 }
 
 func (ss *stateStore) MarkSpent(ctx context.Context, domainID, stateID string, transactionID uuid.UUID) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateSpends = []*StateSpend{
-		{State: *id, Transaction: transactionID},
+		{State: id, Transaction: transactionID},
 	}
 
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, sequenceID uuid.UUID, creating, spending bool) error {
-	id, err := types.ParseBytes32(ctx, stateID)
+func (ss *stateStore) MarkLocked(ctx context.Context, domainID, stateID string, transactionID uuid.UUID, creating, spending bool) error {
+	id, err := types.ParseBytes32Ctx(ctx, stateID)
 	if err != nil {
 		return err
 	}
 
 	op := ss.writer.newWriteOp(domainID)
 	op.stateLocks = []*StateLock{
-		{State: *id, Sequence: sequenceID, Creating: creating, Spending: spending},
+		{State: id, Transaction: transactionID, Creating: creating, Spending: spending},
 	}
 
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)
 }
 
-func (ss *stateStore) ResetSequence(ctx context.Context, domainID string, sequenceID uuid.UUID) error {
+func (ss *stateStore) ResetTransaction(ctx context.Context, domainID string, transactionID uuid.UUID) error {
 	op := ss.writer.newWriteOp(domainID)
-	op.sequenceLockDeletes = []uuid.UUID{sequenceID}
+	op.transactionLockDeletes = []uuid.UUID{transactionID}
 
 	ss.writer.queue(ctx, op)
 	return op.flush(ctx)

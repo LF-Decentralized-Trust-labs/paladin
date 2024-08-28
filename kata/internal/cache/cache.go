@@ -18,7 +18,7 @@ package cache
 
 import (
 	"github.com/Code-Hex/go-generics-cache/policy/lru"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 
 type Config struct {

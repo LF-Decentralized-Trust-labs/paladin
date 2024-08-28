@@ -37,6 +37,8 @@ func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) 
 	})
 	assert.NoError(t, err)
 
+	store.Close()
+
 	return ctx, store.(*staticStore)
 }
 

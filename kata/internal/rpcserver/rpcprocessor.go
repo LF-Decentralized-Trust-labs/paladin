@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcbackend.RPCRequest) (*rpcbackend.RPCResponse, bool) {
@@ -49,7 +49,7 @@ func (s *rpcServer) processRPC(ctx context.Context, rpcReq *rpcbackend.RPCReques
 
 	startTime := time.Now()
 	log.L(ctx).Debugf("RPC-> %s", rpcReq.Method)
-	rpcRes := handler(ctx, rpcReq)
+	rpcRes := handler.Handle(ctx, rpcReq)
 	durationMS := float64(time.Since(startTime)) / float64(time.Millisecond)
 	if rpcRes.Error != nil {
 		log.L(ctx).Errorf("<!RPC %s (%.2fms): %s", rpcReq.Method, durationMS, rpcRes.Error.Message)

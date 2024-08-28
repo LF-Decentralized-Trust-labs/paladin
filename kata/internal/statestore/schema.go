@@ -69,12 +69,15 @@ type Schema interface {
 	IDString() string
 	Signature() string
 	Persisted() *SchemaPersisted
-	LabelInfo() []*schemaLabelInfo
 	ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
 }
 
-func schemaCacheKey(domainID string, id *types.Bytes32) string {
+type labelInfoAccess interface {
+	labelInfo() []*schemaLabelInfo
+}
+
+func schemaCacheKey(domainID string, id types.Bytes32) string {
 	return domainID + "/" + id.String()
 }
 
@@ -86,14 +89,14 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (Schema, error) {
-	id, err := types.ParseBytes32(ctx, schemaID)
+	id, err := types.ParseBytes32Ctx(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
 	return ss.getSchemaByID(ctx, domainID, id, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID *types.Bytes32, failNotFound bool) (Schema, error) {
+func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID types.Bytes32, failNotFound bool) (Schema, error) {
 
 	cacheKey := schemaCacheKey(domainID, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -143,7 +146,7 @@ func (ss *stateStore) ListSchemas(ctx context.Context, domainID string) (results
 	}
 	results = make([]Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, domainID, &id.ID, true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, domainID, id.ID, true); err != nil {
 			return nil, err
 		}
 	}

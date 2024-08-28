@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type staticStore struct {
@@ -112,4 +112,8 @@ func (ils *staticStore) LoadKeyMaterial(ctx context.Context, keyHandle string) (
 		return nil, i18n.NewError(ctx, msgs.MsgSigningKeyCannotBeResolved)
 	}
 	return key, nil
+}
+
+func (ils *staticStore) Close() {
+
 }

@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"gorm.io/gorm"
 )
 
@@ -47,7 +47,6 @@ func (est EventStreamType) Options() []string {
 		string(EventStreamTypeInternal),
 	}
 }
-func (est EventStreamType) Default() string { return string(EventStreamTypeInternal) }
 func (est EventStreamType) Enum() types.Enum[EventStreamType] {
 	return types.Enum[EventStreamType](est)
 }
@@ -68,12 +67,19 @@ type EventStreamCheckpoint struct {
 }
 
 type EventStreamSignature struct {
-	Stream    uuid.UUID     `json:"stream"                      gorm:"primaryKey"`
-	Signature types.Bytes32 `json:"signature"                   gorm:"primaryKey"`
+	Stream        uuid.UUID     `json:"stream"                 gorm:"primaryKey"`
+	SignatureHash types.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
 }
 
 type EventWithData struct {
 	*IndexedEvent
+
+	// SoliditySignature allows a deterministic comparison to which ABI to use in the runtime,
+	// when both the blockindexer and consuming code are using the same version of firefly-signer.
+	// Includes variable names, including deep within nested structure.
+	// Things like whitespace etc. subject to change (so should not stored for later comparison)
+	SoliditySignature string `json:"soliditySignature"`
+
 	Address types.EthAddress `json:"address"`
 	Data    types.RawJSON    `json:"data"`
 }
@@ -85,7 +91,10 @@ type EventDeliveryBatch struct {
 	Events     []*EventWithData `json:"events"`
 }
 
-type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) error
+// Post commit callback is invoked after the DB transaction completes (only on success)
+type PostCommit func()
+
+type InternalStreamCallback func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error)
 
 type InternalEventStream struct {
 	Definition *EventStream

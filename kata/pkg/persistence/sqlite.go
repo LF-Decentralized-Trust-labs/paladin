@@ -22,7 +22,7 @@ import (
 
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	migratesqlite3 "github.com/golang-migrate/migrate/v4/database/sqlite3"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	gormSQLite "gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

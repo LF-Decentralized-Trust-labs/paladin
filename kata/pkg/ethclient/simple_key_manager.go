@@ -98,9 +98,13 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 	}
 	key := loc.Keys[keyName]
 	if key == nil || key.Identifiers[algorithm] == "" {
-		// resolve either a new key, or a new identifier for an existing key
 		resolveRequest.Name = keyName
-		resolveRequest.Index = loc.Children
+		// resolve either a new key, or a new identifier for an existing key
+		if key == nil {
+			resolveRequest.Index = loc.Children
+		} else {
+			resolveRequest.Index = key.Index
+		}
 		resolved, err := km.signer.Resolve(ctx, resolveRequest)
 		if err != nil {
 			return "", "", err
@@ -129,4 +133,8 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, a
 
 func (km *simpleKeyManager) Sign(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
 	return km.signer.Sign(ctx, req)
+}
+
+func (km *simpleKeyManager) Close() {
+	km.signer.Close()
 }

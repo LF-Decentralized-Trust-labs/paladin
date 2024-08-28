@@ -28,21 +28,35 @@ import (
 
 // RPCHandler should not be implemented directly - use RPCMethod0 ... RPCMethod5 to implement your function
 // These use generics to avoid you needing to do any messy type mapping in your functions.
-type RPCHandler func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
+type RPCHandler interface {
+	Handle(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
+}
+
+func HandlerFunc(fn func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse) RPCHandler {
+	return &rpcHandlerFunc{fn: fn}
+}
+
+type rpcHandlerFunc struct {
+	fn func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse
+}
+
+func (hf *rpcHandlerFunc) Handle(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return hf.fn(ctx, req)
+}
 
 func RPCMethod0[R any](impl func(ctx context.Context) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		code, err := parseParams(ctx, req)
 		if err == nil {
 			result, err = impl(ctx)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func RPCMethod1[R any, P0 any](impl func(ctx context.Context, param0 P0) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		param0 := new(P0)
 		code, err := parseParams(ctx, req, param0)
@@ -50,11 +64,11 @@ func RPCMethod1[R any, P0 any](impl func(ctx context.Context, param0 P0) (R, err
 			result, err = impl(ctx, *param0)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func RPCMethod2[R any, P0 any, P1 any](impl func(ctx context.Context, param0 P0, param1 P1) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		param0 := new(P0)
 		param1 := new(P1)
@@ -63,11 +77,11 @@ func RPCMethod2[R any, P0 any, P1 any](impl func(ctx context.Context, param0 P0,
 			result, err = impl(ctx, *param0, *param1)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func RPCMethod3[R any, P0 any, P1 any, P2 any](impl func(ctx context.Context, param0 P0, param1 P1, param2 P2) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		param0 := new(P0)
 		param1 := new(P1)
@@ -77,11 +91,11 @@ func RPCMethod3[R any, P0 any, P1 any, P2 any](impl func(ctx context.Context, pa
 			result, err = impl(ctx, *param0, *param1, *param2)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func RPCMethod4[R any, P0 any, P1 any, P2 any, P3 any](impl func(ctx context.Context, param0 P0, param1 P1, param2 P2, param3 P3) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		param0 := new(P0)
 		param1 := new(P1)
@@ -92,11 +106,11 @@ func RPCMethod4[R any, P0 any, P1 any, P2 any, P3 any](impl func(ctx context.Con
 			result, err = impl(ctx, *param0, *param1, *param2, *param3)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func RPCMethod5[R any, P0 any, P1 any, P2 any, P3 any, P4 any](impl func(ctx context.Context, param0 P0, param1 P1, param2 P2, param3 P3, param4 P4) (R, error)) RPCHandler {
-	return func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
+	return HandlerFunc(func(ctx context.Context, req *rpcbackend.RPCRequest) *rpcbackend.RPCResponse {
 		var result R
 		param0 := new(P0)
 		param1 := new(P1)
@@ -108,7 +122,7 @@ func RPCMethod5[R any, P0 any, P1 any, P2 any, P3 any, P4 any](impl func(ctx con
 			result, err = impl(ctx, *param0, *param1, *param2, *param3, *param4)
 		}
 		return mapResponse(ctx, req, result, code, err)
-	}
+	})
 }
 
 func parseParams(ctx context.Context, req *rpcbackend.RPCRequest, params ...interface{}) (rpcbackend.RPCCode, error) {

@@ -6,4 +6,5 @@ use (
 	./kata
 	./talaria
 	./testinfra
+	./toolkit_go
 )

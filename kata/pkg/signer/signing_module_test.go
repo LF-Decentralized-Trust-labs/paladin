@@ -24,9 +24,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/confutil"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,6 +65,10 @@ func (tk *testKeyStoreAll) Sign_secp256k1(ctx context.Context, keyHandle string,
 
 func (tk *testKeyStoreAll) ListKeys(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error) {
 	return tk.listKeys(ctx, req)
+}
+
+func (tk *testKeyStoreAll) Close() {
+
 }
 
 func TestExtensionInitFail(t *testing.T) {
@@ -121,7 +126,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 				Name:      "key 23456",
 				KeyHandle: "key23456",
 				Identifiers: []*proto.PublicKeyIdentifier{
-					{Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
+					{Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES, Identifier: "0x93e5a15ce57564278575ff7182b5b3746251e781"},
 				},
 			},
 		},
@@ -162,6 +167,7 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011415", err)
 
+	sm.Close()
 }
 
 func TestExtensionKeyStoreListFail(t *testing.T) {
@@ -221,7 +227,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 	assert.NoError(t, err)
 
 	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -229,7 +235,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 
 	resSign, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.NoError(t, err)
@@ -260,7 +266,7 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Name:       "key1",
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -292,7 +298,7 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "pop", err)
@@ -310,7 +316,7 @@ func TestSignInMemoryFailBadKey(t *testing.T) {
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
 	assert.Regexp(t, "PD011418", err)
@@ -330,18 +336,18 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, resolveRes.KeyHandle)
 	assert.Equal(t, "key1", resolveRes.KeyHandle)
-	assert.Equal(t, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
+	assert.Equal(t, algorithms.ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
 	assert.NotEmpty(t, resolveRes.Identifiers[0].Identifier)
 
 	signRes, err := sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: resolveRes.KeyHandle,
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("sign me"),
 	})
 	assert.NoError(t, err)
@@ -406,7 +412,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	assert.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.NoError(t, err)
@@ -426,7 +432,7 @@ func TestInMemorySignFailures(t *testing.T) {
 	sm.(*signingModule).disableKeyLoading = true
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
 	assert.Regexp(t, "PD011409", err)
@@ -455,7 +461,7 @@ func TestZKPSigningModuleKeyResolution(t *testing.T) {
 	assert.NoError(t, err)
 
 	resp1, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		Algorithms: []string{api.Algorithm_ECDSA_SECP256K1_PLAINBYTES, api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES},
+		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES, algorithms.ZKP_BABYJUBJUB_PLAINBYTES},
 		Name:       "blueKey",
 		Path: []*proto.ResolveKeyPathSegment{
 			{Name: "alice"},

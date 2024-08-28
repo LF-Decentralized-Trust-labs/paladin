@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/hex"
+	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -28,12 +29,52 @@ import (
 // EthAddress is an SQL serializable version of ethtypes.Address0xHex
 type EthAddress [20]byte
 
+func ParseEthAddress(s string) (*EthAddress, error) {
+	a, err := ethtypes.NewAddress(s)
+	if err != nil {
+		return nil, err
+	}
+	return (*EthAddress)(a), nil
+}
+
+func MustEthAddress(s string) *EthAddress {
+	a := ethtypes.MustNewAddress(s)
+	return (*EthAddress)(a)
+}
+
+func EthAddressBytes(b []byte) *EthAddress {
+	var a EthAddress
+	copy(a[:], b)
+	return &a
+}
+
 func (a *EthAddress) Address0xHex() *ethtypes.Address0xHex {
 	return (*ethtypes.Address0xHex)(a)
 }
 
+func (a *EthAddress) Checksummed() string {
+	return (*ethtypes.AddressWithChecksum)(a).String()
+}
+
 func (a EthAddress) String() string {
 	return a.Address0xHex().String()
+}
+
+func (a *EthAddress) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	parsed, err := ParseEthAddress(s)
+	if err != nil {
+		return err
+	}
+	*a = *parsed
+	return nil
+}
+
+func (a *EthAddress) MarshalJSON() ([]byte, error) {
+	return json.Marshal(a.String())
 }
 
 // Scan implements sql.Scanner
@@ -72,10 +113,7 @@ func (a *EthAddress) Scan(src interface{}) error {
 }
 
 // Value implements sql.Valuer
-func (a *EthAddress) Value() (driver.Value, error) {
-	if a == nil {
-		return nil, nil
-	}
+func (a EthAddress) Value() (driver.Value, error) {
 	// no prefix - always 40 chars
 	return hex.EncodeToString(a[:]), nil
 }

@@ -20,9 +20,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
-	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 )
@@ -48,11 +48,11 @@ func (sf Int64Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (dri
 	}
 	switch v := untyped.(type) {
 	case string:
-		bi, ok := new(big.Int).SetString(v, 0)
-		if ok && bi.IsInt64() {
+		bi, err := ethtypes.BigIntegerFromString(ctx, v)
+		if err == nil && bi.IsInt64() {
 			return bi.Int64(), nil
 		}
-		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidForInt64, v)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgFiltersValueInvalidForInt64, v)
 	case float64:
 		return (int64)(v), nil
 	case bool:

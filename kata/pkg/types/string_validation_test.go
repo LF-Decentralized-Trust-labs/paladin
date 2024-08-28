@@ -19,23 +19,34 @@ package types
 import (
 	"context"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestValidate64SafeCharsStartEndAlphaNum(t *testing.T) {
-	err := Validate64SafeCharsStartEndAlphaNum(context.Background(), "_wrong", "name")
-	assert.Regexp(t, "PD011106.*name", err)
 
-	err = Validate64SafeCharsStartEndAlphaNum(context.Background(), "w!ong", "name")
-	assert.Regexp(t, "PD011106.*name", err)
-
-	err = Validate64SafeCharsStartEndAlphaNum(context.Background(), "01234567890123456789012345678901234567890123456789012345678901234", "name")
-	assert.Regexp(t, "PD011106.*name", err)
-
-	err = Validate64SafeCharsStartEndAlphaNum(context.Background(), "", "name")
-	assert.Regexp(t, "PD011106.*name", err)
-
-	err = Validate64SafeCharsStartEndAlphaNum(context.Background(), "good.n_ess-4", "name")
+	err := ValidateSafeCharsStartEndAlphaNum(context.Background(), "good.n_ess-4", DefaultNameMaxLen, "name")
 	assert.NoError(t, err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "good.n_ess-4", DefaultNameMaxLen, "name")
+	assert.NoError(t, err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "i_domain_mgr_0x91c02c04d77f397c4153f177736ebd19939bad5a4ee3849e1c70adbc96c2c9bb", DefaultNameMaxLen, "name")
+	assert.NoError(t, err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "_wrong", DefaultNameMaxLen, "name")
+	assert.Regexp(t, "PD011106.*name", err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "w!ong", DefaultNameMaxLen, "name")
+	assert.Regexp(t, "PD011106.*name", err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "01234567890123456789012345678901234567890123456789012345678901234", 64, "name")
+	assert.Regexp(t, "PD011106.*name", err)
+
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "", DefaultNameMaxLen, "name")
+	assert.Regexp(t, "PD011106.*name", err)
+	assert.True(t, unicode.IsLetter('À'))
+	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "not_Àll_ascii", DefaultNameMaxLen, "name")
+	assert.Regexp(t, "PD011106.*name", err)
 }
