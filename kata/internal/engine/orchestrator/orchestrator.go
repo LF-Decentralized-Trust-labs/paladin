@@ -162,8 +162,8 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
-		&stages.AssembleStage{},
 		&stages.AttestationStage{},
+		&stages.AssembleStage{},
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
