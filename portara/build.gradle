@@ -27,19 +27,23 @@ test {
 }
 
 configurations {
+    // Resolvable configurations
     toolkitProtoDefinitions {
         canBeConsumed = false
+        canBeResolved = true
     }
     libkata {
         canBeConsumed = false
+        canBeResolved = true
     }
     libstarter {
         canBeConsumed = false
+        canBeResolved = true
     }
 }
 
 dependencies {
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
     testImplementation project(path: ":kata", configuration: "libkata")
     testImplementation project(path: ":toolkit_go", configuration: "libstarter")
 }

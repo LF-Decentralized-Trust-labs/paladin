@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type mintHandler struct {
@@ -50,7 +50,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    tx.domainConfig.NotaryLookup,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 			// TODO: should we also resolve "To" party?
 		},
@@ -74,13 +74,13 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 	return &pb.AssembleTransactionResponse{
 		AssemblyResult: pb.AssembleTransactionResponse_OK,
 		AssembledTransaction: &pb.AssembledTransaction{
-			NewStates: outputStates,
+			OutputStates: outputStates,
 		},
 		AttestationPlan: []*pb.AttestationRequest{
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Parties:         []string{tx.domainConfig.NotaryLookup},
 			},
 		},
@@ -112,9 +112,9 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
-	for i, state := range req.FinalizedTransaction.NewStates {
-		outputs[i] = state.HashId
+	outputs := make([]string, len(req.OutputStates))
+	for i, state := range req.OutputStates {
+		outputs[i] = state.Id
 	}
 
 	params := map[string]interface{}{

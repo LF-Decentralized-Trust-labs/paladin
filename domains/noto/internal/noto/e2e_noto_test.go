@@ -19,20 +19,21 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"gopkg.in/yaml.v3"
+
+	"github.com/go-resty/resty/v2"
+
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/pkg/testbed"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	toDomain       = "to-domain"
-	testbedAddr    = "http://localhost:49600"
-	grpcAddr       = "dns:localhost:49601"
 	notaryName     = "notary"
 	recipient1Name = "recipient1"
 	recipient2Name = "recipient2"
@@ -44,25 +45,44 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func newTestDomain(t *testing.T) (context.Context, context.CancelFunc, *Noto, rpcbackend.Backend) {
-	ctx := context.Background()
-	domain, err := New(ctx, grpcAddr)
+func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
+	configYAML, err := yaml.Marshal(&config)
 	assert.NoError(t, err)
-
-	log.L(ctx).Infof("Listening for gRPC messages on %s", toDomain)
-	err = domain.Listen(ctx, toDomain)
+	err = yaml.Unmarshal(configYAML, &yn)
 	assert.NoError(t, err)
+	return yn
+}
 
-	conf := ffresty.Config{URL: testbedAddr}
-	rest := ffresty.NewWithConfig(ctx, conf)
-	rpc := rpcbackend.NewRPCClient(rest)
+func deployFactory(ctx context.Context, t *testing.T, factory SolidityBuild) string {
+	tb := testbed.NewTestBed()
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	assert.NoError(t, err)
+	defer done()
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	callCtx, cancelCtx := context.WithTimeout(ctx, 10*time.Second)
-	cancel := func() {
-		domain.Close()
-		cancelCtx()
-	}
-	return callCtx, cancel, domain, rpc
+	log.L(ctx).Infof("Deploying Noto factory")
+	factoryAddress, err := deployBytecode(ctx, rpc, factory)
+	assert.NoError(t, err)
+	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
+	return factoryAddress
+}
+
+func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Noto, rpcbackend.Backend) {
+	var domain *Noto
+	tb := testbed.NewTestBed()
+	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+		domain = New(callbacks)
+		return domain
+	})
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
+		domainName: {
+			Config: yamlConfig(t, config),
+			Plugin: plugin,
+		},
+	})
+	assert.NoError(t, err)
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+	return done, domain, rpc
 }
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
@@ -76,34 +96,23 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityB
 }
 
 func TestNoto(t *testing.T) {
-	log.L(context.Background()).Infof("TestNoto")
-	ctx, cancel, noto, rpc := newTestDomain(t)
-	defer cancel()
-
+	ctx := context.Background()
+	log.L(ctx).Infof("TestNoto")
 	domainName := "noto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	factory := loadBuild(notoFactoryJSON)
 
-	log.L(ctx).Infof("Deploying Noto factory")
-	factoryAddress, err := deployBytecode(ctx, rpc, factory)
-	assert.NoError(t, err)
+	factory := loadBuild(notoFactoryJSON)
+	factoryAddress := deployFactory(ctx, t, factory)
 	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
 
-	log.L(ctx).Infof("Configuring Noto domain")
-	var boolResult bool
-	domainConfig := Config{
+	done, noto, rpc := newTestDomain(t, domainName, &Config{
 		FactoryAddress: factoryAddress,
-	}
-	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
-		domainName, domainConfig)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
-	assert.True(t, boolResult)
+	})
+	defer done()
 
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, &NotoConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -111,6 +120,7 @@ func TestNoto(t *testing.T) {
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
 	log.L(ctx).Infof("Mint 100 from notary to notary")
+	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),
@@ -142,7 +152,7 @@ func TestNoto(t *testing.T) {
 		}),
 	})
 	assert.NotNil(t, rpcerr)
-	assert.EqualError(t, rpcerr.Error(), "mint can only be initiated by notary")
+	assert.ErrorContains(t, rpcerr.Error(), "mint can only be initiated by notary")
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 150 from notary (should fail)")
@@ -207,39 +217,24 @@ func TestNoto(t *testing.T) {
 }
 
 func TestNotoSelfSubmit(t *testing.T) {
-	log.L(context.Background()).Infof("TestNotoSelfSubmit")
-	ctx, cancel, noto, rpc := newTestDomain(t)
-	defer cancel()
-
+	ctx := context.Background()
+	log.L(ctx).Infof("TestNotoSelfSubmit")
 	domainName := "noto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	factory := loadBuild(notoSelfSubmitFactoryJSON)
 
-	log.L(ctx).Infof("Deploying Noto factory")
-	var factoryAddress string
-	rpcerr := rpc.CallRPC(ctx, &factoryAddress, "testbed_deployBytecode",
-		notaryName, factory.ABI, factory.Bytecode.String(), `{}`)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
+	factory := loadBuild(notoSelfSubmitFactoryJSON)
+	factoryAddress := deployFactory(ctx, t, factory)
 	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
 
-	log.L(ctx).Infof("Configuring Noto domain")
-	var boolResult bool
-	domainConfig := Config{
+	done, noto, rpc := newTestDomain(t, domainName, &Config{
 		FactoryAddress: factoryAddress,
 		Variant:        "NotoSelfSubmit",
-	}
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
-		domainName, domainConfig)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
-	assert.True(t, boolResult)
+	})
+	defer done()
 
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, &NotoConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -247,6 +242,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
 	log.L(ctx).Infof("Mint 100 from notary to notary")
+	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     notaryName,
 		To:       types.EthAddress(notoAddress),

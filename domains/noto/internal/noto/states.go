@@ -25,8 +25,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type NotoCoin struct {
@@ -136,12 +136,12 @@ func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 			lastStateTimestamp = state.StoredAt
 			coin, err := n.makeCoin(state.DataJson)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.HashId, err)
+				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.Id, err)
 			}
 			total = total.Add(total, coin.Amount.BigInt())
 			stateRefs = append(stateRefs, &pb.StateRef{
 				SchemaId: state.SchemaId,
-				HashId:   state.HashId,
+				Id:       state.Id,
 			})
 			coins = append(coins, coin)
 			if total.Cmp(amount.BigInt()) >= 0 {
@@ -165,14 +165,14 @@ func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*Not
 
 func (n *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
 	req := &pb.FindAvailableStatesRequest{
-		DomainUuid: n.domainID,
-		SchemaId:   n.coinSchema.Id,
-		QueryJson:  query,
+		SchemaId:  n.coinSchema.Id,
+		QueryJson: query,
 	}
-
-	res := &pb.FindAvailableStatesResponse{}
-	err := requestReply(ctx, n.replies, fromDomain, *n.dest, req, &res)
-	return res.States, err
+	res, err := n.callbacks.FindAvailableStates(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return res.States, nil
 }
 
 func (n *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {

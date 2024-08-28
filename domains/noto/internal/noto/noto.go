@@ -21,20 +21,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"reflect"
-	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"gopkg.in/yaml.v2"
 )
 
@@ -50,10 +46,6 @@ var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/NotoSelfSubmit.json
 var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 
-var (
-	fromDomain = "from-domain"
-)
-
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
 	Variant        string `json:"variant" yaml:"variant"`
@@ -67,17 +59,11 @@ type SolidityBuild struct {
 type Noto struct {
 	Interface DomainInterface
 
-	config       *Config
-	conn         *grpc.ClientConn
-	dest         *string
-	client       pb.KataMessageServiceClient
-	stream       pb.KataMessageService_ListenClient
-	stopListener context.CancelFunc
-	done         chan bool
-	chainID      int64
-	domainID     string
-	coinSchema   *pb.StateSchema
-	replies      *replyTracker
+	config     *Config
+	callbacks  plugintk.DomainCallbacks
+	chainID    int64
+	domainID   string
+	coinSchema *pb.StateSchema
 }
 
 type NotoDomainConfig struct {
@@ -122,203 +108,15 @@ func loadBuild(buildOutput []byte) SolidityBuild {
 	return build
 }
 
-func New(ctx context.Context, addr string) (*Noto, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	conn, err := grpc.NewClient(addr, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect gRPC: %v", err)
-	}
+func New(callbacks plugintk.DomainCallbacks) *Noto {
 	noto := &Noto{
-		conn:   conn,
-		client: pb.NewKataMessageServiceClient(conn),
-	}
-	noto.replies = &replyTracker{
-		inflight: make(map[string]*inflightRequest),
-		client:   noto.client,
+		callbacks: callbacks,
 	}
 	noto.Interface = noto.getInterface()
-	return noto, noto.waitForReady(ctx, 2*time.Second)
+	return noto
 }
 
-func (n *Noto) waitForReady(ctx context.Context, deadline time.Duration) error {
-	status, err := n.client.Status(ctx, &pb.StatusRequest{})
-	end := time.Now().Add(deadline)
-	for !status.GetOk() {
-		time.Sleep(time.Second)
-		if time.Now().After(end) {
-			return fmt.Errorf("server was not ready after %s", deadline)
-		}
-		status, err = n.client.Status(ctx, &pb.StatusRequest{})
-	}
-	if err != nil {
-		return err
-	}
-	if !status.GetOk() {
-		return fmt.Errorf("got non-OK status from server")
-	}
-	return nil
-}
-
-func (n *Noto) Close() error {
-	if n.stream != nil {
-		if err := n.stream.CloseSend(); err != nil {
-			return err
-		}
-		n.done <- true
-		n.stopListener()
-	}
-	if n.conn != nil {
-		if err := n.conn.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (n *Noto) Listen(ctx context.Context, dest string) error {
-	n.dest = &dest
-	n.done = make(chan bool, 1)
-
-	var err error
-	var listenerContext context.Context
-
-	listenerContext, n.stopListener = context.WithCancel(ctx)
-	n.stream, err = n.client.Listen(listenerContext, &pb.ListenRequest{Destination: dest})
-	if err != nil {
-		return fmt.Errorf("failed to listen for domain events: %v", err)
-	}
-
-	handlerCtx := log.WithLogField(ctx, "role", "handler")
-	go n.handler(handlerCtx)
-	return nil
-}
-
-func (n *Noto) sendReply(ctx context.Context, message *pb.Message, reply proto.Message) error {
-	body, err := anypb.New(reply)
-	if err == nil {
-		_, err = n.client.SendMessage(ctx, &pb.Message{
-			Destination:   *message.ReplyTo,
-			CorrelationId: &message.Id,
-			Body:          body,
-			ReplyTo:       n.dest,
-		})
-	}
-	return err
-}
-
-func (n *Noto) handler(ctx context.Context) {
-	for {
-		in, err := n.stream.Recv()
-		select {
-		case <-n.done:
-			return
-		default:
-			// do nothing
-		}
-		if err != nil {
-			log.L(ctx).Errorf("Error receiving message - terminating handler loop: %v", err)
-			return
-		}
-
-		// TODO: should probably have a finite number of workers?
-		// Cannot be synchronous, as some calls ("assemble") may need to make
-		// their own additional calls ("find states") and receive the results
-		go func() {
-			reply, err := n.handleMessage(ctx, in)
-			if err != nil {
-				reply = &pb.DomainAPIError{ErrorMessage: err.Error()}
-				err = nil
-			}
-			if reply != nil {
-				if err = n.sendReply(ctx, in, reply); err != nil {
-					log.L(ctx).Errorf("Error sending message reply: %s", err)
-				}
-			}
-		}()
-	}
-}
-
-func (n *Noto) handleMessage(ctx context.Context, message *pb.Message) (reply proto.Message, err error) {
-	body, err := message.Body.UnmarshalNew()
-	if err != nil {
-		return nil, err
-	}
-
-	inflight := n.replies.getInflight(message.CorrelationId)
-	if inflight != nil {
-		inflight.done <- message
-		return nil, nil
-	}
-
-	switch req := body.(type) {
-	case *pb.ConfigureDomainRequest:
-		log.L(ctx).Infof("Received ConfigureDomainRequest")
-		return n.configure(req)
-
-	case *pb.InitDomainRequest:
-		log.L(ctx).Infof("Received InitDomainRequest")
-		return n.init(req)
-
-	case *pb.InitDeployTransactionRequest:
-		log.L(ctx).Infof("Received InitDeployTransactionRequest")
-		params, err := n.validateDeploy(req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.initDeploy(params)
-
-	case *pb.PrepareDeployTransactionRequest:
-		log.L(ctx).Infof("Received PrepareDeployTransactionRequest")
-		_, err := n.validateDeploy(req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.prepareDeploy(ctx, req)
-
-	case *pb.InitTransactionRequest:
-		log.L(ctx).Infof("Received InitTransactionRequest")
-		tx, err := n.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
-
-	case *pb.AssembleTransactionRequest:
-		log.L(ctx).Infof("Received AssembleTransactionRequest")
-		tx, err := n.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
-
-	case *pb.EndorseTransactionRequest:
-		log.L(ctx).Infof("Received EndorseTransactionRequest")
-		tx, err := n.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
-
-	case *pb.PrepareTransactionRequest:
-		log.L(ctx).Infof("Received PrepareTransactionRequest")
-		tx, err := n.validateTransaction(ctx, req.Transaction)
-		if err != nil {
-			return nil, err
-		}
-		return n.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
-
-	case *pb.DomainAPIError:
-		log.L(ctx).Errorf("Received error: %s", req.ErrorMessage)
-		return nil, nil
-
-	default:
-		log.L(ctx).Warnf("Unhandled message type: %s", reflect.TypeOf(req))
-		return nil, nil
-	}
-}
-
-func (n *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
+func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 	var config Config
 	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
 	if err != nil {
@@ -366,29 +164,39 @@ func (n *Noto) configure(req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainRes
 			PrivateContractAbiJson: string(notoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
-		},
-	}, nil
-}
-
-func (n *Noto) init(req *pb.InitDomainRequest) (*pb.InitDomainResponse, error) {
-	n.domainID = req.DomainUuid
-	n.coinSchema = req.AbiStateSchemas[0]
-	log.L(context.TODO()).Infof("Received schema: %s", n.coinSchema)
-	return &pb.InitDomainResponse{}, nil
-}
-
-func (n *Noto) initDeploy(params *NotoConstructorParams) (*pb.InitDeployTransactionResponse, error) {
-	return &pb.InitDeployTransactionResponse{
-		RequiredVerifiers: []*pb.ResolveVerifierRequest{
-			{
-				Lookup:    params.Notary,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+			BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+				SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
 			},
 		},
 	}, nil
 }
 
-func (n *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransactionRequest) (*pb.PrepareDeployTransactionResponse, error) {
+func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
+	n.domainID = req.DomainUuid
+	n.coinSchema = req.AbiStateSchemas[0]
+	return &pb.InitDomainResponse{}, nil
+}
+
+func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
+	params, err := n.validateDeploy(req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.InitDeployResponse{
+		RequiredVerifiers: []*pb.ResolveVerifierRequest{
+			{
+				Lookup:    params.Notary,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
+		},
+	}, nil
+}
+
+func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+	_, err := n.validateDeploy(req.Transaction)
+	if err != nil {
+		return nil, err
+	}
 	config := &NotoDomainConfig{
 		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
 		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
@@ -412,13 +220,45 @@ func (n *Noto) prepareDeploy(ctx context.Context, req *pb.PrepareDeployTransacti
 		return nil, err
 	}
 
-	return &pb.PrepareDeployTransactionResponse{
+	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
 			FunctionName: "deploy",
 			ParamsJson:   string(paramsJSON),
 		},
-		SigningAddress: config.NotaryLookup,
+		Signer: &config.NotaryLookup,
 	}, nil
+}
+
+func (n *Noto) InitTransaction(ctx context.Context, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+	tx, err := n.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return n.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
+}
+
+func (n *Noto) AssembleTransaction(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	tx, err := n.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return n.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
+}
+
+func (n *Noto) EndorseTransaction(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	tx, err := n.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return n.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
+}
+
+func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	tx, err := n.validateTransaction(ctx, req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	return n.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
 }
 
 func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
@@ -457,12 +297,12 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, err
 	}
 
-	signature, err := parser.ABI.SignatureCtx(ctx)
+	signature, _, err := parser.ABI.SolidityDefCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if tx.FunctionSignature != signature {
-		return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
+		return nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
 	}
 
 	domainConfig, err := n.decodeDomainConfig(ctx, tx.ContractConfig)
@@ -502,11 +342,11 @@ func (h *domainHandler) parseCoinList(label string, states []*pb.EndorsableState
 			return nil, nil, nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
 		}
 		if coins[i], err = h.noto.makeCoin(input.StateDataJson); err != nil {
-			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.HashId, err)
+			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.Id, err)
 		}
 		refs[i] = &pb.StateRef{
 			SchemaId: input.SchemaId,
-			HashId:   input.HashId,
+			Id:       input.Id,
 		}
 		total = total.Add(total, coins[i].Amount.BigInt())
 	}

@@ -428,7 +428,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
-	assert.ErrorContains(t, err, "encoding/hex: invalid byte:")
+	assert.ErrorContains(t, err, "witness is empty")
 }
 
 func TestSnarkProveErrorGenerateProof2(t *testing.T) {

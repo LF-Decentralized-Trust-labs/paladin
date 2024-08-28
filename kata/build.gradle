@@ -37,26 +37,30 @@ ext {
 }
 
 configurations {
+    // Resolvable configurations
     compiledContracts {
         canBeConsumed = false
+        canBeResolved = true
     }
     toolkitProtoDefinitions {
         canBeConsumed = false
+        canBeResolved = true
     }
+
+    // Consumable configurations
     libkata {
         canBeConsumed = true
         canBeResolved = false
     }
-    protocFiles {
+    protoCompiled {
         canBeConsumed = true
         canBeResolved = false
     }
 }
 
-
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
 }
 
 task installTools(type: Exec) {
@@ -256,7 +260,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContract
 task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     workingDir '.'
 
-    def libName;
+    def libName
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
         libName = "libkata.dll"
     } else if (Os.isFamily(Os.FAMILY_MAC)) {
@@ -467,25 +471,8 @@ task build {
     dependsOn tasks.checkCoverage
 }
 
-tasks.register('zipProtocFiles', Zip) {  
-    from fileTree("pkg") {
-        include "**/*.proto"
-    }
-    eachFile { fcd ->
-        fcd.setRelativePath(fcd.relativePath.prepend("pkg"))
-    }
-    archiveFileName = "proto.zip"
-    destinationDirectory = projectDir
-    includeEmptyDirs = false
-    dependsOn('protoc')
-}
-
-artifacts {
-    protocFiles(zipProtocFiles)
-}
-
 dependencies {
     libkata files(buildSharedLibrary)
-    protocCompile files(protoc)
+    protoCompiled files(protoc)
 }
 

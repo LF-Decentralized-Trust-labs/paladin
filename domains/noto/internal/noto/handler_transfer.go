@@ -22,8 +22,8 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type transferHandler struct {
@@ -49,7 +49,7 @@ func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    tx.domainConfig.NotaryLookup,
-				Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 			// TODO: should we also resolve "From"/"To" parties?
 		},
@@ -95,7 +95,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 			{
 				Name:            "sender",
 				AttestationType: pb.AttestationType_SIGN,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Payload:         encodedTransfer,
 				Parties:         []string{req.Transaction.From},
 			},
@@ -103,7 +103,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Parties:         []string{tx.domainConfig.NotaryLookup},
 			},
 		}
@@ -113,14 +113,14 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Parties:         []string{tx.domainConfig.NotaryLookup},
 			},
 			// Sender will endorse the assembled transaction (by submitting to the ledger)
 			{
 				Name:            "sender",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Parties:         []string{req.Transaction.From},
 			},
 		}
@@ -129,8 +129,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	return &pb.AssembleTransactionResponse{
 		AssemblyResult: pb.AssembleTransactionResponse_OK,
 		AssembledTransaction: &pb.AssembledTransaction{
-			SpentStates: inputStates,
-			NewStates:   outputStates,
+			InputStates:  inputStates,
+			OutputStates: outputStates,
 		},
 		AttestationPlan: attestation,
 	}, nil
@@ -165,7 +165,7 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *parse
 func (h *transferHandler) validateOwners(tx *parsedTransaction, coins *gatheredCoins) error {
 	for i, coin := range coins.inCoins {
 		if coin.Owner != tx.transaction.From {
-			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].HashId, tx.transaction.From)
+			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.transaction.From)
 		}
 	}
 	return nil
@@ -185,7 +185,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 
 	switch h.noto.config.Variant {
 	case "Noto":
-		if req.Name == "notary" {
+		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
 			if err := h.validateSenderSignature(ctx, tx, req, coins); err != nil {
 				return nil, err
@@ -195,15 +195,15 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 			}, nil
 		}
 	case "NotoSelfSubmit":
-		if req.Name == "notary" {
+		if req.EndorsementRequest.Name == "notary" {
 			// Notary provides a signature for the assembled payload (to be verified on base ledger)
 			inputIDs := make([]interface{}, len(req.Inputs))
 			outputIDs := make([]interface{}, len(req.Outputs))
 			for i, state := range req.Inputs {
-				inputIDs[i] = state.HashId
+				inputIDs[i] = state.Id
 			}
 			for i, state := range req.Outputs {
-				outputIDs[i] = state.HashId
+				outputIDs[i] = state.Id
 			}
 			data := ethtypes.HexBytes0xPrefix("")
 			encodedTransfer, err := h.noto.encodeTransferMasked(ctx, tx.contractAddress, inputIDs, outputIDs, data)
@@ -214,7 +214,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 				EndorsementResult: pb.EndorseTransactionResponse_SIGN,
 				Payload:           encodedTransfer,
 			}, nil
-		} else if req.Name == "sender" {
+		} else if req.EndorsementRequest.Name == "sender" {
 			// Sender submits the transaction
 			return &pb.EndorseTransactionResponse{
 				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
@@ -222,17 +222,17 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 		}
 	}
 
-	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.Name)
+	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.EndorsementRequest.Name)
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	inputs := make([]string, len(req.FinalizedTransaction.SpentStates))
-	for i, state := range req.FinalizedTransaction.SpentStates {
-		inputs[i] = state.HashId
+	inputs := make([]string, len(req.InputStates))
+	for i, state := range req.InputStates {
+		inputs[i] = state.Id
 	}
-	outputs := make([]string, len(req.FinalizedTransaction.NewStates))
-	for i, state := range req.FinalizedTransaction.NewStates {
-		outputs[i] = state.HashId
+	outputs := make([]string, len(req.OutputStates))
+	for i, state := range req.OutputStates {
+		outputs[i] = state.Id
 	}
 
 	var signature *pb.AttestationResult

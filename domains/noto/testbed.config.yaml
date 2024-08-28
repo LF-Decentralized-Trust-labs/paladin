@@ -3,21 +3,18 @@ db:
   sqlite:
     uri: ':memory:'
     autoMigrate: true
-    migrationsDir: './db/migrations/sqlite'
+    migrationsDir: '../../../../kata/db/migrations/sqlite'
 rpcServer:
   http:
-    address: 0.0.0.0
-    port: 49600
+    port: 0
   ws:
     disabled: true
 blockchain:
+  http:
+    url: http://localhost:8545
   ws:
-    url: ws://besu:8546
+    url: ws://localhost:8546
     initialConnectAttempts: 25
-bus:
-  grpc:
-    socketProtocol: tcp
-    socketAddress: ":49601"
 signer:
   keyDerivation:
     type: "bip32"
