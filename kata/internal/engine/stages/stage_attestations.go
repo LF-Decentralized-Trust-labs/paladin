@@ -91,7 +91,8 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 }
 
 func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
-	return tsg.IsAttestationCompleted(ctx)
+	tx := tsg.HACKGetPrivateTx()
+	return tx.PostAssembly != nil && tx.PostAssembly.AttestationPlan != nil && len(tx.PostAssembly.AttestationPlan) > len(tx.PostAssembly.Endorsements)
 }
 
 func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {

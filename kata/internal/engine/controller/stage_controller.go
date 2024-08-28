@@ -47,7 +47,8 @@ type PaladinStageController struct {
 
 func (psc *PaladinStageController) CalculateStage(ctx context.Context, tsg transactionstore.TxStateGetters) string {
 	calculatedStage := ""
-	for stage, stageProcessor := range psc.stageProcessors {
+	for _, stage := range psc.stageNames {
+		stageProcessor := psc.stageProcessors[stage]
 		if stageProcessor.MatchStage(ctx, tsg, psc.stageFoundationService) {
 			calculatedStage = stage
 			break // we break as soon as we found a matching state, if a transaction could match more stages, we'll have random behavior, but we don't waste cycles to figure that out
@@ -93,11 +94,14 @@ func (psc *PaladinStageController) GetAllStages() []string {
 
 func NewPaladinStageController(ctx context.Context, stageFoundationService types.StageFoundationService, tsps []TxStageProcessor) StageController {
 	stageProcessorsMap := map[string]TxStageProcessor{}
+	stageNames := []string{}
 	for _, tsp := range tsps {
+		stageNames = append(stageNames, tsp.Name())
 		stageProcessorsMap[tsp.Name()] = tsp
 	}
 	return &PaladinStageController{
 		stageProcessors:        stageProcessorsMap,
 		stageFoundationService: stageFoundationService,
+		stageNames:             stageNames,
 	}
 }
