@@ -64,3 +64,9 @@ message TransactionConfirmedEvent {
 message TransactionRevertedEvent {
     string transactionId = 1;
 }
+
+message TransactionDelegatedEvent {
+    string transactionId = 1;
+    string delegatingNodeId = 2;
+    string delegateNodeId = 3;
+}
