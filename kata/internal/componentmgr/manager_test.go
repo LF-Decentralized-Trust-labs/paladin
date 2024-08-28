@@ -15,175 +15,222 @@
 
 package componentmgr
 
-// import (
-// 	"context"
-// 	"errors"
-// 	"testing"
+import (
+	"context"
+	"errors"
+	"net"
+	"os"
+	"testing"
 
-// 	"github.com/google/uuid"
-// 	"github.com/hyperledger/firefly-signer/pkg/abi"
-// 	"github.com/kaleido-io/paladin/kata/internal/components"
-// 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-// 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
-// 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-// 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
-// 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-// 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
-// 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/mock"
-// )
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
+	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/kata/pkg/persistence"
+	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
 
-// func TestInitOK(t *testing.T) {
+func TestInitOK(t *testing.T) {
 
-// 	// We build a config that allows us to get through init successfully, as should be possible
-// 	// (anything that can't do this should have a separate Start() phase).
-// 	testConfig := &Config{
-// 		DB: persistence.Config{
-// 			Type: "sqlite",
-// 			SQLite: persistence.SQLiteConfig{
-// 				SQLDBConfig: persistence.SQLDBConfig{
-// 					URI:           ":memory:",
-// 					AutoMigrate:   confutil.P(true),
-// 					MigrationsDir: "../../db/migrations/sqlite",
-// 				},
-// 			},
-// 		},
-// 		Blockchain: ethclient.Config{
-// 			HTTP: rpcclient.HTTPConfig{
-// 				URL: "http://localhost:8545", // we won't actually connect this test, just check the config
-// 			},
-// 		},
-// 		Signer: api.Config{
-// 			KeyDerivation: api.KeyDerivationConfig{
-// 				Type: api.KeyDerivationTypeBIP32,
-// 			},
-// 			KeyStore: api.StoreConfig{
-// 				Type: "static",
-// 				Static: api.StaticKeyStorageConfig{
-// 					Keys: map[string]api.StaticKeyEntryConfig{
-// 						"seed": {
-// 							Encoding: "hex",
-// 							Inline:   "dfaf68b749c53672e5fa8e0b41514f9efd033ba6aa3add3b8b07f92e66f0e64a",
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		RPCServer: rpcserver.Config{
-// 			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
-// 			WS:   rpcserver.WSEndpointConfig{Disabled: true},
-// 		},
-// 	}
+	// We build a config that allows us to get through init successfully, as should be possible
+	// (anything that can't do this should have a separate Start() phase).
+	testConfig := &Config{
+		DB: persistence.Config{
+			Type: "sqlite",
+			SQLite: persistence.SQLiteConfig{
+				SQLDBConfig: persistence.SQLDBConfig{
+					URI:           ":memory:",
+					AutoMigrate:   confutil.P(true),
+					MigrationsDir: "../../db/migrations/sqlite",
+				},
+			},
+		},
+		Blockchain: ethclient.Config{
+			HTTP: rpcclient.HTTPConfig{
+				URL: "http://localhost:8545", // we won't actually connect this test, just check the config
+			},
+		},
+		Signer: api.Config{
+			KeyDerivation: api.KeyDerivationConfig{
+				Type: api.KeyDerivationTypeBIP32,
+			},
+			KeyStore: api.StoreConfig{
+				Type: "static",
+				Static: api.StaticKeyStorageConfig{
+					Keys: map[string]api.StaticKeyEntryConfig{
+						"seed": {
+							Encoding: "hex",
+							Inline:   "dfaf68b749c53672e5fa8e0b41514f9efd033ba6aa3add3b8b07f92e66f0e64a",
+						},
+					},
+				},
+			},
+		},
+		RPCServer: rpcserver.Config{
+			HTTP: rpcserver.HTTPEndpointConfig{Disabled: true},
+			WS:   rpcserver.WSEndpointConfig{Disabled: true},
+		},
+	}
 
-// 	mockEngine := componentmocks.NewEngine(t)
-// 	mockEngine.On("EngineName").Return("utengine")
-// 	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
-// 	cm := NewComponentManager(context.Background(), uuid.New(), testConfig, mockEngine).(*componentManager)
-// 	err := cm.Init()
-// 	assert.NoError(t, err)
+	mockEngine := componentmocks.NewEngine(t)
+	mockEngine.On("EngineName").Return("utengine")
+	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig, mockEngine).(*componentManager)
+	err := cm.Init()
+	assert.NoError(t, err)
 
-// 	assert.NotNil(t, cm.KeyManager())
-// 	assert.NotNil(t, cm.EthClientFactory())
-// 	assert.NotNil(t, cm.Persistence())
-// 	assert.NotNil(t, cm.StateStore())
-// 	assert.NotNil(t, cm.RPCServer())
-// 	assert.NotNil(t, cm.BlockIndexer())
-// 	assert.NotNil(t, cm.DomainManager())
-// 	assert.NotNil(t, cm.DomainRegistration())
-// 	assert.NotNil(t, cm.PluginController())
-// 	assert.NotNil(t, cm.Engine())
+	assert.NotNil(t, cm.KeyManager())
+	assert.NotNil(t, cm.EthClientFactory())
+	assert.NotNil(t, cm.Persistence())
+	assert.NotNil(t, cm.StateStore())
+	assert.NotNil(t, cm.RPCServer())
+	assert.NotNil(t, cm.BlockIndexer())
+	assert.NotNil(t, cm.DomainManager())
+	assert.NotNil(t, cm.DomainRegistration())
+	assert.NotNil(t, cm.PluginController())
+	assert.NotNil(t, cm.Engine())
 
-// 	cm.Stop()
+	cm.Stop()
 
-// }
+}
 
-// func TestStartOK(t *testing.T) {
+func tempSocketFile(t *testing.T) (fileName string) {
+	f, err := os.CreateTemp("", "p.*.sock")
+	if err == nil {
+		fileName = f.Name()
+	}
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		err = os.Remove(fileName)
+	}
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.Remove(fileName)
+	})
+	return
+}
 
-// 	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
-// 	mockEthClientFactory.On("Start").Return(nil)
-// 	mockEthClientFactory.On("Stop").Return()
+func TestStartOK(t *testing.T) {
 
-// 	mockBlockIndexer := componentmocks.NewBlockIndexer(t)
-// 	mockBlockIndexer.On("Start", mock.AnythingOfType("*blockindexer.InternalEventStream")).Return(nil)
-// 	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
-// 	mockBlockIndexer.On("Stop").Return()
+	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
+	mockEthClientFactory.On("Start").Return(nil)
+	mockEthClientFactory.On("Stop").Return()
 
-// 	mockPluginController := componentmocks.NewPluginController(t)
-// 	mockPluginController.On("Start").Return(nil)
-// 	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
-// 	mockPluginController.On("Stop").Return()
+	mockBlockIndexer := componentmocks.NewBlockIndexer(t)
+	mockBlockIndexer.On("Start", mock.AnythingOfType("*blockindexer.InternalEventStream")).Return(nil)
+	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
+	mockBlockIndexer.On("Stop").Return()
 
-// 	mockDomainManager := componentmocks.NewDomainManager(t)
-// 	mockDomainManager.On("Start").Return(nil)
-// 	mockDomainManager.On("Stop").Return()
+	mockPluginController := componentmocks.NewPluginController(t)
+	mockPluginController.On("Start").Return(nil)
+	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
+	mockPluginController.On("Stop").Return()
 
-// 	mockStateStore := componentmocks.NewStateStore(t)
-// 	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
+	mockDomainManager := componentmocks.NewDomainManager(t)
+	mockDomainManager.On("Start").Return(nil)
+	mockDomainManager.On("Stop").Return()
 
-// 	mockRPCServer := componentmocks.NewRPCServer(t)
-// 	mockRPCServer.On("Start").Return(nil)
-// 	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
-// 	mockRPCServer.On("Stop").Return()
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
 
-// 	mockEngine := componentmocks.NewEngine(t)
-// 	mockEngine.On("Start").Return(nil)
-// 	mockEngine.On("Stop").Return()
+	mockRPCServer := componentmocks.NewRPCServer(t)
+	mockRPCServer.On("Start").Return(nil)
+	mockRPCServer.On("Register", mock.AnythingOfType("*rpcserver.RPCModule")).Return()
+	mockRPCServer.On("Stop").Return()
+	mockRPCServer.On("HTTPAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8545})
+	mockRPCServer.On("WSAddr").Return(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8546})
 
-// 	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, mockEngine).(*componentManager)
-// 	cm.ethClientFactory = mockEthClientFactory
-// 	cm.initResults = map[string]*components.ManagerInitResult{
-// 		"utengine": {
-// 			EventStreams: []*components.ManagerEventStream{
-// 				{ABI: abi.ABI{}},
-// 			},
-// 			RPCModules: []*rpcserver.RPCModule{
-// 				rpcserver.NewRPCModule("ut"),
-// 			},
-// 		},
-// 	}
-// 	cm.blockIndexer = mockBlockIndexer
-// 	cm.pluginController = mockPluginController
-// 	cm.domainManager = mockDomainManager
-// 	cm.stateStore = mockStateStore
-// 	cm.rpcServer = mockRPCServer
-// 	cm.engine = mockEngine
+	mockEngine := componentmocks.NewEngine(t)
+	mockEngine.On("Start").Return(nil)
+	mockEngine.On("EngineName").Return("unittest_engine")
+	mockEngine.On("Stop").Return()
 
-// 	err := cm.StartComponents()
-// 	assert.NoError(t, err)
-// 	err = cm.CompleteStart()
-// 	assert.NoError(t, err)
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, mockEngine).(*componentManager)
+	cm.ethClientFactory = mockEthClientFactory
+	cm.initResults = map[string]*components.ManagerInitResult{
+		"utengine": {
+			EventStreams: []*components.ManagerEventStream{
+				{ABI: abi.ABI{}},
+			},
+			RPCModules: []*rpcserver.RPCModule{
+				rpcserver.NewRPCModule("ut"),
+			},
+		},
+	}
+	cm.blockIndexer = mockBlockIndexer
+	cm.pluginController = mockPluginController
+	cm.domainManager = mockDomainManager
+	cm.stateStore = mockStateStore
+	cm.rpcServer = mockRPCServer
+	cm.engine = mockEngine
 
-// 	cm.Stop()
-// 	assert.NoError(t, err)
-// }
+	err := cm.StartComponents()
+	assert.NoError(t, err)
+	err = cm.CompleteStart()
+	assert.NoError(t, err)
 
-// func TestBuildInternalEventStreamsError(t *testing.T) {
-// 	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
-// 	cm.initResults = map[string]*components.ManagerInitResult{
-// 		"utengine": {
-// 			EventStreams: []*components.ManagerEventStream{
-// 				{ABI: abi.ABI{
-// 					{Type: "event", Inputs: abi.ParameterArray{{Type: "wrong"}}},
-// 				}},
-// 			},
-// 		},
-// 	}
+	cm.Stop()
+	assert.NoError(t, err)
+}
 
-// 	_, err := cm.buildInternalEventStreams()
-// 	assert.Regexp(t, "FF22025", err)
+func TestBuildInternalEventStreamsError(t *testing.T) {
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, nil).(*componentManager)
+	cm.initResults = map[string]*components.ManagerInitResult{
+		"utengine": {
+			EventStreams: []*components.ManagerEventStream{
+				{ABI: abi.ABI{
+					{Type: "event", Inputs: abi.ParameterArray{{Type: "wrong"}}},
+				}},
+			},
+		},
+	}
 
-// }
+	_, err := cm.buildInternalEventStreams()
+	assert.Regexp(t, "FF22025", err)
 
-// func TestErrorWrapping(t *testing.T) {
-// 	cm := NewComponentManager(context.Background(), uuid.New(), &Config{}, nil).(*componentManager)
+}
 
-// 	mockKeyManager := componentmocks.NewKeyManager(t)
-// 	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
+func TestErrorWrapping(t *testing.T) {
+	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), &Config{}, nil).(*componentManager)
 
-// 	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened(mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
-// 	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted(mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
-// 	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
+	mockKeyManager := componentmocks.NewKeyManager(t)
+	mockEthClientFactory := componentmocks.NewEthClientFactory(t)
 
-// }
+	assert.Regexp(t, "PD010000.*pop", cm.addIfOpened("key_manager", mockKeyManager, errors.New("pop"), msgs.MsgComponentKeyManagerInitError))
+	assert.Regexp(t, "PD010017.*pop", cm.addIfStarted("engine", mockEthClientFactory, errors.New("pop"), msgs.MsgComponentEngineInitError))
+	assert.Regexp(t, "PD010008.*pop", cm.wrapIfErr(errors.New("pop"), msgs.MsgComponentBlockIndexerInitError))
+
+}
+
+func TestUnitTestStart(t *testing.T) {
+	ctx := context.Background()
+
+	var conf *Config
+	err := ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
+	assert.NoError(t, err)
+	// For running in this unit test the dirs are different to the sample config
+	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
+	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
+
+	mockEngine := componentmocks.NewEngine(t)
+	mockEngine.On("EngineName").Return("unittest_engine")
+	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
+	mockEngine.On("Start").Return(nil)
+	mockEngine.On("Stop").Return()
+
+	cm, err := UnitTestStart(ctx, conf, mockEngine, func(c components.AllComponents) error {
+		return nil
+	})
+	assert.NoError(t, err)
+
+	defer cm.Stop()
+}

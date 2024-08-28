@@ -129,8 +129,8 @@ func addStateBaseLabels(labelValues filters.PassthroughValueSet, id types.Bytes3
 }
 
 type trackingLabelSet struct {
-	labels map[string]*SchemaLabelInfo
-	used   map[string]*SchemaLabelInfo
+	labels map[string]*schemaLabelInfo
+	used   map[string]*schemaLabelInfo
 }
 
 func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
@@ -147,7 +147,7 @@ func (ft trackingLabelSet) ResolverFor(fieldName string) filters.FieldResolver {
 }
 
 func (ss *stateStore) labelSetFor(schema Schema) *trackingLabelSet {
-	tls := trackingLabelSet{labels: make(map[string]*SchemaLabelInfo), used: make(map[string]*SchemaLabelInfo)}
+	tls := trackingLabelSet{labels: make(map[string]*schemaLabelInfo), used: make(map[string]*schemaLabelInfo)}
 	for _, fi := range schema.(labelInfoAccess).labelInfo() {
 		tls.labels[fi.label] = fi
 	}
@@ -160,6 +160,10 @@ func (ss *stateStore) FindStates(ctx context.Context, domainID, schemaID string,
 }
 
 func (ss *stateStore) findStates(ctx context.Context, domainID, schemaID string, query *filters.QueryJSON, status StateStatusQualifier, excluded ...*idOnly) (schema Schema, s []*State, err error) {
+	if len(query.Sort) == 0 {
+		query.Sort = []string{".created"}
+	}
+
 	schema, err = ss.GetSchema(ctx, domainID, schemaID, true)
 	if err != nil {
 		return nil, nil, err

@@ -21,9 +21,9 @@ import (
 
 	_ "embed"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -44,7 +44,7 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{
-				DeployTX:      parsedEvent.TXId.UUIDLower16(),
+				DeployTX:      parsedEvent.TXId.UUIDFirst16(),
 				DomainAddress: parsedEvent.Domain,
 				Address:       ev.Address,
 				ConfigBytes:   parsedEvent.Data,

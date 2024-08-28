@@ -72,10 +72,10 @@ func TestEventIndexingWithDB(t *testing.T) {
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
-						 "txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
-						 "domain": "` + tp.d.factoryContractAddress.String() + `",
-						 "data": "0xfeedbeef"
-					 }`),
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"data": "0xfeedbeef"
+					}`),
 				},
 			},
 		})
@@ -97,6 +97,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 	}, dc.info)
 	assert.Equal(t, contractAddr, psc.Address())
 	assert.Equal(t, "test1", psc.Domain().Name())
+	assert.Equal(t, "0xfeedbeef", psc.ConfigBytes().String())
 	assert.Equal(t, tp.d.factoryContractAddress, psc.Domain().Address())
 
 	// Get cached
@@ -165,10 +166,10 @@ func TestEventIndexingInsertError(t *testing.T) {
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
 					Data: types.RawJSON(`{
-						 "txId": "` + types.Bytes32UUIDLower16(deployTX).String() + `",
-						 "domain": "` + tp.d.factoryContractAddress.String() + `",
-						 "data": "0xfeedbeef"
-					 }`),
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"data": "0xfeedbeef"
+					}`),
 				},
 			},
 		})

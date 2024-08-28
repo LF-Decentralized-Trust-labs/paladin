@@ -19,9 +19,9 @@ import (
 	"net"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -201,6 +201,18 @@ func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *prot
 	return &proto.SubscribeToTopicResponse{
 		Result: proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK,
 	}, nil
+}
+
+func (s *KataMessageService) UnsubscribeFromTopic(ctx context.Context, request *proto.UnsubscribeFromTopicRequest) (*proto.UnsubscribeFromTopicResponse, error) {
+	log.L(ctx).Info("UnsubscribeFromTopic")
+
+	err := s.messageBroker.UnsubscribeFromTopic(ctx, request.Topic, request.Destination)
+	if err != nil {
+		log.L(ctx).Error("Error unsubscribing from topic", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.UnsubscribeFromTopicResponse{}, nil
 }
 
 // TODO should we implement a handshake to prevent clients from listening to arbitrary destinations?

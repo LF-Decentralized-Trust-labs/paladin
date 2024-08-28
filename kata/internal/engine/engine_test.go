@@ -44,35 +44,18 @@ func TestEngine(t *testing.T) {
 	assert.Equal(t, "Kata Engine", engine.Name())
 
 	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
-
-	mDomainSmartContract := componentmocks.NewDomainSmartContract(t)
-
-	initialised := make(chan struct{}, 1)
-	mDomainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		initialised <- struct{}{}
-	}).Return(nil)
-
-	assembled := make(chan struct{}, 1)
-	mDomainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		tx := args.Get(1).(*components.PrivateTransaction)
-		tx.PostAssembly = &components.TransactionPostAssembly{}
-		assembled <- struct{}{}
-
-	}).Return(nil)
-
-	mDomainMgr := componentmocks.NewDomainManager(t)
-	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainSmartContract, nil)
-
-	mStateStore := componentmocks.NewStateStore(t)
-	//TODO do we need this?
+	mDomainAPI := componentmocks.NewDomainSmartContract(t)
+	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Return(nil)
+	mDomainMgr := &componentmocks.DomainManager{}
+	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainAPI, nil)
+	mStateStore := &componentmocks.StateStore{}
+	mComponents.On("StateStore").Once().Return(mStateStore)
+	mComponents.On("DomainManager").Once().Return(mDomainMgr).Maybe()
 	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
-		err := fn(ctx, mDomainStateInterface)
-		assert.NoError(t, err)
-	}).Maybe().Return(nil)
-
-	mComponents.On("StateStore").Return(mStateStore).Maybe()
-	mComponents.On("DomainManager").Return(mDomainMgr).Maybe()
+		_ = fn(ctx, mDomainStateInterface)
+	}).Once().Return(nil)
+	assert.Equal(t, "Kata Engine", engine.Name())
 
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
 	// no input domain should err

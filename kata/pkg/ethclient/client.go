@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -30,9 +29,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -104,7 +104,7 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error) {
 
 	if from != nil {
-		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 
 func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
-	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
 	signature, err := ec.keymgr.Sign(ctx, &proto.SignRequest{
-		Algorithm: api.Algorithm_ECDSA_SECP256K1_PLAINBYTES,
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		KeyHandle: keyHandle,
 		Payload:   types.HexBytes(hash.Sum(nil)),
 	})

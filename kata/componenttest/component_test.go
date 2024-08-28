@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,6 +69,38 @@ func TestRunTransactionSubmission(t *testing.T) {
 		Destination: testDestination,
 	})
 	require.NoError(t, err, "failed to call Listen")
+
+	// TODO: Currently the comms bus only functions correctly if you know your
+	// destination actually exists on the server side - but the `Listen()` is
+	// an async stream so you have no idea when it's been created.
+	//
+	// This workaround is the only way currently to find out your destination exists.
+	// By trying to subscribe to it, you get the same error below that the
+	// sender of your replies would, until the destination is set up:
+	// Error sending response: PD010600: Destination not found: test-destination
+	//
+	// If we continue to have a model for destinations like this in the future, we
+	// need a robust way to "create" destinations so you know they exist before you
+	// perform a request/reply exchange with them.
+	for {
+		_, err = client.SubscribeToTopic(ctx, &pb.SubscribeToTopicRequest{
+			Topic:       "anything-it-does-not-matter",
+			Destination: "test-destination",
+		})
+		if err != nil && strings.Contains(err.Error(), "PD010600") {
+			log.L(ctx).Infof("Destination still creating: %s", err)
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		assert.NoError(t, err)
+		break
+	}
+	// We just unsubscribe straight away
+	_, err = client.UnsubscribeFromTopic(ctx, &pb.UnsubscribeFromTopicRequest{
+		Topic:       "anything-it-does-not-matter",
+		Destination: "test-destination",
+	})
+	assert.NoError(t, err)
 
 	submitTransaction := transactionsPB.SubmitTransactionRequest{
 		From:            "fromID",
@@ -101,7 +135,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
@@ -247,10 +281,26 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go kata.Run(ctx, configFile.Name())
+	go kata.TestCommsBusRun(ctx, configFile.Name())
 
-	// todo do we really need to sleep here?
-	time.Sleep(time.Second * 2)
+	// Wait until the engine is listening - otherwise our messages will be discarded
+	// TODO: This is a temporary situation as the transactional model of the engine forms
+waitForEngine:
+	for {
+		commsBus := kata.CommsBus()
+		time.Sleep(10 * time.Millisecond)
+		if commsBus == nil {
+			continue
+		}
+		destinations, err := commsBus.Broker().ListDestinations(ctx)
+		assert.NoError(t, err)
+		for _, d := range destinations {
+			if d == "kata-txn-engine" {
+				// The engine is listening
+				break waitForEngine
+			}
+		}
+	}
 
 	return socketAddress, func() {
 		os.Remove(configFile.Name())
@@ -271,7 +321,7 @@ func newClientForTesting(ctx context.Context, t *testing.T, socketAddress string
 		time.Sleep(time.Second)
 		delay++
 		status, err = client.Status(ctx, &pb.StatusRequest{})
-		require.Less(t, delay, 2, "Server did not start after 2 seconds")
+		require.Less(t, delay, 5, "Server did not start in expected time")
 	}
 	require.NoError(t, err)
 	assert.True(t, status.GetOk())
@@ -348,7 +398,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -482,5 +532,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	kata.Stop(ctx, socketAddress)
+	kata.CommsBusStop(ctx, socketAddress)
 }

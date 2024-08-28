@@ -289,6 +289,8 @@ github.com/hyperledger/firefly-common v1.4.8 h1:0o1Qp1c5YzQo8nbnX+gAo9SVd2tR4Z9U
 github.com/hyperledger/firefly-common v1.4.8/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240820224751-0fe396789f6a h1:e+gQ8Lo222CUfq55oDMQkm5t8X7GmJzL8mD0tenaA5w=
 github.com/hyperledger/firefly-signer v1.1.14-0.20240820224751-0fe396789f6a/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240827185235-2fe278d0353f h1:imY5Y+qoGn6SSb2aL1cuuQH4QR0VcTKli/MDurxNxK0=
+github.com/hyperledger/firefly-signer v1.1.14-0.20240827185235-2fe278d0353f/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
 github.com/iancoleman/strcase v0.3.0 h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=
 github.com/iancoleman/strcase v0.3.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/iden3/go-iden3-crypto v0.0.16 h1:zN867xiz6HgErXVIV/6WyteGcOukE9gybYTorBMEdsk=

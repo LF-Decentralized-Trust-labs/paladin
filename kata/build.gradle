@@ -18,20 +18,21 @@ import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
+        include "kata.go"
         include "internal/**/*.go"
         include "pkg/**/*.go"
         include "componenttest/**/*.go"
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 92.5
+    targetCoverage = 94
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/kata/pkg/proto',
         'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
         'github.com/kaleido-io/paladin/toolkit/prototk',
         'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/kata/testbed',
+        'github.com/kaleido-io/paladin/kata/pkg/testbed',
     ]
 }
 
@@ -42,14 +43,23 @@ configurations {
     toolkitProtoDefinitions {
         canBeConsumed = false
     }
+    libkata {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    protocFiles {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
+
 
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
 }
 
-task installTools(type:Exec, dependsOn: ':toolkit_go:protoc') {
+task installTools(type:Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
@@ -90,7 +100,7 @@ task copyTestbedContracts(type: Copy) {
         include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
         include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
     }
-    into 'testbed/abis'
+    into 'pkg/testbed/abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }
@@ -135,74 +145,7 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-
-task makeMocks(type: Mockery, dependsOn: [tasks.protoc, tasks.installTools]) {
-    mockery 'bin/mockery'
-    args '--case', 'underscore'
-    mock {
-        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
-        includeAll true
-        outputPackage 'rpcbackendmocks'
-        outputDir 'mocks/rpcbackendmocks'
-    }
-    mock {
-        inputDir "internal/engine"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/statestore"
-        name "StateStore"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-
-    mock {
-        inputDir "internal/statestore"
-        name "DomainStateInterface"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/commsbus"
-        includeAll true
-        outputPackage 'commsbusmocks'
-        outputDir 'mocks/commsbusmocks'
-    }
-    mock {
-        inputDir "internal/components"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "pkg/blockindexer"
-        name "BlockIndexer"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/plugins"
-        name "PluginController"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "internal/rpcserver"
-        name "RPCServer"
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
-        inputDir "pkg/ethclient"
-        includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-}
-
-task goGet(type:Exec, dependsOn:[tasks.makeMocks,tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -213,9 +156,79 @@ task goGet(type:Exec, dependsOn:[tasks.makeMocks,tasks.protoc,tasks.copyContract
     args 'get'
 }
 
+task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
+    mockery 'bin/mockery'
+    args '--case', 'underscore'
+    mock {
+        inputDir "go list -f {{.Dir}} github.com/hyperledger/firefly-signer/pkg/rpcbackend".execute().text.trim()
+        includeAll true
+        outputPackage 'rpcbackendmocks'
+        outputDir 'mocks/rpcbackendmocks'
+    }
+    mock {
+        inputDir 'internal/engine'
+        includeAll true
+        outputPackage 'enginemocks'
+        outputDir 'mocks/enginemocks'
+    }
+    mock {
+        inputDir 'internal/components'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/componentmgr'
+        name 'ComponentManager'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'StateStore'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'Schema'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/statestore'
+        name 'DomainStateInterface'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/blockindexer'
+        name 'BlockIndexer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/plugins'
+        name 'PluginController'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'internal/rpcserver'
+        name 'RPCServer'
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+    mock {
+        inputDir 'pkg/ethclient'
+        includeAll true
+        outputPackage 'componentmocks'
+        outputDir 'mocks/componentmocks'
+    }
+}
 
-
-task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') { delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
+    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -262,21 +275,6 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     args '-o', libName
     args '-buildmode=c-shared'
     args 'kata.go'
-}
-
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
-    workingDir '.'
-
-    inputs.files(goFiles)
-    inputs.dir("testbed")
-    outputs.dir("bin")
-
-    environment("CGO_ENABLED", "1")
-
-    executable 'go'
-    args 'build'
-    args '-o', 'bin/'
-    args './testbed'
 }
 
 task buildTestPluginsSharedLibraryA(type:Exec) {
@@ -346,7 +344,7 @@ abstract class ComponentTest extends Exec {
         workingDir '.'
         executable 'go'
         args 'test'
-        args './componenttest', './testbed'
+        args './componenttest', './pkg/testbed'
         args '-cover'
         args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
@@ -364,7 +362,7 @@ abstract class ComponentTest extends Exec {
                     println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
                     println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
                 }
-                // execResult.assertNormalExitValue(); TODO: restore the error exit when tests are passing again
+                execResult.assertNormalExitValue();
             }
         }
     }
@@ -460,19 +458,10 @@ task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
 }
 
 task build {
-    dependsOn tasks.buildTestbed
-    // dependsOn tasks.lint
+    dependsOn tasks.lint
     dependsOn tasks.test
     dependsOn tasks.aggregateCoverage
     dependsOn tasks.checkCoverage
-}
-
-configurations {
-    libkata
-    protocFiles {
-        canBeConsumed = true
-        canBeResolved = false
-    }
 }
 
 tasks.register('zipProtocFiles', Zip) {  
@@ -495,3 +484,4 @@ artifacts {
 dependencies {
     libkata files(buildSharedLibrary)
 }
+

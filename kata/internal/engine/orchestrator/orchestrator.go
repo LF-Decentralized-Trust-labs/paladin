@@ -29,7 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 // Orchestrator orchestrates transaction processing within a specific private preserving contract
