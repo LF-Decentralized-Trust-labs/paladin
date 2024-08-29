@@ -44,11 +44,12 @@ type domainHandler struct {
 
 func (z *Zeto) getInterface() DomainInterface {
 	iface := DomainInterface{
-		"constructor": {
+		"initialize": {
 			ABI: &abi.Entry{
 				Type: abi.Constructor,
 				Inputs: abi.ParameterArray{
 					{Name: "from", Type: "string"},
+					{Name: "initialOwner", Type: "string"},
 					{Name: "depositVerifier", Type: "address"},
 					{Name: "withdrawVerifier", Type: "address"},
 					{Name: "verifier", Type: "address"},
@@ -89,6 +90,7 @@ func (z *Zeto) getInterface() DomainInterface {
 
 type ZetoConstructorParams struct {
 	From             string `json:"from"`
+	InitialOwner     string `json:"initialOwner"`
 	Verifier         string `json:"verifier"`
 	DepositVerifier  string `json:"depositVerifier"`
 	WithdrawVerifier string `json:"withdrawVerifier"`

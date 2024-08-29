@@ -1,0 +1,48 @@
+contracts:
+  factory:
+    # if the address is set, it takes precendece over
+    # the rest of the properties for deploying a factory
+    address: '0x0'
+    # if the address is not set, the factory will be deployed
+    # with the following properties
+    abiAndBytecode:
+      # if the path is set, the target must be a JSON file
+      # containing the "abi" and "bytecode" properties
+      path: ./abis/ZetoFactory.json
+      json:
+        abi:
+        bytecode:
+    # the Zeto factory is a CloneFactory, which needs implementation
+    # contracts to be set
+    implementations:
+      - name: Zeto_Anon
+        address:
+        abiAndBytecode:
+          path: ./abis/Zeto_Anon.json
+          json:
+            abi:
+            bytecode:
+        libraries:
+          - CommonLib
+          - Groth16Verifier_Anon
+          - Groth16Verifier_CheckHashesValue
+          - Groth16Verifier_CheckInputsOutputsValue
+      - name: CommonLib
+        address:
+        abiAndBytecode:
+          path: ./abis/CommonLib.json
+          json:
+            abi:
+            bytecode:
+      - name: Groth16Verifier_Anon
+        address:
+        abiAndBytecode:
+          path: ./abis/Groth16Verifier_Anon.json
+      - name: Groth16Verifier_CheckHashesValue
+        address:
+        abiAndBytecode:
+          path: ./abis/Groth16Verifier_CheckHashesValue.json
+      - name: Groth16Verifier_CheckInputsOutputsValue
+        address:
+        abiAndBytecode:
+          path: ./abis/Groth16Verifier_CheckInputsOutputsValue.json

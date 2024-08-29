@@ -17,6 +17,7 @@ package zeto
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"testing"
 
@@ -30,12 +31,16 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 var (
 	controllerName = "controller"
 	recipient1Name = "recipient1"
 )
+
+//go:embed zeto.config.yaml
+var testZetoConfigYaml []byte // From "gradle copySolidity"
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
@@ -97,6 +102,11 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *Solidity
 	return addr, nil
 }
 
+type ZetoSetImplementationParams struct {
+	Implementation string `json:"implementation"`
+	Name           string `json:"name"`
+}
+
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
@@ -120,6 +130,17 @@ func TestZeto(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
+	log.L(ctx).Infof("Configuring Zeto factory for the implementation address")
+	var boolResult bool
+	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_invokePublic", controllerEth, factoryAddress, factory.ABI, "registerImplementation", toJSON(t, &ZetoSetImplementationParams{
+		Implementation: implAddress,
+		Name:           "Zeto_Anon",
+	}))
+	if rpcerr != nil {
+		assert.NoError(t, rpcerr.Error())
+	}
+	assert.True(t, boolResult)
+
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{
 		FactoryAddress: contracts["factory"],
 		Libraries:      contracts,
@@ -128,7 +149,7 @@ func TestZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying an instance of Zeto")
 	var zetoAddress ethtypes.Address0xHex
-	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
+	rpcerr = rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{
 			From:             controllerName,
 			Verifier:         contracts["verifier"],
@@ -141,7 +162,6 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
-	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),

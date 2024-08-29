@@ -46,15 +46,37 @@ dependencies {
     kataProtoCompiled project(path: ":kata", configuration: "protoCompiled")
 }
 
-task copySolidity(type: Copy) {
-    inputs.files(configurations.contractCompile)
-    from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/zeto/ZetoSample.sol/ZetoSample.json'
-        include 'contracts/zeto/ZetoSampleFactory.sol/ZetoSampleFactory.json'
-        include 'zeto/contracts/lib/common.sol/Commonlib.json'
-        include 'zeto/contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
-        include 'zeto/contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
-        include 'zeto/contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
+task installZeto(type: Exec) {
+    workingDir "${rootDir}/zeto/solidity"
+
+    executable 'npm'
+    args 'install'
+    inputs.files("package.json")
+    outputs.files("package-lock.json")
+    outputs.dir("node_modules")
+}
+
+task compileZeto(type: Exec, dependsOn: installZeto) {
+    workingDir "${rootDir}/zeto/solidity"
+
+    executable 'npx'
+    args 'hardhat'
+    args 'compile'
+
+    inputs.files(fileTree(dir: "../../zeto/solidity", include: "**/*.sol"))
+}
+
+task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
+    inputs.files(fileTree("${rootDir}/zeto/solidity/artifacts"))
+    from fileTree("${rootDir}/zeto/solidity/artifacts") {
+        include 'contracts/zeto_anon.sol/Zeto_Anon.json'
+        include 'contracts/lib/common.sol/Commonlib.json'
+        include 'contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
+        include 'contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
+        include 'contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
+    }
+    from fileTree("${rootDir}/solidity/artifacts") {
+        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
     }
     into 'internal/zeto/abis'
 
@@ -69,9 +91,9 @@ task circuitsInstall(type: Exec) {
     args 'install'
     workingDir "${rootDir}/zeto/zkp/circuits"
 
-    inputs.files("package.json", "package-lock.json")
-    outputs.files("package-lock.json")
-    outputs.dir("node_modules")
+    inputs.files("${rootDir}/zeto/zkp/circuits/package.json", "${rootDir}/zeto/zkp/circuits/package-lock.json")
+    outputs.files("${rootDir}/zeto/zkp/circuits/package-lock.json")
+    outputs.dir("${rootDir}/zeto/zkp/circuits/node_modules")
 }
 
 task installCircom {
@@ -125,6 +147,7 @@ task test(type: Exec) {
     workingDir '.'
     executable 'go'
     args 'test'
+    args '-v'
     args './internal/...'
     args '-cover'
     args '-covermode=atomic'
