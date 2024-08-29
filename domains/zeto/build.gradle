@@ -13,12 +13,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
     }
     jsCircuits = "${rootDir}/zeto/zkp/circuits"
     zkpOut = "${projectDir}/zkp"
+    toolsOut = "${projectDir}/tools"
 }
 
 configurations {
@@ -71,9 +74,28 @@ task circuitsInstall(type: Exec) {
     outputs.dir("node_modules")
 }
 
-task installCircom(type: Download) {
-    src "https://github.com/iden3/circom/releases/download/v2.1.9/circom-linux-amd64"
-    dest new File(buildDir, "circom")
+task installCircom {
+    def filename
+    def outname
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        filename = "circom-windows-amd64.exe"
+        outname = "circom.exe"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        filename = "circom-macos-amd64"
+        outname = "circom"
+    } else {
+        filename = "circom-linux-amd64"
+        outname = "circom"
+    }
+
+    def url = "https://github.com/iden3/circom/releases/download/v2.1.9/${filename}"
+    def f = new File(toolsOut, outname)
+    doFirst {
+        mkdir(f.parent)
+        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
+        f.setExecutable(true)
+    }
+    outputs.file(f)
 }
 
 task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
@@ -82,7 +104,7 @@ task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
     args '--', '-c', 'anon'
     workingDir "${rootDir}/zeto/zkp/circuits"
 
-    environment 'PATH', "${environment.PATH}:${buildDir}/circom"
+    environment 'PATH', "${toolsOut}${File.pathSeparator}${environment.PATH}"
     environment "CIRCUITS_ROOT", zkpOut
     environment "PROVING_KEYS_ROOT", zkpOut
     environment "PTAU_DOWNLOAD_PATH", zkpOut
@@ -122,4 +144,5 @@ task clean(type: Delete) {
     delete 'coverage'
     delete 'internal/zeto/abis'
     delete zkpOut
+    delete toolsOut
 }
