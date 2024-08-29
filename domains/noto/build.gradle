@@ -73,17 +73,6 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
-
-    ignoreExitValue true
-
-    doLast {
-        String composeLogs = getProject().findProperty('composeLogs')
-        ExecResult execResult = executionResult.get()
-        if (execResult.exitValue != 0 && composeLogs == "true") {
-            startTestbed.dumpLogs("testbed")
-        }
-        execResult.assertNormalExitValue()
-    }
 }
 
 task build {
