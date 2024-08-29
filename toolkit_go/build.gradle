@@ -29,8 +29,16 @@ ext {
 }
 
 configurations {
-    toolkitProtoDefinitions {
+    // Resolvable configurations
+    protoDefinitions {
         canBeConsumed = false
+        canBeResolved = true
+    }
+
+    // Consumable configurations
+    protoCompiled {
+        canBeConsumed = true
+        canBeResolved = false
     }
     libstarter {
         canBeConsumed = true
@@ -39,7 +47,7 @@ configurations {
 }
 
 dependencies {
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
+    protoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
 }
 
 task installTools(type:Exec) {
@@ -64,15 +72,15 @@ task installTools(type:Exec) {
 
 task protoc(type: ProtoCompile, dependsOn: [installTools]) {
     protocPath "bin"
-    protoPath configurations.toolkitProtoDefinitions.asPath
-    protoFiles fileTree(configurations.toolkitProtoDefinitions.asPath) {
+    protoPath configurations.protoDefinitions.asPath
+    protoFiles fileTree(configurations.protoDefinitions.asPath) {
         include "*.proto"
     }
     plugins {
         go {
             out "${projectDir}/pkg/prototk"
             opt 'paths=source_relative'
-            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+            fileTree(configurations.protoDefinitions.asPath) {
                include "*.proto"
             }.each { File file ->
                 opt "M${file.name}=pkg/prototk"
@@ -81,7 +89,7 @@ task protoc(type: ProtoCompile, dependsOn: [installTools]) {
         go_grpc {
             out "${projectDir}/pkg/prototk"
             opt 'paths=source_relative'
-            fileTree(configurations.toolkitProtoDefinitions.asPath) {
+            fileTree(configurations.protoDefinitions.asPath) {
                include "*.proto"
             }.each { File file ->
                 opt "M${file.name}=pkg/prototk"
@@ -217,4 +225,5 @@ task build {
 
 dependencies {
     libstarter files(buildStarterLibrary)
+    protoCompiled files(protoc)
 }

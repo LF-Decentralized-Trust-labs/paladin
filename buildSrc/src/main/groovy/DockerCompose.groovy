@@ -1,3 +1,6 @@
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.TimeZone
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
@@ -17,6 +20,13 @@ class DockerCompose extends DefaultTask {
     @Input
     List<String> args = []
 
+    private final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    private Date startTime
+
+    DockerCompose() {
+        dateFormat.timeZone = TimeZone.getTimeZone('UTC')
+    }
+
     void composeFile(Object f) {
         composeFiles << project.file(f)
     }
@@ -31,6 +41,9 @@ class DockerCompose extends DefaultTask {
 
     void dumpLogs(String service = '') {
         List<String> cmd = [*dockerCommand(), 'logs']
+        if (startTime != null) {
+            cmd += ['--since', dateFormat.format(startTime)]
+        }
         if (service == '') {
             println 'Dumping Docker logs'
         } else {
@@ -42,6 +55,7 @@ class DockerCompose extends DefaultTask {
 
     @TaskAction
     void exec() {
+        startTime = new Date()
         List<String> cmd = [*dockerCommand(), *args]
         ExecResult execResult = project.exec { commandLine cmd }
         if (execResult.exitValue != 0) {

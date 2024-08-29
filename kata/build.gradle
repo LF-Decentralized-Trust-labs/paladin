@@ -37,29 +37,33 @@ ext {
 }
 
 configurations {
+    // Resolvable configurations
     compiledContracts {
         canBeConsumed = false
+        canBeResolved = true
     }
     toolkitProtoDefinitions {
         canBeConsumed = false
+        canBeResolved = true
     }
+
+    // Consumable configurations
     libkata {
         canBeConsumed = true
         canBeResolved = false
     }
-    protocFiles {
+    protoCompiled {
         canBeConsumed = true
         canBeResolved = false
     }
 }
 
-
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "toolkitProtoDefinitions")
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
 }
 
-task installTools(type:Exec) {
+task installTools(type: Exec) {
     workingDir '.'
     environment('GOBIN', "${projectDir}/bin")
     executable 'go'
@@ -246,7 +250,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContract
     inputs.files(goFiles);
     environment 'GOGC', '20'
 
-    executable "${projectDir}/bin/golangci-lint"
+    executable "bin/golangci-lint"
     args 'run'
     args '-v'
     args '--color=always'
@@ -256,7 +260,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContract
 task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     workingDir '.'
 
-    def libName;
+    def libName
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
         libName = "libkata.dll"
     } else if (Os.isFamily(Os.FAMILY_MAC)) {
@@ -305,13 +309,12 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
 }
 
 task buildTestPluginsSharedLibraries {
-    dependsOn tasks.buildTestPluginsSharedLibraryA
-
+    dependsOn buildTestPluginsSharedLibraryA
 }
 
 abstract class UnitTests extends Exec {
     {
-        inputs.files(getProject().goFiles)
+        inputs.files(project.goFiles)
         outputs.dir('coverage')
 
         workingDir '.'
@@ -321,21 +324,19 @@ abstract class UnitTests extends Exec {
         args '-cover'
         args '-covermode=atomic'
         args '-timeout=30s'
-        args "-test.gocoverdir=${getProject().projectDir}/coverage"
+        args "-test.gocoverdir=${project.projectDir}/coverage"
     }
 }
 
 
 abstract class ComponentTest extends Exec {
-
-
     {
         java.text.DateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
         df.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
         Date startTime = new Date();
 
-        inputs.files(getProject().goFiles)
-        inputs.files(getProject().fileTree("testbed") {
+        inputs.files(project.goFiles)
+        inputs.files(project.fileTree("testbed") {
             include "**/*.json"
         })
 
@@ -349,18 +350,21 @@ abstract class ComponentTest extends Exec {
         args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
-        args "-test.gocoverdir=${getProject().projectDir}/coverage"
+        args "-test.gocoverdir=${project.projectDir}/coverage"
 
         ignoreExitValue true
 
         doLast {
             def ExecResult execResult = getExecutionResult().get();
-            def composeLogs = getProject().findProperty('composeLogs');
+            def composeLogs = project.findProperty('composeLogs');
             if (execResult.getExitValue() != 0) {
                 if (composeLogs == "true") {
+                    // TODO: can we use DockerCompose.dumpLogs() here?
                     println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
-                    println "docker logs --since ${df.format(startTime)} paladin-test-db".execute().waitForProcessOutput(System.err,System.err)
-                    println "docker logs --since ${df.format(startTime)} paladin-test-besu".execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-postgres-1"
+                        .execute().waitForProcessOutput(System.err,System.err)
+                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-besu-1"
+                        .execute().waitForProcessOutput(System.err,System.err)
                 }
                 execResult.assertNormalExitValue();
             }
@@ -380,10 +384,15 @@ task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMock
     }
 }
 
-task unitTestSQLite(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet]) {
+task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [tasks.setupCoverage, tasks.goGet, ':testinfra:startTestInfra']) {
+task unitTestPostgres(type: UnitTests) {
+    dependsOn [
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+    ]
     args '-tags', "testdbpostgres"
 }
 
@@ -415,7 +424,7 @@ task buildCoverageTxt(type: Exec, dependsOn: [
 
 }
 
-task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
+task aggregateCoverage(type: Copy, dependsOn: buildCoverageTxt) {
     from 'coverage/coverage_unfiltered.txt'
     into 'coverage'
     outputs.files('coverage/coverage.txt')
@@ -425,7 +434,7 @@ task aggregateCoverage(type: Copy, dependsOn: tasks.buildCoverageTxt) {
     filter(LineContains, negate: true, contains: getProject().ext.coverageExcludedPackages, matchAny: true) 
 }
 
-task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
+task checkCoverage(dependsOn: [aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
 
     doLast {
@@ -442,13 +451,11 @@ task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
     }
 }
 
-task test() {
-    finalizedBy [
-        tasks.checkCoverage,
-    ]
+task test {
+    finalizedBy checkCoverage
 }
 
-task testcov(type: Exec, dependsOn: [tasks.test, tasks.aggregateCoverage]) {
+task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {
     inputs.files('coverage/coverage.txt')
     workingDir '.'
     executable 'go'
@@ -464,24 +471,8 @@ task build {
     dependsOn tasks.checkCoverage
 }
 
-tasks.register('zipProtocFiles', Zip) {  
-    from fileTree("pkg") {
-        include "**/*.proto"
-    }
-    eachFile { fcd ->
-        fcd.setRelativePath(fcd.relativePath.prepend("pkg"))
-    }
-    archiveFileName = "proto.zip"
-    destinationDirectory = file("$projectDir")
-    includeEmptyDirs = false
-    dependsOn('protoc')
-}
-
-artifacts {
-    protocFiles(zipProtocFiles)
-}
-
 dependencies {
     libkata files(buildSharedLibrary)
+    protoCompiled files(protoc)
 }
 
