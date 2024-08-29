@@ -102,16 +102,7 @@ type parsedTransaction struct {
 	params          interface{}
 }
 
-func loadBuild(buildOutput []byte) SolidityBuild {
-	var build SolidityBuild
-	err := json.Unmarshal(buildOutput, &build)
-	if err != nil {
-		panic(err)
-	}
-	return build
-}
-
-func loadBuildLinked(buildOutput []byte, libraries map[string]string) SolidityBuild {
+func loadBuildLinked(buildOutput []byte, libraries map[string]string) *SolidityBuild {
 	var build SolidityBuildWithLinks
 	err := json.Unmarshal(buildOutput, &build)
 	if err != nil {
@@ -121,7 +112,7 @@ func loadBuildLinked(buildOutput []byte, libraries map[string]string) SolidityBu
 	if err != nil {
 		panic(err)
 	}
-	return SolidityBuild{
+	return &SolidityBuild{
 		ABI:      build.ABI,
 		Bytecode: bytecode,
 	}
