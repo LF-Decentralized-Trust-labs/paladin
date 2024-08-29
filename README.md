@@ -57,12 +57,13 @@ Install the following pre-reqs:
 - install [protoc](https://grpc.io/docs/protoc-installation/)
 - install [docker with compose plugin](https://docs.docker.com/compose/install/)
 - install npm
+- update submodules: `git submodule update --recursive --init`
 
 
 Run the following command to build Paladin:
 
 ```shell
-./gradlew build
+./gradlew --parallel build
 ```
 
 ## How to run Paladin
