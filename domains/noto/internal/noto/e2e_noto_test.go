@@ -53,18 +53,20 @@ func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
 	return yn
 }
 
-func deployFactory(ctx context.Context, t *testing.T, factory SolidityBuild) string {
+func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]byte) map[string]string {
 	tb := testbed.NewTestBed()
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	log.L(ctx).Infof("Deploying Noto factory")
-	factoryAddress, err := deployBytecode(ctx, rpc, factory)
-	assert.NoError(t, err)
-	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
-	return factoryAddress
+	deployed := make(map[string]string, len(contracts))
+	for name, contract := range contracts {
+		build := loadBuild(contract)
+		deployed[name], err = deployBytecode(ctx, rpc, build)
+		assert.NoError(t, err)
+	}
+	return deployed
 }
 
 func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Noto, rpcbackend.Backend) {
@@ -85,7 +87,7 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 	return done, domain, rpc
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *SolidityBuild) (string, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
 		notaryName, build.ABI, build.Bytecode.String(), `{}`)
@@ -101,12 +103,17 @@ func TestNoto(t *testing.T) {
 	domainName := "noto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
-	factory := loadBuild(notoFactoryJSON)
-	factoryAddress := deployFactory(ctx, t, factory)
-	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
+	log.L(ctx).Infof("Deploying Noto factory")
+	contractSource := map[string][]byte{
+		"factory": notoFactoryJSON,
+	}
+	contracts := deployContracts(ctx, t, contractSource)
+	for name, address := range contracts {
+		log.L(ctx).Infof("%s deployed to %s", name, address)
+	}
 
 	done, noto, rpc := newTestDomain(t, domainName, &Config{
-		FactoryAddress: factoryAddress,
+		FactoryAddress: contracts["factory"],
 	})
 	defer done()
 
@@ -222,12 +229,17 @@ func TestNotoSelfSubmit(t *testing.T) {
 	domainName := "noto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
-	factory := loadBuild(notoSelfSubmitFactoryJSON)
-	factoryAddress := deployFactory(ctx, t, factory)
-	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
+	log.L(ctx).Infof("Deploying Noto factory")
+	contractSource := map[string][]byte{
+		"factory": notoSelfSubmitFactoryJSON,
+	}
+	contracts := deployContracts(ctx, t, contractSource)
+	for name, address := range contracts {
+		log.L(ctx).Infof("%s deployed to %s", name, address)
+	}
 
 	done, noto, rpc := newTestDomain(t, domainName, &Config{
-		FactoryAddress: factoryAddress,
+		FactoryAddress: contracts["factory"],
 		Variant:        "NotoSelfSubmit",
 	})
 	defer done()

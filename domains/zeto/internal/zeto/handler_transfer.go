@@ -41,12 +41,6 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	if transferParams.To == "" {
 		return nil, fmt.Errorf("parameter 'to' is required")
 	}
-	if transferParams.SenderKey == "" {
-		return nil, fmt.Errorf("parameter 'senderKey' is required")
-	}
-	if transferParams.RecipientKey == "" {
-		return nil, fmt.Errorf("parameter 'recipientKey' is required")
-	}
 	if transferParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
@@ -59,11 +53,11 @@ func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    params.SenderKey,
+				Lookup:    tx.transaction.From,
 				Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 			},
 			{
-				Lookup:    params.RecipientKey,
+				Lookup:    params.To,
 				Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 			},
 		},
@@ -127,13 +121,13 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCo
 func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(ZetoTransferParams)
 
-	resolvedSender := findVerifier(params.SenderKey, req.ResolvedVerifiers)
+	resolvedSender := findVerifier(tx.transaction.From, req.ResolvedVerifiers)
 	if resolvedSender == nil {
-		return nil, fmt.Errorf("failed to resolve: %s", params.SenderKey)
+		return nil, fmt.Errorf("failed to resolve: %s", tx.transaction.From)
 	}
-	resolvedRecipient := findVerifier(params.RecipientKey, req.ResolvedVerifiers)
+	resolvedRecipient := findVerifier(params.To, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
-		return nil, fmt.Errorf("failed to resolve: %s", params.RecipientKey)
+		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}
 
 	senderKey, err := h.loadBabyJubKey([]byte(resolvedSender.Verifier))
@@ -180,7 +174,13 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				AttestationType: pb.AttestationType_SIGN,
 				Algorithm:       algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 				Payload:         payloadBytes,
-				Parties:         []string{params.SenderKey},
+				Parties:         []string{tx.transaction.From},
+			},
+			{
+				Name:            "submitter",
+				AttestationType: pb.AttestationType_ENDORSE,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				Parties:         []string{tx.transaction.From},
 			},
 		},
 	}, nil

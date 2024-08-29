@@ -50,10 +50,6 @@ var zetoFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/ZetoSample.json
 var zetoJSON []byte // From "gradle copySolidity"
 
-var (
-	fromDomain = "from-domain"
-)
-
 type Config struct {
 	FactoryAddress string            `json:"factoryAddress" yaml:"factoryAddress"`
 	Libraries      map[string]string `json:"libraries" yaml:"libraries"`
@@ -106,16 +102,7 @@ type parsedTransaction struct {
 	params          interface{}
 }
 
-func loadBuild(buildOutput []byte) SolidityBuild {
-	var build SolidityBuild
-	err := json.Unmarshal(buildOutput, &build)
-	if err != nil {
-		panic(err)
-	}
-	return build
-}
-
-func loadBuildLinked(buildOutput []byte, libraries map[string]string) SolidityBuild {
+func loadBuildLinked(buildOutput []byte, libraries map[string]string) *SolidityBuild {
 	var build SolidityBuildWithLinks
 	err := json.Unmarshal(buildOutput, &build)
 	if err != nil {
@@ -125,7 +112,7 @@ func loadBuildLinked(buildOutput []byte, libraries map[string]string) SolidityBu
 	if err != nil {
 		panic(err)
 	}
-	return SolidityBuild{
+	return &SolidityBuild{
 		ABI:      build.ABI,
 		Bytecode: bytecode,
 	}
@@ -315,12 +302,12 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, err
 	}
 
-	signature, err := parser.ABI.SignatureCtx(ctx)
+	signature, _, err := parser.ABI.SolidityDefCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if tx.FunctionSignature != signature {
-		return nil, fmt.Errorf("unexpected signature for function: %s", functionABI.Name)
+		return nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
 	}
 
 	domainConfig, err := z.decodeDomainConfig(ctx, tx.ContractConfig)

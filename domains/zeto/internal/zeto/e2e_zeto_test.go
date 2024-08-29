@@ -33,10 +33,8 @@ import (
 )
 
 var (
-	controllerEth     = "controller:eth"
-	controllerBabyJub = "controller:babyjub"
-	recipient1Eth     = "recipient1:eth"
-	recipient1BabyJub = "recipient1:babyjub"
+	controllerName = "controller"
+	recipient1Name = "recipient1"
 )
 
 func toJSON(t *testing.T, v any) []byte {
@@ -53,18 +51,22 @@ func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
 	return yn
 }
 
-func deployFactory(ctx context.Context, t *testing.T, factory SolidityBuild) string {
+func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][]byte) map[string]string {
 	tb := testbed.NewTestBed()
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	log.L(ctx).Infof("Deploying Noto factory")
-	factoryAddress, err := deployBytecode(ctx, rpc, factory)
-	assert.NoError(t, err)
-	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
-	return factoryAddress
+	deployed := make(map[string]string, len(contracts))
+	for _, entry := range contracts {
+		for name, contract := range entry {
+			build := loadBuildLinked(contract, deployed)
+			deployed[name], err = deployBytecode(ctx, rpc, build)
+			assert.NoError(t, err)
+		}
+	}
+	return deployed
 }
 
 func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
@@ -85,10 +87,10 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 	return done, domain, rpc
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityBuild) (string, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *SolidityBuild) (string, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-		controllerEth, build.ABI, build.Bytecode.String(), `{}`)
+		controllerName, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		return "", rpcerr.Error()
 	}
@@ -98,57 +100,40 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityB
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
-	domainName := "noto_" + types.RandHex(8)
+	domainName := "zeto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
-	log.L(ctx).Infof("Deploying Zeto libraries")
-	commonLibAddress := deployFactory(ctx, t, loadBuild(commonLibJSON))
-	log.L(ctx).Infof("commonlib deployed to %s", commonLibAddress)
-
-	verifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_Anon))
-	log.L(ctx).Infof("verifier deployed to %s", verifierAddress)
-
-	depositVerifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_CheckHashesValue))
-	log.L(ctx).Infof("depositVerifier deployed to %s", depositVerifierAddress)
-
-	withdrawVerifierAddress := deployFactory(ctx, t, loadBuild(Groth16Verifier_CheckInputsOutputsValue))
-	log.L(ctx).Infof("withdrawVerifier deployed to %s", withdrawVerifierAddress)
-
-	libraries := map[string]string{
-		"Commonlib": commonLibAddress,
+	log.L(ctx).Infof("Deploying Zeto libraries+factory")
+	contractSource := []map[string][]byte{
+		{
+			"Commonlib":        commonLibJSON,
+			"verifier":         Groth16Verifier_Anon,
+			"depositVerifier":  Groth16Verifier_CheckHashesValue,
+			"withdrawVerifier": Groth16Verifier_CheckInputsOutputsValue,
+		},
+		{
+			"factory": zetoFactoryJSON, //depends on Commonlib from previous group
+		},
+	}
+	contracts := deployContracts(ctx, t, contractSource)
+	for name, address := range contracts {
+		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	log.L(ctx).Infof("Deploying Zeto factory")
-	factory := loadBuildLinked(zetoFactoryJSON, libraries)
-	factoryAddress := deployFactory(ctx, t, factory)
-	log.L(ctx).Infof("Zeto factory deployed to %s", factoryAddress)
-
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{
-		FactoryAddress: factoryAddress,
+		FactoryAddress: contracts["factory"],
+		Libraries:      contracts,
 	})
 	defer done()
 
-	log.L(ctx).Infof("Configuring Zeto domain")
-	var boolResult bool
-	domainConfig := Config{
-		FactoryAddress: factoryAddress,
-		Libraries:      libraries,
-	}
-	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
-		domainName, domainConfig)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
-	assert.True(t, boolResult)
-
 	log.L(ctx).Infof("Deploying an instance of Zeto")
 	var zetoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{
-			From:             controllerEth,
-			Verifier:         verifierAddress,
-			DepositVerifier:  depositVerifierAddress,
-			WithdrawVerifier: withdrawVerifierAddress,
+			From:             controllerName,
+			Verifier:         contracts["verifier"],
+			DepositVerifier:  contracts["depositVerifier"],
+			WithdrawVerifier: contracts["withdrawVerifier"],
 		})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -156,14 +141,14 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
+	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     controllerEth,
+		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["mint"].ABI,
 		Inputs: toJSON(t, &ZetoMintParams{
-			To:           controllerEth,
-			RecipientKey: controllerBabyJub,
-			Amount:       ethtypes.NewHexInteger64(10),
+			To:     controllerName,
+			Amount: ethtypes.NewHexInteger64(10),
 		}),
 	})
 	if rpcerr != nil {
@@ -175,17 +160,16 @@ func TestZeto(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, coins, 1)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
-	assert.Equal(t, controllerEth, coins[0].Owner)
+	assert.Equal(t, controllerName, coins[0].Owner)
 
 	log.L(ctx).Infof("Mint 20 from controller to controller")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     controllerEth,
+		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["mint"].ABI,
 		Inputs: toJSON(t, &ZetoMintParams{
-			To:           controllerEth,
-			RecipientKey: controllerBabyJub,
-			Amount:       ethtypes.NewHexInteger64(20),
+			To:     controllerName,
+			Amount: ethtypes.NewHexInteger64(20),
 		}),
 	})
 	if rpcerr != nil {
@@ -197,19 +181,18 @@ func TestZeto(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
-	assert.Equal(t, controllerEth, coins[0].Owner)
+	assert.Equal(t, controllerName, coins[0].Owner)
 	assert.Equal(t, int64(20), coins[1].Amount.Int64())
-	assert.Equal(t, controllerEth, coins[1].Owner)
+	assert.Equal(t, controllerName, coins[1].Owner)
 
 	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     recipient1Eth,
+		From:     recipient1Name,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["mint"].ABI,
 		Inputs: toJSON(t, &ZetoMintParams{
-			To:           recipient1Eth,
-			RecipientKey: recipient1BabyJub,
-			Amount:       ethtypes.NewHexInteger64(10),
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(10),
 		}),
 	})
 	assert.NotNil(t, rpcerr)
@@ -218,14 +201,12 @@ func TestZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
-		From:     controllerEth,
+		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
 		Function: *zeto.Interface["transfer"].ABI,
 		Inputs: toJSON(t, &ZetoTransferParams{
-			To:           recipient1Eth,
-			SenderKey:    controllerBabyJub,
-			RecipientKey: recipient1BabyJub,
-			Amount:       ethtypes.NewHexInteger64(25),
+			To:     recipient1Name,
+			Amount: ethtypes.NewHexInteger64(25),
 		}),
 	})
 	if rpcerr != nil {

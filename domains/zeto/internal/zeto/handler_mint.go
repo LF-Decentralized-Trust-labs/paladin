@@ -37,9 +37,6 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	if mintParams.To == "" {
 		return nil, fmt.Errorf("parameter 'to' is required")
 	}
-	if mintParams.RecipientKey == "" {
-		return nil, fmt.Errorf("parameter 'recipientKey' is required")
-	}
 	if mintParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
@@ -52,8 +49,8 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    params.RecipientKey,
-				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				Lookup:    params.To,
+				Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 			},
 		},
 	}, nil
@@ -62,9 +59,9 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.params.(ZetoMintParams)
 
-	resolvedRecipient := findVerifier(params.RecipientKey, req.ResolvedVerifiers)
+	resolvedRecipient := findVerifier(params.To, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
-		return nil, fmt.Errorf("failed to resolve: %s", params.RecipientKey)
+		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}
 
 	var recipientKeyCompressed babyjub.PublicKeyComp

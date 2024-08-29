@@ -97,13 +97,13 @@ type gatheredCoins struct {
 	outTotal  *big.Int
 }
 
-func loadBuild(buildOutput []byte) SolidityBuild {
+func loadBuild(buildOutput []byte) *SolidityBuild {
 	var build SolidityBuild
 	err := json.Unmarshal(buildOutput, &build)
 	if err != nil {
 		panic(err)
 	}
-	return build
+	return &build
 }
 
 func New(callbacks plugintk.DomainCallbacks) *Noto {
@@ -124,8 +124,8 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
-	var factory SolidityBuild
-	var contract SolidityBuild
+	var factory *SolidityBuild
+	var contract *SolidityBuild
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"

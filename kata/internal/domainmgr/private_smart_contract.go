@@ -351,8 +351,8 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	// Run the prepare
 	res, err := dc.api.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
-		InputStates:       dc.toReferenceList(postAssembly.InputStates),
-		OutputStates:      dc.toReferenceList(postAssembly.OutputStates),
+		InputStates:       dc.toEndorsableList(postAssembly.InputStates),
+		OutputStates:      dc.toEndorsableList(postAssembly.OutputStates),
 		AttestationResult: dc.allAttestations(tx),
 	})
 	if err != nil {
@@ -456,15 +456,4 @@ func (dc *domainContract) toEndorsableList(states []*components.FullState) []*pr
 		}
 	}
 	return endorsableList
-}
-
-func (dc *domainContract) toReferenceList(states []*components.FullState) []*prototk.StateRef {
-	referenceList := make([]*prototk.StateRef, len(states))
-	for i, input := range states {
-		referenceList[i] = &prototk.StateRef{
-			Id:       input.ID.String(),
-			SchemaId: input.Schema.String(),
-		}
-	}
-	return referenceList
 }

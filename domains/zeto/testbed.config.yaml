@@ -3,29 +3,28 @@ db:
   sqlite:
     uri: ':memory:'
     autoMigrate: true
-    migrationsDir: './db/migrations/sqlite'
+    migrationsDir: '../../../../kata/db/migrations/sqlite'
 rpcServer:
   http:
-    address: 0.0.0.0
-    port: 49610
+    port: 0
   ws:
     disabled: true
+grpc:
+  shutdownTimeout: 1s
 blockchain:
+  http:
+    url: http://localhost:8545
   ws:
-    url: ws://besu:8546
+    url: ws://localhost:8546
     initialConnectAttempts: 25
-bus:
-  grpc:
-    socketProtocol: tcp
-    socketAddress: ":49611"
 signer:
   keyDerivation:
     type: "bip32"
   keyStore:
     type: "static"
     snarkProver:
-      circuitsDir: zkp
-      provingKeysDir: zkp
+      circuitsDir: ../../zkp
+      provingKeysDir: ../../zkp
     static:
       keys:
         seed:
