@@ -24,7 +24,7 @@ public class Main {
 
     private static final Logger LOGGER = LogManager.getLogger(Main.class);
 
-    static int run(String[] args) {
+    public static int run(String[] args) {
         PluginLoader loader = null;
 
         if (args.length < 2) {
