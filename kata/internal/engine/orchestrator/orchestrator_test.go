@@ -32,7 +32,10 @@ import (
 
 func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	mockAllComponents := componentmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{})
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -79,7 +82,10 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 
 func TestOrchestratorHandleEvents(t *testing.T) {
 	ctx := context.Background()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	mockAllComponents := componentmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{})
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -151,7 +157,11 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	mockAllComponents := componentmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
+
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{})
 	ocDone, err := testOc.Start(ctx)
 	assert.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
@@ -162,7 +172,10 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	mockAllComponents := componentmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{})
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
@@ -183,7 +196,10 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 			ID: newTxID,
 		},
 	}
-	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, &componentmocks.StateStore{}, &componentmocks.DomainSmartContract{})
+	mockAllComponents := componentmocks.NewAllComponents(t)
+	mockStateStore := componentmocks.NewStateStore(t)
+	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
+	testOc := NewOrchestrator(ctx, "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{})
 	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 

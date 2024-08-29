@@ -115,7 +115,7 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
 	// TODO how to measure fairness/ per From address / contract address / something else
 	if e.orchestrators[txInstance.GetContractAddress(ctx)] == nil {
-		e.orchestrators[txInstance.GetContractAddress(ctx)] = orchestrator.NewOrchestrator(ctx, txInstance.GetContractAddress(ctx) /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components.StateStore(), domainAPI)
+		e.orchestrators[txInstance.GetContractAddress(ctx)] = orchestrator.NewOrchestrator(ctx, txInstance.GetContractAddress(ctx) /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components, domainAPI)
 		orchestratorDone, err := e.orchestrators[txInstance.GetContractAddress(ctx)].Start(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", txInstance.GetContractAddress(ctx), err)
