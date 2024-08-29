@@ -18,7 +18,6 @@ package testbed
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
@@ -90,19 +89,18 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 		}
 	}
 
-	var pLoader atomic.Pointer[plugins.UnitTestPluginLoader]
+	var pl plugins.UnitTestPluginLoader
 	pluginInit := func(c components.AllComponents) (err error) {
+		loaderMap := make(map[string]plugintk.Plugin)
 		for name, domain := range domains {
-			pc := c.PluginController()
-			pl, err := plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
-				name: domain.Plugin,
-			})
-			pLoader.Store(&pl)
-			if err != nil {
-				return err
-			}
-			go pl.Run()
+			loaderMap[name] = domain.Plugin
 		}
+		pc := c.PluginController()
+		pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
+		if err != nil {
+			return err
+		}
+		go pl.Run()
 		return nil
 	}
 
@@ -113,9 +111,8 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 
 	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), func() {
 		cm.Stop()
-		pPL := pLoader.Load()
-		if pPL != nil {
-			(*pPL).Stop()
+		if pl != nil {
+			pl.Stop()
 		}
 	}, nil
 }
