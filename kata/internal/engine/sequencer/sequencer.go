@@ -191,18 +191,6 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 	return nil
 }
 
-func (s *sequencer) sendReassembleMessage(ctx context.Context, assemblingNodeID string, transactionID string) {
-
-	err := s.eventSync.SendMessage(ctx, assemblingNodeID, &pb.ReassembleRequest{
-		TransactionId: transactionID,
-	},
-	)
-	if err != nil {
-		//TODO - what should we do here?  Should we retry?  Should we log and ignore?
-		log.L(ctx).Errorf("Error sending reassemble message: %s", err)
-	}
-}
-
 func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
 	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
 	for _, stateID := range txn.inputStates {

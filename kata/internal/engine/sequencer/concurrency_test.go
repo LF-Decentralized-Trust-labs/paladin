@@ -320,7 +320,7 @@ type transactionInvoker struct {
 	stopMsg chan bool
 }
 
-func (a *transactionInvoker) stop(t *testing.T) {
+func (a *transactionInvoker) stop(_ *testing.T) {
 	a.stopMsg <- true
 }
 func (a *transactionInvoker) run(t *testing.T, postInvoke func()) {
@@ -348,11 +348,4 @@ func newTransactionInvoker(nodeId uuid.UUID, name string, engine Engine) *transa
 		next:    make(chan bool, 1),
 		stopMsg: make(chan bool, 1),
 	}
-}
-
-type fakeEndorser struct {
-}
-
-func newFakeEndorser() *fakeEndorser {
-	return &fakeEndorser{}
 }
