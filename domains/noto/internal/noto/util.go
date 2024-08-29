@@ -13,17 +13,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-ext {
-    protosDir = layout.projectDirectory.dir('protos')
+package noto
+
+import (
+	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+)
+
+func findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
+	for _, verifier := range verifiers {
+		if verifier.Lookup == lookup {
+			return verifier
+		}
+	}
+	return nil
 }
 
-configurations {
-    protoDefinitions {
-        canBeConsumed = true
-        canBeResolved = false
-    }
-}
-
-artifacts {
-    protoDefinitions(protosDir) {}
+func findAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
+	for _, attestation := range attestations {
+		if attestation.Name == name {
+			return attestation
+		}
+	}
+	return nil
 }

@@ -1,6 +1,5 @@
 services:
   postgres:
-    container_name: paladin-test-db
     image: postgres
     ports:
       - 5432:5432
@@ -8,7 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: my-secret
   besu_bootstrap:
-    container_name: paladin-besu-bootstrap
     image: paladin/besu_bootstrap
     user: 0:0
     volumes:
@@ -16,7 +14,6 @@ services:
     command:
       - /var/besu
   besu:
-    container_name: paladin-test-besu
     image: hyperledger/besu:latest
     user: 0:0
     volumes:
@@ -46,6 +43,7 @@ services:
       - --data-path=/var/besu/data
       - --node-private-key-file=/var/besu/key
       - --revert-reason-enabled
+      - --host-allowlist=localhost,besu
 volumes:
   besu_data:
     driver: local

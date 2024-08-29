@@ -17,10 +17,26 @@ package testbed
 
 import (
 	"context"
+	"fmt"
+	"testing"
 
+	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"gopkg.in/yaml.v3"
 )
+
+type Testbed interface {
+	StartForTest(t *testing.T, configFile string, domains map[string]*TestbedDomain) (url string, done func())
+}
+
+type TestbedDomain struct {
+	Config yaml.Node
+	Plugin plugintk.Plugin
+}
 
 type testbed struct {
 	ctx       context.Context
@@ -51,5 +67,52 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 	tb.c = c
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
+	}, nil
+}
+
+func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain) (url string, done func(), err error) {
+	ctx := context.Background()
+
+	var conf *componentmgr.Config
+	if err = componentmgr.ReadAndParseYAMLFile(ctx, configFile, &conf); err != nil {
+		return "", nil, err
+	}
+
+	conf.DomainManagerConfig.Domains = make(map[string]*domainmgr.DomainConfig, len(domains))
+	for name, domain := range domains {
+		conf.DomainManagerConfig.Domains[name] = &domainmgr.DomainConfig{
+			Plugin: plugins.PluginConfig{
+				Type:    plugins.LibraryTypeCShared.Enum(),
+				Library: "loaded/via/unit/test/loader",
+			},
+			Config: domain.Config,
+		}
+	}
+
+	var pl plugins.UnitTestPluginLoader
+	pluginInit := func(c components.AllComponents) (err error) {
+		loaderMap := make(map[string]plugintk.Plugin)
+		for name, domain := range domains {
+			loaderMap[name] = domain.Plugin
+		}
+		pc := c.PluginController()
+		pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
+		if err != nil {
+			return err
+		}
+		go pl.Run()
+		return nil
+	}
+
+	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, pluginInit)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), func() {
+		cm.Stop()
+		if pl != nil {
+			pl.Stop()
+		}
 	}, nil
 }
