@@ -182,6 +182,12 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				Payload:         payloadBytes,
 				Parties:         []string{params.SenderKey},
 			},
+			{
+				Name:            "submitter",
+				AttestationType: pb.AttestationType_ENDORSE,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				Parties:         []string{tx.transaction.From},
+			},
 		},
 	}, nil
 }

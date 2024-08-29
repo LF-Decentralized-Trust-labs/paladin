@@ -60,10 +60,8 @@ func deployFactory(ctx context.Context, t *testing.T, factory SolidityBuild) str
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	log.L(ctx).Infof("Deploying Noto factory")
 	factoryAddress, err := deployBytecode(ctx, rpc, factory)
 	assert.NoError(t, err)
-	log.L(ctx).Infof("Noto factory deployed to %s", factoryAddress)
 	return factoryAddress
 }
 
@@ -98,7 +96,7 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build SolidityB
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
-	domainName := "noto_" + types.RandHex(8)
+	domainName := "zeto_" + types.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
 	log.L(ctx).Infof("Deploying Zeto libraries")
@@ -125,25 +123,13 @@ func TestZeto(t *testing.T) {
 
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{
 		FactoryAddress: factoryAddress,
+		Libraries:      libraries,
 	})
 	defer done()
 
-	log.L(ctx).Infof("Configuring Zeto domain")
-	var boolResult bool
-	domainConfig := Config{
-		FactoryAddress: factoryAddress,
-		Libraries:      libraries,
-	}
-	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_configureInit",
-		domainName, domainConfig)
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
-	assert.True(t, boolResult)
-
 	log.L(ctx).Infof("Deploying an instance of Zeto")
 	var zetoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{
 			From:             controllerEth,
 			Verifier:         verifierAddress,
@@ -156,6 +142,7 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
+	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerEth,
 		To:       types.EthAddress(zetoAddress),

@@ -53,7 +53,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    params.RecipientKey,
-				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 			},
 		},
 	}, nil
