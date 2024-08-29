@@ -19,54 +19,101 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
 
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 )
 
-func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) error {
-	if len(config.DomainContracts.Factory.Implementations) == 0 {
-		return fmt.Errorf("no implementations specified for factory contract")
-	}
-	// libraries contracts are deployed first. they are specified as regular contracts in the config
-	// but are referenced from the main contracts by the `libraries` field
-	libraries := make(map[string]bool)
+// func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (map[string]*ethtypes.Address0xHex, error) {
+// 	if len(config.DomainContracts.Factory.Implementations) == 0 {
+// 		return nil, fmt.Errorf("no implementations specified for factory contract")
+// 	}
+// 	// libraries contracts are deployed first. they are specified as regular contracts in the config
+// 	// but are referenced from the main contracts by the `libraries` field
+// 	libraryContracts, err := findLibraryContracts(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	deployedContracts := make(map[string]*ethtypes.Address0xHex)
+
+// 	// deploy libraries
+// 	for _, contract := range libraryContracts {
+// 		addr, err := deployContract(ctx, rpc, deployer, contract)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		deployedContracts[contract.Name] = addr
+// 	}
+
+// 	// deploy implementation (non-library) contracts
+// 	for _, contract := range config.DomainContracts.Factory.Implementations {
+// 		if libraryContracts[contract.Name] != nil {
+// 			// already deployed as a library
+// 			continue
+// 		}
+// 		addr, err := deployContract(ctx, rpc, deployer, &contract)
+// 	}
+// 	return nil
+// }
+
+// when contracts include a `libraries` section, the libraries must be deployed first
+// we build a sorted list of contracts, with the dependencies first, and the depending
+// contracts later
+func sortContracts(config *ZetoDomainConfig) (map[string]*ZetoDomainContract, error) {
+	var contracts []*ZetoDomainContract
 	for _, contract := range config.DomainContracts.Factory.Implementations {
-		if len(contract.Libraries) > 0 {
-			for _, library := range contract.Libraries {
-				libraries[library] = true
+		contracts = append(contracts, &contract)
+	}
+
+	sort.Slice(contracts, func(i, j int) bool {
+		if len(contracts[i].Libraries) == 0 && len(contracts[j].Libraries) == 0 {
+			// order doesn't matter
+			return false
+		}
+		if len(contracts[i].Libraries) > 0 && len(contracts[j].Libraries) > 0 {
+			// the order is determined by the dependencies
+			for _, lib := range contracts[i].Libraries {
+				if lib == contracts[j].Name {
+					// i depends on j
+					return false
+				}
 			}
-		}
-	}
-
-	var libraryContracts []*ZetoDomainContract
-	for lib := range libraries {
-		var contract *ZetoDomainContract
-		for _, impl := range config.DomainContracts.Factory.Implementations {
-			if impl.Name == lib {
-				contract = &impl
-				break
+			for _, lib := range contracts[j].Libraries {
+				if lib == contracts[i].Name {
+					// j depends on i
+					return true
+				}
 			}
+			// no dependency relationship
+			return false
 		}
-		if contract == nil {
-			return fmt.Errorf("library contract %s referenced but not found", lib)
-		}
-		libraryContracts = append(libraryContracts, contract)
-	}
-
-	// deploy libraries
-	for _, contract := range libraryContracts {
-		err := deployContract(ctx, rpc, deployer, contract)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+		return len(contracts[i].Libraries) < len(contracts[j].Libraries)
+	})
 }
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract) error {
+// 	libraryContracts := make(map[string]*ZetoDomainContract)
+// 	for lib := range libraries {
+// 		var contract *ZetoDomainContract
+// 		for _, impl := range config.DomainContracts.Factory.Implementations {
+// 			if impl.Name == lib {
+// 				contract = &impl
+// 				break
+// 			}
+// 		}
+// 		if contract == nil {
+// 			return nil, fmt.Errorf("library contract %s referenced but not found", lib)
+// 		}
+// 		libraryContracts[contract.Name] = contract
+// 	}
+// 	return libraryContracts, nil
+// }
+
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract) (*ethtypes.Address0xHex, error) {
 	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
-		return fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
+		return nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
 	// deploy the contract
 	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
@@ -75,25 +122,36 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 		abiBytecode["bytecode"] = contract.AbiAndBytecode.Json.Bytecode
 		bytes, err := json.Marshal(abiBytecode)
 		if err != nil {
-			return fmt.Errorf("failed to marshal abi and bytecode content in the Domain configuration. %s", err)
+			return nil, fmt.Errorf("failed to marshal abi and bytecode content in the Domain configuration. %s", err)
 		}
 		var build SolidityBuild
 		err = json.Unmarshal(bytes, &build)
 		if err != nil {
-			return fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
+			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
 		}
-		_, err = deployBytecode(ctx, rpc, deployer, build)
+		return deployBytecode(ctx, rpc, deployer, build)
+	} else {
+		// load the abi and bytecode from the file
+		bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
+		}
+		var build SolidityBuild
+		err = json.Unmarshal(bytes, &build)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
+		}
+		return deployBytecode(ctx, rpc, deployer, build)
 	}
-	return nil
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build SolidityBuild) (string, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build SolidityBuild) (*ethtypes.Address0xHex, error) {
 	var addr string
 	// TODO: replace with the actual API call against the engine
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
 		deployer, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
-		return "", rpcerr.Error()
+		return nil, rpcerr.Error()
 	}
-	return addr, nil
+	return ethtypes.MustNewAddress(addr), nil
 }
