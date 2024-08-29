@@ -9,6 +9,8 @@ rpcServer:
     port: 0
   ws:
     disabled: true
+grpc:
+  shutdownTimeout: 1s
 blockchain:
   http:
     url: http://localhost:8545
