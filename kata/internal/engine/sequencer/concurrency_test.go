@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sequence
+package sequencer
 
 import (
 	"context"
@@ -24,9 +24,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/mocks/sequencemocks"
+	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -207,9 +207,9 @@ func TestConcurrentSequencing(t *testing.T) {
 	log.L(ctx).Infof("node2ID %s", node2ID)
 	log.L(ctx).Infof("node3ID %s", node3ID)
 
-	dispatcher1Mock := sequencemocks.NewDispatcher(t)
-	dispatcher2Mock := sequencemocks.NewDispatcher(t)
-	dispatcher3Mock := sequencemocks.NewDispatcher(t)
+	dispatcher1Mock := enginemocks.NewDispatcher(t)
+	dispatcher2Mock := enginemocks.NewDispatcher(t)
+	dispatcher3Mock := enginemocks.NewDispatcher(t)
 
 	internodeTransportLayer := NewFakeTransportLayer(t)
 

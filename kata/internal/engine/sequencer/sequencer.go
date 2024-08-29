@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sequence
+package sequencer
 
 import (
 	"context"
@@ -22,8 +22,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"google.golang.org/protobuf/proto"

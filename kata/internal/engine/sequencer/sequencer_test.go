@@ -14,16 +14,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sequence
+package sequencer
 
 import (
 	"context"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/sequence/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/mocks/sequencemocks"
+	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -933,17 +933,17 @@ func TestSequencerLoopDetection(t *testing.T) {
 }
 */
 type sequencerMockDependencies struct {
-	eventSyncMock  *sequencemocks.EventSync
-	resolverMock   *sequencemocks.ContentionResolver
-	dispatcherMock *sequencemocks.Dispatcher
+	eventSyncMock  *enginemocks.EventSync
+	resolverMock   *enginemocks.ContentionResolver
+	dispatcherMock *enginemocks.Dispatcher
 }
 
 func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (Sequencer, sequencerMockDependencies) {
 
-	eventSyncMock := sequencemocks.NewEventSync(t)
-	dispatcherMock := sequencemocks.NewDispatcher(t)
+	eventSyncMock := enginemocks.NewEventSync(t)
+	dispatcherMock := enginemocks.NewDispatcher(t)
 	if mockResolver {
-		resolverMock := sequencemocks.NewContentionResolver(t)
+		resolverMock := enginemocks.NewContentionResolver(t)
 		return &sequencer{
 				nodeID:                      nodeID,
 				eventSync:                   eventSyncMock,
