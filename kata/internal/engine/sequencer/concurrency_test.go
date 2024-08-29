@@ -25,9 +25,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -65,19 +65,16 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 	// Assemble a transaction
-	newState := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	newState := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	txnID := uuid.New()
 	log.L(ctx).Infof("Assembling transaction %s", txnID)
 
 	// Tell all nodes about the transaction
 	err := f.transportLayer.PublishEvent(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txnID.String(),
-		NodeId:          f.nodeID,
-		InputStateHash:  []string{f.currentState},
-		OutputStateHash: []string{newState.String()},
+		TransactionId: txnID.String(),
+		NodeId:        f.nodeID,
+		InputStateID:  []string{f.currentState},
+		OutputStateID: []string{newState.String()},
 	})
 	require.NoError(f.t, err)
 
@@ -97,7 +94,7 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 func (f *fakeEngine) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	f.currentState = event.OutputStateHash[0]
+	f.currentState = event.OutputStateID[0]
 	return f.sequencer.OnTransactionAssembled(ctx, event)
 
 }
@@ -213,10 +210,7 @@ func TestConcurrentSequencing(t *testing.T) {
 
 	internodeTransportLayer := NewFakeTransportLayer(t)
 
-	seedState := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	seedState := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	node1Sequencer := NewSequencer(node1ID,
 		internodeTransportLayer,

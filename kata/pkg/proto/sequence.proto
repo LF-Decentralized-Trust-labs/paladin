@@ -22,13 +22,13 @@ import "google/protobuf/any.proto";
 // StateClaiomEvent is an event that is emitted when a node has pressumptively claimed a state that it believes to be available ( i.e. either in pending or confirmed metastate).
 // if this believe is not held by any other node ( i.e. they beleive it is already claimed) then this will trigger a contention resolution process to determine the rightful claimer of the state.
 message StateClaimEvent {
-    string stateHash = 1;
+    string state_id = 1;
     string transactionId = 2;
 }
 
 // StateClaimLostEvent is an event that is emitted after a contention resolution process has determined that a claim has been lost by the given transaction
 message StateClaimLostEvent {
-    string stateHash = 1;
+    string state_id = 1;
     string transactionId = 2;
 }
 
@@ -39,8 +39,8 @@ message ReassembleRequest {
 message TransactionAssembledEvent {
     string transactionId = 1;
     string nodeId = 2;
-    repeated string inputStateHash = 3;
-    repeated string outputStateHash = 4;
+    repeated string inputStateID = 3;
+    repeated string outputStateID = 4;
 }
 
 message TransactionEndorsedEvent {

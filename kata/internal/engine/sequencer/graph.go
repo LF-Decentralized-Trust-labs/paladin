@@ -105,22 +105,22 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 	stateToSpender := make(map[string]*int)
 	stateToMinter := make(map[string]*int)
 	for txnIndex, txn := range g.transactions {
-		for _, stateHash := range txn.inputStates {
-			if stateToSpender[stateHash] != nil {
+		for _, stateID := range txn.inputStates {
+			if stateToSpender[stateID] != nil {
 				//TODO this is expected in some cases and represents a contention that needs to be resolved
 				//TBC do we assert that it is resovled before we get to this point?
-				log.L(ctx).Errorf("State hash %s is spent by multiple transactions", stateHash)
+				log.L(ctx).Errorf("State hash %s is spent by multiple transactions", stateID)
 				return i18n.NewError(ctx, msgs.MsgSequencerInternalError)
 			}
-			stateToSpender[stateHash] = ptrTo(txnIndex)
+			stateToSpender[stateID] = ptrTo(txnIndex)
 		}
-		for _, stateHash := range txn.inputStates {
-			if stateToMinter[stateHash] != nil {
+		for _, stateID := range txn.inputStates {
+			if stateToMinter[stateID] != nil {
 				//This should never happen unless something has gone drastically wrong elsewhere
-				log.L(ctx).Errorf("State hash %s is minted by multiple transactions", stateHash)
+				log.L(ctx).Errorf("State hash %s is minted by multiple transactions", stateID)
 				return i18n.NewError(ctx, msgs.MsgSequencerInternalError)
 			}
-			stateToMinter[stateHash] = ptrTo(txnIndex)
+			stateToMinter[stateID] = ptrTo(txnIndex)
 		}
 	}
 
@@ -133,10 +133,10 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 		//TODO this is O(n^2) and could be optimised
 		//TODO what about input states that are not output states of any transaction? Do we assume that the minter transactions are already dispatched /
 		// or confirmed?
-		for _, stateHash := range minter.outputStates {
-			if spenderIndex := stateToSpender[stateHash]; spenderIndex != nil {
+		for _, stateID := range minter.outputStates {
+			if spenderIndex := stateToSpender[stateID]; spenderIndex != nil {
 				//we have a dependency relationship
-				g.transactionsMatrix[minterIndex][*spenderIndex] = append(g.transactionsMatrix[minterIndex][*spenderIndex], stateHash)
+				g.transactionsMatrix[minterIndex][*spenderIndex] = append(g.transactionsMatrix[minterIndex][*spenderIndex], stateID)
 			}
 		}
 	}

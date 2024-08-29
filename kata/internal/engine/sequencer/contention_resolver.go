@@ -27,13 +27,13 @@ func NewContentionResolver() ContentionResolver {
 }
 
 type ContentionResolver interface {
-	Resolve(stateHash, biddingContentionResolver1, biddingContentionResolver2 string) (string, error)
+	Resolve(stateID, biddingContentionResolver1, biddingContentionResolver2 string) (string, error)
 }
 
 type contentionResolver struct {
 }
 
-func (c *contentionResolver) Resolve(stateHash, bidder1, bidder2 string) (string, error) {
+func (c *contentionResolver) Resolve(stateID, bidder1, bidder2 string) (string, error) {
 
 	bidders := make([]string, 0, 1000)
 	// create 500 virtual nodes for each bidding ContentionResolver
@@ -42,7 +42,7 @@ func (c *contentionResolver) Resolve(stateHash, bidder1, bidder2 string) (string
 		bidders = append(bidders, bidder2+strconv.Itoa(i))
 	}
 	ring := hashring.New(bidders)
-	winnerVirtual, _ := ring.GetNode(stateHash)
+	winnerVirtual, _ := ring.GetNode(stateID)
 	winner := winnerVirtual[:36]
 	return winner, nil
 

@@ -22,9 +22,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -62,15 +62,12 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:          node1ID.String(),
-		TransactionId:   txn1ID.String(),
-		OutputStateHash: []string{stateHash.String()},
+		NodeId:        node1ID.String(),
+		TransactionId: txn1ID.String(),
+		OutputStateID: []string{stateID.String()},
 	})
 
 	assert.NoError(t, err)
@@ -86,9 +83,9 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 
 	//now add a second transaction that is dependant on the first (before the first is confirmed)
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:         node1ID.String(),
-		TransactionId:  txn2ID.String(),
-		InputStateHash: []string{stateHash.String()},
+		NodeId:        node1ID.String(),
+		TransactionId: txn2ID.String(),
+		InputStateID:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -110,16 +107,13 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:          node1ID.String(),
-		TransactionId:   txn1ID.String(),
-		OutputStateHash: []string{stateHash.String()},
+		NodeId:        node1ID.String(),
+		TransactionId: txn1ID.String(),
+		OutputStateID: []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
@@ -127,9 +121,9 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:         node1ID.String(),
-		TransactionId:  txn2ID.String(),
-		InputStateHash: []string{stateHash.String()},
+		NodeId:        node1ID.String(),
+		TransactionId: txn2ID.String(),
+		InputStateID:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -163,10 +157,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
 
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -174,9 +165,9 @@ func TestSequencerRemoteDependency(t *testing.T) {
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn1ID.String(),
-		NodeId:          remoteNodeId.String(),
-		OutputStateHash: []string{stateHash.String()},
+		TransactionId: txn1ID.String(),
+		NodeId:        remoteNodeId.String(),
+		OutputStateID: []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -189,9 +180,9 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	}).Return(nil)
 
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:  txn2ID.String(),
-		NodeId:         localNodeId.String(),
-		InputStateHash: []string{stateHash.String()},
+		TransactionId: txn2ID.String(),
+		NodeId:        localNodeId.String(),
+		InputStateID:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -228,15 +219,9 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 	txn2ID := uuid.New()
 	txn3ID := uuid.New()
 
-	stateHashA := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateIDA := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
-	stateHashB := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateIDB := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -244,18 +229,18 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn1ID.String(),
-		NodeId:          remoteNode1Id.String(),
-		OutputStateHash: []string{stateHashA.String()},
+		TransactionId: txn1ID.String(),
+		NodeId:        remoteNode1Id.String(),
+		OutputStateID: []string{stateIDA.String()},
 	})
 	assert.NoError(t, err)
 
 	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn2ID.String(),
-		NodeId:          remoteNode2Id.String(),
-		InputStateHash:  []string{stateHashA.String()},
-		OutputStateHash: []string{stateHashB.String()},
+		TransactionId: txn2ID.String(),
+		NodeId:        remoteNode2Id.String(),
+		InputStateID:  []string{stateIDA.String()},
+		OutputStateID: []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -268,9 +253,9 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 
 	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:  txn3ID.String(),
-		NodeId:         localNodeId.String(),
-		InputStateHash: []string{stateHashB.String()},
+		TransactionId: txn3ID.String(),
+		NodeId:        localNodeId.String(),
+		InputStateID:  []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -316,15 +301,9 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	txn2ID := uuid.New()
 	txn3ID := uuid.New()
 
-	stateHashA := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateIDA := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
-	stateHashB := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateIDB := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -332,27 +311,27 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn1ID.String(),
-		NodeId:          remoteNode1Id.String(),
-		OutputStateHash: []string{stateHashA.String()},
+		TransactionId: txn1ID.String(),
+		NodeId:        remoteNode1Id.String(),
+		OutputStateID: []string{stateIDA.String()},
 	})
 	assert.NoError(t, err)
 
 	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn2ID.String(),
-		NodeId:          remoteNode2Id.String(),
-		InputStateHash:  []string{stateHashA.String()},
-		OutputStateHash: []string{stateHashB.String()},
+		TransactionId: txn2ID.String(),
+		NodeId:        remoteNode2Id.String(),
+		InputStateID:  []string{stateIDA.String()},
+		OutputStateID: []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
 	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
 	//but the local node has not been notified that txn2 has been delegated to remoteNode1 yet
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:  txn3ID.String(),
-		NodeId:         localNodeId.String(),
-		InputStateHash: []string{stateHashB.String()},
+		TransactionId: txn3ID.String(),
+		NodeId:        localNodeId.String(),
+		InputStateID:  []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -390,16 +369,13 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 
 	txn4ID := uuid.New()
 
-	stateHashC := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateIDC := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   txn4ID.String(),
-		NodeId:          remoteNode3Id.String(),
-		InputStateHash:  []string{stateHashB.String()},
-		OutputStateHash: []string{stateHashC.String()},
+		TransactionId: txn4ID.String(),
+		NodeId:        remoteNode3Id.String(),
+		InputStateID:  []string{stateIDB.String()},
+		OutputStateID: []string{stateIDC.String()},
 	})
 	assert.NoError(t, err)
 
@@ -428,15 +404,9 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	dependency1TransactionID := uuid.New()
 	dependency2TransactionID := uuid.New()
 
-	stateHash1 := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID1 := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
-	stateHash2 := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID2 := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -444,17 +414,17 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 
 	// First transaction (the minter of a given state) is assembled on the remote node
 	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   dependency1TransactionID.String(),
-		NodeId:          remoteNode1Id.String(),
-		OutputStateHash: []string{stateHash1.String()},
+		TransactionId: dependency1TransactionID.String(),
+		NodeId:        remoteNode1Id.String(),
+		OutputStateID: []string{stateID1.String()},
 	})
 	assert.NoError(t, err)
 
 	// Second transaction (the minter of the other state) is assembled on a different remote node
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:   dependency2TransactionID.String(),
-		NodeId:          remoteNode2Id.String(),
-		OutputStateHash: []string{stateHash2.String()},
+		TransactionId: dependency2TransactionID.String(),
+		NodeId:        remoteNode2Id.String(),
+		OutputStateID: []string{stateID2.String()},
 	})
 	assert.NoError(t, err)
 
@@ -467,9 +437,9 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	// new transaction (the spender of that states) is assembled on the local node
 
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		TransactionId:  newTransactionID.String(),
-		NodeId:         localNodeId.String(),
-		InputStateHash: []string{stateHash1.String(), stateHash2.String()},
+		TransactionId: newTransactionID.String(),
+		NodeId:        localNodeId.String(),
+		InputStateID:  []string{stateID1.String(), stateID2.String()},
 	})
 	assert.NoError(t, err)
 
@@ -529,16 +499,13 @@ func TestSequencerApproveEndorsement(t *testing.T) {
 	ctx := context.Background()
 	nodeID := uuid.New()
 	txn1ID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn1ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -552,22 +519,19 @@ func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
 	remoteNodeID := uuid.New()
 
 	txn1ID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:         remoteNodeID.String(),
-		TransactionId:  txn1ID.String(),
-		InputStateHash: []string{stateHash.String()},
+		NodeId:        remoteNodeID.String(),
+		TransactionId: txn1ID.String(),
+		InputStateID:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn1ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -577,10 +541,7 @@ func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
 
 	ctx := context.Background()
 	nodeID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
@@ -588,14 +549,14 @@ func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
 
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn1ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
 
 	approved, err = node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn2ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.False(t, approved)
@@ -606,25 +567,22 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	ctx := context.Background()
 	nodeID := uuid.New()
 	remoteNodeID := uuid.New()
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
-		NodeId:         remoteNodeID.String(),
-		TransactionId:  txn1ID.String(),
-		InputStateHash: []string{stateHash.String()},
+		NodeId:        remoteNodeID.String(),
+		TransactionId: txn1ID.String(),
+		InputStateID:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn1ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -636,7 +594,7 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 
 	approved, err = node1Sequencer.ApproveEndorsement(ctx, types.EndorsementRequest{
 		TransactionID: txn2ID.String(),
-		InputStates:   []string{stateHash.String()},
+		InputStates:   []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	assert.True(t, approved)
@@ -663,17 +621,14 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
 
-	stateHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateID := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	stateKnownByNode1 := statestore.State{
-		Hash:      stateHash,
+		Hash:      stateID,
 		ClaimedBy: &txn1ID,
 	}
 
 	stateKnownByNode2 := statestore.State{
-		Hash:      stateHash,
+		Hash:      stateID,
 		ClaimedBy: &txn2ID,
 	}
 
@@ -694,8 +649,8 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	persistenceMock2.On("GetTransactionByID", ctx, txn1ID).Return(txn1, nil).Maybe()
 	persistenceMock2.On("GetTransactionByID", ctx, txn2ID).Return(txn2, nil).Maybe()
 
-	persistenceMock1.On("GetStateByHash", ctx, stateHash.String()).Return(stateKnownByNode1, nil).Maybe()
-	persistenceMock2.On("GetStateByHash", ctx, stateHash.String()).Return(stateKnownByNode2, nil).Maybe()
+	persistenceMock1.On("GetStateByHash", ctx, stateID.String()).Return(stateKnownByNode1, nil).Maybe()
+	persistenceMock2.On("GetStateByHash", ctx, stateID.String()).Return(stateKnownByNode2, nil).Maybe()
 
 	persistenceMock1.On("UpdateState", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		node1PersistedState = args.Get(1).(statestore.State)
@@ -727,13 +682,13 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 
 	// txn1 claims the state
 	stateClaimEvent1 := &pb.StateClaimEvent{
-		StateHash:     stateHash.String(),
+		StateID:     stateID.String(),
 		TransactionId: txn1ID.String(),
 	}
 
 	// node2 claims the state
 	stateClaimEvent2 := &pb.StateClaimEvent{
-		StateHash:     stateHash.String(),
+		StateID:     stateID.String(),
 		TransactionId: txn2ID.String(),
 	}
 	var wg sync.WaitGroup
@@ -809,10 +764,7 @@ func TestSequencerLoopDetection(t *testing.T) {
 		AssemblingNodeID: node2ID,
 	}
 
-	stateAHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateAHash := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	stateAKnownByNode1 := statestore.State{
 		Hash:      stateAHash,
 		ClaimedBy: &txn1ID,
@@ -823,10 +775,7 @@ func TestSequencerLoopDetection(t *testing.T) {
 		ClaimedBy: &txn2ID,
 	}
 
-	stateBHash := statestore.HashID{
-		L: uuid.New(),
-		H: uuid.New(),
-	}
+	stateBHash := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 	stateBKnownByNode1 := statestore.State{
 		Hash:      stateBHash,
 		ClaimedBy: &txn1ID,
@@ -881,19 +830,19 @@ func TestSequencerLoopDetection(t *testing.T) {
 	transportMock2.On("SendMessage", ctx, mock.MatchedBy(isReassembleMessage)).Run(recordReassembleMessage).Return(nil).Maybe()
 
 	stateClaimEvent1A := &pb.StateClaimEvent{
-		StateHash:     stateAHash.String(),
+		StateID:     stateAHash.String(),
 		TransactionId: txn1ID.String(),
 	}
 	stateClaimEvent1B := &pb.StateClaimEvent{
-		StateHash:     stateBHash.String(),
+		StateID:     stateBHash.String(),
 		TransactionId: txn1ID.String(),
 	}
 	stateClaimEvent2A := &pb.StateClaimEvent{
-		StateHash:     stateAHash.String(),
+		StateID:     stateAHash.String(),
 		TransactionId: txn2ID.String(),
 	}
 	stateClaimEvent2B := &pb.StateClaimEvent{
-		StateHash:     stateBHash.String(),
+		StateID:     stateBHash.String(),
 		TransactionId: txn2ID.String(),
 	}
 

@@ -130,7 +130,7 @@ type delegatableTransaction struct {
 }
 
 type unconfirmedState struct {
-	stateHash            string
+	stateID              string
 	mintingTransactionID string
 }
 
@@ -205,12 +205,12 @@ func (s *sequencer) sendReassembleMessage(ctx context.Context, assemblingNodeID 
 
 func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
 	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
-	for _, stateHash := range txn.inputStates {
-		unconfirmedState, ok := s.unconfirmedStatesByHash[stateHash]
+	for _, stateID := range txn.inputStates {
+		unconfirmedState, ok := s.unconfirmedStatesByHash[stateID]
 		if !ok {
 			//this state is already confirmed
 			//TODO should we verify this is the case and not just the case that we have not learned about it yet?
-			log.L(ctx).Debugf("State %s is already confirmed", stateHash)
+			log.L(ctx).Debugf("State %s is already confirmed", stateID)
 			continue
 		}
 		mintingTransactionID := unconfirmedState.mintingTransactionID
@@ -392,12 +392,12 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 		id:               event.TransactionId,
 		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
 		assemblerNodeID:  event.NodeId,
-		outputStates:     event.OutputStateHash,
-		inputStates:      event.InputStateHash,
+		outputStates:     event.OutputStateID,
+		inputStates:      event.InputStateID,
 	}
-	for _, unconfirmedStateHash := range event.OutputStateHash {
-		s.unconfirmedStatesByHash[unconfirmedStateHash] = &unconfirmedState{
-			stateHash:            unconfirmedStateHash,
+	for _, unconfirmedStateID := range event.OutputStateID {
+		s.unconfirmedStatesByHash[unconfirmedStateID] = &unconfirmedState{
+			stateID:              unconfirmedStateID,
 			mintingTransactionID: event.TransactionId,
 		}
 	}
@@ -434,7 +434,7 @@ func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.Transac
 /*
 func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimEvent) error {
 	log.L(ctx).Infof("Received state claim event: %s", event.String())
-	state, err := s.persistence.GetStateByHash(ctx, event.StateHash)
+	state, err := s.persistence.GetStateByHash(ctx, event.StateID)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting state by ID: %s", err)
 		return err
@@ -493,9 +493,9 @@ func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimE
 
 func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
-	outputStateHashes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
-	for _, outputStateHash := range outputStateHashes {
-		s.unconfirmedStatesByHash[outputStateHash] = nil
+	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
+	for _, outputStateID := range outputStateIDes {
+		s.unconfirmedStatesByHash[outputStateID] = nil
 	}
 	s.unconfirmedTransactionsByID[event.TransactionId] = nil
 
@@ -555,8 +555,8 @@ func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {
 	contentionFound := false
-	for _, stateHash := range endorsementRequst.InputStates {
-		if stateSpender, ok := s.stateSpenders[stateHash]; ok {
+	for _, stateID := range endorsementRequst.InputStates {
+		if stateSpender, ok := s.stateSpenders[stateID]; ok {
 			if stateSpender != endorsementRequst.TransactionID {
 				//another transaction is already recognised as the spender of this state
 				contentionFound = true
@@ -568,8 +568,8 @@ func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst ty
 		return false, nil
 	}
 	//register this transaction as the spender of all the states
-	for _, stateHash := range endorsementRequst.InputStates {
-		s.stateSpenders[stateHash] = endorsementRequst.TransactionID
+	for _, stateID := range endorsementRequst.InputStates {
+		s.stateSpenders[stateID] = endorsementRequst.TransactionID
 	}
 	return true, nil
 }
