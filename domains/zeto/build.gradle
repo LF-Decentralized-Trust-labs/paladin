@@ -71,14 +71,9 @@ task circuitsInstall(type: Exec) {
     outputs.dir("node_modules")
 }
 
-task installCircom(type: Exec) {
-    def url = "https://github.com/iden3/circom/releases/download/v2.1.9/circom-linux-amd64"
-    def f = new File(File.getTempDirectory(), "circom")
-    if (!f.exists()) {
-        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-        f.setExecutable(true)
-    }
-    environment 'PATH', "${environment.PATH}:${f}"
+task installCircom(type: Download) {
+    src "https://github.com/iden3/circom/releases/download/v2.1.9/circom-linux-amd64"
+    dest new File(buildDir, "circom")
 }
 
 task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
@@ -87,6 +82,7 @@ task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
     args '--', '-c', 'anon'
     workingDir "${rootDir}/zeto/zkp/circuits"
 
+    environment 'PATH', "${environment.PATH}:${buildDir}/circom"
     environment "CIRCUITS_ROOT", zkpOut
     environment "PROVING_KEYS_ROOT", zkpOut
     environment "PTAU_DOWNLOAD_PATH", zkpOut
