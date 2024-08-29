@@ -61,7 +61,6 @@ func (z *Zeto) getInterface() DomainInterface {
 				Type: abi.Function,
 				Inputs: abi.ParameterArray{
 					{Name: "to", Type: "string"},
-					{Name: "recipientKey", Type: "string"},
 					{Name: "amount", Type: "uint256"},
 				},
 			},
@@ -72,8 +71,6 @@ func (z *Zeto) getInterface() DomainInterface {
 				Type: abi.Function,
 				Inputs: abi.ParameterArray{
 					{Name: "to", Type: "string"},
-					{Name: "senderKey", Type: "string"},
-					{Name: "recipientKey", Type: "string"},
 					{Name: "amount", Type: "uint256"},
 				},
 			},
@@ -98,14 +95,11 @@ type ZetoConstructorParams struct {
 }
 
 type ZetoMintParams struct {
-	To           string               `json:"to"`
-	RecipientKey string               `json:"recipientKey"`
-	Amount       *ethtypes.HexInteger `json:"amount"`
+	To     string               `json:"to"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
 type ZetoTransferParams struct {
-	To           string               `json:"to"`
-	SenderKey    string               `json:"senderKey"`
-	RecipientKey string               `json:"recipientKey"`
-	Amount       *ethtypes.HexInteger `json:"amount"`
+	To     string               `json:"to"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }
