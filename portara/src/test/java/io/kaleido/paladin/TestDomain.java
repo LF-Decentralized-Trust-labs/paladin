@@ -19,13 +19,15 @@ import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.DomainBase;
 import io.kaleido.paladin.toolkit.DomainInstance;
 
+import java.util.concurrent.CompletableFuture;
+
 public class TestDomain extends DomainInstance {
     TestDomain(String grpcTarget, String instanceId) {
         super(grpcTarget, instanceId);
     }
 
     @Override
-    protected ToDomain.ConfigureDomainResponse configureDomain(ToDomain.ConfigureDomainRequest request) {
+    protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
                 .setConstructorAbiJson("""
                     {"type":"constructor","inputs":[]}
@@ -37,43 +39,44 @@ public class TestDomain extends DomainInstance {
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())
                 .build();
-        return ToDomain.ConfigureDomainResponse.newBuilder()
+        return CompletableFuture.completedFuture(ToDomain.ConfigureDomainResponse.newBuilder()
                 .setDomainConfig(domainConfig)
-                .build();
+                .build()
+        );
     }
 
     @Override
-    protected ToDomain.InitDomainResponse initDomain(ToDomain.InitDomainRequest request) {
-        return ToDomain.InitDomainResponse.getDefaultInstance();
+    protected CompletableFuture<ToDomain.InitDomainResponse> initDomain(ToDomain.InitDomainRequest request) {
+        return CompletableFuture.completedFuture(ToDomain.InitDomainResponse.getDefaultInstance());
     }
 
     @Override
-    protected ToDomain.InitDeployResponse initDeploy(ToDomain.InitDeployRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected ToDomain.PrepareDeployResponse prepareDeploy(ToDomain.PrepareDeployRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.PrepareDeployResponse> prepareDeploy(ToDomain.PrepareDeployRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected ToDomain.InitTransactionResponse initTransaction(ToDomain.InitTransactionRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected ToDomain.AssembleTransactionResponse assembleTransaction(ToDomain.AssembleTransactionRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected ToDomain.EndorseTransactionResponse endorseTransaction(ToDomain.EndorseTransactionRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.EndorseTransactionResponse> endorseTransaction(ToDomain.EndorseTransactionRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override
-    protected ToDomain.PrepareTransactionResponse prepareTransaction(ToDomain.PrepareTransactionRequest request) {
-        return null;
+    protected CompletableFuture<ToDomain.PrepareTransactionResponse> prepareTransaction(ToDomain.PrepareTransactionRequest request) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 }

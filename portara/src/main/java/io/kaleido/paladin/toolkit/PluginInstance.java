@@ -20,6 +20,7 @@ import github.com.kaleido_io.paladin.toolkit.Service;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
+import io.netty.util.concurrent.CompleteFuture;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
@@ -49,8 +50,6 @@ abstract class PluginInstance<MSG> {
 
     protected PluginControllerGrpc.PluginControllerStub stub;
 
-    private Context.CancellableContext mListenContext;
-
     private boolean shuttingDown;
 
     private int reconnectCount = 0;
@@ -58,8 +57,6 @@ abstract class PluginInstance<MSG> {
     private CompletableFuture<Void> reconnect;
 
     private StreamObserver<MSG> sendStream;
-
-    private final Executor requestExecutor = Executors.newCachedThreadPool();
 
     public PluginInstance(String grpcTarget, String pluginId) {
         this.grpcTarget = grpcTarget;
@@ -69,7 +66,7 @@ abstract class PluginInstance<MSG> {
 
     abstract StreamObserver<MSG> connect(StreamObserver<MSG> observer);
 
-    abstract void handleRequest(MSG msg);
+    abstract CompletableFuture<MSG> handleRequest(MSG msg);
 
     abstract Service.Header getHeader(MSG msg);
 
@@ -125,16 +122,6 @@ abstract class PluginInstance<MSG> {
                 build();
     }
 
-    final Service.Header getErrorReplyHeader(MSG req, Throwable t) {
-        return Service.Header.newBuilder().
-                setPluginId(pluginId).
-                setMessageId(UUID.randomUUID().toString()).
-                setCorrelationId(getHeader(req).getMessageId()).
-                setMessageType(Service.Header.MessageType.ERROR_RESPONSE).
-                setErrorMessage(t.getMessage()).
-                build();
-    }
-
     final CompletableFuture<MSG> requestReply(MSG requestMessage) {
         CompletableFuture<MSG> inflight =
                 inflightRequests.addRequest(UUID.fromString(getHeader(requestMessage).getMessageId()));
@@ -170,8 +157,22 @@ abstract class PluginInstance<MSG> {
         }
     }
 
-    void send(MSG msg) {
+    private Void send(MSG msg) {
         sendStream.onNext(msg);
+        return null;
+    }
+
+    private Void sendErrorReply(Service.Header reqHeader, Throwable t) {
+        Service.Header resHeader = Service.Header.newBuilder().
+                setPluginId(pluginId).
+                setMessageId(UUID.randomUUID().toString()).
+                setCorrelationId(reqHeader.getMessageId()).
+                setMessageType(Service.Header.MessageType.ERROR_RESPONSE).
+                setErrorMessage(t.getMessage()).
+                build();
+        LOGGER.error(new FormattedMessage("sending error reply {} to {}", resHeader.getMessageId(), reqHeader.getMessageId()), t);
+        sendStream.onNext(buildMessage(resHeader));
+        return null;
     }
 
     private final class StreamHandler implements StreamObserver<MSG> {
@@ -188,8 +189,11 @@ abstract class PluginInstance<MSG> {
                     }
                 }
                 case Service.Header.MessageType.REQUEST_TO_PLUGIN -> {
-                    // Dispatch for async handling of the request (do not block this thread)
-                    requestExecutor.execute(() -> handleRequest(msg));
+                    // Dispatch for async handling of the request (do not block this thread at all)
+                    CompletableFuture.runAsync(() -> handleRequest(msg)
+                            .thenApply(PluginInstance.this::send)
+                            .exceptionally((t) -> sendErrorReply(getHeader(msg), t))
+                    );
                 }
                 default -> {
                     LOGGER.warn("Received unexpected message {} type {}", header.getMessageId(), header.getMessageType());
