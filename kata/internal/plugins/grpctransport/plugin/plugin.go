@@ -16,7 +16,6 @@ package grpctransport
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
 
@@ -38,7 +37,7 @@ type GRPCTransport struct {
 
 	sendMessages chan *ExternalMessage
 
-	serverWg     sync.WaitGroup
+	ServerWg     sync.WaitGroup // TODO: This should not be exported (done to make the init call work)
 	serverConn   *grpc.ClientConn
 	serverCtx    context.Context
 	serverCancel context.CancelFunc
@@ -78,13 +77,13 @@ func (gpt *GRPCTransport) Init() error {
 	pcCtx := pluginControllerClient.Context()
 
 	// Start listening for events on the plugin stream
-	gpt.serverWg.Add(1)
+	gpt.ServerWg.Add(1)
 	go func() {
 		for {
 			inboundMessage, err := pluginControllerClient.Recv()
 			if err == io.EOF {
 				log.L(pcCtx).Info("grpctransport: EOF received")
-				gpt.serverWg.Done()
+				gpt.ServerWg.Done()
 				return
 			}
 			if err != nil {
@@ -156,7 +155,7 @@ func (gpt *GRPCTransport) Init() error {
 			case msg := <-gpt.sendMessages:
 				err := gpt.externalServer.QueueMessageForSend(msg.Body, msg.TransportDetails)
 				if err != nil {
-					log.L(ctx).Errorf("Could not send message to external server for send")
+					log.L(pcCtx).Errorf("Could not send message to external server for send")
 				}
 			}
 		}
@@ -166,12 +165,12 @@ func (gpt *GRPCTransport) Init() error {
 }
 
 func (gpt *GRPCTransport) InitializeExternalListener() {
-	gpt.serverWg.Add(1)
+	gpt.ServerWg.Add(1)
 	go func() {
 		for {
 			select {
 			case <-gpt.serverCtx.Done():
-				gpt.serverWg.Done()
+				gpt.ServerWg.Done()
 				return
 			case msg := <-gpt.externalServer.recvMessages:
 				serializedTransportMessage, err := yaml.Marshal(msg)
@@ -209,41 +208,4 @@ func (gpt *GRPCTransport) Shutdown() error {
 	// and therefore release anyone waiting on the wait group
 
 	return nil
-}
-
-var transport *GRPCTransport
-var ctx context.Context
-
-func Run(pluginID, connString string) error {
-	ctx = context.Background()
-
-	if transport != nil {
-		return fmt.Errorf("Run called twice on the plugin, exiting!")
-	}
-
-	transport, err := NewGRPCTransport(pluginID, connString)
-	if err != nil {
-		return err
-	}
-
-	err = transport.Init()
-	if err != nil {
-		return err
-	}
-
-	transport.serverWg.Wait()
-	return nil
-}
-
-func Stop() {
-	if transport == nil {
-		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
-		return
-	}
-
-	err := transport.Shutdown()
-	if err != nil {
-		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
-		return
-	}
 }

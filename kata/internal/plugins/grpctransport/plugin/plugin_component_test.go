@@ -35,7 +35,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 
-	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport"
+	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
 
