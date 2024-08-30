@@ -18,8 +18,10 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
@@ -70,7 +72,54 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 	}, nil
 }
 
-func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*componentmgr.UTInitFunction) (url string, done func(), err error) {
+type UTInitFunction struct {
+	PreManagerStart  func(c components.AllComponents) error
+	PostManagerStart func(c components.AllComponents) error
+}
+
+func unitTestSocketFile() (fileName string, err error) {
+	f, err := os.CreateTemp("", "testbed.paladin.*.sock")
+	if err == nil {
+		fileName = f.Name()
+	}
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		err = os.Remove(fileName)
+	}
+	return
+}
+
+func unitTestComponentManagerStart(ctx context.Context, conf *componentmgr.Config, engine components.Engine, callbacks ...*UTInitFunction) (cm componentmgr.ComponentManager, err error) {
+	socketFile, err := unitTestSocketFile()
+	if err == nil {
+		cm = componentmgr.NewComponentManager(ctx, socketFile, uuid.New(), conf, engine)
+		err = cm.Init()
+	}
+	if err == nil {
+		err = cm.StartComponents()
+	}
+	for _, cb := range callbacks {
+		if err == nil && cb.PreManagerStart != nil {
+			err = cb.PreManagerStart(cm)
+		}
+	}
+	if err == nil {
+		err = cm.StartManagers()
+	}
+	for _, cb := range callbacks {
+		if err == nil && cb.PostManagerStart != nil {
+			err = cb.PostManagerStart(cm)
+		}
+	}
+	if err == nil {
+		err = cm.CompleteStart()
+	}
+	return cm, err
+}
+
+func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error) {
 	ctx := context.Background()
 
 	var conf *componentmgr.Config
@@ -92,7 +141,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	var pl plugins.UnitTestPluginLoader
 	initFunctions = append(initFunctions,
 		// We add an init function that loads the plugin loader after the plugin controller has started.
-		&componentmgr.UTInitFunction{
+		&UTInitFunction{
 			PostManagerStart: func(c components.AllComponents) (err error) {
 				loaderMap := make(map[string]plugintk.Plugin)
 				for name, domain := range domains {
@@ -109,7 +158,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 		},
 	)
 
-	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, initFunctions...)
+	cm, err := unitTestComponentManagerStart(ctx, conf, tb, initFunctions...)
 	if err != nil {
 		return "", nil, err
 	}

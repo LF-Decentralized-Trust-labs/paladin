@@ -17,15 +17,17 @@ package testbed
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 )
 
-func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), pluginInit ...*componentmgr.UTInitFunction) (url string, tb *testbed, done func()) {
+func writeTestConfig(t *testing.T) (configFile string) {
 	ctx := context.Background()
 	log.SetLevel("debug")
 
@@ -35,14 +37,12 @@ func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), plugi
 	// For running in this unit test the dirs are different to the sample config
 	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
 	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
-	setConf(conf)
-
-	tb = NewTestBed()
-	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, pluginInit...)
+	configFile = path.Join(t.TempDir(), "test.config.yaml")
+	f, err := os.Create(configFile)
+	assert.NoError(t, err)
+	defer f.Close()
+	err = yaml.NewEncoder(f).Encode(conf)
 	assert.NoError(t, err)
 
-	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), tb, func() {
-		cm.Stop()
-	}
-
+	return configFile
 }
