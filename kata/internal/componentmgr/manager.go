@@ -18,7 +18,6 @@ package componentmgr
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -325,51 +324,4 @@ func (cm *componentManager) PluginController() plugins.PluginController {
 
 func (cm *componentManager) Engine() components.Engine {
 	return cm.engine
-}
-
-type UTInitFunction struct {
-	PreManagerStart  func(c components.AllComponents) error
-	PostManagerStart func(c components.AllComponents) error
-}
-
-func UnitTestStart(ctx context.Context, conf *Config, engine components.Engine, callbacks ...*UTInitFunction) (cm ComponentManager, err error) {
-	socketFile, err := unitTestSocketFile()
-	if err == nil {
-		cm = NewComponentManager(ctx, socketFile, uuid.New(), conf, engine)
-		err = cm.Init()
-	}
-	if err == nil {
-		err = cm.StartComponents()
-	}
-	for _, cb := range callbacks {
-		if err == nil && cb.PreManagerStart != nil {
-			err = cb.PreManagerStart(cm)
-		}
-	}
-	if err == nil {
-		err = cm.StartManagers()
-	}
-	for _, cb := range callbacks {
-		if err == nil && cb.PostManagerStart != nil {
-			err = cb.PostManagerStart(cm)
-		}
-	}
-	if err == nil {
-		err = cm.CompleteStart()
-	}
-	return cm, err
-}
-
-func unitTestSocketFile() (fileName string, err error) {
-	f, err := os.CreateTemp("", "testbed.paladin.*.sock")
-	if err == nil {
-		fileName = f.Name()
-	}
-	if err == nil {
-		err = f.Close()
-	}
-	if err == nil {
-		err = os.Remove(fileName)
-	}
-	return
 }

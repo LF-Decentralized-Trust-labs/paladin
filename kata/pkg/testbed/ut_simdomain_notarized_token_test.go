@@ -32,11 +32,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -596,35 +593,21 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		}}
 	})
 
-	var pl plugins.UnitTestPluginLoader
-	url, _, done := newUnitTestbed(t,
-		func(conf *componentmgr.Config) {
-			conf.DomainManagerConfig.Domains = map[string]*domainmgr.DomainConfig{
-				"domain1": {
-					Plugin: plugins.PluginConfig{
-						Type:    plugins.LibraryTypeCShared.Enum(),
-						Library: "loaded/via/unit/test/loader",
-					},
-					Config: yamlNode(`{"some":"config"}`),
-				},
-			}
+	tb := NewTestBed()
+	confFile := writeTestConfig(t)
+	url, done, err := tb.StartForTest(confFile, map[string]*TestbedDomain{
+		"domain1": {
+			Plugin: fakeCoinDomain,
+			Config: yamlNode(`{"some":"config"}`),
 		},
-		&componentmgr.UTInitFunction{
-			PostManagerStart: func(c components.AllComponents) (err error) {
-				ec = c.EthClientFactory().HTTPClient()
-				bi := c.BlockIndexer()
-				blockIndexer.Store(&bi)
-				pc := c.PluginController()
-				pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
-					"domain1": fakeCoinDomain,
-				})
-				assert.NoError(t, err)
-				go pl.Run()
-				return nil
-			},
-		})
+	}, &UTInitFunction{PreManagerStart: func(c components.AllComponents) error {
+		ec = c.EthClientFactory().HTTPClient()
+		bi := c.BlockIndexer()
+		blockIndexer.Store(&bi)
+		return nil
+	}})
+	assert.NoError(t, err)
 	defer done()
-	defer pl.Stop()
 
 	tbRPC := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
