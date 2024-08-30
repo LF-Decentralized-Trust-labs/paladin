@@ -235,4 +235,10 @@ var (
 	MsgDomainEndorsementReverted        = ffe("PD011617", "Endorsement from '%s' reverted: %s")
 	MsgDomainFunctionNotFound           = ffe("PD011618", "Function with name '%s' not found on ABI")
 	MsgDomainBaseLedgerSubmitInvalid    = ffe("PD011619", "Base ledger submission config is invalid")
+
+	// TransportManager module PD0119XX
+
+	// GRPC Transport plugin PD0120XX
+	MsgGRPCPluginAlreadyRunning     = ffe("PD011200", "GRPC Transport is already running")
+	MsgGRPCPluginCouldNotInitialize = ffe("PD011201", "Error during initialization of plugin %s")
 )

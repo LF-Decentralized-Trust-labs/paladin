@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// These certs are not real, and not used for another other than UTs.
+
 var (
 	VALID_CERT = `-----BEGIN CERTIFICATE-----
 MIIEYDCCAkigAwIBAgIUSq1CnHOv+627dDDGZXUDuH9JVxAwDQYJKoZIhvcNAQEL

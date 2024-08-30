@@ -40,7 +40,6 @@ var (
 	testPort        = 10002
 	loopbackAddress = fmt.Sprintf("localhost:%d", testPort)
 	sendingAddress  = fmt.Sprintf("localhost:%d", testPort+1)
-	fakeDesintation = "somewhereoverthemoon"
 )
 
 type fakeExternalGRPCServer struct {

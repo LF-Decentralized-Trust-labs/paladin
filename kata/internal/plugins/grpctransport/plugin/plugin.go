@@ -102,7 +102,7 @@ func (gpt *GRPCTransport) Init() error {
 
 				processedConfig, err := ProcessGRPCConfig(upc)
 				if err != nil {
-					log.L(pcCtx).Errorf("grpctransport: Could not unmarshal config %v", err)
+					log.L(pcCtx).Errorf("grpctransport: Could not process config %v", err)
 					break
 				}
 
@@ -120,7 +120,7 @@ func (gpt *GRPCTransport) Init() error {
 				if gpt.externalServer == nil {
 					gpt.externalServer, err = NewExternalGRPCServer(gpt.serverCtx, gpt.Config.ExternalPort, gpt.Config.ServerCertificate, gpt.Config.ClientCertificate)
 					if err != nil {
-						log.L(pcCtx).Errorf("grpctransport: Could not unmarshal config %v", err)
+						log.L(pcCtx).Errorf("grpctransport: Could not start external server %v", err)
 						break
 					}
 				}
@@ -155,7 +155,7 @@ func (gpt *GRPCTransport) Init() error {
 			case msg := <-gpt.sendMessages:
 				err := gpt.externalServer.QueueMessageForSend(msg.Body, msg.TransportDetails)
 				if err != nil {
-					log.L(pcCtx).Errorf("Could not send message to external server for send")
+					log.L(pcCtx).Errorf("grpctransport: Could not send message to external server for send")
 				}
 			}
 		}

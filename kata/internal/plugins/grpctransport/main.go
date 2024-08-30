@@ -16,10 +16,12 @@
 package main
 
 import (
-	"fmt"
 	"context"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
+
 	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
 )
 
@@ -30,17 +32,17 @@ func Run(pluginID, connString string) error {
 	ctx = context.Background()
 
 	if transport != nil {
-		return fmt.Errorf("Run called twice on the plugin, exiting!")
+		return i18n.NewError(ctx, msgs.MsgGRPCPluginAlreadyRunning)
 	}
 
 	transport, err := grpctransport.NewGRPCTransport(pluginID, connString)
 	if err != nil {
-		return err
+		return i18n.NewError(ctx, msgs.MsgGRPCPluginCouldNotInitialize, err.Error())
 	}
 
 	err = transport.Init()
 	if err != nil {
-		return err
+		return i18n.NewError(ctx, msgs.MsgGRPCPluginCouldNotInitialize, err.Error())
 	}
 
 	transport.ServerWg.Wait()
@@ -49,13 +51,13 @@ func Run(pluginID, connString string) error {
 
 func Stop() {
 	if transport == nil {
-		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
+		log.L(ctx).Errorf("stop called on an uninitialized plugin")
 		return
 	}
 
 	err := transport.Shutdown()
 	if err != nil {
-		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
+		log.L(ctx).Errorf("stop called on an uninitialized plugin")
 		return
 	}
 }
