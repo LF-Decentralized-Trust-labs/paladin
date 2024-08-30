@@ -104,29 +104,7 @@ func TestZeto(t *testing.T) {
 	domainContracts, err := deployDomainContracts(ctx, rpc, controllerName, &config)
 	assert.NoError(t, err)
 
-	abiFunc, err := ec.ABIFunction(ctx, domainContracts.factoryAbi.Functions()["registerImplementation"])
-	assert.NoError(t, err)
-
-	// Send the transaction
-	addr := ethtypes.Address0xHex(*domainContracts.factoryAddress)
-	params := &ZetoSetImplementationParams{
-		Name: "Zeto_Anon",
-		Implementation: ZetoImplementationInfo{
-			Implementation:   domainContracts.deployedContracts["Zeto_Anon"].String(),
-			Verifier:         domainContracts.deployedContracts["Groth16Verifier_Anon"].String(),
-			DepositVerifier:  domainContracts.deployedContracts["Groth16Verifier_CheckHashesValue"].String(),
-			WithdrawVerifier: domainContracts.deployedContracts["Groth16Verifier_CheckInputsOutputsValue"].String(),
-		},
-	}
-	txHash, err := abiFunc.R(ctx).
-		Signer(controllerName).
-		To(&addr).
-		Input(params).
-		SignAndSend()
-	assert.NoError(t, err)
-	if err == nil {
-		_, err = bi.WaitForTransaction(ctx, *txHash)
-	}
+	err = configureFactoryContract(ctx, ec, bi, controllerName, domainContracts)
 	assert.NoError(t, err)
 
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{

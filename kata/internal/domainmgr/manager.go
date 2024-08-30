@@ -46,6 +46,7 @@ var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
 
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
+var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContractByFactory_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
@@ -88,6 +89,13 @@ type event_PaladinNewSmartContract_V0 struct {
 	TXId   types.Bytes32    `json:"txId"`
 	Domain types.EthAddress `json:"domain"`
 	Data   types.HexBytes   `json:"data"`
+}
+
+type event_PaladinNewSmartContractByFactory_V0 struct {
+	TXId     types.Bytes32    `json:"txId"`
+	Domain   types.EthAddress `json:"domain"`
+	Instance types.EthAddress `json:"instance"`
+	Data     types.HexBytes   `json:"data"`
 }
 
 func (dm *domainManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {

@@ -70,8 +70,10 @@ task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
     inputs.files(fileTree("${rootDir}/zeto/solidity/artifacts"))
     from fileTree("${rootDir}/zeto/solidity/artifacts") {
         include 'contracts/zeto_anon.sol/Zeto_Anon.json'
+        include 'contracts/zeto_nf_anon.sol/Zeto_NfAnon.json'
         include 'contracts/lib/common.sol/Commonlib.json'
         include 'contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
+        include 'contracts/lib/verifier_nf_anon.sol/Groth16Verifier_NfAnon.json'
         include 'contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
         include 'contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
     }
@@ -142,6 +144,7 @@ task test(type: Exec) {
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.kataProtoCompiled)
     inputs.files(goFiles)
+    inputs.file('./internal/zeto/zeto.config.yaml')
     outputs.dir('coverage')
 
     workingDir '.'

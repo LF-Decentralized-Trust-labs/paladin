@@ -16,6 +16,7 @@ contracts:
   # contracts to be set
   implementations:
     - name: Zeto_Anon
+      cloneable: true
       address:
       abiAndBytecode:
         path: ./abis/Zeto_Anon.json
@@ -25,6 +26,19 @@ contracts:
       libraries:
         - CommonLib
         - Groth16Verifier_Anon
+        - Groth16Verifier_CheckHashesValue
+        - Groth16Verifier_CheckInputsOutputsValue
+    - name: Zeto_NfAnon
+      cloneable: true
+      address:
+      abiAndBytecode:
+        path: ./abis/Zeto_NfAnon.json
+        json:
+          abi:
+          bytecode:
+      libraries:
+        - CommonLib
+        - Groth16Verifier_NfAnon
         - Groth16Verifier_CheckHashesValue
         - Groth16Verifier_CheckInputsOutputsValue
     - name: CommonLib
@@ -38,6 +52,10 @@ contracts:
       address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_Anon.json
+    - name: Groth16Verifier_NfAnon
+      address:
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_NfAnon.json
     - name: Groth16Verifier_CheckHashesValue
       address:
       abiAndBytecode:

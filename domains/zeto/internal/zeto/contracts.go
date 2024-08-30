@@ -25,6 +25,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -61,6 +63,7 @@ func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer
 	if err != nil {
 		return nil, err
 	}
+	log.L(ctx).Infof("Deployed factory contract to %s", factoryAddr.String())
 
 	// configure the factory contract with the implementation contracts
 	factorySpec, err := getContractSpec(&config.DomainContracts.Factory)
@@ -185,28 +188,66 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string
 	return ethtypes.MustNewAddress(addr), nil
 }
 
-func configureFactoryContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, factoryAddr *ethtypes.Address0xHex, factoryAbi abi.ABI, deployedContracts map[string]*ethtypes.Address0xHex) error {
-	var boolResult bool
-
-	params := &ZetoSetImplementationParams{
-		Name: "Zeto_Anon",
-		Implementation: ZetoImplementationInfo{
-			Implementation:   deployedContracts["Zeto_Anon"].String(),
-			Verifier:         deployedContracts["Groth16Verifier_Anon"].String(),
-			DepositVerifier:  deployedContracts["Groth16Verifier_CheckHashesValue"].String(),
-			WithdrawVerifier: deployedContracts["Groth16Verifier_CheckInputsOutputsValue"].String(),
-		},
-	}
-
-	jsonBytes, err := json.Marshal(params)
+func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi blockindexer.BlockIndexer, deployer string, domainContracts *zetoDomainContracts) error {
+	abiFunc, err := ec.ABIFunction(ctx, domainContracts.factoryAbi.Functions()["registerImplementation"])
 	if err != nil {
 		return err
 	}
 
-	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_invokePublic", deployer, factoryAddr.String(), factoryAbi, "registerImplementation", jsonBytes)
-	if rpcerr != nil {
-		return rpcerr.Error()
+	// Send the transaction
+	addr := ethtypes.Address0xHex(*domainContracts.factoryAddress)
+	for _, contractName := range domainContracts.cloneableContracts {
+		err = registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, addr, bi)
+		if err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc ethclient.ABIFunctionClient, deployer string, addr ethtypes.Address0xHex, bi blockindexer.BlockIndexer) error {
+	log.L(ctx).Infof("Registering implementation %s", name)
+	// work out the verifier contract name, by taking the suffix from the implementation name
+	// such as Zeto_Anon -> Groth16Verifier_Anon
+	// TODO: think about more robust ways than relying on the naming convention
+	verifierName := "Groth16Verifier_" + name[len("Zeto_"):]
+	implAddr, ok := domainContracts.deployedContracts[name]
+	if !ok {
+		return fmt.Errorf("implementation contract %s not found among the deployed contracts", name)
+	}
+	verifierAddr, ok := domainContracts.deployedContracts[verifierName]
+	if !ok {
+		return fmt.Errorf("verifier contract %s not found among the deployed contracts", verifierName)
+	}
+	depositVerifierAddr, ok := domainContracts.deployedContracts["Groth16Verifier_CheckHashesValue"]
+	if !ok {
+		return fmt.Errorf("deposit verifier contract not found among the deployed contracts")
+	}
+	withdrawVerifierAddr, ok := domainContracts.deployedContracts["Groth16Verifier_CheckInputsOutputsValue"]
+	if !ok {
+		return fmt.Errorf("withdraw verifier contract not found among the deployed contracts")
+	}
+	params := &ZetoSetImplementationParams{
+		Name: name,
+		Implementation: ZetoImplementationInfo{
+			Implementation:   implAddr.String(),
+			Verifier:         verifierAddr.String(),
+			DepositVerifier:  depositVerifierAddr.String(),
+			WithdrawVerifier: withdrawVerifierAddr.String(),
+		},
+	}
+	txHash, err := abiFunc.R(ctx).
+		Signer(deployer).
+		To(&addr).
+		Input(params).
+		SignAndSend()
+	if err != nil {
+		return err
+	}
+	_, err = bi.WaitForTransaction(ctx, *txHash)
+	if err != nil {
+		return err
+	}
 	return nil
 }
