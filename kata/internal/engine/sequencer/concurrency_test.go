@@ -73,8 +73,8 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 	err := f.transportLayer.PublishEvent(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txnID.String(),
 		NodeId:        f.nodeID,
-		InputStateID:  []string{f.currentState},
-		OutputStateID: []string{newState.String()},
+		InputStateId:  []string{f.currentState},
+		OutputStateId: []string{newState.String()},
 	})
 	require.NoError(f.t, err)
 
@@ -94,7 +94,7 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 func (f *fakeEngine) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	f.currentState = event.OutputStateID[0]
+	f.currentState = event.OutputStateId[0]
 	return f.sequencer.OnTransactionAssembled(ctx, event)
 
 }

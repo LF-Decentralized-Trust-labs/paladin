@@ -23,50 +23,50 @@ import "google/protobuf/any.proto";
 // if this believe is not held by any other node ( i.e. they beleive it is already claimed) then this will trigger a contention resolution process to determine the rightful claimer of the state.
 message StateClaimEvent {
     string state_id = 1;
-    string transactionId = 2;
+    string transaction_id = 2;
 }
 
 // StateClaimLostEvent is an event that is emitted after a contention resolution process has determined that a claim has been lost by the given transaction
 message StateClaimLostEvent {
     string state_id = 1;
-    string transactionId = 2;
+    string transaction_id = 2;
 }
 
 message ReassembleRequest {
-    string transactionId = 1;   
+    string transaction_id = 1;   
 }
 
 message TransactionAssembledEvent {
-    string transactionId = 1;
+    string transaction_id = 1;
     string nodeId = 2;
-    repeated string inputStateID = 3;
-    repeated string outputStateID = 4;
+    repeated string input_state_id = 3;
+    repeated string output_state_id = 4;
 }
 
 message TransactionEndorsedEvent {
-    string transactionId = 1;
+    string transaction_id = 1;
 }
 
 message DelegateTransaction {
-    string transactionId = 1;
-    string delegatingNodeId = 2;
-    string delegateNodeId = 3;
+    string transaction_id = 1;
+    string delegating_node_id = 2;
+    string delegate_node_id = 3;
 }
 
 message TransactionBlockedEvent {
-    string transactionId = 1;
+    string transaction_id = 1;
 }
 
 message TransactionConfirmedEvent {
-    string transactionId = 1;
+    string transaction_id = 1;
 }
 
 message TransactionRevertedEvent {
-    string transactionId = 1;
+    string transaction_id = 1;
 }
 
 message TransactionDelegatedEvent {
-    string transactionId = 1;
-    string delegatingNodeId = 2;
-    string delegateNodeId = 3;
+    string transaction_id = 1;
+    string delegatingNode_id = 2;
+    string delegateNode_id = 3;
 }

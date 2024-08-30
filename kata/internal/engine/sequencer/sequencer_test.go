@@ -67,7 +67,7 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
 		TransactionId: txn1ID.String(),
-		OutputStateID: []string{stateID.String()},
+		OutputStateId: []string{stateID.String()},
 	})
 
 	assert.NoError(t, err)
@@ -85,7 +85,7 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
 		TransactionId: txn2ID.String(),
-		InputStateID:  []string{stateID.String()},
+		InputStateId:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -113,7 +113,7 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
 		TransactionId: txn1ID.String(),
-		OutputStateID: []string{stateID.String()},
+		OutputStateId: []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
@@ -123,7 +123,7 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
 		TransactionId: txn2ID.String(),
-		InputStateID:  []string{stateID.String()},
+		InputStateId:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -166,7 +166,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn1ID.String(),
 		NodeId:        remoteNodeId.String(),
-		OutputStateID: []string{stateID.String()},
+		OutputStateId: []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -175,7 +175,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn2ID.String(),
 		NodeId:        localNodeId.String(),
-		InputStateID:  []string{stateID.String()},
+		InputStateId:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn1ID.String(),
 		NodeId:        remoteNode1Id.String(),
-		OutputStateID: []string{stateIDA.String()},
+		OutputStateId: []string{stateIDA.String()},
 	})
 	assert.NoError(t, err)
 
@@ -229,8 +229,8 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn2ID.String(),
 		NodeId:        remoteNode2Id.String(),
-		InputStateID:  []string{stateIDA.String()},
-		OutputStateID: []string{stateIDB.String()},
+		InputStateId:  []string{stateIDA.String()},
+		OutputStateId: []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn3ID.String(),
 		NodeId:        localNodeId.String(),
-		InputStateID:  []string{stateIDB.String()},
+		InputStateId:  []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -295,7 +295,7 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn1ID.String(),
 		NodeId:        remoteNode1Id.String(),
-		OutputStateID: []string{stateIDA.String()},
+		OutputStateId: []string{stateIDA.String()},
 	})
 	assert.NoError(t, err)
 
@@ -303,8 +303,8 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn2ID.String(),
 		NodeId:        remoteNode2Id.String(),
-		InputStateID:  []string{stateIDA.String()},
-		OutputStateID: []string{stateIDB.String()},
+		InputStateId:  []string{stateIDA.String()},
+		OutputStateId: []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -313,7 +313,7 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn3ID.String(),
 		NodeId:        localNodeId.String(),
-		InputStateID:  []string{stateIDB.String()},
+		InputStateId:  []string{stateIDB.String()},
 	})
 	assert.NoError(t, err)
 
@@ -349,8 +349,8 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	err = node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn4ID.String(),
 		NodeId:        remoteNode3Id.String(),
-		InputStateID:  []string{stateIDB.String()},
-		OutputStateID: []string{stateIDC.String()},
+		InputStateId:  []string{stateIDB.String()},
+		OutputStateId: []string{stateIDC.String()},
 	})
 	assert.NoError(t, err)
 
@@ -386,7 +386,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	err := localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: dependency1TransactionID.String(),
 		NodeId:        remoteNode1Id.String(),
-		OutputStateID: []string{stateID1.String()},
+		OutputStateId: []string{stateID1.String()},
 	})
 	assert.NoError(t, err)
 
@@ -394,7 +394,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: dependency2TransactionID.String(),
 		NodeId:        remoteNode2Id.String(),
-		OutputStateID: []string{stateID2.String()},
+		OutputStateId: []string{stateID2.String()},
 	})
 	assert.NoError(t, err)
 
@@ -409,7 +409,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	err = localNodeSequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: newTransactionID.String(),
 		NodeId:        localNodeId.String(),
-		InputStateID:  []string{stateID1.String(), stateID2.String()},
+		InputStateId:  []string{stateID1.String(), stateID2.String()},
 	})
 	assert.NoError(t, err)
 
@@ -490,7 +490,7 @@ func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        remoteNodeID.String(),
 		TransactionId: txn1ID.String(),
-		InputStateID:  []string{stateID.String()},
+		InputStateId:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 
@@ -540,7 +540,7 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	err := node1Sequencer.OnTransactionAssembled(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        remoteNodeID.String(),
 		TransactionId: txn1ID.String(),
-		InputStateID:  []string{stateID.String()},
+		InputStateId:  []string{stateID.String()},
 	})
 	assert.NoError(t, err)
 

@@ -61,8 +61,8 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 				err := as.sequencer.OnTransactionAssembled(ctx, &sequence.TransactionAssembledEvent{
 					TransactionId: tx.ID.String(),
 					NodeId:        "todo",
-					InputStateID:  []string{},
-					OutputStateID: []string{},
+					InputStateId:  []string{},
+					OutputStateId: []string{},
 				})
 				if err != nil {
 					log.L(ctx).Errorf("OnTransactionAssembled failed: %s", err)

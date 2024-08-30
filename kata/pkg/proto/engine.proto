@@ -22,16 +22,16 @@ import "google/protobuf/any.proto";
 //A message that pertains to a specific contract orchestrator in the engine for a given transaction
 message ContractMessage {
     string id = 1;
-    string contractAddress = 2;
-    string transactionId = 3;
+    string contract_address = 2;
+    string transaction_id = 3;
     google.protobuf.Any data = 4;
 }
 
 //A message that pertains to a specific stage in the engine for a given transaction
 message StageMessage {
     string id = 1;
-    string contractAddress = 2;
-    string transactionId = 3;
+    string contract_address = 2;
+    string transaction_id = 3;
     string stage = 4;
     google.protobuf.Any data = 5;
 }
@@ -39,7 +39,7 @@ message StageMessage {
 //An event that should be broadcast to all nodes in the network participating in a given contract
 message ContractEvent {
     string id = 1;
-    string contractAddress = 2;
+    string contract_address = 2;
     google.protobuf.Any data = 3;
 }
 

@@ -319,10 +319,10 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 		id:               event.TransactionId,
 		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
 		assemblerNodeID:  event.NodeId,
-		outputStates:     event.OutputStateID,
-		inputStates:      event.InputStateID,
+		outputStates:     event.OutputStateId,
+		inputStates:      event.InputStateId,
 	}
-	for _, unconfirmedStateID := range event.OutputStateID {
+	for _, unconfirmedStateID := range event.OutputStateId {
 		s.unconfirmedStatesByHash[unconfirmedStateID] = &unconfirmedState{
 			stateID:              unconfirmedStateID,
 			mintingTransactionID: event.TransactionId,
