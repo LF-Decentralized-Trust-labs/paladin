@@ -34,7 +34,7 @@ func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
 
 	resolver := NewContentionResolver()
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000; i++ {
 		stateID := uuid.New().String()
 		winner, err := resolver.Resolve(stateID, biddingTransaction1, biddingTransaction2)
 		require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
 		}
 
 	}
-	assert.InDelta(t, winner2, winner1, 10)
+	assert.InDelta(t, winner2, winner1, 100)
 }
 
 func TestContentionResolver_CommutativeProperty(t *testing.T) {
