@@ -208,25 +208,9 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (types.TxStatus, error) {
 	stageContext := ts.GetStageContext(ctx)
 	if stageContext != nil {
-		var status string
-		switch stageContext.Stage {
-		case "assemble":
-			status = "assembling"
-		case "attestation":
-			tx := ts.tsm.HACKGetPrivateTx()
-			//temporary status calculation until we have a sequence incorporated and its handover to the dispatcher
-			if tx.PostAssembly != nil && len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan) {
-				status = "endorsing"
-			} else {
-				status = "endorsed"
-			}
-		case "dispatch":
-			status = "dispatching"
-		}
-
 		return types.TxStatus{
 			TxID:   ts.tsm.GetTxID(ctx),
-			Status: status,
+			Status: stageContext.Stage,
 		}, nil
 	}
 	//TODO what error condition can cause this?

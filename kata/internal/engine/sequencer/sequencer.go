@@ -22,87 +22,29 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
-	"google.golang.org/protobuf/proto"
 )
-
-type EventSync interface {
-	// most likely will be replaced (or become a thin wrapper to transport manager
-	PublishEvent(ctx context.Context, eventPayload proto.Message) error
-	SendMessage(ctx context.Context, recipient string, message proto.Message) error
-}
 
 // an ordered list of transactions that are handed over to the dispatcher to be submitted to the base ledger in that order
 type Sequence []*transactionstore.Transaction
 
-type Dispatcher interface {
-	// Dispatcher is the component that takes responsibility for submitting the transactions in the sequence to the base ledger in the correct order
-	// most likely will be replaced with (or become an integration to) either the comms bus or some utility of the StageController framework
-	Dispatch(context.Context, []uuid.UUID) error
-}
-
-type Sequencer interface {
-	/*
-		OnTransactionAssembled is emitted whenever a transaction has been assembled by any node in the network, including the local node.
-	*/
-	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
-
-	/*
-		OnTransactionEndorsed is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
-	*/
-	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
-
-	/*
-		OnTransactionConfirmed is emitted whenever a transaction has been confirmed on the base ledger
-		i.e. it has been included in a block with enough subsequent blocks to consider this final for that particular chain.
-	*/
-	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
-
-	/*
-		OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
-		steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
-		event is emitted.
-	*/
-	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
-
-	/*
-		OnTransactionDelegated is emitted whenever a transaction has been delegated from one node to another
-		this is an event that is broadcast to all nodes after the fact and should not be confused with the DelegateTransaction message which is
-		an instruction to the delegate node.
-	*/
-	OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error
-
-	/*
-		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
-	*/
-	AssignTransaction(ctx context.Context, transactionID string) error
-
-	/*
-		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
-		"given the information available to the local node at this point in time, does it appear that this transaction has no contention on input states".
-	*/
-	ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error)
-}
-
 func NewSequencer(
 	nodeID uuid.UUID,
 
-	/*
-		eventSync is a placeholder for the transport layer that will be used to communicate with other nodes in the network
-	*/
-	eventSync EventSync,
+	publisher types.Publisher,
+	delegator types.Delegator,
 
 	/*
 		dispatcher is the reciever of the sequenced transactions and will be responsible for submitting them to the base ledger in the correct order
 	*/
-	dispatcher Dispatcher,
+	dispatcher types.Dispatcher,
 
-) Sequencer {
+) types.Sequencer {
 	return &sequencer{
-		eventSync:                   eventSync,
+		publisher:                   publisher,
 		dispatcher:                  dispatcher,
 		nodeID:                      nodeID,
 		resolver:                    NewContentionResolver(),
@@ -110,6 +52,7 @@ func NewSequencer(
 		unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
 		unconfirmedTransactionsByID: make(map[string]*transaction),
 		stateSpenders:               make(map[string]string),
+		delegator:                   delegator,
 	}
 }
 
@@ -145,9 +88,10 @@ type transaction struct {
 
 type sequencer struct {
 	nodeID                      uuid.UUID
-	eventSync                   EventSync
+	publisher                   types.Publisher
+	delegator                   types.Delegator
 	resolver                    ContentionResolver
-	dispatcher                  Dispatcher
+	dispatcher                  types.Dispatcher
 	graph                       Graph
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 	unconfirmedStatesByHash     map[string]*unconfirmedState
@@ -213,12 +157,7 @@ func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transact
 }
 
 func (s *sequencer) delegate(ctx context.Context, transactionId string, delegateNodeID string) error {
-	err := s.eventSync.SendMessage(ctx, delegateNodeID, &pb.DelegateTransaction{
-		TransactionId:    transactionId,
-		DelegatingNodeId: s.nodeID.String(),
-		DelegateNodeId:   delegateNodeID,
-	},
-	)
+	err := s.delegator.Delegate(ctx, transactionId, delegateNodeID)
 	if err != nil {
 		log.L(ctx).Errorf("Error sending delegate transaction message: %s", err)
 		return err
@@ -239,7 +178,7 @@ func (s *sequencer) blockTransaction(ctx context.Context, transactionId string, 
 		transactionID: transactionId,
 		blockedBy:     blockedBy,
 	})
-	err := s.eventSync.PublishEvent(ctx, &pb.TransactionBlockedEvent{
+	err := s.publisher.PublishEvent(ctx, &pb.TransactionBlockedEvent{
 		TransactionId: transactionId,
 	},
 	)

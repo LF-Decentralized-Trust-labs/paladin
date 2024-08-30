@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
@@ -45,13 +45,13 @@ type Engine interface {
 
 type fakeEngine struct {
 	nodeID         string
-	sequencer      Sequencer
+	sequencer      types.Sequencer
 	currentState   string
 	transportLayer *fakeTransportLayer
 	t              *testing.T
 }
 
-func newFakeEngine(t *testing.T, nodeID string, sequencer Sequencer, seedState string, transportLayer *fakeTransportLayer) *fakeEngine {
+func newFakeEngine(t *testing.T, nodeID string, sequencer types.Sequencer, seedState string, transportLayer *fakeTransportLayer) *fakeEngine {
 	return &fakeEngine{
 		nodeID:         nodeID,
 		sequencer:      sequencer,
@@ -142,7 +142,7 @@ func (f *fakeTransportLayer) addEngine(nodeID uuid.UUID, engine Engine) {
 	f.engines[nodeID.String()] = engine
 }
 
-// PublishEvent implements EventSync.
+// PublishEvent implements Publisher.
 func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event proto.Message) error {
 	log.L(ctx).Info("PublishEvent")
 
@@ -164,22 +164,8 @@ func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event proto.Messa
 	return nil
 }
 
-// SendMessage implements EventSync.
-func (f *fakeTransportLayer) SendMessage(ctx context.Context, recipient string, message proto.Message) error {
-	//nodeID := message.Destination
-	switch message := message.(type) {
-	case *pb.ReassembleRequest:
-		log.L(ctx).Info("ReassembleRequest")
-
-	case *pb.DelegateTransaction:
-		log.L(ctx).Info("DelegateTransaction")
-		engine := f.engines[recipient]
-		err := engine.DelegateTransaction(ctx, message)
-		require.NoError(f.t, err)
-	default:
-		panic("unimplemented message type ")
-	}
-	return nil
+func (f *fakeTransportLayer) PublishStageEvent(ctx context.Context, stageEvent *types.StageEvent) error {
+	panic("unimplemented")
 }
 
 func NewFakeTransportLayer(t *testing.T) *fakeTransportLayer {
@@ -189,11 +175,43 @@ func NewFakeTransportLayer(t *testing.T) *fakeTransportLayer {
 	}
 }
 
+type fakeDelegator struct {
+	//map of sequencer to nodeID
+	engines map[string]Engine
+	t       *testing.T
+	nodeID  string
+}
+
+func (f *fakeDelegator) addEngine(nodeID uuid.UUID, engine Engine) {
+	f.engines[nodeID.String()] = engine
+}
+
+// Delegate implements Delegator.
+func (f *fakeDelegator) Delegate(ctx context.Context, txnID, delegate string) error {
+
+	log.L(ctx).Info("DelegateTransaction")
+	engine := f.engines[delegate]
+	err := engine.DelegateTransaction(ctx, &pb.DelegateTransaction{
+		TransactionId:    txnID,
+		DelegatingNodeId: f.nodeID,
+		DelegateNodeId:   delegate,
+	})
+	require.NoError(f.t, err)
+	return nil
+}
+
+func NewFakeDelegator(t *testing.T, nodeID string) *fakeDelegator {
+	return &fakeDelegator{
+		engines: make(map[string]Engine),
+		t:       t,
+		nodeID:  nodeID,
+	}
+}
+
 func TestConcurrentSequencing(t *testing.T) {
 	// 3 nodes, concurrently assemble transactions that consume the output of each other
 	// check that all transactions are dispatched to the same node
 	// unless there is a break in the chain long enough for the previous transactions to be confirmed
-
 	ctx := context.Background()
 	log.SetLevel("debug")
 
@@ -212,20 +230,27 @@ func TestConcurrentSequencing(t *testing.T) {
 
 	seedState := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
 
+	delegatorMock1 := NewFakeDelegator(t, node1ID.String())
+
 	node1Sequencer := NewSequencer(node1ID,
 		internodeTransportLayer,
+		delegatorMock1,
 		dispatcher1Mock,
 	)
 	node1Engine := newFakeEngine(t, node1ID.String(), node1Sequencer, seedState.String(), internodeTransportLayer)
 
+	delegatorMock2 := NewFakeDelegator(t, node2ID.String())
 	node2Sequencer := NewSequencer(node2ID,
 		internodeTransportLayer,
+		delegatorMock2,
 		dispatcher2Mock,
 	)
 	node2Engine := newFakeEngine(t, node2ID.String(), node2Sequencer, seedState.String(), internodeTransportLayer)
 
+	delegatorMock3 := NewFakeDelegator(t, node3ID.String())
 	node3Sequencer := NewSequencer(node3ID,
 		internodeTransportLayer,
+		delegatorMock3,
 		dispatcher3Mock,
 	)
 	node3Engine := newFakeEngine(t, node3ID.String(), node3Sequencer, seedState.String(), internodeTransportLayer)
@@ -233,6 +258,15 @@ func TestConcurrentSequencing(t *testing.T) {
 	internodeTransportLayer.addEngine(node1ID, node1Engine)
 	internodeTransportLayer.addEngine(node2ID, node2Engine)
 	internodeTransportLayer.addEngine(node3ID, node3Engine)
+
+	delegatorMock1.addEngine(node2ID, node2Engine)
+	delegatorMock1.addEngine(node3ID, node3Engine)
+
+	delegatorMock2.addEngine(node1ID, node1Engine)
+	delegatorMock2.addEngine(node3ID, node3Engine)
+
+	delegatorMock3.addEngine(node1ID, node1Engine)
+	delegatorMock3.addEngine(node2ID, node2Engine)
 
 	transactionInvoker1 := newTransactionInvoker(node1ID, "transactionInvoker1", node1Engine)
 	transactionInvoker2 := newTransactionInvoker(node2ID, "transactionInvoker2", node2Engine)

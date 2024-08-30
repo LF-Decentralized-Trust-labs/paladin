@@ -18,9 +18,12 @@ package types
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"google.golang.org/protobuf/proto"
 )
 
 type StageProcessNextStep int
@@ -79,6 +82,12 @@ type IdentityResolver interface {
 	GetDispatchAddress(preferredAddresses []string) string
 }
 
+type Publisher interface {
+	//Service for sending messages and events within the local node and as a client to the transport manager to send to other nodes
+	PublishEvent(ctx context.Context, eventPayload proto.Message) error
+	PublishStageEvent(ctx context.Context, stageEvent *StageEvent) error
+}
+
 type StageFoundationService interface {
 	TransportManager() components.TransportManager
 	IdentityResolver() IdentityResolver
@@ -86,11 +95,50 @@ type StageFoundationService interface {
 	Sequencer() Sequencer
 	DomainAPI() components.DomainSmartContract
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
+	Publisher() Publisher
 }
 
 type Sequencer interface {
-	// GetLatestAssembleRoundForTx will find the sequence the transaction is in and what's the latest assemble round for that sequence
-	GetLatestAssembleRoundForTx(ctx context.Context, txID string) (assembleRound int64)
+	/*
+		OnTransactionAssembled is emitted whenever a transaction has been assembled by any node in the network, including the local node.
+	*/
+	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
+
+	/*
+		OnTransactionEndorsed is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
+	*/
+	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
+
+	/*
+		OnTransactionConfirmed is emitted whenever a transaction has been confirmed on the base ledger
+		i.e. it has been included in a block with enough subsequent blocks to consider this final for that particular chain.
+	*/
+	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
+
+	/*
+		OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
+		steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
+		event is emitted.
+	*/
+	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
+
+	/*
+		OnTransactionDelegated is emitted whenever a transaction has been delegated from one node to another
+		this is an event that is broadcast to all nodes after the fact and should not be confused with the DelegateTransaction message which is
+		an instruction to the delegate node.
+	*/
+	OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error
+
+	/*
+		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
+	*/
+	AssignTransaction(ctx context.Context, transactionID string) error
+
+	/*
+		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
+		"given the information available to the local node at this point in time, does it appear that this transaction has no contention on input states".
+	*/
+	ApproveEndorsement(ctx context.Context, endorsementRequest EndorsementRequest) (bool, error)
 }
 
 type PaladinStageFoundationService struct {
@@ -100,6 +148,10 @@ type PaladinStageFoundationService struct {
 	sequencer           Sequencer
 	domainAPI           components.DomainSmartContract
 	transport           components.TransportManager
+	publisher           Publisher
+}
+
+type TransactionDispatched struct {
 }
 
 func (psfs *PaladinStageFoundationService) DependencyChecker() DependencyChecker {
@@ -126,14 +178,42 @@ func (psfs *PaladinStageFoundationService) DomainAPI() components.DomainSmartCon
 	return psfs.domainAPI
 }
 
+func (psfs *PaladinStageFoundationService) Publisher() Publisher {
+	return psfs.publisher
+}
+
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 	stateStore statestore.StateStore,
-	nodeAndWalletLookUp IdentityResolver, transport components.TransportManager, domainAPI components.DomainSmartContract) StageFoundationService {
+	nodeAndWalletLookUp IdentityResolver, transport components.TransportManager, domainAPI components.DomainSmartContract, publisher Publisher) StageFoundationService {
 	return &PaladinStageFoundationService{
 		dependencyChecker:   dependencyChecker,
 		stateStore:          stateStore,
 		nodeAndWalletLookUp: nodeAndWalletLookUp,
 		transport:           transport,
 		domainAPI:           domainAPI,
+		publisher:           publisher,
 	}
+}
+
+type EndorsementRequest struct {
+	TransactionID string
+	InputStates   []string
+}
+
+type Transaction struct {
+	ID              string
+	AssemblerNodeID string
+	OutputStates    []string
+	InputStates     []string
+}
+
+type Dispatcher interface {
+	// Dispatcher is the component that takes responsibility for submitting the transactions in the sequence to the base ledger in the correct order
+	// most likely will be replaced with (or become an integration to) either the comms bus or some utility of the StageController framework
+	Dispatch(context.Context, []uuid.UUID) error
+}
+
+type Delegator interface {
+	// Delegator is the component that takes responsibility for delegating transactions to other nodes
+	Delegate(ctx context.Context, transactionId string, delegateNodeId string) error
 }

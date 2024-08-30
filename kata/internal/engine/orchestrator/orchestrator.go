@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
@@ -105,6 +106,7 @@ type Orchestrator struct {
 	persistenceRetryTimeout time.Duration
 
 	StageController controller.StageController
+	sequencer       types.Sequencer
 
 	// each orchestrator has its own go routine
 	initiated       time.Time     // when orchestrator is created
@@ -129,6 +131,10 @@ type Orchestrator struct {
 
 	staleTimeout time.Duration
 	// lastActivityTime time.Time
+
+	domainAPI           components.DomainSmartContract
+	assemblyRequestChan chan *components.PrivateTransaction
+	stopAssemblyLoop    chan bool
 }
 
 var orchestratorConfigDefault = OrchestratorConfig{
@@ -139,7 +145,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.AllComponents, domainAPI components.DomainSmartContract) *Orchestrator {
+func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.AllComponents, domainAPI components.DomainSmartContract, publisher types.Publisher, sequencer types.Sequencer) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -158,13 +164,18 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		processedTxIDs:               make(map[string]bool),
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
+		domainAPI:                    domainAPI,
+		assemblyRequestChan:          make(chan *components.PrivateTransaction, 100), //TODO: buffer size should be configurable
+		stopAssemblyLoop:             make(chan bool, 1),
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, components.TransportManager(), domainAPI), []controller.TxStageProcessor{
+	newOrchestrator.sequencer = sequencer
+
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &types.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
-		&stages.AttestationStage{},
-		&stages.AssembleStage{},
+		stages.NewAttestationStage(sequencer),
+		stages.NewAssembleStage(sequencer),
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
@@ -197,7 +208,6 @@ func (oc *Orchestrator) evaluationLoop() {
 		added, total := oc.evaluateTransactions(ctx)
 		log.L(ctx).Debugf("Orchestrator loop added %d txs, there are %d txs in total", added, total)
 	}
-
 }
 
 func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, newTotal int) {
@@ -351,6 +361,11 @@ func (oc *Orchestrator) Stop() {
 	// if it already has an item in the channel, this function does nothing
 	select {
 	case oc.stopProcess <- true:
+	default:
+	}
+
+	select {
+	case oc.stopAssemblyLoop <- true:
 	default:
 	}
 }

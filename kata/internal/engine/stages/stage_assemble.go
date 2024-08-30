@@ -23,11 +23,19 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type AssembleStage struct{}
+type AssembleStage struct {
+	sequencer types.Sequencer
+}
 
+func NewAssembleStage(sequencer types.Sequencer) *AssembleStage {
+	return &AssembleStage{
+		sequencer: sequencer,
+	}
+}
 func (as *AssembleStage) Name() string {
 	return "assemble"
 }
@@ -42,6 +50,7 @@ type assembleComplete struct {
 }
 
 func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+	tx := tsg.HACKGetPrivateTx()
 
 	unprocessedStageEvents = []*types.StageEvent{}
 	if len(stageEvents) > 0 {
@@ -49,6 +58,16 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 
 			switch event.Data.(type) {
 			case assembleComplete:
+				err := as.sequencer.OnTransactionAssembled(ctx, &sequence.TransactionAssembledEvent{
+					TransactionId: tx.ID.String(),
+					NodeId:        "todo",
+					InputStateID:  []string{},
+					OutputStateID: []string{},
+				})
+				if err != nil {
+					log.L(ctx).Errorf("OnTransactionAssembled failed: %s", err)
+					panic("todo")
+				}
 				return nil, nil, types.NextStepNewStage
 			default:
 				unprocessedStageEvents = append(unprocessedStageEvents, event)

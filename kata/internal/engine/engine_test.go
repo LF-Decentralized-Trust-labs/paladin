@@ -189,10 +189,12 @@ func TestEngine(t *testing.T) {
 			case <-timeout:
 				// Timeout reached, exit the loop
 				assert.Fail(t, "Timed out waiting for transaction to be endorsed")
-				return "timeout"
+				s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
+				require.NoError(t, err)
+				return s.Status
 			case <-tick:
 				s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
-				if s.Status == "endorsed" {
+				if s.Status == "dispatch" {
 					return s.Status
 				}
 				assert.NoError(t, err)
@@ -200,13 +202,13 @@ func TestEngine(t *testing.T) {
 		}
 	}()
 
-	assert.Equal(t, status, "endorsed")
+	assert.Equal(t, "dispatch", status)
 
 }
 
 func newEngineForTesting(t *testing.T) (Engine, *componentmocks.AllComponents) {
 	mockAllComponents := componentmocks.NewAllComponents(t)
-	e := NewEngine()
+	e := NewEngine(uuid.Must(uuid.NewUUID()))
 	r, err := e.Init(mockAllComponents)
 	assert.Nil(t, r)
 	assert.NoError(t, err)

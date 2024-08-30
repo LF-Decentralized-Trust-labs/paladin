@@ -18,9 +18,11 @@ package engine
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/orchestrator"
+	"github.com/kaleido-io/paladin/kata/internal/engine/sequencer"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -66,6 +68,7 @@ type engine struct {
 	done          chan struct{}
 	orchestrators map[string]*orchestrator.Orchestrator
 	components    components.AllComponents
+	nodeID        uuid.UUID
 }
 
 // Init implements Engine.
@@ -91,9 +94,10 @@ func (e *engine) Stop() {
 	panic("unimplemented")
 }
 
-func NewEngine() Engine {
+func NewEngine(nodeID uuid.UUID) Engine {
 	return &engine{
 		orchestrators: make(map[string]*orchestrator.Orchestrator),
+		nodeID:        nodeID,
 	}
 }
 
@@ -117,7 +121,25 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
 	// TODO how to measure fairness/ per From address / contract address / something else
 	if e.orchestrators[contractAddr.String()] == nil {
-		e.orchestrators[contractAddr.String()] = orchestrator.NewOrchestrator(ctx, contractAddr.String() /** TODO: fill in the real plug-ins*/, &orchestrator.OrchestratorConfig{}, e.components, domainAPI)
+		publisher := NewPublisher(e)
+		delegator := NewDelegator()
+		dispatcher := NewDispatcher(contractAddr.String(), publisher)
+		seq := sequencer.NewSequencer(
+			e.nodeID,
+			publisher,
+			delegator,
+			dispatcher,
+		)
+		e.orchestrators[contractAddr.String()] =
+			orchestrator.NewOrchestrator(
+				ctx, e.nodeID,
+				contractAddr.String(), /** TODO: fill in the real plug-ins*/
+				&orchestrator.OrchestratorConfig{},
+				e.components,
+				domainAPI,
+				publisher,
+				seq,
+			)
 		orchestratorDone, err := e.orchestrators[contractAddr.String()].Start(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", contractAddr.String(), err)
@@ -151,7 +173,7 @@ func (e *engine) GetTxStatus(ctx context.Context, domainAddress string, txID str
 func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
 	targetOrchestrator := e.orchestrators[stageEvent.ContractAddress]
 	if targetOrchestrator == nil { // this is an event that belongs to a contract that's not in flight, throw it away and rely on the engine to trigger the action again when the orchestrator is wake up. (an enhanced version is to add weight on queueing an orchestrator)
-		log.L(ctx).Warnf("Ignored event for  domain contract %s and transaction %s on stage %s. If this happens a lot, check the orchestrator idle timeout is set to a reasonable number", stageEvent.ContractAddress, stageEvent.TxID, stageEvent.Stage)
+		log.L(ctx).Warnf("Ignored event for domain contract %s and transaction %s on stage %s. If this happens a lot, check the orchestrator idle timeout is set to a reasonable number", stageEvent.ContractAddress, stageEvent.TxID, stageEvent.Stage)
 	} else {
 		targetOrchestrator.HandleEvent(ctx, stageEvent)
 	}

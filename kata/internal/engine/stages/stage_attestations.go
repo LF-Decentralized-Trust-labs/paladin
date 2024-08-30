@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -31,7 +32,15 @@ import (
 type AttestationResult struct {
 }
 
-type AttestationStage struct{}
+type AttestationStage struct {
+	sequencer types.Sequencer
+}
+
+func NewAttestationStage(sequencer types.Sequencer) *AttestationStage {
+	return &AttestationStage{
+		sequencer: sequencer,
+	}
+}
 
 func (as *AttestationStage) Name() string {
 	return "attestation"
@@ -58,9 +67,27 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 					tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, v)
 
 					if len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan) {
-						nextStep = types.NextStepWait
+						log.L(ctx).Infof("Transaction %s has %d endorsements out of %d", tx.ID.String(), len(tx.PostAssembly.Endorsements), len(tx.PostAssembly.AttestationPlan))
 					} else {
+						//TODO should really call out to the engine to publish this event because it needs
+						// to go to other nodes too?
+
+						//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
+						err := as.sequencer.OnTransactionEndorsed(ctx, &sequence.TransactionEndorsedEvent{
+							TransactionId: tx.ID.String(),
+						})
+						if err != nil {
+							//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+							log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
+						}
+					}
+				case *types.TransactionDispatched:
+					if isEndorsed(tx) {
+						tx.Signer = "TODO"
 						nextStep = types.NextStepNewStage
+					} else {
+						//TODO this is an error, we should never have gotten here without endorsements
+						log.L(ctx).Errorf("Transaction dispatched without endorsements")
 					}
 				}
 			}
@@ -73,12 +100,24 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 	return
 }
 
+func isAssembled(tx *components.PrivateTransaction) bool {
+	return tx.PostAssembly != nil &&
+		tx.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_OK
+}
+
+func isDispatched(tx *components.PrivateTransaction) bool {
+	return tx.Signer != "" // TODO this is the only check we can do for now to see if the transaction has been dispatched
+}
+
+func isEndorsed(tx *components.PrivateTransaction) bool {
+	return len(tx.PostAssembly.AttestationPlan) > 0 &&
+		len(tx.PostAssembly.Endorsements) >= len(tx.PostAssembly.AttestationPlan)
+}
+
 func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
-	return tx.PostAssembly != nil &&
-		tx.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_OK &&
-		len(tx.PostAssembly.AttestationPlan) > 0 //&&
-	//len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan)
+	// any asembled transactions are in this stage until they are dispatched
+	return isAssembled(tx) && !isDispatched(tx)
 
 }
 
@@ -89,6 +128,13 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
 		return nil, i18n.NewError(ctx, msgs.MsgEngineInternalError, "")
 	}
+
+	err := as.sequencer.AssignTransaction(ctx, tx.ID.String())
+	if err != nil {
+		log.L(ctx).Errorf("Failed to assign transaction to sequencer: %s", err)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+	}
+
 	attPlan := tx.PostAssembly.AttestationPlan
 	attResults := tx.PostAssembly.Endorsements
 	for _, ap := range attPlan {
