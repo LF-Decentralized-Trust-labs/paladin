@@ -32,7 +32,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -600,7 +599,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			Plugin: fakeCoinDomain,
 			Config: yamlNode(`{"some":"config"}`),
 		},
-	}, &UTInitFunction{PreManagerStart: func(c components.AllComponents) error {
+	}, &UTInitFunction{PreManagerStart: func(c AllComponents) error {
 		ec = c.EthClientFactory().HTTPClient()
 		bi := c.BlockIndexer()
 		blockIndexer.Store(&bi)

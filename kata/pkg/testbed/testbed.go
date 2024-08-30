@@ -73,9 +73,14 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 }
 
 type UTInitFunction struct {
-	PreManagerStart  func(c components.AllComponents) error
-	PostManagerStart func(c components.AllComponents) error
+	PreManagerStart  func(c AllComponents) error
+	PostManagerStart func(c AllComponents) error
 }
+
+// redeclare the AllComponents interface to allow unit test
+// code in the same package to access the AllComponents interface
+// while keeping it internal
+type AllComponents components.AllComponents
 
 func unitTestSocketFile() (fileName string, err error) {
 	f, err := os.CreateTemp("", "testbed.paladin.*.sock")
@@ -142,7 +147,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	initFunctions = append(initFunctions,
 		// We add an init function that loads the plugin loader after the plugin controller has started.
 		&UTInitFunction{
-			PostManagerStart: func(c components.AllComponents) (err error) {
+			PostManagerStart: func(c AllComponents) (err error) {
 				loaderMap := make(map[string]plugintk.Plugin)
 				for name, domain := range domains {
 					loaderMap[name] = domain.Plugin

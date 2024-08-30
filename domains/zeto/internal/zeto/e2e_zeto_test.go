@@ -25,6 +25,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/testbed"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -80,7 +82,17 @@ func TestZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying Zeto libraries+factory")
 	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	var ec ethclient.EthClient
+	var bi blockindexer.BlockIndexer
+	url, done, err := tb.StartForTest(
+		"../../testbed.config.yaml",
+		map[string]*testbed.TestbedDomain{},
+		&testbed.UTInitFunction{PreManagerStart: func(c testbed.AllComponents) error {
+			ec = c.EthClientFactory().HTTPClient()
+			bi = c.BlockIndexer()
+			return nil
+		},
+		})
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
@@ -89,11 +101,36 @@ func TestZeto(t *testing.T) {
 	err = yaml.Unmarshal(testZetoConfigYaml, &config)
 	assert.NoError(t, err)
 
-	factory, _, err := deployDomainContracts(ctx, rpc, controllerName, &config)
+	domainContracts, err := deployDomainContracts(ctx, rpc, controllerName, &config)
+	assert.NoError(t, err)
+
+	abiFunc, err := ec.ABIFunction(ctx, domainContracts.factoryAbi.Functions()["registerImplementation"])
+	assert.NoError(t, err)
+
+	// Send the transaction
+	addr := ethtypes.Address0xHex(*domainContracts.factoryAddress)
+	params := &ZetoSetImplementationParams{
+		Name: "Zeto_Anon",
+		Implementation: ZetoImplementationInfo{
+			Implementation:   domainContracts.deployedContracts["Zeto_Anon"].String(),
+			Verifier:         domainContracts.deployedContracts["Groth16Verifier_Anon"].String(),
+			DepositVerifier:  domainContracts.deployedContracts["Groth16Verifier_CheckHashesValue"].String(),
+			WithdrawVerifier: domainContracts.deployedContracts["Groth16Verifier_CheckInputsOutputsValue"].String(),
+		},
+	}
+	txHash, err := abiFunc.R(ctx).
+		Signer(controllerName).
+		To(&addr).
+		Input(params).
+		SignAndSend()
+	assert.NoError(t, err)
+	if err == nil {
+		_, err = bi.WaitForTransaction(ctx, *txHash)
+	}
 	assert.NoError(t, err)
 
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{
-		FactoryAddress: factory.String(),
+		FactoryAddress: domainContracts.factoryAddress.String(),
 	})
 	defer done()
 

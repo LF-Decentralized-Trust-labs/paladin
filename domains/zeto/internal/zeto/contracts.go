@@ -28,43 +28,53 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (*ethtypes.Address0xHex, []string, error) {
+type zetoDomainContracts struct {
+	factoryAddress     *ethtypes.Address0xHex
+	factoryAbi         abi.ABI
+	deployedContracts  map[string]*ethtypes.Address0xHex
+	cloneableContracts []string
+}
+
+func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (*zetoDomainContracts, error) {
 	if len(config.DomainContracts.Implementations) == 0 {
-		return nil, nil, fmt.Errorf("no implementations specified for factory contract")
+		return nil, fmt.Errorf("no implementations specified for factory contract")
 	}
 
 	// the cloneable contracts are the ones that can be cloned by the factory
+	// these are the top level Zeto token contracts
 	cloneableContracts := findCloneableContracts(config)
 
 	// sort contracts so that the dependencies are deployed first
 	sortedContractList, err := sortContracts(config)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// deploy the implementation contracts
 	deployedContracts, err := deployContracts(ctx, rpc, deployer, sortedContractList)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// deploy the factory contract
 	factoryAddr, err := deployContract(ctx, rpc, deployer, &config.DomainContracts.Factory, deployedContracts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// configure the factory contract with the implementation contracts
 	factorySpec, err := getContractSpec(&config.DomainContracts.Factory)
 	if err != nil {
-		return nil, nil, err
-	}
-	err = configureFactoryContract(ctx, rpc, deployer, factoryAddr, factorySpec.ABI, deployedContracts)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return factoryAddr, cloneableContracts, nil
+	ctrs := &zetoDomainContracts{
+		factoryAddress:     factoryAddr,
+		factoryAbi:         factorySpec.ABI,
+		deployedContracts:  deployedContracts,
+		cloneableContracts: cloneableContracts,
+	}
+	return ctrs, nil
 }
 
 func findCloneableContracts(config *ZetoDomainConfig) []string {
