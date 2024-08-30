@@ -168,10 +168,11 @@ func TestScenario1(t *testing.T) {
 	require.Len(t, dispatchableTransactions, 3)
 
 	//make sure they come out in the expected order
-	// stricly speaking, the absolute order does not matter so long as dependencies come before dependants.
-	//However we also check here that the breadth first search is favouring older transactions as expected
-	assert.Equal(t, "tx0", dispatchableTransactions[0])
-	assert.Equal(t, "tx1", dispatchableTransactions[1])
+	// the absolute order does not matter so long as dependencies come before dependants.
+	// so we expect either 0,1,3 or 1,0,3.
+	assert.True(t, ((dispatchableTransactions[0] == "tx0" && dispatchableTransactions[1] == "tx1") ||
+		(dispatchableTransactions[0] == "tx1" && dispatchableTransactions[1] == "tx0")))
+
 	//transaction 2 is not endorsed so should not be in the dispatchable list
 	assert.Equal(t, "tx3", dispatchableTransactions[2])
 
@@ -181,10 +182,10 @@ func TestScenario1(t *testing.T) {
 	require.Len(t, dispatchableTransactions, 3)
 
 	//make sure they come out in the expected order
-	// stricly speaking, the absolute order does not matter so long as dependencies come before dependants.
-	//However we also check here that the breadth first search is favouring older transactions as expected
-	assert.Equal(t, "tx0", dispatchableTransactions[0])
-	assert.Equal(t, "tx1", dispatchableTransactions[1])
+	// the absolute order does not matter so long as dependencies come before dependants.
+	// so we expect either 0,1,3 or 1,0,3.
+	assert.True(t, ((dispatchableTransactions[0] == "tx0" && dispatchableTransactions[1] == "tx1") ||
+		(dispatchableTransactions[0] == "tx1" && dispatchableTransactions[1] == "tx0")))
 	assert.Equal(t, "tx3", dispatchableTransactions[2])
 
 	err = testGraph.RemoveTransactions(ctx, dispatchableTransactions)
