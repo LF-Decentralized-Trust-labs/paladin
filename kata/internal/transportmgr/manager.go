@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
@@ -42,9 +43,11 @@ type transportManager struct {
 
 func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
 	return &transportManager{
-		bgCtx: bgCtx,
-		conf:  conf,
-		recvMessages: make(chan components.TransportMessage),
+		bgCtx:            bgCtx,
+		conf:             conf,
+		recvMessages:     make(chan components.TransportMessage, 1),
+		transportsByID:   make(map[uuid.UUID]*transport),
+		transportsByName: make(map[string]*transport),
 	}
 }
 
@@ -126,7 +129,7 @@ func (tm *transportManager) GetTransportByName(ctx context.Context, name string)
 
 // Internal callback method from the transports to the manager
 func (tm *transportManager) recieveExternalMessage(msg components.TransportMessage) {
-	tm.recvMessages<- msg
+	tm.recvMessages <- msg
 }
 
 // Send implements TransportManager
@@ -153,8 +156,9 @@ func (tm *transportManager) Send(ctx context.Context, message components.Transpo
 
 	return nil
 }
+
 // Send implements TransportManager
-func (tm *transportManager) Recieve(onMessage func(ctx context.Context, message components.TransportMessage) error) error {
+func (tm *transportManager) RegisterReceiver(onMessage func(ctx context.Context, message components.TransportMessage) error) error {
 	go func() {
 		for {
 			select {
@@ -162,12 +166,14 @@ func (tm *transportManager) Recieve(onMessage func(ctx context.Context, message 
 				return
 			case message := <-tm.recvMessages:
 				{
-					// TODO: What are we doing with errors that come out of here?
-					onMessage(tm.bgCtx, message)
+					err := onMessage(tm.bgCtx, message)
+					if err != nil {
+						log.L(tm.bgCtx).Errorf("error from receiver when processing new message: %v", err)
+					}
 				}
 			}
 		}
 	}()
 
 	return nil
-} 
+}

@@ -17,8 +17,6 @@ package transportmgr
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -42,10 +40,8 @@ type transport struct {
 	name string
 	api  plugins.TransportManagerToTransport
 
-	stateLock   sync.Mutex
 	initialized atomic.Bool
 	initRetry   *retry.Retry
-	config      *prototk.TransportConfig
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -126,7 +122,7 @@ func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequ
 	}
 
 	transportMessage := &components.TransportMessage{}
-	err := json.Unmarshal([]byte(req.Body), transportMessage)
+	err := yaml.Unmarshal([]byte(req.Body), transportMessage)
 	if err != nil {
 		return nil, err
 	}

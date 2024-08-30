@@ -15,126 +15,78 @@
 
 package transportmgr
 
-// import (
-// 	"context"
-// 	"testing"
+import (
+	"context"
+	"testing"
 
-// 	"github.com/google/uuid"
-// 	"github.com/kaleido-io/paladin/kata/internal/plugins"
-// 	"github.com/stretchr/testify/assert"
-// 	"gopkg.in/yaml.v3"
-// )
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
+)
 
-// type mockComponents struct {
-// }
+type mockComponents struct {
+}
 
-// func newTestTransportManager(t *testing.T, realDB bool, conf *TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
-// 	ctx, cancelCtx := context.WithCancel(context.Background())
+func newTestTransportManager(t *testing.T, realDB bool, conf *TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
 
-// 	mc := &mockComponents{}
+	mc := &mockComponents{}
+	tm := NewTransportManager(ctx, conf)
 
-// 	// Blockchain stuff is always mocked
-// 	// preMocks := componentmocks.NewPreInitComponents(t)
-// 	// preMocks.On("EthClientFactory").Return(mc.ethClientFactory)
-// 	// mc.ethClientFactory.On("ChainID").Return(int64(12345)).Maybe()
-// 	// mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
-// 	// mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
-// 	// preMocks.On("BlockIndexer").Return(mc.blockIndexer)
+	err := tm.Start()
+	assert.NoError(t, err)
 
-// 	// var p persistence.Persistence
-// 	// var err error
-// 	// var pDone func()
-// 	// if realDB {
-// 	// 	p, pDone, err = persistence.NewUnitTestPersistence(ctx)
-// 	// 	assert.NoError(t, err)
-// 	// 	realStateStore := statestore.NewStateStore(ctx, &statestore.Config{}, p)
-// 	// 	preMocks.On("StateStore").Return(realStateStore)
-// 	// } else {
-// 	// 	mp, err := mockpersistence.NewSQLMockProvider()
-// 	// 	assert.NoError(t, err)
-// 	// 	p = mp.P
-// 	// 	mc.db = mp.Mock
-// 	// 	pDone = func() {
-// 	// 		assert.NoError(t, mp.Mock.ExpectationsWereMet())
-// 	// 	}
-// 	// 	preMocks.On("StateStore").Return(mc.stateStore)
-// 	// 	mridc := mc.stateStore.On("RunInTransportContext", mock.Anything, mock.Anything)
-// 	// 	mridc.Run(func(args mock.Arguments) {
-// 	// 		mridc.Return((args[1].(statestore.TransportContextFunction))(
-// 	// 			ctx, mc.transportStateInterface,
-// 	// 		))
-// 	// 	}).Maybe()
-// 	// 	mridcf := mc.stateStore.On("RunInTransportContextFlush", mock.Anything, mock.Anything)
-// 	// 	mridcf.Run(func(args mock.Arguments) {
-// 	// 		mridcf.Return((args[1].(statestore.TransportContextFunction))(
-// 	// 			ctx, mc.transportStateInterface,
-// 	// 		))
-// 	// 	}).Maybe()
-// 	// }
-// 	// preMocks.On("Persistence").Return(p)
+	return ctx, tm.(*transportManager), mc, func() {
+		cancelCtx()
+		// pDone()
+		tm.Stop()
+	}
+}
 
-// 	// for _, fn := range extraSetup {
-// 	// 	fn(mc)
-// 	// }
+func yamlNode(t *testing.T, s string) (n yaml.Node) {
+	err := yaml.Unmarshal([]byte(s), &n)
+	assert.NoError(t, err)
+	return
+}
 
-// 	dm := NewTransportManager(ctx, conf)
-// 	initInstructions, err := dm.Init(nil)
-// 	assert.NoError(t, err)
-// 	assert.Len(t, initInstructions.EventStreams, 1)
+func TestConfiguredTransports(t *testing.T) {
+	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+		Transports: map[string]*TransportConfig{
+			"test1": {
+				Plugin: plugins.PluginConfig{
+					Type:     plugins.LibraryTypeCShared.Enum(),
+					Location: "some/where",
+				},
+			},
+		},
+	})
+	defer done()
 
-// 	err = dm.Start()
-// 	assert.NoError(t, err)
+	assert.Equal(t, map[string]*plugins.PluginConfig{
+		"test1": {
+			Type:     plugins.LibraryTypeCShared.Enum(),
+			Location: "some/where",
+		},
+	}, dm.ConfiguredTransports())
+}
 
-// 	return ctx, dm.(*transportManager), mc, func() {
-// 		cancelCtx()
-// 		// pDone()
-// 		dm.Stop()
-// 	}
-// }
+func TestTransportRegisteredNotFound(t *testing.T) {
+	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+		Transports: map[string]*TransportConfig{},
+	})
+	defer done()
 
-// func yamlNode(t *testing.T, s string) (n yaml.Node) {
-// 	err := yaml.Unmarshal([]byte(s), &n)
-// 	assert.NoError(t, err)
-// 	return
-// }
+	_, err := dm.TransportRegistered("unknown", uuid.New(), nil)
+	assert.Regexp(t, "PD011600", err)
+}
 
-// func TestConfiguredTransports(t *testing.T) {
-// 	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
-// 		Transports: map[string]*TransportConfig{
-// 			"test1": {
-// 				Plugin: plugins.PluginConfig{
-// 					Type:     plugins.LibraryTypeCShared.Enum(),
-// 					Location: "some/where",
-// 				},
-// 			},
-// 		},
-// 	})
-// 	defer done()
+func TestGetTransportNotFound(t *testing.T) {
+	ctx, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+		Transports: map[string]*TransportConfig{},
+	})
+	defer done()
 
-// 	assert.Equal(t, map[string]*plugins.PluginConfig{
-// 		"test1": {
-// 			Type:     plugins.LibraryTypeCShared.Enum(),
-// 			Location: "some/where",
-// 		},
-// 	}, dm.ConfiguredTransports())
-// }
-
-// func TestTransportRegisteredNotFound(t *testing.T) {
-// 	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
-// 		Transports: map[string]*TransportConfig{},
-// 	})
-// 	defer done()
-
-// 	_, err := dm.TransportRegistered("unknown", uuid.New(), nil)
-// 	assert.Regexp(t, "PD011600", err)
-// }
-
-// func TestGetTransportNotFound(t *testing.T) {
-// 	ctx, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
-// 		Transports: map[string]*TransportConfig{},
-// 	})
-// 	defer done()
-
-// 	_, err := dm.GetTransportByName(ctx, "wrong")
-// 	assert.Regexp(t, "PD011600", err)
-// }
+	_, err := dm.GetTransportByName(ctx, "wrong")
+	assert.Regexp(t, "PD011600", err)
+}
