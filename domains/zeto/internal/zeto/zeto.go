@@ -17,7 +17,6 @@ package zeto
 
 import (
 	"context"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -32,24 +31,6 @@ import (
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"gopkg.in/yaml.v2"
 )
-
-//go:embed abis/Commonlib.json
-var commonLibJSON []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_Anon.json
-var Groth16Verifier_Anon []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_CheckHashesValue.json
-var Groth16Verifier_CheckHashesValue []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_CheckInputsOutputsValue.json
-var Groth16Verifier_CheckInputsOutputsValue []byte // From "gradle copySolidity"
-
-//go:embed abis/ZetoFactory.json
-var zetoFactoryJSON []byte // From "gradle copySolidity"
-
-//go:embed abis/Zeto_Anon.json
-var zetoJSON []byte // From "gradle copySolidity"
 
 type Config struct {
 	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
@@ -74,11 +55,14 @@ type SolidityLinkReference struct {
 type Zeto struct {
 	Interface DomainInterface
 
-	config     *Config
-	callbacks  plugintk.DomainCallbacks
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
+	config      *Config
+	callbacks   plugintk.DomainCallbacks
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	tokenName   string
+	factoryAbi  abi.ABI
+	contractAbi abi.ABI
 }
 
 type ZetoDomainAbiConfig struct {
@@ -101,7 +85,7 @@ type ZetoImplementationInfo struct {
 type ZetoDeployParams struct {
 	TransactionID string                    `json:"transactionId"`
 	Data          ethtypes.HexBytes0xPrefix `json:"data"`
-	Name          string                    `json:"name"`
+	TokenName     string                    `json:"tokenName"`
 	InitialOwner  string                    `json:"initialOwner"`
 }
 
@@ -168,14 +152,11 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.config = &config
 	z.chainID = req.ChainId
 
-	factory := loadBuildLinked(zetoFactoryJSON, map[string]string{})
-	contract := loadBuildLinked(zetoJSON, map[string]string{})
-
-	factoryJSON, err := json.Marshal(factory.ABI)
+	factoryJSON, err := json.Marshal(z.factoryAbi)
 	if err != nil {
 		return nil, err
 	}
-	zetoJSON, err := json.Marshal(contract.ABI)
+	zetoJSON, err := json.Marshal(z.contractAbi)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +212,7 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	deployParams := &ZetoDeployParams{
 		TransactionID: req.Transaction.TransactionId,
 		Data:          ethtypes.HexBytes0xPrefix(""),
+		TokenName:     z.tokenName,
 		InitialOwner:  req.ResolvedVerifiers[0].Verifier,
 	}
 	paramsJSON, err := json.Marshal(deployParams)

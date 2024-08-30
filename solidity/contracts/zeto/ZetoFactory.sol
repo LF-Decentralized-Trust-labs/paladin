@@ -7,10 +7,11 @@ import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 contract ZetoFactory is ZetoTokenFactory, IPaladinContract_V0 {
     function deploy(
         bytes32 transactionId,
+        string memory tokenName,
         address initialOwner,
         bytes memory data
     ) external {
-        address instance = deployZetoFungibleToken("Zeto_Anon", initialOwner);
+        address instance = deployZetoFungibleToken(tokenName, initialOwner);
         emit PaladinNewSmartContractByFactory_V0(
             transactionId,
             instance,

@@ -17,6 +17,7 @@ package zeto
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -30,11 +31,23 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
+//go:embed abis/ZetoFactory.json
+var zetoFactoryJSON []byte // From "gradle copySolidity"
+
 type zetoDomainContracts struct {
-	factoryAddress     *ethtypes.Address0xHex
-	factoryAbi         abi.ABI
-	deployedContracts  map[string]*ethtypes.Address0xHex
-	cloneableContracts []string
+	factoryAddress       *ethtypes.Address0xHex
+	factoryAbi           abi.ABI
+	deployedContracts    map[string]*ethtypes.Address0xHex
+	deployedContractAbis map[string]abi.ABI
+	cloneableContracts   []string
+}
+
+func newZetoDomainContracts() *zetoDomainContracts {
+	factory := loadBuildLinked(zetoFactoryJSON, map[string]string{})
+
+	return &zetoDomainContracts{
+		factoryAbi: factory.ABI,
+	}
 }
 
 func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (*zetoDomainContracts, error) {
@@ -53,30 +66,23 @@ func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer
 	}
 
 	// deploy the implementation contracts
-	deployedContracts, err := deployContracts(ctx, rpc, deployer, sortedContractList)
+	deployedContracts, deployedContractAbis, err := deployContracts(ctx, rpc, deployer, sortedContractList)
 	if err != nil {
 		return nil, err
 	}
 
 	// deploy the factory contract
-	factoryAddr, err := deployContract(ctx, rpc, deployer, &config.DomainContracts.Factory, deployedContracts)
+	factoryAddr, _, err := deployContract(ctx, rpc, deployer, &config.DomainContracts.Factory, deployedContracts)
 	if err != nil {
 		return nil, err
 	}
 	log.L(ctx).Infof("Deployed factory contract to %s", factoryAddr.String())
 
-	// configure the factory contract with the implementation contracts
-	factorySpec, err := getContractSpec(&config.DomainContracts.Factory)
-	if err != nil {
-		return nil, err
-	}
-
-	ctrs := &zetoDomainContracts{
-		factoryAddress:     factoryAddr,
-		factoryAbi:         factorySpec.ABI,
-		deployedContracts:  deployedContracts,
-		cloneableContracts: cloneableContracts,
-	}
+	ctrs := newZetoDomainContracts()
+	ctrs.factoryAddress = factoryAddr
+	ctrs.deployedContracts = deployedContracts
+	ctrs.deployedContractAbis = deployedContractAbis
+	ctrs.cloneableContracts = cloneableContracts
 	return ctrs, nil
 }
 
@@ -125,31 +131,36 @@ func sortContracts(config *ZetoDomainConfig) ([]ZetoDomainContract, error) {
 	return contracts, nil
 }
 
-func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []ZetoDomainContract) (map[string]*ethtypes.Address0xHex, error) {
+func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []ZetoDomainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
 	deployedContracts := make(map[string]*ethtypes.Address0xHex)
-
+	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
-		addr, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
+		addr, abi, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		log.L(ctx).Infof("Deployed contract %s to %s", contract.Name, addr.String())
 		deployedContracts[contract.Name] = addr
+		deployedContractAbis[contract.Name] = abi
 	}
 
-	return deployedContracts, nil
+	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, error) {
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
-		return nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
+		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
 	// deploy the contract
 	build, err := getContractSpec(contract)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return deployBytecode(ctx, rpc, deployer, build)
+	addr, err := deployBytecode(ctx, rpc, deployer, build)
+	if err != nil {
+		return nil, nil, err
+	}
+	return addr, build.ABI, nil
 }
 
 func getContractSpec(contract *ZetoDomainContract) (*SolidityBuild, error) {

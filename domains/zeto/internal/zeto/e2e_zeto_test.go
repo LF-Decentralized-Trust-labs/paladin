@@ -56,11 +56,14 @@ func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
 	return yn
 }
 
-func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
+func newTestDomain(t *testing.T, domainName string, tokenName string, config *Config, domainContracts *zetoDomainContracts) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
 	var domain *Zeto
 	tb := testbed.NewTestBed()
 	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 		domain = New(callbacks)
+		domain.tokenName = tokenName
+		domain.factoryAbi = domainContracts.factoryAbi
+		domain.contractAbi = domainContracts.deployedContractAbis[tokenName]
 		return domain
 	})
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
@@ -107,9 +110,9 @@ func TestZeto(t *testing.T) {
 	err = configureFactoryContract(ctx, ec, bi, controllerName, domainContracts)
 	assert.NoError(t, err)
 
-	done, zeto, rpc := newTestDomain(t, domainName, &Config{
+	done, zeto, rpc := newTestDomain(t, domainName, "Zeto_Anon", &Config{
 		FactoryAddress: domainContracts.factoryAddress.String(),
-	})
+	}, domainContracts)
 	defer done()
 
 	log.L(ctx).Infof("Deploying an instance of Zeto")
