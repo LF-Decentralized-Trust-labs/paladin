@@ -72,6 +72,11 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 	}, nil
 }
 
+// redeclare the AllComponents interface to allow unit test
+// code in the same package to access the AllComponents interface
+// while keeping it internal
+type AllComponents components.AllComponents
+
 type UTInitFunction struct {
 	PreManagerStart  func(c AllComponents) error
 	PostManagerStart func(c AllComponents) error
