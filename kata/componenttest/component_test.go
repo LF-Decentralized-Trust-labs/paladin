@@ -169,10 +169,10 @@ signer:
             encoding: none
             inline: polar mechanic crouch jungle field room dry sure machine brisk seed bulk student total ethics
 `), &testConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := persistence.NewPersistence(ctx, &testConfig.DB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer p.Close()
 
 	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
@@ -186,7 +186,7 @@ signer:
 	}
 	var simpleStorageBuild solBuild
 	err = json.Unmarshal(simpleStorageBuildJSON, &simpleStorageBuild)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	eventStreamEvents := make(chan *blockindexer.EventWithData, 2 /* all the events we exepct */)
 	err = indexer.Start(&blockindexer.InternalEventStream{
@@ -206,16 +206,16 @@ signer:
 			ABI:  abi.ABI{simpleStorageBuild.ABI.Events()["Changed"]},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer indexer.Stop()
 
 	keyMgr, err := ethclient.NewSimpleTestKeyManager(ctx, &testConfig.Signer)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ecf, err := ethclient.NewEthClientFactory(ctx, keyMgr, &testConfig.Blockchain)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ecf.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer ecf.Stop()
 	ethClient := ecf.HTTPClient()
 
