@@ -21,12 +21,11 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
-	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 
-func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), pluginInit ...func(c components.AllComponents) error) (url string, tb *testbed, done func()) {
+func newUnitTestbed(t *testing.T, setConf func(conf *componentmgr.Config), pluginInit ...*componentmgr.UTInitFunction) (url string, tb *testbed, done func()) {
 	ctx := context.Background()
 	log.SetLevel("debug")
 

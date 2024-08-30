@@ -70,7 +70,7 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 	}, nil
 }
 
-func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain) (url string, done func(), err error) {
+func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*componentmgr.UTInitFunction) (url string, done func(), err error) {
 	ctx := context.Background()
 
 	var conf *componentmgr.Config
@@ -90,21 +90,26 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	}
 
 	var pl plugins.UnitTestPluginLoader
-	pluginInit := func(c components.AllComponents) (err error) {
-		loaderMap := make(map[string]plugintk.Plugin)
-		for name, domain := range domains {
-			loaderMap[name] = domain.Plugin
-		}
-		pc := c.PluginController()
-		pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
-		if err != nil {
-			return err
-		}
-		go pl.Run()
-		return nil
-	}
+	initFunctions = append(initFunctions,
+		// We add an init function that loads the plugin loader after the plugin controller has started.
+		&componentmgr.UTInitFunction{
+			PostManagerStart: func(c components.AllComponents) (err error) {
+				loaderMap := make(map[string]plugintk.Plugin)
+				for name, domain := range domains {
+					loaderMap[name] = domain.Plugin
+				}
+				pc := c.PluginController()
+				pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
+				if err != nil {
+					return err
+				}
+				go pl.Run()
+				return nil
+			},
+		},
+	)
 
-	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, pluginInit)
+	cm, err := componentmgr.UnitTestStart(ctx, conf, tb, initFunctions...)
 	if err != nil {
 		return "", nil, err
 	}

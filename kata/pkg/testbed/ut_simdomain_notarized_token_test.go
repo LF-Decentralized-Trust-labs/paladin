@@ -609,17 +609,19 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				},
 			}
 		},
-		func(c components.AllComponents) (err error) {
-			ec = c.EthClientFactory().HTTPClient()
-			bi := c.BlockIndexer()
-			blockIndexer.Store(&bi)
-			pc := c.PluginController()
-			pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
-				"domain1": fakeCoinDomain,
-			})
-			assert.NoError(t, err)
-			go pl.Run()
-			return nil
+		&componentmgr.UTInitFunction{
+			PostManagerStart: func(c components.AllComponents) (err error) {
+				ec = c.EthClientFactory().HTTPClient()
+				bi := c.BlockIndexer()
+				blockIndexer.Store(&bi)
+				pc := c.PluginController()
+				pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), map[string]plugintk.Plugin{
+					"domain1": fakeCoinDomain,
+				})
+				assert.NoError(t, err)
+				go pl.Run()
+				return nil
+			},
 		})
 	defer done()
 	defer pl.Stop()

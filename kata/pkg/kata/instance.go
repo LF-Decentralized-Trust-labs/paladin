@@ -120,6 +120,9 @@ func (i *instance) run() RC {
 		err = cm.StartComponents()
 	}
 	if err == nil {
+		err = cm.StartManagers()
+	}
+	if err == nil {
 		err = cm.CompleteStart()
 	}
 	if err != nil {
