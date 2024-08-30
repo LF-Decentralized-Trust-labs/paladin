@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -40,7 +38,7 @@ var (
 )
 
 //go:embed zeto.config.yaml
-var testZetoConfigYaml []byte // From "gradle copySolidity"
+var testZetoConfigYaml []byte
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
@@ -54,24 +52,6 @@ func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
 	err = yaml.Unmarshal(configYAML, &yn)
 	assert.NoError(t, err)
 	return yn
-}
-
-func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][]byte) map[string]string {
-	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
-	assert.NoError(t, err)
-	defer done()
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-
-	deployed := make(map[string]string, len(contracts))
-	for _, entry := range contracts {
-		for name, contract := range entry {
-			build := loadBuildLinked(contract, deployed)
-			deployed[name], err = deployBytecode(ctx, rpc, build)
-			assert.NoError(t, err)
-		}
-	}
-	return deployed
 }
 
 func newTestDomain(t *testing.T, domainName string, config *Config) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
@@ -92,21 +72,6 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 	return done, domain, rpc
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *SolidityBuild) (string, error) {
-	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-		controllerName, build.ABI, build.Bytecode.String(), `{}`)
-	if rpcerr != nil {
-		return "", rpcerr.Error()
-	}
-	return addr, nil
-}
-
-type ZetoSetImplementationParams struct {
-	Implementation string `json:"implementation"`
-	Name           string `json:"name"`
-}
-
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
@@ -114,47 +79,29 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
 	log.L(ctx).Infof("Deploying Zeto libraries+factory")
-	contractSource := []map[string][]byte{
-		{
-			"Commonlib":        commonLibJSON,
-			"verifier":         Groth16Verifier_Anon,
-			"depositVerifier":  Groth16Verifier_CheckHashesValue,
-			"withdrawVerifier": Groth16Verifier_CheckInputsOutputsValue,
-		},
-		{
-			"factory": zetoFactoryJSON, //depends on Commonlib from previous group
-		},
-	}
-	contracts := deployContracts(ctx, t, contractSource)
-	for name, address := range contracts {
-		log.L(ctx).Infof("%s deployed to %s", name, address)
-	}
+	tb := testbed.NewTestBed()
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	assert.NoError(t, err)
+	defer done()
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	log.L(ctx).Infof("Configuring Zeto factory for the implementation address")
-	var boolResult bool
-	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_invokePublic", controllerEth, factoryAddress, factory.ABI, "registerImplementation", toJSON(t, &ZetoSetImplementationParams{
-		Implementation: implAddress,
-		Name:           "Zeto_Anon",
-	}))
-	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
-	}
-	assert.True(t, boolResult)
+	var config ZetoDomainConfig
+	err = yaml.Unmarshal(testZetoConfigYaml, &config)
+	assert.NoError(t, err)
+
+	factory, _, err := deployDomainContracts(ctx, rpc, controllerName, &config)
+	assert.NoError(t, err)
 
 	done, zeto, rpc := newTestDomain(t, domainName, &Config{
-		FactoryAddress: contracts["factory"],
-		Libraries:      contracts,
+		FactoryAddress: factory.String(),
 	})
 	defer done()
 
 	log.L(ctx).Infof("Deploying an instance of Zeto")
 	var zetoAddress ethtypes.Address0xHex
-	rpcerr = rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{
-			From:             controllerName,
-			Verifier:         contracts["verifier"],
-			DepositVerifier:  contracts["depositVerifier"],
-			WithdrawVerifier: contracts["withdrawVerifier"],
+			From: controllerName,
 		})
 	if rpcerr != nil {
 		assert.NoError(t, rpcerr.Error())
@@ -162,6 +109,7 @@ func TestZeto(t *testing.T) {
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
+	var boolResult bool
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),

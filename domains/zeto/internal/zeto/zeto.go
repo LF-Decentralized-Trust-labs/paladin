@@ -52,8 +52,7 @@ var zetoFactoryJSON []byte // From "gradle copySolidity"
 var zetoJSON []byte // From "gradle copySolidity"
 
 type Config struct {
-	FactoryAddress string            `json:"factoryAddress" yaml:"factoryAddress"`
-	Libraries      map[string]string `json:"libraries" yaml:"libraries"`
+	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
 }
 
 type SolidityBuild struct {
@@ -87,14 +86,23 @@ type ZetoDomainAbiConfig struct {
 
 var ZetoDomainConfigABI = &abi.ParameterArray{}
 
+type ZetoSetImplementationParams struct {
+	Name           string                 `json:"name"`
+	Implementation ZetoImplementationInfo `json:"implementation"`
+}
+
+type ZetoImplementationInfo struct {
+	Implementation   string `json:"implementation"`
+	Verifier         string `json:"verifier"`
+	DepositVerifier  string `json:"depositVerifier"`
+	WithdrawVerifier string `json:"withdrawVerifier"`
+}
+
 type ZetoDeployParams struct {
-	TransactionID    string                    `json:"transactionId"`
-	Data             ethtypes.HexBytes0xPrefix `json:"data"`
-	Name             string                    `json:"name"`
-	InitialOwner     string                    `json:"initialOwner"`
-	Verifier         string                    `json:"_verifier"`
-	DepositVerifier  string                    `json:"_depositVerifier"`
-	WithdrawVerifier string                    `json:"_withdrawVerifier"`
+	TransactionID string                    `json:"transactionId"`
+	Data          ethtypes.HexBytes0xPrefix `json:"data"`
+	Name          string                    `json:"name"`
+	InitialOwner  string                    `json:"initialOwner"`
 }
 
 type parsedTransaction struct {
@@ -160,8 +168,8 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.config = &config
 	z.chainID = req.ChainId
 
-	factory := loadBuild(zetoFactoryJSON)
-	contract := loadBuild(zetoJSON)
+	factory := loadBuildLinked(zetoFactoryJSON, map[string]string{})
+	contract := loadBuildLinked(zetoJSON, map[string]string{})
 
 	factoryJSON, err := json.Marshal(factory.ABI)
 	if err != nil {
@@ -208,7 +216,7 @@ func (z *Zeto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.I
 	return &pb.InitDeployResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    params.From,
+				Lookup:    "controller",
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 		},
@@ -221,12 +229,9 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 		return nil, err
 	}
 	deployParams := &ZetoDeployParams{
-		TransactionID:    req.Transaction.TransactionId,
-		Data:             ethtypes.HexBytes0xPrefix(""),
-		InitialOwner:     req.ResolvedVerifiers[0].Verifier,
-		DepositVerifier:  params.DepositVerifier,
-		WithdrawVerifier: params.WithdrawVerifier,
-		Verifier:         params.Verifier,
+		TransactionID: req.Transaction.TransactionId,
+		Data:          ethtypes.HexBytes0xPrefix(""),
+		InitialOwner:  req.ResolvedVerifiers[0].Verifier,
 	}
 	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {

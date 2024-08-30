@@ -8,18 +8,9 @@ contract ZetoFactory is ZetoTokenFactory, IPaladinContract_V0 {
     function deploy(
         bytes32 transactionId,
         address initialOwner,
-        address _depositVerifier,
-        address _withdrawVerifier,
-        address _verifier,
         bytes memory data
     ) external {
-        address instance = deployZetoFungibleToken(
-            "Zeto_Anon",
-            initialOwner,
-            _depositVerifier,
-            _withdrawVerifier,
-            _verifier
-        );
+        address instance = deployZetoFungibleToken("Zeto_Anon", initialOwner);
         emit PaladinNewSmartContractByFactory_V0(
             transactionId,
             instance,

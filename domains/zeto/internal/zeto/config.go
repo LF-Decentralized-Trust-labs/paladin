@@ -20,7 +20,8 @@ type ZetoDomainConfig struct {
 }
 
 type ZetoDomainContracts struct {
-	Factory ZetoDomainContractFactory `yaml:"factory"`
+	Factory         ZetoDomainContract   `yaml:"factory"`
+	Implementations []ZetoDomainContract `yaml:"implementations"`
 }
 
 type ZetoDomainContract struct {
@@ -28,13 +29,7 @@ type ZetoDomainContract struct {
 	ContractAddress string         `yaml:"address"`
 	AbiAndBytecode  AbiAndBytecode `yaml:"abiAndBytecode"`
 	Libraries       []string       `yaml:"libraries"`
-}
-
-type ZetoDomainContractFactory struct {
-	ContractAddress string               `yaml:"address"`
-	AbiAndBytecode  AbiAndBytecode       `yaml:"abiAndBytecode"`
-	Libraries       []string             `yaml:"libraries"`
-	Implementations []ZetoDomainContract `yaml:"implementations"`
+	Cloneable       bool           `yaml:"cloneable"`
 }
 
 type AbiAndBytecode struct {

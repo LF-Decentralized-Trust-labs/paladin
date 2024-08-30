@@ -22,51 +22,67 @@ import (
 	"os"
 	"sort"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-// func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (map[string]*ethtypes.Address0xHex, error) {
-// 	if len(config.DomainContracts.Factory.Implementations) == 0 {
-// 		return nil, fmt.Errorf("no implementations specified for factory contract")
-// 	}
-// 	// libraries contracts are deployed first. they are specified as regular contracts in the config
-// 	// but are referenced from the main contracts by the `libraries` field
-// 	libraryContracts, err := findLibraryContracts(config)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (*ethtypes.Address0xHex, []string, error) {
+	if len(config.DomainContracts.Implementations) == 0 {
+		return nil, nil, fmt.Errorf("no implementations specified for factory contract")
+	}
 
-// 	deployedContracts := make(map[string]*ethtypes.Address0xHex)
+	// the cloneable contracts are the ones that can be cloned by the factory
+	cloneableContracts := findCloneableContracts(config)
 
-// 	// deploy libraries
-// 	for _, contract := range libraryContracts {
-// 		addr, err := deployContract(ctx, rpc, deployer, contract)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		deployedContracts[contract.Name] = addr
-// 	}
+	// sort contracts so that the dependencies are deployed first
+	sortedContractList, err := sortContracts(config)
+	if err != nil {
+		return nil, nil, err
+	}
 
-// 	// deploy implementation (non-library) contracts
-// 	for _, contract := range config.DomainContracts.Factory.Implementations {
-// 		if libraryContracts[contract.Name] != nil {
-// 			// already deployed as a library
-// 			continue
-// 		}
-// 		addr, err := deployContract(ctx, rpc, deployer, &contract)
-// 	}
-// 	return nil
-// }
+	// deploy the implementation contracts
+	deployedContracts, err := deployContracts(ctx, rpc, deployer, sortedContractList)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// deploy the factory contract
+	factoryAddr, err := deployContract(ctx, rpc, deployer, &config.DomainContracts.Factory, deployedContracts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// configure the factory contract with the implementation contracts
+	factorySpec, err := getContractSpec(&config.DomainContracts.Factory)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = configureFactoryContract(ctx, rpc, deployer, factoryAddr, factorySpec.ABI, deployedContracts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return factoryAddr, cloneableContracts, nil
+}
+
+func findCloneableContracts(config *ZetoDomainConfig) []string {
+	var cloneableContracts []string
+	for _, contract := range config.DomainContracts.Implementations {
+		if contract.Cloneable {
+			cloneableContracts = append(cloneableContracts, contract.Name)
+		}
+	}
+	return cloneableContracts
+}
 
 // when contracts include a `libraries` section, the libraries must be deployed first
 // we build a sorted list of contracts, with the dependencies first, and the depending
 // contracts later
-func sortContracts(config *ZetoDomainConfig) (map[string]*ZetoDomainContract, error) {
-	var contracts []*ZetoDomainContract
-	for _, contract := range config.DomainContracts.Factory.Implementations {
-		contracts = append(contracts, &contract)
-	}
+func sortContracts(config *ZetoDomainConfig) ([]ZetoDomainContract, error) {
+	var contracts []ZetoDomainContract
+	contracts = append(contracts, config.DomainContracts.Implementations...)
 
 	sort.Slice(contracts, func(i, j int) bool {
 		if len(contracts[i].Libraries) == 0 && len(contracts[j].Libraries) == 0 {
@@ -92,30 +108,39 @@ func sortContracts(config *ZetoDomainConfig) (map[string]*ZetoDomainContract, er
 		}
 		return len(contracts[i].Libraries) < len(contracts[j].Libraries)
 	})
+
+	return contracts, nil
 }
 
-// 	libraryContracts := make(map[string]*ZetoDomainContract)
-// 	for lib := range libraries {
-// 		var contract *ZetoDomainContract
-// 		for _, impl := range config.DomainContracts.Factory.Implementations {
-// 			if impl.Name == lib {
-// 				contract = &impl
-// 				break
-// 			}
-// 		}
-// 		if contract == nil {
-// 			return nil, fmt.Errorf("library contract %s referenced but not found", lib)
-// 		}
-// 		libraryContracts[contract.Name] = contract
-// 	}
-// 	return libraryContracts, nil
-// }
+func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []ZetoDomainContract) (map[string]*ethtypes.Address0xHex, error) {
+	deployedContracts := make(map[string]*ethtypes.Address0xHex)
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract) (*ethtypes.Address0xHex, error) {
+	for _, contract := range contracts {
+		addr, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
+		if err != nil {
+			return nil, err
+		}
+		log.L(ctx).Infof("Deployed contract %s to %s", contract.Name, addr.String())
+		deployedContracts[contract.Name] = addr
+	}
+
+	return deployedContracts, nil
+}
+
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, error) {
 	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
 		return nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
 	// deploy the contract
+	build, err := getContractSpec(contract)
+	if err != nil {
+		return nil, err
+	}
+	return deployBytecode(ctx, rpc, deployer, build)
+}
+
+func getContractSpec(contract *ZetoDomainContract) (*SolidityBuild, error) {
+	var build SolidityBuild
 	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
 		abiBytecode := make(map[string]interface{})
 		abiBytecode["abi"] = contract.AbiAndBytecode.Json.Abi
@@ -124,34 +149,54 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal abi and bytecode content in the Domain configuration. %s", err)
 		}
-		var build SolidityBuild
 		err = json.Unmarshal(bytes, &build)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
 		}
-		return deployBytecode(ctx, rpc, deployer, build)
 	} else {
-		// load the abi and bytecode from the file
 		bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
 		}
-		var build SolidityBuild
 		err = json.Unmarshal(bytes, &build)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
 		}
-		return deployBytecode(ctx, rpc, deployer, build)
 	}
+	return &build, nil
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build SolidityBuild) (*ethtypes.Address0xHex, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *SolidityBuild) (*ethtypes.Address0xHex, error) {
 	var addr string
-	// TODO: replace with the actual API call against the engine
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-		deployer, build.ABI, build.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
 	}
 	return ethtypes.MustNewAddress(addr), nil
+}
+
+func configureFactoryContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, factoryAddr *ethtypes.Address0xHex, factoryAbi abi.ABI, deployedContracts map[string]*ethtypes.Address0xHex) error {
+	var boolResult bool
+
+	params := &ZetoSetImplementationParams{
+		Name: "Zeto_Anon",
+		Implementation: ZetoImplementationInfo{
+			Implementation:   deployedContracts["Zeto_Anon"].String(),
+			Verifier:         deployedContracts["Groth16Verifier_Anon"].String(),
+			DepositVerifier:  deployedContracts["Groth16Verifier_CheckHashesValue"].String(),
+			WithdrawVerifier: deployedContracts["Groth16Verifier_CheckInputsOutputsValue"].String(),
+		},
+	}
+
+	jsonBytes, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	rpcerr := rpc.CallRPC(ctx, &boolResult, "testbed_invokePublic", deployer, factoryAddr.String(), factoryAbi, "registerImplementation", jsonBytes)
+	if rpcerr != nil {
+		return rpcerr.Error()
+	}
+
+	return nil
 }
