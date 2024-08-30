@@ -1,16 +1,16 @@
 /*
-* Copyright © 2024 Kaleido, Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
-* the License. You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
-* an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
-* specific language governing permissions and limitations under the License.
-*
-* SPDX-License-Identifier: Apache-2.0
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package grpctransport
@@ -26,27 +26,28 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v3"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	
+
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
-	grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 )
 
 type ExternalMessage struct {
-	proto.Message
+	Body             string
+	TransportDetails string
+}
 
-	// Where are we sending the message to?
-	ExternalAddress string
-
-	// Who signed the cert of the endpoint we're talking to?
-	CACertificate string
+type TransportDetails struct {
+	Address       string `yaml:"address"`
+	CaCertificate string `yaml:"caCertificate"`
 }
 
 type ExternalServer interface {
 	QueueMessageForSend(msg *proto.ExternalMessage)
-	GetMessages(dest destination) chan *proto.Message
+	GetMessages() chan *proto.Message
 	Shutdown()
 }
 
@@ -60,8 +61,8 @@ type externalGRPCServer struct {
 	serverCertPool    *x509.CertPool
 
 	// TODO: We probably don't want to do this, what happens when we're not consuming messages correctly?
-	recvMessages map[destination]chan *proto.Message
-	sendMessages chan *proto.ExternalMessage
+	recvMessages chan *components.TransportMessage
+	sendMessages chan *ExternalMessage
 	port         int
 }
 
@@ -75,8 +76,8 @@ func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls
 	}
 
 	server := &externalGRPCServer{
-		recvMessages:      make(map[destination]chan *proto.Message, 1),
-		sendMessages:      make(chan *proto.ExternalMessage, 1),
+		recvMessages:      make(chan *components.TransportMessage, 1),
+		sendMessages:      make(chan *ExternalMessage, 1),
 		port:              port,
 		clientCertificate: clientCertificate,
 		serverCertificate: serverCertificate,
@@ -91,16 +92,17 @@ func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls
 	return server, nil
 }
 
-func (egs *externalGRPCServer) QueueMessageForSend(msg *proto.ExternalMessage) {
-	egs.sendMessages <- msg
-}
-
-func (egs *externalGRPCServer) GetMessages(dest destination) chan *proto.Message {
-	if egs.recvMessages[dest] == nil {
-		egs.recvMessages[dest] = make(chan *proto.Message, 1)
+func (egs *externalGRPCServer) QueueMessageForSend(msg string, transportDetails string) error {
+	egs.sendMessages <- &ExternalMessage{
+		Body:             msg,
+		TransportDetails: transportDetails,
 	}
 
-	return egs.recvMessages[dest]
+	return nil
+}
+
+func (egs *externalGRPCServer) GetMessages() <-chan *components.TransportMessage {
+	return egs.recvMessages
 }
 
 func (egs *externalGRPCServer) Shutdown() {
@@ -173,8 +175,8 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 			case sendMsg := <-egs.sendMessages:
 				{
 					// Unmarshal the transport information
-					ti := &grpctransportpb.GRPCTransportInformation{}
-					err := sendMsg.GetTransportInformation().UnmarshalTo(ti)
+					ti := &TransportDetails{}
+					err := yaml.Unmarshal([]byte(sendMsg.TransportDetails), ti)
 					if err != nil {
 						log.L(ctx).Errorf("grpctransport: could not unmarshal transport information")
 						continue
@@ -186,7 +188,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 					}
 
 					inpalMessage := &interPaladinPB.InterPaladinMessage{
-						Body: sendMsg.Body,
+						Body: []byte(sendMsg.Body),
 					}
 
 					var conn *grpc.ClientConn
@@ -220,16 +222,11 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 }
 
 func (egs *externalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *interPaladinPB.InterPaladinMessage) (*interPaladinPB.InterPaladinMessage, error) {
-	recvMessage := &ExternalMessage{}
-	err := message.GetBody().UnmarshalTo(recvMessage)
+	transportedMessage := &components.TransportMessage{}
+	err := yaml.Unmarshal(message.Body, transportedMessage)
 	if err != nil {
 		return nil, err
 	}
-
-	if egs.recvMessages[destination(recvMessage.Destination)] == nil {
-		egs.recvMessages[destination(recvMessage.Destination)] = make(chan *proto.Message, 1)
-	}
-
-	egs.recvMessages[destination(recvMessage.Destination)] <- &recvMessage.Message
+	egs.recvMessages <- transportedMessage
 	return nil, nil
 }

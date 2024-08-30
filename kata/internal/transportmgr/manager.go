@@ -37,13 +37,14 @@ type transportManager struct {
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	recvMessages map[string]chan components.TransportMessage
+	recvMessages chan components.TransportMessage
 }
 
 func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
 	return &transportManager{
 		bgCtx: bgCtx,
 		conf:  conf,
+		recvMessages: make(chan components.TransportMessage),
 	}
 }
 
@@ -124,21 +125,20 @@ func (tm *transportManager) GetTransportByName(ctx context.Context, name string)
 }
 
 // Internal callback method from the transports to the manager
-func (tm *transportManager) recieveExternalMessage(component string, msg components.TransportMessage) {
-	if tm.recvMessages[component] == nil {
-		tm.recvMessages[component] = make(chan components.TransportMessage)
-	}
-
-	tm.recvMessages[component] <- msg
+func (tm *transportManager) recieveExternalMessage(msg components.TransportMessage) {
+	tm.recvMessages<- msg
 }
 
 // Send implements TransportManager
-func (tm *transportManager) Send(ctx context.Context, message components.TransportMessage, identity string, component string) error {
+func (tm *transportManager) Send(ctx context.Context, message components.TransportMessage, identity string) error {
 	// TODO: Plug point for calling through to the registry
 	// TODO: Plugin determination
 
 	knownPlugin := "grpc"
 	transport, err := tm.GetTransportByName(ctx, knownPlugin)
+	if err != nil {
+		return err
+	}
 
 	serializedMessage, err := json.Marshal(message)
 	if err != nil {
@@ -146,27 +146,23 @@ func (tm *transportManager) Send(ctx context.Context, message components.Transpo
 	}
 
 	// TODO: Transport Details
-	err = transport.Send(ctx, string(serializedMessage), "", component)
+	err = transport.Send(ctx, string(serializedMessage), "")
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-
 // Send implements TransportManager
-func (tm *transportManager) Recieve(component string, onMessage func(ctx context.Context, message components.TransportMessage) error) error {
-	if tm.recvMessages[component] == nil {
-		tm.recvMessages[component] = make(chan components.TransportMessage)
-	}
-
+func (tm *transportManager) Recieve(onMessage func(ctx context.Context, message components.TransportMessage) error) error {
 	go func() {
 		for {
 			select {
 			case <-tm.bgCtx.Done():
 				return
-			case message := <-tm.recvMessages[component]:
+			case message := <-tm.recvMessages:
 				{
+					// TODO: What are we doing with errors that come out of here?
 					onMessage(tm.bgCtx, message)
 				}
 			}

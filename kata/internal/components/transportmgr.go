@@ -23,8 +23,8 @@ import (
 )
 
 type TransportMessage struct {
-	MessageType string
-	Payload     string
+	MessageType string `yaml:"messageType"`
+	Payload     []byte `yaml:"payload"`
 }
 
 type TransportManager interface {
@@ -32,11 +32,11 @@ type TransportManager interface {
 	plugins.TransportRegistration
 	GetTransportByName(ctx context.Context, name string) (Transport, error)
 
-	Send(ctx context.Context, message TransportMessage, identity string, component string) error
-	Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
+	Send(ctx context.Context, message TransportMessage, node string) error
+	RegisterReceiver(onMessage func(ctx context.Context, message TransportMessage) error) error
 }
 
 type Transport interface {
-	Send(ctx context.Context, message string, transportDetails string, component string) error
+	Send(ctx context.Context, message string, transportDetails string) error
 	Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }

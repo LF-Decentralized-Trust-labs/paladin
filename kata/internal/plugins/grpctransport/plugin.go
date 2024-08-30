@@ -1,263 +1,249 @@
 /*
-* Copyright © 2024 Kaleido, Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
-* the License. You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
-* an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
-* specific language governing permissions and limitations under the License.
-*
-* SPDX-License-Identifier: Apache-2.0
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package grpctransport
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
-	"time"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v3"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-const ProviderName = "github.com/kaleido-io/paladin/kata/internal/plugins/talaria/grpctransport"
+type GRPCTransport struct {
+	prototk.UnimplementedPluginControllerServer
+	externalServer *externalGRPCServer
+	controllerClient grpc.BidiStreamingClient[prototk.TransportMessage, prototk.TransportMessage]
 
-type destination string
+	pluginID   string
+	connString string
 
-type grpcTransportInstance struct {
-	stopListener func()
+	sendMessages chan *ExternalMessage
+
+	serverWg     sync.WaitGroup
+	serverConn   *grpc.ClientConn
+	serverCtx    context.Context
+	serverCancel context.CancelFunc
+
+	Config      *GRPCConfig
+	Initialized bool
 }
 
-type grpcTransportProvider struct {
-	stopListener func()
-	instances    map[destination]*grpcTransportInstance
-	client       proto.KataMessageServiceClient
-	config       GRPCTransportConfig
+
+func NewGRPCTransport(pluginID, connString string) (*GRPCTransport, error) {
+	return &GRPCTransport{
+		pluginID:     pluginID,
+		connString:   connString,
+		sendMessages: make(chan *ExternalMessage, 1),
+	}, nil
 }
 
-type GRPCTransportConfig struct {
-	ClientCertificate                   *tls.Certificate
-	ServerCertificate                   *tls.Certificate
-	ExternalListenPort                  int
-	CommsBusConnectionRetryLimit        int
-	CommsBusConnectionRetryAttemptDelay int
-}
+func (gpt *GRPCTransport) Init() error {
+	gpt.serverCtx, gpt.serverCancel = context.WithCancel(context.Background())
+	log.L(gpt.serverCtx).Info("grpctransport.Init")
 
-// Singleton instance of the GRPC Plugin
-var provider *grpcTransportProvider
-var externalServer ExternalServer
-
-func Shutdown() {
-	if provider == nil {
-		return
-	}
-
-	if provider.instances != nil {
-		for _, instance := range provider.instances {
-			instance.stopListener()
-		}
-	}
-
-	provider.stopListener()
-	provider = nil
-
-	if externalServer == nil {
-		return
-	}
-
-	externalServer.Shutdown()
-	externalServer = nil
-}
-
-func BuildInfo() string {
-	ctx := context.Background()
-	log.L(ctx).Infof("grpctransport.BuildInfo: %s", ProviderName)
-	return ProviderName
-}
-
-func InitializeTransportProvider(socketAddress string, listenerDestination string, config *GRPCTransportConfig) error {
-	ctx := context.Background()
-	log.L(ctx).Info("grpctransport.InitializeTransportProvider")
-
-	if provider != nil {
-		return fmt.Errorf("gRPC transport provider already initialized")
-	}
-
-	if config == nil {
-		config = &GRPCTransportConfig{
-			ExternalListenPort: 8080,
-		}
-	}
-
-	// Create a gRPC client connection to the comms bus
-	commsbusConn, err := grpc.NewClient(fmt.Sprintf("unix://%s", socketAddress), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Create a gRPC Connection back to the plugin controller
+	pluginControllerConn, err := grpc.NewClient(gpt.connString, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
 
-	client := proto.NewKataMessageServiceClient(commsbusConn)
+	gpt.serverConn = pluginControllerConn
 
-	var connErr error
-	var status *proto.StatusResponse
-	for retryCount := 0; retryCount < 2; retryCount++ {
-		status, connErr = client.Status(ctx, &proto.StatusRequest{})
-		if status.GetOk() {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	if !status.GetOk() && connErr != nil {
-		log.L(ctx).Errorf("grpctransport: Could not form connection to the comms bus after %d retries", 2)
-		return connErr
-	}
+	client := prototk.NewPluginControllerClient(pluginControllerConn)
 
-	messageStream, err := client.Listen(ctx, &proto.ListenRequest{
-		Destination: listenerDestination,
-	})
+	pluginControllerClient, err := client.ConnectTransport(gpt.serverCtx)
 	if err != nil {
 		return err
 	}
-
-	listenerContext := messageStream.Context()
+	gpt.controllerClient = pluginControllerClient
+	pcCtx := pluginControllerClient.Context()
 
 	// Start listening for events on the plugin stream
+	gpt.serverWg.Add(1)
 	go func() {
 		for {
-			inboundMessage, err := messageStream.Recv()
+			inboundMessage, err := pluginControllerClient.Recv()
 			if err == io.EOF {
-				log.L(listenerContext).Info("grpctransport: EOF received")
+				log.L(pcCtx).Info("grpctransport: EOF received")
+				gpt.serverWg.Done()
 				return
 			}
 			if err != nil {
 				continue
 			}
-			log.L(listenerContext).Infof("grpctransport: Received message")
-			receivedBody1, err := inboundMessage.GetBody().UnmarshalNew()
-			if err != nil {
-				log.L(listenerContext).Errorf("grpctransport: Error unmarshalling message: %s", err)
-				continue
-			}
 
-			switch string(receivedBody1.ProtoReflect().Descriptor().FullName()) {
-			case "github.com.kaleido_io.paladin.kata.plugin.CreateInstance":
-				log.L(listenerContext).Info("grpctransport: Received CreateInstanceRequest message")
-				createInstanceRequest := new(pluginPB.CreateInstance)
-				err := inboundMessage.GetBody().UnmarshalTo(createInstanceRequest)
+			switch input := inboundMessage.RequestToTransport.(type) {
+			case *prototk.TransportMessage_ConfigureTransport:
+				config := input.ConfigureTransport.ConfigYaml
+				upc := &UnprocessedGRPCConfig{}
+				err := yaml.Unmarshal([]byte(config), upc)
 				if err != nil {
-					log.L(listenerContext).Errorf("grpctransport: Error unmarshalling CreateInstanceRequest: %s", err)
-					continue
+					log.L(pcCtx).Errorf("grpctransport: Could not unmarshal config %v", err)
+					break
 				}
-				err = provider.createInstance(listenerContext, createInstanceRequest)
+
+				processedConfig, err := ProcessGRPCConfig(upc)
 				if err != nil {
-					log.L(listenerContext).Errorf("grpctransport: Error creating instance: %s", err)
-					continue
+					log.L(pcCtx).Errorf("grpctransport: Could not unmarshal config %v", err)
+					break
 				}
-			default:
-				log.L(listenerContext).Errorf("grpctransport: Unknown message type: %s", receivedBody1.ProtoReflect().Descriptor().FullName())
+
+				gpt.Config = processedConfig
+
+				pluginControllerClient.Send(&prototk.TransportMessage{
+					ResponseFromTransport: &prototk.TransportMessage_ConfigureTransportRes{
+						ConfigureTransportRes: &prototk.ConfigureTransportResponse{
+							TransportConfig: &prototk.TransportConfig{}, // TODO: What is the shape of the response here?
+						},
+					},
+				})
+			case *prototk.TransportMessage_InitTransport:
+				// Now bring up the external endpoint other Paladin's are going to speak to us on
+				if gpt.externalServer == nil {
+					gpt.externalServer, err = NewExternalGRPCServer(gpt.serverCtx, gpt.Config.ExternalPort, gpt.Config.ServerCertificate, gpt.Config.ClientCertificate)
+					if err != nil {
+						log.L(pcCtx).Errorf("grpctransport: Could not unmarshal config %v", err)
+						break
+					}
+				}
+
+				gpt.InitializeExternalListener()
+
+				pluginControllerClient.Send(&prototk.TransportMessage{
+					ResponseFromTransport: &prototk.TransportMessage_InitTransportRes{
+						InitTransportRes: &prototk.InitTransportResponse{},
+					},
+				})
+			case *prototk.TransportMessage_SendMessage:
+				gpt.sendMessages <- &ExternalMessage{
+					Body:             input.SendMessage.Body,
+					TransportDetails: input.SendMessage.TransportDetails,
+				}
+
+				pluginControllerClient.Send(&prototk.TransportMessage{
+					ResponseFromTransport: &prototk.TransportMessage_SendMessageRes{
+						SendMessageRes: &prototk.SendMessageResponse{},
+					},
+				})
 			}
 		}
 	}()
 
-	// Now bring up the external endpoint other Paladin's are going to speak to us on
-	if externalServer == nil {
-		// Mostly put behind an interface to make stubbing for UTs easy
-		externalServer, err = NewExternalGRPCServer(ctx, config.ExternalListenPort, config.ServerCertificate, config.ClientCertificate)
+	go func() {
+		for {
+			select {
+			case <-pcCtx.Done():
+				return
+			case msg := <-gpt.sendMessages:
+				err := gpt.externalServer.QueueMessageForSend(msg.Body, msg.TransportDetails)
+				if err != nil {
+					log.L(ctx).Errorf("Could not send message to external server for send")
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (gpt *GRPCTransport) InitializeExternalListener() {
+	gpt.serverWg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-gpt.serverCtx.Done():
+				gpt.serverWg.Done()
+				return
+			case msg := <-gpt.externalServer.recvMessages:
+				serializedTransportMessage, err := yaml.Marshal(msg)
+				if err != nil {
+					continue
+				}
+
+				err = gpt.controllerClient.Send(&prototk.TransportMessage{
+					RequestFromTransport: &prototk.TransportMessage_Recieve{
+						Recieve: &prototk.ReceiveMessageRequest{
+							Body: string(serializedTransportMessage),
+						},
+					},
+				})
+				if err != nil {
+					log.L(gpt.serverCtx).Error("grpctransport: Could not call transport manager to return message")
+				}
+			}
+		}
+	}()
+	gpt.Initialized = true
+}
+
+func (gpt *GRPCTransport) Shutdown() error {
+	if gpt.Initialized {
+		err := gpt.serverConn.Close()
 		if err != nil {
 			return err
 		}
 	}
 
-	provider = &grpcTransportProvider{
-		stopListener: func() { _ = messageStream.CloseSend() },
-		instances:    make(map[destination]*grpcTransportInstance),
-		client:       client,
-		config:       *config,
-	}
+	gpt.serverCancel()
+
+	// Closing the connection should stop the goroutine to the plugin
+	// and therefore release anyone waiting on the wait group
 
 	return nil
 }
 
-func (gtp *grpcTransportProvider) createInstance(ctx context.Context, createInstanceRequest *pluginPB.CreateInstance) error {
-	log.L(ctx).Infof("grpctransport.createInstance: name: %s, destination: %s", createInstanceRequest.GetName(), createInstanceRequest.GetMessageDestination())
+var transport *GRPCTransport
+var ctx context.Context
 
-	instanceName := createInstanceRequest.GetName()
+func Run(pluginID, connString string) error {
+	ctx = context.Background()
 
-	listenerContext, stopListener := context.WithCancel(ctx)
-	messageStream, err := gtp.client.Listen(listenerContext, &proto.ListenRequest{
-		Destination: instanceName,
-	})
+	if transport != nil {
+		return fmt.Errorf("Run called twice on the plugin, exiting!")
+	}
+
+	transport, err := NewGRPCTransport(pluginID, connString)
 	if err != nil {
-		stopListener()
 		return err
 	}
 
-	// Messages coming through the stream here need to be sent to another Paladin, messages coming
-	// back from the server need to be fed to the comms bus
-
-	newInstance := &grpcTransportInstance{
-		stopListener: func() {
-			_ = messageStream.CloseSend()
-			stopListener()
-		},
+	err = transport.Init()
+	if err != nil {
+		return err
 	}
-	gtp.instances[destination(instanceName)] = newInstance
 
-	go func() {
-		for {
-			inboundMessage, err := messageStream.Recv()
-			if err == io.EOF {
-				log.L(ctx).Info("grpctransport instance: EOF received")
-				return
-			}
-			if err != nil {
-				log.L(ctx).Errorf("grpctransport instance: Error processing message: %v", err)
-				return
-			}
-
-			externMessage := &proto.ExternalMessage{}
-			err = inboundMessage.Body.UnmarshalTo(externMessage)
-			if err != nil {
-				log.L(ctx).Errorf("grpctransport instance: Could not unmarshal message: %v", err)
-				continue
-			}
-
-			externalServer.QueueMessageForSend(externMessage)
-		}
-	}()
-
-	instanceMessageRecvChannel := externalServer.GetMessages(destination(instanceName))
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-instanceMessageRecvChannel:
-				{
-					// Need to send the message back to the comms bus so it can then be sent back to the actual destination
-					response, err := gtp.client.SendMessage(ctx, msg)
-					if err != nil {
-						log.L(ctx).Errorf("grpctransport instance: error sending message to comms bus %v", err)
-						continue
-					}
-					if response.Result == proto.SEND_MESSAGE_RESULT_SEND_MESSAGE_FAIL {
-						log.L(ctx).Errorf("grpctransport instance: failed response when sending message to comms bus %s", *response.Reason)
-						continue
-					}
-				}
-			}
-		}
-	}()
-
+	transport.serverWg.Wait()
 	return nil
+}
+
+func Stop() {
+	if transport == nil {
+		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
+		return
+	}
+
+	err := transport.Shutdown()
+	if err != nil {
+		log.L(ctx).Errorf("grpctransport: Stop called on an uninitialized plugin")
+		return
+	}
 }

@@ -17,12 +17,10 @@ syntax = "proto3";
 package github.com.kaleido_io.paladin.kata.interpaladin;
 option go_package = "pkg/proto/interpaladin";
 
-import "google/protobuf/any.proto";
-
 service InterPaladinTransport {
   rpc SendInterPaladinMessage(InterPaladinMessage) returns (InterPaladinMessage) {}
 }
 
 message InterPaladinMessage {
-    google.protobuf.Any body = 1;
+  bytes body = 1;
 }

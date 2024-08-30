@@ -17,8 +17,6 @@ syntax = "proto3";
 
 package github.com.kaleido_io.paladin.toolkit;
 
-import "google/protobuf/any.proto";
-
 message ConfigureTransportRequest {
   string name = 1; // The name
   string config_yaml = 2; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
@@ -29,17 +27,15 @@ message ConfigureTransportResponse {
 }
 
 message SendMessageRequest {
-    string component = 1;
-    string transport_details = 2;
-    string body = 3;
+    string transport_details = 1;
+    string body = 2;
 }
 
 message SendMessageResponse {
 }
 
 message ReceiveMessageRequest {
-    string component = 1;
-    string body = 2;
+    string body = 1;
 }
 
 message ReceiveMessageResponse {

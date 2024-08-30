@@ -12,7 +12,6 @@
 *
 * SPDX-License-Identifier: Apache-2.0
  */
-
 package grpctransport
 
 import (
@@ -28,13 +27,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/anypb"
+	"gopkg.in/yaml.v3"
 
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 	"github.com/stretchr/testify/assert"
 
-	grpctransportpb "github.com/kaleido-io/paladin/kata/pkg/proto/grpctransport"
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
 
@@ -104,27 +102,21 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 		wg.Done()
 	}()
 
-	// Create a fake message and queue it for sending
-	fakeInternalMessage := &proto.Message{
-		Id:          "some-uuid",
-		Destination: fmt.Sprintf("localhost:%d", testPort+1),
-	}
-	fakeInternalMessagePb, err := anypb.New(fakeInternalMessage)
-	assert.NoError(t, err)
-
-	transportInformation := &grpctransportpb.GRPCTransportInformation{
-		Address:       sendingAddress,
+	td := &TransportDetails{
+		Address: sendingAddress,
 		CaCertificate: string(server2CaCertificate),
 	}
-	transportInformationPb, err := anypb.New(transportInformation)
+	transportDetailBytes, err := yaml.Marshal(td)
 	assert.NoError(t, err)
 
-	fakeMessage := &proto.ExternalMessage{
-		Body: fakeInternalMessagePb,
-		TransportInformation: transportInformationPb,
+	tm := &components.TransportMessage{
+		MessageType: "something",
+		Payload: []byte("something"),
 	}
+	tmBytes, err := yaml.Marshal(tm)
+	assert.NoError(t, err)
 
-	server.QueueMessageForSend(fakeMessage)
+	server.QueueMessageForSend(string(tmBytes), string(transportDetailBytes))
 
 	// Fake server will close when it gets a message
 	wg.Wait()
@@ -154,25 +146,20 @@ func TestOutboundMessageFlow(t *testing.T) {
 		wg.Done()
 	}()
 
-	fakeInternalMessage := &proto.Message{
-		Id:          "some-uuid",
-		Destination: fmt.Sprintf("localhost:%d", testPort+1),
+	td := &TransportDetails{
+		Address: sendingAddress,
 	}
-	fakeInternalMessagePb, err := anypb.New(fakeInternalMessage)
+	transportDetailBytes, err := yaml.Marshal(td)
 	assert.NoError(t, err)
 
-	transportInformation := &grpctransportpb.GRPCTransportInformation{
-		Address:       sendingAddress,
+	tm := &components.TransportMessage{
+		MessageType: "something",
+		Payload: []byte("something"),
 	}
-	transportInformationPb, err := anypb.New(transportInformation)
+	tmBytes, err := yaml.Marshal(tm)
 	assert.NoError(t, err)
 
-	fakeMessage := &proto.ExternalMessage{
-		Body: fakeInternalMessagePb,
-		TransportInformation: transportInformationPb,
-	}
-
-	server.QueueMessageForSend(fakeMessage)
+	server.QueueMessageForSend(string(tmBytes), string(transportDetailBytes))
 	wg.Wait()
 }
 
@@ -207,18 +194,12 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 
 	client := interpaladin.NewInterPaladinTransportClient(conn)
 
-	fakeInternalMessage := &proto.Message{
-		Id:          "some-uuid",
-		Destination: fakeDesintation,
+	fakeMessage := &ExternalMessage{
+		Body: "something",
+		TransportDetails: "something",
 	}
 
-	fakeMessage := &ExternalMessage{ // TODO: Why is this not broken?
-		Message:         *fakeInternalMessage,
-		ExternalAddress: loopbackAddress,
-		CACertificate:   string(caCertificate), // This is actually redundant for this specific test
-	}
-
-	mPay, err := anypb.New(fakeMessage)
+	fakeMessageBytes, err := yaml.Marshal(fakeMessage)
 	assert.NoError(t, err)
 
 	// This flow is showing what happens when we get an inbound message, in this case we're going to pretend
@@ -226,11 +207,11 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	server.serverCertPool.AppendCertsFromPEM([]byte(caCertificate))
 
 	_, err = client.SendInterPaladinMessage(ctx, &interpaladin.InterPaladinMessage{
-		Body: mPay,
+		Body: fakeMessageBytes,
 	})
 	assert.NoError(t, err)
 
-	recvMessageFlow := server.GetMessages(destination(fakeDesintation))
+	recvMessageFlow := server.GetMessages()
 
 	msg := <-recvMessageFlow
 	assert.NotNil(t, msg)
@@ -248,25 +229,20 @@ func TestInboundMessageFlow(t *testing.T) {
 
 	client := interpaladin.NewInterPaladinTransportClient(conn)
 
-	fakeInternalMessage := &proto.Message{
-		Id:          "some-uuid",
-		Destination: fakeDesintation,
+	fakeMessage := &ExternalMessage{
+		Body: "something",
+		TransportDetails: "something",
 	}
 
-	fakeMessage := &ExternalMessage{ // TODO: Why is this not broken?
-		Message:         *fakeInternalMessage,
-		ExternalAddress: loopbackAddress,
-	}
-
-	mPay, err := anypb.New(fakeMessage)
+	fakeMessageBytes, err := yaml.Marshal(fakeMessage)
 	assert.NoError(t, err)
 
 	_, err = client.SendInterPaladinMessage(ctx, &interpaladin.InterPaladinMessage{
-		Body: mPay,
+		Body: fakeMessageBytes,
 	})
 	assert.NoError(t, err)
 
-	recvMessageFlow := server.GetMessages(destination(fakeDesintation))
+	recvMessageFlow := server.GetMessages()
 
 	msg := <-recvMessageFlow
 	assert.NotNil(t, msg)

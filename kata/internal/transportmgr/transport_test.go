@@ -33,7 +33,7 @@ package transportmgr
 // type testPlugin struct {
 // 	plugintk.TransportAPIBase
 // 	initialized  atomic.Bool
-// 	t            *transport
+// 	d            *transport
 // 	stateSchemas []*prototk.StateSchema
 // }
 
@@ -49,9 +49,9 @@ package transportmgr
 // 	}
 // }
 
-// func newTestTe(t *testing.T, transportConfig *prototk.TransportConfig) (context.Context, *transportManager, *testPlugin, func()) {
-// 	ctx, dm, _, done := newTestTrans(t, realDB, &DomainManagerConfig{
-// 		Domains: map[string]*DomainConfig{
+// func newTestTransport(t *testing.T, realDB bool, transportConfig *prototk.TransportConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+// 	ctx, dm, _, done := newTestTransportManager(t, realDB, &TransportManagerConfig{
+// 		Transports: map[string]*TransportConfig{
 // 			"test1": {
 // 				Config: yamlNode(t, `{"some":"conf"}`),
 // 			},
@@ -59,57 +59,59 @@ package transportmgr
 // 	}, extraSetup...)
 
 // 	tp := newTestPlugin(nil)
-// 	tp.Functions = &plugintk.DomainAPIFunctions{
-// 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+// 	tp.Functions = &plugintk.TransportAPIFunctions{
+// 		ConfigureTransport: func(ctx context.Context, cdr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 // 			assert.Equal(t, "test1", cdr.Name)
 // 			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
-// 			return &prototk.ConfigureDomainResponse{
-// 				DomainConfig: domainConfig,
+// 			return &prototk.ConfigureTransportResponse{
+// 				TransportConfig: transportConfig,
 // 			}, nil
 // 		},
-// 		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
-// 			tp.stateSchemas = idr.AbiStateSchemas
-// 			return &prototk.InitDomainResponse{}, nil
+// 		InitTransport: func(ctx context.Context, idr *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
+// 			return &prototk.InitTransportResponse{}, nil
 // 		},
 // 	}
 
-// 	registerTestDomain(t, dm, tp)
+// 	registerTestTransport(t, dm, tp)
 // 	return ctx, dm, tp, done
 // }
 
-// func registerTestDomain(t *testing.T, dm *domainManager, tp *testPlugin) {
-// 	domainID := uuid.New()
-// 	_, err := dm.DomainRegistered("test1", domainID, tp)
+// func registerTestTransport(t *testing.T, dm *transportManager, tp *testPlugin) {
+// 	transportID := uuid.New()
+// 	_, err := dm.TransportRegistered("test1", transportID, tp)
 // 	assert.NoError(t, err)
 
-// 	da, err := dm.GetDomainByName(context.Background(), "test1")
+// 	da, err := dm.GetTransportByName(context.Background(), "test1")
 // 	assert.NoError(t, err)
-// 	tp.d = da.(*domain)
+// 	tp.d = da.(*transport)
 // 	tp.d.initRetry.UTSetMaxAttempts(1)
 // 	<-tp.d.initDone
 // }
 
-// func goodDomainConf() *prototk.DomainConfig {
-// 	return &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
+// func goodTransportConf() *prototk.TransportConfig {
+// 	return &prototk.TransportConfig{
+// 		// BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+// 		// 	SubmitMode: prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
+// 		// },
+// 		// ConstructorAbiJson:     fakeCoinConstructorABI,
+// 		// FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+// 		// FactoryContractAbiJson: `[]`,
+// 		// PrivateContractAbiJson: `[]`,
+// 		// AbiStateSchemasJson: []string{
+// 		// 	fakeCoinStateSchema,
+// 		// },
 // 	}
 // }
 
-// func TestDomainInitStates(t *testing.T) {
+// func TestTransportInitStates(t *testing.T) {
 
-// 	domainConf := goodDomainConf()
-// 	ctx, dm, tp, done := newTestDomain(t, true, domainConf)
+// 	transportConf := goodTransportConf()
+// 	ctx, dm, tp, done := newTestTransport(t, true, transportConf)
 // 	defer done()
 
 // 	assert.Nil(t, tp.d.initError.Load())
 // 	assert.True(t, tp.initialized.Load())
-// 	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
+// 	byAddr, err := dm.getTransportByAddress(ctx, types.MustEthAddress(transportConf.FactoryContractAddress))
 // 	assert.NoError(t, err)
 // 	assert.Equal(t, tp.d, byAddr)
 
@@ -117,9 +119,9 @@ package transportmgr
 
 // func TestDoubleRegisterReplaces(t *testing.T) {
 
-// 	domainConf := goodDomainConf()
-// 	ctx, dm, tp0, done := newTestDomain(t, false, domainConf, func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
+// 	transportConf := goodTransportConf()
+// 	ctx, dm, tp0, done := newTestTransport(t, false, transportConf, func(mc *mockComponents) {
+// 		mc.transportStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
 // 	})
 // 	defer done()
 // 	assert.Nil(t, tp0.d.initError.Load())
@@ -128,25 +130,26 @@ package transportmgr
 // 	// Register again
 // 	tp1 := newTestPlugin(nil)
 // 	tp1.Functions = tp0.Functions
-// 	registerTestDomain(t, dm, tp1)
+// 	registerTestTransport(t, dm, tp1)
 // 	assert.Nil(t, tp1.d.initError.Load())
 // 	assert.True(t, tp1.initialized.Load())
 
 // 	// Check we get the second from all the maps
-// 	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
+// 	byAddr, err := dm.getTransportByAddress(ctx, types.MustEthAddress(transportConf.FactoryContractAddress))
 // 	assert.NoError(t, err)
 // 	assert.Same(t, tp1.d, byAddr)
-// 	byName, err := dm.GetDomainByName(ctx, "test1")
+// 	byName, err := dm.GetTransportByName(ctx, "test1")
 // 	assert.NoError(t, err)
 // 	assert.Same(t, tp1.d, byName)
-// 	byUUID := dm.domainsByID[tp1.d.id]
+// 	byUUID := dm.transportsByID[tp1.d.id]
 // 	assert.NoError(t, err)
 // 	assert.Same(t, tp1.d, byUUID)
 
 // }
 
-// func TestDomainInitBadSchemas(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitBadSchemas(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     fakeCoinConstructorABI,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -160,8 +163,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitBadConstructor(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitBadConstructor(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     `!!!wrong`,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -175,8 +179,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitBadConstructorType(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitBadConstructorType(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     `{"type":"event"}`,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -190,8 +195,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitSchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitSchemaStoreFail(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     `{"type":"event"}`,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -205,8 +211,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitBadAddress(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitBadAddress(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     fakeCoinConstructorABI,
 // 		FactoryContractAddress: `!wrong`,
 // 		FactoryContractAbiJson: `[]`,
@@ -220,8 +227,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitFactoryABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitFactoryABIInvalid(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     fakeCoinConstructorABI,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `!!!wrong`,
@@ -235,8 +243,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitPrivateABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitPrivateABIInvalid(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     fakeCoinConstructorABI,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -250,8 +259,9 @@ package transportmgr
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportInitFactorySchemaStoreFail(t *testing.T) {
+// 	_, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
+// 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 // 		ConstructorAbiJson:     fakeCoinConstructorABI,
 // 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
 // 		FactoryContractAbiJson: `[]`,
@@ -260,17 +270,17 @@ package transportmgr
 // 			fakeCoinStateSchema,
 // 		},
 // 	}, func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
+// 		mc.transportStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
 // 	})
 // 	defer done()
 // 	assert.Regexp(t, "pop", *tp.d.initError.Load())
 // 	assert.False(t, tp.initialized.Load())
 // }
 
-// func TestDomainConfigureFail(t *testing.T) {
+// func TestTransportConfigureFail(t *testing.T) {
 
-// 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-// 		Domains: map[string]*DomainConfig{
+// 	ctx, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+// 		Transports: map[string]*TransportConfig{
 // 			"test1": {
 // 				Config: yamlNode(t, `{"some":"conf"}`),
 // 			},
@@ -278,27 +288,27 @@ package transportmgr
 // 	})
 // 	defer done()
 
-// 	tp := newTestPlugin(&plugintk.DomainAPIFunctions{
-// 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
+// 	tp := newTestPlugin(&plugintk.TransportAPIFunctions{
+// 		ConfigureTransport: func(ctx context.Context, cdr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 // 			return nil, fmt.Errorf("pop")
 // 		},
 // 	})
 
-// 	domainID := uuid.New()
-// 	_, err := dm.DomainRegistered("test1", domainID, tp)
+// 	transportID := uuid.New()
+// 	_, err := dm.TransportRegistered("test1", transportID, tp)
 // 	assert.NoError(t, err)
 
-// 	da, err := dm.GetDomainByName(ctx, "test1")
+// 	da, err := dm.GetTransportByName(ctx, "test1")
 // 	assert.NoError(t, err)
 
-// 	d := da.(*domain)
+// 	d := da.(*transport)
 // 	d.initRetry.UTSetMaxAttempts(1)
 // 	<-d.initDone
 // 	assert.Regexp(t, "pop", *d.initError.Load())
 // }
 
-// func TestDomainFindAvailableStatesNotInit(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
+// func TestTransportFindAvailableStatesNotInit(t *testing.T) {
+// 	ctx, _, tp, done := newTestTransport(t, false, &prototk.TransportConfig{
 // 		FactoryContractAbiJson: `!!!WRONG`,
 // 	})
 // 	defer done()
@@ -307,9 +317,9 @@ package transportmgr
 // 	assert.Regexp(t, "PD011601", err)
 // }
 
-// func TestDomainFindAvailableStatesBadQuery(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
+// func TestTransportFindAvailableStatesBadQuery(t *testing.T) {
+// 	ctx, _, tp, done := newTestTransport(t, false, goodTransportConf(), func(mc *mockComponents) {
+// 		mc.transportStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
 // 	})
 // 	defer done()
 // 	assert.Nil(t, tp.d.initError.Load())
@@ -320,10 +330,10 @@ package transportmgr
 // 	assert.Regexp(t, "PD011608", err)
 // }
 
-// func TestDomainFindAvailableStatesFail(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
-// 		mc.domainStateInterface.On("FindAvailableStates", "12345", mock.Anything).Return(nil, fmt.Errorf("pop"))
+// func TestTransportFindAvailableStatesFail(t *testing.T) {
+// 	ctx, _, tp, done := newTestTransport(t, false, goodTransportConf(), func(mc *mockComponents) {
+// 		mc.transportStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
+// 		mc.transportStateInterface.On("FindAvailableStates", "12345", mock.Anything).Return(nil, fmt.Errorf("pop"))
 // 	})
 // 	defer done()
 // 	assert.Nil(t, tp.d.initError.Load())
@@ -334,13 +344,13 @@ package transportmgr
 // 	assert.Regexp(t, "pop", err)
 // }
 
-// func TestDomainFindAvailableStatesOK(t *testing.T) {
-// 	ctx, dm, tp, done := newTestDomain(t, true /* use real state store for this one */, goodDomainConf())
+// func TestTransportFindAvailableStatesOK(t *testing.T) {
+// 	ctx, dm, tp, done := newTestTransport(t, true /* use real state store for this one */, goodTransportConf())
 // 	defer done()
 // 	assert.Nil(t, tp.d.initError.Load())
 
 // 	txID := uuid.New()
-// 	err := dm.stateStore.RunInDomainContextFlush("test1", func(ctx context.Context, dsi statestore.DomainStateInterface) error {
+// 	err := dm.stateStore.RunInTransportContextFlush("test1", func(ctx context.Context, dsi statestore.TransportStateInterface) error {
 // 		newStates, err := dsi.UpsertStates(&txID, []*statestore.StateUpsert{
 // 			{
 // 				SchemaID: tp.stateSchemas[0].Id,
@@ -381,4 +391,3 @@ package transportmgr
 // 	assert.NoError(t, err)
 // 	assert.Len(t, states.States, 0)
 // }
- 
