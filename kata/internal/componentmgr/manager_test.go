@@ -175,6 +175,8 @@ func TestStartOK(t *testing.T) {
 
 	err := cm.StartComponents()
 	assert.NoError(t, err)
+	err = cm.StartManagers()
+	assert.NoError(t, err)
 	err = cm.CompleteStart()
 	assert.NoError(t, err)
 
@@ -227,8 +229,13 @@ func TestUnitTestStart(t *testing.T) {
 	mockEngine.On("Start").Return(nil)
 	mockEngine.On("Stop").Return()
 
-	cm, err := UnitTestStart(ctx, conf, mockEngine, func(c components.AllComponents) error {
-		return nil
+	cm, err := UnitTestStart(ctx, conf, mockEngine, &UTInitFunction{
+		PreManagerStart: func(c components.AllComponents) error {
+			return nil
+		},
+		PostManagerStart: func(c components.AllComponents) error {
+			return nil
+		},
 	})
 	assert.NoError(t, err)
 
