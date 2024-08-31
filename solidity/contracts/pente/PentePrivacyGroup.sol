@@ -95,15 +95,25 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         validateEndorsements(transitionHash, signatures);
 
         // Perform the state transitions
+        uint nonZeroInputCount = 0;
+        bytes32[] memory nonZeroInputs = new bytes32[](oldStates.length);
         for (uint i = 0; i < accounts.length; i++) {
             if (oldStates[i] != _accountStates[accounts[i]]) {
                 revert PenteAccountStateMismatch(oldStates[i], _accountStates[accounts[i]]);
             }
+            if (oldStates[i] != bytes32(0)) {
+                nonZeroInputs[nonZeroInputCount] = oldStates[i];
+                nonZeroInputCount++;
+            }
             _accountStates[accounts[i]] = newStates[i];
+        }
+        bytes32[] memory nonZeroInputsFinal = new bytes32[](nonZeroInputCount);
+        for (uint i = 0; i < nonZeroInputCount; i++) {
+            nonZeroInputsFinal[i] = nonZeroInputs[i];
         }
 
         // Emmit the state transition event
-        emit PaladinPrivateTransaction_V0(txID, oldStates, newStates, new bytes(0));
+        emit PaladinPrivateTransaction_V0(txID, nonZeroInputsFinal, newStates, new bytes(0));
     }
 
     function _buildTransitionHash(
