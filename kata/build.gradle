@@ -324,11 +324,7 @@ task buildTestPluginsSharedLibraryGRPCTransport(type:Exec) {
 }
 
 task buildTestPluginsSharedLibraries {
-<<<<<<< HEAD
     dependsOn tasks.buildTestPluginsSharedLibraryGRPCTransport
-=======
-    dependsOn buildTestPluginsSharedLibraryA
->>>>>>> 6443a872ceb5d57eb7b9ba31999a239d3536e1c7
 }
 
 abstract class UnitTests extends Exec {
