@@ -103,6 +103,7 @@ func NewEngine(nodeID uuid.UUID) Engine {
 
 // HandleNewTx implements Engine.
 func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error) { // TODO: this function currently assumes another layer initialize transactions and store them into DB
+	log.L(ctx).Debugf("Handling new transaction: %v", tx)
 	if tx.Inputs == nil || tx.Inputs.Domain == "" {
 		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
