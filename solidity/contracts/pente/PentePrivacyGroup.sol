@@ -33,12 +33,12 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
     error PenteUpgradeNotPreauthorized();
     error PenteAccountStateMismatch(bytes32 asserted, bytes32 actual);
 
-    struct EndorsementConfig_V0 {
+    struct EndorsementConfig {
         uint      threshold;
         address[] endorsmentSet;
     }
 
-    EndorsementConfig_V0 endorsementConfig;
+    EndorsementConfig _endorsementConfig;
 
     constructor() {}
 
@@ -47,9 +47,15 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         address domain,
         bytes calldata config
     ) public initializer {
+        __EIP712_init("pente", "0.0.1");
+
         bytes4 configSelector = bytes4(config[0:4]);
         if (configSelector == PenteConfigID_Endorsement_V0) {
-            endorsementConfig = abi.decode(config[4:], (EndorsementConfig_V0));
+            (uint threshold, address[] memory endorsmentSet) = abi.decode(config[4:], (uint, address[]));
+            _endorsementConfig = EndorsementConfig({
+                threshold: threshold,
+                endorsmentSet: endorsmentSet
+            });
         } else {
             revert PenteUnsupportedConfigType(configSelector);
         }
@@ -133,7 +139,7 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         bytes[] calldata
         signatures
     ) internal view {
-        address[] memory endorsers = endorsementConfig.endorsmentSet;
+        address[] memory endorsers = _endorsementConfig.endorsmentSet;
         address[] memory endorsements = new address[](signatures.length);
         uint collected;
         for (uint iSig = 0; iSig < signatures.length; iSig++) {
@@ -160,8 +166,8 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
             collected++;
         }
         // Check we reached our threshold
-        if (collected < endorsementConfig.threshold) {
-            revert PenteEndorsementThreshold(collected, endorsementConfig.threshold);
+        if (collected < _endorsementConfig.threshold) {
+            revert PenteEndorsementThreshold(collected, _endorsementConfig.threshold);
         }
     }
 

@@ -7,7 +7,7 @@ import {PentePrivacyGroup} from "./PentePrivacyGroup.sol";
 contract PenteFactory {
     PentePrivacyGroup pentePrivacyGroupFactory = new PentePrivacyGroup();
 
-    function deploy(
+    function newPrivacyGroup(
         bytes32 transactionId,
         bytes memory config
     ) external {
