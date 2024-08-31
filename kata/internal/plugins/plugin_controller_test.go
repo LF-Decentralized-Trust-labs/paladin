@@ -70,6 +70,9 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	for name, td := range ts.DomainRegistration().(*testDomainManager).domains {
 		testPlugins[name] = td
 	}
+	for name, td := range ts.TransportRegistration().(*testTransportManager).transports {
+		testPlugins[name] = td
+	}
 	return testPlugins
 }
 

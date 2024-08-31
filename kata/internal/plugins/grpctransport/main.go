@@ -18,9 +18,7 @@ package main
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
 
 	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
 )
@@ -28,25 +26,26 @@ import (
 var transport *grpctransport.GRPCTransport
 var ctx context.Context
 
-func Run(pluginID, connString string) error {
+func Run(pluginID, connString string) {
 	ctx = context.Background()
+	log.L(ctx).Info("grpctransport.Init")
 
 	if transport != nil {
-		return i18n.NewError(ctx, msgs.MsgGRPCPluginAlreadyRunning)
+		log.L(ctx).Errorf("plugin is already initialized")
+		return
 	}
 
 	transport, err := grpctransport.NewGRPCTransport(pluginID, connString)
 	if err != nil {
-		return i18n.NewError(ctx, msgs.MsgGRPCPluginCouldNotInitialize, err.Error())
+		log.L(ctx).Errorf("error getting new transport")
 	}
 
 	err = transport.Init()
 	if err != nil {
-		return i18n.NewError(ctx, msgs.MsgGRPCPluginCouldNotInitialize, err.Error())
+		log.L(ctx).Errorf("error initting transport")
 	}
 
 	transport.ServerWg.Wait()
-	return nil
 }
 
 func Stop() {

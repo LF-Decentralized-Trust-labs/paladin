@@ -27,6 +27,9 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"gopkg.in/yaml.v3"
+	
+	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
 )
 
 type transportManager struct {
@@ -137,6 +140,39 @@ func (tm *transportManager) Send(ctx context.Context, message components.Transpo
 	// TODO: Plug point for calling through to the registry
 	// TODO: Plugin determination
 
+	transportDetails := ""
+	if identity == "test" {
+		deets := grpctransport.TransportDetails{
+			Address: ":8081",
+			CaCertificate: `-----BEGIN CERTIFICATE-----
+			MIIDuzCCAqOgAwIBAgIUPTw5vaIfHg8yLutcS+IKqHAEWiwwDQYJKoZIhvcNAQEL
+			BQAwbTELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVN0YXRlMREwDwYDVQQHDAhMb2Nh
+			bGl0eTEVMBMGA1UECgwMT3JnYW5pemF0aW9uMRAwDgYDVQQLDAdPcmdVbml0MRIw
+			EAYDVQQDDAlsb2NhbGhvc3QwHhcNMjQwODA4MTAzNTMwWhcNMzQwODA2MTAzNTMw
+			WjBtMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFU3RhdGUxETAPBgNVBAcMCExvY2Fs
+			aXR5MRUwEwYDVQQKDAxPcmdhbml6YXRpb24xEDAOBgNVBAsMB09yZ1VuaXQxEjAQ
+			BgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+			AOsKJKuyMysGsmW0X9oYSd3NJgzS6X3o8FqJWuC0vM6tmJMNORLJKcgE7bzKS2J9
+			pHEG9qU0VADy4cfkj2Jaf0nXiptGZWGF5M1TV3gA6K/ZQt1SwS8Y4LZNo13Ek4pm
+			znav4HWP8hGjW1Ym70M2Ru9vAvh14pv1VPaDq0eQY7de/Wpt0NPfcrXv5dw+wZQh
+			OhxczE4QW1hJVF+7uyTzqBVXnUuIpWEYH3WIO/VyQIJERN8ynApnndtglbHXoNhj
+			xZcZV1gfrOMHXQURhy04KigIvx7lxYqz5MNkFgfFxCHrkkmKH6CTw2ALmHBlXF6X
+			+qE1jyWYClh014v/yFik82cCAwEAAaNTMFEwHQYDVR0OBBYEFKzheOJklxwLUrx7
+			qAi/wOKzRd7FMB8GA1UdIwQYMBaAFKzheOJklxwLUrx7qAi/wOKzRd7FMA8GA1Ud
+			EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAAcQOJhQ9NhBjjvFJAfbF9S1
+			+E1DrP+zjOm8vGWEvVi4NlGVqd4KJVBeHX7IWewMSvBQasdOAFP25VOBqoPFVhNS
+			XrnBnErCwQyx3NzHQCv50tRDI6e3ms5xh+4bnP7q4fye7QdFJtY7P6CQQMJq46dp
+			r4aQhKExbB4TgECsYvFLrEpqHI375nghkEKAZD2wmLWCPb7mi1jommXBzxsIyl8u
+			dlHsczoHgXf2K90p0iqCAluHMB4WgOVZX39ljHN/2o3mQgPQZtDHAL0jCaXKN9io
+			o4+luzQ1J0UWAGpVThWlEcC5IRrmo5+4+KqyE/wTYJF4dlG/noA8XxkNqM15kY0=
+			-----END CERTIFICATE-----
+			`,
+		}
+
+		bytes, _ := yaml.Marshal(deets)
+		transportDetails = string(bytes) 
+	}
+
 	knownPlugin := "grpc"
 	transport, err := tm.GetTransportByName(ctx, knownPlugin)
 	if err != nil {
@@ -149,7 +185,7 @@ func (tm *transportManager) Send(ctx context.Context, message components.Transpo
 	}
 
 	// TODO: Transport Details
-	err = transport.Send(ctx, string(serializedMessage), "")
+	err = transport.Send(ctx, string(serializedMessage), transportDetails)
 	if err != nil {
 		return err
 	}

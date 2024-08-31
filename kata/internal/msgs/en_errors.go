@@ -239,6 +239,6 @@ var (
 	// TransportManager module PD0119XX
 
 	// GRPC Transport plugin PD0120XX
-	MsgGRPCPluginAlreadyRunning     = ffe("PD011200", "GRPC Transport is already running")
-	MsgGRPCPluginCouldNotInitialize = ffe("PD011201", "Error during initialization of plugin %s")
+	MsgGRPCPluginAlreadyRunning     = ffe("PD012000", "GRPC Transport is already running")
+	MsgGRPCPluginCouldNotInitialize = ffe("PD012001", "Error during initialization of plugin %s")
 )
