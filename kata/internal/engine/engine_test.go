@@ -228,40 +228,41 @@ func TestEngineDependantTransaction(t *testing.T) {
 
 	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		tx := args.Get(1).(*components.PrivateTransaction)
-		switch tx.Inputs.From {
-		case "Alice":
-			tx.PostAssembly = &components.TransactionPostAssembly{
-				AssemblyResult: prototk.AssembleTransactionResponse_OK,
-				OutputStates:   states,
-				AttestationPlan: []*prototk.AttestationRequest{
-					{
-						Name:            "notary",
-						AttestationType: prototk.AttestationType_ENDORSE,
-						//Algorithm:       api.SignerAlgorithm_ED25519,
-						Parties: []string{
-							"domain1/contract1/notary",
-						},
+		tx.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+			OutputStates:   states,
+			AttestationPlan: []*prototk.AttestationRequest{
+				{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Parties: []string{
+						"domain1/contract1/notary",
 					},
 				},
-			}
-		case "Bob":
-			tx.PostAssembly = &components.TransactionPostAssembly{
-				AssemblyResult: prototk.AssembleTransactionResponse_OK,
-				InputStates:    states,
-				AttestationPlan: []*prototk.AttestationRequest{
-					{
-						Name:            "notary",
-						AttestationType: prototk.AttestationType_ENDORSE,
-						//Algorithm:       api.SignerAlgorithm_ED25519,
-						Parties: []string{
-							"domain1/contract1/notary",
-						},
+			},
+		}
+	}).Once().Return(nil)
+
+	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+
+		tx.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+			InputStates:    states,
+			AttestationPlan: []*prototk.AttestationRequest{
+				{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Parties: []string{
+						"domain1/contract1/notary",
 					},
 				},
-			}
+			},
 		}
 
-	}).Return(nil)
+	}).Once().Return(nil)
 
 	sentEndorsementRequest := make(chan struct{}, 1)
 	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -313,6 +314,10 @@ func TestEngineDependantTransaction(t *testing.T) {
 
 	attestationResultAny, err := anypb.New(&attestationResult)
 	assert.NoError(t, err)
+
+	//wait for both transactions to send the endorsement request
+	<-sentEndorsementRequest
+	<-sentEndorsementRequest
 
 	// endorse transaction 2 before 1 and check that 2 is not dispatched before 1
 	engineMessage := pbEngine.StageMessage{
