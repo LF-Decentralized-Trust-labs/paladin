@@ -37,26 +37,21 @@ import (
 // Attempt to assert the behaviour of the Engine as a whole component in isolation from the rest of the system
 // Tests in this file do not mock anything else in this package or sub packages but does mock other components and managers in paladin as per their interfaces
 
-func TestEngine(t *testing.T) {
+func TestEngineSimpleTransaction(t *testing.T) {
 	ctx := context.Background()
 
-	domainAddress := types.MustEthAddress(types.RandHex(20))
-	domainAddressString := domainAddress.String()
-
-	engine, mComponents := newEngineForTesting(t)
+	engine, mocks, domainAddress := newEngineForTesting(t)
 	assert.Equal(t, "Kata Engine", engine.Name())
 
-	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
-
-	mDomainSmartContract := componentmocks.NewDomainSmartContract(t)
+	domainAddressString := domainAddress.String()
 
 	initialised := make(chan struct{}, 1)
-	mDomainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		initialised <- struct{}{}
 	}).Return(nil)
 
 	assembled := make(chan struct{}, 1)
-	mDomainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		tx := args.Get(1).(*components.PrivateTransaction)
 
 		tx.PostAssembly = &components.TransactionPostAssembly{
@@ -83,12 +78,8 @@ func TestEngine(t *testing.T) {
 
 	}).Return(nil)
 
-	mDomainMgr := componentmocks.NewDomainManager(t)
-	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainSmartContract, nil)
-
-	mTransportManager := componentmocks.NewTransportManager(t)
 	sentEndorsementRequest := make(chan struct{}, 1)
-	mTransportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		sentEndorsementRequest <- struct{}{}
 	}).Return(nil).Maybe()
 
@@ -97,25 +88,21 @@ func TestEngine(t *testing.T) {
 		return nil
 	}
 	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
-	mTransportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
 
 	}).Return(nil).Maybe()
 
-	mStateStore := componentmocks.NewStateStore(t)
 	//TODO do we need this?
-	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
-		err := fn(ctx, mDomainStateInterface)
+		err := fn(ctx, mocks.domainStateInterface)
 		assert.NoError(t, err)
 	}).Maybe().Return(nil)
 
-	mComponents.On("StateStore").Return(mStateStore).Maybe()
-	mComponents.On("DomainManager").Return(mDomainMgr).Maybe()
-	mComponents.On("TransportManager").Return(mTransportManager).Maybe()
-
 	err := engine.Start()
 	assert.NoError(t, err)
+
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
 	// no input domain should err
 	assert.Regexp(t, "PD011800", err)
@@ -131,7 +118,7 @@ func TestEngine(t *testing.T) {
 
 	//poll until the transaction is initialised
 	select {
-	case <-time.After(100000 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		assert.Fail(t, "Timed out waiting for transaction to be initialised")
 	case <-initialised:
 		break
@@ -139,7 +126,7 @@ func TestEngine(t *testing.T) {
 
 	//poll until the transaction is assembled
 	select {
-	case <-time.After(100000 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		assert.Fail(t, "Timed out waiting for transaction to be assembled")
 	case <-assembled:
 		break
@@ -147,7 +134,7 @@ func TestEngine(t *testing.T) {
 
 	//poll until the endorsement request has been sent
 	select {
-	case <-time.After(100000 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		assert.Fail(t, "Timed out waiting for endorsement request to be sent")
 	case <-sentEndorsementRequest:
 		break
@@ -206,12 +193,35 @@ func TestEngine(t *testing.T) {
 
 }
 
-func newEngineForTesting(t *testing.T) (Engine, *componentmocks.AllComponents) {
-	mockAllComponents := componentmocks.NewAllComponents(t)
+type dependencyMocks struct {
+	allComponents        *componentmocks.AllComponents
+	domainStateInterface *componentmocks.DomainStateInterface
+	domainSmartContract  *componentmocks.DomainSmartContract
+	domainMgr            *componentmocks.DomainManager
+	transportManager     *componentmocks.TransportManager
+	stateStore           *componentmocks.StateStore
+}
+
+func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddress) {
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+
+	mocks := &dependencyMocks{
+		allComponents:        componentmocks.NewAllComponents(t),
+		domainStateInterface: componentmocks.NewDomainStateInterface(t),
+		domainSmartContract:  componentmocks.NewDomainSmartContract(t),
+		domainMgr:            componentmocks.NewDomainManager(t),
+		transportManager:     componentmocks.NewTransportManager(t),
+		stateStore:           componentmocks.NewStateStore(t),
+	}
+	mocks.allComponents.On("StateStore").Return(mocks.stateStore).Maybe()
+	mocks.allComponents.On("DomainManager").Return(mocks.domainMgr).Maybe()
+	mocks.allComponents.On("TransportManager").Return(mocks.transportManager).Maybe()
+	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
+
 	e := NewEngine(uuid.Must(uuid.NewUUID()))
-	r, err := e.Init(mockAllComponents)
+	r, err := e.Init(mocks.allComponents)
 	assert.Nil(t, r)
 	assert.NoError(t, err)
-	return e, mockAllComponents
+	return e, mocks, domainAddress
 
 }
