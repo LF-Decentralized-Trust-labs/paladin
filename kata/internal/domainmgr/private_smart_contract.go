@@ -56,10 +56,9 @@ func (d *domain) newSmartContract(def *PrivateSmartContract) *domainContract {
 }
 
 func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
-
-	// We are responsible for building the PreAssembly
-	preAssembly := &components.TransactionPreAssembly{}
-	tx.PreAssembly = preAssembly
+	if tx.Inputs == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteInitTransaction)
+	}
 
 	// Query the base block height to inform the assembly step that comes later
 	confirmedBlockHeight, err := dc.dm.blockIndexer.GetConfirmedBlockHeight(ctx)
@@ -84,7 +83,7 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	}
 
 	txSpec := &prototk.TransactionSpecification{
-		TransactionId:      types.Bytes32UUIDLower16(tx.ID).String(),
+		TransactionId:      types.Bytes32UUIDFirst16(tx.ID).String(),
 		ContractAddress:    dc.info.Address.String(),
 		ContractConfig:     dc.info.ConfigBytes,
 		From:               txi.From,
@@ -93,8 +92,6 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		FunctionSignature:  txi.Function.SolString(), // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
 		BaseBlock:          int64(confirmedBlockHeight),
 	}
-	preAssembly.TransactionSpecification = txSpec
-
 	// Do the request with the domain
 	res, err := dc.api.InitTransaction(ctx, &prototk.InitTransactionRequest{
 		Transaction: txSpec,
@@ -104,17 +101,22 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	}
 
 	// Store the response back on the TX
-	preAssembly.RequiredVerifiers = res.RequiredVerifiers
+	preAssembly := &components.TransactionPreAssembly{
+		TransactionSpecification: txSpec,
+		RequiredVerifiers:        res.RequiredVerifiers,
+	}
+	tx.PreAssembly = preAssembly
 	return nil
 }
 
 func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteAssembleTransaction)
+	}
 
 	// Clear any previous assembly state out, as it's considered completely invalid
 	// at this point if we're re-assembling.
 	preAssembly := tx.PreAssembly
-	postAssembly := &components.TransactionPostAssembly{}
-	tx.PostAssembly = postAssembly
 
 	// Now we have the required verifiers, we can ask the domain to do the heavy lifting
 	// and assemble the transaction (using the state store interface we provide)
@@ -126,6 +128,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 		return err
 	}
 
+	postAssembly := &components.TransactionPostAssembly{}
 	// We hydrate the states on our side of the Manager<->Plugin divide at this point,
 	// which provides back to the engine the full sequence locking information of the
 	// states (inputs, and read)
@@ -146,11 +149,17 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	// of the result, and the locking on the input states, the engine might decide to
 	// abandon this attempt and just re-assemble later.
 	postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
+	tx.PostAssembly = postAssembly
 	return nil
 }
 
 // Happens only on the sequencing node
 func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.OutputStatesPotential == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteWritePotentialStates)
+	}
+
 	// Now we're confident enough about this transaction to (on the sequencer) to have allocated
 	// it to a sequence, and we want to write the OutputStatesPotential array:
 	// 1) Writing them to the DB (unflushed at this point)
@@ -202,6 +211,10 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 // Happens on all nodes that are aware of the transaction and want to mask input states from other
 // transactions being assembled on the same node.
 func (dc *domainContract) LockStates(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.InputStates == nil || tx.PostAssembly.OutputStates == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteLockStates)
+	}
 
 	// Important responsibilities of this function
 	// 1) to ensure all the states have been written (unflushed) to the DB, so that the calling code
@@ -251,6 +264,10 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
 func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.InputStates == nil || tx.PostAssembly.OutputStates == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgDomainTXIncompleteEndorseTransaction)
+	}
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
 	// is being handled as part of an overall sequence of endorsements, and for performance it is
@@ -275,7 +292,7 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	})
 	// We don't do any processing - as the result is not directly processable by us.
 	// It is an instruction to the engine - such as an authority to sign an endorsement,
-	// or a constraint on
+	// or a constraint on submission to the chain
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +304,46 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	}, nil
 }
 
+func (dc *domainContract) ResolveDispatch(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.PostAssembly.Endorsements == nil {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteResolveDispatch)
+	}
+
+	for _, ar := range tx.PostAssembly.Endorsements {
+		for _, c := range ar.Constraints {
+			if c == prototk.AttestationResult_ENDORSER_MUST_SUBMIT {
+				if tx.Signer != "" {
+					// Multiple endorsers claiming it is an error
+					return i18n.NewError(ctx, msgs.MsgDomainMultipleEndorsersSubmit)
+				}
+				tx.Signer = ar.Verifier.Lookup
+			}
+		}
+	}
+	if tx.Signer != "" {
+		return nil
+	}
+
+	config := dc.d.Configuration()
+	switch config.BaseLedgerSubmitConfig.SubmitMode {
+	case prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS:
+		tx.Signer = config.BaseLedgerSubmitConfig.OneTimeUsePrefix + tx.ID.String()
+		return nil
+	case prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION:
+		// if there was an endorser, we'd have it above
+		return i18n.NewError(ctx, msgs.MsgDomainNoEndorserSubmit)
+	default:
+		return i18n.NewError(ctx, msgs.MsgDomainInvalidSubmissionConfig, config.BaseLedgerSubmitConfig.SubmitMode)
+	}
+
+}
+
 func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
+		tx.PostAssembly == nil || tx.Signer == "" {
+		return i18n.NewError(ctx, msgs.MsgDomainTXIncompletePrepareTransaction)
+	}
 
 	preAssembly := tx.PreAssembly
 	postAssembly := tx.PostAssembly
@@ -295,8 +351,8 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	// Run the prepare
 	res, err := dc.api.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
-		InputStates:       dc.toReferenceList(postAssembly.InputStates),
-		OutputStates:      dc.toReferenceList(postAssembly.OutputStates),
+		InputStates:       dc.toEndorsableList(postAssembly.InputStates),
+		OutputStates:      dc.toEndorsableList(postAssembly.OutputStates),
 		AttestationResult: dc.allAttestations(tx),
 	})
 	if err != nil {
@@ -307,10 +363,14 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	if functionABI == nil {
 		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 	}
+	inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
+	if err != nil {
+		return err
+	}
 	tx.PreparedTransaction = &components.EthTransaction{
 		FunctionABI: functionABI,
 		To:          dc.Address(),
-		Params:      types.RawJSON(res.Transaction.ParamsJson),
+		Inputs:      inputs,
 	}
 	return nil
 }
@@ -323,7 +383,7 @@ func (dc *domainContract) Address() types.EthAddress {
 	return dc.info.Address
 }
 
-func (dc *domainContract) ConfigBytes() []byte {
+func (dc *domainContract) ConfigBytes() types.HexBytes {
 	return dc.info.ConfigBytes
 }
 
@@ -396,15 +456,4 @@ func (dc *domainContract) toEndorsableList(states []*components.FullState) []*pr
 		}
 	}
 	return endorsableList
-}
-
-func (dc *domainContract) toReferenceList(states []*components.FullState) []*prototk.StateRef {
-	referenceList := make([]*prototk.StateRef, len(states))
-	for i, input := range states {
-		referenceList[i] = &prototk.StateRef{
-			Id:       input.ID.String(),
-			SchemaId: input.Schema.String(),
-		}
-	}
-	return referenceList
 }

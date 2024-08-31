@@ -29,6 +29,7 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -138,6 +139,7 @@ func TestSnarkProve(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -146,11 +148,11 @@ func TestSnarkProve(t *testing.T) {
 
 	res, err := prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, 38, len(res.Payload))
+	assert.Equal(t, 34, len(res.Payload))
 }
 
 func TestSnarkProveError(t *testing.T) {
@@ -177,7 +179,7 @@ func TestSnarkProveError(t *testing.T) {
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "cannot parse invalid wire-format data")
@@ -201,6 +203,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     []uint64{32, 38},
+			OutputSalts:      []string{"salt1", "salt2"},
 			OutputOwners:     []string{"bob", "alice"},
 		},
 	}
@@ -209,7 +212,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "circuit ID is required")
@@ -233,7 +236,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "input commitments are required")
@@ -248,7 +251,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "input values are required")
@@ -264,7 +267,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "input salts are required")
@@ -281,7 +284,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "output values are required")
@@ -299,7 +302,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "output owner keys are required")
@@ -318,7 +321,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "anon.wasm: no such file or directory")
@@ -372,7 +375,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.EqualError(t, err, "bang!")
@@ -422,10 +425,10 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
-	assert.ErrorContains(t, err, "encoding/hex: invalid byte:")
+	assert.ErrorContains(t, err, "witness is empty")
 }
 
 func TestSnarkProveErrorGenerateProof2(t *testing.T) {
@@ -468,6 +471,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -475,7 +479,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "failed to parse input commitment")
@@ -488,6 +492,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
+			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -495,7 +500,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
-		Algorithm: api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES,
+		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "failed to parse input salt")

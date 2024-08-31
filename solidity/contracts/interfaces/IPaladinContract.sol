@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.20;
 
 interface IPaladinContract_V0 {
 
@@ -18,6 +18,6 @@ interface IPaladinContract_V0 {
 
     // TODO: Reconcile if we need this standard function or not - or if domain off-chain code
     //       can simply construct the transactions directly
-    function paladinExecute_V0(bytes32 txId, bytes32 fnSelector, bytes calldata payload) external;
+    // function paladinExecute_V0(bytes32 txId, bytes32 fnSelector, bytes calldata payload) external;
 
 }

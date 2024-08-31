@@ -48,13 +48,14 @@ type Domain interface {
 type DomainSmartContract interface {
 	Domain() Domain
 	Address() types.EthAddress
-	ConfigBytes() []byte
+	ConfigBytes() types.HexBytes
 
 	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
 	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error
 	LockStates(ctx context.Context, tx *PrivateTransaction) error
 	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
+	ResolveDispatch(ctx context.Context, tx *PrivateTransaction) error
 	PrepareTransaction(ctx context.Context, tx *PrivateTransaction) error
 }
 

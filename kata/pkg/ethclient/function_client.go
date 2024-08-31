@@ -29,6 +29,7 @@ import (
 )
 
 type ABIFunctionClient interface {
+	ABIEntry() *abi.Entry
 	R(ctx context.Context) ABIFunctionRequestBuilder
 }
 
@@ -91,6 +92,7 @@ type abiFunctionClient struct {
 	bytecode    types.HexBytes
 	signature   string
 	selector    []byte
+	abiEntry    *abi.Entry
 	inputCount  int
 	inputs      abi.TypeComponent
 	outputCount int
@@ -195,6 +197,7 @@ func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Ent
 }
 
 func (ac *abiFunctionClient) functionCommon(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error) {
+	ac.abiEntry = functionABI
 	ac.signature, err = functionABI.SignatureCtx(ctx)
 	if err == nil {
 		ac.inputCount = len(functionABI.Inputs)
@@ -228,6 +231,10 @@ func (abic *abiClient) MustConstructor(bytecode types.HexBytes) ABIFunctionClien
 
 func (abic *abiClient) ABI() abi.ABI {
 	return abic.abi
+}
+
+func (ac *abiFunctionClient) ABIEntry() *abi.Entry {
+	return ac.abiEntry
 }
 
 func (ac *abiFunctionClient) R(ctx context.Context) ABIFunctionRequestBuilder {
@@ -296,6 +303,7 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 			return i18n.NewError(ac.ctx, msgs.MsgEthClientMissingInput)
 		}
 		var inputMap map[string]any
+		var cv *abi.ComponentValue
 		switch input := ac.input.(type) {
 		case map[string]any:
 			inputMap = input
@@ -305,6 +313,8 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 			err = json.Unmarshal(input, &inputMap)
 		case types.RawJSON:
 			err = json.Unmarshal(input, &inputMap)
+		case *abi.ComponentValue:
+			cv = input
 		default:
 			var jsonInput []byte
 			jsonInput, err = json.Marshal(ac.input)
@@ -312,8 +322,7 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 				err = json.Unmarshal(jsonInput, &inputMap)
 			}
 		}
-		var cv *abi.ComponentValue
-		if err == nil {
+		if err == nil && cv == nil /* might have got a CV directly */ {
 			cv, err = ac.inputs.ParseExternalCtx(ac.ctx, inputMap)
 		}
 		if err == nil {

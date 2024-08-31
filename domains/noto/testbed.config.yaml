@@ -1,0 +1,30 @@
+db:
+  type: sqlite
+  sqlite:
+    uri: ':memory:'
+    autoMigrate: true
+    migrationsDir: '../../../../kata/db/migrations/sqlite'
+rpcServer:
+  http:
+    port: 0
+  ws:
+    disabled: true
+grpc:
+  shutdownTimeout: 1s
+blockchain:
+  http:
+    url: http://localhost:8545
+  ws:
+    url: ws://localhost:8546
+    initialConnectAttempts: 25
+signer:
+  keyDerivation:
+    type: "bip32"
+  keyStore:
+    type: "static"
+    static:
+      keys:
+        seed:
+          encoding: none
+          # DO NOT USE THIS MNEMONIC FOR ANYTHING APART FROM TESTBED TESTING
+          inline: lift steak taste love canvas crush oil fortune pave joy empty hedgehog radio outdoor twice

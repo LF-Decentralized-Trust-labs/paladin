@@ -1,5 +1,7 @@
 rootProject.name = 'paladin'
 
+include 'domains:noto'
+include 'domains:zeto'
 include 'testinfra'
 include 'kata'
 include 'pente'

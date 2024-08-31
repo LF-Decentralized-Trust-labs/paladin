@@ -13,7 +13,8 @@ version = '1.0-SNAPSHOT'
 task wrapper(type: Wrapper){}
 
 application {
-    applicationDefaultJvmArgs = ["-Djna.library.path=" + file("${rootDir}/kata").absolutePath]
+    applicationDefaultJvmArgs = ["-Djna.library.path=" +
+        file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath ]
 }
 
 repositories {
@@ -22,25 +23,38 @@ repositories {
 
 test {
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath
-}
-
-tasks.named('compileJava') {
-    dependsOn ':kata:buildSharedLibrary'
+    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
 }
 
 configurations {
-    protocFilesImport
+    // Resolvable configurations
+    toolkitProtoDefinitions {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    libkata {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    libstarter {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 dependencies {
-    protocFilesImport project(path: ':kata', configuration: 'protocFiles')
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+    testImplementation project(path: ":kata", configuration: "libkata")
+    testImplementation project(path: ":toolkit_go", configuration: "libstarter")
 }
 
 tasks.register('collectProtocFiles', Copy) {
-    from zipTree(configurations.protocFilesImport.getFiles()[0])
+    from configurations.toolkitProtoDefinitions.asFileTree
     into "src/main/proto"
-    dependsOn(':kata:zipProtocFiles')
+}
+
+tasks.register('cleanProto', Delete) {
+    delete 'src/main/proto'
 }
 
 tasks.named('generateProto') {
@@ -55,6 +69,10 @@ tasks.named('processResources') {
     dependsOn ':kata:protoc'
 }
 
+tasks.named('clean') {
+    dependsOn tasks.cleanProto
+}
+
 def grpcVersion = '1.65.0'
 def protobufVersion = '3.25.1'
 def protocVersion = protobufVersion
@@ -66,6 +84,9 @@ dependencies {
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
     implementation 'io.netty:netty-all:4.1.111.Final' // supports Java 16 UDS natively since Netty 4.4.110
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2'
+
+    implementation 'org.apache.logging.log4j:log4j-core:2.23.1'
 
     implementation project(path: ':kata', configuration: 'libkata')
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
@@ -75,6 +96,7 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation project(path: ':toolkit_go', configuration: 'libstarter')
 
 }
 

@@ -23,7 +23,6 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -31,7 +30,9 @@ import (
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/common"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -55,7 +56,7 @@ func Register(ctx context.Context, config api.SnarkProverConfig, registry map[st
 	if err != nil {
 		return err
 	}
-	registry[api.Algorithm_ZKP_BABYJUBJUB_PLAINBYTES] = signer
+	registry[algorithms.ZKP_BABYJUBJUB_PLAINBYTES] = signer
 	return nil
 }
 
@@ -159,10 +160,10 @@ func validateInputs(inputs *pb.ProvingRequestCommon) error {
 func serializeProof(proof *types.ZKProof) ([]byte, error) {
 	snark := pb.SnarkProof{}
 	snark.A = proof.Proof.A
-	snark.B = make([]*pb.B_Item, len(proof.Proof.B))
+	snark.B = make([]*pb.B_Item, 0, len(proof.Proof.B))
 	for _, p := range proof.Proof.B {
 		bItems := pb.B_Item{}
-		bItems.Items = p
+		bItems.Items = append(bItems.Items, p...)
 		snark.B = append(snark.B, &bItems)
 	}
 	snark.C = proof.Proof.C
@@ -175,23 +176,34 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 	outputCommitments := make([]*big.Int, len(commonInputs.OutputValues))
 	outputSalts := make([]*big.Int, len(commonInputs.OutputValues))
 	outputOwnerPublicKeys := make([][]*big.Int, len(commonInputs.OutputValues))
+	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
 
-	// TODO: how to tell the domain how to construct the UTXO?
-	for i, value := range commonInputs.OutputValues {
-		salt := utxo.NewSalt()
+	for i := 0; i < len(commonInputs.OutputSalts); i++ {
+		salt, ok := new(big.Int).SetString(commonInputs.OutputSalts[i], 16)
+		if !ok {
+			return nil, errors.New("failed to parse output salt")
+		}
 		outputSalts[i] = salt
-		ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
-		if err != nil {
-			return nil, err
-		}
-		outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
 
-		u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
-		hash, err := u.GetHash()
-		if err != nil {
-			return nil, err
+		if salt.Cmp(big.NewInt(0)) == 0 {
+			outputOwnerPublicKeys[i] = []*big.Int{big.NewInt(0), big.NewInt(0)}
+			outputValues[i] = big.NewInt(0)
+			outputCommitments[i] = big.NewInt(0)
+		} else {
+			ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
+			if err != nil {
+				return nil, err
+			}
+			outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
+			value := commonInputs.OutputValues[i]
+			outputValues[i] = new(big.Int).SetUint64(value)
+			u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
+			hash, err := u.GetHash()
+			if err != nil {
+				return nil, err
+			}
+			outputCommitments[i] = hash
 		}
-		outputCommitments[i] = hash
 	}
 
 	inputCommitments := make([]*big.Int, len(commonInputs.InputCommitments))
@@ -204,15 +216,11 @@ func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core
 		}
 		inputCommitments[i] = commitment
 		inputValues[i] = new(big.Int).SetUint64(commonInputs.InputValues[i])
-		v, ok := new(big.Int).SetString(commonInputs.InputSalts[i], 16)
+		salt, ok := new(big.Int).SetString(commonInputs.InputSalts[i], 16)
 		if !ok {
 			return nil, errors.New("failed to parse input salt")
 		}
-		inputSalts[i] = v
-	}
-	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
-	for i, v := range commonInputs.OutputValues {
-		outputValues[i] = new(big.Int).SetUint64(v)
+		inputSalts[i] = salt
 	}
 
 	witnessInputs := map[string]interface{}{

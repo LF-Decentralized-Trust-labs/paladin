@@ -19,9 +19,9 @@ import (
 	"net"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,7 +46,8 @@ func (s *grpcServer) GetSocketAddress() string {
 }
 
 type GRPCConfig struct {
-	SocketAddress *string `yaml:"socketAddress"`
+	SocketProtocol *string `yaml:"socketProtocol"`
+	SocketAddress  *string `yaml:"socketAddress"`
 }
 
 func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCServer, error) {
@@ -54,9 +55,13 @@ func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCSe
 		log.L(ctx).Error("missing grpc config in config")
 		return nil, i18n.NewError(ctx, tkmsgs.MsgConfigFileMissingMandatoryValue, "socketAddress")
 	}
+	socketProtocol := "unix"
+	if conf.SocketProtocol != nil && *conf.SocketProtocol != "" {
+		socketProtocol = *conf.SocketProtocol
+	}
 	socketAddress := *conf.SocketAddress
-	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
-	l, err := net.Listen("unix", socketAddress)
+	log.L(ctx).Infof("server starting at %s socket %s", socketProtocol, socketAddress)
+	l, err := net.Listen(socketProtocol, socketAddress)
 	if err != nil {
 		log.L(ctx).Error("failed to listen: ", err)
 		return nil, err
@@ -201,6 +206,18 @@ func (s *KataMessageService) SubscribeToTopic(ctx context.Context, request *prot
 	return &proto.SubscribeToTopicResponse{
 		Result: proto.SUBSCRIBE_TO_TOPIC_RESULT_SUBSCRIBE_TO_TOPIC_OK,
 	}, nil
+}
+
+func (s *KataMessageService) UnsubscribeFromTopic(ctx context.Context, request *proto.UnsubscribeFromTopicRequest) (*proto.UnsubscribeFromTopicResponse, error) {
+	log.L(ctx).Info("UnsubscribeFromTopic")
+
+	err := s.messageBroker.UnsubscribeFromTopic(ctx, request.Topic, request.Destination)
+	if err != nil {
+		log.L(ctx).Error("Error unsubscribing from topic", err)
+		// Handle the error
+		return nil, err
+	}
+	return &proto.UnsubscribeFromTopicResponse{}, nil
 }
 
 // TODO should we implement a handshake to prevent clients from listening to arbitrary destinations?
