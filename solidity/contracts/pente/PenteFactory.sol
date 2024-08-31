@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Noto} from "./Noto.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {PentePrivacyGroup} from "./PentePrivacyGroup.sol";
 
-contract NotoFactory {
+contract PenteFactory {
+    PentePrivacyGroup pentePrivacyGroupFactory = new PentePrivacyGroup();
+
     function deploy(
         bytes32 transactionId,
-        address notary,
-        bytes memory data
+        bytes memory config
     ) external {
-        new Noto(transactionId, address(this), notary, data);
+        address instance = Clones.clone(address(pentePrivacyGroupFactory));
+        (PentePrivacyGroup(instance)).initialize(transactionId, address(this), config);
     }
 }
