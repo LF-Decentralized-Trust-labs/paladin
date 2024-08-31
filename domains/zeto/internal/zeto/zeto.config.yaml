@@ -24,7 +24,6 @@ contracts:
           abi:
           bytecode:
       libraries:
-        - CommonLib
         - Groth16Verifier_Anon
         - Groth16Verifier_CheckHashesValue
         - Groth16Verifier_CheckInputsOutputsValue
@@ -37,17 +36,9 @@ contracts:
           abi:
           bytecode:
       libraries:
-        - CommonLib
         - Groth16Verifier_NfAnon
         - Groth16Verifier_CheckHashesValue
         - Groth16Verifier_CheckInputsOutputsValue
-    - name: CommonLib
-      address:
-      abiAndBytecode:
-        path: ./abis/CommonLib.json
-        json:
-          abi:
-          bytecode:
     - name: Groth16Verifier_Anon
       address:
       abiAndBytecode:

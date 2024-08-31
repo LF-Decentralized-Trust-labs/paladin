@@ -71,7 +71,6 @@ task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
     from fileTree("${rootDir}/zeto/solidity/artifacts") {
         include 'contracts/zeto_anon.sol/Zeto_Anon.json'
         include 'contracts/zeto_nf_anon.sol/Zeto_NfAnon.json'
-        include 'contracts/lib/common.sol/Commonlib.json'
         include 'contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
         include 'contracts/lib/verifier_nf_anon.sol/Groth16Verifier_NfAnon.json'
         include 'contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
