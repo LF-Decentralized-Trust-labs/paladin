@@ -46,6 +46,7 @@ var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
 
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
+var eventSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContractByFactory_V0")
 var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContractByFactory_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")

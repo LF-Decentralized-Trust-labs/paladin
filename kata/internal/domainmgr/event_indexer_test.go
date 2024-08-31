@@ -77,6 +77,23 @@ func TestEventIndexingWithDB(t *testing.T) {
 						"data": "0xfeedbeef"
 					}`),
 				},
+				{
+					SoliditySignature: eventSolSig_PaladinNewSmartContractByFactory_V0,
+					Address:           contractAddr,
+					IndexedEvent: &blockindexer.IndexedEvent{
+						BlockNumber:      12345,
+						TransactionIndex: 0,
+						LogIndex:         0,
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						Signature:        eventSig_PaladinNewSmartContractByFactory_V0,
+					},
+					Data: types.RawJSON(`{
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"instance": "` + contractAddr.String() + `",
+						"data": "0xfeedbeef"
+					}`),
+				},
 			},
 		})
 		return err

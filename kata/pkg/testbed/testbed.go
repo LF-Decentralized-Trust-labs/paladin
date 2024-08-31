@@ -82,11 +82,6 @@ type UTInitFunction struct {
 	PostManagerStart func(c AllComponents) error
 }
 
-// redeclare the AllComponents interface to allow unit test
-// code in the same package to access the AllComponents interface
-// while keeping it internal
-type AllComponents components.AllComponents
-
 func unitTestSocketFile() (fileName string, err error) {
 	f, err := os.CreateTemp("", "testbed.paladin.*.sock")
 	if err == nil {
