@@ -175,7 +175,7 @@ func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress stri
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
 		stages.NewAttestationStage(sequencer),
-		stages.NewAssembleStage(sequencer),
+		stages.NewAssembleStage(sequencer, nodeID.String()),
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)

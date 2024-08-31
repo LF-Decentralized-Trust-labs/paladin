@@ -20,6 +20,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
@@ -29,11 +30,13 @@ import (
 
 type AssembleStage struct {
 	sequencer types.Sequencer
+	nodeID    string
 }
 
-func NewAssembleStage(sequencer types.Sequencer) *AssembleStage {
+func NewAssembleStage(sequencer types.Sequencer, nodeID string) *AssembleStage {
 	return &AssembleStage{
 		sequencer: sequencer,
+		nodeID:    nodeID,
 	}
 }
 func (as *AssembleStage) Name() string {
@@ -49,6 +52,14 @@ func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg trans
 type assembleComplete struct {
 }
 
+func stateIDs(states []*components.FullState) []string {
+	stateIDs := make([]string, 0, len(states))
+	for _, state := range states {
+		stateIDs = append(stateIDs, state.ID.String())
+	}
+	return stateIDs
+}
+
 func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
 	tx := tsg.HACKGetPrivateTx()
 
@@ -58,11 +69,12 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 
 			switch event.Data.(type) {
 			case assembleComplete:
+
 				err := as.sequencer.OnTransactionAssembled(ctx, &sequence.TransactionAssembledEvent{
 					TransactionId: tx.ID.String(),
-					NodeId:        "todo",
-					InputStateId:  []string{},
-					OutputStateId: []string{},
+					NodeId:        as.nodeID,
+					InputStateId:  stateIDs(tx.PostAssembly.InputStates),
+					OutputStateId: stateIDs(tx.PostAssembly.OutputStates),
 				})
 				if err != nil {
 					log.L(ctx).Errorf("OnTransactionAssembled failed: %s", err)
