@@ -193,6 +193,207 @@ func TestEngineSimpleTransaction(t *testing.T) {
 
 }
 
+func TestEngineDependantTransaction(t *testing.T) {
+	ctx := context.Background()
+
+	engine, mocks, domainAddress := newEngineForTesting(t)
+	assert.Equal(t, "Kata Engine", engine.Name())
+
+	domainAddressString := domainAddress.String()
+
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
+	states := []*components.FullState{
+		{
+			ID:     types.Bytes32(types.RandBytes(32)),
+			Schema: types.Bytes32(types.RandBytes(32)),
+			Data:   types.JSONString("foo"),
+		},
+	}
+
+	tx1 := &components.PrivateTransaction{
+		ID: uuid.New(),
+		Inputs: &components.TransactionInputs{
+			Domain: domainAddressString,
+			From:   "Alice",
+		},
+	}
+
+	tx2 := &components.PrivateTransaction{
+		ID: uuid.New(),
+		Inputs: &components.TransactionInputs{
+			Domain: domainAddressString,
+			From:   "Bob",
+		},
+	}
+
+	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+		switch tx.Inputs.From {
+		case "Alice":
+			tx.PostAssembly = &components.TransactionPostAssembly{
+				AssemblyResult: prototk.AssembleTransactionResponse_OK,
+				OutputStates:   states,
+				AttestationPlan: []*prototk.AttestationRequest{
+					{
+						Name:            "notary",
+						AttestationType: prototk.AttestationType_ENDORSE,
+						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Parties: []string{
+							"domain1/contract1/notary",
+						},
+					},
+				},
+			}
+		case "Bob":
+			tx.PostAssembly = &components.TransactionPostAssembly{
+				AssemblyResult: prototk.AssembleTransactionResponse_OK,
+				InputStates:    states,
+				AttestationPlan: []*prototk.AttestationRequest{
+					{
+						Name:            "notary",
+						AttestationType: prototk.AttestationType_ENDORSE,
+						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Parties: []string{
+							"domain1/contract1/notary",
+						},
+					},
+				},
+			}
+		}
+
+	}).Return(nil)
+
+	sentEndorsementRequest := make(chan struct{}, 1)
+	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		sentEndorsementRequest <- struct{}{}
+	}).Return(nil).Maybe()
+
+	onMessage := func(ctx context.Context, message components.TransportMessage) error {
+		assert.Fail(t, "onMessage has not been set")
+		return nil
+	}
+	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
+	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
+
+	}).Return(nil).Maybe()
+
+	//TODO do we need this?
+	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+		fn := args.Get(1).(statestore.DomainContextFunction)
+		err := fn(ctx, mocks.domainStateInterface)
+		assert.NoError(t, err)
+	}).Maybe().Return(nil)
+
+	err := engine.Start()
+	assert.NoError(t, err)
+
+	tx1ID, err := engine.HandleNewTx(ctx, tx1)
+	assert.NoError(t, err)
+	require.NotNil(t, tx1ID)
+
+	tx2ID, err := engine.HandleNewTx(ctx, tx2)
+	assert.NoError(t, err)
+	require.NotNil(t, tx2ID)
+
+	// Neither transaction should be dispatched yet
+	s, err := engine.GetTxStatus(ctx, domainAddressString, tx1ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, "dispatch", s.Status)
+
+	s, err = engine.GetTxStatus(ctx, domainAddressString, tx2ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, "dispatch", s.Status)
+
+	attestationResult := prototk.AttestationResult{
+		Name:            "notary",
+		AttestationType: prototk.AttestationType_ENDORSE,
+		Payload:         types.RandBytes(32),
+	}
+
+	attestationResultAny, err := anypb.New(&attestationResult)
+	assert.NoError(t, err)
+
+	// endorse transaction 2 before 1 and check that 2 is not dispatched before 1
+	engineMessage := pbEngine.StageMessage{
+		ContractAddress: domainAddressString,
+		TransactionId:   tx2ID,
+		Data:            attestationResultAny,
+		Stage:           "attestation",
+	}
+
+	engineMessageBytes, err := proto.Marshal(&engineMessage)
+	assert.NoError(t, err)
+
+	//now send the endorsement back
+	err = onMessage(ctx, components.TransportMessage{
+		MessageType: "endorsement",
+		Payload:     engineMessageBytes,
+	})
+	assert.NoError(t, err)
+
+	//unless the tests are running in short mode, wait a second to ensure that the transaction is not dispatched
+	if !testing.Short() {
+		time.Sleep(1 * time.Second)
+	}
+	s, err = engine.GetTxStatus(ctx, domainAddressString, tx1ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, "dispatch", s.Status)
+
+	s, err = engine.GetTxStatus(ctx, domainAddressString, tx2ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, "dispatch", s.Status)
+
+	// endorse transaction 1 and check that both it and 2 are dispatched
+	engineMessage = pbEngine.StageMessage{
+		ContractAddress: domainAddressString,
+		TransactionId:   tx1ID,
+		Data:            attestationResultAny,
+		Stage:           "attestation",
+	}
+
+	engineMessageBytes, err = proto.Marshal(&engineMessage)
+	assert.NoError(t, err)
+
+	//now send the endorsement back
+	err = onMessage(ctx, components.TransportMessage{
+		MessageType: "endorsement",
+		Payload:     engineMessageBytes,
+	})
+	assert.NoError(t, err)
+
+	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, tx1ID, 2*time.Second)
+	assert.Equal(t, "dispatch", status)
+
+	status = pollForStatus(ctx, t, "dispatch", engine, domainAddressString, tx2ID, 2*time.Second)
+	assert.Equal(t, "dispatch", status)
+
+	//TODO assert that transaction 1 got dispatched before 2
+
+}
+
+func pollForStatus(ctx context.Context, t *testing.T, expectedStatus string, engine Engine, domainAddressString, txID string, duration time.Duration) string {
+	timeout := time.After(duration)
+	tick := time.Tick(100 * time.Millisecond)
+
+	for {
+		select {
+		case <-timeout:
+			// Timeout reached, exit the loop
+			assert.Failf(t, "Timed out waiting for status %s", expectedStatus)
+			s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
+			require.NoError(t, err)
+			return s.Status
+		case <-tick:
+			s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
+			if s.Status == expectedStatus {
+				return s.Status
+			}
+			assert.NoError(t, err)
+		}
+	}
+}
+
 type dependencyMocks struct {
 	allComponents        *componentmocks.AllComponents
 	domainStateInterface *componentmocks.DomainStateInterface
