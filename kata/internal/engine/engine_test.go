@@ -241,41 +241,41 @@ func TestEngineDependantTransaction(t *testing.T) {
 
 	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		tx := args.Get(1).(*components.PrivateTransaction)
-		tx.PostAssembly = &components.TransactionPostAssembly{
-			AssemblyResult: prototk.AssembleTransactionResponse_OK,
-			OutputStates:   states,
-			AttestationPlan: []*prototk.AttestationRequest{
-				{
-					Name:            "notary",
-					AttestationType: prototk.AttestationType_ENDORSE,
-					//Algorithm:       api.SignerAlgorithm_ED25519,
-					Parties: []string{
-						"domain1/contract1/notary",
+		switch tx.ID.String() {
+		case tx1.ID.String():
+			tx.PostAssembly = &components.TransactionPostAssembly{
+				AssemblyResult: prototk.AssembleTransactionResponse_OK,
+				OutputStates:   states,
+				AttestationPlan: []*prototk.AttestationRequest{
+					{
+						Name:            "notary",
+						AttestationType: prototk.AttestationType_ENDORSE,
+						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Parties: []string{
+							"domain1/contract1/notary",
+						},
 					},
 				},
-			},
-		}
-	}).Once().Return(nil)
-
-	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
-		tx := args.Get(1).(*components.PrivateTransaction)
-
-		tx.PostAssembly = &components.TransactionPostAssembly{
-			AssemblyResult: prototk.AssembleTransactionResponse_OK,
-			InputStates:    states,
-			AttestationPlan: []*prototk.AttestationRequest{
-				{
-					Name:            "notary",
-					AttestationType: prototk.AttestationType_ENDORSE,
-					//Algorithm:       api.SignerAlgorithm_ED25519,
-					Parties: []string{
-						"domain1/contract1/notary",
+			}
+		case tx2.ID.String():
+			tx.PostAssembly = &components.TransactionPostAssembly{
+				AssemblyResult: prototk.AssembleTransactionResponse_OK,
+				InputStates:    states,
+				AttestationPlan: []*prototk.AttestationRequest{
+					{
+						Name:            "notary",
+						AttestationType: prototk.AttestationType_ENDORSE,
+						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Parties: []string{
+							"domain1/contract1/notary",
+						},
 					},
 				},
-			},
+			}
+		default:
+			assert.Fail(t, "Unexpected transaction ID")
 		}
-
-	}).Once().Return(nil)
+	}).Times(2).Return(nil)
 
 	sentEndorsementRequest := make(chan struct{}, 1)
 	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -391,7 +391,6 @@ func TestEngineDependantTransaction(t *testing.T) {
 }
 
 func TestEngineMiniLoad(t *testing.T) {
-	t.Skip("This test does not run reliably in the full gradle build for an unknown reason but it is still useful for local testing")
 	ctx := context.Background()
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
