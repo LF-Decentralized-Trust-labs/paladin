@@ -17,15 +17,19 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
+	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	engineTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	pbEngine "github.com/kaleido-io/paladin/kata/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -375,6 +379,216 @@ func TestEngineDependantTransaction(t *testing.T) {
 
 	//TODO assert that transaction 1 got dispatched before 2
 
+}
+
+func TestEngineMiniLoad(t *testing.T) {
+	ctx := context.Background()
+	log.SetLevel("debug")
+
+	engine, mocks, domainAddress := newEngineForTesting(t)
+	assert.Equal(t, "Kata Engine", engine.Name())
+
+	domainAddressString := domainAddress.String()
+
+	//500 is the maximum we can do in this test for now until either
+	//a) implement config to allow us to define MaxConcurrentTransactions
+	//b) implement ( or mock) transaction dispatch processing all the way to confirmation
+	numTransactions := 500
+
+	//dependenciesByTransactionID := make(map[string][]string)
+	unclaimedPendingStatesToMintingTransaction := make(map[types.Bytes32]string)
+
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
+
+	r := rand.New(rand.NewSource(42))
+	failEarly := make(chan string, 1)
+
+	assembleConcurrency := 0
+	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		//assert that we are not assembling more than 1 transaction at a time
+		if assembleConcurrency > 0 {
+			failEarly <- "Assembling more than one transaction at a time"
+		}
+		require.Equal(t, assembleConcurrency, 0, "Assembling more than one transaction at a time")
+
+		assembleConcurrency++
+		defer func() { assembleConcurrency-- }()
+
+		// chose a number of dependencies at random 0, 1, 2, 3
+		// for each dependency, chose a different unclaimed pending state to spend
+		tx := args.Get(1).(*components.PrivateTransaction)
+
+		var inputStates []*components.FullState
+		numDependencies := min(r.Intn(4), len(unclaimedPendingStatesToMintingTransaction))
+		dependencies := make([]string, numDependencies)
+		for i := 0; i < numDependencies; i++ {
+			// chose a random unclaimed pending state to spend
+			stateIndex := r.Intn(len(unclaimedPendingStatesToMintingTransaction))
+
+			keys := make([]types.Bytes32, len(unclaimedPendingStatesToMintingTransaction))
+			keyIndex := 0
+			for keyName := range unclaimedPendingStatesToMintingTransaction {
+
+				keys[keyIndex] = keyName
+				keyIndex++
+			}
+			stateID := keys[stateIndex]
+			inputStates = append(inputStates, &components.FullState{
+				ID: stateID,
+			})
+
+			log.L(ctx).Infof("input state %s, numDependencies %d i %d", stateID, numDependencies, i)
+			dependencies[i] = unclaimedPendingStatesToMintingTransaction[stateID]
+			delete(unclaimedPendingStatesToMintingTransaction, stateID)
+		}
+		numOutputStates := r.Intn(4)
+
+		outputStates := make([]*components.FullState, numOutputStates)
+		for i := 0; i < numOutputStates; i++ {
+			stateID := types.Bytes32(types.RandBytes(32))
+			outputStates[i] = &components.FullState{
+				ID: stateID,
+			}
+			unclaimedPendingStatesToMintingTransaction[stateID] = tx.ID.String()
+		}
+
+		tx.PostAssembly = &components.TransactionPostAssembly{
+
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+			OutputStates:   outputStates,
+			InputStates:    inputStates,
+			AttestationPlan: []*prototk.AttestationRequest{
+				{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Parties: []string{
+						"domain1/contract1/notary",
+					},
+				},
+			},
+		}
+	}).Return(nil)
+
+	endorsementRequests := make(chan string, 10)
+	//mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.AnythingOfType("github.com/kaleido-io/paladin/kata/internal/components.TransportMessage")).Run(func(args mock.Arguments) {
+	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		transportMessage := args.Get(1)
+		switch transportMessage := transportMessage.(type) {
+		case components.TransportMessage:
+
+			payloadBytes := transportMessage.Payload
+			stageEvent := new(engineTypes.StageEvent)
+			err := json.Unmarshal(payloadBytes, stageEvent)
+			assert.NoError(t, err)
+
+			endorsementRequests <- stageEvent.TxID
+		default:
+			assert.Fail(t, "Unexpected message type")
+		}
+	}).Return(nil).Maybe()
+
+	onMessage := func(ctx context.Context, message components.TransportMessage) error {
+		assert.Fail(t, "onMessage has not been set")
+		return nil
+	}
+	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
+	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
+
+	}).Return(nil).Maybe()
+
+	//TODO do we need this?
+	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+		fn := args.Get(1).(statestore.DomainContextFunction)
+		err := fn(ctx, mocks.domainStateInterface)
+		assert.NoError(t, err)
+	}).Maybe().Return(nil)
+
+	expectedNonce := uint64(0)
+
+	numDispatched := 0
+	allDispatched := make(chan bool, 1)
+	engine.Subscribe(ctx, func(event engineTypes.EngineEvent) {
+		numDispatched++
+		switch event := event.(type) {
+		case *engineTypes.TransactionDispatchedEvent:
+			assert.Equal(t, expectedNonce, event.Nonce)
+			expectedNonce++
+		}
+		if numDispatched == numTransactions {
+			allDispatched <- true
+		}
+	})
+
+	err := engine.Start()
+	assert.NoError(t, err)
+
+	for i := 0; i < numTransactions; i++ {
+		tx := &components.PrivateTransaction{
+			ID: uuid.New(),
+			Inputs: &components.TransactionInputs{
+				Domain: domainAddressString,
+				From:   "Alice",
+			},
+		}
+		txID, err := engine.HandleNewTx(ctx, tx)
+		assert.NoError(t, err)
+		require.NotNil(t, txID)
+	}
+
+	// whenever a new endorsement request comes in, endorse it after a random delay
+	go func() {
+		for {
+			txID := <-endorsementRequests
+			go func() {
+				time.Sleep(time.Duration(r.Intn(1000)) * time.Millisecond)
+				attestationResult := prototk.AttestationResult{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					Payload:         types.RandBytes(32),
+				}
+
+				attestationResultAny, err := anypb.New(&attestationResult)
+				assert.NoError(t, err)
+
+				engineMessage := pbEngine.StageMessage{
+					ContractAddress: domainAddressString,
+					TransactionId:   txID,
+					Data:            attestationResultAny,
+					Stage:           "attestation",
+				}
+				engineMessageBytes, err := proto.Marshal(&engineMessage)
+				assert.NoError(t, err)
+
+				//now send the endorsement back
+				err = onMessage(ctx, components.TransportMessage{
+					MessageType: "endorsement",
+					Payload:     engineMessageBytes,
+				})
+				assert.NoError(t, err)
+			}()
+		}
+	}()
+
+	deadline, ok := t.Deadline()
+	if !ok {
+		//there was no -timeout flag, default to 10 seconds
+		deadline = time.Now().Add(10 * time.Second)
+	}
+out:
+	for {
+		select {
+		case <-time.After(time.Until(deadline)):
+			log.L(ctx).Errorf("Timed out waiting for all transactions to be dispatched")
+			assert.Fail(t, "Timed out waiting for all transactions to be dispatched")
+			break out
+		case <-allDispatched:
+			break out
+		case reason := <-failEarly:
+			require.Fail(t, reason)
+		}
+	}
 }
 
 func pollForStatus(ctx context.Context, t *testing.T, expectedStatus string, engine Engine, domainAddressString, txID string, duration time.Duration) string {
