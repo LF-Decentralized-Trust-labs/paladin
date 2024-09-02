@@ -20,20 +20,19 @@ import (
 
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"google.golang.org/protobuf/proto"
 )
 
-func NewPublisher(engine Engine) types.Publisher {
+func NewPublisher(e *engine) types.Publisher {
 	return &publisher{
-		engine: engine,
+		engine: e,
 	}
 }
 
 type publisher struct {
-	engine Engine
+	engine *engine
 }
 
-// PublishEvent implements types.Publisher.
+// PublishStageEvent implements types.Publisher.
 func (p *publisher) PublishStageEvent(ctx context.Context, stageEvent *types.StageEvent) error {
 
 	p.engine.HandleNewEvents(ctx, stageEvent)
@@ -42,7 +41,14 @@ func (p *publisher) PublishStageEvent(ctx context.Context, stageEvent *types.Sta
 }
 
 // PublishEvent implements types.Publisher.
-func (p *publisher) PublishEvent(ctx context.Context, eventPayload proto.Message) error {
+func (p *publisher) PublishEvent(ctx context.Context, eventPayload interface{}) error {
+	//TODO really need to decide when to use protobufs and when to use json
+	// current assumption is that we would use golang structs for internal messages within a single engine,
+	//protobuf for internal messages between nodes because it is faster and more efficient on the network bandwidth
+	// and json for external messages because it is more consumable by external applications
+	// but there are cases where all three of those are being emitted from the same point in the code
+	// and we need to decide how to handle that
 	log.L(ctx).Infof("Publishing event: %v", eventPayload)
+	p.engine.publishToSubscribers(ctx, eventPayload)
 	return nil
 }

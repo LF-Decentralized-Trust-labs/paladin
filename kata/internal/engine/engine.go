@@ -17,6 +17,7 @@ package engine
 
 import (
 	"context"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -60,15 +61,18 @@ type Engine interface {
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
 	Stop()
+	Subscribe(ctx context.Context, subscriber types.EventSubscriber)
 }
 
 type engine struct {
-	ctx           context.Context
-	ctxCancel     func()
-	done          chan struct{}
-	orchestrators map[string]*orchestrator.Orchestrator
-	components    components.AllComponents
-	nodeID        uuid.UUID
+	ctx             context.Context
+	ctxCancel       func()
+	done            chan struct{}
+	orchestrators   map[string]*orchestrator.Orchestrator
+	components      components.AllComponents
+	nodeID          uuid.UUID
+	subscribers     []types.EventSubscriber
+	subscribersLock sync.Mutex
 }
 
 // Init implements Engine.
@@ -98,6 +102,7 @@ func NewEngine(nodeID uuid.UUID) Engine {
 	return &engine{
 		orchestrators: make(map[string]*orchestrator.Orchestrator),
 		nodeID:        nodeID,
+		subscribers:   make([]types.EventSubscriber, 0),
 	}
 }
 
@@ -229,4 +234,24 @@ func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
 		//TODO do we need to tell the transport manager that we are done listening?
 	}()
 	return done
+}
+
+// For now, this is here to help with testing but it seems like it could be useful thing to have
+// in the future if we want to have an eventing interface but at such time we would need to put more effort
+// into the reliabilty of the event delivery or maybe there is only a consumer of the event and it is responsible
+// for managing multiple subscribers and durability etc...
+func (e *engine) Subscribe(ctx context.Context, subscriber types.EventSubscriber) {
+	e.subscribersLock.Lock()
+	defer e.subscribersLock.Unlock()
+	//TODO implement this
+	e.subscribers = append(e.subscribers, subscriber)
+}
+
+func (e *engine) publishToSubscribers(ctx context.Context, event types.EngineEvent) {
+	log.L(ctx).Debugf("Publishing event to subscribers")
+	e.subscribersLock.Lock()
+	defer e.subscribersLock.Unlock()
+	for _, subscriber := range e.subscribers {
+		subscriber(event)
+	}
 }

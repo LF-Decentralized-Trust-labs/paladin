@@ -30,7 +30,6 @@ import (
 	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 )
 
 type Engine interface {
@@ -143,7 +142,7 @@ func (f *fakeTransportLayer) addEngine(nodeID uuid.UUID, engine Engine) {
 }
 
 // PublishEvent implements Publisher.
-func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event proto.Message) error {
+func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event interface{}) error {
 	log.L(ctx).Info("PublishEvent")
 
 	switch event := event.(type) {
