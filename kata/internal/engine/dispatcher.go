@@ -64,11 +64,16 @@ func (p *dispatcher) Dispatch(ctx context.Context, transactionIDs []uuid.UUID) e
 			log.L(ctx).Errorf("Error publishing stage event: %s", err)
 			return err
 		}
-		p.publisher.PublishEvent(ctx, &types.TransactionDispatchedEvent{
+		err = p.publisher.PublishEvent(ctx, &types.TransactionDispatchedEvent{
 			TransactionID:  transactionID.String(),
 			Nonce:          p.NextNonce(),
 			SigningAddress: "0x1234567890abcdef",
 		})
+		if err != nil {
+			//TODO think about how best to handle this error
+			log.L(ctx).Errorf("Error publishing event: %s", err)
+			return err
+		}
 	}
 
 	return nil
