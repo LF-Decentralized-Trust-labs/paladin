@@ -46,7 +46,8 @@ func (s *grpcServer) GetSocketAddress() string {
 }
 
 type GRPCConfig struct {
-	SocketAddress *string `yaml:"socketAddress"`
+	SocketProtocol *string `yaml:"socketProtocol"`
+	SocketAddress  *string `yaml:"socketAddress"`
 }
 
 func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCServer, error) {
@@ -54,9 +55,13 @@ func newGRPCServer(ctx context.Context, broker Broker, conf *GRPCConfig) (GRPCSe
 		log.L(ctx).Error("missing grpc config in config")
 		return nil, i18n.NewError(ctx, tkmsgs.MsgConfigFileMissingMandatoryValue, "socketAddress")
 	}
+	socketProtocol := "unix"
+	if conf.SocketProtocol != nil && *conf.SocketProtocol != "" {
+		socketProtocol = *conf.SocketProtocol
+	}
 	socketAddress := *conf.SocketAddress
-	log.L(ctx).Infof("server starting at unix socket %s", socketAddress)
-	l, err := net.Listen("unix", socketAddress)
+	log.L(ctx).Infof("server starting at %s socket %s", socketProtocol, socketAddress)
+	l, err := net.Listen(socketProtocol, socketAddress)
 	if err != nil {
 		log.L(ctx).Error("failed to listen: ", err)
 		return nil, err

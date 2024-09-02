@@ -109,14 +109,14 @@ message EndorseTransactionResponse {
 
 // **PREPARE** step for a transaction 
 message PrepareTransactionRequest {
-  TransactionSpecification transaction = 1;
-  repeated StateRef input_states = 2; // The list of input states
-  repeated StateRef output_states = 3; // The list of output states
+  TransactionSpecification transaction = 1; // The transaction specified by the user
+  repeated EndorsableState input_states = 2; // The list of input states
+  repeated EndorsableState output_states = 3; // The list of output states
   repeated AttestationResult attestation_result = 4; // The results of any proofs/attestations that came out of the endorsement phase
 }
 
 message PrepareTransactionResponse {
-BaseLedgerTransaction transaction = 2; // The instruction for submission to the base ledger
+  BaseLedgerTransaction transaction = 2; // The instruction for submission to the base ledger
 }
 
 message DomainConfig {
