@@ -57,7 +57,7 @@ type Engine interface {
 	HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
 	GetTxStatus(ctx context.Context, domainAddress string, txID string) (status types.TxStatus, err error)
-	Name() string
+	EngineName() string
 	Init(components.AllComponents) (*components.ManagerInitResult, error)
 	Start() error
 	Stop()
@@ -78,11 +78,11 @@ type engine struct {
 // Init implements Engine.
 func (e *engine) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
 	e.components = c
-	return nil, nil
+	return &components.ManagerInitResult{}, nil
 }
 
 // Name implements Engine.
-func (e *engine) Name() string {
+func (e *engine) EngineName() string {
 	return "Kata Engine"
 }
 

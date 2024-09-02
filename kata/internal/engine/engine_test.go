@@ -41,11 +41,20 @@ import (
 // Attempt to assert the behaviour of the Engine as a whole component in isolation from the rest of the system
 // Tests in this file do not mock anything else in this package or sub packages but does mock other components and managers in paladin as per their interfaces
 
+func TestEngineInit(t *testing.T) {
+
+	engine, mocks, _ := newEngineForTesting(t)
+	assert.Equal(t, "Kata Engine", engine.EngineName())
+	initResult, err := engine.Init(mocks.allComponents)
+	assert.NoError(t, err)
+	assert.NotNil(t, initResult)
+}
+
 func TestEngineSimpleTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
-	assert.Equal(t, "Kata Engine", engine.Name())
+	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
 
@@ -201,7 +210,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
-	assert.Equal(t, "Kata Engine", engine.Name())
+	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
 
@@ -386,7 +395,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	log.SetLevel("debug")
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
-	assert.Equal(t, "Kata Engine", engine.Name())
+	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
 
@@ -659,7 +668,7 @@ func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddr
 
 	e := NewEngine(uuid.Must(uuid.NewUUID()))
 	r, err := e.Init(mocks.allComponents)
-	assert.Nil(t, r)
+	assert.NotNil(t, r)
 	assert.NoError(t, err)
 	return e, mocks, domainAddress
 
