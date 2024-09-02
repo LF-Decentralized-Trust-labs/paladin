@@ -123,6 +123,7 @@ func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore
 
 func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	tx := tsg.HACKGetPrivateTx()
+	log.L(ctx).Debugf("AttestationStage.PerformAction tx: %s", tx.ID.String())
 
 	if tx.PostAssembly == nil {
 		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
