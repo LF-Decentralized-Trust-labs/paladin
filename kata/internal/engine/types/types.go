@@ -17,13 +17,13 @@ package types
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
-	"google.golang.org/protobuf/proto"
 )
 
 type StageProcessNextStep int
@@ -40,6 +40,21 @@ type StageEvent struct {
 	ContractAddress string      `json:"contractAddress"`
 	TxID            string      `json:"transactionId"`
 	Data            interface{} `json:"data"` // schema decided by each stage
+}
+
+type StageChangeEvent struct {
+	ID              string      `json:"id"`
+	PreviousStage   string      `json:"previousStage"`
+	NewStage        string      `json:"newStage"`
+	ContractAddress string      `json:"contractAddress"`
+	TxID            string      `json:"transactionId"`
+	Data            interface{} `json:"data"` // schema decided by each stage
+}
+
+type TransactionDispatchedEvent struct {
+	TransactionID  string `json:"transactionId"`
+	Nonce          uint64 `json:"nonce"`
+	SigningAddress string `json:"signingAddress"`
 }
 
 type TxProcessPreReq struct {
@@ -84,7 +99,7 @@ type IdentityResolver interface {
 
 type Publisher interface {
 	//Service for sending messages and events within the local node and as a client to the transport manager to send to other nodes
-	PublishEvent(ctx context.Context, eventPayload proto.Message) error
+	PublishEvent(ctx context.Context, eventPayload interface{}) error
 	PublishStageEvent(ctx context.Context, stageEvent *StageEvent) error
 }
 
@@ -217,3 +232,15 @@ type Delegator interface {
 	// Delegator is the component that takes responsibility for delegating transactions to other nodes
 	Delegate(ctx context.Context, transactionId string, delegateNodeId string) error
 }
+
+type StageContext struct {
+	Ctx            context.Context
+	ID             string
+	Stage          string
+	StageEntryTime time.Time
+}
+
+type EngineEvent interface {
+}
+
+type EventSubscriber func(event EngineEvent)
