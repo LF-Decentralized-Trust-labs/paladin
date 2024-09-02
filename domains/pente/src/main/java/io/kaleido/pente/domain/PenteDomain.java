@@ -33,13 +33,16 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
-        config.initFromYAML(request.getConfigYaml());
+        // The in-memory config is late initialized here (and does so in its lock so access from any thread
+        // we get called on for this and subsequent gRPC calls is safe).
+        config.initFromJSON(request.getConfigJson());
 
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setConstructorAbiJson(config.privateConstructor().toString())
+                .setConstructorAbiJson(config.abiEntry_privateConstructor().toString())
                 .setFactoryContractAddress(config.getAddress().toString())
                 .setFactoryContractAbiJson(config.getFactoryContractABI().toString())
                 .setPrivateContractAbiJson(config.getPrivacyGroupABI().toString())
+                .addAllAbiStateSchemasJson(config.allPenteSchemas())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())
@@ -52,6 +55,8 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.InitDomainResponse> initDomain(ToDomain.InitDomainRequest request) {
+        // Store our state schema
+        config.schemasInitialized(request.getAbiStateSchemasList());
         return CompletableFuture.completedFuture(ToDomain.InitDomainResponse.getDefaultInstance());
     }
 

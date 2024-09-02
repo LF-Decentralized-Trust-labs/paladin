@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,6 +27,10 @@ import org.web3j.abi.datatypes.Address;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Provides thread safe access to the configuration of the domain from the functions that are called
@@ -38,17 +43,21 @@ public class PenteConfiguration {
 
     private final JsonABI privacyGroupABI;
 
-    private boolean initialized;
-
     private Address address;
 
-    private PenteConfiguration() {
+    private String schemaId_AccountStateV20240902;
+
+    record Schema(String id, String signature, JsonABI.Parameter def) {}
+
+    private final Map<String, Schema> schemasByID = new HashMap<>();
+
+    PenteConfiguration() {
         try {
             factoryContractABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
-                    "contracts/testcontracts/PenteFactory.sol/PenteFactory.json",
+                    "contracts/pente/PenteFactory.sol/PenteFactory.json",
                     "abi");
             privacyGroupABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
-                    "contracts/testcontracts/PentePrivacyGroup.sol/PentePrivacyGroup.json",
+                    "contracts/pente/PentePrivacyGroup.sol/PentePrivacyGroup.json",
                     "abi");
         } catch (Exception t) {
             LOGGER.error("failed to initialize configuration", t);
@@ -56,11 +65,44 @@ public class PenteConfiguration {
         }
     }
 
-    JsonABI.Entry privateConstructor() {
+    public static final String ENDORSEMENT_TYPE_GROUP_SCOPED_KEYS = "groupScopedKeys";
+
+    private static JsonABI.Parameter abiTuple_group() {
+        return JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                JsonABI.newParameter("salt", "bytes32"),
+                JsonABI.newParameter("members", "string[]")
+        ));
+    }
+
+    JsonABI.Entry abiEntry_privateConstructor() {
         return JsonABI.newConstructor(JsonABI.newParameters(
-            JsonABI.newParameter("lookup", "string"),
-            JsonABI.newTupleArray("members", JsonABI.newParameters(
-                    JsonABI.newParameter("lookup", "string")
+                abiTuple_group(),
+                JsonABI.newParameter("endorsementType", "string")
+        ));
+    }
+
+    JsonABI.Entry abiEntry_privateTransactionInvoke() {
+        return JsonABI.newConstructor(JsonABI.newParameters(
+                abiTuple_group(),
+                JsonABI.newParameter("from", "string"),
+                JsonABI.newParameter("to", "string"),
+                JsonABI.newParameter("gas", "uint256"),
+                JsonABI.newParameter("value", "uint256"),
+                JsonABI.newParameter("data", "bytes")
+        ));
+    }
+
+    JsonABI.Parameter abiTuple_AccountStateV20240902() {
+        return JsonABI.newTuple("AccountStateV20240902", "AccountStateV20240902", JsonABI.newParameters(
+            JsonABI.newIndexedParameter("address", "address"),
+            JsonABI.newParameter("nonce", "uint256"),
+            JsonABI.newParameter("balance", "uint256"),
+            JsonABI.newParameter("codeHash", "bytes32"),
+            JsonABI.newParameter("code", "bytes"),
+            JsonABI.newParameter("storageRoot", "bytes32"),
+            JsonABI.newTupleArray("storage", "StorageTrie", JsonABI.newParameters(
+                JsonABI.newParameter("key", "bytes32"),
+                JsonABI.newParameter("value", "bytes32")
             ))
         ));
     }
@@ -79,26 +121,45 @@ public class PenteConfiguration {
         return privacyGroupABI;
     }
 
-    synchronized void checkInitialized() {
-        if (!initialized) {
-            throw new IllegalStateException("config not initialized");
-        }
-    }
-
     synchronized Address getAddress() {
-        checkInitialized();
         return address;
     }
 
-    synchronized void initFromYAML(String yamlConfig) {
+    synchronized void initFromJSON(String yamlConfig) {
         try {
-            final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            final ObjectMapper mapper = new ObjectMapper();
             PenteYAMLConfig config = mapper.readValue(new StringReader(yamlConfig), PenteYAMLConfig.class);
             this.address = new Address(config.address());
-            this.initialized = true;
         } catch(IOException e) {
             throw new IllegalArgumentException(e);
         }
+    }
+
+    List<String> allPenteSchemas() {
+        return Arrays.asList(new String[]{
+                abiTuple_AccountStateV20240902().toString(),
+        });
+    }
+
+    synchronized void schemasInitialized(List<ToDomain.StateSchema> schemas) {
+        List<String> schemaDefs = allPenteSchemas();
+        if (schemas.size() != schemaDefs.size()) {
+            throw new IllegalStateException("expected %d schemas, received %d".formatted(schemaDefs.size(), schemas.size()));
+        }
+        schemaId_AccountStateV20240902 = schemas.getFirst().getId();
+        schemasByID.put(schemaId_AccountStateV20240902, new Schema(
+                schemas.getFirst().getId(),
+                schemas.getFirst().getSignature(),
+                abiTuple_AccountStateV20240902()
+        ));
+    }
+
+    synchronized Schema schema_AccountStateV20240902() {
+        return schemasByID.get(schemaId_AccountStateV20240902);
+    }
+
+    synchronized Schema schema_AccountStateLatest() {
+        return schema_AccountStateV20240902();
     }
 
 }

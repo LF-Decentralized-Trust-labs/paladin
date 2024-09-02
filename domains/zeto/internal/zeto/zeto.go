@@ -29,7 +29,6 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"gopkg.in/yaml.v2"
 )
 
 //go:embed abis/Commonlib.json
@@ -51,8 +50,8 @@ var zetoFactoryJSON []byte // From "gradle copySolidity"
 var zetoJSON []byte // From "gradle copySolidity"
 
 type Config struct {
-	FactoryAddress string            `json:"factoryAddress" yaml:"factoryAddress"`
-	Libraries      map[string]string `json:"libraries" yaml:"libraries"`
+	FactoryAddress string            `json:"factoryAddress"`
+	Libraries      map[string]string `json:"libraries"`
 }
 
 type SolidityBuild struct {
@@ -149,7 +148,7 @@ func New(callbacks plugintk.DomainCallbacks) *Zeto {
 
 func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
 	var config Config
-	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
+	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +281,7 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*Ze
 
 func (z *Zeto) validateDeploy(tx *pb.DeployTransactionSpecification) (*ZetoConstructorParams, error) {
 	var params ZetoConstructorParams
-	err := yaml.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
+	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }
 

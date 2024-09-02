@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"gopkg.in/yaml.v3"
 )
 
 type Testbed interface {
@@ -36,7 +35,7 @@ type Testbed interface {
 }
 
 type TestbedDomain struct {
-	Config yaml.Node
+	Config map[string]any
 	Plugin plugintk.Plugin
 }
 

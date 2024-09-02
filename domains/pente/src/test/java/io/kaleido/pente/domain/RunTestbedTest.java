@@ -36,10 +36,6 @@ public class RunTestbedTest {
 
     @Test
     void runTestbed() throws Exception {
-        System.out.println(System.getProperty("os.name"));
-        System.out.println(System.getProperty("os.arch"));
-        System.out.println(System.getProperty("java.library.path"));
-
         // Generate config that listens on an available RPC port
         ServerSocket s = new ServerSocket(0);
         int availableRPCPort = s.getLocalPort();
@@ -71,19 +67,20 @@ blockchain:
    ws:
      url: ws://localhost:8546
 domains:
-  domain1:
-     plugin:
-        type: c-shared
-        library: starter
-     config: {}
-  domain2:
-     plugin:
-        type: jar
-        class: %s
-     config: {}
-loader:
-  debug: true
-""".formatted(new File("../../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort, PenteDomainFactory.class.getName());
+  pente:
+    plugin:
+      type: jar
+      class: %s
+    config:
+      address: %s
+log:
+  level: debug
+""".formatted(
+        new File("../../kata/db/migrations/sqlite").getAbsolutePath(),
+                availableRPCPort,
+                PenteDomainFactory.class.getName(),
+                "0x107A104E72fC31D9571a3B9a4eac91b9B530Ce99"
+        );
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
 

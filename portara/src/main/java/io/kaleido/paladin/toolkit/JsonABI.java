@@ -80,7 +80,7 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
                 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
                 String internalType,
                 @JsonProperty
-                @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+                @JsonInclude(JsonInclude.Include.NON_NULL)
                 JsonABI.Parameters components,
                 @JsonProperty
                 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
@@ -103,7 +103,7 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
         }
 
         public static Entry newConstructor(Parameters inputs) {
-                return new Entry("constuctor", "", inputs, null, "",false, false, false);
+                return new Entry("constructor", "", inputs, null, "",false, false, false);
         }
 
         public static Entry newFunction(String name, Parameters inputs, Parameters outputs) {
@@ -128,12 +128,12 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
                 return new Parameter(name, type, "", null, true);
         }
 
-        public static Parameter newTuple(String name, Parameters components) {
-                return new Parameter(name, "tuple", "", components, false);
+        public static Parameter newTuple(String name, String structName, Parameters components) {
+                return new Parameter(name, "tuple", "struct %s".formatted(structName), components, false);
         }
 
-        public static Parameter newTupleArray(String name, Parameters components) {
-                return new Parameter(name, "tuple[]", "", components, false);
+        public static Parameter newTupleArray(String name, String structName, Parameters components) {
+                return new Parameter(name, "tuple[]", "struct %s[]".formatted(structName), components, false);
         }
 
         public static JsonABI fromJSONResourceEntry(ClassLoader classLoader, String resourcePath, String entry) throws IOException {

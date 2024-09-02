@@ -69,7 +69,7 @@ public class JsonABITest {
                 )
         );
         assertEquals("""
-            {"type":"constuctor","inputs":[{"name":"param1","type":"uint256"}]}
+            {"type":"constructor","inputs":[{"name":"param1","type":"uint256"}]}
         """.trim(), constructor.toString());
     }
 
@@ -78,18 +78,19 @@ public class JsonABITest {
         JsonABI.Entry fn = JsonABI.newFunction(
                 "doStuff",
                 JsonABI.newParameters(
-                        JsonABI.newTupleArray("param1", JsonABI.newParameters(
+                        JsonABI.newTupleArray("param1", "MyParam", JsonABI.newParameters(
                                 JsonABI.newParameter("field1", "uint256"),
                                 JsonABI.newParameter("field2", "string")
                         ))
                 ),
                 JsonABI.newParameters(
                         JsonABI.newParameter("out1", "uint256"),
-                        JsonABI.newParameter("out2", "string")
+                        JsonABI.newParameter("out2", "string"),
+                        JsonABI.newTuple("out3", "MyReturn", JsonABI.newParameters())
                 )
         );
         assertEquals("""
-                {"type":"function","name":"doStuff","inputs":[{"name":"param1","type":"tuple[]","components":[{"name":"field1","type":"uint256"},{"name":"field2","type":"string"}]}],"outputs":[{"name":"out1","type":"uint256"},{"name":"out2","type":"string"}]}
+                {"type":"function","name":"doStuff","inputs":[{"name":"param1","type":"tuple[]","internalType":"struct MyParam[]","components":[{"name":"field1","type":"uint256"},{"name":"field2","type":"string"}]}],"outputs":[{"name":"out1","type":"uint256"},{"name":"out2","type":"string"},{"name":"out3","type":"tuple","internalType":"struct MyReturn","components":[]}]}
             """.trim(), fn.toString());
     }
 
