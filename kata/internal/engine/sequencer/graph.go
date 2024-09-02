@@ -110,7 +110,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 				//TODO this is expected in some cases and represents a contention that needs to be resolved
 				//TBC do we assert that it is resovled before we get to this point?
 				log.L(ctx).Errorf("State hash %s is spent by multiple transactions", stateID)
-				return i18n.NewError(ctx, msgs.MsgSequencerInternalError)
+				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is spent by multiple transactions")
 			}
 			stateToSpender[stateID] = ptrTo(txnIndex)
 		}
@@ -118,7 +118,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 			if stateToMinter[stateID] != nil {
 				//This should never happen unless something has gone drastically wrong elsewhere
 				log.L(ctx).Errorf("State hash %s is minted by multiple transactions", stateID)
-				return i18n.NewError(ctx, msgs.MsgSequencerInternalError)
+				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is minted by multiple transactions")
 			}
 			stateToMinter[stateID] = ptrTo(txnIndex)
 		}
