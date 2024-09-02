@@ -365,66 +365,6 @@ func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-/*
-func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimEvent) error {
-	log.L(ctx).Infof("Received state claim event: %s", event.String())
-	state, err := s.persistence.GetStateByHash(ctx, event.StateID)
-	if err != nil {
-		log.L(ctx).Errorf("Error getting state by ID: %s", err)
-		return err
-	}
-	if state.ClaimedBy != nil {
-		//we have a contention
-		log.L(ctx).Debug("Contention")
-		// if this is the only state being claimed by both transactions, then we can resolve the contention immediately
-		// if either of the transactions is claiming more than one state, then the is no guarantee that we can predict the final outcome
-		// so all we can do is add both transactions to a sequence and let that sequencer
-		resolvedClaimer, err := s.resolver.Resolve(state.Hash.String(), state.ClaimedBy.String(), event.TransactionId)
-		if err != nil {
-			log.L(ctx).Errorf("Error resolving contention: %s", err)
-			return err
-		}
-		if resolvedClaimer == event.TransactionId {
-			// the current claimer has lost its claim
-			currentClaimer, err := s.persistence.GetTransactionByID(ctx, *state.ClaimedBy)
-			if err != nil {
-				log.L(ctx).Errorf("Error getting transaction by ID: %s", err)
-				return err
-			}
-			if currentClaimer.AssemblingNodeID == s.nodeID {
-
-				// if the loser is assembled by the current node, then send a message to the assembler to reassemble
-				// TODO - not sure this is exactly how the orchestrator expects us to deal with this.
-				//Should we be sending a message to the orchestrator to update the transaction state and let the assemble stage notice that on its next cycle?
-
-				//Before sending that message, we need to ensure that the DB is updated with the new claimer otherwise the assembler will attempt to claim this new state again
-				resolvedClaimerUUID, err := uuid.Parse(resolvedClaimer)
-				if err != nil {
-					log.L(ctx).Errorf("failed to parse resolved claimer as uuid: %s", resolvedClaimer)
-					return err
-				}
-				state.ClaimedBy = &resolvedClaimerUUID
-				err = s.persistence.UpdateState(ctx, state)
-				if err != nil {
-					log.L(ctx).Errorf("Error updating state: %s", err)
-					return err
-				}
-				s.sendReassembleMessage(ctx, currentClaimer.ID.String())
-			}
-		}
-		s.publishStateClaimLostEvent(ctx, state.Hash.String(), state.ClaimedBy.String())
-	} else {
-		log.L(ctx).Debug("No contention")
-		err = s.persistence.UpdateState(ctx, state)
-		if err != nil {
-			log.L(ctx).Errorf("Error updating state: %s", err)
-			return err
-		}
-	}
-	return nil
-}
-*/
-
 func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
 	s.lock.Lock()
