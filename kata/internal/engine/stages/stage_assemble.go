@@ -17,6 +17,7 @@ package stages
 
 import (
 	"context"
+	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -31,6 +32,7 @@ import (
 type AssembleStage struct {
 	sequencer types.Sequencer
 	nodeID    string
+	lock      sync.Mutex
 }
 
 func NewAssembleStage(sequencer types.Sequencer, nodeID string) *AssembleStage {
@@ -101,12 +103,15 @@ func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	// temporary hack.  components.PrivateTx should be passed in as a parameter
 	tx := tsg.HACKGetPrivateTx()
-	//TODO assembly must be single threaded ( at least single thread per domain contract)
-	// can we assume that we are already on a single thread or do we need to delegate to a single thread here
+	log.L(ctx).Debugf("AssembleStage.PerformAction tx: %s", tx.ID.String())
+
 	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
+	//assembly must be single threaded ( at least single thread per domain contract)
+	as.lock.Lock()
+	defer as.lock.Unlock()
 	err := sfs.DomainAPI().AssembleTransaction(ctx, tx)
 	if err != nil {
 		log.L(ctx).Errorf("AssembleTransaction failed: %s", err)
