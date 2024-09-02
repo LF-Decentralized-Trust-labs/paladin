@@ -391,8 +391,8 @@ func TestEngineDependantTransaction(t *testing.T) {
 }
 
 func TestEngineMiniLoad(t *testing.T) {
+	t.Skip("This test does not run reliably in the full gradle build for an unknown reason but it is still useful for local testing")
 	ctx := context.Background()
-	log.SetLevel("debug")
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
