@@ -83,8 +83,10 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-core:2.23+'
 
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+
     testImplementation project(path: ":kata", configuration: "libkata")
     testImplementation project(path: ":toolkit_go", configuration: "libstarter")
+    testImplementation project(path: ":solidity", configuration: "compiledContracts")
 
     implementation 'net.java.dev.jna:jna-platform:5.14+'
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"

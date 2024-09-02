@@ -49,7 +49,7 @@ public class SimpleStorageWrappedStoreRetreiveTest {
         // Load some bytecode for our first contract deploy
         String resourcePath = "contracts/testcontracts/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
         String hexByteCode;
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
             assertNotNull(is);
             JsonNode node = new ObjectMapper().readTree(is);
             hexByteCode = node.get("bytecode").asText();

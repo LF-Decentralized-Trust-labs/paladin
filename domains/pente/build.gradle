@@ -49,17 +49,19 @@ dependencies {
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
 
     implementation 'io.netty:netty-all:4.1+'
+    implementation 'org.apache.logging.log4j:log4j-core:2.23+'
 
     testImplementation project(path: ":kata", configuration: "libkata")
+    testImplementation project(path: ":solidity", configuration: "compiledContracts")
 
     testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.mockito:mockito-core:5.12+'
     testImplementation 'org.slf4j:slf4j-reload4j:2.0+'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17+'
-    testImplementation project(path: ":solidity", configuration: "compiledContracts")
 
     implementation 'org.hyperledger.besu:evm:24.5.4'
     implementation 'org.hyperledger.besu:besu-datatypes:24.5.4'

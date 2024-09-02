@@ -20,20 +20,26 @@ import io.kaleido.paladin.toolkit.DomainInstance;
 
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 public class PenteDomain extends DomainInstance {
+    private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
+
+    private final PenteConfiguration config = new PenteConfiguration();
+
     PenteDomain(String grpcTarget, String instanceId) {
         super(grpcTarget, instanceId);
     }
 
     @Override
     protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
+        config.initFromYAML(request.getConfigYaml());
+
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setConstructorAbiJson("""
-                    {"type":"constructor","inputs":[]}
-                """)
-                .setFactoryContractAddress("0x1000000000000000000000000000000000000001")
-                .setFactoryContractAbiJson("[]")
-                .setPrivateContractAbiJson("[]")
+                .setConstructorAbiJson(config.privateConstructor().toString())
+                .setFactoryContractAddress(config.getAddress().toString())
+                .setFactoryContractAbiJson(config.getFactoryContractABI().toString())
+                .setPrivateContractAbiJson(config.getPrivacyGroupABI().toString())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())
