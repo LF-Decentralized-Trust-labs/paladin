@@ -18,6 +18,7 @@ package sequencer
 
 import (
 	"context"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -97,9 +98,12 @@ type sequencer struct {
 	unconfirmedStatesByHash     map[string]*unconfirmedState
 	unconfirmedTransactionsByID map[string]*transaction
 	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
+	lock                        sync.Mutex        //put one massive mutex around the whole sequencer for now.  We can optimise this later
+
 }
 
 func (s *sequencer) evaluateGraph(ctx context.Context) error {
+
 	dispatchableTransactions, err := s.graph.GetDispatchableTransactions(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Error getting dispatchable transactions: %s", err)
@@ -314,6 +318,8 @@ func (s *sequencer) acceptTransaction(ctx context.Context, transaction *transact
 
 func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	//Record the new transaction
 	s.unconfirmedTransactionsByID[event.TransactionId] = &transaction{
 		id:               event.TransactionId,
@@ -338,7 +344,8 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
 
 	log.L(ctx).Infof("Received transaction endorsed event: %s", event.String())
-
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if !s.graph.IncludesTransaction(event.TransactionId) {
 		log.L(ctx).Debugf("Transaction %s does not exist locally", event.TransactionId)
 		return nil
@@ -420,6 +427,8 @@ func (s *sequencer) OnStateClaimEvent(ctx context.Context, event *pb.StateClaimE
 
 func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
 	for _, outputStateID := range outputStateIDes {
 		s.unconfirmedStatesByHash[outputStateID] = nil
@@ -441,6 +450,8 @@ func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.Transa
 
 func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error {
 	//release the transaction's claim on any states
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	for state, spender := range s.stateSpenders {
 		if spender == event.TransactionId {
 			delete(s.stateSpenders, state)
@@ -450,6 +461,8 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 }
 
 func (s *sequencer) OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	transaction := s.unconfirmedTransactionsByID[event.TransactionId]
 	if transaction == nil {
 		log.L(ctx).Errorf("Transaction %s does not exist", event.TransactionId)
@@ -467,6 +480,8 @@ func (s *sequencer) OnTransactionDelegated(ctx context.Context, event *pb.Transa
 
 func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
 	log.L(ctx).Infof("AssignTransaction: %s", txnID)
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	//TODO we assume that the AssignTransaction message always comes _after_ the transactionAssembled event.  Is this safe to assume?  Should we pass the full transaction details on the delegateTransaction message? Or should we wait for the transactionAssembled event before actioning the delgation?
 	txn, ok := s.unconfirmedTransactionsByID[txnID]
@@ -481,6 +496,8 @@ func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
 }
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	contentionFound := false
 	for _, stateID := range endorsementRequst.InputStates {
 		if stateSpender, ok := s.stateSpenders[stateID]; ok {
