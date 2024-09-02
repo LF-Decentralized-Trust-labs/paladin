@@ -17,6 +17,7 @@ package engine
 
 import (
 	"context"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
@@ -27,6 +28,7 @@ func NewDispatcher(contractAddress string, publisher types.Publisher) types.Disp
 	return &dispatcher{
 		publisher:       publisher,
 		contractAddress: contractAddress,
+		nextNonce:       0,
 	}
 }
 
@@ -34,6 +36,16 @@ type dispatcher struct {
 	sequencedTransactions []uuid.UUID
 	publisher             types.Publisher
 	contractAddress       string
+	nextNonce             uint64
+	nextNonceLock         sync.Mutex
+}
+
+func (p *dispatcher) NextNonce() uint64 {
+	p.nextNonceLock.Lock()
+	defer p.nextNonceLock.Unlock()
+	nextNonce := p.nextNonce
+	p.nextNonce++
+	return nextNonce
 }
 
 // Dispatch implements types.Dispatcher.
@@ -52,6 +64,11 @@ func (p *dispatcher) Dispatch(ctx context.Context, transactionIDs []uuid.UUID) e
 			log.L(ctx).Errorf("Error publishing stage event: %s", err)
 			return err
 		}
+		p.publisher.PublishEvent(ctx, &types.TransactionDispatchedEvent{
+			TransactionID:  transactionID.String(),
+			Nonce:          p.NextNonce(),
+			SigningAddress: "0x1234567890abcdef",
+		})
 	}
 
 	return nil
