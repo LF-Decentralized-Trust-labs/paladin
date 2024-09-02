@@ -395,7 +395,9 @@ func TestEngineMiniLoad(t *testing.T) {
 	//b) implement ( or mock) transaction dispatch processing all the way to confirmation
 	numTransactions := 500
 
-	//dependenciesByTransactionID := make(map[string][]string)
+	dependenciesByTransactionID := make(map[string][]string) // populated during assembly stage
+	nonceByTransactionID := make(map[string]uint64)          // populated when dispatch event recieved and used later to check that the nonce order matchs the dependency order
+
 	unclaimedPendingStatesToMintingTransaction := make(map[types.Bytes32]string)
 
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
@@ -441,8 +443,9 @@ func TestEngineMiniLoad(t *testing.T) {
 			dependencies[i] = unclaimedPendingStatesToMintingTransaction[stateID]
 			delete(unclaimedPendingStatesToMintingTransaction, stateID)
 		}
-		numOutputStates := r.Intn(4)
+		dependenciesByTransactionID[tx.ID.String()] = dependencies
 
+		numOutputStates := r.Intn(4)
 		outputStates := make([]*components.FullState, numOutputStates)
 		for i := 0; i < numOutputStates; i++ {
 			stateID := types.Bytes32(types.RandBytes(32))
@@ -515,6 +518,7 @@ func TestEngineMiniLoad(t *testing.T) {
 		case *engineTypes.TransactionDispatchedEvent:
 			assert.Equal(t, expectedNonce, event.Nonce)
 			expectedNonce++
+			nonceByTransactionID[event.TransactionID] = event.Nonce
 		}
 		if numDispatched == numTransactions {
 			allDispatched <- true
@@ -576,6 +580,7 @@ func TestEngineMiniLoad(t *testing.T) {
 		//there was no -timeout flag, default to 10 seconds
 		deadline = time.Now().Add(10 * time.Second)
 	}
+	haveAllDispatched := false
 out:
 	for {
 		select {
@@ -584,11 +589,25 @@ out:
 			assert.Fail(t, "Timed out waiting for all transactions to be dispatched")
 			break out
 		case <-allDispatched:
+			haveAllDispatched = true
 			break out
 		case reason := <-failEarly:
 			require.Fail(t, reason)
 		}
 	}
+
+	if haveAllDispatched {
+		//check that they were dispatched a valid order ( i.e. no transaction was dispatched before its dependencies)
+		for txId, nonce := range nonceByTransactionID {
+			dependencies := dependenciesByTransactionID[txId]
+			for _, depTxID := range dependencies {
+				depNonce, ok := nonceByTransactionID[depTxID]
+				assert.True(t, ok)
+				assert.True(t, depNonce < nonce)
+			}
+		}
+	}
+
 }
 
 func pollForStatus(ctx context.Context, t *testing.T, expectedStatus string, engine Engine, domainAddressString, txID string, duration time.Duration) string {
