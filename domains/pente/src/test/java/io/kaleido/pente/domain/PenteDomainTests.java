@@ -42,7 +42,7 @@ public class PenteDomainTests {
             try (JsonRpcClient testbedClient = new JsonRpcClient(deployBed.getRPCUrl())) {
                 return testbedClient.request("testbed_deployBytecode",
                         "deployer",
-                        factoryABI.toString(),
+                        factoryABI,
                         factoryBytecode,
                         "{}");
             }

@@ -89,6 +89,8 @@ public class JsonRpcClient implements Closeable {
             JSONRPCError error
     ) {}
 
+    private final Duration requestTimeout = Duration.ofSeconds(30);
+
     public <ResultType> ResultType request(String method, Object ...params) throws IOException {
         long requestId = nextRequest.getAndIncrement();
         try {
@@ -104,7 +106,7 @@ public class JsonRpcClient implements Closeable {
 
             // Build HTTP request
             HttpRequest req = HttpRequest.newBuilder()
-                    .timeout(Duration.ofSeconds(1))
+                    .timeout(requestTimeout)
                     .uri(new URI(uriString))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))

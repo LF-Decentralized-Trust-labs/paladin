@@ -35,6 +35,9 @@ public class ResourceLoader {
             if (entryNode == null) {
                 throw new IllegalArgumentException("entry %s not found in JSON resource %s".formatted(entry, resourcePath));
             }
+            if (entryNode.isValueNode()) {
+                return entryNode.asText();
+            }
             return objectMapper.writeValueAsString(entryNode);
         }
     }

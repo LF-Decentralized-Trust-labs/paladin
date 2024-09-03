@@ -101,12 +101,14 @@ public class Testbed implements Closeable {
                     migrationsDir: %s
                     debugQueries:  true
                 signer:
+                  keyDerivation:
+                    type: bip32
                   keyStore:
                     type: static
                     static:
                       keys:
                         seed:
-                          encoding: none
+                          encoding: hex
                           inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
                 rpcServer:
                   http:
