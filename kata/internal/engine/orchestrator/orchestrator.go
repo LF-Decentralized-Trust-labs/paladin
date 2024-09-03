@@ -134,7 +134,6 @@ type Orchestrator struct {
 
 	domainAPI           components.DomainSmartContract
 	assemblyRequestChan chan *components.PrivateTransaction
-	stopAssemblyLoop    chan bool
 }
 
 var orchestratorConfigDefault = OrchestratorConfig{
@@ -166,7 +165,6 @@ func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress stri
 		stopProcess:                  make(chan bool, 1),
 		domainAPI:                    domainAPI,
 		assemblyRequestChan:          make(chan *components.PrivateTransaction, 100), //TODO: buffer size should be configurable
-		stopAssemblyLoop:             make(chan bool, 1),
 	}
 
 	newOrchestrator.sequencer = sequencer
@@ -364,10 +362,6 @@ func (oc *Orchestrator) Stop() {
 	default:
 	}
 
-	select {
-	case oc.stopAssemblyLoop <- true:
-	default:
-	}
 }
 
 func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
