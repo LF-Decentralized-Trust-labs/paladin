@@ -47,12 +47,16 @@ public class Main {
         return instance;
     }
 
-    public static synchronized void stop() throws InterruptedException {
+    public static synchronized void stop() {
         final RuntimeInfo runningInstance = instance;
         if (runningInstance != null) {
             CompletableFuture.runAsync(() -> ensureLoaded().Stop());
             while (instance != null) {
-                Main.class.wait();
+                try {
+                    Main.class.wait();
+                } catch(InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }

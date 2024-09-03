@@ -15,14 +15,43 @@
 
 package io.kaleido.pente.domain;
 
+import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonRpcClient;
+import io.kaleido.paladin.toolkit.ResourceLoader;
+import io.kaleido.paladin.toolkit.Testbed;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class PenteDomainTests {
 
+    private final Testbed.Setup testbedSetup = new Testbed.Setup("../../kata/db/migrations/sqlite", 5000);
+
+    String deployFactory() throws Exception {
+        try (Testbed deployBed = new Testbed(testbedSetup)) {
+            deployBed.start();
+            String factoryBytecode = ResourceLoader.jsonResourceEntryText(
+                    this.getClass().getClassLoader(),
+                    "contracts/pente/PenteFactory.sol/PenteFactory.json",
+                    "bytecode"
+            );
+            JsonABI factoryABI = JsonABI.fromJSONResourceEntry(
+                    this.getClass().getClassLoader(),
+                    "contracts/pente/PenteFactory.sol/PenteFactory.json",
+                    "abi"
+            );
+            try (JsonRpcClient testbedClient = new JsonRpcClient(deployBed.getRPCUrl())) {
+                return testbedClient.request("testbed_deployBytecode",
+                        "deployer",
+                        factoryABI.toString(),
+                        factoryBytecode,
+                        "{}");
+            }
+        }
+    }
+
     @Test
     void testSimpleStorage() throws Exception {
-        PenteTestbed tb = new PenteTestbed();
-        tb.start();
-        tb.stop();
+        String address = deployFactory();
+        Assertions.assertNotEquals("", address);
     }
 }
