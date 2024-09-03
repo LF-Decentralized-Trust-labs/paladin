@@ -20,7 +20,7 @@ package github.com.kaleido_io.paladin.toolkit;
 // **CONFIGURE** happens once when the domain is loaded into Paladin
 message ConfigureDomainRequest {
   string name = 1; // The name
-  string config_yaml = 2; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
+  string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for domain)
   int64 chain_id = 3; // The chain_id of the underlying base ledger on which all smart contracts are deployed
 }
 
