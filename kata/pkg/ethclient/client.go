@@ -16,11 +16,14 @@
 package ethclient
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
@@ -48,6 +51,11 @@ type EthClient interface {
 	ChainID() int64
 
 	// Below are raw functions that the ABI() above provides wrappers for
+	GasPrice(ctx context.Context) (gasPrice *ethtypes.HexInteger, err error)
+	GetBalance(ctx context.Context, address string, block string) (balance *ethtypes.HexInteger, err error)
+	GasEstimate(ctx context.Context, tx *ethsigner.Transaction) (gasLimit *ethtypes.HexInteger, err error)
+	GetTransactionCount(ctx context.Context, fromAddr string) (transactionCount *ethtypes.HexUint64, err error)
+	GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error)
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error)
 	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error)
 	SendRawTransaction(ctx context.Context, rawTX types.HexBytes) (*types.Bytes32, error)
@@ -120,6 +128,99 @@ func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsign
 
 }
 
+func (ec *ethClient) GetBalance(ctx context.Context, address string, block string) (*ethtypes.HexInteger, error) {
+	var addressBalance ethtypes.HexInteger
+
+	if rpcErr := ec.rpc.CallRPC(ctx, &addressBalance, "eth_getBalance", address, block); rpcErr != nil {
+		log.L(ctx).Errorf("eth_getBalance failed: %+v", rpcErr)
+		return nil, rpcErr.Error()
+	}
+	return &addressBalance, nil
+}
+
+func (ec *ethClient) GasPrice(ctx context.Context) (*ethtypes.HexInteger, error) {
+	// currently only support London style gas price
+	// For EIP1559, will need to add support for `eth_maxPriorityFeePerGas`
+	var gasPrice ethtypes.HexInteger
+
+	if rpcErr := ec.rpc.CallRPC(ctx, &gasPrice, "eth_gasPrice"); rpcErr != nil {
+		log.L(ctx).Errorf("eth_gasPrice failed: %+v", rpcErr)
+		return nil, rpcErr.Error()
+	}
+	return &gasPrice, nil
+}
+
+func (ec *ethClient) GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error) {
+
+	// Get the receipt in the back-end JSON/RPC format
+	var ethReceipt *txReceiptJSONRPC
+	rpcErr := ec.rpc.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+	if ethReceipt == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgReceiptNotAvailable, txHash)
+	}
+	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
+
+	var returnDataString *string
+	var transactionErrorMessage *string
+
+	if !isSuccess {
+		returnDataString, transactionErrorMessage = ec.getErrorInfo(ctx, ethReceipt.RevertReason)
+	}
+
+	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
+		ContractAddress:   ethReceipt.ContractAddress,
+		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
+		From:              ethReceipt.From,
+		To:                ethReceipt.To,
+		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
+		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		ReturnValue:       returnDataString,
+		ErrorMessage:      transactionErrorMessage,
+	})
+
+	var txIndex int64
+	if ethReceipt.TransactionIndex != nil {
+		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
+	}
+	receiptResponse := &TransactionReceiptResponse{
+		BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
+		TransactionIndex: fftypes.NewFFBigInt(txIndex),
+		BlockHash:        ethReceipt.BlockHash.String(),
+		Success:          isSuccess,
+		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
+		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+	}
+
+	if ethReceipt.ContractAddress != nil {
+		location, _ := json.Marshal(map[string]string{
+			"address": ethReceipt.ContractAddress.String(),
+		})
+		receiptResponse.ContractLocation = fftypes.JSONAnyPtrBytes(location)
+	}
+	return receiptResponse, nil
+}
+
+func (ec *ethClient) GasEstimate(ctx context.Context, tx *ethsigner.Transaction) (*ethtypes.HexInteger, error) {
+	var gasEstimate ethtypes.HexInteger
+	if rpcErr := ec.rpc.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
+		log.L(ctx).Errorf("eth_estimateGas failed: %+v", rpcErr)
+		return nil, rpcErr.Error()
+	}
+	return &gasEstimate, nil
+}
+
+func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr string) (*ethtypes.HexUint64, error) {
+	var transactionCount ethtypes.HexUint64
+	if rpcErr := ec.rpc.CallRPC(ctx, &transactionCount, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
+		log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, rpcErr)
+		return nil, rpcErr.Error()
+	}
+	return &transactionCount, nil
+}
+
 func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
 	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, algorithms.ECDSA_SECP256K1_PLAINBYTES)
@@ -130,18 +231,20 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
 	if tx.Nonce == nil {
-		if rpcErr := ec.rpc.CallRPC(ctx, &tx.Nonce, "eth_getTransactionCount", fromAddr, "latest"); rpcErr != nil {
-			log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, rpcErr)
-			return nil, rpcErr.Error()
+		txNonce, err := ec.GetTransactionCount(ctx, fromAddr)
+		if err != nil {
+			log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", fromAddr, err)
+			return nil, err
 		}
+		tx.Nonce = ethtypes.NewHexInteger(big.NewInt(int64(txNonce.Uint64())))
 	}
 
 	if tx.GasLimit == nil {
 		// Estimate gas before submission
-		var gasEstimate ethtypes.HexInteger
-		if rpcErr := ec.rpc.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx); rpcErr != nil {
-			log.L(ctx).Errorf("eth_estimateGas failed: %+v", rpcErr)
-			return nil, rpcErr.Error()
+		gasEstimate, err := ec.GasEstimate(ctx, tx)
+		if err != nil {
+			log.L(ctx).Errorf("eth_estimateGas failed: %+v", err)
+			return nil, err
 		}
 		// If that went well, so submission with a bump on the estimation
 		gasLimitFactored := new(big.Float).SetInt(gasEstimate.BigInt())
@@ -219,4 +322,31 @@ func logJSON(v interface{}) string {
 		ret = (string)(b)
 	}
 	return ret
+}
+func (ec *ethClient) getErrorInfo(ctx context.Context, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
+
+	var revertReason string
+	if revertFromReceipt != nil {
+		revertReason = revertFromReceipt.String()
+	}
+
+	// See if the return value is using the default error you get from "revert"
+	var errorMessage string
+	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
+	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
+		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
+		if err == nil {
+			errorMessage = value.Children[0].Value.(string)
+		}
+	}
+
+	// Otherwise we can't decode it, so put it directly in the error
+	if errorMessage == "" {
+		if len(returnDataBytes) > 0 {
+			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotDecoded, revertReason).Error()
+		} else {
+			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotAvailable).Error()
+		}
+	}
+	return &revertReason, &errorMessage
 }

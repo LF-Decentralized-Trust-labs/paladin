@@ -18,6 +18,7 @@ package ethclient
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
@@ -61,7 +62,7 @@ func TestCallFail(t *testing.T) {
 
 }
 
-func TestGetTransactionCountFail(t *testing.T) {
+func TestGetTransactionCountFailForBuildRawTx(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexUint64, error) {
 			return 0, fmt.Errorf("pop")
@@ -72,6 +73,116 @@ func TestGetTransactionCountFail(t *testing.T) {
 	_, err := ec.HTTPClient().BuildRawTransaction(ctx, EIP1559, "key1", &ethsigner.Transaction{})
 	assert.Regexp(t, "pop", err)
 
+}
+
+func TestGetBalance(t *testing.T) {
+	balanceHexInt := ethtypes.NewHexInteger(big.NewInt(200000))
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_getBalance: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexInteger, error) {
+			return *balanceHexInt, nil
+		},
+	})
+	defer done()
+
+	balance, err := ec.HTTPClient().GetBalance(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754", "latest")
+	assert.NoError(t, err)
+	assert.Equal(t, balanceHexInt, balance)
+
+}
+
+func TestGetBalanceFail(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_getBalance: func(ctx context.Context, ah ethtypes.Address0xHex, s string) (ethtypes.HexInteger, error) {
+			return ethtypes.HexInteger{}, fmt.Errorf("pop")
+		},
+	})
+	defer done()
+
+	_, err := ec.HTTPClient().GetBalance(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754", "latest")
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestGasPrice(t *testing.T) {
+	gasPriceHexInt := ethtypes.NewHexInteger(big.NewInt(200000))
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_gasPrice: func(ctx context.Context) (ethtypes.HexInteger, error) {
+			return *gasPriceHexInt, nil
+		},
+	})
+	defer done()
+
+	gasPrice, err := ec.HTTPClient().GasPrice(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, gasPriceHexInt, gasPrice)
+
+}
+
+func TestGasPriceFail(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_gasPrice: func(ctx context.Context) (ethtypes.HexInteger, error) {
+			return ethtypes.HexInteger{}, fmt.Errorf("pop")
+		},
+	})
+	defer done()
+
+	_, err := ec.HTTPClient().GasPrice(ctx)
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestGasEstimate(t *testing.T) {
+	gasEstimateHexInt := ethtypes.NewHexInteger(big.NewInt(200000))
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
+			return *gasEstimateHexInt, nil
+		},
+	})
+	defer done()
+
+	gasLimit, err := ec.HTTPClient().GasEstimate(ctx, &ethsigner.Transaction{})
+	assert.NoError(t, err)
+	assert.Equal(t, gasEstimateHexInt, gasLimit)
+
+}
+
+func TestGasEstimateFail(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
+			return ethtypes.HexInteger{}, fmt.Errorf("pop")
+		},
+	})
+	defer done()
+
+	_, err := ec.HTTPClient().GasEstimate(ctx, &ethsigner.Transaction{})
+	assert.Regexp(t, "pop", err)
+}
+
+func TestGetTransactionCount(t *testing.T) {
+	txCountHexUint := (ethtypes.HexUint64)(200000)
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_getTransactionCount: func(ctx context.Context, addr ethtypes.Address0xHex, block string) (ethtypes.HexUint64, error) {
+			return txCountHexUint, nil
+		},
+	})
+	defer done()
+
+	txCount, err := ec.HTTPClient().GetTransactionCount(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754")
+	assert.NoError(t, err)
+	assert.Equal(t, txCountHexUint, *txCount)
+
+}
+
+func TestGetTransactionCountFail(t *testing.T) {
+	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+		eth_getTransactionCount: func(ctx context.Context, addr ethtypes.Address0xHex, block string) (ethtypes.HexUint64, error) {
+			return (ethtypes.HexUint64)(0), fmt.Errorf("pop")
+		},
+	})
+	defer done()
+
+	_, err := ec.HTTPClient().GetTransactionCount(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754")
+	assert.Regexp(t, "pop", err)
 }
 
 func TestEstimateGasFail(t *testing.T) {
