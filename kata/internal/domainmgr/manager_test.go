@@ -32,7 +32,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gopkg.in/yaml.v3"
 )
 
 type mockComponents struct {
@@ -111,12 +110,6 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 		pDone()
 		dm.Stop()
 	}
-}
-
-func yamlNode(t *testing.T, s string) (n yaml.Node) {
-	err := yaml.Unmarshal([]byte(s), &n)
-	assert.NoError(t, err)
-	return
 }
 
 func TestConfiguredDomains(t *testing.T) {
