@@ -77,7 +77,12 @@ func TestNewEnginePolling(t *testing.T) {
 	mockIT := NewInFlightTransaction(enh, te, mockManagedTx1)
 	te.InFlightTxs = []*InFlightTransaction{mockIT}
 	te.transactionIDsInStatusUpdate = []string{"randomID"}
-
+	mTS.On("AddSubStatusAction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		time.Sleep(1 * time.Hour) // make sure the async action never got returned as the test will mock the events
+	}).Maybe()
+	mTS.On("UpdateTransaction", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		time.Sleep(1 * time.Hour) // make sure the async action never got returned as the test will mock the events
+	}).Maybe()
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Once()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Maybe()
@@ -89,7 +94,7 @@ func TestNewEnginePolling(t *testing.T) {
 		close(addressBalanceChecked)
 	}).Once()
 	te.enginePollingInterval = 1 * time.Hour
-	te.Start(ctx)
+	_, _ = te.Start(ctx)
 	<-addressBalanceChecked
 }
 
@@ -184,7 +189,7 @@ func TestNewEnginePollingRemoveCompleted(t *testing.T) {
 		close(addressBalanceChecked)
 	}).Once()
 	te.enginePollingInterval = 1 * time.Hour
-	te.Start(ctx)
+	_, _ = te.Start(ctx)
 	<-addressBalanceChecked
 }
 
@@ -242,7 +247,7 @@ func TestNewEnginePollingRemoveSuspended(t *testing.T) {
 		close(addressBalanceChecked)
 	}).Once()
 	te.enginePollingInterval = 1 * time.Hour
-	te.Start(ctx)
+	_, _ = te.Start(ctx)
 	<-addressBalanceChecked
 }
 
@@ -290,9 +295,8 @@ func TestNewEnginePollingMarkStale(t *testing.T) {
 		close(addressBalanceChecked)
 	}).Once()
 	te.enginePollingInterval = 1 * time.Hour
-	te.Start(ctx)
+	te.pollAndProcess(ctx)
 	<-addressBalanceChecked
-	te.poll(ctx)
 	assert.Equal(t, TransactionEngineStateStale, te.state)
 }
 

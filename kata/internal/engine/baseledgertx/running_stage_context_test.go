@@ -43,6 +43,5 @@ func TestRunningStageContext(t *testing.T) {
 
 	mTS := enginemocks.NewTransactionStore(t)
 	mTS.On("AddSubStatusAction", mock.Anything, mock.Anything, newSubStatus, baseTypes.BaseTxActionRetrieveGasPrice, fftypes.JSONAnyPtr("info"), fftypes.JSONAnyPtr("error"), mock.Anything).Return(nil).Once()
-	testRunningStageContext.StageOutputsToBePersisted.HistoryUpdates[0](mTS)
-
+	_ = testRunningStageContext.StageOutputsToBePersisted.HistoryUpdates[0](mTS)
 }

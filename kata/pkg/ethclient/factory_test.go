@@ -34,14 +34,15 @@ import (
 )
 
 type mockEth struct {
-	eth_getBalance          func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexInteger, error)
-	eth_gasPrice            func(context.Context) (ethtypes.HexInteger, error)
-	eth_gasLimit            func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
-	eth_chainId             func(context.Context) (ethtypes.HexUint64, error)
-	eth_getTransactionCount func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
-	eth_estimateGas         func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
-	eth_sendRawTransaction  func(context.Context, types.HexBytes) (types.HexBytes, error)
-	eth_call                func(context.Context, ethsigner.Transaction, string) (types.HexBytes, error)
+	eth_getBalance            func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexInteger, error)
+	eth_gasPrice              func(context.Context) (ethtypes.HexInteger, error)
+	eth_gasLimit              func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
+	eth_chainId               func(context.Context) (ethtypes.HexUint64, error)
+	eth_getTransactionCount   func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
+	eth_getTransactionReceipt func(context.Context, ethtypes.HexBytes0xPrefix) (*txReceiptJSONRPC, error)
+	eth_estimateGas           func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
+	eth_sendRawTransaction    func(context.Context, types.HexBytes) (types.HexBytes, error)
+	eth_call                  func(context.Context, ethsigner.Transaction, string) (types.HexBytes, error)
 }
 
 func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) (rpcServer rpcserver.RPCServer, done func()) {
@@ -82,6 +83,7 @@ func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) 
 	rpcServer.Register(rpcserver.NewRPCModule("eth").
 		Add("eth_chainId", checkNil(mEth.eth_chainId, rpcserver.RPCMethod0)).
 		Add("eth_getTransactionCount", checkNil(mEth.eth_getTransactionCount, rpcserver.RPCMethod2)).
+		Add("eth_getTransactionReceipt", checkNil(mEth.eth_getTransactionReceipt, rpcserver.RPCMethod1)).
 		Add("eth_estimateGas", checkNil(mEth.eth_estimateGas, rpcserver.RPCMethod1)).
 		Add("eth_sendRawTransaction", checkNil(mEth.eth_sendRawTransaction, rpcserver.RPCMethod1)).
 		Add("eth_call", checkNil(mEth.eth_call, rpcserver.RPCMethod2)).

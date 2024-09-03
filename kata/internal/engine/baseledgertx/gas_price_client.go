@@ -68,7 +68,6 @@ type GasPriceClient interface {
 	ParseGasPriceJSON(ctx context.Context, input *fftypes.JSONAny) (gpo *baseTypes.GasPriceObject, err error)
 	GetGasPriceObject(ctx context.Context) (gasPrice *baseTypes.GasPriceObject, err error)
 	Init(ctx context.Context, cAPI ethclient.EthClient)
-	FillInEthTxGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) error
 }
 
 // The hybrid gas price client retrieves gas price using the following methods in order and will return as soon as the method succeeded unless there is an override
@@ -169,14 +168,14 @@ func (hGpc *HybridGasPriceClient) DeleteCache(ctx context.Context) bool {
 	return hGpc.gasPriceCache.Delete("gasPrice")
 }
 
-func NewGasPriceClient(ctx context.Context, conf config.Section, gasPriceCache cache.CInterface) (GasPriceClient, error) {
+func NewGasPriceClient(ctx context.Context, conf config.Section, gasPriceCache cache.CInterface) GasPriceClient {
 	gasPriceClient := &HybridGasPriceClient{}
 	// initialize gas oracle
 	// set fixed gas price
 	gasPriceClient.fixedGasPrice = fftypes.JSONAnyPtr(conf.GetString(GasPriceFixedJSONString))
 	gasPriceClient.gasPriceCache = gasPriceCache
 
-	return gasPriceClient, nil
+	return gasPriceClient
 }
 
 func (hGpc *HybridGasPriceClient) ParseGasPriceJSON(ctx context.Context, input *fftypes.JSONAny) (gpo *baseTypes.GasPriceObject, err error) {
@@ -211,21 +210,4 @@ func (hGpc *HybridGasPriceClient) ParseGasPriceJSON(ctx context.Context, input *
 	}
 	log.L(ctx).Tracef("Gas price object generated using gasPrice field, gasPrice=%+v", gpo)
 	return gpo, nil
-}
-
-func (hGpc *HybridGasPriceClient) FillInEthTxGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) (err error) {
-	gpo, err := hGpc.ParseGasPriceJSON(ctx, input)
-	if err != nil {
-		return err
-	}
-	if gpo.GasPrice == nil {
-		tx.MaxPriorityFeePerGas = (*ethtypes.HexInteger)(gpo.MaxPriorityFeePerGas)
-		tx.MaxFeePerGas = (*ethtypes.HexInteger)(gpo.MaxFeePerGas)
-		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)
-		return nil
-	} else {
-		tx.GasPrice = (*ethtypes.HexInteger)(gpo.GasPrice)
-		log.L(ctx).Debugf("gasPrice=%s", tx.GasPrice)
-	}
-	return nil
 }

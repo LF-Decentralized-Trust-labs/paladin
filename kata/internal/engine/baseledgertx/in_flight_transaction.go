@@ -34,6 +34,8 @@ import (
 )
 
 type InFlightTransaction struct {
+	testOnlyNoActionMode bool // Note: this flag can never be set in normal code path, exposed for testing only
+	testOnlyNoEventMode  bool // Note: this flag can never be set in normal code path, exposed for testing only
 
 	// a reference to the transaction engine
 	*transactionEngine
@@ -111,7 +113,7 @@ func NewInFlightTransaction(
 	}
 
 	ift.MarkTime("wait_in_inflight_queue")
-	ift.stateManager = NewInFlightTransactionStateManager(enth.thMetrics, enth.balanceManager, enth.txStore, enth.txConfirmationListener, ift, NewInMemoryTxStateMananger(enth.ctx, mtx), te.turnOffHistory)
+	ift.stateManager = NewInFlightTransactionStateManager(enth.thMetrics, enth.balanceManager, enth.txStore, enth.txConfirmationListener, ift, NewInMemoryTxStateMananger(enth.ctx, mtx), te.turnOffHistory, ift.testOnlyNoEventMode)
 	return ift
 }
 
@@ -628,10 +630,6 @@ func (it *InFlightTransaction) calculateNewGasPrice(ctx context.Context, existin
 		log.L(ctx).Debugf("First time assigning gas price to transaction with ID: %s, gas price object: %+v.", it.stateManager.GetTxID(), newGpo)
 		return newGpo
 	}
-	if newGpo == nil {
-		log.L(ctx).Warnf("New gas price object for transaction with ID: %s is nil, using existing gas price object: %+v.", it.stateManager.GetTxID(), newGpo)
-		return existingGpo
-	}
 	if newGpo.GasPrice != nil && existingGpo.GasPrice != nil && existingGpo.GasPrice.Cmp(newGpo.GasPrice) == 1 {
 		// existing gas price already above the new gas price, increase using percentage
 		newPercentage := big.NewInt(100)
@@ -720,7 +718,7 @@ func (it *InFlightTransaction) TriggerTracking(ctx context.Context) error {
 	it.executeAsync(func() {
 		transactionHashToBeTracked := it.stateManager.GetTransactionHash()
 		policyInfo := it.stateManager.GetPolicyInfo()
-		if policyInfo.SubmittedTxHashes != nil && len(policyInfo.SubmittedTxHashes) > 0 {
+		if len(policyInfo.SubmittedTxHashes) > 0 {
 			// check which transaction hash can be tracked
 			for _, hash := range policyInfo.SubmittedTxHashes {
 				if hash != "" && hash != it.stateManager.GetTransactionHash() {
@@ -789,6 +787,9 @@ type TriggerNextStageOutput struct {
 }
 
 func (it *InFlightTransaction) executeAsync(funcToExecute func(), ctx context.Context, stage baseTypes.InFlightTxStage, isPersistence bool) {
+	if it.testOnlyNoActionMode {
+		return
+	}
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {

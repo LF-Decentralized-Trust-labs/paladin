@@ -25,6 +25,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/cache"
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -36,7 +37,7 @@ import (
 func NewTestFixedPriceGasPriceClient(t *testing.T) GasPriceClient {
 	ctx := context.Background()
 	hgc := &HybridGasPriceClient{}
-	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`10`)
+	hgc.fixedGasPrice = fftypes.JSONAnyPtr(`{"gasPrice": 10}`)
 	hgc.gasPriceCache = cache.NewUmanagedCache(ctx, 100, 1*time.Minute)
 	return hgc
 }
@@ -69,6 +70,30 @@ func NewTestNodeGasPriceClient(t *testing.T, connectorAPI ethclient.EthClient) G
 	return hgc
 }
 
+func TestSetFixedGasPriceIfConfigured(t *testing.T) {
+	ctx := context.Background()
+	zeroHgc := NewTestZeroGasPriceChainClient(t)
+	testTx := &ethsigner.Transaction{}
+	zeroHgc.SetFixedGasPriceIfConfigured(ctx, testTx)
+	assert.Equal(t, big.NewInt(0), testTx.GasPrice.BigInt())
+	assert.Nil(t, testTx.MaxFeePerGas)
+	assert.Nil(t, testTx.MaxPriorityFeePerGas)
+
+	testTx = &ethsigner.Transaction{}
+	tenHgc := NewTestFixedPriceGasPriceClient(t)
+	tenHgc.SetFixedGasPriceIfConfigured(ctx, testTx)
+	assert.Equal(t, big.NewInt(10), testTx.GasPrice.BigInt())
+	assert.Nil(t, testTx.MaxFeePerGas)
+	assert.Nil(t, testTx.MaxPriorityFeePerGas)
+
+	testTx = &ethsigner.Transaction{}
+	eip1559Hgc := NewTestFixedPriceGasPriceClientEIP1559(t)
+	eip1559Hgc.SetFixedGasPriceIfConfigured(ctx, testTx)
+	assert.Equal(t, big.NewInt(10), testTx.MaxFeePerGas.BigInt())
+	assert.Equal(t, big.NewInt(1), testTx.MaxPriorityFeePerGas.BigInt())
+	assert.Nil(t, testTx.GasPrice)
+}
+
 func TestGasPriceClientInit(t *testing.T) {
 	ctx := context.Background()
 	hgc := &HybridGasPriceClient{}
@@ -82,15 +107,14 @@ func TestGasPriceClientInit(t *testing.T) {
 	assert.True(t, hgc.hasZeroGasPrice)
 }
 
-func TestGasPriceClientUsingOracle(t *testing.T) {
+func TestGasPriceClient(t *testing.T) {
 	ctx := context.Background()
 	gasPriceCache := cache.NewUmanagedCache(ctx, 100, 1*time.Minute)
 	conf := config.RootSection("unittestgasprice")
 	InitGasPriceConfig(conf)
 	gasPriceConf := conf.SubSection(GasPriceSection)
 
-	gasPriceClient, err := NewGasPriceClient(ctx, gasPriceConf, gasPriceCache)
-	assert.NoError(t, err)
+	gasPriceClient := NewGasPriceClient(ctx, gasPriceConf, gasPriceCache)
 	hgc := gasPriceClient.(*HybridGasPriceClient)
 
 	mEC := componentmocks.NewEthClient(t)

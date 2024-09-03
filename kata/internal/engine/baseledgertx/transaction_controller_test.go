@@ -51,7 +51,7 @@ func TestNewControllerNoNewEngine(t *testing.T) {
 	enh.InFlightEngines = map[string]*transactionEngine{
 		testMainSigningAddress: {state: TransactionEngineStateIdle, stateEntryTime: time.Now()}, // already has an engine for 0x1
 	}
-	enh.Start(ctx)
+	_, _ = enh.Start(ctx)
 }
 
 func TestNewControllerPollingCancelledContext(t *testing.T) {
@@ -172,13 +172,16 @@ func TestNewControllerPollingStoppingAnEngineAndSelf(t *testing.T) {
 		stateEntryTime:               time.Now().Add(-enh.maxEngineIdle).Add(-1 * time.Minute),
 		InFlightTxsStale:             make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
+		txStore:                      mTS,
+		ethClient:                    mEC,
+		managedTXEventNotifier:       mEN,
+		txConfirmationListener:       mCL,
+		maxInFlightTxs:               0,
 	}
 	enh.InFlightEngines = map[string]*transactionEngine{
 		testMainSigningAddress: existingEngine, // already has an engine for 0x1
 	}
-	existingEngine.engineLoopDone = make(chan struct{})
-	go existingEngine.Start(ctx)
-	enh.Start(ctx)
+	_, _ = existingEngine.Start(ctx)
 	enh.MarkInFlightEnginesStale()
 	<-existingEngine.engineLoopDone
 	assert.Equal(t, TransactionEngineStateStopped, existingEngine.state)
@@ -186,10 +189,11 @@ func TestNewControllerPollingStoppingAnEngineAndSelf(t *testing.T) {
 	//stops OK
 	cancelCtx()
 	<-enh.controllerLoopDone
+	time.Sleep(2 * time.Second)
 }
 
 func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
 		Transaction: &ethsigner.Transaction{
@@ -231,8 +235,14 @@ func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
 		stateEntryTime:               time.Now().Add(-enh.maxEngineIdle).Add(-1 * time.Minute),
 		InFlightTxsStale:             make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
+		txStore:                      mTS,
+		ethClient:                    mEC,
+		managedTXEventNotifier:       mEN,
+		txConfirmationListener:       mCL,
 	}
-	go existingEngine.Start(ctx)
+	go func() {
+		_, _ = existingEngine.Start(ctx)
+	}()
 	// already has a running engine for the address so no new engine should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Maybe()
@@ -273,7 +283,7 @@ func TestNewControllerPollingExcludePausedEngine(t *testing.T) {
 	}).Once()
 	enh.InFlightEngines = map[string]*transactionEngine{}
 	enh.SigningAddressesPausedUntil = map[string]time.Time{testMainSigningAddress: time.Now().Add(1 * time.Hour)}
-	enh.Start(ctx)
+	_, _ = enh.Start(ctx)
 	<-listed
 	assert.Empty(t, enh.InFlightEngines)
 }
@@ -299,7 +309,7 @@ func TestNewControllerCheckNoDefaultHandlers(t *testing.T) {
 }
 
 func TestNewControllerGetPendingFuelingTxs(t *testing.T) {
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
 		Transaction: &ethsigner.Transaction{
@@ -337,7 +347,7 @@ func TestNewControllerGetPendingFuelingTxs(t *testing.T) {
 }
 
 func TestNewControllerCheckTxCompleteness(t *testing.T) {
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID:     uuid.New().String(),
 		Status: baseTypes.BaseTxStatusSucceeded,
@@ -403,5 +413,4 @@ func TestNewControllerCheckTxCompleteness(t *testing.T) {
 	testTxToCheck.Status = baseTypes.BaseTxStatusFailed
 	enh.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
 	assert.True(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
-
 }

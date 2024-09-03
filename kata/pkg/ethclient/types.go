@@ -144,13 +144,6 @@ type receiptExtraInfo struct {
 	ReturnValue       *string                `json:"returnValue,omitempty"`
 }
 
-type txDebugTrace struct {
-	Gas         *fftypes.FFBigInt `json:"gas"`
-	Failed      bool              `json:"failed"`
-	ReturnValue string            `json:"returnValue"`
-	StructLogs  []StructLog       `json:"structLogs"`
-}
-
 type StructLog struct {
 	PC      *fftypes.FFBigInt `json:"pc"`
 	Op      *string           `json:"op"`

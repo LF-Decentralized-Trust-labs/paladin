@@ -43,13 +43,13 @@ type testInFlightTransactionStateManagerWithMocks struct {
 	inMemoryTxState baseTypes.InMemoryTxStateManager
 }
 
-func NewTestInFlightTransactionStateManager(t *testing.T) *testInFlightTransactionStateManagerWithMocks {
+func newTestInFlightTransactionStateManager(t *testing.T) *testInFlightTransactionStateManagerWithMocks {
 	mBM, mEC, _ := NewTestBalanceManager(context.Background(), t)
 	mockInMemoryState := NewTestInMemoryTxState(t)
 	mockActionTriggers := enginemocks.NewInFlightStageActionTriggers(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
-	iftxs := NewInFlightTransactionStateManager(&baseLedgerTxEngineMetrics{}, mBM, mTS, mCL, mockActionTriggers, mockInMemoryState, false)
+	iftxs := NewInFlightTransactionStateManager(&baseLedgerTxEngineMetrics{}, mBM, mTS, mCL, mockActionTriggers, mockInMemoryState, false, false)
 	return &testInFlightTransactionStateManagerWithMocks{
 		iftxs,
 		mEC,
@@ -64,7 +64,7 @@ func NewTestInFlightTransactionStateManager(t *testing.T) *testInFlightTransacti
 
 func TestStateManagerStageManagementBasic(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 	stateManager := testStateManagerWithMocks.stateManager
 	assert.Nil(t, stateManager.GetRunningStageContext(ctx))
 	assert.Nil(t, stateManager.GetStageTriggerError(ctx))
@@ -75,12 +75,11 @@ func TestStateManagerStageManagementBasic(t *testing.T) {
 	assert.True(t, stateManager.ValidatedTransactionHashMatchState(ctx))
 	stateManager.SetValidatedTransactionHashMatchState(ctx, false)
 	assert.False(t, stateManager.ValidatedTransactionHashMatchState(ctx))
-
 }
 
 func TestStateManagerStageManagementCanSubmit(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 	stateManager := testStateManagerWithMocks.stateManager
 	stateManager.SetTransactionEngineContext(ctx, &baseTypes.TransactionEngineContext{
 		PreviousNonceCostUnknown: false,
@@ -106,7 +105,7 @@ func TestStateManagerStageManagementCanSubmit(t *testing.T) {
 }
 
 func TestStateManagerStageManagementTransactionFromRetrieveGasPriceToTracking(t *testing.T) {
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 
 	ctx := context.Background()
 	stateManager := testStateManagerWithMocks.stateManager
@@ -163,7 +162,7 @@ func TestStateManagerStageManagementTransactionFromRetrieveGasPriceToTracking(t 
 
 func TestStateManagerStageOutputManagement(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 	stateManager := testStateManagerWithMocks.stateManager
 	expectedNumberOfPersistenceSuccessOutput := 342
 	expectedNumberOfPersistenceErrorOutput := 50
@@ -374,7 +373,7 @@ func TestStateManagerStageOutputManagement(t *testing.T) {
 
 func TestStateManagerTxPersistenceManagementTransactionConfirmed(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 
 	stateManager := testStateManagerWithMocks.stateManager
 
@@ -472,7 +471,7 @@ func TestStateManagerTxPersistenceManagementTransactionConfirmed(t *testing.T) {
 
 func TestStateManagerTxPersistenceManagementTransactionConfirmedRetrieveReceiptAndTxFailed(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 
 	stateManager := testStateManagerWithMocks.stateManager
 
@@ -562,7 +561,7 @@ func TestStateManagerTxPersistenceManagementTransactionConfirmedRetrieveReceiptA
 
 func TestStateManagerTxPersistenceManagementUpdateErrors(t *testing.T) {
 	ctx := context.Background()
-	testStateManagerWithMocks := NewTestInFlightTransactionStateManager(t)
+	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 
 	stateManager := testStateManagerWithMocks.stateManager
 

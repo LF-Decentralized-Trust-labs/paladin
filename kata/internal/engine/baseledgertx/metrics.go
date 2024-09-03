@@ -17,6 +17,8 @@ package baseledgertx
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type BaseLedgerTxEngineMetricsManager interface {
@@ -31,25 +33,31 @@ type baseLedgerTxEngineMetrics struct {
 }
 
 func (thm *baseLedgerTxEngineMetrics) InitMetrics(ctx context.Context) {
+	log.L(ctx).Tracef("Init metrics")
 	// TODO
 }
 
 func (thm *baseLedgerTxEngineMetrics) RecordOperationMetrics(ctx context.Context, operationName string, operationResult string, durationInSeconds float64) {
+	log.L(ctx).Tracef("RecordOperationMetrics")
 	// TODO
 }
 
 func (thm *baseLedgerTxEngineMetrics) RecordStageChangeMetrics(ctx context.Context, stage string, durationInSeconds float64) {
+	log.L(ctx).Tracef("RecordStageChangeMetrics")
 	// TODO
 }
 
 func (thm *baseLedgerTxEngineMetrics) RecordInFlightEnginePoolMetrics(ctx context.Context, usedCountPerState map[string]int, freeCount int) {
+	log.L(ctx).Tracef("RecordInFlightEnginePoolMetrics")
 	// TODO
 }
 
 func (thm *baseLedgerTxEngineMetrics) RecordInFlightTxQueueMetrics(ctx context.Context, usedCountPerStage map[string]int, freeCount int) {
+	log.L(ctx).Tracef("RecordInFlightTxQueueMetrics")
 	// TODO
 }
 
 func (thm *baseLedgerTxEngineMetrics) RecordCompletedTransactionCountMetrics(ctx context.Context, processStatus string) {
+	log.L(ctx).Tracef("RecordCompletedTransactionCountMetrics")
 	// TODO
 }

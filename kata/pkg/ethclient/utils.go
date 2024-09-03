@@ -17,7 +17,6 @@ package ethclient
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -43,13 +42,4 @@ func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) strin
 		return fmt.Sprintf("%.12d/%.6d", blockNumber.Int(), transactionIndex.Int())
 	}
 	return ""
-}
-
-func padHexData(hexString string) string {
-	hexString = strings.TrimPrefix(hexString, "0x")
-	if len(hexString)%2 == 1 {
-		hexString = "0" + hexString
-	}
-
-	return hexString
 }

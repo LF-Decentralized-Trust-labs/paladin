@@ -27,11 +27,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 
 	"github.com/hyperledger/firefly-common/pkg/cache"
@@ -119,11 +117,7 @@ func (f *TransactionHandlerFactory) NewTransactionHandler(ctx context.Context, c
 	gasPriceCache, _ := cm.GetCache(ctx, "enterprise", "gasPrice", gasPriceConf.GetByteSize(GasPriceCacheSizeByteString), gasPriceConf.GetDuration(GasPriceCacheTTLDurationString), gasPriceConf.GetBool(GasPriceCacheEnabled), cache.StrictExpiry, cache.TTLFromInitialAdd)
 	log.L(ctx).Debugf("Gas price cache setting. Enabled: %t , size: %d , ttl: %s", gasPriceConf.GetBool(GasPriceCacheEnabled), gasPriceConf.GetByteSize(GasPriceCacheSizeByteString), gasPriceConf.GetDuration(GasPriceCacheTTLDurationString))
 
-	gasPriceClient, err := NewGasPriceClient(ctx, gasPriceConf, gasPriceCache)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to init signer signer due to %+v", err)
-		return nil, i18n.NewError(ctx, msgs.MsgInvalidGasClientConfig, err)
-	}
+	gasPriceClient := NewGasPriceClient(ctx, gasPriceConf, gasPriceCache)
 	controllerConfig := conf.SubSection(TransactionControllerSection)
 	engineConfig := conf.SubSection(TransactionEngineSection)
 	balanceManagerConfig := conf.SubSection(BalanceManagerSection)
@@ -215,14 +209,14 @@ func (enterpriseHandler *enterpriseTransactionHandler) HandleNewTransaction(ctx 
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
 	_, fromAddr, err := enterpriseHandler.keymgr.ResolveKey(ctx, reqOptions.SignerID, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
-		return nil, true, err
+		return nil, false, err
 	}
 
 	var ethTx *ethsigner.Transaction
 	switch ethPayload := txPayload.(type) {
 	case *components.EthTransfer:
 		ethTx = &ethsigner.Transaction{
-			From:  json.RawMessage(types.JSONString(fromAddr)),
+			From:  json.RawMessage(fromAddr),
 			To:    ethPayload.To.Address0xHex(),
 			Value: ethPayload.Value,
 		}
@@ -230,28 +224,28 @@ func (enterpriseHandler *enterpriseTransactionHandler) HandleNewTransaction(ctx 
 	case *components.EthTransaction:
 		abiFunc, err := enterpriseHandler.ethClient.ABIFunction(ctx, ethPayload.FunctionABI)
 		if err != nil {
-			return nil, true, err
+			return nil, false, err
 		}
-		addr := ethtypes.Address0xHex(ethPayload.To)
+		addr := ethPayload.To.Address0xHex()
 		txCallDataBuilder := abiFunc.R(ctx).
-			To(&addr).
+			To(addr).
 			Input(ethPayload.Inputs)
 		buildErr := txCallDataBuilder.BuildCallData()
 		if buildErr != nil {
-			return nil, true, buildErr
+			return nil, false, buildErr
 		}
 		ethTx = txCallDataBuilder.TX()
 		txType = InFlightTxOperationInvokePreparation
 	case *components.EthDeployTransaction:
 		abiFunc, err := enterpriseHandler.ethClient.ABIConstructor(ctx, ethPayload.ConstructorABI, ethPayload.Bytecode)
 		if err != nil {
-			return nil, true, err
+			return nil, false, err
 		}
 		txCallDataBuilder := abiFunc.R(ctx).
 			Input(ethPayload.Inputs)
 		buildErr := txCallDataBuilder.BuildCallData()
 		if buildErr != nil {
-			return nil, true, buildErr
+			return nil, false, buildErr
 		}
 		ethTx = txCallDataBuilder.TX()
 		txType = InFlightTxOperationDeployPreparation

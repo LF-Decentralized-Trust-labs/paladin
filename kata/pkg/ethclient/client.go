@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -332,7 +333,7 @@ func (ec *ethClient) getErrorInfo(ctx context.Context, revertFromReceipt *ethtyp
 
 	// See if the return value is using the default error you get from "revert"
 	var errorMessage string
-	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
+	returnDataBytes, _ := hex.DecodeString(strings.TrimPrefix(revertReason, "0x"))
 	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
 		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
 		if err == nil {

@@ -31,6 +31,8 @@ import (
 )
 
 type inFlightTransactionState struct {
+	testMode bool // Note: this flag can never be set in normal code path, exposed for testing only
+
 	BaseLedgerTxEngineMetricsManager
 	baseTypes.BalanceManager
 
@@ -170,6 +172,9 @@ func (iftxs *inFlightTransactionState) ProcessStageOutputs(ctx context.Context, 
 }
 
 func (iftxs *inFlightTransactionState) AddStageOutputs(ctx context.Context, stageOutput *baseTypes.StageOutput) {
+	if iftxs.testMode {
+		return
+	}
 	iftxs.bufferedStageOutputsMux.Lock()
 	defer iftxs.bufferedStageOutputsMux.Unlock()
 	iftxs.bufferedStageOutputs = append(iftxs.bufferedStageOutputs, stageOutput)
@@ -181,8 +186,11 @@ func NewInFlightTransactionStateManager(thm BaseLedgerTxEngineMetricsManager,
 	txConfirmationListener baseTypes.TransactionConfirmationListener,
 	ifsat baseTypes.InFlightStageActionTriggers,
 	imtxs baseTypes.InMemoryTxStateManager,
-	turnOffHistory bool) baseTypes.InFlightTransactionStateManager {
+	turnOffHistory bool,
+	noEventMode bool,
+) baseTypes.InFlightTransactionStateManager {
 	return &inFlightTransactionState{
+		testMode:                         noEventMode,
 		BaseLedgerTxEngineMetricsManager: thm,
 		BalanceManager:                   bm,
 		txStore:                          txStore,

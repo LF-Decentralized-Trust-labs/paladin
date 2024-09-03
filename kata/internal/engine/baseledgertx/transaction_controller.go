@@ -74,19 +74,6 @@ func InitTransactionControllerConfig(conf config.Section) {
 	controllerConfig.AddKnownKey(TransactionControllerRetryMaxDelayDurationString, defaultTransactionControllerRetryMaxDelay)
 	controllerConfig.AddKnownKey(TransactionControllerRetryFactorFloat, defaultTransactionControllerRetryFactor)
 }
-
-// metrics
-const metricsLabelInFlightEngineState = "eng_state"
-
-const metricsGaugeEnginesInFlightUsedWithState = "eng_in_flight_used_total"
-const metricsGaugeEnginesInFlightUsedWithStateDescription = "Number of transaction engines currently in flight grouped by state"
-
-const metricsGaugeEnginesInFlightFree = "eng_in_flight_free_total"
-const metricsGaugeEnginesInFlightFreeDescription = "Number of space left in the in flight engines pool"
-
-const metricsHistogramTransactionStageDurationNSWithStageName = "tx_process_stages_seconds"
-const metricsHistogramTransactionStageDurationNSWithStageNameDescription = "Duration of in-flight transaction process stayed in a stage grouped by stage"
-
 // role of transaction controller:
 // 1. owner and the only manipulator of the transaction engines pool
 //    - decides how many transaction engines can there be in total at a given time

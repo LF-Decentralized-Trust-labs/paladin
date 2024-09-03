@@ -32,6 +32,9 @@ import (
 )
 
 func calculateTransactionHash(rawTxnData []byte) *types.Bytes32 {
+	if rawTxnData == nil {
+		return nil
+	}
 	msgHash := sha3.NewLegacyKeccak256()
 	msgHash.Write(rawTxnData)
 	hashBytes := types.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
@@ -70,21 +73,8 @@ func (it *InFlightTransaction) submitTX(ctx context.Context, mtx *baseTypes.Mana
 					log.L(ctx).Debugf("Submitted %s successfully with hash=%s", mtx.ID, txHash)
 				}
 			} else {
-				if calculatedTxHash != nil {
-					txHash = calculatedTxHash
-					// we have a calculated hash
-					log.L(ctx).Warnf("Received response for transaction %s, no transaction hash from the response, using the calculated transaction hash %s instead.", mtx.ID, txHash)
-				} else {
-					// no calculated hash, transaction lost, requires an resubmission
-					submissionError = i18n.NewError(ctx, msgs.MsgSubmissionResponseMissingTxHash, mtx.ID)
-					log.L(ctx).Errorf("Received response for transaction %s, no transaction hash from the response.", mtx.ID)
-					if attempt <= it.transactionSubmissionRetryCount {
-						return true, submissionError
-					} else {
-						submissionOutcome = baseTypes.SubmissionOutcomeFailedRequiresRetry
-						return false, nil
-					}
-				}
+				txHash = calculatedTxHash
+				log.L(ctx).Warnf("Received response for transaction %s, no transaction hash from the response, using the calculated transaction hash %s instead.", mtx.ID, txHash)
 			}
 			log.L(ctx).Infof("Transaction %s at nonce %s / %d submitted. Hash: %s", mtx.ID, mtx.From, mtx.Nonce.Int64(), mtx.TransactionHash)
 			submissionOutcome = baseTypes.SubmissionOutcomeSubmittedNew
