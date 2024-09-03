@@ -49,6 +49,12 @@ func (p *publisher) PublishEvent(ctx context.Context, eventPayload interface{}) 
 	// but there are cases where all three of those are being emitted from the same point in the code
 	// and we need to decide how to handle that
 	log.L(ctx).Infof("Publishing event: %v", eventPayload)
+
+	//TODO need to decide if we should leverage (or throwaway) the exising commsbus package.
+	// for now, other than stage events, we only publish to subscribers of the engine and there is exactly one of those
+	// at time of writing - which is the unit test
+	// there may be a future where we want to publish to multiple internal subscribers, in which case we would need to use commsbus
+	// and/or multiple external subscribers
 	p.engine.publishToSubscribers(ctx, eventPayload)
 	return nil
 }
