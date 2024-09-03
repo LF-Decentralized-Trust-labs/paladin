@@ -46,3 +46,47 @@ func writeTestConfig(t *testing.T) (configFile string) {
 
 	return configFile
 }
+
+func TestYAMLConfigWorks(t *testing.T) {
+	yamlConf := `
+db:
+  type: sqlite
+  sqlite:
+    uri:           ":memory:"
+    autoMigrate:   true
+    migrationsDir: any
+    debugQueries:  true
+signer:
+  keyStore:
+    type: static
+    static:
+      keys:
+        seed:
+          encoding: none
+          inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
+rpcServer:
+  http:
+    port: 1234
+  ws:
+    disabled: true
+blockchain:
+   http:
+     url: http://localhost:8545
+   ws:
+     url: ws://localhost:8546
+domains:
+  pente:
+    plugin:
+      type: jar
+      class: any
+    config:
+      address: any
+log:
+  level: debug	
+`
+	var conf componentmgr.Config
+	err := yaml.Unmarshal([]byte(yamlConf), &conf)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, conf.DomainManagerConfig.Domains["pente"].Config)
+}

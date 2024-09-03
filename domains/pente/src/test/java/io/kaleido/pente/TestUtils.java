@@ -13,9 +13,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.evm;
+package io.kaleido.pente;
 
-import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.DelegatingBytes;
 import org.apache.tuweni.units.bigints.UInt256;
 import org.hyperledger.besu.datatypes.Address;

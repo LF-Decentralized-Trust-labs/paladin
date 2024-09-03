@@ -4,3 +4,12 @@ plugins {
 
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
+
+ext {
+    testInfraLocks = []
+    lockTestInfra = { task ->
+        // Add this task to the end of the list of tasks that need the shared test infra
+        task.mustRunAfter(*testInfraLocks)
+        testInfraLocks << task.path
+    }
+}
