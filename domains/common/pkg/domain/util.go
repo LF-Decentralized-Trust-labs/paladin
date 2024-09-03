@@ -13,13 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zeto
+package domain
 
 import (
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-func findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
+func FindVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
 	for _, verifier := range verifiers {
 		if verifier.Lookup == lookup {
 			return verifier
@@ -28,7 +28,7 @@ func findVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedV
 	return nil
 }
 
-func findAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
+func FindAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
 	for _, attestation := range attestations {
 		if attestation.Name == name {
 			return attestation

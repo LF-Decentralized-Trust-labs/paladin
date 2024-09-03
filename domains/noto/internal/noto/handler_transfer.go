@@ -22,12 +22,13 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type transferHandler struct {
-	domainHandler
+	noto *Noto
 }
 
 func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
@@ -41,14 +42,14 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	if transferParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
-	return transferParams, nil
+	return &transferParams, nil
 }
 
-func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+func (h *transferHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    tx.domainConfig.NotaryLookup,
+				Lookup:    tx.DomainConfig.NotaryLookup,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 			// TODO: should we also resolve "From"/"To" parties?
@@ -56,16 +57,16 @@ func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *
 	}, nil
 }
 
-func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.params.(NotoTransferParams)
+func (h *transferHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*NotoTransferParams)
 
-	notary := findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
-	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, tx.transaction.From, params.Amount)
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, tx.Transaction.From, params.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +76,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(tx.transaction.From, ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := h.noto.prepareOutputs(tx.Transaction.From, ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +87,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	var attestation []*pb.AttestationRequest
 	switch h.noto.config.Variant {
 	case "Noto":
-		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.contractAddress, inputCoins, outputCoins)
+		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +105,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.domainConfig.NotaryLookup},
+				Parties:         []string{tx.DomainConfig.NotaryLookup},
 			},
 		}
 	case "NotoSelfSubmit":
@@ -114,7 +115,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.domainConfig.NotaryLookup},
+				Parties:         []string{tx.DomainConfig.NotaryLookup},
 			},
 			// Sender will endorse the assembled transaction (by submitting to the ledger)
 			{
@@ -143,12 +144,12 @@ func (h *transferHandler) validateAmounts(coins *gatheredCoins) error {
 	return nil
 }
 
-func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
-	signature := findAttestation("sender", req.Signatures)
+func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+	signature := domain.FindAttestation("sender", req.Signatures)
 	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
 	}
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.contractAddress, coins.inCoins, coins.outCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
 		return err
 	}
@@ -162,17 +163,17 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *parse
 	return nil
 }
 
-func (h *transferHandler) validateOwners(tx *parsedTransaction, coins *gatheredCoins) error {
+func (h *transferHandler) validateOwners(tx *ParsedTransaction, coins *gatheredCoins) error {
 	for i, coin := range coins.inCoins {
-		if coin.Owner != tx.transaction.From {
-			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.transaction.From)
+		if coin.Owner != tx.Transaction.From {
+			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.Transaction.From)
 		}
 	}
 	return nil
 }
 
-func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	coins, err := h.gatherCoins(req.Inputs, req.Outputs)
+func (h *transferHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+	coins, err := h.noto.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +207,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 				outputIDs[i] = state.Id
 			}
 			data := ethtypes.HexBytes0xPrefix("")
-			encodedTransfer, err := h.noto.encodeTransferMasked(ctx, tx.contractAddress, inputIDs, outputIDs, data)
+			encodedTransfer, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inputIDs, outputIDs, data)
 			if err != nil {
 				return nil, err
 			}
@@ -225,7 +226,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, re
 	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.EndorsementRequest.Name)
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *transferHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -239,13 +240,13 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, re
 	switch h.noto.config.Variant {
 	case "Noto":
 		// Include the signature from the sender (informational only)
-		signature = findAttestation("sender", req.AttestationResult)
+		signature = domain.FindAttestation("sender", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'sender' attestation")
 		}
 	case "NotoSelfSubmit":
 		// Include the signature from the notary (will be verified on base ledger)
-		signature = findAttestation("notary", req.AttestationResult)
+		signature = domain.FindAttestation("notary", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'notary' attestation")
 		}
