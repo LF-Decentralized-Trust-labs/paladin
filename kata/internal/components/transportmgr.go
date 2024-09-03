@@ -25,6 +25,6 @@ type TransportMessage struct {
 }
 
 type TransportManager interface {
-	Send(ctx context.Context, message TransportMessage, identity string) error
+	Send(ctx context.Context, message TransportMessage, nodeId string) error
 	RegisterReceiver(onMessage func(ctx context.Context, message TransportMessage) error) error
 }

@@ -322,7 +322,7 @@ func (s stubTransportManager) RegisterReceiver(onMessage func(ctx context.Contex
 }
 
 // Send implements components.TransportManager.
-func (s stubTransportManager) Send(ctx context.Context, message components.TransportMessage, address string) error {
+func (s stubTransportManager) Send(ctx context.Context, message components.TransportMessage, nodeId string) error {
 	return nil
 }
 
