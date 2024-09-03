@@ -185,7 +185,7 @@ func (e *engine) HandleNewEvent(ctx context.Context, stageEvent *types.StageEven
 	}
 }
 
-func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
+func (e *engine) StartEventListener(ctx context.Context) {
 	e.done = make(chan struct{})
 
 	err := e.components.TransportManager().RegisterReceiver(func(ctx context.Context, message components.TransportMessage) error {
@@ -222,12 +222,6 @@ func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
 		log.L(ctx).Errorf("Failed to start event listener: %s", err)
 		panic(err)
 	}
-
-	go func() {
-		<-done
-		//TODO do we need to tell the transport manager that we are done listening?
-	}()
-	return done
 }
 
 // For now, this is here to help with testing but it seems like it could be useful thing to have
