@@ -380,6 +380,8 @@ func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
 }
 
 func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
+	//TODO This is primarily here to help with testing for now
+	// this needs to be revisited ASAP as part of a holisitic review of the persistence model
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
 	if txProc, ok := oc.incompleteTxSProcessMap[txID]; ok {

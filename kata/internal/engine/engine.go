@@ -166,6 +166,8 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 }
 
 func (e *engine) GetTxStatus(ctx context.Context, domainAddress string, txID string) (status types.TxStatus, err error) {
+	//TODO This is primarily here to help with testing for now
+	// this needs to be revisited ASAP as part of a holisitic review of the persistence model
 	targetOrchestrator := e.orchestrators[domainAddress]
 	if targetOrchestrator == nil {
 		//TODO should be valid to query the status of a transaction that belongs to a domain instance that is not currently active
