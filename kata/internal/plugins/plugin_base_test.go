@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -45,8 +45,8 @@ type mockPlugin struct {
 func (tp *mockPlugin) Conf() *PluginConfig {
 	if tp.conf == nil {
 		tp.conf = &PluginConfig{
-			Type:     types.Enum[LibraryType](LibraryTypeCShared),
-			Location: "/any/where",
+			Type:    types.Enum[LibraryType](LibraryTypeCShared),
+			Library: "/any/where",
 		}
 	}
 	return tp.conf
@@ -54,10 +54,10 @@ func (tp *mockPlugin) Conf() *PluginConfig {
 
 // mockPlugin is used to test generic situations that apply across plugin types.
 // Note in the tests in this file we use Domain plugins, but simply because we have to have a type.
-func (tp *mockPlugin) Run(pluginId, targetURL string) {
+func (tp *mockPlugin) Run(grpcTarget, pluginId string) {
 	t := tp.t
 
-	conn, err := grpc.NewClient(targetURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 

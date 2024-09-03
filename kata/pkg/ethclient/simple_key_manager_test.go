@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,7 +85,7 @@ func TestGenerateIndexes(t *testing.T) {
 	defer done()
 	for iFolder := 0; iFolder < 10; iFolder++ {
 		for iKey := 0; iKey < 10; iKey++ {
-			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+			keyHandle, addr, err := kmgr.ResolveKey(context.Background(), fmt.Sprintf("my/one-use-set-%d/%s", iFolder, uuid.New()), algorithms.ECDSA_SECP256K1_PLAINBYTES)
 			assert.NoError(t, err)
 			assert.NotEmpty(t, ethtypes.MustNewAddress(addr))
 			assert.Equal(t, fmt.Sprintf("m/44'/60'/0'/%d/%d", iFolder, iKey), keyHandle)
@@ -101,7 +102,7 @@ func TestKeyManagerResolveFail(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	_, _, err = kmgr.ResolveKey(context.Background(), "does not exist", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, _, err = kmgr.ResolveKey(context.Background(), "does not exist", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	assert.Regexp(t, "PD011418", err)
 }
 
@@ -118,6 +119,23 @@ func TestKeyManagerResolveConflict(t *testing.T) {
 		},
 	}
 
-	_, _, err := kmgr.ResolveKey(context.Background(), "key1", api.Algorithm_ECDSA_SECP256K1_PLAINBYTES)
+	_, _, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	assert.Regexp(t, "PD011509", err)
+}
+
+func TestKeyManagerResolveSameKeyTwoAlgorithms(t *testing.T) {
+
+	kmgr, done := newTestHDWalletKeyManager(t)
+	defer done()
+
+	kmgr.rootFolder.Keys = map[string]*keyMapping{}
+
+	keyHandle1, verifier1, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	assert.NoError(t, err)
+
+	keyHandle2, verifier2, err := kmgr.ResolveKey(context.Background(), "key1", algorithms.ZKP_BABYJUBJUB_PLAINBYTES)
+	assert.NoError(t, err)
+
+	assert.Equal(t, keyHandle1, keyHandle2)
+	assert.NotEqual(t, verifier1, verifier2)
 }

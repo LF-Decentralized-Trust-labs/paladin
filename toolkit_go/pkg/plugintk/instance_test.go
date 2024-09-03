@@ -26,7 +26,7 @@ import (
 
 func newTestPluginRunner(connString string) *pluginRun[prototk.DomainMessage] {
 	pf := NewDomain(func(callbacks DomainCallbacks) DomainAPI { return nil })
-	pi := newPluginInstance(pf.(*pluginFactory[prototk.DomainMessage]), uuid.NewString(), connString)
+	pi := newPluginInstance(pf.(*pluginFactory[prototk.DomainMessage]), connString, uuid.NewString())
 	return &pluginRun[prototk.DomainMessage]{pi: pi}
 }
 

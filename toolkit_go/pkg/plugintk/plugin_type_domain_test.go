@@ -49,7 +49,7 @@ func setupDomainTests(t *testing.T) (context.Context, *pluginExerciser[prototk.D
 	domainDone := make(chan struct{})
 	go func() {
 		defer close(domainDone)
-		domain.Run(pluginID, "unix:"+tc.socketFile)
+		domain.Run("unix:"+tc.socketFile, pluginID)
 	}()
 	callbacks := <-waitForCallbacks
 

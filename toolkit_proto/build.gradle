@@ -18,12 +18,12 @@ ext {
 }
 
 configurations {
-    toolkitProtoDefinitions {
+    protoDefinitions {
         canBeConsumed = true
         canBeResolved = false
     }
 }
 
 artifacts {
-    toolkitProtoDefinitions(protosDir) {}
+    protoDefinitions(protosDir) {}
 }

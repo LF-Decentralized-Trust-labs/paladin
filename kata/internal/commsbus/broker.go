@@ -23,9 +23,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )

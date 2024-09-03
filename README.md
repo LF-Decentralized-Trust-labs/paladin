@@ -14,7 +14,7 @@ Paladin is a privacy preserving transaction manager for Ethereum.
     - Learn more about [Private Data Transports & Endpoint Registry](./architecture/data_and_registry.md)
 - Paladin supports Privacy Preserving Smart Contracts, and provides samples out-of-the-box
     - Each smart contract has a part of that runs as a EVM smart contract on an **unmodified** EVM blockchain, and a part that runs as part of Paladin
-      - Learn more about [ledger layers](./larchitecture/ledger_layers.md)
+      - Learn more about [ledger layers](./architecture/ledger_layers.md)
     - _Some_ implement `tokens backed by Zero-knowledge Proofs`
       - Learn more about [Zeto](./architecture/zeto.md)
     - _Some_ implement `tokens backed by Notary Certificates` (issuer/signatory endorsed tokens)
@@ -56,6 +56,7 @@ Install the following pre-reqs:
 - JDK [version 21](https://jdk.java.net/archive/) which is compatible with [Gradle version 8.4](./gradle/wrapper/gradle-wrapper.properties)
 - install [protoc](https://grpc.io/docs/protoc-installation/)
 - install [docker with compose plugin](https://docs.docker.com/compose/install/)
+- install npm
 
 
 Run the following command to build Paladin:

@@ -22,11 +22,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) error
@@ -290,11 +290,8 @@ func (dc *domainContext) mergeInMemoryMatches(schema Schema, states []*State, ex
 		}
 	}
 
-	// Sort it in place
+	// Sort it in place - note we ensure we always have a sort instruction on the DB
 	sortInstructions := query.Sort
-	if len(sortInstructions) == 0 {
-		sortInstructions = []string{".created"}
-	}
 	if err = filters.SortValueSetInPlace(dc.ctx, dc.ss.labelSetFor(schema), fullList, sortInstructions...); err != nil {
 		return nil, err
 	}

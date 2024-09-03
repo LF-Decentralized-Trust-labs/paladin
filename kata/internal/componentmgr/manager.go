@@ -32,17 +32,20 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type ComponentManager interface {
 	components.AllComponents
 	Init() error
 	StartComponents() error
+	StartManagers() error
 	CompleteStart() error
 	Stop()
 }
 
 type componentManager struct {
+	grpcTarget   string
 	instanceUUID uuid.UUID
 	bgCtx        context.Context
 	// config
@@ -65,8 +68,8 @@ type componentManager struct {
 	initResults          map[string]*components.ManagerInitResult
 	internalEventStreams []*blockindexer.InternalEventStream
 	// keep track of everything we started
-	started []stoppable
-	opened  []closeable
+	started map[string]stoppable
+	opened  map[string]closeable
 }
 
 // things that have a running component that is active in the background and hence "stops"
@@ -79,32 +82,35 @@ type closeable interface {
 	Close()
 }
 
-func NewComponentManager(bgCtx context.Context, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
+func NewComponentManager(bgCtx context.Context, grpcTarget string, instanceUUID uuid.UUID, conf *Config, engine components.Engine) ComponentManager {
+	log.InitConfig(&conf.Log)
 	return &componentManager{
+		grpcTarget:   grpcTarget, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
 		instanceUUID: instanceUUID,
 		bgCtx:        bgCtx,
 		conf:         conf,
 		engine:       engine,
 		initResults:  make(map[string]*components.ManagerInitResult),
+		started:      make(map[string]stoppable),
+		opened:       make(map[string]closeable),
 	}
 }
 
 func (cm *componentManager) Init() (err error) {
-
 	// pre-init components
 	cm.keyManager, err = ethclient.NewSimpleTestKeyManager(cm.bgCtx, &cm.conf.Signer)
-	err = cm.addIfOpened(cm.keyManager, err, msgs.MsgComponentKeyManagerInitError)
+	err = cm.addIfOpened("key_manager", cm.keyManager, err, msgs.MsgComponentKeyManagerInitError)
 	if err == nil {
 		cm.ethClientFactory, err = ethclient.NewEthClientFactory(cm.bgCtx, cm.keyManager, &cm.conf.Blockchain)
 		err = cm.wrapIfErr(err, msgs.MsgComponentEthClientInitError)
 	}
 	if err == nil {
 		cm.persistence, err = persistence.NewPersistence(cm.bgCtx, &cm.conf.DB)
-		err = cm.addIfOpened(cm.persistence, err, msgs.MsgComponentDBInitError)
+		err = cm.addIfOpened("database", cm.persistence, err, msgs.MsgComponentDBInitError)
 	}
 	if err == nil {
 		cm.stateStore = statestore.NewStateStore(cm.bgCtx, &cm.conf.StateStore, cm.persistence)
-		err = cm.addIfOpened(cm.stateStore, err, msgs.MsgComponentStateStoreInitError)
+		err = cm.addIfOpened("state_store", cm.stateStore, err, msgs.MsgComponentStateStoreInitError)
 	}
 	if err == nil {
 		cm.blockIndexer, err = blockindexer.NewBlockIndexer(cm.bgCtx, &cm.conf.BlockIndexer, &cm.conf.Blockchain.WS, cm.persistence)
@@ -129,7 +135,7 @@ func (cm *componentManager) Init() (err error) {
 
 	// using init of managers, for post-init components
 	if err == nil {
-		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
+		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
 		err = cm.wrapIfErr(err, msgs.MsgComponentPluginCtrlInitError)
 	}
 
@@ -145,7 +151,7 @@ func (cm *componentManager) StartComponents() (err error) {
 
 	// start the eth client
 	err = cm.ethClientFactory.Start()
-	err = cm.addIfStarted(cm.ethClientFactory, err, msgs.MsgComponentEthClientStartError)
+	err = cm.addIfStarted("eth_client", cm.ethClientFactory, err, msgs.MsgComponentEthClientStartError)
 
 	// start the block indexer
 	if err == nil {
@@ -153,7 +159,7 @@ func (cm *componentManager) StartComponents() (err error) {
 	}
 	if err == nil {
 		err = cm.blockIndexer.Start(cm.internalEventStreams...)
-		err = cm.addIfStarted(cm.blockIndexer, err, msgs.MsgComponentBlockIndexerStartError)
+		err = cm.addIfStarted("block_indexer", cm.blockIndexer, err, msgs.MsgComponentBlockIndexerStartError)
 	}
 	if err == nil {
 		// we wait until the block indexer has connected and established the block height
@@ -162,12 +168,14 @@ func (cm *componentManager) StartComponents() (err error) {
 		_, err = cm.blockIndexer.GetBlockListenerHeight(cm.bgCtx)
 		err = cm.wrapIfErr(err, msgs.MsgComponentBlockIndexerStartError)
 	}
+	return err
+}
+
+func (cm *componentManager) StartManagers() (err error) {
 
 	// start the managers
-	if err == nil {
-		err = cm.domainManager.Start()
-		err = cm.addIfStarted(cm.domainManager, err, msgs.MsgComponentDomainStartError)
-	}
+	err = cm.domainManager.Start()
+	err = cm.addIfStarted("domain_manager", cm.domainManager, err, msgs.MsgComponentDomainStartError)
 
 	if err == nil {
 		err = cm.transportManager.Start()
@@ -177,7 +185,7 @@ func (cm *componentManager) StartComponents() (err error) {
 	// start the plugin controller
 	if err == nil {
 		err = cm.pluginController.Start()
-		err = cm.addIfStarted(cm.pluginController, err, msgs.MsgComponentPluginCtrlStartError)
+		err = cm.addIfStarted("plugin_controller", cm.pluginController, err, msgs.MsgComponentPluginCtrlStartError)
 	}
 	return err
 }
@@ -190,14 +198,25 @@ func (cm *componentManager) CompleteStart() error {
 	// start the engine
 	if err == nil {
 		err = cm.engine.Start()
-		err = cm.addIfStarted(cm.engine, err, msgs.MsgComponentEngineStartError)
+		err = cm.addIfStarted(cm.engine.EngineName(), cm.engine, err, msgs.MsgComponentEngineStartError)
 	}
 
 	// start the RPC server last
 	if err == nil {
 		cm.registerRPCModules()
 		err = cm.rpcServer.Start()
-		err = cm.addIfStarted(cm.rpcServer, err, msgs.MsgComponentRPCServerStartError)
+		err = cm.addIfStarted("rpc_server", cm.rpcServer, err, msgs.MsgComponentRPCServerStartError)
+	}
+	if err == nil {
+		httpEndpoint := "disabled"
+		if cm.rpcServer.HTTPAddr() != nil {
+			httpEndpoint = cm.rpcServer.HTTPAddr().String()
+		}
+		wsEndpoint := "disabled"
+		if cm.rpcServer.WSAddr() != nil {
+			httpEndpoint = cm.rpcServer.WSAddr().String()
+		}
+		log.L(cm.bgCtx).Infof("Startup complete. RPC endpoints http=%s ws=%s", httpEndpoint, wsEndpoint)
 	}
 
 	return err
@@ -210,19 +229,19 @@ func (cm *componentManager) wrapIfErr(err error, failMsg i18n.ErrorMessageKey) e
 	return nil
 }
 
-func (cm *componentManager) addIfStarted(c stoppable, err error, failMsg i18n.ErrorMessageKey) error {
+func (cm *componentManager) addIfStarted(desc string, c stoppable, err error, failMsg i18n.ErrorMessageKey) error {
 	if err != nil {
 		return i18n.WrapError(cm.bgCtx, err, failMsg)
 	}
-	cm.started = append(cm.started, c)
+	cm.started[desc] = c
 	return nil
 }
 
-func (cm *componentManager) addIfOpened(c closeable, err error, failMsg i18n.ErrorMessageKey) error {
+func (cm *componentManager) addIfOpened(desc string, c closeable, err error, failMsg i18n.ErrorMessageKey) error {
 	if err != nil {
 		return i18n.WrapError(cm.bgCtx, err, failMsg)
 	}
-	cm.opened = append(cm.opened, c)
+	cm.opened[desc] = c
 	return nil
 }
 
@@ -263,14 +282,20 @@ func (cm *componentManager) registerRPCModules() {
 }
 
 func (cm *componentManager) Stop() {
+	log.L(cm.bgCtx).Info("Stopping")
 	// stop all the stoppable things we started
-	for _, c := range cm.started {
+	for name, c := range cm.started {
+		log.L(cm.bgCtx).Infof("Stopping %s", name)
 		c.Stop()
+		log.L(cm.bgCtx).Debugf("Stopped %s", name)
 	}
 	// close all the closable things we opened
-	for _, c := range cm.opened {
+	for name, c := range cm.opened {
+		log.L(cm.bgCtx).Infof("Stopping %s", name)
 		c.Close()
+		log.L(cm.bgCtx).Debugf("Stopped %s", name)
 	}
+	log.L(cm.bgCtx).Debug("Stopped")
 }
 
 func (cm *componentManager) KeyManager() ethclient.KeyManager {

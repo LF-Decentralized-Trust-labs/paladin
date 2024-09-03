@@ -30,7 +30,8 @@ message ProvingRequestCommon {
   repeated string inputSalts = 3;
   string inputOwner = 4;
   repeated uint64 outputValues = 5;
-  repeated string outputOwners = 6;
+  repeated string outputSalts = 6;
+  repeated string outputOwners = 7;
 }
 
 message SnarkProof {
