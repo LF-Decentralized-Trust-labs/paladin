@@ -19,7 +19,8 @@ package github.com.kaleido_io.paladin.toolkit;
 
 import "to_domain.proto";
 import "from_domain.proto";
-import "transport.proto";
+import "to_transport.proto";
+import "from_transport.proto";
 
 enum PluginType {
   DOMAIN = 0;
@@ -82,24 +83,26 @@ message TransportMessage {
   Header header = 1;
 
   oneof request_to_transport {
-    ConfigureTransportRequest configure_transport = 3001;
-    InitTransportRequest init_transport = 3002;
-    SendMessageRequest send_message = 3003;
+    ConfigureTransportRequest configure_transport =         1010;
+    InitTransportRequest init_transport =                   1020;
+    SendMessageRequest send_message =                       1030;
   }
 
   oneof response_from_transport {
-    ConfigureTransportResponse configure_transport_res = 3004;
-    InitTransportResponse init_transport_res = 3005;
-    SendMessageResponse send_message_res = 3006;
+    ConfigureTransportResponse configure_transport_res =    1011;
+    InitTransportResponse init_transport_res =              1021;
+    SendMessageResponse send_message_res =                  1031;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
   oneof request_from_transport {
-    ReceiveMessageRequest recieve = 3007;
+    ResolveTargetRequest resolve_target =                   2010;
+    ReceiveMessageRequest receive_message =                 2020;
   }
 
   oneof response_to_transport {
-    ReceiveMessageResponse receive_res = 3008;
+    ResolveTargetResponse resolve_target_res =              2011;
+    ReceiveMessageResponse receive_message_res =            2021;
   }
 }
 

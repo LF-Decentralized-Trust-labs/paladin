@@ -19,8 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-
-	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
+	"github.com/kaleido-io/paladin/transports/grpc/internal/grpctransport"
 )
 
 var transport *grpctransport.GRPCTransport

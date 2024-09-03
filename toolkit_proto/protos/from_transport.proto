@@ -17,23 +17,6 @@ syntax = "proto3";
 
 package github.com.kaleido_io.paladin.toolkit;
 
-message ConfigureTransportRequest {
-  string name = 1; // The name
-  string config_yaml = 2; // The block of YAML supplied in the configuration for the domain by the Paladin administrator
-}
-
-message ConfigureTransportResponse {
-    TransportConfig transport_config = 1;
-}
-
-message SendMessageRequest {
-    string transport_details = 1;
-    string body = 2;
-}
-
-message SendMessageResponse {
-}
-
 message ReceiveMessageRequest {
     string body = 1;
 }
@@ -41,11 +24,10 @@ message ReceiveMessageRequest {
 message ReceiveMessageResponse {
 }
 
-message InitTransportRequest {
-    string transport_uuid = 1; // A runtime instance UUID of this transport, that it must supply on all requests
+message ResolveTargetRequest {
+    string target = 1;
 }
 
-message InitTransportResponse {
+message ResolveTargetResponse {
+    string transport_details = 1;
 }
-
-message TransportConfig {}

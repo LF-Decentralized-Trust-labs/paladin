@@ -3,6 +3,7 @@ go 1.22.5
 use (
 	./domains/noto
 	./domains/zeto
+	./transports/grpc
 	./kata
 	./testinfra
 	./toolkit_go

@@ -102,7 +102,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 	}()
 
 	td := &TransportDetails{
-		Address: sendingAddress,
+		Address:       sendingAddress,
 		CaCertificate: string(server2CaCertificate),
 	}
 	transportDetailBytes, err := yaml.Marshal(td)
@@ -110,7 +110,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 
 	tm := &components.TransportMessage{
 		MessageType: "something",
-		Payload: []byte("something"),
+		Payload:     []byte("something"),
 	}
 	tmBytes, err := yaml.Marshal(tm)
 	assert.NoError(t, err)
@@ -153,7 +153,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 
 	tm := &components.TransportMessage{
 		MessageType: "something",
-		Payload: []byte("something"),
+		Payload:     []byte("something"),
 	}
 	tmBytes, err := yaml.Marshal(tm)
 	assert.NoError(t, err)
@@ -194,7 +194,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	client := interpaladin.NewInterPaladinTransportClient(conn)
 
 	fakeMessage := &ExternalMessage{
-		Body: "something",
+		Body:             "something",
 		TransportDetails: "something",
 	}
 
@@ -229,7 +229,7 @@ func TestInboundMessageFlow(t *testing.T) {
 	client := interpaladin.NewInterPaladinTransportClient(conn)
 
 	fakeMessage := &ExternalMessage{
-		Body: "something",
+		Body:             "something",
 		TransportDetails: "something",
 	}
 

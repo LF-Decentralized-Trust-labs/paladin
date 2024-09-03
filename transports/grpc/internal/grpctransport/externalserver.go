@@ -28,9 +28,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 
 	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
@@ -61,7 +61,7 @@ type externalGRPCServer struct {
 	serverCertPool    *x509.CertPool
 
 	// TODO: We probably don't want to do this, what happens when we're not consuming messages correctly?
-	recvMessages chan *components.TransportMessage
+	recvMessages chan *prototk.TransportMessage
 	sendMessages chan *ExternalMessage
 	port         int
 }
@@ -76,7 +76,7 @@ func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls
 	}
 
 	server := &externalGRPCServer{
-		recvMessages:      make(chan *components.TransportMessage, 1),
+		recvMessages:      make(chan *prototk.TransportMessage, 1),
 		sendMessages:      make(chan *ExternalMessage, 1),
 		port:              port,
 		clientCertificate: clientCertificate,
@@ -101,7 +101,7 @@ func (egs *externalGRPCServer) QueueMessageForSend(msg string, transportDetails 
 	return nil
 }
 
-func (egs *externalGRPCServer) GetMessages() <-chan *components.TransportMessage {
+func (egs *externalGRPCServer) GetMessages() <-chan *prototk.TransportMessage {
 	return egs.recvMessages
 }
 
@@ -222,7 +222,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 }
 
 func (egs *externalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *interPaladinPB.InterPaladinMessage) (*interPaladinPB.InterPaladinMessage, error) {
-	transportedMessage := &components.TransportMessage{}
+	transportedMessage := &prototk.TransportMessage{}
 	err := yaml.Unmarshal(message.Body, transportedMessage)
 	if err != nil {
 		return nil, err

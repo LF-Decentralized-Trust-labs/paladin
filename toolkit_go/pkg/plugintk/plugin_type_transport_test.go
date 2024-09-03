@@ -46,10 +46,10 @@ func setupTransportTests(t *testing.T) (context.Context, *pluginExerciser[protot
 	exerciser := newPluginExerciser(t, pluginID, &TransportMessageWrapper{}, inOutMap)
 	tc.fakeTransportController = exerciser.controller
 
-	domainDone := make(chan struct{})
+	transportDone := make(chan struct{})
 	go func() {
-		defer close(domainDone)
-		transport.Run(pluginID, "unix:"+tc.socketFile)
+		defer close(transportDone)
+		transport.Run("unix:"+tc.socketFile, pluginID)
 	}()
 	callbacks := <-waitForCallbacks
 
@@ -57,17 +57,30 @@ func setupTransportTests(t *testing.T) (context.Context, *pluginExerciser[protot
 		checkPanic()
 		transport.Stop()
 		tcDone()
-		<-domainDone
+		<-transportDone
 	}
+}
+
+func TestTransportCallback_ResolveTarget(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_ResolveTarget{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_ResolveTargetRes{
+			ResolveTargetRes: &prototk.ResolveTargetResponse{},
+		}
+	}
+	_, err := callbacks.ResolveTarget(ctx, &prototk.ResolveTargetRequest{})
+	assert.NoError(t, err)
 }
 
 func TestTransportCallback_ReceiveMessage(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
 	defer done()
 
-	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_Recieve{})] = func(dm *prototk.TransportMessage) {
-		dm.ResponseToTransport = &prototk.TransportMessage_ReceiveRes{
-			ReceiveRes: &prototk.ReceiveMessageResponse{},
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_ReceiveMessage{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_ReceiveMessageRes{
+			ReceiveMessageRes: &prototk.ReceiveMessageResponse{},
 		}
 	}
 	_, err := callbacks.Receive(ctx, &prototk.ReceiveMessageRequest{})
@@ -122,5 +135,15 @@ func TestTransportFunction_SendMessage(t *testing.T) {
 		}
 	}, func(res *prototk.TransportMessage) {
 		assert.IsType(t, &prototk.TransportMessage_SendMessageRes{}, res.ResponseFromTransport)
+	})
+}
+
+func TestTransportRequestError(t *testing.T) {
+	_, exerciser, _, _, _, done := setupTransportTests(t)
+	defer done()
+
+	// Check responseToPluginAs handles nil
+	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {}, func(res *prototk.TransportMessage) {
+		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
 	})
 }
