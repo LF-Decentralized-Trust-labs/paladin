@@ -17,9 +17,12 @@ package plugins
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -67,21 +70,53 @@ func (tdm *testTransportManager) TransportRegistered(name string, id uuid.UUID, 
 	return tdm.transportRegistered(name, id, toTransport)
 }
 
+func newTestTransportPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+
+	udsString := tempUDS(t)
+	loaderId := uuid.New()
+	allPlugins := setup.allPlugins()
+	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
+		GRPC: GRPCConfig{
+			ShutdownTimeout: confutil.P("1ms"),
+		},
+	})
+	assert.NoError(t, err)
+
+	err = pc.Start()
+	assert.NoError(t, err)
+
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tpl.Run()
+	}()
+
+	return ctx, pc.(*pluginController), func() {
+		recovered := recover()
+		if recovered != nil {
+			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
+			panic(recovered)
+		}
+		cancelCtx()
+		pc.Stop()
+		tpl.Stop()
+		<-done
+	}
+
+}
+
 func TestTransportRequestsOK(t *testing.T) {
 
 	waitForAPI := make(chan TransportManagerToTransport, 1)
 	waitForCallbacks := make(chan plugintk.TransportCallbacks, 1)
 
-	var transportID string
 	transportFunctions := &plugintk.TransportAPIFunctions{
 		ConfigureTransport: func(ctx context.Context, cdr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
-			return &prototk.ConfigureTransportResponse{
-				TransportConfig: &prototk.TransportConfig{},
-			}, nil
-		},
-		InitTransport: func(ctx context.Context, idr *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
-			assert.Equal(t, transportID, idr.TransportUuid)
-			return &prototk.InitTransportResponse{}, nil
+			return &prototk.ConfigureTransportResponse{}, nil
 		},
 		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 			assert.Equal(t, "node1", smr.Node)
@@ -99,7 +134,6 @@ func TestTransportRequestsOK(t *testing.T) {
 	}
 	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
 		assert.Equal(t, "transport1", name)
-		transportID = id.String()
 		waitForAPI <- toTransport
 		return ttm, nil
 	}
@@ -123,11 +157,6 @@ func TestTransportRequestsOK(t *testing.T) {
 	transportAPI := <-waitForAPI
 
 	_, err := transportAPI.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{})
-	assert.NoError(t, err)
-
-	_, err = transportAPI.InitTransport(ctx, &prototk.InitTransportRequest{
-		TransportUuid: transportID,
-	})
 	assert.NoError(t, err)
 
 	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{

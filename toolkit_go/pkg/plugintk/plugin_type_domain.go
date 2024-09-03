@@ -46,7 +46,7 @@ func NewDomain(df DomainFactory) PluginBase {
 		factory: df,
 	}
 	return NewPluginBase(
-		prototk.PluginType_DOMAIN,
+		prototk.PluginInfo_DOMAIN,
 		func(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
 			return client.ConnectDomain(ctx)
 		},

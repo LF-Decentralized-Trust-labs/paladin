@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/registrymgr"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
@@ -38,6 +39,7 @@ type Config struct {
 	domainmgr.DomainManagerConfig       `yaml:",inline"`
 	plugins.PluginControllerConfig      `yaml:",inline"`
 	transportmgr.TransportManagerConfig `yaml:",inline"`
+	registrymgr.RegistryManagerConfig   `yaml:",inline"`
 	Log                                 log.Config          `yaml:"log"`
 	Blockchain                          ethclient.Config    `yaml:"blockchain"`
 	DB                                  persistence.Config  `yaml:"db"`

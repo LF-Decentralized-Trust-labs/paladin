@@ -17,9 +17,10 @@ syntax = "proto3";
 
 package github.com.kaleido_io.paladin.toolkit;
 
-message ConfigureRegistryRequest {
-    string name = 1; // The name
-    string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
+message UpsertTransportDetails {
+    string node = 1; // The node
+    string transport_details = 2; // The transport details (opaque to registry)
   }
 
-message ConfigureRegistryResponse {}
+message UpsertTransportDetailsResponse {}
+

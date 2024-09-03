@@ -22,12 +22,7 @@ import "from_domain.proto";
 import "to_transport.proto";
 import "from_transport.proto";
 import "to_registry.proto";
-
-enum PluginType {
-  DOMAIN = 0;
-  TRANSPORT = 1;
-  REGISTRY = 2;
-}
+import "from_registry.proto";
 
 message Header {
   enum MessageType {
@@ -111,25 +106,21 @@ message RegistryMessage {
 
   oneof request_to_registry {
     ConfigureRegistryRequest configure_registry =                   1010;
-    ResolveTransportDetailsRequest resolve_transport_details =      1030;
   }
 
   oneof response_from_registry {
     ConfigureRegistryResponse configure_registry_res =              1011;
-    ResolveTransportDetailsResponse resolve_transport_details_res = 1021;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
   oneof request_from_registry {
-    None _no_requests =                                             2990;
+    UpsertTransportDetails upsert_transport_details =               2010;
   }
 
   oneof response_to_registry {
-    None _no_responses =                                            2991;
+    UpsertTransportDetailsResponse upsert_transport_details_res   = 2011;
   }
 }
-
-message None {}
 
 // establishes the long-lived connection
 message PluginLoaderInit {
@@ -140,6 +131,7 @@ message PluginInfo {
   enum PluginType {
     DOMAIN = 0;
     TRANSPORT = 1;
+    REGISTRY = 2;
   }
   string id = 1; // UUID that is unique to this runtime instance of the domain
   string name = 2; // The plugin manager ensures only once instance is loaded with this ID

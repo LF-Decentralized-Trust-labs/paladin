@@ -37,11 +37,11 @@ type TransportCallbacks interface {
 type TransportFactory func(callbacks TransportCallbacks) TransportAPI
 
 func NewTransport(df TransportFactory) PluginBase {
-	impl := &TransportPlugin{
+	impl := &transportPlugin{
 		factory: df,
 	}
 	return NewPluginBase(
-		prototk.PluginType_TRANSPORT,
+		prototk.PluginInfo_TRANSPORT,
 		func(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.TransportMessage, prototk.TransportMessage], error) {
 			return client.ConnectTransport(ctx)
 		},
@@ -86,7 +86,7 @@ func (pm *TransportPluginMessage) ProtoMessage() pb.Message {
 
 type TransportMessageWrapper struct{}
 
-type TransportPlugin struct {
+type transportPlugin struct {
 	TransportMessageWrapper
 	factory TransportFactory
 }
@@ -95,22 +95,22 @@ func (tmw *TransportMessageWrapper) Wrap(m *prototk.TransportMessage) PluginMess
 	return &TransportPluginMessage{m: m}
 }
 
-func (tmw *TransportPlugin) NewHandler(proxy PluginProxy[prototk.TransportMessage]) PluginHandler[prototk.TransportMessage] {
-	th := &TransportHandler{
-		TransportPlugin: tmw,
+func (tp *transportPlugin) NewHandler(proxy PluginProxy[prototk.TransportMessage]) PluginHandler[prototk.TransportMessage] {
+	th := &transportHandler{
+		transportPlugin: tp,
 		proxy:           proxy,
 	}
-	th.api = tmw.factory(th)
+	th.api = tp.factory(th)
 	return th
 }
 
-type TransportHandler struct {
-	*TransportPlugin
+type transportHandler struct {
+	*transportPlugin
 	api   TransportAPI
 	proxy PluginProxy[prototk.TransportMessage]
 }
 
-func (th *TransportHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage[prototk.TransportMessage]) (PluginMessage[prototk.TransportMessage], error) {
+func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage[prototk.TransportMessage]) (PluginMessage[prototk.TransportMessage], error) {
 	req := iReq.Message()
 	res := &prototk.TransportMessage{}
 	var err error
@@ -129,7 +129,7 @@ func (th *TransportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 	return th.Wrap(res), err
 }
 
-func (th *TransportHandler) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (th *transportHandler) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	res, err := th.proxy.RequestFromPlugin(ctx, th.Wrap(&prototk.TransportMessage{
 		RequestFromTransport: &prototk.TransportMessage_ReceiveMessage{
 			ReceiveMessage: req,
@@ -140,7 +140,7 @@ func (th *TransportHandler) Receive(ctx context.Context, req *prototk.ReceiveMes
 	})
 }
 
-func (th *TransportHandler) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+func (th *transportHandler) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
 	res, err := th.proxy.RequestFromPlugin(ctx, th.Wrap(&prototk.TransportMessage{
 		RequestFromTransport: &prototk.TransportMessage_GetTransportDetails{
 			GetTransportDetails: req,

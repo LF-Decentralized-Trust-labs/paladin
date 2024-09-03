@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/registrymgr"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
@@ -62,6 +63,7 @@ type componentManager struct {
 	// managers
 	domainManager    components.DomainManager
 	transportManager components.TransportManager
+	registryManager  components.RegistryManager
 	// engine
 	engine components.Engine
 	// init to start tracking
@@ -133,6 +135,11 @@ func (cm *componentManager) Init() (err error) {
 		cm.initResults["transports_mgr"], err = cm.transportManager.Init(cm)
 	}
 
+	if err == nil {
+		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerConfig)
+		cm.initResults["registry_mgr"], err = cm.registryManager.Init(cm)
+	}
+
 	// using init of managers, for post-init components
 	if err == nil {
 		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
@@ -179,7 +186,12 @@ func (cm *componentManager) StartManagers() (err error) {
 
 	if err == nil {
 		err = cm.transportManager.Start()
-		cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentDomainStartError)
+		cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentTransportStartError)
+	}
+
+	if err == nil {
+		err = cm.registryManager.Start()
+		cm.addIfStarted("registry_manager", cm.registryManager, err, msgs.MsgComponentRegistryStartError)
 	}
 
 	// start the plugin controller
@@ -336,6 +348,14 @@ func (cm *componentManager) TransportManager() components.TransportManager {
 
 func (cm *componentManager) TransportRegistration() plugins.TransportRegistration {
 	return cm.transportManager
+}
+
+func (cm *componentManager) RegistryManager() components.RegistryManager {
+	return cm.registryManager
+}
+
+func (cm *componentManager) RegistryRegistration() plugins.RegistryRegistration {
+	return cm.registryManager
 }
 
 func (cm *componentManager) PluginController() plugins.PluginController {

@@ -12,14 +12,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package registrymgr
 
-syntax = "proto3";
+import (
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"gopkg.in/yaml.v3"
+)
 
-package github.com.kaleido_io.paladin.toolkit;
+type RegistryManagerConfig struct {
+	Registries map[string]*RegistryConfig `yaml:"registries"`
+}
 
-message ConfigureRegistryRequest {
-    string name = 1; // The name
-    string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
-  }
+type RegistryInitConfig struct {
+	Retry retry.Config `yaml:"retry"`
+}
 
-message ConfigureRegistryResponse {}
+type RegistryConfig struct {
+	Init   RegistryInitConfig   `yaml:"init"`
+	Plugin plugins.PluginConfig `yaml:"plugin"`
+	Config yaml.Node            `yaml:"config"`
+}

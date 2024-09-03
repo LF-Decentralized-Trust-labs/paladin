@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package transportmgr
+package registrymgr
 
 import (
 	"context"
@@ -31,15 +31,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type transport struct {
+type registry struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf *TransportConfig
-	tm   *transportManager
+	conf *RegistryConfig
+	tm   *registryManager
 	id   uuid.UUID
 	name string
-	api  plugins.TransportManagerToTransport
+	api  plugins.RegistryManagerToRegistry
 
 	initialized atomic.Bool
 	initRetry   *retry.Retry
@@ -48,53 +48,53 @@ type transport struct {
 	initDone  chan struct{}
 }
 
-func (tm *transportManager) newTransport(id uuid.UUID, name string, conf *TransportConfig, toTransport plugins.TransportManagerToTransport) *transport {
-	t := &transport{
+func (tm *registryManager) newRegistry(id uuid.UUID, name string, conf *RegistryConfig, toRegistry plugins.RegistryManagerToRegistry) *registry {
+	t := &registry{
 		tm:        tm,
 		conf:      conf,
 		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
 		name:      name,
 		id:        id,
-		api:       toTransport,
+		api:       toRegistry,
 		initDone:  make(chan struct{}),
 	}
-	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "transport", t.name))
+	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "registry", t.name))
 	return t
 }
 
-func (t *transport) init() {
+func (t *registry) init() {
 	defer close(t.initDone)
 
 	// We block retrying each part of init until we succeed, or are cancelled
-	// (which the plugin manager will do if the transport disconnects)
+	// (which the plugin manager will do if the registry disconnects)
 	err := t.initRetry.Do(t.ctx, func(attempt int) (bool, error) {
-		// Send the configuration to the transport for processing
+		// Send the configuration to the registry for processing
 		confJSON, _ := json.Marshal(&t.conf.Config)
-		_, err := t.api.ConfigureTransport(t.ctx, &prototk.ConfigureTransportRequest{
+		_, err := t.api.ConfigureRegistry(t.ctx, &prototk.ConfigureRegistryRequest{
 			Name:       t.name,
 			ConfigJson: string(confJSON),
 		})
 		return true, err
 	})
 	if err != nil {
-		log.L(t.ctx).Debugf("transport initialization cancelled before completion: %s", err)
+		log.L(t.ctx).Debugf("registry initialization cancelled before completion: %s", err)
 		t.initError.Store(&err)
 	} else {
-		log.L(t.ctx).Debugf("transport initialization complete")
+		log.L(t.ctx).Debugf("registry initialization complete")
 		t.initialized.Store(true)
 		// Inform the plugin manager callback
 		t.api.Initialized()
 	}
 }
 
-func (t *transport) checkInit(ctx context.Context) error {
+func (t *registry) checkInit(ctx context.Context) error {
 	if !t.initialized.Load() {
 		return i18n.NewError(ctx, msgs.MsgDomainNotInitialized)
 	}
 	return nil
 }
 
-func (t *transport) Send(ctx context.Context, message *components.TransportMessage) error {
+func (t *registry) Send(ctx context.Context, message *components.RegistryMessage) error {
 	if err := t.checkInit(ctx); err != nil {
 		return err
 	}
@@ -110,27 +110,23 @@ func (t *transport) Send(ctx context.Context, message *components.TransportMessa
 	return nil
 }
 
-// Transport callback to the transport manager when a message is received
-func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+// Registry callback to the registry manager when a message is received
+func (t *registry) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	if err := t.checkInit(ctx); err != nil {
 		return nil, err
 	}
 
-	transportMessage := &components.TransportMessage{}
-	err := yaml.Unmarshal([]byte(req.Body), transportMessage)
+	registryMessage := &components.RegistryMessage{}
+	err := yaml.Unmarshal([]byte(req.Body), registryMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	t.tm.receiveExternalMessage(transportMessage)
+	t.tm.receiveExternalMessage(*registryMessage)
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
-func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	panic("todo")
-}
-
-func (t *transport) close() {
+func (t *registry) close() {
 	t.cancelCtx()
 	<-t.initDone
 }

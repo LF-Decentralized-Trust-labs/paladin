@@ -13,13 +13,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-syntax = "proto3";
+package components
 
-package github.com.kaleido_io.paladin.toolkit;
+import (
+	"context"
 
-message ConfigureRegistryRequest {
-    string name = 1; // The name
-    string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
-  }
+	"github.com/kaleido-io/paladin/kata/internal/plugins"
+)
 
-message ConfigureRegistryResponse {}
+type RegistryManager interface {
+	ManagerLifecycle
+	plugins.RegistryRegistration
+	ResolveTransportDetails(ctx context.Context, node string) (string, error)
+}

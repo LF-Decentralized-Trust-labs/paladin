@@ -96,6 +96,8 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.DomainRegistration())
 	assert.NotNil(t, cm.TransportManager())
 	assert.NotNil(t, cm.TransportRegistration())
+	assert.NotNil(t, cm.RegistryManager())
+	assert.NotNil(t, cm.RegistryRegistration())
 	assert.NotNil(t, cm.PluginController())
 	assert.NotNil(t, cm.Engine())
 
@@ -144,7 +146,11 @@ func TestStartOK(t *testing.T) {
 	mockTransportManager := componentmocks.NewTransportManager(t)
 	mockTransportManager.On("Start").Return(nil)
 	mockTransportManager.On("Stop").Return()
-	
+
+	mockRegistryManager := componentmocks.NewRegistryManager(t)
+	mockRegistryManager.On("Start").Return(nil)
+	mockRegistryManager.On("Stop").Return()
+
 	mockStateStore := componentmocks.NewStateStore(t)
 	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
 

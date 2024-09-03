@@ -59,6 +59,8 @@ var (
 	MsgComponentWaitPluginStartError   = ffe("PD010016", "Error waiting for plugins to start")
 	MsgComponentEngineInitError        = ffe("PD010017", "Error initializing engine")
 	MsgComponentEngineStartError       = ffe("PD010018", "Error starting engine")
+	MsgComponentTransportStartError    = ffe("PD010019", "Error starting transport manager")
+	MsgComponentRegistryStartError     = ffe("PD010020", "Error starting registry manager")
 
 	// States PD0101XX
 	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")

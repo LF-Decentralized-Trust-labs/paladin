@@ -26,19 +26,20 @@ import (
 
 type RegistryAPI interface {
 	ConfigureRegistry(context.Context, *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error)
-	ResolveTransportDetails(context.Context, *prototk.ResolveTransportDetailsRequest) (*prototk.ResolveTransportDetailsResponse, error)
 }
 
-type RegistryCallbacks interface{}
+type RegistryCallbacks interface {
+	UpsertTransportDetails(context.Context, *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error)
+}
 
 type RegistryFactory func(callbacks RegistryCallbacks) RegistryAPI
 
 func NewRegistry(df RegistryFactory) PluginBase {
-	impl := &RegistryPlugin{
+	impl := &registryPlugin{
 		factory: df,
 	}
 	return NewPluginBase(
-		prototk.PluginType_TRANSPORT,
+		prototk.PluginInfo_REGISTRY,
 		func(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.RegistryMessage, prototk.RegistryMessage], error) {
 			return client.ConnectRegistry(ctx)
 		},
@@ -83,7 +84,7 @@ func (pm *RegistryPluginMessage) ProtoMessage() pb.Message {
 
 type RegistryMessageWrapper struct{}
 
-type RegistryPlugin struct {
+type registryPlugin struct {
 	RegistryMessageWrapper
 	factory RegistryFactory
 }
@@ -92,22 +93,22 @@ func (tmw *RegistryMessageWrapper) Wrap(m *prototk.RegistryMessage) PluginMessag
 	return &RegistryPluginMessage{m: m}
 }
 
-func (tmw *RegistryPlugin) NewHandler(proxy PluginProxy[prototk.RegistryMessage]) PluginHandler[prototk.RegistryMessage] {
-	th := &RegistryHandler{
-		RegistryPlugin: tmw,
+func (rp *registryPlugin) NewHandler(proxy PluginProxy[prototk.RegistryMessage]) PluginHandler[prototk.RegistryMessage] {
+	th := &registryHandler{
+		registryPlugin: rp,
 		proxy:          proxy,
 	}
-	th.api = tmw.factory(th)
+	th.api = rp.factory(th)
 	return th
 }
 
-type RegistryHandler struct {
-	*RegistryPlugin
+type registryHandler struct {
+	*registryPlugin
 	api   RegistryAPI
 	proxy PluginProxy[prototk.RegistryMessage]
 }
 
-func (th *RegistryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage[prototk.RegistryMessage]) (PluginMessage[prototk.RegistryMessage], error) {
+func (th *registryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessage[prototk.RegistryMessage]) (PluginMessage[prototk.RegistryMessage], error) {
 	req := iReq.Message()
 	res := &prototk.RegistryMessage{}
 	var err error
@@ -116,19 +117,25 @@ func (th *RegistryHandler) RequestToPlugin(ctx context.Context, iReq PluginMessa
 		resMsg := &prototk.RegistryMessage_ConfigureRegistryRes{}
 		resMsg.ConfigureRegistryRes, err = th.api.ConfigureRegistry(ctx, input.ConfigureRegistry)
 		res.ResponseFromRegistry = resMsg
-	case *prototk.RegistryMessage_ResolveTransportDetails:
-		resMsg := &prototk.RegistryMessage_ResolveTransportDetailsRes{}
-		resMsg.ResolveTransportDetailsRes, err = th.api.ResolveTransportDetails(ctx, input.ResolveTransportDetails)
-		res.ResponseFromRegistry = resMsg
 	default:
 		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
 	}
 	return th.Wrap(res), err
 }
 
+func (dh *registryHandler) UpsertTransportDetails(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
+	res, err := dh.proxy.RequestFromPlugin(ctx, dh.Wrap(&prototk.RegistryMessage{
+		RequestFromRegistry: &prototk.RegistryMessage_UpsertTransportDetails{
+			UpsertTransportDetails: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.RegistryMessage_UpsertTransportDetailsRes) *prototk.UpsertTransportDetailsResponse {
+		return msg.UpsertTransportDetailsRes
+	})
+}
+
 type RegistryAPIFunctions struct {
-	ConfigureRegistry       func(context.Context, *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error)
-	ResolveTransportDetails func(context.Context, *prototk.ResolveTransportDetailsRequest) (*prototk.ResolveTransportDetailsResponse, error)
+	ConfigureRegistry func(context.Context, *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error)
 }
 
 type RegistryAPIBase struct {
@@ -137,8 +144,4 @@ type RegistryAPIBase struct {
 
 func (tb *RegistryAPIBase) ConfigureRegistry(ctx context.Context, req *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
 	return callPluginImpl(ctx, req, tb.Functions.ConfigureRegistry)
-}
-
-func (tb *RegistryAPIBase) ResolveTransportDetails(ctx context.Context, req *prototk.ResolveTransportDetailsRequest) (*prototk.ResolveTransportDetailsResponse, error) {
-	return callPluginImpl(ctx, req, tb.Functions.ResolveTransportDetails)
 }

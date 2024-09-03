@@ -16,6 +16,7 @@ package plugintk
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -60,6 +61,19 @@ func setupRegistryTests(t *testing.T) (context.Context, *pluginExerciser[prototk
 	}
 }
 
+func TestRegistryallback_UpsertTransportDetails(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupRegistryTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.RegistryMessage_UpsertTransportDetails{})] = func(dm *prototk.RegistryMessage) {
+		dm.ResponseToRegistry = &prototk.RegistryMessage_UpsertTransportDetailsRes{
+			UpsertTransportDetailsRes: &prototk.UpsertTransportDetailsResponse{},
+		}
+	}
+	_, err := callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{})
+	assert.NoError(t, err)
+}
+
 func TestRegistryFunction_ConfigureRegistry(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupRegistryTests(t)
 	defer done()
@@ -77,23 +91,6 @@ func TestRegistryFunction_ConfigureRegistry(t *testing.T) {
 	})
 }
 
-func TestRegistryFunction_ResolveTransportDetails(t *testing.T) {
-	_, exerciser, funcs, _, _, done := setupRegistryTests(t)
-	defer done()
-
-	// InitRegistry - paladin to registry
-	funcs.ResolveTransportDetails = func(ctx context.Context, cdr *prototk.ResolveTransportDetailsRequest) (*prototk.ResolveTransportDetailsResponse, error) {
-		return &prototk.ResolveTransportDetailsResponse{}, nil
-	}
-	exerciser.doExchangeToPlugin(func(req *prototk.RegistryMessage) {
-		req.RequestToRegistry = &prototk.RegistryMessage_ResolveTransportDetails{
-			ResolveTransportDetails: &prototk.ResolveTransportDetailsRequest{},
-		}
-	}, func(res *prototk.RegistryMessage) {
-		assert.IsType(t, &prototk.RegistryMessage_ResolveTransportDetailsRes{}, res.ResponseFromRegistry)
-	})
-}
-
 func TestRegistryRequestError(t *testing.T) {
 	_, exerciser, _, _, _, done := setupRegistryTests(t)
 	defer done()
@@ -102,4 +99,10 @@ func TestRegistryRequestError(t *testing.T) {
 	exerciser.doExchangeToPlugin(func(req *prototk.RegistryMessage) {}, func(res *prototk.RegistryMessage) {
 		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
 	})
+}
+
+func TestRegistryWrapperFields(t *testing.T) {
+	m := &RegistryPluginMessage{m: &prototk.RegistryMessage{}}
+	assert.Nil(t, m.RequestFromPlugin())
+	assert.Nil(t, m.ResponseToPlugin())
 }

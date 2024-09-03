@@ -35,6 +35,7 @@ import (
 type Managers interface {
 	DomainRegistration() DomainRegistration
 	TransportRegistration() TransportRegistration
+	RegistryRegistration() RegistryRegistration
 }
 
 type PluginController interface {
@@ -64,6 +65,9 @@ type pluginController struct {
 	transportManager TransportRegistration
 	transportPlugins map[uuid.UUID]*plugin[prototk.TransportMessage]
 
+	registryManager RegistryRegistration
+	registryPlugins map[uuid.UUID]*plugin[prototk.RegistryMessage]
+
 	notifyPluginsUpdated chan bool
 	pluginLoaderDone     chan struct{}
 	loadingProgressed    chan *prototk.PluginLoadFailed
@@ -87,6 +91,9 @@ func NewPluginController(bgCtx context.Context,
 
 		transportManager: managers.TransportRegistration(),
 		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
+
+		registryManager: managers.RegistryRegistration(),
+		registryPlugins: make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
@@ -205,6 +212,11 @@ func (pc *pluginController) ReloadPluginList() (err error) {
 	for name, tp := range pc.transportManager.ConfiguredTransports() {
 		if err == nil {
 			err = initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp)
+		}
+	}
+	for name, tp := range pc.registryManager.ConfiguredRegistries() {
+		if err == nil {
+			err = initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
 	if err != nil {

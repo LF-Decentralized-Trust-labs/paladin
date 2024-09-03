@@ -16,9 +16,7 @@ package plugins
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -49,6 +47,7 @@ func tempUDS(t *testing.T) string {
 type testManagers struct {
 	testDomainManager    *testDomainManager
 	testTransportManager *testTransportManager
+	testRegistryManager  *testRegistryManager
 }
 
 func (ts *testManagers) DomainRegistration() DomainRegistration {
@@ -65,6 +64,13 @@ func (ts *testManagers) TransportRegistration() TransportRegistration {
 	return ts.testTransportManager
 }
 
+func (ts *testManagers) RegistryRegistration() RegistryRegistration {
+	if ts.testRegistryManager == nil {
+		ts.testRegistryManager = &testRegistryManager{}
+	}
+	return ts.testRegistryManager
+}
+
 func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	testPlugins := make(map[string]plugintk.Plugin)
 	for name, td := range ts.DomainRegistration().(*testDomainManager).domains {
@@ -73,85 +79,10 @@ func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	for name, td := range ts.TransportRegistration().(*testTransportManager).transports {
 		testPlugins[name] = td
 	}
+	for name, td := range ts.RegistryRegistration().(*testRegistryManager).registries {
+		testPlugins[name] = td
+	}
 	return testPlugins
-}
-
-func newTestDomainPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
-
-	udsString := tempUDS(t)
-	loaderId := uuid.New()
-	allPlugins := setup.allPlugins()
-	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
-		GRPC: GRPCConfig{
-			ShutdownTimeout: confutil.P("1ms"),
-		},
-	})
-	assert.NoError(t, err)
-
-	err = pc.Start()
-	assert.NoError(t, err)
-
-	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
-	assert.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		tpl.Run()
-	}()
-
-	return ctx, pc.(*pluginController), func() {
-		recovered := recover()
-		if recovered != nil {
-			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
-			panic(recovered)
-		}
-		cancelCtx()
-		pc.Stop()
-		tpl.Stop()
-		<-done
-	}
-
-}
-
-func newTestTransportPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
-
-	udsString := tempUDS(t)
-	loaderId := uuid.New()
-	allPlugins := setup.allPlugins()
-	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
-		GRPC: GRPCConfig{
-			ShutdownTimeout: confutil.P("1ms"),
-		},
-	})
-	assert.NoError(t, err)
-
-	err = pc.Start()
-	assert.NoError(t, err)
-
-	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
-	assert.NoError(t, err)
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		tpl.Run()
-	}()
-
-	return ctx, pc.(*pluginController), func() {
-		recovered := recover()
-		if recovered != nil {
-			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
-			panic(recovered)
-		}
-		cancelCtx()
-		pc.Stop()
-		tpl.Stop()
-		<-done
-	}
-
 }
 
 func TestControllerStartGracefulShutdownNoConns(t *testing.T) {

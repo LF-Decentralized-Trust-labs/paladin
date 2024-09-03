@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package transportmgr
+package registrymgr
 
 import (
 	"context"
@@ -29,118 +29,118 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type transportManager struct {
+type registryManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf      *TransportManagerConfig
+	conf      *RegistryManagerConfig
 	localNode string
 
-	transportsByID   map[uuid.UUID]*transport
-	transportsByName map[string]*transport
+	registriesByID   map[uuid.UUID]*registry
+	registriesByName map[string]*registry
 
-	recvMessages chan *components.TransportMessage
+	recvMessages chan components.RegistryMessage
 }
 
-func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
-	return &transportManager{
+func NewRegistryManager(bgCtx context.Context, conf *RegistryManagerConfig) components.RegistryManager {
+	return &registryManager{
 		bgCtx:            bgCtx,
 		conf:             conf,
-		recvMessages:     make(chan *components.TransportMessage, 1),
-		transportsByID:   make(map[uuid.UUID]*transport),
-		transportsByName: make(map[string]*transport),
+		recvMessages:     make(chan components.RegistryMessage, 1),
+		registriesByID:   make(map[uuid.UUID]*registry),
+		registriesByName: make(map[string]*registry),
 	}
 }
 
-func (tm *transportManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
-	// TransportManager does not rely on any other components during the pre-init phase (at the moment)
+func (tm *registryManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+	// RegistryManager does not rely on any other components during the pre-init phase (at the moment)
 	// for QoS we may need persistence in the future, and this will be the plug point for the registry
 	// when we have it
 
 	return &components.ManagerInitResult{}, nil
 }
 
-func (tm *transportManager) Start() error { return nil }
+func (tm *registryManager) Start() error { return nil }
 
-func (tm *transportManager) Stop() {
+func (tm *registryManager) Stop() {
 	tm.mux.Lock()
-	var allTransports []*transport
-	for _, t := range tm.transportsByID {
-		allTransports = append(allTransports, t)
+	var allRegistries []*registry
+	for _, t := range tm.registriesByID {
+		allRegistries = append(allRegistries, t)
 	}
 	tm.mux.Unlock()
-	for _, t := range allTransports {
-		tm.cleanupTransport(t)
+	for _, t := range allRegistries {
+		tm.cleanupRegistry(t)
 	}
 
 }
 
-func (tm *transportManager) cleanupTransport(t *transport) {
-	// must not hold the transport lock when running this
+func (tm *registryManager) cleanupRegistry(t *registry) {
+	// must not hold the registry lock when running this
 	t.close()
-	delete(tm.transportsByID, t.id)
-	delete(tm.transportsByName, t.name)
+	delete(tm.registriesByID, t.id)
+	delete(tm.registriesByName, t.name)
 }
 
-func (tm *transportManager) ConfiguredTransports() map[string]*plugins.PluginConfig {
+func (tm *registryManager) ConfiguredRegistries() map[string]*plugins.PluginConfig {
 	pluginConf := make(map[string]*plugins.PluginConfig)
-	for name, conf := range tm.conf.Transports {
+	for name, conf := range tm.conf.Registries {
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
 }
 
-func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTransport plugins.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+func (tm *registryManager) RegistryRegistered(name string, id uuid.UUID, toRegistry plugins.RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
 	tm.mux.Lock()
 	defer tm.mux.Unlock()
 
 	// Replaces any previously registered instance
-	existing := tm.transportsByName[name]
+	existing := tm.registriesByName[name]
 	for existing != nil {
 		// Can't hold the lock in cleanup, hence the loop
 		tm.mux.Unlock()
-		tm.cleanupTransport(existing)
+		tm.cleanupRegistry(existing)
 		tm.mux.Lock()
-		existing = tm.transportsByName[name]
+		existing = tm.registriesByName[name]
 	}
 
-	// Get the config for this transport
-	conf := tm.conf.Transports[name]
+	// Get the config for this registry
+	conf := tm.conf.Registries[name]
 	if conf == nil {
 		// Shouldn't be possible
 		return nil, i18n.NewError(tm.bgCtx, msgs.MsgDomainNotFound, name)
 	}
 
 	// Initialize
-	t := tm.newTransport(id, name, conf, toTransport)
-	tm.transportsByID[id] = t
-	tm.transportsByName[name] = t
+	t := tm.newRegistry(id, name, conf, toRegistry)
+	tm.registriesByID[id] = t
+	tm.registriesByName[name] = t
 	go t.init()
 	return t, nil
 }
 
-func (tm *transportManager) getTransportByName(ctx context.Context, name string) (*transport, error) {
+func (tm *registryManager) getRegistryByName(ctx context.Context, name string) (*registry, error) {
 	tm.mux.Lock()
 	defer tm.mux.Unlock()
-	t := tm.transportsByName[name]
+	t := tm.registriesByName[name]
 	if t == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgDomainNotFound, name)
 	}
 	return t, nil
 }
 
-// Internal callback method from the transports to the manager
-func (tm *transportManager) receiveExternalMessage(msg *components.TransportMessage) {
+// Internal callback method from the registries to the manager
+func (tm *registryManager) receiveExternalMessage(msg components.RegistryMessage) {
 	tm.recvMessages <- msg
 }
 
-// Send implements TransportManager
-func (tm *transportManager) Send(ctx context.Context, msgInput *components.TransportMessageInput) error {
+// Send implements RegistryManager
+func (tm *registryManager) Send(ctx context.Context, msgInput *components.RegistryMessageInput) error {
 	// TODO: Plug point for calling through to the registry
 	// TODO: Plugin determination
 
 	knownPlugin := "grpc"
-	transport, err := tm.getTransportByName(ctx, knownPlugin)
+	registry, err := tm.getRegistryByName(ctx, knownPlugin)
 	if err != nil {
 		return err
 	}
@@ -150,14 +150,10 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 		len(msgInput.ReplyToIdentity) == 0 ||
 		len(msgInput.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
-		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+		return i18n.NewError(ctx, msgs.MsgRegistryInvalidMessage)
 	}
 
-	panic("TODO")
-
-	err = transport.Send(ctx, &components.TransportMessage{
-		// TODO
-	})
+	err = registry.Send(ctx, message)
 	if err != nil {
 		return err
 	}
@@ -165,11 +161,11 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 	return nil
 }
 
-func (tm *transportManager) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+func (tm *registryManager) GetRegistryDetails(ctx context.Context, req *prototk.GetRegistryDetailsRequest) (*prototk.GetRegistryDetailsResponse, error) {
 	if req.Node != "test" {
 		panic("unimplemented")
 	}
-	return &prototk.GetTransportDetailsResponse{TransportDetails: `
+	return &prototk.GetRegistryDetailsResponse{RegistryDetails: `
 		{
 			"address": ":8081",
 			"caCertificate": "-----BEGIN CERTIFICATE-----\n` +
@@ -197,8 +193,8 @@ func (tm *transportManager) GetTransportDetails(ctx context.Context, req *protot
 		}`}, nil
 }
 
-// Send implements TransportManager
-func (tm *transportManager) RegisterReceiver(onMessage func(ctx context.Context, message *components.TransportMessage) error) error {
+// Send implements RegistryManager
+func (tm *registryManager) RegisterReceiver(onMessage func(ctx context.Context, message components.RegistryMessage) error) error {
 	go func() {
 		for {
 			select {
