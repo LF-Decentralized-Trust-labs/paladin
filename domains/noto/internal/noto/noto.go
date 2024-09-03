@@ -29,7 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"gopkg.in/yaml.v2"
 )
 
 //go:embed abis/NotoFactory.json
@@ -45,8 +44,8 @@ var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
 var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 
 type Config struct {
-	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
-	Variant        string `json:"variant" yaml:"variant"`
+	FactoryAddress string `json:"factoryAddress"`
+	Variant        string `json:"variant"`
 }
 
 type SolidityBuild struct {
@@ -116,7 +115,7 @@ func New(callbacks plugintk.DomainCallbacks) *Noto {
 
 func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
 	var config Config
-	err := yaml.Unmarshal([]byte(req.ConfigYaml), &config)
+	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +274,7 @@ func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*No
 
 func (n *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConstructorParams, error) {
 	var params NotoConstructorParams
-	err := yaml.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
+	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }
 

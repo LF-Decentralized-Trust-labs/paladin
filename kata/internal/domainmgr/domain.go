@@ -33,7 +33,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"gopkg.in/yaml.v3"
 )
 
 type domain struct {
@@ -74,6 +73,7 @@ func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
 	}
+	log.L(dm.bgCtx).Debugf("Domain %s configured. Config: %s", name, types.JSONString(conf.Config))
 	d.ctx, d.cancelCtx = context.WithCancel(log.WithLogField(dm.bgCtx, "domain", d.name))
 	return d
 }
@@ -151,11 +151,10 @@ func (d *domain) init() {
 	err := d.initRetry.Do(d.ctx, func(attempt int) (bool, error) {
 
 		// Send the configuration to the domain for processing
-		confYAML, _ := yaml.Marshal(&d.conf.Config)
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
 			Name:       d.name,
 			ChainId:    d.dm.ethClientFactory.ChainID(),
-			ConfigYaml: string(confYAML),
+			ConfigJson: types.JSONString(d.conf.Config).String(),
 		})
 		if err != nil {
 			return true, err

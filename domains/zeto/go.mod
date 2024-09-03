@@ -9,10 +9,9 @@ require (
 	github.com/hyperledger/firefly-signer v1.1.14-0.20240827185235-2fe278d0353f
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/kaleido-io/paladin/kata v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/protobuf v1.34.2
-	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -102,11 +101,15 @@ require (
 	google.golang.org/grpc v1.65.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlite v1.5.6 // indirect
 	gorm.io/gorm v1.25.11 // indirect
 )
 
 replace github.com/kaleido-io/paladin/kata => ../../kata
+
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
 
 replace github.com/hyperledger-labs/zeto/go-sdk => ../../zeto/go-sdk
