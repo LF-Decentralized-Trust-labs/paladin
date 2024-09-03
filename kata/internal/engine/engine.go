@@ -54,7 +54,7 @@ func (mpm *MockPlugins) Validate(ctx context.Context, contractAddress string, ts
 }
 
 type Engine interface {
-	HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent)
+	HandleNewEvent(ctx context.Context, stageEvent *types.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
 	GetTxStatus(ctx context.Context, domainAddress string, txID string) (status types.TxStatus, err error)
 	EngineName() string
@@ -176,7 +176,7 @@ func (e *engine) GetTxStatus(ctx context.Context, domainAddress string, txID str
 
 }
 
-func (e *engine) HandleNewEvents(ctx context.Context, stageEvent *types.StageEvent) {
+func (e *engine) HandleNewEvent(ctx context.Context, stageEvent *types.StageEvent) {
 	targetOrchestrator := e.orchestrators[stageEvent.ContractAddress]
 	if targetOrchestrator == nil { // this is an event that belongs to a contract that's not in flight, throw it away and rely on the engine to trigger the action again when the orchestrator is wake up. (an enhanced version is to add weight on queueing an orchestrator)
 		log.L(ctx).Warnf("Ignored event for domain contract %s and transaction %s on stage %s. If this happens a lot, check the orchestrator idle timeout is set to a reasonable number", stageEvent.ContractAddress, stageEvent.TxID, stageEvent.Stage)
@@ -208,14 +208,8 @@ func (e *engine) StartEventListener(ctx context.Context) (done <-chan bool) {
 			log.L(ctx).Errorf("Failed to unmarshal from any: %s", err)
 			return i18n.WrapError(ctx, err, msgs.MsgEngineParseFailed)
 		}
-		orchestrator, ok := e.orchestrators[stageMessage.ContractAddress]
-		if !ok {
-			//TODO should attempt to load the orchestrator from the database if it's not in memory
-			log.L(ctx).Errorf("No orchestrator found for contract address %s", stageMessage.ContractAddress)
-			return i18n.NewError(ctx, msgs.MsgEngineInternalError)
-		}
 
-		orchestrator.HandleEvent(ctx, &types.StageEvent{
+		e.HandleNewEvent(ctx, &types.StageEvent{
 			ContractAddress: stageMessage.ContractAddress,
 			TxID:            stageMessage.TransactionId,
 			Stage:           stageMessage.Stage,

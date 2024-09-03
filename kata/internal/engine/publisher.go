@@ -35,7 +35,7 @@ type publisher struct {
 // PublishStageEvent implements types.Publisher.
 func (p *publisher) PublishStageEvent(ctx context.Context, stageEvent *types.StageEvent) error {
 
-	p.engine.HandleNewEvents(ctx, stageEvent)
+	p.engine.HandleNewEvent(ctx, stageEvent)
 	return nil
 
 }
