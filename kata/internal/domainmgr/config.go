@@ -20,7 +20,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"gopkg.in/yaml.v3"
 )
 
 // Intended to be embedded at root level of paladin config
@@ -36,7 +35,7 @@ type DomainManagerManagerConfig struct {
 type DomainConfig struct {
 	Init   DomainInitConfig     `yaml:"init"`
 	Plugin plugins.PluginConfig `yaml:"plugin"`
-	Config yaml.Node            `yaml:"config"`
+	Config map[string]any       `yaml:"config"`
 }
 
 var ContractCacheDefaults = &cache.Config{

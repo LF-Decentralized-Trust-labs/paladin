@@ -41,7 +41,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 )
 
 //go:embed abis/SIMDomain.json
@@ -307,7 +306,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 			ConfigureDomain: func(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 				assert.Equal(t, "domain1", req.Name)
-				assert.JSONEq(t, `{"some":"config"}`, req.ConfigYaml)
+				assert.JSONEq(t, `{"some":"config"}`, req.ConfigJson)
 				assert.Equal(t, int64(1337), req.ChainId) // from tools/besu_bootstrap
 				chainID = req.ChainId
 
@@ -597,7 +596,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	url, done, err := tb.StartForTest(confFile, map[string]*TestbedDomain{
 		"domain1": {
 			Plugin: fakeCoinDomain,
-			Config: yamlNode(`{"some":"config"}`),
+			Config: map[string]any{"some": "config"},
 		},
 	}, &UTInitFunction{PreManagerStart: func(c AllComponents) error {
 		ec = c.EthClientFactory().HTTPClient()
@@ -642,9 +641,4 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	})
 	assert.Nil(t, rpcErr)
 
-}
-
-func yamlNode(s string) (yn yaml.Node) {
-	_ = yaml.Unmarshal([]byte(s), &yn)
-	return yn
 }

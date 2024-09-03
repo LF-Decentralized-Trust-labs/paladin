@@ -12,27 +12,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido.paladin.loader;
 
-abstract class Plugin  {
+package io.kaleido.paladin;
 
-   protected final String grpcTarget;
-   protected final PluginInfo info;
+import io.kaleido.paladin.toolkit.DomainBase;
+import io.kaleido.paladin.toolkit.DomainInstance;
+import org.junit.jupiter.api.Test;
 
-   interface PluginStopped {
-      void pluginStopped(String instanceId, Plugin plugin, Throwable t);
-   }
-
-   final PluginStopped onStop;
-
-   Plugin(String grpcTarget, PluginInfo info, PluginStopped onStop) {
-      this.grpcTarget = grpcTarget;
-      this.info = info;
-      this.onStop = onStop;
-   }
-
-   abstract void loadAndStart() throws Exception;
-
-   abstract void stop() throws Exception;
-
+public class TestDomainFactory extends DomainBase {
+    @Override
+    protected DomainInstance newDomainInstance(String grpcTarget, String instanceId) {
+        return new TestDomain(grpcTarget, instanceId);
+    }
 }

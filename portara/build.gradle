@@ -22,6 +22,9 @@ repositories {
 }
 
 test {
+    testLogging {
+        showStandardStreams = true
+    }
     useJUnitPlatform()
     systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
 }
@@ -40,12 +43,6 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-}
-
-dependencies {
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
-    testImplementation project(path: ":kata", configuration: "libkata")
-    testImplementation project(path: ":toolkit_go", configuration: "libstarter")
 }
 
 tasks.register('collectProtocFiles', Copy) {
@@ -73,8 +70,8 @@ tasks.named('clean') {
     dependsOn tasks.cleanProto
 }
 
-def grpcVersion = '1.65.0'
-def protobufVersion = '3.25.1'
+def grpcVersion = '1.65+'
+def protobufVersion = '3.25+'
 def protocVersion = protobufVersion
 
 dependencies {
@@ -83,18 +80,23 @@ dependencies {
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
-    implementation 'io.netty:netty-all:4.1.111.Final' // supports Java 16 UDS natively since Netty 4.4.110
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2'
+    implementation 'io.netty:netty-all:4.1+'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
 
-    implementation 'org.apache.logging.log4j:log4j-core:2.23.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.23+'
 
-    implementation project(path: ':kata', configuration: 'libkata')
-    implementation 'net.java.dev.jna:jna-platform:5.14.0'
+    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+
+    testImplementation project(path: ":kata", configuration: "libkata")
+    testImplementation project(path: ":toolkit_go", configuration: "libstarter")
+    testImplementation project(path: ":solidity", configuration: "compiledContracts")
+
+    implementation 'net.java.dev.jna:jna-platform:5.14+'
     implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
 
-    compileOnly "org.apache.tomcat:annotations-api:6.0.53"
+    compileOnly "org.apache.tomcat:annotations-api:6.0+"
 
-    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation project(path: ':toolkit_go', configuration: 'libstarter')
 
