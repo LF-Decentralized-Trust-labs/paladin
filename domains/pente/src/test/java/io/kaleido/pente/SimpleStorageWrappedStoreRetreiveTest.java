@@ -13,12 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.evm;
+package io.kaleido.pente;
 
 import io.kaleido.pente.evmrunner.EVMRunner;
 import io.kaleido.pente.evmrunner.EVMVersion;
 import io.kaleido.pente.evmstate.PersistedAccount;
-import org.apache.commons.io.IOUtils;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.frame.MessageFrame;
@@ -33,10 +32,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import static io.kaleido.evm.TestUtils.*;
+import static io.kaleido.pente.TestUtils.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SimpleStorageWrappedStoreRetreiveTest {
@@ -51,7 +49,7 @@ public class SimpleStorageWrappedStoreRetreiveTest {
         // Load some bytecode for our first contract deploy
         String resourcePath = "contracts/testcontracts/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
         String hexByteCode;
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
             assertNotNull(is);
             JsonNode node = new ObjectMapper().readTree(is);
             hexByteCode = node.get("bytecode").asText();

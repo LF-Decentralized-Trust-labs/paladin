@@ -13,16 +13,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.evm;
+package io.kaleido.pente;
 
 import io.kaleido.pente.evmrunner.EVMRunner;
 import io.kaleido.pente.evmrunner.EVMVersion;
-import io.kaleido.pente.evmstate.AccountLoader;
-import io.kaleido.pente.evmstate.PersistedAccount;
-import org.apache.commons.io.IOUtils;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
-import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.junit.jupiter.api.Test;
@@ -35,12 +31,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
-import static io.kaleido.evm.TestUtils.sortedAddressList;
+import static io.kaleido.pente.TestUtils.sortedAddressList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 

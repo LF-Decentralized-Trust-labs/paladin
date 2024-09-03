@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -44,12 +42,12 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
-	configYAML, err := yaml.Marshal(&config)
+func mapConfig(t *testing.T, config *Config) (m map[string]any) {
+	configJSON, err := json.Marshal(&config)
 	require.NoError(t, err)
-	err = yaml.Unmarshal(configYAML, &yn)
+	err = json.Unmarshal(configJSON, &m)
 	require.NoError(t, err)
-	return yn
+	return m
 }
 
 func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][]byte) map[string]string {
@@ -79,7 +77,7 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 	})
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
 		domainName: {
-			Config: yamlConfig(t, config),
+			Config: mapConfig(t, config),
 			Plugin: plugin,
 		},
 	})

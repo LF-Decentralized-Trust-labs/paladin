@@ -21,37 +21,42 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public class PluginJNA extends Plugin {
 
     private static final Logger LOGGER = LogManager.getLogger(PluginJNA.class);
 
-    private PluginJNA paladinGo;
+    private final String libName;
 
-    private final PluginCShared lib;
+    private PluginCShared lib;
 
     interface PluginCShared extends Library {
-        int Run(String grpcTarget, String pluginUUID);
-        void Stop();
+        int Run(String grpcTarget, String pluginId);
+        void Stop(String pluginId);
     }
 
-    PluginJNA(String grpcTarget, PluginInfo info, String libName) throws UnsatisfiedLinkError {
-        super(grpcTarget, info);
+    PluginJNA(String grpcTarget, PluginInfo info, PluginStopped onStop, String libName) throws UnsatisfiedLinkError {
+        super(grpcTarget, info, onStop);
+        this.libName = libName;
+    }
+
+
+    @Override
+    public synchronized void stop() throws Exception {
+        lib.Stop(info.instanceId());
+    }
+
+    @Override
+    public synchronized void loadAndStart() throws Exception {
         LOGGER.info("Loading plugin via JNA: {}", libName);
         lib = Native.load(libName, PluginCShared.class);
-    }
-
-
-    @Override
-    public void stop() {
-        lib.Stop();
-    }
-
-    @Override
-    public void run() {
-        int rc = lib.Run(this.grpcTarget, info.instanceUUID().toString());
-        if (rc != 0) {
-            throw new RuntimeException("Plugin returned RC=%d".formatted(rc));
-        }
+        CompletableFuture.runAsync(() -> {
+            LOGGER.info("starting {} {} [{}]", info.pluginType(), info.name(), info.instanceId());
+            int rc = lib.Run(this.grpcTarget, info.instanceId());
+            if (rc != 0) {
+                throw new RuntimeException("Plugin returned RC=%d".formatted(rc));
+            }
+        }).whenComplete((voidResult, t) -> onStop.pluginStopped(info.instanceId(), this, t));
     }
 }

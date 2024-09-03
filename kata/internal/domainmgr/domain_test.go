@@ -184,7 +184,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	ctx, dm, _, done := newTestDomainManager(t, realDB, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config: yamlNode(t, `{"some":"conf"}`),
+				Config: map[string]any{"some": "conf"},
 			},
 		},
 	}, extraSetup...)
@@ -193,7 +193,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	tp.Functions = &plugintk.DomainAPIFunctions{
 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
 			assert.Equal(t, "test1", cdr.Name)
-			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
+			assert.JSONEq(t, `{"some":"conf"}`, cdr.ConfigJson)
 			return &prototk.ConfigureDomainResponse{
 				DomainConfig: domainConfig,
 			}, nil
@@ -421,7 +421,7 @@ func TestDomainConfigureFail(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config: yamlNode(t, `{"some":"conf"}`),
+				Config: map[string]any{"some": "config"},
 			},
 		},
 	})
