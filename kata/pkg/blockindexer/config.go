@@ -23,7 +23,7 @@ import (
 )
 
 type Config struct {
-	FromBlock             types.RawJSON      `yaml:"fromBlock"`
+	FromBlock             types.RawJSON      `yaml:"fromBlock,omitempty"`
 	CommitBatchSize       *int               `yaml:"commitBatchSize"`
 	CommitBatchTimeout    *string            `yaml:"commitBatchTimeout"`
 	RequiredConfirmations *int               `yaml:"requiredConfirmations"`

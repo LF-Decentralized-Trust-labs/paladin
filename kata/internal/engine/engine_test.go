@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
-
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,30 +35,70 @@ import (
 // Tests in this file do not mock anything else in this package or sub packages but does mock other components and managers in paladin as per their interfaces
 
 func TestEngine(t *testing.T) {
-	t.Skip("Skipping test as it is not implemented yet")
 	ctx := context.Background()
 
 	domainAddress := types.MustEthAddress(types.RandHex(20))
 	domainAddressString := domainAddress.String()
 
 	engine, mComponents := newEngineForTesting(t)
-	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
-	mDomainAPI := componentmocks.NewDomainSmartContract(t)
-	mDomainAPI.On("InitTransaction", ctx, mock.Anything).Return(nil)
-	mDomainMgr := &componentmocks.DomainManager{}
-	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainAPI, nil)
-	mStateStore := &componentmocks.StateStore{}
-	mComponents.On("StateStore").Once().Return(mStateStore)
-	mComponents.On("DomainManager").Once().Return(mDomainMgr).Maybe()
-	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
-		fn := args.Get(1).(statestore.DomainContextFunction)
-		_ = fn(ctx, mDomainStateInterface)
-	}).Once().Return(nil)
 	assert.Equal(t, "Kata Engine", engine.Name())
 
+	mDomainStateInterface := componentmocks.NewDomainStateInterface(t)
+
+	mDomainSmartContract := componentmocks.NewDomainSmartContract(t)
+
+	initialised := make(chan struct{}, 1)
+	mDomainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		initialised <- struct{}{}
+	}).Return(nil)
+
+	assembled := make(chan struct{}, 1)
+	mDomainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+
+		tx.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+			InputStates: []*components.FullState{
+				{
+					ID:     types.Bytes32(types.RandBytes(32)),
+					Schema: types.Bytes32(types.RandBytes(32)),
+					Data:   types.JSONString("foo"),
+				},
+			},
+			AttestationPlan: []*prototk.AttestationRequest{
+				{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Parties: []string{
+						"domain1/contract1/notary",
+					},
+				},
+			},
+		}
+		assembled <- struct{}{}
+
+	}).Return(nil)
+
+	mDomainMgr := componentmocks.NewDomainManager(t)
+	mDomainMgr.On("GetSmartContractByAddress", ctx, *domainAddress).Once().Return(mDomainSmartContract, nil)
+
+	mStateStore := componentmocks.NewStateStore(t)
+	//TODO do we need this?
+	mStateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+		fn := args.Get(1).(statestore.DomainContextFunction)
+		err := fn(ctx, mDomainStateInterface)
+		assert.NoError(t, err)
+	}).Maybe().Return(nil)
+
+	mComponents.On("StateStore").Return(mStateStore).Maybe()
+	mComponents.On("DomainManager").Return(mDomainMgr).Maybe()
+
+	err := engine.Start()
+	assert.NoError(t, err)
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
 	// no input domain should err
-	assert.Regexp(t, "PD011700", err)
+	assert.Regexp(t, "PD011800", err)
 	assert.Empty(t, txID)
 	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
 		ID: uuid.New(),
@@ -66,19 +106,24 @@ func TestEngine(t *testing.T) {
 			Domain: domainAddressString,
 		},
 	})
-
-	//poll until the transaction is processed
-	for {
-		status, err := engine.GetTxStatus(ctx, txID)
-		require.NoError(t, err)
-		if status.Status == "completed" {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
 	assert.NoError(t, err)
 	require.NotNil(t, txID)
+
+	//poll until the transaction is initialised
+	select {
+	case <-time.After(1000 * time.Millisecond):
+		assert.Fail(t, "Timed out waiting for transaction to be initialised")
+	case <-initialised:
+		break
+	}
+
+	//poll until the transaction is assembled
+	select {
+	case <-time.After(1000 * time.Millisecond):
+		assert.Fail(t, "Timed out waiting for transaction to be assembled")
+	case <-assembled:
+		break
+	}
 
 }
 

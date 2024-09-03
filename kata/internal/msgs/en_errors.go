@@ -257,7 +257,11 @@ var (
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")
 
 	// Engine PD0118XX
-	MsgDomainNotProvided = ffe("PD011800", "Domain not found in the transaction input")
+	MsgDomainNotProvided    = ffe("PD011800", "Domain not found in the transaction input")
+	MsgEngineInternalError  = ffe("PD011801", "Unexpected error in engine")
+	MsgEngineAssembleError  = ffe("PD011802", "Error assembling transaction")
+	MsgEngineParseFailed    = ffe("PD011803", "Failed to parse message")
+	MsgEngineInvalidMessage = ffe("PD011804", "Invalid message recieved from transport")
 
 	// Base Ledger engine PD0119XX
 	MsgInsufficientBalance              = ffe("PD011900", "Balance %s of fueling source address %s is below the required amount %s ")

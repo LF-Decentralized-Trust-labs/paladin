@@ -23,19 +23,21 @@ task besuBootstrapTool(type: Exec) {
 
 task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {
     composeFile 'docker-compose-test.yml'
+    projectName 'paladin-testinfra'
     args 'up', '-d'
 }
 
 task stopTestInfra(type: DockerCompose) {
     composeFile 'docker-compose-test.yml'
+    projectName 'paladin-testinfra'
     args 'down'
 }
 
 task removeBesuBootstrapTool(type: Exec, dependsOn: stopTestInfra) {
     executable "docker"
     args "rmi", "-f", "paladin/besu_bootstrap"
-    
-    ignoreExitValue = true
+    errorOutput OutputStream.nullOutputStream()
+    ignoreExitValue true
 }
 
 task clean(type: Delete, dependsOn: [tasks.removeBesuBootstrapTool, tasks.stopTestInfra]) {

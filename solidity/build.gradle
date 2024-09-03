@@ -28,7 +28,7 @@ configurations {
 task install(type: Exec) {
     executable 'npm'
     args 'install'
-    inputs.files("package.json", "package-lock.json")
+    inputs.files("package.json")
     outputs.files("package-lock.json")
     outputs.dir("node_modules")
 }
@@ -41,6 +41,9 @@ task compile(type: Exec, dependsOn: install) {
     inputs.files(fileTree(".") {
         include "contracts/**/*.sol"
         include "test/**/*.ts"
+    })
+    inputs.files(fileTree("../zeto/solidity") {
+        include "**/*.sol"
     })
     outputs.dirs(buildOutput, "cache", "typechain-types")
 }
@@ -66,6 +69,7 @@ task test(type: Exec, dependsOn: compile) {
 task build(dependsOn: test) {}
 
 task clean(type: Delete) {
+    delete "node_modules"
     delete buildOutput, "cache", "typechain-types"
     delete testResults
 }

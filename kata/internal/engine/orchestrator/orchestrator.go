@@ -25,7 +25,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
@@ -138,7 +137,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, ss statestore.StateStore, domainAPI components.DomainSmartContract) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.AllComponents, domainAPI components.DomainSmartContract) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -159,11 +158,11 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		stopProcess:                  make(chan bool, 1),
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, ss, &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
-		&stages.AssembleStage{},
 		&stages.AttestationStage{},
+		&stages.AssembleStage{},
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
@@ -225,12 +224,13 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 		if sc != nil {
 			if sc.Stage == "remove" {
 				// no longer in an incomplete stage
-				delete(oc.incompleteTxSProcessMap, txID)
 				oc.totalCompleted = oc.totalCompleted + 1
 				// hasActivity = true
 				log.L(ctx).Debugf("Orchestrator evaluate and process, marking %s as complete.", txID)
+				break
 			} else if sc.Stage == "suspend" {
 				log.L(ctx).Debugf("Orchestrator evaluate and process, removed suspended tx %s", txID)
+				break
 			} else {
 				stageCounts[sc.Stage] = stageCounts[sc.Stage] + 1
 			}
@@ -238,6 +238,7 @@ func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, ne
 			stageCounts["queued"] = stageCounts["queued"] + 1
 
 		}
+		oc.incompleteTxSProcessMap[txID] = txp
 	}
 
 	log.L(ctx).Debugf("Orchestrator evaluate and process, stage counts: %+v", stageCounts)
