@@ -14,9 +14,9 @@ import (
 	"os"
 	"plugin"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
@@ -152,7 +152,6 @@ func main() {
 
 	// -------------------------------------------------------------------------------------- Initialize the transport manager
 
-	
 	config := grpctransport.UnprocessedGRPCConfig{
 		ServerCertificate: &realPaladinServerCert,
 		ServerKey:         &realPaladinServerKey,
@@ -161,7 +160,7 @@ func main() {
 		ExternalPort:      8081,
 	}
 	marshalledConfig, err := yaml.Marshal(config)
-	
+
 	var configNode *yaml.Node
 	yaml.Unmarshal(marshalledConfig, &configNode)
 
@@ -193,15 +192,14 @@ func main() {
 	})
 
 	// -------------------------------------------------------------------------------------- Test Everything End-to-End
-	
+
 	err = manager.Send(ctx, components.TransportMessage{
 		MessageType: "something",
-		Payload: []byte("something"),
+		Payload:     []byte("something"),
 	}, "test")
 	if err != nil {
 		log.L(ctx).Errorf("error sending the message %v", err)
 		return
 	}
-
 
 }

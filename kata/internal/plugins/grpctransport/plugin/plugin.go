@@ -23,13 +23,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type GRPCTransport struct {
 	prototk.UnimplementedPluginControllerServer
-	externalServer *externalGRPCServer
+	externalServer   *externalGRPCServer
 	controllerClient grpc.BidiStreamingClient[prototk.TransportMessage, prototk.TransportMessage]
 
 	pluginID   string
@@ -45,7 +45,6 @@ type GRPCTransport struct {
 	Config      *GRPCConfig
 	Initialized bool
 }
-
 
 func NewGRPCTransport(pluginID, connString string) (*GRPCTransport, error) {
 	return &GRPCTransport{

@@ -60,7 +60,7 @@ type componentManager struct {
 	// post-init
 	pluginController plugins.PluginController
 	// managers
-	domainManager components.DomainManager
+	domainManager    components.DomainManager
 	transportManager components.TransportManager
 	// engine
 	engine components.Engine
@@ -179,7 +179,7 @@ func (cm *componentManager) StartManagers() (err error) {
 
 	if err == nil {
 		err = cm.transportManager.Start()
-		cm.addIfStarted(cm.transportManager, err, msgs.MsgComponentDomainStartError)
+		cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentDomainStartError)
 	}
 
 	// start the plugin controller

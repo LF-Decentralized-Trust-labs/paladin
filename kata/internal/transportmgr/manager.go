@@ -22,13 +22,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"gopkg.in/yaml.v3"
-	
+
 	grpctransport "github.com/kaleido-io/paladin/kata/internal/plugins/grpctransport/plugin"
 )
 
@@ -170,7 +170,7 @@ func (tm *transportManager) Send(ctx context.Context, message components.Transpo
 		}
 
 		bytes, _ := yaml.Marshal(deets)
-		transportDetails = string(bytes) 
+		transportDetails = string(bytes)
 	}
 
 	knownPlugin := "grpc"
