@@ -232,7 +232,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
-    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete 'libkata.dylib', 'libkata.so', 'libkata.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -241,6 +241,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     }
     delete 'coverage'
     delete 'mocks'
+    delete 'internal/domainmgr/abis'
     delete 'componenttest/abis'
 }
 
