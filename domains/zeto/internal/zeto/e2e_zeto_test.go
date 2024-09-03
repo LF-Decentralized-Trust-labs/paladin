@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -39,22 +40,22 @@ var (
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return result
 }
 
 func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
 	configYAML, err := yaml.Marshal(&config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = yaml.Unmarshal(configYAML, &yn)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return yn
 }
 
 func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][]byte) map[string]string {
 	tb := testbed.NewTestBed()
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
@@ -63,7 +64,7 @@ func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][
 		for name, contract := range entry {
 			build := loadBuildLinked(contract, deployed)
 			deployed[name], err = deployBytecode(ctx, rpc, build)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 	return deployed
@@ -82,7 +83,7 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 			Plugin: plugin,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, domain, rpc
 }
@@ -157,8 +158,8 @@ func TestZeto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	coins, err := zeto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 1)
+	require.NoError(t, err)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
 	assert.Equal(t, controllerName, coins[0].Owner)
 
@@ -178,8 +179,8 @@ func TestZeto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	coins, err = zeto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 2)
+	require.NoError(t, err)
+	require.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
 	assert.Equal(t, controllerName, coins[0].Owner)
 	assert.Equal(t, int64(20), coins[1].Amount.Int64())
@@ -195,7 +196,7 @@ func TestZeto(t *testing.T) {
 			Amount: ethtypes.NewHexInteger64(10),
 		}),
 	})
-	assert.NotNil(t, rpcerr)
+	require.NotNil(t, rpcerr)
 	assert.EqualError(t, rpcerr.Error(), "failed to send base ledger transaction: Execution reverted")
 	assert.True(t, boolResult)
 
