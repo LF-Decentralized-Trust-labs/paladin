@@ -33,7 +33,7 @@ public class PluginJNA extends Plugin {
 
     interface PluginCShared extends Library {
         int Run(String grpcTarget, String pluginId);
-        void Stop();
+        void Stop(String pluginId);
     }
 
     PluginJNA(String grpcTarget, PluginInfo info, PluginStopped onStop, String libName) throws UnsatisfiedLinkError {
@@ -44,7 +44,7 @@ public class PluginJNA extends Plugin {
 
     @Override
     public synchronized void stop() throws Exception {
-        lib.Stop();
+        lib.Stop(info.instanceId());
     }
 
     @Override

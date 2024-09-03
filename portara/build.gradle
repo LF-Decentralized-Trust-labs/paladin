@@ -22,6 +22,9 @@ repositories {
 }
 
 test {
+    testLogging {
+        showStandardStreams = true
+    }
     useJUnitPlatform()
     systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
 }

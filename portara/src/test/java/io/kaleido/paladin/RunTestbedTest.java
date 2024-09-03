@@ -15,17 +15,14 @@
 
 package io.kaleido.paladin;
 
+import io.kaleido.paladin.toolkit.JsonRpcClient;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,13 +59,21 @@ signer:
 rpcServer:
   http:
     port: %s
+    shutdownTimeout: 0s
   ws:
     disabled: true
+    shutdownTimeout: 0s
+grpc:
+    shutdownTimeout: 0s
 blockchain:
    http:
      url: http://localhost:8545
    ws:
      url: ws://localhost:8546
+loader:
+  debug: true
+log:
+  level: trace
 domains:
   domain1:
      plugin:
@@ -80,8 +85,6 @@ domains:
         type: jar
         class: %s
      config: {}
-loader:
-  debug: true
 """.formatted(new File("../kata/db/migrations/sqlite").getAbsolutePath(), availableRPCPort, TestDomainFactory.class.getName());
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlContent);
@@ -97,31 +100,18 @@ loader:
         long startTime = System.currentTimeMillis();
         boolean connected = false;
         while (!connected) {
-            final URI testbedRPC = new URI(String.format("http://127.0.0.1:%d", availableRPCPort));
-            try (HttpClient rpcClient = HttpClient.newBuilder().build()) {
-                HttpRequest req = HttpRequest.newBuilder()
-                    .timeout(Duration.ofSeconds(1))
-                    .uri(testbedRPC)
-                        .POST(HttpRequest.BodyPublishers.ofString("""
-                            {
-                               "jsonrpc": "2.0",
-                               "id": 1,
-                               "method": "testbed_listDomains",
-                               "params": []
-                            }
-                        """))
-                        .build();
-                HttpResponse<String> res = rpcClient.send(req, HttpResponse.BodyHandlers.ofString());
-                assertEquals(200, res.statusCode(), res.body());
+            try (JsonRpcClient rpcClient = new JsonRpcClient("http://127.0.0.1:%d".formatted(availableRPCPort))) {
+                List<String> domains = rpcClient.request("testbed_listDomains");
+                assertEquals(2, domains.size());
                 connected = true;
             } catch(IOException e) {
                 System.err.printf("Waiting to connect: %s\n", e);
             }
-            assertTrue(System.currentTimeMillis()-startTime < 5000, "Test ran too long");
-            if (rc.isDone()) {
-                assertEquals(0, rc.get());
-            }
+            assertTrue(System.currentTimeMillis()-startTime < 5000, "Startup took too too long");
             Thread.sleep(250);
         }
+
+        Main.stop();
+        assertEquals(rc.get(), 0);
     }
 }

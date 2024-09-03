@@ -12,22 +12,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.kaleido.paladin;
 
-import com.sun.jna.Native;
-import com.sun.jna.Library;
+package io.kaleido.pente.domain;
 
-public class KataJNA {
+import org.junit.jupiter.api.Test;
 
-    private PaladinGo paladinGo;
+public class PenteDomainTests {
 
-    public interface PaladinGo extends Library {
-        int Run(String socketAddress, String loaderUUID, String configFile, String engineName) ;
-        void Stop();
+    @Test
+    void testSimpleStorage() throws Exception {
+        PenteTestbed tb = new PenteTestbed();
+        tb.start();
+        tb.stop();
     }
-
-    public static PaladinGo Load() {
-        return Native.load("kata", PaladinGo.class);
-    }
-
 }

@@ -20,9 +20,42 @@ import io.kaleido.paladin.loader.PluginLoader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
 public class Main {
 
     private static final Logger LOGGER = LogManager.getLogger(Main.class);
+
+    static KataJNA.PaladinGo kata;
+
+    static RuntimeInfo instance;
+
+    public static synchronized KataJNA.PaladinGo ensureLoaded() {
+        if (kata == null) {
+            kata = KataJNA.Load();
+        }
+        return kata;
+    }
+
+    private static synchronized RuntimeInfo setRunning(RuntimeInfo newInstance) {
+        if (instance != null && newInstance != null) {
+            throw new IllegalStateException("already running %s".formatted(newInstance.instanceId()));
+        }
+        instance = newInstance;
+        Main.class.notifyAll();
+        return instance;
+    }
+
+    public static synchronized void stop() throws InterruptedException {
+        final RuntimeInfo runningInstance = instance;
+        if (runningInstance != null) {
+            CompletableFuture.runAsync(() -> ensureLoaded().Stop());
+            while (instance != null) {
+                Main.class.wait();
+            }
+        }
+    }
 
     public static int run(String[] args) {
         PluginLoader loader = null;
@@ -37,11 +70,11 @@ public class Main {
             // We have a very limited amount of parsing of the config file that happens in the loader.
             // We just need enough to know whether to use a special temp dir for our socket file,
             // and to initialize the Java logging framework.
-            RuntimeInfo runtimeInfo = new YamlConfig(configFile).getRuntimeInfo();
+            RuntimeInfo runtimeInfo = setRunning(new YamlConfig(configFile).getRuntimeInfo());
 
             loader = new PluginLoader(runtimeInfo.socketFilename(), runtimeInfo.instanceId());
 
-            return KataJNA.Load().Run(
+            return ensureLoaded().Run(
                     runtimeInfo.socketFilename(),
                     runtimeInfo.instanceId().toString(),
                     configFile,
@@ -53,6 +86,7 @@ public class Main {
             if (loader != null) {
                 loader.shutdown();
             }
+            setRunning(null);
         }
     }
 
