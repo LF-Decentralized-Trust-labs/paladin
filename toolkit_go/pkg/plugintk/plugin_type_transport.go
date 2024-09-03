@@ -26,7 +26,6 @@ import (
 
 type TransportAPI interface {
 	ConfigureTransport(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
-	InitTransport(context.Context, *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error)
 	SendMessage(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
 }
 
@@ -120,10 +119,6 @@ func (th *TransportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 		resMsg := &prototk.TransportMessage_ConfigureTransportRes{}
 		resMsg.ConfigureTransportRes, err = th.api.ConfigureTransport(ctx, input.ConfigureTransport)
 		res.ResponseFromTransport = resMsg
-	case *prototk.TransportMessage_InitTransport:
-		resMsg := &prototk.TransportMessage_InitTransportRes{}
-		resMsg.InitTransportRes, err = th.api.InitTransport(ctx, input.InitTransport)
-		res.ResponseFromTransport = resMsg
 	case *prototk.TransportMessage_SendMessage:
 		resMsg := &prototk.TransportMessage_SendMessageRes{}
 		resMsg.SendMessageRes, err = th.api.SendMessage(ctx, input.SendMessage)
@@ -158,7 +153,6 @@ func (th *TransportHandler) GetTransportDetails(ctx context.Context, req *protot
 
 type TransportAPIFunctions struct {
 	ConfigureTransport func(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
-	InitTransport      func(context.Context, *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error)
 	SendMessage        func(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
 }
 
@@ -168,10 +162,6 @@ type TransportAPIBase struct {
 
 func (tb *TransportAPIBase) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 	return callPluginImpl(ctx, req, tb.Functions.ConfigureTransport)
-}
-
-func (tb *TransportAPIBase) InitTransport(ctx context.Context, req *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
-	return callPluginImpl(ctx, req, tb.Functions.InitTransport)
 }
 
 func (tb *TransportAPIBase) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {

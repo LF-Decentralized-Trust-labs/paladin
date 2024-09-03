@@ -21,10 +21,12 @@ import "to_domain.proto";
 import "from_domain.proto";
 import "to_transport.proto";
 import "from_transport.proto";
+import "to_registry.proto";
 
 enum PluginType {
   DOMAIN = 0;
   TRANSPORT = 1;
+  REGISTRY = 2;
 }
 
 message Header {
@@ -84,14 +86,12 @@ message TransportMessage {
 
   oneof request_to_transport {
     ConfigureTransportRequest configure_transport =         1010;
-    InitTransportRequest init_transport =                   1020;
-    SendMessageRequest send_message =                       1030;
+    SendMessageRequest send_message =                       1020;
   }
 
   oneof response_from_transport {
     ConfigureTransportResponse configure_transport_res =    1011;
-    InitTransportResponse init_transport_res =              1021;
-    SendMessageResponse send_message_res =                  1031;
+    SendMessageResponse send_message_res =                  1021;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
@@ -105,6 +105,31 @@ message TransportMessage {
     ReceiveMessageResponse receive_message_res =            2021;
   }
 }
+
+message RegistryMessage {
+  Header header = 1;
+
+  oneof request_to_registry {
+    ConfigureRegistryRequest configure_registry =                   1010;
+    ResolveTransportDetailsRequest resolve_transport_details =      1030;
+  }
+
+  oneof response_from_registry {
+    ConfigureRegistryResponse configure_registry_res =              1011;
+    ResolveTransportDetailsResponse resolve_transport_details_res = 1021;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_registry {
+    None _no_requests =                                             2990;
+  }
+
+  oneof response_to_registry {
+    None _no_responses =                                            2991;
+  }
+}
+
+message None {}
 
 // establishes the long-lived connection
 message PluginLoaderInit {
@@ -152,4 +177,7 @@ service PluginController {
 
   // Connect as a transport plugin establishing the bidirectional stream of communications
   rpc ConnectTransport(stream TransportMessage) returns (stream TransportMessage) {}
+
+  // Connect as a registry plugin establishing the bidirectional stream of communications
+  rpc ConnectRegistry(stream RegistryMessage) returns (stream RegistryMessage) {}
 }

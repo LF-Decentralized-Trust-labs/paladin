@@ -17,18 +17,17 @@ syntax = "proto3";
 
 package github.com.kaleido_io.paladin.toolkit;
 
-message ConfigureTransportRequest {
-  string name = 1; // The name
-  string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
-}
+message ConfigureRegistryRequest {
+    string name = 1; // The name
+    string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
+  }
 
-message ConfigureTransportResponse {
-}
+message ConfigureRegistryResponse {}
 
-message SendMessageRequest {
+message ResolveTransportDetailsRequest {
     string node = 1;
-    bytes payload = 2;
 }
 
-message SendMessageResponse {
+message ResolveTransportDetailsResponse {
+    string transport_details = 2;
 }

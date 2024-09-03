@@ -104,23 +104,6 @@ func TestTransportFunction_ConfigureTransport(t *testing.T) {
 	})
 }
 
-func TestTransportFunction_InitTransport(t *testing.T) {
-	_, exerciser, funcs, _, _, done := setupTransportTests(t)
-	defer done()
-
-	// InitTransport - paladin to transport
-	funcs.InitTransport = func(ctx context.Context, cdr *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
-		return &prototk.InitTransportResponse{}, nil
-	}
-	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
-		req.RequestToTransport = &prototk.TransportMessage_InitTransport{
-			InitTransport: &prototk.InitTransportRequest{},
-		}
-	}, func(res *prototk.TransportMessage) {
-		assert.IsType(t, &prototk.TransportMessage_InitTransportRes{}, res.ResponseFromTransport)
-	})
-}
-
 func TestTransportFunction_SendMessage(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupTransportTests(t)
 	defer done()

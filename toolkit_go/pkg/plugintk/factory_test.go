@@ -34,8 +34,9 @@ type testController struct {
 	server     *grpc.Server
 	socketFile string
 
-	fakeDomainController func(grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error
+	fakeDomainController    func(grpc.BidiStreamingServer[prototk.DomainMessage, prototk.DomainMessage]) error
 	fakeTransportController func(grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error
+	fakeRegistryController  func(grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error
 }
 
 func newTestController(t *testing.T) (context.Context, *testController, func()) {
@@ -69,6 +70,10 @@ func (tc *testController) ConnectDomain(stream grpc.BidiStreamingServer[prototk.
 
 func (tc *testController) ConnectTransport(stream grpc.BidiStreamingServer[prototk.TransportMessage, prototk.TransportMessage]) error {
 	return tc.fakeTransportController(stream)
+}
+
+func (tc *testController) ConnectRegistry(stream grpc.BidiStreamingServer[prototk.RegistryMessage, prototk.RegistryMessage]) error {
+	return tc.fakeRegistryController(stream)
 }
 
 func tempSocketFile(t *testing.T) string {
