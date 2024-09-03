@@ -18,25 +18,34 @@ package components
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
+// TransportTarget splits out the four parts of the routing required
+type TransportTarget struct {
+	Node     string
+	Identity string
+}
+
 type TransportMessage struct {
-	MessageType string `yaml:"messageType"`
-	Payload     []byte `yaml:"payload"`
+	MessageID     uuid.UUID
+	CorrelationID *uuid.UUID
+	Destination   TransportTarget
+	ReplyTo       TransportTarget
+	Payload       []byte
+}
+
+type TransportMessageInput struct {
+	Destination     TransportTarget
+	ReplyToIdentity string
+	CorrelationID   *uuid.UUID
+	Payload         []byte
 }
 
 type TransportManager interface {
 	ManagerLifecycle
 	plugins.TransportRegistration
-	GetTransportByName(ctx context.Context, name string) (Transport, error)
-
-	Send(ctx context.Context, message TransportMessage, node string) error
-	RegisterReceiver(onMessage func(ctx context.Context, message TransportMessage) error) error
-}
-
-type Transport interface {
-	Send(ctx context.Context, message string, transportDetails string) error
-	Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
+	Send(ctx context.Context, message *TransportMessageInput) error
+	RegisterReceiver(onMessage func(ctx context.Context, message *TransportMessage) error) error
 }

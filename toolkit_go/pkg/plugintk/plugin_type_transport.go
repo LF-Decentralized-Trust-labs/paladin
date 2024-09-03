@@ -31,7 +31,7 @@ type TransportAPI interface {
 }
 
 type TransportCallbacks interface {
-	ResolveTarget(context.Context, *prototk.ResolveTargetRequest) (*prototk.ResolveTargetResponse, error)
+	GetTransportDetails(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
 	Receive(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
@@ -145,14 +145,14 @@ func (th *TransportHandler) Receive(ctx context.Context, req *prototk.ReceiveMes
 	})
 }
 
-func (th *TransportHandler) ResolveTarget(ctx context.Context, req *prototk.ResolveTargetRequest) (*prototk.ResolveTargetResponse, error) {
+func (th *TransportHandler) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
 	res, err := th.proxy.RequestFromPlugin(ctx, th.Wrap(&prototk.TransportMessage{
-		RequestFromTransport: &prototk.TransportMessage_ResolveTarget{
-			ResolveTarget: req,
+		RequestFromTransport: &prototk.TransportMessage_GetTransportDetails{
+			GetTransportDetails: req,
 		},
 	}))
-	return responseToPluginAs(ctx, res, err, func(msg *prototk.TransportMessage_ResolveTargetRes) *prototk.ResolveTargetResponse {
-		return msg.ResolveTargetRes
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.TransportMessage_GetTransportDetailsRes) *prototk.GetTransportDetailsResponse {
+		return msg.GetTransportDetailsRes
 	})
 }
 

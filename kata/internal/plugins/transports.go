@@ -74,12 +74,21 @@ func (br *TransportBridge) Initialized() {
 // requests to callbacks in the Transport manager
 func (br *TransportBridge) RequestReply(ctx context.Context, reqMsg plugintk.PluginMessage[prototk.TransportMessage]) (resFn func(plugintk.PluginMessage[prototk.TransportMessage]), err error) {
 	switch req := reqMsg.Message().RequestFromTransport.(type) {
-	case *prototk.TransportMessage_Recieve:
-		return callManagerImpl(ctx, req.Recieve,
+	case *prototk.TransportMessage_GetTransportDetails:
+		return callManagerImpl(ctx, req.GetTransportDetails,
+			br.manager.GetTransportDetails,
+			func(resMsg *prototk.TransportMessage, res *prototk.GetTransportDetailsResponse) {
+				resMsg.ResponseToTransport = &prototk.TransportMessage_GetTransportDetailsRes{
+					GetTransportDetailsRes: res,
+				}
+			},
+		)
+	case *prototk.TransportMessage_ReceiveMessage:
+		return callManagerImpl(ctx, req.ReceiveMessage,
 			br.manager.Receive,
 			func(resMsg *prototk.TransportMessage, res *prototk.ReceiveMessageResponse) {
-				resMsg.ResponseToTransport = &prototk.TransportMessage_ReceiveRes{
-					ReceiveRes: res,
+				resMsg.ResponseToTransport = &prototk.TransportMessage_ReceiveMessageRes{
+					ReceiveMessageRes: res,
 				}
 			},
 		)

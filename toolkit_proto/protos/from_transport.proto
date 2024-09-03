@@ -24,10 +24,10 @@ message ReceiveMessageRequest {
 message ReceiveMessageResponse {
 }
 
-message ResolveTargetRequest {
-    string target = 1;
+message GetTransportDetailsRequest {
+    string node = 1;
 }
 
-message ResolveTargetResponse {
+message GetTransportDetailsResponse {
     string transport_details = 1;
 }

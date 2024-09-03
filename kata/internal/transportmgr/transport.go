@@ -57,7 +57,7 @@ func (tm *transportManager) newTransport(id uuid.UUID, name string, conf *Transp
 		api:       toTransport,
 		initDone:  make(chan struct{}),
 	}
-	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "domain", t.name))
+	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "transport", t.name))
 	return t
 }
 
@@ -99,14 +99,14 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) Send(ctx context.Context, serializedMessage string, transportDetails string) error {
+func (t *transport) Send(ctx context.Context, message *components.TransportMessage) error {
 	if err := t.checkInit(ctx); err != nil {
 		return err
 	}
 
 	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
-		Body:             serializedMessage,
-		TransportDetails: transportDetails,
+		Node:    message.Destination.Node,
+		Payload: message.Payload,
 	})
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func (t *transport) Send(ctx context.Context, serializedMessage string, transpor
 	return nil
 }
 
-// Transport callback to the transport manager when a message is recieved
+// Transport callback to the transport manager when a message is received
 func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	if err := t.checkInit(ctx); err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequ
 		return nil, err
 	}
 
-	t.tm.recieveExternalMessage(*transportMessage)
+	t.tm.receiveExternalMessage(*transportMessage)
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 

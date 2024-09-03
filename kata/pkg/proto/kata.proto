@@ -27,7 +27,7 @@ service KataMessageService {
   // for now, the listeners thread will stop when the context is cancelled (e.g. connection is dopped)
   //rpc StopListener() returns (stream Message) {}
   // Simple RPC to Subscribe to an event, request provides the destination name for the listener
-  // to recieve events on the given topic
+  // to receive events on the given topic
   rpc SubscribeToTopic(SubscribeToTopicRequest) returns (SubscribeToTopicResponse) {}
 
   rpc UnsubscribeFromTopic(UnsubscribeFromTopicRequest) returns (UnsubscribeFromTopicResponse) {}

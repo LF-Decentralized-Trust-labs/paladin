@@ -261,11 +261,8 @@ var (
 	MsgEngineInternalError  = ffe("PD011801", "Unexpected error in engine")
 	MsgEngineAssembleError  = ffe("PD011802", "Error assembling transaction")
 	MsgEngineParseFailed    = ffe("PD011803", "Failed to parse message")
-	MsgEngineInvalidMessage = ffe("PD011804", "Invalid message recieved from transport")
+	MsgEngineInvalidMessage = ffe("PD011804", "Invalid message received from transport")
 
 	// TransportManager module PD0119XX
-
-	// GRPC Transport plugin PD0120XX
-	MsgGRPCPluginAlreadyRunning     = ffe("PD012000", "GRPC Transport is already running")
-	MsgGRPCPluginCouldNotInitialize = ffe("PD012001", "Error during initialization of plugin %s")
+	MsgTransportInvalidMessage = ffe("PD011900", "Invalid message")
 )

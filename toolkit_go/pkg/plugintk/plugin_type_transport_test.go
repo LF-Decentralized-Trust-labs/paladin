@@ -61,16 +61,16 @@ func setupTransportTests(t *testing.T) (context.Context, *pluginExerciser[protot
 	}
 }
 
-func TestTransportCallback_ResolveTarget(t *testing.T) {
+func TestTransportCallback_GetTransportDetails(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
 	defer done()
 
-	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_ResolveTarget{})] = func(dm *prototk.TransportMessage) {
-		dm.ResponseToTransport = &prototk.TransportMessage_ResolveTargetRes{
-			ResolveTargetRes: &prototk.ResolveTargetResponse{},
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_GetTransportDetails{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_GetTransportDetailsRes{
+			GetTransportDetailsRes: &prototk.GetTransportDetailsResponse{},
 		}
 	}
-	_, err := callbacks.ResolveTarget(ctx, &prototk.ResolveTargetRequest{})
+	_, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{})
 	assert.NoError(t, err)
 }
 

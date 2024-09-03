@@ -96,8 +96,8 @@ func TestSendMessage(t *testing.T) {
 	defer done()
 
 	message := &components.TransportMessage{
-		MessageType: "something",
-		Payload:     []byte("something"),
+		Node:    "node1",
+		Payload: []byte("something"),
 	}
 	serializedMessage, err := yaml.Marshal(message)
 	assert.NoError(t, err)

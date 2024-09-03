@@ -17,7 +17,6 @@ package transportmgr
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"github.com/google/uuid"
@@ -27,14 +26,15 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"gopkg.in/yaml.v3"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type transportManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf *TransportManagerConfig
+	conf      *TransportManagerConfig
+	localNode string
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -56,6 +56,7 @@ func (tm *transportManager) Init(pic components.PreInitComponents) (*components.
 	// TransportManager does not rely on any other components during the pre-init phase (at the moment)
 	// for QoS we may need persistence in the future, and this will be the plug point for the registry
 	// when we have it
+
 	return &components.ManagerInitResult{}, nil
 }
 
@@ -118,7 +119,7 @@ func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTra
 	return t, nil
 }
 
-func (tm *transportManager) GetTransportByName(ctx context.Context, name string) (components.Transport, error) {
+func (tm *transportManager) getTransportByName(ctx context.Context, name string) (*transport, error) {
 	tm.mux.Lock()
 	defer tm.mux.Unlock()
 	t := tm.transportsByName[name]
@@ -129,66 +130,67 @@ func (tm *transportManager) GetTransportByName(ctx context.Context, name string)
 }
 
 // Internal callback method from the transports to the manager
-func (tm *transportManager) recieveExternalMessage(msg components.TransportMessage) {
+func (tm *transportManager) receiveExternalMessage(msg components.TransportMessage) {
 	tm.recvMessages <- msg
 }
 
 // Send implements TransportManager
-func (tm *transportManager) Send(ctx context.Context, message components.TransportMessage, identity string) error {
+func (tm *transportManager) Send(ctx context.Context, msgInput *components.TransportMessageInput) error {
 	// TODO: Plug point for calling through to the registry
 	// TODO: Plugin determination
 
-	transportDetails := ""
-	if identity == "test" {
-		deets := `
-		{
-			"address": ":8081",
-			"caCertificate": "-----BEGIN CERTIFICATE-----\n` +
-			`MIIDuzCCAqOgAwIBAgIUPTw5vaIfHg8yLutcS+IKqHAEWiwwDQYJKoZIhvcNAQEL\n` +
-			`BQAwbTELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVN0YXRlMREwDwYDVQQHDAhMb2Nh\n` +
-			`bGl0eTEVMBMGA1UECgwMT3JnYW5pemF0aW9uMRAwDgYDVQQLDAdPcmdVbml0MRIw\n` +
-			`EAYDVQQDDAlsb2NhbGhvc3QwHhcNMjQwODA4MTAzNTMwWhcNMzQwODA2MTAzNTMw\n` +
-			`WjBtMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFU3RhdGUxETAPBgNVBAcMCExvY2Fs\n` +
-			`aXR5MRUwEwYDVQQKDAxPcmdhbml6YXRpb24xEDAOBgNVBAsMB09yZ1VuaXQxEjAQ\n` +
-			`BgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\n` +
-			`AOsKJKuyMysGsmW0X9oYSd3NJgzS6X3o8FqJWuC0vM6tmJMNORLJKcgE7bzKS2J9\n` +
-			`pHEG9qU0VADy4cfkj2Jaf0nXiptGZWGF5M1TV3gA6K/ZQt1SwS8Y4LZNo13Ek4pm\n` +
-			`znav4HWP8hGjW1Ym70M2Ru9vAvh14pv1VPaDq0eQY7de/Wpt0NPfcrXv5dw+wZQh\n` +
-			`OhxczE4QW1hJVF+7uyTzqBVXnUuIpWEYH3WIO/VyQIJERN8ynApnndtglbHXoNhj\n` +
-			`xZcZV1gfrOMHXQURhy04KigIvx7lxYqz5MNkFgfFxCHrkkmKH6CTw2ALmHBlXF6X\n` +
-			`+qE1jyWYClh014v/yFik82cCAwEAAaNTMFEwHQYDVR0OBBYEFKzheOJklxwLUrx7\n` +
-			`qAi/wOKzRd7FMB8GA1UdIwQYMBaAFKzheOJklxwLUrx7qAi/wOKzRd7FMA8GA1Ud\n` +
-			`EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAAcQOJhQ9NhBjjvFJAfbF9S1\n` +
-			`+E1DrP+zjOm8vGWEvVi4NlGVqd4KJVBeHX7IWewMSvBQasdOAFP25VOBqoPFVhNS\n` +
-			`XrnBnErCwQyx3NzHQCv50tRDI6e3ms5xh+4bnP7q4fye7QdFJtY7P6CQQMJq46dp\n` +
-			`r4aQhKExbB4TgECsYvFLrEpqHI375nghkEKAZD2wmLWCPb7mi1jommXBzxsIyl8u\n` +
-			`dlHsczoHgXf2K90p0iqCAluHMB4WgOVZX39ljHN/2o3mQgPQZtDHAL0jCaXKN9io\n` +
-			`o4+luzQ1J0UWAGpVThWlEcC5IRrmo5+4+KqyE/wTYJF4dlG/noA8XxkNqM15kY0=\n` +
-			`-----END CERTIFICATE-----\n",
-		}`
-
-		bytes, _ := yaml.Marshal(deets)
-		transportDetails = string(bytes)
-	}
-
 	knownPlugin := "grpc"
-	transport, err := tm.GetTransportByName(ctx, knownPlugin)
+	transport, err := tm.getTransportByName(ctx, knownPlugin)
 	if err != nil {
 		return err
 	}
 
-	serializedMessage, err := json.Marshal(message)
-	if err != nil {
-		return err
+	if len(msgInput.Destination.Node) == 0 ||
+		len(msgInput.Destination.Identity) == 0 ||
+		len(msgInput.ReplyToIdentity) == 0 ||
+		len(msgInput.Payload) == 0 {
+		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
+		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	// TODO: Transport Details
-	err = transport.Send(ctx, string(serializedMessage), transportDetails)
+	err = transport.Send(ctx, message)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (tm *transportManager) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+	if req.Node != "test" {
+		panic("unimplemented")
+	}
+	return &prototk.GetTransportDetailsResponse{TransportDetails: `
+		{
+			"address": ":8081",
+			"caCertificate": "-----BEGIN CERTIFICATE-----\n` +
+		`MIIDuzCCAqOgAwIBAgIUPTw5vaIfHg8yLutcS+IKqHAEWiwwDQYJKoZIhvcNAQEL\n` +
+		`BQAwbTELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVN0YXRlMREwDwYDVQQHDAhMb2Nh\n` +
+		`bGl0eTEVMBMGA1UECgwMT3JnYW5pemF0aW9uMRAwDgYDVQQLDAdPcmdVbml0MRIw\n` +
+		`EAYDVQQDDAlsb2NhbGhvc3QwHhcNMjQwODA4MTAzNTMwWhcNMzQwODA2MTAzNTMw\n` +
+		`WjBtMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFU3RhdGUxETAPBgNVBAcMCExvY2Fs\n` +
+		`aXR5MRUwEwYDVQQKDAxPcmdhbml6YXRpb24xEDAOBgNVBAsMB09yZ1VuaXQxEjAQ\n` +
+		`BgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\n` +
+		`AOsKJKuyMysGsmW0X9oYSd3NJgzS6X3o8FqJWuC0vM6tmJMNORLJKcgE7bzKS2J9\n` +
+		`pHEG9qU0VADy4cfkj2Jaf0nXiptGZWGF5M1TV3gA6K/ZQt1SwS8Y4LZNo13Ek4pm\n` +
+		`znav4HWP8hGjW1Ym70M2Ru9vAvh14pv1VPaDq0eQY7de/Wpt0NPfcrXv5dw+wZQh\n` +
+		`OhxczE4QW1hJVF+7uyTzqBVXnUuIpWEYH3WIO/VyQIJERN8ynApnndtglbHXoNhj\n` +
+		`xZcZV1gfrOMHXQURhy04KigIvx7lxYqz5MNkFgfFxCHrkkmKH6CTw2ALmHBlXF6X\n` +
+		`+qE1jyWYClh014v/yFik82cCAwEAAaNTMFEwHQYDVR0OBBYEFKzheOJklxwLUrx7\n` +
+		`qAi/wOKzRd7FMB8GA1UdIwQYMBaAFKzheOJklxwLUrx7qAi/wOKzRd7FMA8GA1Ud\n` +
+		`EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAAcQOJhQ9NhBjjvFJAfbF9S1\n` +
+		`+E1DrP+zjOm8vGWEvVi4NlGVqd4KJVBeHX7IWewMSvBQasdOAFP25VOBqoPFVhNS\n` +
+		`XrnBnErCwQyx3NzHQCv50tRDI6e3ms5xh+4bnP7q4fye7QdFJtY7P6CQQMJq46dp\n` +
+		`r4aQhKExbB4TgECsYvFLrEpqHI375nghkEKAZD2wmLWCPb7mi1jommXBzxsIyl8u\n` +
+		`dlHsczoHgXf2K90p0iqCAluHMB4WgOVZX39ljHN/2o3mQgPQZtDHAL0jCaXKN9io\n` +
+		`o4+luzQ1J0UWAGpVThWlEcC5IRrmo5+4+KqyE/wTYJF4dlG/noA8XxkNqM15kY0=\n` +
+		`-----END CERTIFICATE-----\n",
+		}`}, nil
 }
 
 // Send implements TransportManager

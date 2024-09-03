@@ -96,12 +96,12 @@ message TransportMessage {
 
   // Request/reply exchanges initiated by the transport, to the paladin node
   oneof request_from_transport {
-    ResolveTargetRequest resolve_target =                   2010;
+    GetTransportDetailsRequest get_transport_details =      2010;
     ReceiveMessageRequest receive_message =                 2020;
   }
 
   oneof response_to_transport {
-    ResolveTargetResponse resolve_target_res =              2011;
+    GetTransportDetailsResponse get_transport_details_res = 2011;
     ReceiveMessageResponse receive_message_res =            2021;
   }
 }

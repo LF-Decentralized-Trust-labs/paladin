@@ -27,8 +27,8 @@ message ConfigureTransportResponse {
 }
 
 message SendMessageRequest {
-    string transport_details = 1;
-    string body = 2;
+    string node = 1;
+    bytes payload = 2;
 }
 
 message SendMessageResponse {
