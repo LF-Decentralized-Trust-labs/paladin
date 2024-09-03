@@ -28,10 +28,15 @@ import (
 type mockComponents struct {
 }
 
-func newTestTransportManager(t *testing.T, realDB bool, conf *TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
+func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	mc := &mockComponents{}
+
+	for _, fn := range extraSetup {
+		fn(mc)
+	}
+
 	tm := NewTransportManager(ctx, conf)
 
 	err := tm.Start()
@@ -51,12 +56,12 @@ func yamlNode(t *testing.T, s string) (n yaml.Node) {
 }
 
 func TestConfiguredTransports(t *testing.T) {
-	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+	_, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{
 			"test1": {
 				Plugin: plugins.PluginConfig{
-					Type:     plugins.LibraryTypeCShared.Enum(),
-					Location: "some/where",
+					Type:    plugins.LibraryTypeCShared.Enum(),
+					Library: "some/where",
 				},
 			},
 		},
@@ -65,14 +70,14 @@ func TestConfiguredTransports(t *testing.T) {
 
 	assert.Equal(t, map[string]*plugins.PluginConfig{
 		"test1": {
-			Type:     plugins.LibraryTypeCShared.Enum(),
-			Location: "some/where",
+			Type:    plugins.LibraryTypeCShared.Enum(),
+			Library: "some/where",
 		},
 	}, dm.ConfiguredTransports())
 }
 
 func TestTransportRegisteredNotFound(t *testing.T) {
-	_, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+	_, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{},
 	})
 	defer done()
@@ -82,7 +87,7 @@ func TestTransportRegisteredNotFound(t *testing.T) {
 }
 
 func TestGetTransportNotFound(t *testing.T) {
-	ctx, dm, _, done := newTestTransportManager(t, false, &TransportManagerConfig{
+	ctx, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{},
 	})
 	defer done()

@@ -48,8 +48,8 @@ func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestTransport(t *testing.T, realDB bool, transportConfig *prototk.TransportConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
-	ctx, tm, _, done := newTestTransportManager(t, realDB, &TransportManagerConfig{
+func newTestTransport(t *testing.T, transportConfig *prototk.TransportConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+	ctx, tm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{
 			"test1": {
 				Config: yamlNode(t, `{"some":"conf"}`),
@@ -92,7 +92,7 @@ func registerTestTransport(t *testing.T, tm *transportManager, tp *testPlugin) {
 }
 
 func TestSendMessage(t *testing.T) {
-	ctx, _, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	ctx, _, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
@@ -111,7 +111,7 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestRecieveMessages(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	ctx, tm, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
@@ -130,7 +130,7 @@ func TestRecieveMessages(t *testing.T) {
 }
 
 func TestRecieveMessagesFailsWhenNotInitialized(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	ctx, tm, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{

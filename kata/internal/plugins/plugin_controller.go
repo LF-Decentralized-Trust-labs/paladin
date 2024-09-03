@@ -196,18 +196,21 @@ func (pc *pluginController) LoaderID() uuid.UUID {
 	return pc.loaderID
 }
 
-func (pc *pluginController) ReloadPluginList() error {
+func (pc *pluginController) ReloadPluginList() (err error) {
 	for name, dp := range pc.domainManager.ConfiguredDomains() {
-		if err := initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp); err != nil {
-			return err
+		if err == nil {
+			err = initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp)
 		}
 	}
 	for name, tp := range pc.transportManager.ConfiguredTransports() {
-		if err := initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp); err != nil {
-			return err
+		if err == nil {
+			err = initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp)
 		}
 	}
-	
+	if err != nil {
+		return err
+	}
+
 	select {
 	case pc.notifyPluginsUpdated <- true:
 	default:

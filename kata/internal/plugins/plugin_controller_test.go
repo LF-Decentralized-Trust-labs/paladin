@@ -47,7 +47,7 @@ func tempUDS(t *testing.T) string {
 }
 
 type testManagers struct {
-	testDomainManager *testDomainManager
+	testDomainManager    *testDomainManager
 	testTransportManager *testTransportManager
 }
 
@@ -121,9 +121,8 @@ func newTestTransportPluginController(t *testing.T, setup *testManagers) (contex
 	udsString := tempUDS(t)
 	loaderId := uuid.New()
 	allPlugins := setup.allPlugins()
-	pc, err := NewPluginController(ctx, loaderId, setup, &PluginControllerConfig{
+	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
 		GRPC: GRPCConfig{
-			Address:         udsString,
 			ShutdownTimeout: confutil.P("1ms"),
 		},
 	})
@@ -165,7 +164,7 @@ func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
 
 func TestInitPluginControllerBadPlugin(t *testing.T) {
 	tdm := &testDomainManager{domains: map[string]plugintk.Plugin{
-		"!badname": &mockPlugin{},
+		"!badname": &mockPlugin[prototk.DomainMessage]{},
 	}}
 	_, err := NewPluginController(context.Background(), tempUDS(t), uuid.New(), &testManagers{testDomainManager: tdm}, &PluginControllerConfig{})
 	assert.Regexp(t, "PD011106", err)
@@ -247,7 +246,9 @@ func TestLoaderErrors(t *testing.T) {
 	ctx := context.Background()
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
-			"domain1": &mockPlugin{
+			"domain1": &mockPlugin[prototk.DomainMessage]{
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
 				conf: &PluginConfig{
 					Type:    LibraryTypeCShared.Enum(),
 					Library: "some/where",
@@ -321,7 +322,9 @@ func TestLoaderErrors(t *testing.T) {
 
 	// Notify of a plugin after closed stream
 	tdm.domains = map[string]plugintk.Plugin{
-		"domain2": &mockPlugin{
+		"domain2": &mockPlugin[prototk.DomainMessage]{
+			connectFactory: domainConnectFactory,
+			headerAccessor: domainHeaderAccessor,
 			conf: &PluginConfig{
 				Type:    LibraryTypeJar.Enum(),
 				Library: "some/where/else",

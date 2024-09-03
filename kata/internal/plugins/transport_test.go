@@ -16,12 +16,14 @@ package plugins
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 )
 
 type testTransportManager struct {
@@ -30,12 +32,23 @@ type testTransportManager struct {
 	receive             func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
+func transportConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.TransportMessage, prototk.TransportMessage], error) {
+	return client.ConnectTransport(context.Background())
+}
+
+func transportHeaderAccessor(msg *prototk.TransportMessage) *prototk.Header {
+	if msg.Header == nil {
+		msg.Header = &prototk.Header{}
+	}
+	return msg.Header
+}
+
 func (tp *testTransportManager) ConfiguredTransports() map[string]*PluginConfig {
 	pluginMap := make(map[string]*PluginConfig)
 	for name := range tp.transports {
 		pluginMap[name] = &PluginConfig{
-			Type:     LibraryTypeCShared.Enum(),
-			Location: "/tmp/not/applicable",
+			Type:    LibraryTypeCShared.Enum(),
+			Library: "/tmp/not/applicable",
 		}
 	}
 	return pluginMap
@@ -65,9 +78,13 @@ func TestTransportRequestsOK(t *testing.T) {
 			assert.Equal(t, transportID, idr.TransportUuid)
 			return &prototk.InitTransportResponse{}, nil
 		},
+		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+			assert.Equal(t, "details1", smr.TransportDetails)
+			return &prototk.SendMessageResponse{}, nil
+		},
 	}
 
-	tdm := &testTransportManager{
+	ttm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
 			"transport1": plugintk.NewTransport(func(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
 				waitForCallbacks <- callbacks
@@ -75,23 +92,20 @@ func TestTransportRequestsOK(t *testing.T) {
 			}),
 		},
 	}
-	tdm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
+	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
 		assert.Equal(t, "transport1", name)
 		transportID = id.String()
 		waitForAPI <- toTransport
-		return tdm, nil
+		return ttm, nil
 	}
 
-	tdm.receive = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-		return &prototk.ReceiveMessageResponse{
-			// States: []*prototk.StoredState{
-			// 	{Id: "12345"},
-			// },
-		}, nil
+	ttm.receive = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+		assert.Equal(t, "body1", req.Body)
+		return &prototk.ReceiveMessageResponse{}, nil
 	}
 
 	ctx, pc, done := newTestTransportPluginController(t, &testManagers{
-		testTransportManager: tdm,
+		testTransportManager: ttm,
 	})
 	defer done()
 
@@ -105,8 +119,99 @@ func TestTransportRequestsOK(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{
+		TransportDetails: "details1",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, smr)
+
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
 	transportAPI.Initialized()
 	assert.NoError(t, pc.WaitForInit(ctx))
+
+	callbacks := <-waitForCallbacks
+	rms, err := callbacks.Receive(ctx, &prototk.ReceiveMessageRequest{
+		Body: "body1",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, rms)
+
+}
+
+func TestTransportRegisterFail(t *testing.T) {
+
+	waitForError := make(chan error, 1)
+
+	tdm := &testTransportManager{
+		transports: map[string]plugintk.Plugin{
+			"transport1": &mockPlugin[prototk.TransportMessage]{
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
+				preRegister: func(transportID string) *prototk.TransportMessage {
+					return &prototk.TransportMessage{
+						Header: &prototk.Header{
+							MessageType: prototk.Header_REGISTER,
+							PluginId:    transportID,
+							MessageId:   uuid.NewString(),
+						},
+					}
+				},
+				expectClose: func(err error) {
+					waitForError <- err
+				},
+			},
+		},
+	}
+	tdm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, _, done := newTestTransportPluginController(t, &testManagers{
+		testTransportManager: tdm,
+	})
+	defer done()
+
+	assert.Regexp(t, "pop", <-waitForError)
+}
+
+func TestFromTransportRequestBadReq(t *testing.T) {
+
+	waitForResponse := make(chan struct{}, 1)
+
+	msgID := uuid.NewString()
+	ttm := &testTransportManager{
+		transports: map[string]plugintk.Plugin{
+			"transport1": &mockPlugin[prototk.TransportMessage]{
+				connectFactory: transportConnectFactory,
+				headerAccessor: transportHeaderAccessor,
+				sendRequest: func(pluginID string) *prototk.TransportMessage {
+					return &prototk.TransportMessage{
+						Header: &prototk.Header{
+							PluginId:    pluginID,
+							MessageId:   msgID,
+							MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
+							// Missing payload
+						},
+					}
+				},
+				handleResponse: func(dm *prototk.TransportMessage) {
+					assert.Equal(t, msgID, *dm.Header.CorrelationId)
+					assert.Regexp(t, "PD011203", *dm.Header.ErrorMessage)
+					close(waitForResponse)
+				},
+			},
+		},
+	}
+	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+		return ttm, nil
+	}
+
+	_, _, done := newTestTransportPluginController(t, &testManagers{
+		testTransportManager: ttm,
+	})
+	defer done()
+
+	<-waitForResponse
+
 }
