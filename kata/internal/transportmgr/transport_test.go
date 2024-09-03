@@ -15,370 +15,135 @@
 
 package transportmgr
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"sync/atomic"
-// 	"testing"
+import (
+	"context"
+	"sync/atomic"
+	"testing"
 
-// 	"github.com/google/uuid"
-// 	"github.com/kaleido-io/paladin/kata/internal/statestore"
-// 	"github.com/kaleido-io/paladin/kata/pkg/types"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/mock"
-// )
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
+)
 
-// type testPlugin struct {
-// 	plugintk.TransportAPIBase
-// 	initialized  atomic.Bool
-// 	t            *transport
-// 	stateSchemas []*prototk.StateSchema
-// }
+type testPlugin struct {
+	plugintk.TransportAPIBase
+	initialized  atomic.Bool
+	t            *transport
+	sendMessages chan *prototk.SendMessageRequest
+}
 
-// func (tp *testPlugin) Initialized() {
-// 	tp.initialized.Store(true)
-// }
+func (tp *testPlugin) Initialized() {
+	tp.initialized.Store(true)
+}
 
-// func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
-// 	return &testPlugin{
-// 		TransportAPIBase: plugintk.TransportAPIBase{
-// 			Functions: transportFuncs,
-// 		},
-// 	}
-// }
+func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
+	return &testPlugin{
+		TransportAPIBase: plugintk.TransportAPIBase{
+			Functions: transportFuncs,
+		},
+		sendMessages: make(chan *prototk.SendMessageRequest, 1),
+	}
+}
 
-// func newTestTe(t *testing.T, transportConfig *prototk.TransportConfig) (context.Context, *transportManager, *testPlugin, func()) {
-// 	ctx, dm, _, done := newTestTrans(t, realDB, &DomainManagerConfig{
-// 		Domains: map[string]*DomainConfig{
-// 			"test1": {
-// 				Config: yamlNode(t, `{"some":"conf"}`),
-// 			},
-// 		},
-// 	}, extraSetup...)
+func newTestTransport(t *testing.T, realDB bool, transportConfig *prototk.TransportConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+	ctx, tm, _, done := newTestTransportManager(t, realDB, &TransportManagerConfig{
+		Transports: map[string]*TransportConfig{
+			"test1": {
+				Config: yamlNode(t, `{"some":"conf"}`),
+			},
+		},
+	}, extraSetup...)
 
-// 	tp := newTestPlugin(nil)
-// 	tp.Functions = &plugintk.DomainAPIFunctions{
-// 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
-// 			assert.Equal(t, "test1", cdr.Name)
-// 			assert.YAMLEq(t, `{"some":"conf"}`, cdr.ConfigYaml)
-// 			return &prototk.ConfigureDomainResponse{
-// 				DomainConfig: domainConfig,
-// 			}, nil
-// 		},
-// 		InitDomain: func(ctx context.Context, idr *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
-// 			tp.stateSchemas = idr.AbiStateSchemas
-// 			return &prototk.InitDomainResponse{}, nil
-// 		},
-// 	}
+	tp := newTestPlugin(nil)
+	tp.Functions = &plugintk.TransportAPIFunctions{
+		ConfigureTransport: func(ctx context.Context, ctr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
+			assert.Equal(t, "test1", ctr.Name)
+			assert.YAMLEq(t, `{"some":"conf"}`, ctr.ConfigYaml)
+			return &prototk.ConfigureTransportResponse{
+				TransportConfig: transportConfig,
+			}, nil
+		},
+		InitTransport: func(ctx context.Context, idr *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
+			return &prototk.InitTransportResponse{}, nil
+		},
+		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+			tp.sendMessages <- smr
+			return &prototk.SendMessageResponse{}, nil
+		},
+	}
 
-// 	registerTestDomain(t, dm, tp)
-// 	return ctx, dm, tp, done
-// }
+	registerTestTransport(t, tm, tp)
+	return ctx, tm, tp, done
+}
 
-// func registerTestDomain(t *testing.T, dm *domainManager, tp *testPlugin) {
-// 	domainID := uuid.New()
-// 	_, err := dm.DomainRegistered("test1", domainID, tp)
-// 	assert.NoError(t, err)
+func registerTestTransport(t *testing.T, tm *transportManager, tp *testPlugin) {
+	transportID := uuid.New()
+	_, err := tm.TransportRegistered("test1", transportID, tp)
+	assert.NoError(t, err)
 
-// 	da, err := dm.GetDomainByName(context.Background(), "test1")
-// 	assert.NoError(t, err)
-// 	tp.d = da.(*domain)
-// 	tp.d.initRetry.UTSetMaxAttempts(1)
-// 	<-tp.d.initDone
-// }
+	ta, err := tm.GetTransportByName(context.Background(), "test1")
+	assert.NoError(t, err)
+	tp.t = ta.(*transport)
+	tp.t.initRetry.UTSetMaxAttempts(1)
+	<-tp.t.initDone
+}
 
-// func goodDomainConf() *prototk.DomainConfig {
-// 	return &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	}
-// }
+func TestSendMessage(t *testing.T) {
+	ctx, _, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	defer done()
 
-// func TestDomainInitStates(t *testing.T) {
+	message := &components.TransportMessage{
+		MessageType: "something",
+		Payload:     []byte("something"),
+	}
+	serializedMessage, err := yaml.Marshal(message)
+	assert.NoError(t, err)
 
-// 	domainConf := goodDomainConf()
-// 	ctx, dm, tp, done := newTestDomain(t, true, domainConf)
-// 	defer done()
+	transportDetails := ""
 
-// 	assert.Nil(t, tp.d.initError.Load())
-// 	assert.True(t, tp.initialized.Load())
-// 	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, tp.d, byAddr)
+	err = tp0.t.Send(ctx, string(serializedMessage), transportDetails)
+	assert.NoError(t, err)
 
-// }
+	<-tp0.sendMessages
+}
 
-// func TestDoubleRegisterReplaces(t *testing.T) {
+func TestRecieveMessages(t *testing.T) {
+	ctx, tm, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	defer done()
 
-// 	domainConf := goodDomainConf()
-// 	ctx, dm, tp0, done := newTestDomain(t, false, domainConf, func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
-// 	})
-// 	defer done()
-// 	assert.Nil(t, tp0.d.initError.Load())
-// 	assert.True(t, tp0.initialized.Load())
+	message := &components.TransportMessage{
+		MessageType: "something",
+		Payload:     []byte("something"),
+	}
+	serializedMessage, err := yaml.Marshal(message)
+	assert.NoError(t, err)
 
-// 	// Register again
-// 	tp1 := newTestPlugin(nil)
-// 	tp1.Functions = tp0.Functions
-// 	registerTestDomain(t, dm, tp1)
-// 	assert.Nil(t, tp1.d.initError.Load())
-// 	assert.True(t, tp1.initialized.Load())
+	_, err = tp0.t.Receive(ctx, &prototk.ReceiveMessageRequest{
+		Body: string(serializedMessage),
+	})
+	assert.NoError(t, err)
 
-// 	// Check we get the second from all the maps
-// 	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
-// 	assert.NoError(t, err)
-// 	assert.Same(t, tp1.d, byAddr)
-// 	byName, err := dm.GetDomainByName(ctx, "test1")
-// 	assert.NoError(t, err)
-// 	assert.Same(t, tp1.d, byName)
-// 	byUUID := dm.domainsByID[tp1.d.id]
-// 	assert.NoError(t, err)
-// 	assert.Same(t, tp1.d, byUUID)
+	<-tm.recvMessages
+}
 
-// }
+func TestRecieveMessagesFailsWhenNotInitialized(t *testing.T) {
+	ctx, tm, tp0, done := newTestTransport(t, false, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	defer done()
 
-// func TestDomainInitBadSchemas(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			`!!! Wrong`,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011602", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+	message := &components.TransportMessage{
+		MessageType: "something",
+		Payload:     []byte("something"),
+	}
+	serializedMessage, err := yaml.Marshal(message)
+	assert.NoError(t, err)
 
-// func TestDomainInitBadConstructor(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `!!!wrong`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011603", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
+	_, err = tp0.t.Receive(ctx, &prototk.ReceiveMessageRequest{
+		Body: string(serializedMessage),
+	})
+	assert.NoError(t, err)
 
-// func TestDomainInitBadConstructorType(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `{"type":"event"}`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainInitSchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     `{"type":"event"}`,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainInitBadAddress(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: `!wrong`,
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011606", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainInitFactoryABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `!!!wrong`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011605", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainInitPrivateABIInvalid(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `!!!wrong`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "PD011607", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
-// 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		ConstructorAbiJson:     fakeCoinConstructorABI,
-// 		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
-// 		FactoryContractAbiJson: `[]`,
-// 		PrivateContractAbiJson: `[]`,
-// 		AbiStateSchemasJson: []string{
-// 			fakeCoinStateSchema,
-// 		},
-// 	}, func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return(nil, fmt.Errorf("pop"))
-// 	})
-// 	defer done()
-// 	assert.Regexp(t, "pop", *tp.d.initError.Load())
-// 	assert.False(t, tp.initialized.Load())
-// }
-
-// func TestDomainConfigureFail(t *testing.T) {
-
-// 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-// 		Domains: map[string]*DomainConfig{
-// 			"test1": {
-// 				Config: yamlNode(t, `{"some":"conf"}`),
-// 			},
-// 		},
-// 	})
-// 	defer done()
-
-// 	tp := newTestPlugin(&plugintk.DomainAPIFunctions{
-// 		ConfigureDomain: func(ctx context.Context, cdr *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
-// 			return nil, fmt.Errorf("pop")
-// 		},
-// 	})
-
-// 	domainID := uuid.New()
-// 	_, err := dm.DomainRegistered("test1", domainID, tp)
-// 	assert.NoError(t, err)
-
-// 	da, err := dm.GetDomainByName(ctx, "test1")
-// 	assert.NoError(t, err)
-
-// 	d := da.(*domain)
-// 	d.initRetry.UTSetMaxAttempts(1)
-// 	<-d.initDone
-// 	assert.Regexp(t, "pop", *d.initError.Load())
-// }
-
-// func TestDomainFindAvailableStatesNotInit(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-// 		FactoryContractAbiJson: `!!!WRONG`,
-// 	})
-// 	defer done()
-// 	assert.NotNil(t, *tp.d.initError.Load())
-// 	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{SchemaId: "12345"})
-// 	assert.Regexp(t, "PD011601", err)
-// }
-
-// func TestDomainFindAvailableStatesBadQuery(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
-// 	})
-// 	defer done()
-// 	assert.Nil(t, tp.d.initError.Load())
-// 	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
-// 		SchemaId:  "12345",
-// 		QueryJson: `!!!{ wrong`,
-// 	})
-// 	assert.Regexp(t, "PD011608", err)
-// }
-
-// func TestDomainFindAvailableStatesFail(t *testing.T) {
-// 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), func(mc *mockComponents) {
-// 		mc.domainStateInterface.On("EnsureABISchemas", mock.Anything).Return([]statestore.Schema{}, nil)
-// 		mc.domainStateInterface.On("FindAvailableStates", "12345", mock.Anything).Return(nil, fmt.Errorf("pop"))
-// 	})
-// 	defer done()
-// 	assert.Nil(t, tp.d.initError.Load())
-// 	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
-// 		SchemaId:  "12345",
-// 		QueryJson: `{}`,
-// 	})
-// 	assert.Regexp(t, "pop", err)
-// }
-
-// func TestDomainFindAvailableStatesOK(t *testing.T) {
-// 	ctx, dm, tp, done := newTestDomain(t, true /* use real state store for this one */, goodDomainConf())
-// 	defer done()
-// 	assert.Nil(t, tp.d.initError.Load())
-
-// 	txID := uuid.New()
-// 	err := dm.stateStore.RunInDomainContextFlush("test1", func(ctx context.Context, dsi statestore.DomainStateInterface) error {
-// 		newStates, err := dsi.UpsertStates(&txID, []*statestore.StateUpsert{
-// 			{
-// 				SchemaID: tp.stateSchemas[0].Id,
-// 				Data: types.RawJSON(`{
-// 					"salt": "5541b2383d8e2726d9318a29b62a44717535e3204257c698ce60c7c8ff093953",
-// 					"owner": "0x8d06f71D68216b31e9019C162528241F44fA0fD9",
-// 					"amount": "0x3033"
-// 				}`),
-// 				Creating: true,
-// 			},
-// 		})
-// 		assert.Len(t, newStates, 1)
-// 		return err
-// 	})
-// 	assert.NoError(t, err)
-
-// 	// Filter match
-// 	states, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
-// 		SchemaId: tp.stateSchemas[0].Id,
-// 		QueryJson: `{
-// 		"eq": [
-// 			{ "field": "owner", "value": "0x8d06f71D68216b31e9019C162528241F44fA0fD9" }
-// 		]
-// 		}`,
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Len(t, states.States, 1)
-
-// 	// Filter miss
-// 	states, err = tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
-// 		SchemaId: tp.stateSchemas[0].Id,
-// 		QueryJson: `{
-// 		"eq": [
-// 			{ "field": "owner", "value": "0xc2C6aABDEb29cB53F164a3d631Af5CDC32A942BF" }
-// 		]
-// 		}`,
-// 	})
-// 	assert.NoError(t, err)
-// 	assert.Len(t, states.States, 0)
-// }
- 
+	<-tm.recvMessages
+}

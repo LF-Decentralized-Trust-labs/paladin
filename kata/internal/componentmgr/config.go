@@ -36,8 +36,8 @@ import (
 
 type Config struct {
 	domainmgr.DomainManagerConfig       `yaml:",inline"`
-	transportmgr.TransportManagerConfig `yaml:",inline"`
 	plugins.PluginControllerConfig      `yaml:",inline"`
+	transportmgr.TransportManagerConfig `yaml:",inline"`
 	Log                                 log.Config          `yaml:"log"`
 	Blockchain                          ethclient.Config    `yaml:"blockchain"`
 	DB                                  persistence.Config  `yaml:"db"`

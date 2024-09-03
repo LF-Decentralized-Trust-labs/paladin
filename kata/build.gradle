@@ -281,23 +281,38 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     args 'kata.go'
 }
 
-task buildTestPluginsSharedLibraryA(type:Exec) {
+task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
+    workingDir '.'
+
+    inputs.files(goFiles)
+    inputs.dir("testbed")
+    outputs.dir("bin")
+
+    environment("CGO_ENABLED", "1")
+
+    executable 'go'
+    args 'build'
+    args '-o', 'bin/'
+    args './testbed'
+}
+
+task buildTestPluginsSharedLibraryGRPCTransport(type:Exec) {
 
     workingDir '.'
 
     def libName;
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        libName = "transportA.dll"
+        libName = "grpctransport.dll"
     } else if (Os.isFamily(Os.FAMILY_MAC)) {
-        libName = "transportA.so"
+        libName = "grpctransport.so"
     } else {
-        libName = "libtransportA.so"
+        libName = "grpctransport.so"
     }
 
     inputs.files(fileTree("${projectDir}").matching {
-        include "test/plugins/transport/A/*.go"
+        include "internal/plugins/grpctransport/*.go"
     })
-    outputs.files([libName, 'libtransportA.h'])
+    outputs.files([libName, 'libgrpctransport.h'])
 
     environment("CGO_ENABLED", "1")
 
@@ -305,11 +320,11 @@ task buildTestPluginsSharedLibraryA(type:Exec) {
     args 'build'
     args '-o', libName
     args '-buildmode=plugin'
-    args 'test/plugins/transport/A/main.go'
+    args 'internal/plugins/grpctransport/main.go'
 }
 
 task buildTestPluginsSharedLibraries {
-    dependsOn buildTestPluginsSharedLibraryA
+    dependsOn tasks.buildTestPluginsSharedLibraryGRPCTransport
 }
 
 abstract class UnitTests extends Exec {

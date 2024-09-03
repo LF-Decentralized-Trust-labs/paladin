@@ -17,8 +17,6 @@ package transportmgr
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -42,10 +40,8 @@ type transport struct {
 	name string
 	api  plugins.TransportManagerToTransport
 
-	stateLock   sync.Mutex
 	initialized atomic.Bool
 	initRetry   *retry.Retry
-	config      *prototk.TransportConfig
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -103,7 +99,7 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) Send(ctx context.Context, serializedMessage string, transportDetails string, component string) error {
+func (t *transport) Send(ctx context.Context, serializedMessage string, transportDetails string) error {
 	if err := t.checkInit(ctx); err != nil {
 		return err
 	}
@@ -111,7 +107,6 @@ func (t *transport) Send(ctx context.Context, serializedMessage string, transpor
 	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
 		Body:             serializedMessage,
 		TransportDetails: transportDetails,
-		Component:        component,
 	})
 	if err != nil {
 		return err
@@ -127,12 +122,12 @@ func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequ
 	}
 
 	transportMessage := &components.TransportMessage{}
-	err := json.Unmarshal([]byte(req.Body), transportMessage)
+	err := yaml.Unmarshal([]byte(req.Body), transportMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	t.tm.recieveExternalMessage(req.Component, *transportMessage)
+	t.tm.recieveExternalMessage(*transportMessage)
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
