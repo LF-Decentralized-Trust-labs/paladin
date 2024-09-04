@@ -202,11 +202,11 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction *tran
 		return false, err
 	}
 
-	blockingNodeIDs := make(map[string]bool)
+	blockingNodeIDs := make(map[string]struct{})
 	blockedBy := make([]blockingTransaction, 0, len(unconfirmedDependencies))
 
 	for _, dependency := range unconfirmedDependencies {
-		blockingNodeIDs[dependency.sequencingNodeID] = true
+		blockingNodeIDs[dependency.sequencingNodeID] = struct{}{}
 		blockedBy = append(blockedBy, blockingTransaction{
 			transactionID: dependency.id,
 			nodeID:        dependency.sequencingNodeID,
