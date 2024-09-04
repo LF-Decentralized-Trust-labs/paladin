@@ -23,11 +23,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
-
-func ptrTo[T any](v T) *T {
-	return &v
-}
 
 type Graph interface {
 	AddTransaction(ctx context.Context, txID string, inputStates []string, outputStates []string) error
@@ -111,7 +108,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 				log.L(ctx).Errorf("State hash %s is spent by multiple transactions", stateID)
 				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is spent by multiple transactions")
 			}
-			stateToSpender[stateID] = ptrTo(txnIndex)
+			stateToSpender[stateID] = confutil.P(txnIndex)
 		}
 	}
 
