@@ -28,11 +28,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-
-	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
+	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 )
 
 type ExternalMessage struct {
@@ -52,7 +50,7 @@ type ExternalServer interface {
 }
 
 type externalGRPCServer struct {
-	interPaladinPB.UnimplementedInterPaladinTransportServer
+	proto.UnimplementedInterPaladinTransportServer
 
 	grpcListener      net.Listener
 	server            *grpc.Server
@@ -153,7 +151,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 	}
 
 	egs.server = s
-	interPaladinPB.RegisterInterPaladinTransportServer(s, egs)
+	proto.RegisterInterPaladinTransportServer(s, egs)
 
 	// Monitor new messages coming in from the network
 	go func() {
@@ -187,7 +185,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 						log.L(ctx).Errorf("grpctransport: could not append the client cert to the pool")
 					}
 
-					inpalMessage := &interPaladinPB.InterPaladinMessage{
+					inpalMessage := &proto.InterPaladinMessage{
 						Body: []byte(sendMsg.Body),
 					}
 
@@ -205,7 +203,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 					}
 					defer conn.Close()
 
-					client := interPaladinPB.NewInterPaladinTransportClient(conn)
+					client := proto.NewInterPaladinTransportClient(conn)
 
 					_, err = client.SendInterPaladinMessage(ctx, inpalMessage)
 					if err != nil {
@@ -221,7 +219,7 @@ func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) e
 	return nil
 }
 
-func (egs *externalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *interPaladinPB.InterPaladinMessage) (*interPaladinPB.InterPaladinMessage, error) {
+func (egs *externalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *proto.InterPaladinMessage) (*proto.InterPaladinMessage, error) {
 	transportedMessage := &prototk.TransportMessage{}
 	err := yaml.Unmarshal(message.Body, transportedMessage)
 	if err != nil {

@@ -29,11 +29,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
+	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"github.com/stretchr/testify/assert"
-
-	interPaladinPB "github.com/kaleido-io/paladin/kata/pkg/proto/interpaladin"
 )
 
 var (
@@ -43,12 +40,12 @@ var (
 )
 
 type fakeExternalGRPCServer struct {
-	interPaladinPB.UnimplementedInterPaladinTransportServer
+	proto.UnimplementedInterPaladinTransportServer
 
 	listener net.Listener
 }
 
-func (fegs *fakeExternalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *interPaladinPB.InterPaladinMessage) (*interPaladinPB.InterPaladinMessage, error) {
+func (fegs *fakeExternalGRPCServer) SendInterPaladinMessage(ctx context.Context, message *proto.InterPaladinMessage) (*proto.InterPaladinMessage, error) {
 	fegs.listener.Close()
 	return nil, nil
 }
@@ -92,7 +89,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 	})))
 	defer s.GracefulStop()
 	defer testLis.Close()
-	interPaladinPB.RegisterInterPaladinTransportServer(s, fakeServer)
+	proto.RegisterInterPaladinTransportServer(s, fakeServer)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -108,7 +105,7 @@ func TestOutboundMessageFlowWithMTLS(t *testing.T) {
 	transportDetailBytes, err := yaml.Marshal(td)
 	assert.NoError(t, err)
 
-	tm := &components.TransportMessage{
+	tm := &TransportMessage{
 		MessageType: "something",
 		Payload:     []byte("something"),
 	}
@@ -136,7 +133,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 	s := grpc.NewServer()
 	defer s.GracefulStop()
 	defer testLis.Close()
-	interPaladinPB.RegisterInterPaladinTransportServer(s, fakeServer)
+	proto.RegisterInterPaladinTransportServer(s, fakeServer)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -151,7 +148,7 @@ func TestOutboundMessageFlow(t *testing.T) {
 	transportDetailBytes, err := yaml.Marshal(td)
 	assert.NoError(t, err)
 
-	tm := &components.TransportMessage{
+	tm := &TransportMessage{
 		MessageType: "something",
 		Payload:     []byte("something"),
 	}
@@ -191,7 +188,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	client := interpaladin.NewInterPaladinTransportClient(conn)
+	client := proto.NewInterPaladinTransportClient(conn)
 
 	fakeMessage := &ExternalMessage{
 		Body:             "something",
@@ -205,7 +202,7 @@ func TestInboundMessageFlowWithMTLS(t *testing.T) {
 	// we know about the Paladin that sent us the message, so we're going to manually add its CA into our store
 	server.serverCertPool.AppendCertsFromPEM([]byte(caCertificate))
 
-	_, err = client.SendInterPaladinMessage(ctx, &interpaladin.InterPaladinMessage{
+	_, err = client.SendInterPaladinMessage(ctx, &proto.InterPaladinMessage{
 		Body: fakeMessageBytes,
 	})
 	assert.NoError(t, err)
@@ -226,7 +223,7 @@ func TestInboundMessageFlow(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	client := interpaladin.NewInterPaladinTransportClient(conn)
+	client := proto.NewInterPaladinTransportClient(conn)
 
 	fakeMessage := &ExternalMessage{
 		Body:             "something",
@@ -236,7 +233,7 @@ func TestInboundMessageFlow(t *testing.T) {
 	fakeMessageBytes, err := yaml.Marshal(fakeMessage)
 	assert.NoError(t, err)
 
-	_, err = client.SendInterPaladinMessage(ctx, &interpaladin.InterPaladinMessage{
+	_, err = client.SendInterPaladinMessage(ctx, &proto.InterPaladinMessage{
 		Body: fakeMessageBytes,
 	})
 	assert.NoError(t, err)

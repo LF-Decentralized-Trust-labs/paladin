@@ -16,49 +16,74 @@
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
+        include "pkg/**/*.go"
+        include "main.go"
     }
 }
 
 configurations {
     // Resolvable configurations
-    contractCompile {
-        canBeConsumed = false
-        canBeResolved = true
-    }
     toolkitProtoCompiled {
-        canBeConsumed = false
-        canBeResolved = true
-    }
-    kataProtoCompiled {
         canBeConsumed = false
         canBeResolved = true
     }
 }
 
 dependencies {
-    contractCompile project(path: ":solidity", configuration: "compiledContracts")
     toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
-    kataProtoCompiled project(path: ":kata", configuration: "protoCompiled")
 }
 
-task copySolidity(type: Copy) {
-    inputs.files(configurations.contractCompile)
-    from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
-        include 'contracts/noto/Noto.sol/Noto.json'
-        include 'contracts/noto/NotoSelfSubmitFactory.sol/NotoSelfSubmitFactory.json'
-        include 'contracts/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
+task installTools(type: Exec) {
+    workingDir '.'
+    environment('GOBIN', "${projectDir}/bin")
+    executable 'go'
+    args 'install'
+    inputs.files('go.mod','go.sum')
+    outputs.files(
+        "bin/protoc-gen-go",
+        "bin/protoc-gen-go-grpc",
+        "bin/golangci-lint",
+        "bin/mockery",
+    )
+    // We use go.mod for dependency version management
+    // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
+    args 'google.golang.org/protobuf/cmd/protoc-gen-go'
+    args 'google.golang.org/grpc/cmd/protoc-gen-go-grpc'
+    args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
+    args 'github.com/vektra/mockery/v2'
+}
+
+task protoc(type: ProtoCompile, dependsOn: [tasks.installTools]) {
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
     }
-    into 'internal/noto/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
 }
 
-task test(type: Exec) {
+task lint(type: Exec, dependsOn:[tasks.protoc]) {
+    workingDir '.'
+
+    inputs.files(goFiles);
+    environment 'GOGC', '20'
+
+    executable "bin/golangci-lint"
+    args 'run'
+    args '-v'
+    args '--color=always'
+    args '--timeout', '5m'
+}
+
+task test(type: Exec, dependsOn:[tasks.protoc]) {
     inputs.files(configurations.toolkitProtoCompiled)
-    inputs.files(configurations.kataProtoCompiled)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
@@ -71,15 +96,14 @@ task test(type: Exec) {
     args '-timeout=30s'
     args "-test.gocoverdir=${projectDir}/coverage"
 
-    dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
 }
 
 task build {
+    dependsOn lint
     dependsOn test
 }
 
 task clean(type: Delete) {
     delete 'coverage'
-    delete 'internal/noto/abis'
 }

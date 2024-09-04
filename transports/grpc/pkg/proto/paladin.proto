@@ -14,13 +14,18 @@
  */
 
 syntax = "proto3";
-package github.com.kaleido_io.paladin.kata.interpaladin;
-option go_package = "pkg/proto/interpaladin";
+package github.com.kaleido_io.paladin.transports.grpc;
+option go_package = "pkg/proto";
 
-service InterPaladinTransport {
-  rpc SendInterPaladinMessage(InterPaladinMessage) returns (InterPaladinMessage) {}
+service PaladinGRPCTransport {
+  rpc MessageStream(Message) returns (Message) {}
 }
 
-message InterPaladinMessage {
-  bytes body = 1;
+message Message {
+  string message_id = 1;
+  optional string correlation_id = 2;
+  string destination = 3;
+  string reply_to = 4;
+  string message_type = 5;
+  bytes payload = 6;
 }
