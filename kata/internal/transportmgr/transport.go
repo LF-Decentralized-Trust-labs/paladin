@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -129,12 +130,17 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 	}
 
 	msg := req.Message
-	if msg == nil || msg.Destination == nil || msg.ReplyTo == nil || len(msg.Payload) == 0 || len(msg.MessageType) == 0 {
+	if msg == nil || len(msg.Payload) == 0 || len(msg.MessageType) == 0 {
 		log.L(ctx).Errorf("Invalid message from transport: %s", protoToJSON(msg))
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
-	if msg.Destination.Node != t.tm.localNodeName {
-		return nil, i18n.NewError(ctx, msgs.MsgTransportWrongNode, t.tm.localNodeName, msg.Destination.Node)
+	destNode, err := types.PrivateIdentityLocator(msg.Destination).Node(ctx, false)
+	if err != nil || destNode != t.tm.localNodeName {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidDestinationReceived, t.tm.localNodeName, msg.Destination)
+	}
+	_, _, err = types.PrivateIdentityLocator(msg.ReplyTo).Validate(ctx, "", false)
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidReplyToReceived, msg.ReplyTo)
 	}
 	msgID, err := uuid.Parse(msg.MessageId)
 	if err != nil {
@@ -160,13 +166,9 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 	transportMessage := &components.TransportMessage{
 		MessageID:     msgID,
 		CorrelationID: pCorrelID,
-		Destination: components.TransportTarget{
-			Node: msg.Destination.Node,
-		},
-		ReplyTo: components.TransportTarget{
-			Node: msg.ReplyTo.Node,
-		},
-		Payload: msg.Payload,
+		Destination:   types.PrivateIdentityLocator(msg.Destination),
+		ReplyTo:       types.PrivateIdentityLocator(msg.ReplyTo),
+		Payload:       msg.Payload,
 	}
 	t.tm.engine.ReceiveTransportMessage(transportMessage)
 
@@ -174,10 +176,15 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 }
 
 func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+	node, err := types.PrivateIdentityLocator(req.Destination).Node(ctx, false)
+	if err != nil || node == t.tm.localNodeName {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidDestinationSend, t.tm.localNodeName, req.Destination)
+	}
+
 	// Do a cache-optimized in the registry manager to get the details of the transport.
 	// We expect this to succeed because we did it before sending (see notes on Send() function)
 	var transportDetails string
-	availableTransports, err := t.tm.registryManager.GetNodeTransports(ctx, req.Node)
+	availableTransports, err := t.tm.registryManager.GetNodeTransports(ctx, node)
 	for _, atd := range availableTransports {
 		if atd.Transport == t.name {
 			transportDetails = atd.TransportDetails
@@ -185,7 +192,7 @@ func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTra
 		}
 	}
 	if transportDetails == "" {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportDetailsNotAvailable, t.name, req.Node)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportDetailsNotAvailable, t.name, node)
 	}
 	return &prototk.GetTransportDetailsResponse{
 		TransportDetails: transportDetails,

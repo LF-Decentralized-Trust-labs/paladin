@@ -32,18 +32,11 @@ message SendMessageRequest {
 message SendMessageResponse {
 }
 
-message Destination {
-    string node = 1;
-    // TODO: discuss with Hosie
-    // string component = 2;
-    // string identity = 3;
-}
-
 message Message {
     string message_id = 1;
     optional string correlation_id = 2;
-    Destination destination = 3;
-    Destination reply_to = 4;
+    string destination = 3;
+    string reply_to = 4;
     string message_type = 5;
     bytes payload = 6;
 }

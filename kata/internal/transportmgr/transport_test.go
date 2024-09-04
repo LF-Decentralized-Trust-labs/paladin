@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -108,11 +109,21 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 }
 
+func testMessage() *components.TransportMessage {
+	return &components.TransportMessage{
+		Destination:   "me@node2",
+		ReplyTo:       "me@node1",
+		CorrelationID: confutil.P(uuid.New()),
+		MessageType:   "myMessageType",
+		Payload:       []byte("something"),
+	}
+}
+
 func TestSendMessage(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node1").Return([]*components.RegistryNodeTransportEntry{
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
-				Node:             "node1",
+				Node:             "node2",
 				Transport:        "test1",
 				TransportDetails: `{"likely":"json stuff"}`,
 			},
@@ -120,28 +131,20 @@ func TestSendMessage(t *testing.T) {
 	})
 	defer done()
 
-	message := &components.TransportMessageInput{
-		Destination: components.TransportTarget{
-			Node: "node1",
-		},
-		CorrelationID: confutil.P(uuid.New()),
-		ReplyTo:       components.LocalTransportTarget{},
-		MessageType:   "myMessageType",
-		Payload:       []byte("something"),
-	}
+	message := testMessage()
 
 	sentMessages := make(chan *prototk.Message, 1)
 	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 		sent := req.Message
 		assert.NotEmpty(t, sent.MessageId)
 		assert.Equal(t, message.CorrelationID.String(), *sent.CorrelationId)
-		assert.Equal(t, message.Destination.Node, sent.Destination.Node)
-		assert.Equal(t, "node1", sent.ReplyTo.Node)
+		assert.Equal(t, message.Destination.String(), sent.Destination)
+		assert.Equal(t, message.ReplyTo.String(), sent.ReplyTo)
 		assert.Equal(t, message.Payload, sent.Payload)
 
 		// ... if we didn't have a connection established we'd expect to come back to request the details
 		gtdr, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-			Node: message.Destination.Node,
+			Destination: message.Destination.String(),
 		})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, gtdr.TransportDetails)
@@ -158,7 +161,7 @@ func TestSendMessage(t *testing.T) {
 
 func TestSendMessageNotInit(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node1").Return([]*components.RegistryNodeTransportEntry{
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:             "node1",
 				Transport:        "test1",
@@ -170,15 +173,7 @@ func TestSendMessageNotInit(t *testing.T) {
 
 	tp.t.initialized.Store(false)
 
-	message := &components.TransportMessageInput{
-		Destination: components.TransportTarget{
-			Node: "node1",
-		},
-		CorrelationID: confutil.P(uuid.New()),
-		ReplyTo:       components.LocalTransportTarget{},
-		MessageType:   "myMessageType",
-		Payload:       []byte("something"),
-	}
+	message := testMessage()
 
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD011601", err)
@@ -187,7 +182,7 @@ func TestSendMessageNotInit(t *testing.T) {
 
 func TestSendMessageFail(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node1").Return([]*components.RegistryNodeTransportEntry{
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:             "node1",
 				Transport:        "test1",
@@ -201,15 +196,7 @@ func TestSendMessageFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	message := &components.TransportMessageInput{
-		Destination: components.TransportTarget{
-			Node: "node1",
-		},
-		CorrelationID: confutil.P(uuid.New()),
-		ReplyTo:       components.LocalTransportTarget{},
-		MessageType:   "myMessageType",
-		Payload:       []byte("something"),
-	}
+	message := testMessage()
 
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "pop", err)
@@ -218,19 +205,11 @@ func TestSendMessageFail(t *testing.T) {
 
 func TestSendMessageDestNotFound(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node1").Return(nil, fmt.Errorf("not found"))
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, fmt.Errorf("not found"))
 	})
 	defer done()
 
-	message := &components.TransportMessageInput{
-		Destination: components.TransportTarget{
-			Node: "node1",
-		},
-		CorrelationID: confutil.P(uuid.New()),
-		ReplyTo:       components.LocalTransportTarget{},
-		MessageType:   "myMessageType",
-		Payload:       []byte("something"),
-	}
+	message := testMessage()
 
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "not found", err)
@@ -239,7 +218,7 @@ func TestSendMessageDestNotFound(t *testing.T) {
 
 func TestSendMessageDestNotAvailable(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node1").Return([]*components.RegistryNodeTransportEntry{
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:             "node1",
 				Transport:        "another",
@@ -249,23 +228,41 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 	})
 	defer done()
 
-	message := &components.TransportMessageInput{
-		Destination: components.TransportTarget{
-			Node: "node1",
-		},
-		CorrelationID: confutil.P(uuid.New()),
-		ReplyTo:       components.LocalTransportTarget{},
-		MessageType:   "myMessageType",
-		Payload:       []byte("something"),
-	}
+	message := testMessage()
 
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD012003.*another", err)
 
 	_, err = tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-		Node: message.Destination.Node,
+		Destination: message.Destination.String(),
 	})
 	assert.Regexp(t, "PD012004", err)
+
+	_, err = tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
+		Destination: "no_node",
+	})
+	assert.Regexp(t, "PD012007", err)
+
+}
+
+func TestSendMessageDestWrong(t *testing.T) {
+	ctx, tm, _, done := newTestTransport(t)
+	defer done()
+
+	message := testMessage()
+
+	message.Destination = types.PrivateIdentityLocator("no_node")
+	err := tm.Send(ctx, message)
+	assert.Regexp(t, "PD012007", err)
+
+	message.Destination = types.PrivateIdentityLocator("this_is_local@node1")
+	err = tm.Send(ctx, message)
+	assert.Regexp(t, "PD012007", err)
+
+	message.Destination = types.PrivateIdentityLocator("ok@node2")
+	message.ReplyTo = types.PrivateIdentityLocator("wrong@@syntax")
+	err = tm.Send(ctx, message)
+	assert.Regexp(t, "PD012006", err)
 
 }
 
@@ -273,7 +270,7 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t)
 	defer done()
 
-	message := &components.TransportMessageInput{}
+	message := &components.TransportMessage{}
 
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD012000", err)
@@ -292,14 +289,10 @@ func TestReceiveMessage(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination: &prototk.Destination{
-			Node: "node1",
-		},
-		ReplyTo: &prototk.Destination{
-			Node: "node2",
-		},
-		MessageType: "myMessageType",
-		Payload:     []byte("some data"),
+		Destination:   "to@node1",
+		ReplyTo:       "from@node2",
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
 	}
 	rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
@@ -319,14 +312,10 @@ func TestReceiveMessageNotInit(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination: &prototk.Destination{
-			Node: "node1",
-		},
-		ReplyTo: &prototk.Destination{
-			Node: "node2",
-		},
-		MessageType: "myMessageType",
-		Payload:     []byte("some data"),
+		Destination:   "to@node1",
+		ReplyTo:       "from@node2",
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
@@ -350,12 +339,8 @@ func TestReceiveMessageWrongNode(t *testing.T) {
 	defer done()
 
 	msg := &prototk.Message{
-		Destination: &prototk.Destination{
-			Node: "node2",
-		},
-		ReplyTo: &prototk.Destination{
-			Node: "node2",
-		},
+		Destination: "to@node2",
+		ReplyTo:     "from@node2",
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -365,17 +350,47 @@ func TestReceiveMessageWrongNode(t *testing.T) {
 	assert.Regexp(t, "PD012005", err)
 }
 
+func TestReceiveMessageBadDestination(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t)
+	defer done()
+
+	msg := &prototk.Message{
+		MessageId:   uuid.NewString(),
+		Destination: "to@node2",
+		ReplyTo:     "from@node1",
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
+	}
+	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		Message: msg,
+	})
+	assert.Regexp(t, "PD012005", err)
+}
+
+func TestReceiveMessageBadReplyToDestination(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t)
+	defer done()
+
+	msg := &prototk.Message{
+		MessageId:   uuid.NewString(),
+		Destination: "to@node1",
+		ReplyTo:     "from",
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
+	}
+	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		Message: msg,
+	})
+	assert.Regexp(t, "PD012006", err)
+}
+
 func TestReceiveMessageBadMsgID(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t)
 	defer done()
 
 	msg := &prototk.Message{
-		Destination: &prototk.Destination{
-			Node: "node1",
-		},
-		ReplyTo: &prototk.Destination{
-			Node: "node2",
-		},
+		Destination: "to@node1",
+		ReplyTo:     "from@node2",
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -392,14 +407,10 @@ func TestReceiveMessageBadCorrelID(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P("wrong"),
-		Destination: &prototk.Destination{
-			Node: "node1",
-		},
-		ReplyTo: &prototk.Destination{
-			Node: "node2",
-		},
-		MessageType: "myMessageType",
-		Payload:     []byte("some data"),
+		Destination:   "to@node1",
+		ReplyTo:       "from@node2",
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,

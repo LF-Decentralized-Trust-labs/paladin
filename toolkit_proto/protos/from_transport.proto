@@ -27,7 +27,7 @@ message ReceiveMessageResponse {
 }
 
 message GetTransportDetailsRequest {
-    string node = 1;
+    string destination = 1;
 }
 
 message GetTransportDetailsResponse {

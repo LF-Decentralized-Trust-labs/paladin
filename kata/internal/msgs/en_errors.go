@@ -162,6 +162,7 @@ var (
 	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
 	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
 	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
+	MsgTypesPrivateIdentityLocatorInvalid = ffe("PD011107", "Locator string %s is invalid")
 
 	// Plugin controller PD0112XX
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
@@ -303,7 +304,10 @@ var (
 	MsgTransportNodeNameNotConfigured         = ffe("PD012002", "nodeName must be configured to set the identity of the local node")
 	MsgTransportNoTransportsConfiguredForNode = ffe("PD012003", "None of the transports registered by node '%s' are configured locally on this node: %v")
 	MsgTransportDetailsNotAvailable           = ffe("PD012004", "Transport '%s' not available for node '%s'")
-	MsgTransportWrongNode                     = ffe("PD012005", "Message received for wrong node expected='%s' received='%s'")
+	MsgTransportInvalidDestinationReceived    = ffe("PD012005", "Message received with invalid destination for local node '%s': '%s'")
+	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
+	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
+	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound = ffe("PD012100", "No entries found for node '%s'")

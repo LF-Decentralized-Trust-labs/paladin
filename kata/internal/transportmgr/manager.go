@@ -132,23 +132,28 @@ func (tm *transportManager) LocalNodeName() string {
 }
 
 // See docs in components package
-func (tm *transportManager) Send(ctx context.Context, msgInput *components.TransportMessageInput) error {
+func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
 
 	// Check the message is valid
-	if len(msgInput.Destination.Node) == 0 ||
-		// len(msgInput.Destination.Identity) == 0 ||
-		// len(msgInput.Destination.Component) == 0 ||
-		// len(msgInput.ReplyTo.Identity) == 0 ||
-		// len(msgInput.ReplyTo.Component) == 0 ||
-		len(msgInput.MessageType) == 0 ||
-		len(msgInput.Payload) == 0 {
-		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
+	if len(msg.MessageType) == 0 ||
+		len(msg.Payload) == 0 {
+		log.L(ctx).Errorf("Invalid message send request %+v", msg)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+	}
+
+	targetNode, err := msg.Destination.Node(ctx, false)
+	if err != nil || targetNode == tm.localNodeName {
+		return i18n.WrapError(ctx, err, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, msg.Destination)
+	}
+
+	msg.ReplyTo, err = msg.ReplyTo.FullyQualified(ctx, tm.localNodeName)
+	if err != nil {
+		return i18n.WrapError(ctx, err, msgs.MsgTransportInvalidReplyToReceived, msg.ReplyTo)
 	}
 
 	// Note the registry is responsible for caching to make this call as efficient as if
 	// we maintained the transport details in-memory ourselves.
-	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, msgInput.Destination.Node)
+	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, targetNode)
 	if err != nil {
 		return err
 	}
@@ -166,7 +171,7 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 		for _, rtd := range registeredTransportDetails {
 			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
 		}
-		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, msgInput.Destination.Node, registeredTransportNames)
+		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, targetNode, registeredTransportNames)
 	}
 
 	// Call the selected transport to send
@@ -175,19 +180,15 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 	//       The transport plugin uses GetTransportDetails to request them back from us, and then caches
 	//       these internally through use of a long lived connection / connection-pool.
 	var correlID *string
-	if msgInput.CorrelationID != nil {
-		correlID = confutil.P(msgInput.CorrelationID.String())
+	if msg.CorrelationID != nil {
+		correlID = confutil.P(msg.CorrelationID.String())
 	}
 	err = transport.send(ctx, &prototk.Message{
 		MessageId:     uuid.New().String(),
 		CorrelationId: correlID,
-		Destination: &prototk.Destination{
-			Node: msgInput.Destination.Node,
-		},
-		ReplyTo: &prototk.Destination{
-			Node: tm.localNodeName,
-		},
-		Payload: msgInput.Payload,
+		Destination:   msg.Destination.String(),
+		ReplyTo:       msg.ReplyTo.String(),
+		Payload:       msg.Payload,
 	})
 	if err != nil {
 		return err

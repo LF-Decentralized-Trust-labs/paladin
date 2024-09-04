@@ -19,14 +19,15 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 type TransportMessage struct {
 	MessageID     uuid.UUID
 	CorrelationID *uuid.UUID
-	Destination   types.PrivateIdentityLookup
-	ReplyTo       types.PrivateIdentityLookup
+	Destination   types.PrivateIdentityLocator
+	ReplyTo       types.PrivateIdentityLocator
 	MessageType   string
 	Payload       []byte
 }
