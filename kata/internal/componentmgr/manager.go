@@ -314,6 +314,22 @@ func (cm *componentManager) DomainManager() components.DomainManager {
 	return cm.domainManager
 }
 
+type stubTransportManager struct{}
+
+// Receive implements components.TransportManager.
+func (s stubTransportManager) RegisterReceiver(onMessage func(ctx context.Context, message components.TransportMessage) error) error {
+	return nil
+}
+
+// Send implements components.TransportManager.
+func (s stubTransportManager) Send(ctx context.Context, message components.TransportMessage, nodeId string) error {
+	return nil
+}
+
+func (cm *componentManager) TransportManager() components.TransportManager {
+	return stubTransportManager{}
+}
+
 func (cm *componentManager) DomainRegistration() plugins.DomainRegistration {
 	return cm.domainManager
 }

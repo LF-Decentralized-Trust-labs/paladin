@@ -17,13 +17,13 @@
 package commsbus
 
 import (
-	"fmt"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	talaria "github.com/kaleido-io/talaria/pkg/talaria"
 )
 
@@ -42,9 +42,8 @@ import (
 	   to talaria and starts the message send flow.
 	 - I'd expect that whatever the comms bus is, is initialised with a reference to the
 	   Talaria runtime, we're using that concept here but it won't look like this when we
-		 actually initialise talaria 
+		 actually initialise talaria
 */
-
 
 type CommsBusAPIServer struct {
 	port int
@@ -86,7 +85,7 @@ func (cs *CommsBusAPIServer) sendMessage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// ---------------------------------------------------------------------------------------------------------------------------------------
-} 
+}
 
 func (cs *CommsBusAPIServer) StartServer(ctx context.Context) {
 	http.HandleFunc("/message", cs.sendMessage)
@@ -99,7 +98,7 @@ func (cs *CommsBusAPIServer) StartServer(ctx context.Context) {
 
 func NewCommsBusAPIServer(port int, transportProvider talaria.TransportProvider) *CommsBusAPIServer {
 	return &CommsBusAPIServer{
-		port: port,
+		port:              port,
 		transportProvider: transportProvider,
 	}
 }

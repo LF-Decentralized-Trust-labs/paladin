@@ -38,6 +38,15 @@ require (
 
 )
 
+require github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b // indirect
+
+require (
+	github.com/Masterminds/squirrel v1.5.4 // indirect
+	github.com/karlseguin/ccache v2.0.3+incompatible // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
+)
+
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
 	4d63.com/gochecknoglobals v0.2.1 // indirect

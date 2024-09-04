@@ -92,14 +92,15 @@ type Transaction struct {
 }
 
 type TransactionUpdate struct { // TODO define updatable fields
-	SequenceID         *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
-	DispatchTxID       *string
-	DispatchAddress    *string
-	AssembledRound     int64
-	PayloadJSON        string
-	AttestationPlan    *string
-	AttestationResults *string
-	AssembleError      string
+	SequenceID          *uuid.UUID // this is just an example used for testing, sequence ID might not be updatable
+	DispatchTxID        *string
+	DispatchAddress     *string
+	AssembledRound      int64
+	PayloadJSON         string
+	AttestationPlan     *string
+	AttestationResults  *string
+	AssembleError       string
+	PreparedTransaction *components.EthTransaction
 }
 
 func NewTransactionStageManager(ctx context.Context, tx *components.PrivateTransaction) TxStateManager {
@@ -155,6 +156,22 @@ func (t *TransactionWrapper) GetContractAddress(ctx context.Context) string {
 }
 
 func (t *TransactionWrapper) IsAttestationCompleted(ctx context.Context) bool {
+	if t.AttestationPlan == "" {
+		return true
+	} else {
+		// TODO: should used in memory objects directly
+		attPlan := t.GetAttestationPlan(ctx) // not sure whether attestation completeness needs domain specific knowledge, preference is no.
+		if attPlan != nil {
+			attResults := t.GetAttestationResults(ctx)
+			if attResults == nil || len(attResults) < len(attPlan) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (t *TransactionWrapper) BaseLedgerTxConfirmed(ctx context.Context) bool {
 	if t.AttestationPlan == "" {
 		return true
 	} else {

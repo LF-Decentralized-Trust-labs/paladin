@@ -99,6 +99,7 @@ task protoc(type: ProtoCompile, dependsOn: [installTools]) {
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
+    delete 'libstarter.dylib', 'libstarter.so', 'libstarter.dll', 'libstarter.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }

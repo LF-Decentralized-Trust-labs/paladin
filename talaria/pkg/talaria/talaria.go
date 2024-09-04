@@ -19,18 +19,18 @@ import (
 	"context"
 	"fmt"
 	"io"
-	
-	"github.com/hyperledger/firefly-common/pkg/log"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	plugins "github.com/kaleido-io/talaria/pkg/plugins"
+	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
-	plugins "github.com/kaleido-io/talaria/pkg/plugins"
 )
 
 // TODO: Talaria is a plugin that speaks to other plugins, all of the code in here at the moment for
 // orchestration of those plugins should be removed and replaced by whatever framework we have in Kata
 
-// TODO: There is a fundamental problem if the context is cancelled with the in-memory sending messages 
+// TODO: There is a fundamental problem if the context is cancelled with the in-memory sending messages
 // buffer that will be lost if kept in memory. This might be a concern of the higher-level components
 // above Talaria
 
@@ -39,7 +39,7 @@ var PluginBufferSize = 10
 type TransportProvider interface {
 	Initialise(ctx context.Context)
 	SendMessage(ctx context.Context, node string, content []byte) error
-	GetMessages() <- chan []byte
+	GetMessages() <-chan []byte
 }
 
 type PluginID string
@@ -55,8 +55,8 @@ type Talaria struct {
 	plugins          []plugins.TransportPlugin
 	pluginLocations  map[PluginID]string
 
-	recvMessages     chan []byte
-	sendingMessages  map[PluginID]chan PluginMessage
+	recvMessages    chan []byte
+	sendingMessages map[PluginID]chan PluginMessage
 }
 
 // TODO: Terrible hack because no config for plugins (this will not be Talaria's concern)
@@ -68,17 +68,17 @@ func NewTalaria(rp RegistryProvider, port int) *Talaria {
 
 	return &Talaria{
 		registryProvider: rp,
-		plugins: transportPlugins,
-		pluginLocations: make(map[PluginID]string),
+		plugins:          transportPlugins,
+		pluginLocations:  make(map[PluginID]string),
 		// TODO: Inbound messages here are buffered, but the read channel isn't which means
 		// we're able to cope with whole bunch of inbound messages with some seperation to
 		// the sending of those messages, but read is always one by one.
-		recvMessages: make(chan []byte, len(transportPlugins) * 10),
+		recvMessages:    make(chan []byte, len(transportPlugins)*10),
 		sendingMessages: make(map[PluginID]chan PluginMessage),
 	}
 }
 
-func (t *Talaria) GetMessages() <- chan []byte {
+func (t *Talaria) GetMessages() <-chan []byte {
 	return t.recvMessages
 }
 
@@ -92,7 +92,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 
 		// For each of the plugins spin up the comms threads
 		t.sendingMessages[PluginID(reg.Name)] = make(chan PluginMessage, PluginBufferSize)
-		
+
 		socketLocationFormatted := fmt.Sprintf("unix://%s", reg.SocketLocation)
 		conn, err := grpc.NewClient(socketLocationFormatted, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
@@ -108,22 +108,22 @@ func (t *Talaria) Initialise(ctx context.Context) {
 			return
 		}
 
-		go func(){
+		go func() {
 			<-ctx.Done()
 			conn.Close()
 			cancel()
 		}()
-			
+
 		// Handle inbound messages back from the plugin
-		go func(){
+		go func() {
 			for {
 				select {
-				case <- pluginCtx.Done():
+				case <-pluginCtx.Done():
 					return
 				default:
 				}
 
-				returnedMessage, err := stream.Recv() 
+				returnedMessage, err := stream.Recv()
 				if err == io.EOF {
 					log.L(ctx).Debugf("Shutting down Talaria listener")
 					return
@@ -137,14 +137,15 @@ func (t *Talaria) Initialise(ctx context.Context) {
 			}
 		}()
 
-		go func(){
+		go func() {
 			for {
 				select {
-				case <- pluginCtx.Done():
+				case <-pluginCtx.Done():
 					return
-				case message := <-t.sendingMessages[PluginID(reg.Name)]: {
-					req := &pluginInterfaceProto.PaladinMessage{
-							Payload: message.Payload,
+				case message := <-t.sendingMessages[PluginID(reg.Name)]:
+					{
+						req := &pluginInterfaceProto.PaladinMessage{
+							Payload:            message.Payload,
 							RoutingInformation: message.RoutingInformation,
 						}
 						// TODO: When is this a blocking operation? What happens if a message cannot be sent?
@@ -152,7 +153,7 @@ func (t *Talaria) Initialise(ctx context.Context) {
 						if err := stream.Send(req); err != nil {
 							log.L(ctx).Errorf("Talaria send error, can not send %v", err)
 						}
-				}
+					}
 				}
 			}
 		}()
@@ -169,7 +170,7 @@ func (t *Talaria) SendMessage(ctx context.Context, paladinNode string, content [
 
 	// TODO: Plugin determination
 	t.sendingMessages["grpc-transport-plugin"] <- PluginMessage{
-		Payload: content,
+		Payload:            content,
 		RoutingInformation: []byte(transpTarget.RoutingInformation),
 	}
 

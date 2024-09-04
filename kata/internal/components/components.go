@@ -59,6 +59,7 @@ type PostInitComponents interface {
 // to the are all defined in this package.
 type Managers interface {
 	DomainManager() DomainManager
+	TransportManager() TransportManager
 }
 
 // All managers conform to a standard lifecycle
