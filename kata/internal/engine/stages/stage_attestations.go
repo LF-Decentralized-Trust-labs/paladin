@@ -73,7 +73,7 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 						// to go to other nodes too?
 
 						//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
-						err := as.sequencer.OnTransactionEndorsed(ctx, &sequence.TransactionEndorsedEvent{
+						err := as.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
 							TransactionId: tx.ID.String(),
 						})
 						if err != nil {

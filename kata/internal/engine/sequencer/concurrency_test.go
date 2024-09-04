@@ -34,10 +34,10 @@ import (
 
 type Engine interface {
 	Invoke(ctx context.Context) error
-	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
-	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
-	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
-	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
+	HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error
+	HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error
+	HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error
+	HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error
 	ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error)
 	DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction) error
 }
@@ -90,30 +90,30 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 	return err
 }
 
-func (f *fakeEngine) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
+func (f *fakeEngine) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
 	f.currentState = event.OutputStateId[0]
-	return f.sequencer.OnTransactionAssembled(ctx, event)
+	return f.sequencer.HandleTransactionAssembledEvent(ctx, event)
 
 }
 
-func (f *fakeEngine) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
+func (f *fakeEngine) HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	return f.sequencer.OnTransactionConfirmed(ctx, event)
+	return f.sequencer.HandleTransactionConfirmedEvent(ctx, event)
 }
 
-func (f *fakeEngine) OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
+func (f *fakeEngine) HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	return f.sequencer.OnTransactionEndorsed(ctx, event)
+	return f.sequencer.HandleTransactionEndorsedEvent(ctx, event)
 }
 
-func (f *fakeEngine) OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error {
+func (f *fakeEngine) HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	return f.sequencer.OnTransactionReverted(ctx, event)
+	return f.sequencer.HandleTransactionRevertedEvent(ctx, event)
 }
 
 func (f *fakeEngine) ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error) {
@@ -149,12 +149,12 @@ func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event interface{}
 	case *pb.TransactionBlockedEvent:
 	case *pb.TransactionAssembledEvent:
 		for _, engine := range f.engines {
-			err := engine.OnTransactionAssembled(ctx, event)
+			err := engine.HandleTransactionAssembledEvent(ctx, event)
 			require.NoError(f.t, err)
 		}
 	case *pb.TransactionEndorsedEvent:
 		for _, engine := range f.engines {
-			err := engine.OnTransactionEndorsed(ctx, event)
+			err := engine.HandleTransactionEndorsedEvent(ctx, event)
 			require.NoError(f.t, err)
 		}
 	default:

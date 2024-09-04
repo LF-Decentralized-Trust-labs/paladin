@@ -72,14 +72,14 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 			switch event.Data.(type) {
 			case assembleComplete:
 
-				err := as.sequencer.OnTransactionAssembled(ctx, &sequence.TransactionAssembledEvent{
+				err := as.sequencer.HandleTransactionAssembledEvent(ctx, &sequence.TransactionAssembledEvent{
 					TransactionId: tx.ID.String(),
 					NodeId:        as.nodeID,
 					InputStateId:  stateIDs(tx.PostAssembly.InputStates),
 					OutputStateId: stateIDs(tx.PostAssembly.OutputStates),
 				})
 				if err != nil {
-					log.L(ctx).Errorf("OnTransactionAssembled failed: %s", err)
+					log.L(ctx).Errorf("HandleTransactionAssembledEvent failed: %s", err)
 					panic("todo")
 				}
 				return nil, nil, types.NextStepNewStage

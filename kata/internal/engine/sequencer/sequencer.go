@@ -316,7 +316,7 @@ func (s *sequencer) acceptTransaction(ctx context.Context, transaction *transact
 	return nil
 }
 
-func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error {
+func (s *sequencer) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -341,7 +341,7 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 	return nil
 }
 
-func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
+func (s *sequencer) HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error {
 
 	log.L(ctx).Infof("Received transaction endorsed event: %s", event.String())
 	s.lock.Lock()
@@ -365,7 +365,7 @@ func (s *sequencer) OnTransactionEndorsed(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
+func (s *sequencer) HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error {
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -388,7 +388,7 @@ func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.Transa
 	return nil
 }
 
-func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error {
+func (s *sequencer) HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error {
 	//release the transaction's claim on any states
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -400,7 +400,7 @@ func (s *sequencer) OnTransactionReverted(ctx context.Context, event *pb.Transac
 	return nil
 }
 
-func (s *sequencer) OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error {
+func (s *sequencer) HandleTransactionDelegatedEvent(ctx context.Context, event *pb.TransactionDelegatedEvent) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	transaction := s.unconfirmedTransactionsByID[event.TransactionId]
@@ -409,7 +409,7 @@ func (s *sequencer) OnTransactionDelegated(ctx context.Context, event *pb.Transa
 		//TODO - should we do something here?  Should we add the transaction to our map?
 		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, event.TransactionId)
 	}
-	log.L(ctx).Infof("OnTransactionDelegated transaction %s delegated from %s to %s", event.TransactionId, event.DelegatingNodeId, event.DelegateNodeId)
+	log.L(ctx).Infof("HandleTransactionDelegatedEvent transaction %s delegated from %s to %s", event.TransactionId, event.DelegatingNodeId, event.DelegateNodeId)
 	if transaction.sequencingNodeID != event.DelegatingNodeId {
 		log.L(ctx).Debugf("local info about transaction %s out of date current sequening node is thought to be  %s", event.TransactionId, transaction.sequencingNodeID)
 	}

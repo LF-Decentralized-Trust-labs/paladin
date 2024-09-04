@@ -115,34 +115,34 @@ type StageFoundationService interface {
 
 type Sequencer interface {
 	/*
-		OnTransactionAssembled is emitted whenever a transaction has been assembled by any node in the network, including the local node.
+		HandleTransactionAssembledEvent is emitted whenever a transaction has been assembled by any node in the network, including the local node.
 	*/
-	OnTransactionAssembled(ctx context.Context, event *pb.TransactionAssembledEvent) error
+	HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error
 
 	/*
-		OnTransactionEndorsed is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
+		HandleTransactionEndorsedEvent is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
 	*/
-	OnTransactionEndorsed(ctx context.Context, event *pb.TransactionEndorsedEvent) error
+	HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 
 	/*
-		OnTransactionConfirmed is emitted whenever a transaction has been confirmed on the base ledger
+		HandleTransactionConfirmedEvent is emitted whenever a transaction has been confirmed on the base ledger
 		i.e. it has been included in a block with enough subsequent blocks to consider this final for that particular chain.
 	*/
-	OnTransactionConfirmed(ctx context.Context, event *pb.TransactionConfirmedEvent) error
+	HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error
 
 	/*
 		OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
 		steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
 		event is emitted.
 	*/
-	OnTransactionReverted(ctx context.Context, event *pb.TransactionRevertedEvent) error
+	HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error
 
 	/*
-		OnTransactionDelegated is emitted whenever a transaction has been delegated from one node to another
+		HandleTransactionDelegatedEvent is emitted whenever a transaction has been delegated from one node to another
 		this is an event that is broadcast to all nodes after the fact and should not be confused with the DelegateTransaction message which is
 		an instruction to the delegate node.
 	*/
-	OnTransactionDelegated(ctx context.Context, event *pb.TransactionDelegatedEvent) error
+	HandleTransactionDelegatedEvent(ctx context.Context, event *pb.TransactionDelegatedEvent) error
 
 	/*
 		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
