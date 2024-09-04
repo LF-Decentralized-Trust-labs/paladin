@@ -44,5 +44,6 @@ message Message {
     optional string correlation_id = 2;
     Destination destination = 3;
     Destination reply_to = 4;
-    bytes payload = 5;
+    string message_type = 5;
+    bytes payload = 6;
 }

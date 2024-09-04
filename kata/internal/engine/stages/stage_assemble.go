@@ -17,17 +17,30 @@ package stages
 
 import (
 	"context"
+	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type AssembleStage struct{}
+type AssembleStage struct {
+	sequencer types.Sequencer
+	nodeID    string
+	lock      sync.Mutex
+}
 
+func NewAssembleStage(sequencer types.Sequencer, nodeID string) *AssembleStage {
+	return &AssembleStage{
+		sequencer: sequencer,
+		nodeID:    nodeID,
+	}
+}
 func (as *AssembleStage) Name() string {
 	return "assemble"
 }
@@ -41,7 +54,16 @@ func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg trans
 type assembleComplete struct {
 }
 
+func stateIDs(states []*components.FullState) []string {
+	stateIDs := make([]string, 0, len(states))
+	for _, state := range states {
+		stateIDs = append(stateIDs, state.ID.String())
+	}
+	return stateIDs
+}
+
 func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+	tx := tsg.HACKGetPrivateTx()
 
 	unprocessedStageEvents = []*types.StageEvent{}
 	if len(stageEvents) > 0 {
@@ -49,6 +71,17 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 
 			switch event.Data.(type) {
 			case assembleComplete:
+
+				err := as.sequencer.HandleTransactionAssembledEvent(ctx, &sequence.TransactionAssembledEvent{
+					TransactionId: tx.ID.String(),
+					NodeId:        as.nodeID,
+					InputStateId:  stateIDs(tx.PostAssembly.InputStates),
+					OutputStateId: stateIDs(tx.PostAssembly.OutputStates),
+				})
+				if err != nil {
+					log.L(ctx).Errorf("HandleTransactionAssembledEvent failed: %s", err)
+					panic("todo")
+				}
 				return nil, nil, types.NextStepNewStage
 			default:
 				unprocessedStageEvents = append(unprocessedStageEvents, event)
@@ -70,12 +103,15 @@ func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	// temporary hack.  components.PrivateTx should be passed in as a parameter
 	tx := tsg.HACKGetPrivateTx()
-	//TODO assembly must be single threaded ( at least single thread per domain contract)
-	// can we assume that we are already on a single thread or do we need to delegate to a single thread here
+	log.L(ctx).Debugf("AssembleStage.PerformAction tx: %s", tx.ID.String())
+
 	if as.GetIncompletePreReqTxIDs(ctx, tsg, sfs) != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionProcessorBlockedOnDependency, tsg.GetTxID(ctx), as.Name())
 	}
 
+	//assembly must be single threaded ( at least single thread per domain contract)
+	as.lock.Lock()
+	defer as.lock.Unlock()
 	err := sfs.DomainAPI().AssembleTransaction(ctx, tx)
 	if err != nil {
 		log.L(ctx).Errorf("AssembleTransaction failed: %s", err)

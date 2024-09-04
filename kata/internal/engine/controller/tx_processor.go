@@ -21,7 +21,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
@@ -35,19 +37,13 @@ const (
 )
 
 type TxProcessor interface {
-	GetStageContext(ctx context.Context) *StageContext
+	GetStageContext(ctx context.Context) *types.StageContext
 	GetStageTriggerError(ctx context.Context) error
 
 	// stage outputs management
 	AddStageEvent(ctx context.Context, stageEvent *types.StageEvent)
 	Init(ctx context.Context)
-}
-
-type StageContext struct {
-	ctx            context.Context
-	ID             string
-	Stage          string
-	stageEntryTime time.Time
+	GetTxStatus(ctx context.Context) (types.TxStatus, error)
 }
 
 func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.TxStateManager, sc StageController) TxProcessor {
@@ -61,7 +57,7 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 
 type PaladinTxProcessor struct {
 	stageContextMutex sync.Mutex
-	stageContext      *StageContext
+	stageContext      *types.StageContext
 	stageTriggerError error
 	stageErrorRetry   time.Duration
 	tsm               transactionstore.TxStateManager
@@ -86,19 +82,19 @@ func (ts *PaladinTxProcessor) createStageContext(ctx context.Context, action sta
 	}
 	nowTime := time.Now() // pin the now time
 	stage := ts.stageController.CalculateStage(ctx, ts.tsm)
-	nextStepContext := &StageContext{
+	nextStepContext := &types.StageContext{
 		Stage:          stage,
 		ID:             uuid.NewString(),
-		stageEntryTime: nowTime,
-		ctx:            log.WithLogField(ctx, "stage", string(stage)),
+		StageEntryTime: nowTime,
+		Ctx:            log.WithLogField(ctx, "stage", string(stage)),
 	}
 	if ts.stageContext != nil {
 		if ts.stageContext.Stage == nextStepContext.Stage { // switching to existing stage ---> this is a retry
 			// redoing the current stage
-			log.L(ctx).Warnf("Transaction with ID %s retrying action, already on stage %s for %s", ts.tsm.GetTxID(ctx), stage, time.Since(ts.stageContext.stageEntryTime))
-			nextStepContext.stageEntryTime = ts.stageContext.stageEntryTime
+			log.L(ctx).Warnf("Transaction with ID %s retrying action, already on stage %s for %s", ts.tsm.GetTxID(ctx), stage, time.Since(ts.stageContext.StageEntryTime))
+			nextStepContext.StageEntryTime = ts.stageContext.StageEntryTime
 		} else {
-			log.L(ctx).Tracef("Transaction with ID %s, switching from %s to %s after %s", ts.tsm.GetTxID(ctx), ts.stageContext.Stage, nextStepContext.Stage, time.Since(ts.stageContext.stageEntryTime))
+			log.L(ctx).Tracef("Transaction with ID %s, switching from %s to %s after %s", ts.tsm.GetTxID(ctx), ts.stageContext.Stage, nextStepContext.Stage, time.Since(ts.stageContext.StageEntryTime))
 		}
 	} else {
 		// init succeeded
@@ -124,7 +120,7 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 		synchronousActionOutput, err := ts.stageController.PerformActionForStage(ctx, string(stageContext.Stage), ts.tsm)
 		ts.stageTriggerError = err
 		if synchronousActionOutput != nil {
-			ts.AddStageEvent(ts.stageContext.ctx, &types.StageEvent{
+			ts.AddStageEvent(ts.stageContext.Ctx, &types.StageEvent{
 				ID:    stageContext.ID,
 				TxID:  ts.tsm.GetTxID(ctx),
 				Stage: stageContext.Stage,
@@ -143,7 +139,7 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 	}, ctx)
 }
 
-func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc StageContext) {
+func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc types.StageContext) {
 	start := time.Now()
 	// unexpected error, set an empty input for the stage
 	// so that the stage handler will handle this as unexpected error
@@ -169,7 +165,7 @@ func (ts *PaladinTxProcessor) executeAsync(funcToExecute func(), ctx context.Con
 	}()
 }
 
-func (ts *PaladinTxProcessor) GetStageContext(ctx context.Context) *StageContext {
+func (ts *PaladinTxProcessor) GetStageContext(ctx context.Context) *types.StageContext {
 	return ts.stageContext
 }
 
@@ -189,7 +185,6 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 	if unProcessedBufferedStageEvents != nil {
 		ts.bufferedStageEvents = unProcessedBufferedStageEvents
 	}
-
 	if txUpdates != nil {
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)
@@ -200,4 +195,16 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 		ts.PerformActionForStageAsync(ctx)
 	}
 	// other wise, the stage told the processor to wait for async events
+}
+
+func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (types.TxStatus, error) {
+	stageContext := ts.GetStageContext(ctx)
+	if stageContext != nil {
+		return types.TxStatus{
+			TxID:   ts.tsm.GetTxID(ctx),
+			Status: stageContext.Stage,
+		}, nil
+	}
+	//TODO what error condition can cause this?
+	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }

@@ -129,7 +129,7 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 	}
 
 	msg := req.Message
-	if msg == nil || msg.Destination == nil || msg.ReplyTo == nil || len(msg.Payload) == 0 {
+	if msg == nil || msg.Destination == nil || msg.ReplyTo == nil || len(msg.Payload) == 0 || len(msg.MessageType) == 0 {
 		log.L(ctx).Errorf("Invalid message from transport: %s", protoToJSON(msg))
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}

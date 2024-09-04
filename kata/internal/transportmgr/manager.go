@@ -140,6 +140,7 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 		// len(msgInput.Destination.Component) == 0 ||
 		// len(msgInput.ReplyTo.Identity) == 0 ||
 		// len(msgInput.ReplyTo.Component) == 0 ||
+		len(msgInput.MessageType) == 0 ||
 		len(msgInput.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)

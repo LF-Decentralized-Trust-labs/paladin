@@ -109,11 +109,11 @@ func TestRecordAndResolveInformation(t *testing.T) {
 	defer done()
 
 	_, err := rm.GetNodeTransports(ctx, "node1")
-	assert.Regexp(t, "PD012000", err)
+	assert.Regexp(t, "PD012100", err)
 
 	// Upsert bad entry
 	_, err = tp.r.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{})
-	assert.Regexp(t, "PD012001", err)
+	assert.Regexp(t, "PD012101", err)
 
 	entry1 := &prototk.UpsertTransportDetails{
 		Node:             "node1",

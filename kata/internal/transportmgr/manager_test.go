@@ -75,7 +75,7 @@ func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSe
 func TestMissingName(t *testing.T) {
 	tm := NewTransportManager(context.Background(), &TransportManagerConfig{})
 	_, err := tm.PreInit(newMockComponents(t).c)
-	assert.Regexp(t, "PD011902", err)
+	assert.Regexp(t, "PD012002", err)
 }
 
 func TestConfiguredTransports(t *testing.T) {
@@ -108,7 +108,7 @@ func TestTransportRegisteredNotFound(t *testing.T) {
 	defer done()
 
 	_, err := dm.TransportRegistered("unknown", uuid.New(), nil)
-	assert.Regexp(t, "PD011901", err)
+	assert.Regexp(t, "PD012001", err)
 }
 
 func TestConfigureTransportFail(t *testing.T) {

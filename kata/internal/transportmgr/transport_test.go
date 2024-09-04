@@ -126,6 +126,7 @@ func TestSendMessage(t *testing.T) {
 		},
 		CorrelationID: confutil.P(uuid.New()),
 		ReplyTo:       components.LocalTransportTarget{},
+		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
 	}
 
@@ -175,6 +176,7 @@ func TestSendMessageNotInit(t *testing.T) {
 		},
 		CorrelationID: confutil.P(uuid.New()),
 		ReplyTo:       components.LocalTransportTarget{},
+		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
 	}
 
@@ -205,6 +207,7 @@ func TestSendMessageFail(t *testing.T) {
 		},
 		CorrelationID: confutil.P(uuid.New()),
 		ReplyTo:       components.LocalTransportTarget{},
+		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
 	}
 
@@ -225,6 +228,7 @@ func TestSendMessageDestNotFound(t *testing.T) {
 		},
 		CorrelationID: confutil.P(uuid.New()),
 		ReplyTo:       components.LocalTransportTarget{},
+		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
 	}
 
@@ -251,16 +255,17 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 		},
 		CorrelationID: confutil.P(uuid.New()),
 		ReplyTo:       components.LocalTransportTarget{},
+		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
 	}
 
 	err := tm.Send(ctx, message)
-	assert.Regexp(t, "PD011903.*another", err)
+	assert.Regexp(t, "PD012003.*another", err)
 
 	_, err = tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
 		Node: message.Destination.Node,
 	})
-	assert.Regexp(t, "PD011904", err)
+	assert.Regexp(t, "PD012004", err)
 
 }
 
@@ -271,7 +276,7 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 	message := &components.TransportMessageInput{}
 
 	err := tm.Send(ctx, message)
-	assert.Regexp(t, "PD011900", err)
+	assert.Regexp(t, "PD012000", err)
 }
 
 func TestReceiveMessage(t *testing.T) {
@@ -293,7 +298,8 @@ func TestReceiveMessage(t *testing.T) {
 		ReplyTo: &prototk.Destination{
 			Node: "node2",
 		},
-		Payload: []byte("some data"),
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
 	}
 	rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
@@ -319,7 +325,8 @@ func TestReceiveMessageNotInit(t *testing.T) {
 		ReplyTo: &prototk.Destination{
 			Node: "node2",
 		},
-		Payload: []byte("some data"),
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
@@ -335,7 +342,7 @@ func TestReceiveMessageNoPayload(t *testing.T) {
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.Regexp(t, "PD011900", err)
+	assert.Regexp(t, "PD012000", err)
 }
 
 func TestReceiveMessageWrongNode(t *testing.T) {
@@ -349,12 +356,13 @@ func TestReceiveMessageWrongNode(t *testing.T) {
 		ReplyTo: &prototk.Destination{
 			Node: "node2",
 		},
-		Payload: []byte("some data"),
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.Regexp(t, "PD011905", err)
+	assert.Regexp(t, "PD012005", err)
 }
 
 func TestReceiveMessageBadMsgID(t *testing.T) {
@@ -368,12 +376,13 @@ func TestReceiveMessageBadMsgID(t *testing.T) {
 		ReplyTo: &prototk.Destination{
 			Node: "node2",
 		},
-		Payload: []byte("some data"),
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.Regexp(t, "PD011900", err)
+	assert.Regexp(t, "PD012000", err)
 }
 
 func TestReceiveMessageBadCorrelID(t *testing.T) {
@@ -389,10 +398,11 @@ func TestReceiveMessageBadCorrelID(t *testing.T) {
 		ReplyTo: &prototk.Destination{
 			Node: "node2",
 		},
-		Payload: []byte("some data"),
+		MessageType: "myMessageType",
+		Payload:     []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.Regexp(t, "PD011900", err)
+	assert.Regexp(t, "PD012000", err)
 }

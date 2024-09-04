@@ -22,29 +22,12 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
-// TransportTarget splits out the four parts of the routing required
-type TransportTarget struct {
-	Node string
-	LocalTransportTarget
-}
-
-type LocalTransportTarget struct {
-	// Component string // TODO: Need to discuss with Hosie
-	// Identity string // TODO: Need to discuss with Hosie
-}
-
 type TransportMessage struct {
 	MessageID     uuid.UUID
 	CorrelationID *uuid.UUID
-	Destination   TransportTarget
-	ReplyTo       TransportTarget
-	Payload       []byte
-}
-
-type TransportMessageInput struct {
-	Destination   TransportTarget
-	ReplyTo       LocalTransportTarget
-	CorrelationID *uuid.UUID
+	Destination   types.PrivateIdentityLookup
+	ReplyTo       types.PrivateIdentityLookup
+	MessageType   string
 	Payload       []byte
 }
 
@@ -69,5 +52,5 @@ type TransportManager interface {
 	// situation to recover from (although not critical path).
 	//
 	// e.g. at-most-once delivery semantics
-	Send(ctx context.Context, message *TransportMessageInput) error
+	Send(ctx context.Context, message *TransportMessage) error
 }

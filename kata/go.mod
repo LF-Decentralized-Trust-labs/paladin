@@ -38,7 +38,10 @@ require (
 
 )
 
-require github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+require (
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b // indirect
+)
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect

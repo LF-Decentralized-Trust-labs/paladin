@@ -21,10 +21,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 
@@ -103,6 +106,7 @@ type Orchestrator struct {
 	persistenceRetryTimeout time.Duration
 
 	StageController controller.StageController
+	sequencer       types.Sequencer
 
 	// each orchestrator has its own go routine
 	initiated       time.Time     // when orchestrator is created
@@ -127,6 +131,9 @@ type Orchestrator struct {
 
 	staleTimeout time.Duration
 	// lastActivityTime time.Time
+
+	domainAPI           components.DomainSmartContract
+	assemblyRequestChan chan *components.PrivateTransaction
 }
 
 var orchestratorConfigDefault = OrchestratorConfig{
@@ -137,7 +144,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract) *Orchestrator {
+func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract, publisher types.Publisher, sequencer types.Sequencer) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -156,13 +163,17 @@ func NewOrchestrator(ctx context.Context, contractAddress string, oc *Orchestrat
 		processedTxIDs:               make(map[string]bool),
 		orchestrationEvalRequestChan: make(chan bool, 1),
 		stopProcess:                  make(chan bool, 1),
+		domainAPI:                    domainAPI,
+		assemblyRequestChan:          make(chan *components.PrivateTransaction, 100), //TODO: buffer size should be configurable
 	}
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, components.StateStore(), &types.MockIdentityResolver{}, &types.MockTransportManager{}, domainAPI), []controller.TxStageProcessor{
+	newOrchestrator.sequencer = sequencer
+
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &types.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
-		&stages.AttestationStage{},
-		&stages.AssembleStage{},
+		stages.NewAttestationStage(sequencer),
+		stages.NewAssembleStage(sequencer, nodeID.String()),
 	})
 
 	log.L(ctx).Debugf("NewOrchestrator for contract address %s created: %+v", newOrchestrator.contractAddress, newOrchestrator)
@@ -195,7 +206,6 @@ func (oc *Orchestrator) evaluationLoop() {
 		added, total := oc.evaluateTransactions(ctx)
 		log.L(ctx).Debugf("Orchestrator loop added %d txs, there are %d txs in total", added, total)
 	}
-
 }
 
 func (oc *Orchestrator) evaluateTransactions(ctx context.Context) (added int, newTotal int) {
@@ -351,6 +361,7 @@ func (oc *Orchestrator) Stop() {
 	case oc.stopProcess <- true:
 	default:
 	}
+
 }
 
 func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
@@ -360,4 +371,16 @@ func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
 	case oc.orchestrationEvalRequestChan <- true:
 	default:
 	}
+}
+
+func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
+	//TODO This is primarily here to help with testing for now
+	// this needs to be revisited ASAP as part of a holisitic review of the persistence model
+	oc.incompleteTxProcessMapMutex.Lock()
+	defer oc.incompleteTxProcessMapMutex.Unlock()
+	if txProc, ok := oc.incompleteTxSProcessMap[txID]; ok {
+		return txProc.GetTxStatus(ctx)
+	}
+	//TODO should be possible to query the status of a transaction that is not inflight
+	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }
