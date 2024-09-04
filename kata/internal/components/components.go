@@ -17,7 +17,6 @@ package components
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
@@ -37,20 +36,8 @@ type PreInitComponents interface {
 	RPCServer() rpcserver.RPCServer
 }
 
-// PostInitComponents depend on instructions/configuration that is initialized by managers
-// to determine their initialization
-//
-// However, they are not managers in their own right and can be re-used across managers.
-//
-// Each component defines the subset of our "components" interface that they require
-// at initialization time, so they can still be independent go packages with their
-// own interfaces (they must not depend on the "components" package themselves).
-type PostInitComponents interface {
-	PluginController() plugins.PluginController
-}
-
 // Managers are initialized after base components with access to them, and provide
-// output that is used to finalize startup of the LateBoundComponents..
+// output that is used to finalize startup of the LateBoundComponents.
 //
 // Their start informs the configuration of the late bound components, so they
 // must start before them. But they still have access to those.
@@ -60,11 +47,16 @@ type PostInitComponents interface {
 type Managers interface {
 	DomainManager() DomainManager
 	TransportManager() TransportManager
+	RegistryManager() RegistryManager
+	PluginManager() PluginManager
 }
 
 // All managers conform to a standard lifecycle
 type ManagerLifecycle interface {
-	Init(PreInitComponents) (*ManagerInitResult, error)
+	// Init only depends on the configuration and components - no other managers
+	PreInit(PreInitComponents) (*ManagerInitResult, error)
+	// Post-init allows the manager to cross-bind to other components, or the Engine
+	PostInit(AllComponents) error
 	Start() error
 	Stop()
 }
@@ -82,9 +74,8 @@ type ManagerInitResult struct {
 	RPCModules   []*rpcserver.RPCModule
 }
 
-type AllComponents interface {
+type PreInitComponentsAndManagers interface {
 	PreInitComponents
-	PostInitComponents
 	Managers
 }
 
@@ -94,7 +85,14 @@ type AllComponents interface {
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
 	EngineName() string
-	Init(AllComponents) (*ManagerInitResult, error)
+	Init(PreInitComponentsAndManagers) (*ManagerInitResult, error)
 	Start() error
 	Stop()
+	ReceiveTransportMessage(*TransportMessage)
+}
+
+type AllComponents interface {
+	PreInitComponents
+	Managers
+	Engine() Engine
 }

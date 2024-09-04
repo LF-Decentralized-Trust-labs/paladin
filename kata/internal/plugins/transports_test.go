@@ -22,16 +22,18 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 )
 
 type testTransportManager struct {
 	transports          map[string]plugintk.Plugin
-	transportRegistered func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
+	transportRegistered func(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
 	resolveTarget       func(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
 	receive             func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
@@ -45,17 +47,25 @@ func transportHeaderAccessor(msg *prototk.TransportMessage) *prototk.Header {
 		msg.Header = &prototk.Header{}
 	}
 	return msg.Header
+
 }
 
-func (tp *testTransportManager) ConfiguredTransports() map[string]*PluginConfig {
-	pluginMap := make(map[string]*PluginConfig)
+func (tp *testTransportManager) mock(t *testing.T) *componentmocks.TransportManager {
+	mdm := componentmocks.NewTransportManager(t)
+	pluginMap := make(map[string]*components.PluginConfig)
 	for name := range tp.transports {
-		pluginMap[name] = &PluginConfig{
-			Type:    LibraryTypeCShared.Enum(),
+		pluginMap[name] = &components.PluginConfig{
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "/tmp/not/applicable",
 		}
 	}
-	return pluginMap
+	mdm.On("ConfiguredTransports").Return(pluginMap).Maybe()
+	mdr := mdm.On("TransportRegistered", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	mdr.Run(func(args mock.Arguments) {
+		m2p, err := tp.transportRegistered(args[0].(string), args[1].(uuid.UUID), args[2].(components.TransportManagerToTransport))
+		mdr.Return(m2p, err)
+	})
+	return mdm
 }
 
 func (tp *testTransportManager) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
@@ -66,27 +76,16 @@ func (tp *testTransportManager) GetTransportDetails(ctx context.Context, req *pr
 	return tp.resolveTarget(ctx, req)
 }
 
-func (tdm *testTransportManager) TransportRegistered(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+func (tdm *testTransportManager) TransportRegistered(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
 	return tdm.transportRegistered(name, id, toTransport)
 }
 
-func newTestTransportPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
+func newTestTransportPluginManager(t *testing.T, setup *testManagers) (context.Context, *pluginManager, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	udsString := tempUDS(t)
-	loaderId := uuid.New()
-	allPlugins := setup.allPlugins()
-	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
-		GRPC: GRPCConfig{
-			ShutdownTimeout: confutil.P("1ms"),
-		},
-	})
-	assert.NoError(t, err)
+	pc := newTestPluginManager(t, setup)
 
-	err = pc.Start()
-	assert.NoError(t, err)
-
-	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -95,7 +94,7 @@ func newTestTransportPluginController(t *testing.T, setup *testManagers) (contex
 		tpl.Run()
 	}()
 
-	return ctx, pc.(*pluginController), func() {
+	return ctx, pc, func() {
 		recovered := recover()
 		if recovered != nil {
 			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
@@ -111,7 +110,7 @@ func newTestTransportPluginController(t *testing.T, setup *testManagers) (contex
 
 func TestTransportRequestsOK(t *testing.T) {
 
-	waitForAPI := make(chan TransportManagerToTransport, 1)
+	waitForAPI := make(chan components.TransportManagerToTransport, 1)
 	waitForCallbacks := make(chan plugintk.TransportCallbacks, 1)
 
 	transportFunctions := &plugintk.TransportAPIFunctions{
@@ -132,7 +131,7 @@ func TestTransportRequestsOK(t *testing.T) {
 			}),
 		},
 	}
-	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
+	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
 		assert.Equal(t, "transport1", name)
 		waitForAPI <- toTransport
 		return ttm, nil
@@ -149,7 +148,7 @@ func TestTransportRequestsOK(t *testing.T) {
 		return &prototk.ReceiveMessageResponse{}, nil
 	}
 
-	ctx, pc, done := newTestTransportPluginController(t, &testManagers{
+	ctx, pc, done := newTestTransportPluginManager(t, &testManagers{
 		testTransportManager: ttm,
 	})
 	defer done()
@@ -208,11 +207,11 @@ func TestTransportRegisterFail(t *testing.T) {
 			},
 		},
 	}
-	tdm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
+	tdm.transportRegistered = func(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (plugintk.TransportCallbacks, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, _, done := newTestTransportPluginController(t, &testManagers{
+	_, _, done := newTestTransportPluginManager(t, &testManagers{
 		testTransportManager: tdm,
 	})
 	defer done()
@@ -248,11 +247,11 @@ func TestFromTransportRequestBadReq(t *testing.T) {
 			},
 		},
 	}
-	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+	ttm.transportRegistered = func(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
 		return ttm, nil
 	}
 
-	_, _, done := newTestTransportPluginController(t, &testManagers{
+	_, _, done := newTestTransportPluginManager(t, &testManagers{
 		testTransportManager: ttm,
 	})
 	defer done()

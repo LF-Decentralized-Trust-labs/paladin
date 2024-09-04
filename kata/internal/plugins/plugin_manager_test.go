@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	prototk "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -50,92 +52,109 @@ type testManagers struct {
 	testRegistryManager  *testRegistryManager
 }
 
-func (ts *testManagers) DomainRegistration() DomainRegistration {
-	if ts.testDomainManager == nil {
-		ts.testDomainManager = &testDomainManager{}
+func (tm *testManagers) componentMocks(t *testing.T) *componentmocks.AllComponents {
+	mc := componentmocks.NewAllComponents(t)
+	if tm.testDomainManager == nil {
+		tm.testDomainManager = &testDomainManager{}
 	}
-	return ts.testDomainManager
-}
-
-func (ts *testManagers) TransportRegistration() TransportRegistration {
-	if ts.testTransportManager == nil {
-		ts.testTransportManager = &testTransportManager{}
+	mc.On("DomainManager").Return(tm.testDomainManager.mock(t)).Maybe()
+	if tm.testTransportManager == nil {
+		tm.testTransportManager = &testTransportManager{}
 	}
-	return ts.testTransportManager
-}
-
-func (ts *testManagers) RegistryRegistration() RegistryRegistration {
-	if ts.testRegistryManager == nil {
-		ts.testRegistryManager = &testRegistryManager{}
+	mc.On("TransportManager").Return(tm.testTransportManager.mock(t)).Maybe()
+	if tm.testRegistryManager == nil {
+		tm.testRegistryManager = &testRegistryManager{}
 	}
-	return ts.testRegistryManager
+	mc.On("RegistryManager").Return(tm.testRegistryManager.mock(t)).Maybe()
+	return mc
 }
 
 func (ts *testManagers) allPlugins() map[string]plugintk.Plugin {
 	testPlugins := make(map[string]plugintk.Plugin)
-	for name, td := range ts.DomainRegistration().(*testDomainManager).domains {
+	for name, td := range ts.testDomainManager.domains {
 		testPlugins[name] = td
 	}
-	for name, td := range ts.TransportRegistration().(*testTransportManager).transports {
+	for name, td := range ts.testTransportManager.transports {
 		testPlugins[name] = td
 	}
-	for name, td := range ts.RegistryRegistration().(*testRegistryManager).registries {
+	for name, td := range ts.testRegistryManager.registries {
 		testPlugins[name] = td
 	}
 	return testPlugins
 }
 
-func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
-	pc, err := NewPluginController(context.Background(), tempUDS(t), uuid.New(), &testManagers{}, &PluginControllerConfig{})
+func newTestPluginManager(t *testing.T, setup *testManagers) *pluginManager {
+	udsString := tempUDS(t)
+	loaderId := uuid.New()
+	pc := NewPluginManager(context.Background(), udsString, loaderId, &PluginManagerConfig{
+		GRPC: GRPCConfig{
+			ShutdownTimeout: confutil.P("1ms"),
+		},
+	})
+	mc := setup.componentMocks(t)
+	ir, err := pc.PreInit(mc)
+	assert.NotNil(t, ir)
+	assert.NoError(t, err)
+	err = pc.PostInit(mc)
 	assert.NoError(t, err)
 	err = pc.Start()
 	assert.NoError(t, err)
+
+	return pc.(*pluginManager)
+}
+
+func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
+	pc := newTestPluginManager(t, &testManagers{})
 	pc.Stop()
 }
 
-func TestInitPluginControllerBadPlugin(t *testing.T) {
+func TestInitPluginManagerBadPlugin(t *testing.T) {
 	tdm := &testDomainManager{domains: map[string]plugintk.Plugin{
 		"!badname": &mockPlugin[prototk.DomainMessage]{},
 	}}
-	_, err := NewPluginController(context.Background(), tempUDS(t), uuid.New(), &testManagers{testDomainManager: tdm}, &PluginControllerConfig{})
+	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &PluginManagerConfig{})
+	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentMocks(t))
 	assert.Regexp(t, "PD011106", err)
 }
 
-func TestInitPluginControllerBadSocket(t *testing.T) {
-	pc, err := NewPluginController(context.Background(),
+func TestInitPluginManagerBadSocket(t *testing.T) {
+	pc := NewPluginManager(context.Background(),
 		t.TempDir(), /* can't use a dir as a socket */
-		uuid.New(), &testManagers{}, &PluginControllerConfig{},
+		uuid.New(), &PluginManagerConfig{},
 	)
+	err := pc.PostInit((&testManagers{}).componentMocks(t))
 	assert.NoError(t, err)
 
 	err = pc.Start()
 	assert.Regexp(t, "bind", err)
 }
 
-func TestInitPluginControllerUDSTooLong(t *testing.T) {
+func TestInitPluginManagerUDSTooLong(t *testing.T) {
 	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
 	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	_, err := NewPluginController(context.Background(),
+	pc := NewPluginManager(context.Background(),
 		string(longerThanUDSSafelySupportsCrossPlatform), /* can't use a dir as a socket */
-		uuid.New(), &testManagers{}, &PluginControllerConfig{},
+		uuid.New(), &PluginManagerConfig{},
 	)
 
+	err := pc.PostInit((&testManagers{}).componentMocks(t))
 	assert.Regexp(t, "PD011204", err)
 }
 
-func TestInitPluginControllerTCP4(t *testing.T) {
+func TestInitPluginManagerTCP4(t *testing.T) {
 	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
 	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	pc, err := NewPluginController(context.Background(),
+	pc := NewPluginManager(context.Background(),
 		"tcp4:127.0.0.1:0",
-		uuid.New(), &testManagers{}, &PluginControllerConfig{},
+		uuid.New(), &PluginManagerConfig{},
 	)
+	err := pc.PostInit((&testManagers{}).componentMocks(t))
 	assert.NoError(t, err)
 
 	err = pc.Start()
@@ -143,16 +162,17 @@ func TestInitPluginControllerTCP4(t *testing.T) {
 	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
 
-func TestInitPluginControllerTCP6(t *testing.T) {
+func TestInitPluginManagerTCP6(t *testing.T) {
 	longerThanUDSSafelySupportsCrossPlatform := make([]rune, 187)
 	for i := 0; i < len(longerThanUDSSafelySupportsCrossPlatform); i++ {
 		longerThanUDSSafelySupportsCrossPlatform[i] = (rune)('a' + (i % 26))
 	}
 
-	pc, err := NewPluginController(context.Background(),
+	pc := NewPluginManager(context.Background(),
 		"tcp6:[::1]:0",
-		uuid.New(), &testManagers{}, &PluginControllerConfig{},
+		uuid.New(), &PluginManagerConfig{},
 	)
+	err := pc.PostInit((&testManagers{}).componentMocks(t))
 	assert.NoError(t, err)
 
 	err = pc.Start()
@@ -161,7 +181,8 @@ func TestInitPluginControllerTCP6(t *testing.T) {
 }
 
 func TestNotifyPluginUpdateNotStarted(t *testing.T) {
-	pc, err := NewPluginController(context.Background(), tempUDS(t), uuid.New(), &testManagers{}, &PluginControllerConfig{})
+	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &PluginManagerConfig{})
+	err := pc.PostInit((&testManagers{}).componentMocks(t))
 	assert.NoError(t, err)
 
 	err = pc.WaitForInit(context.Background())
@@ -180,21 +201,22 @@ func TestLoaderErrors(t *testing.T) {
 			"domain1": &mockPlugin[prototk.DomainMessage]{
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
-				conf: &PluginConfig{
-					Type:    LibraryTypeCShared.Enum(),
+				conf: &components.PluginConfig{
+					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
 			},
 		},
 	}
-	pc, err := NewPluginController(ctx,
+	pc := NewPluginManager(ctx,
 		"tcp:127.0.0.1:0",
 		uuid.New(),
-		&testManagers{testDomainManager: tdm}, &PluginControllerConfig{
+		&PluginManagerConfig{
 			GRPC: GRPCConfig{
 				ShutdownTimeout: confutil.P("1ms"),
 			},
 		})
+	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentMocks(t))
 	assert.NoError(t, err)
 
 	err = pc.Start()
@@ -256,8 +278,8 @@ func TestLoaderErrors(t *testing.T) {
 		"domain2": &mockPlugin[prototk.DomainMessage]{
 			connectFactory: domainConnectFactory,
 			headerAccessor: domainHeaderAccessor,
-			conf: &PluginConfig{
-				Type:    LibraryTypeJar.Enum(),
+			conf: &components.PluginConfig{
+				Type:    components.LibraryTypeJar.Enum(),
 				Library: "some/where/else",
 			},
 		},
@@ -269,6 +291,6 @@ func TestLoaderErrors(t *testing.T) {
 
 	// Also check we don't block on the LoadFailed notification if the channel gets full (which it will after stop)
 	for i := 0; i < 3; i++ {
-		_, _ = pc.(*pluginController).LoadFailed(context.Background(), &prototk.PluginLoadFailed{Plugin: &prototk.PluginInfo{}})
+		_, _ = pc.(*pluginManager).LoadFailed(context.Background(), &prototk.PluginLoadFailed{Plugin: &prototk.PluginInfo{}})
 	}
 }

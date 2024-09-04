@@ -19,13 +19,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 // TransportTarget splits out the four parts of the routing required
 type TransportTarget struct {
-	Node     string
-	Identity string
+	Node string
+	// Component string // TODO: Need to discuss with Hosie
+	// Identity string // TODO: Need to discuss with Hosie
 }
 
 type TransportMessage struct {
@@ -43,9 +44,14 @@ type TransportMessageInput struct {
 	Payload         []byte
 }
 
+type TransportManagerToTransport interface {
+	plugintk.TransportAPI
+	Initialized()
+}
+
 type TransportManager interface {
 	ManagerLifecycle
-	plugins.TransportRegistration
+	ConfiguredTransports() map[string]*PluginConfig
+	TransportRegistered(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
 	Send(ctx context.Context, message *TransportMessageInput) error
-	RegisterReceiver(onMessage func(ctx context.Context, message *TransportMessage) error) error
 }

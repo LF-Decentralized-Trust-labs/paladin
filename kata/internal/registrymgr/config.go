@@ -15,7 +15,7 @@
 package registrymgr
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 )
 
@@ -28,7 +28,7 @@ type RegistryInitConfig struct {
 }
 
 type RegistryConfig struct {
-	Init   RegistryInitConfig   `yaml:"init"`
-	Plugin plugins.PluginConfig `yaml:"plugin"`
-	Config map[string]any       `yaml:"config"`
+	Init   RegistryInitConfig      `yaml:"init"`
+	Plugin components.PluginConfig `yaml:"plugin"`
+	Config map[string]any          `yaml:"config"`
 }

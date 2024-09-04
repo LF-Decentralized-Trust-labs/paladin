@@ -212,12 +212,6 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
         outputDir 'mocks/componentmocks'
     }
     mock {
-        inputDir 'internal/plugins'
-        name 'PluginController'
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
-    }
-    mock {
         inputDir 'internal/rpcserver'
         name 'RPCServer'
         outputPackage 'componentmocks'

@@ -17,27 +17,15 @@ package plugins
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type TransportManagerToTransport interface {
-	plugintk.TransportAPI
-	Initialized()
-}
-
-// The interface the rest of Paladin uses to integrate with Transport plugins
-type TransportRegistration interface {
-	ConfiguredTransports() map[string]*PluginConfig
-	TransportRegistered(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
-}
-
 // The gRPC stream connected to by Transport plugins
-func (pc *pluginController) ConnectTransport(stream prototk.PluginController_ConnectTransportServer) error {
-	handler := newPluginHandler(pc, prototk.PluginInfo_TRANSPORT, pc.transportPlugins, stream,
+func (pm *pluginManager) ConnectTransport(stream prototk.PluginController_ConnectTransportServer) error {
+	handler := newPluginHandler(pm, prototk.PluginInfo_TRANSPORT, pm.transportPlugins, stream,
 		&plugintk.TransportMessageWrapper{},
 		func(plugin *plugin[prototk.TransportMessage], toPlugin managerToPlugin[prototk.TransportMessage]) (pluginToManager pluginToManager[prototk.TransportMessage], err error) {
 			br := &TransportBridge{
@@ -47,7 +35,7 @@ func (pc *pluginController) ConnectTransport(stream prototk.PluginController_Con
 				pluginId:   plugin.id.String(),
 				toPlugin:   toPlugin,
 			}
-			br.manager, err = pc.transportManager.TransportRegistered(plugin.name, plugin.id, br)
+			br.manager, err = pm.transportManager.TransportRegistered(plugin.name, plugin.id, br)
 			if err != nil {
 				return nil, err
 			}

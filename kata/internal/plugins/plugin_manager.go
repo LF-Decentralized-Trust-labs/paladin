@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
@@ -32,22 +33,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Managers interface {
-	DomainRegistration() DomainRegistration
-	TransportRegistration() TransportRegistration
-	RegistryRegistration() RegistryRegistration
-}
-
-type PluginController interface {
-	Start() error
-	Stop()
-	GRPCTargetURL() string
-	LoaderID() uuid.UUID
-	WaitForInit(ctx context.Context) error
-	ReloadPluginList() error
-}
-
-type pluginController struct {
+type pluginManager struct {
 	prototk.UnimplementedPluginControllerServer
 	bgCtx    context.Context
 	mux      sync.Mutex
@@ -55,17 +41,18 @@ type pluginController struct {
 	server   *grpc.Server
 
 	loaderID        uuid.UUID
+	grpcTarget      string
 	network         string
 	address         string
 	shutdownTimeout time.Duration
 
-	domainManager DomainRegistration
+	domainManager components.DomainManager
 	domainPlugins map[uuid.UUID]*plugin[prototk.DomainMessage]
 
-	transportManager TransportRegistration
+	transportManager components.TransportManager
 	transportPlugins map[uuid.UUID]*plugin[prototk.TransportMessage]
 
-	registryManager RegistryRegistration
+	registryManager components.RegistryManager
 	registryPlugins map[uuid.UUID]*plugin[prototk.RegistryMessage]
 
 	notifyPluginsUpdated chan bool
@@ -74,61 +61,48 @@ type pluginController struct {
 	serverDone           chan error
 }
 
-func NewPluginController(bgCtx context.Context,
-	socketFile string, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
+func NewPluginManager(bgCtx context.Context,
+	grpcTarget string, // default is a UDS path, can use tcp:127.0.0.1:12345 strings too (or tcp4:/tcp6:)
 	loaderID uuid.UUID,
-	managers Managers,
-	conf *PluginControllerConfig) (_ PluginController, err error) {
+	conf *PluginManagerConfig) components.PluginManager {
 
-	pc := &pluginController{
+	pc := &pluginManager{
 		bgCtx: bgCtx,
 
+		grpcTarget:      grpcTarget,
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *DefaultGRPCConfig.ShutdownTimeout),
 
-		domainManager: managers.DomainRegistration(),
-		domainPlugins: make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
-
-		transportManager: managers.TransportRegistration(),
+		domainPlugins:    make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
 		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
-
-		registryManager: managers.RegistryRegistration(),
-		registryPlugins: make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
+		registryPlugins:  make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
 
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
 		loadingProgressed:    make(chan *prototk.PluginLoadFailed, 1),
 	}
-
-	if err := pc.ReloadPluginList(); err != nil {
-		return nil, err
-	}
-
-	if err := pc.parseGRPCAddress(bgCtx, socketFile); err != nil {
-		return nil, err
-	}
-	return pc, nil
+	return pc
 }
 
-func (pc *pluginController) parseGRPCAddress(ctx context.Context, serverAddr string) error {
+func (pm *pluginManager) parseGRPCAddress(ctx context.Context, serverAddr string) error {
 
 	// We support a subset of the Go network prefixes, and if none is found, we default to UNIX Domain Sockets ("unix:")
 	tcpStr, isTCP := strings.CutPrefix(serverAddr, "tcp:")
 	if isTCP {
-		pc.network = "tcp"
-		pc.address = tcpStr
+		pm.network = "tcp"
+		pm.address = tcpStr
 		return nil
 	}
 	tcp4Str, isTCP4 := strings.CutPrefix(serverAddr, "tcp4:")
 	if isTCP4 {
-		pc.network = "tcp4"
-		pc.address = tcp4Str
+		pm.network = "tcp4"
+		pm.address = tcp4Str
 		return nil
 	}
 	tcp6Str, isTCP6 := strings.CutPrefix(serverAddr, "tcp6:")
 	if isTCP6 {
-		pc.network = "tcp6"
-		pc.address = tcp6Str
+		pm.network = "tcp6"
+		pm.address = tcp6Str
 		return nil
 	}
 	udsPath := strings.Trim(serverAddr, "unix:")
@@ -139,84 +113,103 @@ func (pc *pluginController) parseGRPCAddress(ctx context.Context, serverAddr str
 		// See https://man7.org/linux/man-pages/man7/unix.7.html for a complex description of "sun_path"
 		return i18n.NewError(ctx, msgs.MsgPluginUDSPathTooLong, len(udsPath))
 	}
-	pc.network = "unix"
-	pc.address = udsPath
+	pm.network = "unix"
+	pm.address = udsPath
 	return nil
 
 }
 
-func (pc *pluginController) Start() (err error) {
-	ctx := pc.bgCtx
-	log.L(ctx).Infof("server starting on %s:%s", pc.network, pc.address)
-	pc.listener, err = net.Listen(pc.network, pc.address)
+func (pm *pluginManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+	return &components.ManagerInitResult{}, nil
+}
+
+func (pm *pluginManager) PostInit(c components.AllComponents) error {
+	pm.domainManager = c.DomainManager()
+	pm.transportManager = c.TransportManager()
+	pm.registryManager = c.RegistryManager()
+
+	if err := pm.ReloadPluginList(); err != nil {
+		return err
+	}
+
+	if err := pm.parseGRPCAddress(pm.bgCtx, pm.grpcTarget); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pm *pluginManager) Start() (err error) {
+	ctx := pm.bgCtx
+	log.L(ctx).Infof("server starting on %s:%s", pm.network, pm.address)
+	pm.listener, err = net.Listen(pm.network, pm.address)
 	if err != nil {
 		log.L(ctx).Error("failed to listen: ", err)
 		return err
 	}
-	pc.server = grpc.NewServer()
+	pm.server = grpc.NewServer()
 
-	prototk.RegisterPluginControllerServer(pc.server, pc)
+	prototk.RegisterPluginControllerServer(pm.server, pm)
 
-	log.L(ctx).Infof("server listening at %v", pc.listener.Addr())
-	go pc.runServer(ctx)
+	log.L(ctx).Infof("server listening at %v", pm.listener.Addr())
+	go pm.runServer(ctx)
 	return nil
 }
 
-func (pc *pluginController) runServer(ctx context.Context) {
+func (pm *pluginManager) runServer(ctx context.Context) {
 	log.L(ctx).Infof("Run GRPC Server")
 
 	log.L(ctx).Infof("Server started")
-	pc.serverDone <- pc.server.Serve(pc.listener)
+	pm.serverDone <- pm.server.Serve(pm.listener)
 	log.L(ctx).Infof("Server ended")
 }
 
-func (pc *pluginController) Stop() {
-	ctx := pc.bgCtx
+func (pm *pluginManager) Stop() {
+	ctx := pm.bgCtx
 	log.L(ctx).Infof("Stop")
 
 	gracefullyStopped := make(chan struct{})
 	go func() {
 		defer close(gracefullyStopped)
-		pc.server.GracefulStop()
+		pm.server.GracefulStop()
 	}()
 	select {
 	case <-gracefullyStopped:
-	case <-time.After(pc.shutdownTimeout):
-		pc.server.Stop()
+	case <-time.After(pm.shutdownTimeout):
+		pm.server.Stop()
 	}
-	serverErr := <-pc.serverDone
+	serverErr := <-pm.serverDone
 	log.L(ctx).Infof("Server stopped (err=%v)", serverErr)
 
 }
 
 // Must be started to call this function
-func (pc *pluginController) GRPCTargetURL() string {
-	switch pc.network {
+func (pm *pluginManager) GRPCTargetURL() string {
+	switch pm.network {
 	case "unix":
-		return "unix:" + pc.listener.Addr().String()
+		return "unix:" + pm.listener.Addr().String()
 	default:
-		return "dns:///" + pc.listener.Addr().String()
+		return "dns:///" + pm.listener.Addr().String()
 	}
 }
 
-func (pc *pluginController) LoaderID() uuid.UUID {
-	return pc.loaderID
+func (pm *pluginManager) LoaderID() uuid.UUID {
+	return pm.loaderID
 }
 
-func (pc *pluginController) ReloadPluginList() (err error) {
-	for name, dp := range pc.domainManager.ConfiguredDomains() {
+func (pm *pluginManager) ReloadPluginList() (err error) {
+	for name, dp := range pm.domainManager.ConfiguredDomains() {
 		if err == nil {
-			err = initPlugin(pc.bgCtx, pc, pc.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp)
+			err = initPlugin(pm.bgCtx, pm, pm.domainPlugins, name, prototk.PluginInfo_DOMAIN, dp)
 		}
 	}
-	for name, tp := range pc.transportManager.ConfiguredTransports() {
+	for name, tp := range pm.transportManager.ConfiguredTransports() {
 		if err == nil {
-			err = initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp)
+			err = initPlugin(pm.bgCtx, pm, pm.transportPlugins, name, prototk.PluginInfo_TRANSPORT, tp)
 		}
 	}
-	for name, tp := range pc.registryManager.ConfiguredRegistries() {
+	for name, tp := range pm.registryManager.ConfiguredRegistries() {
 		if err == nil {
-			err = initPlugin(pc.bgCtx, pc, pc.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
+			err = initPlugin(pm.bgCtx, pm, pm.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
 	if err != nil {
@@ -224,21 +217,21 @@ func (pc *pluginController) ReloadPluginList() (err error) {
 	}
 
 	select {
-	case pc.notifyPluginsUpdated <- true:
+	case pm.notifyPluginsUpdated <- true:
 	default:
 	}
 	return nil
 }
 
-func (pc *pluginController) WaitForInit(ctx context.Context) error {
+func (pm *pluginManager) WaitForInit(ctx context.Context) error {
 	for {
-		unloadedDomainPlugins, _ := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, false)
+		unloadedDomainPlugins, _ := unloadedPlugins(pm, pm.domainPlugins, prototk.PluginInfo_DOMAIN, false)
 		unloadedCount := len(unloadedDomainPlugins)
 		if unloadedCount == 0 {
 			return nil
 		}
 		select {
-		case loadErrOrNil := <-pc.loadingProgressed:
+		case loadErrOrNil := <-pm.loadingProgressed:
 			if loadErrOrNil != nil {
 				return i18n.NewError(ctx, msgs.MsgPluginLoadFailed, loadErrOrNil.ErrorMessage)
 			}
@@ -249,40 +242,40 @@ func (pc *pluginController) WaitForInit(ctx context.Context) error {
 	}
 }
 
-func (pc *pluginController) newReqContext() context.Context {
-	return log.WithLogField(pc.bgCtx, "plugin_reqid", types.ShortID())
+func (pm *pluginManager) newReqContext() context.Context {
+	return log.WithLogField(pm.bgCtx, "plugin_reqid", types.ShortID())
 }
 
-func (pc *pluginController) InitLoader(req *prototk.PluginLoaderInit, stream prototk.PluginController_InitLoaderServer) error {
-	ctx := pc.newReqContext()
+func (pm *pluginManager) InitLoader(req *prototk.PluginLoaderInit, stream prototk.PluginController_InitLoaderServer) error {
+	ctx := pm.newReqContext()
 	suppliedID, err := uuid.Parse(req.Id)
-	if err != nil || suppliedID != pc.loaderID {
+	if err != nil || suppliedID != pm.loaderID {
 		return i18n.WrapError(ctx, err, msgs.MsgPluginLoaderUUIDError)
 	}
-	pc.mux.Lock()
-	if pc.pluginLoaderDone != nil {
-		pc.mux.Unlock()
+	pm.mux.Lock()
+	if pm.pluginLoaderDone != nil {
+		pm.mux.Unlock()
 		return i18n.WrapError(ctx, err, msgs.MsgPluginLoaderAlreadyInit)
 	}
-	pc.pluginLoaderDone = make(chan struct{})
-	pc.mux.Unlock()
+	pm.pluginLoaderDone = make(chan struct{})
+	pm.mux.Unlock()
 	log.L(ctx).Infof("Plugin loader connected")
-	return pc.sendPluginsToLoader(stream)
+	return pm.sendPluginsToLoader(stream)
 }
 
-func (pc *pluginController) LoadFailed(ctx context.Context, req *prototk.PluginLoadFailed) (*prototk.EmptyResponse, error) {
+func (pm *pluginManager) LoadFailed(ctx context.Context, req *prototk.PluginLoadFailed) (*prototk.EmptyResponse, error) {
 	log.L(ctx).Errorf("Plugin load %s (type=%s) failed: %s", req.Plugin.Name, req.Plugin.PluginType, req.ErrorMessage)
 	select {
-	case pc.loadingProgressed <- req:
+	case pm.loadingProgressed <- req:
 	default:
 	}
 	return &prototk.EmptyResponse{}, nil
 }
 
-func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], name string, pType prototk.PluginInfo_PluginType, conf *PluginConfig) (err error) {
-	pc.mux.Lock()
-	defer pc.mux.Unlock()
-	plugin := &plugin[CB]{pc: pc, id: uuid.New(), name: name}
+func initPlugin[CB any](ctx context.Context, pm *pluginManager, pluginMap map[uuid.UUID]*plugin[CB], name string, pType prototk.PluginInfo_PluginType, conf *components.PluginConfig) (err error) {
+	pm.mux.Lock()
+	defer pm.mux.Unlock()
+	plugin := &plugin[CB]{pc: pm, id: uuid.New(), name: name}
 	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, name, types.DefaultNameMaxLen, "name"); err != nil {
 		return err
 	}
@@ -295,21 +288,21 @@ func initPlugin[CB any](ctx context.Context, pc *pluginController, pluginMap map
 		LibLocation: conf.Library,
 		Class:       conf.Class,
 	}
-	plugin.def.LibType, err = types.MapEnum(conf.Type, golangToProtoLibTypeMap)
+	plugin.def.LibType, err = components.MapLibraryTypeToProto(conf.Type)
 	pluginMap[plugin.id] = plugin
 	return err
 }
 
-func (pc *pluginController) tapLoadingProgressed() {
+func (pm *pluginManager) tapLoadingProgressed() {
 	select {
-	case pc.loadingProgressed <- nil:
+	case pm.loadingProgressed <- nil:
 	default:
 	}
 }
 
-func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], pbType prototk.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
-	pc.mux.Lock()
-	defer pc.mux.Unlock()
+func unloadedPlugins[CB any](pm *pluginManager, pluginMap map[uuid.UUID]*plugin[CB], pbType prototk.PluginInfo_PluginType, setInitializing bool) (unloaded, notInitializing []*plugin[CB]) {
+	pm.mux.Lock()
+	defer pm.mux.Unlock()
 	pluginList := []string{}
 	for name, plugin := range pluginMap {
 		pluginList = append(pluginList, fmt.Sprintf("%s:%s", plugin.def.Plugin.PluginType, name))
@@ -324,50 +317,50 @@ func unloadedPlugins[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plug
 		}
 	}
 	if len(unloaded) > 0 {
-		log.L(pc.bgCtx).Debugf("%d of %d %s plugins loaded", len(pluginMap)-len(unloaded), len(pluginMap), pbType)
+		log.L(pm.bgCtx).Debugf("%d of %d %s plugins loaded", len(pluginMap)-len(unloaded), len(pluginMap), pbType)
 	} else {
-		log.L(pc.bgCtx).Infof("All plugins loaded %v", pluginList)
+		log.L(pm.bgCtx).Infof("All %s plugins loaded %v", pbType, pluginList)
 	}
 	return unloaded, notInitializing
 }
 
-func getPluginByIDString[CB any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType prototk.PluginInfo_PluginType) (p *plugin[CB], err error) {
-	pc.mux.Lock()
-	defer pc.mux.Unlock()
+func getPluginByIDString[CB any](pm *pluginManager, pluginMap map[uuid.UUID]*plugin[CB], idStr string, pbType prototk.PluginInfo_PluginType) (p *plugin[CB], err error) {
+	pm.mux.Lock()
+	defer pm.mux.Unlock()
 	id, err := uuid.Parse(idStr)
 	if err == nil {
 		p = pluginMap[id]
 		if p == nil {
-			err = i18n.NewError(pc.bgCtx, msgs.MsgPluginUUIDNotFound, pbType, id)
+			err = i18n.NewError(pm.bgCtx, msgs.MsgPluginUUIDNotFound, pbType, id)
 		}
 	}
 	return p, err
 }
 
-func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_InitLoaderServer) (err error) {
+func (pm *pluginManager) sendPluginsToLoader(stream prototk.PluginController_InitLoaderServer) (err error) {
 	defer func() {
-		pc.mux.Lock()
-		defer pc.mux.Unlock()
-		close(pc.pluginLoaderDone)
-		pc.pluginLoaderDone = nil
+		pm.mux.Lock()
+		defer pm.mux.Unlock()
+		close(pm.pluginLoaderDone)
+		pm.pluginLoaderDone = nil
 	}()
 	ctx := stream.Context()
 	for {
 		// We send a load request for each plugin that isn't new - which should result in that plugin being loaded
 		// and resulting in a ConnectDomain bi-directional stream being set up.
-		_, notInitializingDomains := unloadedPlugins(pc, pc.domainPlugins, prototk.PluginInfo_DOMAIN, true)
+		_, notInitializingDomains := unloadedPlugins(pm, pm.domainPlugins, prototk.PluginInfo_DOMAIN, true)
 		for _, plugin := range notInitializingDomains {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}
 		}
-		_, notInitializingTransports := unloadedPlugins(pc, pc.transportPlugins, prototk.PluginInfo_TRANSPORT, true)
+		_, notInitializingTransports := unloadedPlugins(pm, pm.transportPlugins, prototk.PluginInfo_TRANSPORT, true)
 		for _, plugin := range notInitializingTransports {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}
 		}
-		_, notInitializingRegistries := unloadedPlugins(pc, pc.registryPlugins, prototk.PluginInfo_REGISTRY, true)
+		_, notInitializingRegistries := unloadedPlugins(pm, pm.registryPlugins, prototk.PluginInfo_REGISTRY, true)
 		for _, plugin := range notInitializingRegistries {
 			if err == nil {
 				err = stream.Send(plugin.def)
@@ -378,7 +371,7 @@ func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_
 			case <-ctx.Done():
 				log.L(ctx).Debugf("loader stream closed")
 				err = i18n.NewError(ctx, msgs.MsgContextCanceled)
-			case <-pc.notifyPluginsUpdated:
+			case <-pm.notifyPluginsUpdated:
 				// loop and load any that need loading
 			}
 		}

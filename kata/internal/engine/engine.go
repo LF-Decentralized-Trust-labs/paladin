@@ -53,7 +53,7 @@ type Engine interface {
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
 	GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error)
 	Name() string
-	Init(components.AllComponents) (*components.ManagerInitResult, error)
+	Init(components.PreInitComponentsAndManagers) (*components.ManagerInitResult, error)
 	Start() error
 	Stop()
 }
@@ -63,11 +63,11 @@ type engine struct {
 	ctxCancel     func()
 	done          chan struct{}
 	orchestrators map[string]*orchestrator.Orchestrator
-	components    components.AllComponents
+	components    components.PreInitComponentsAndManagers
 }
 
 // Init implements Engine.
-func (e *engine) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
+func (e *engine) Init(c components.PreInitComponentsAndManagers) (*components.ManagerInitResult, error) {
 	e.components = c
 	return nil, nil
 }

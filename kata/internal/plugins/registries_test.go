@@ -22,16 +22,18 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 )
 
 type testRegistryManager struct {
 	registries         map[string]plugintk.Plugin
-	registryRegistered func(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error)
+	registryRegistered func(name string, id uuid.UUID, toRegistry components.RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error)
 
 	upsertTransportDetails func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error)
 }
@@ -47,42 +49,34 @@ func registryHeaderAccessor(msg *prototk.RegistryMessage) *prototk.Header {
 	return msg.Header
 }
 
-func (tp *testRegistryManager) ConfiguredRegistries() map[string]*PluginConfig {
-	pluginMap := make(map[string]*PluginConfig)
+func (tp *testRegistryManager) mock(t *testing.T) *componentmocks.RegistryManager {
+	mdm := componentmocks.NewRegistryManager(t)
+	pluginMap := make(map[string]*components.PluginConfig)
 	for name := range tp.registries {
-		pluginMap[name] = &PluginConfig{
-			Type:    LibraryTypeCShared.Enum(),
+		pluginMap[name] = &components.PluginConfig{
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "/tmp/not/applicable",
 		}
 	}
-	return pluginMap
-}
-
-func (tdm *testRegistryManager) RegistryRegistered(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
-	return tdm.registryRegistered(name, id, toRegistry)
+	mdm.On("ConfiguredRegistries").Return(pluginMap).Maybe()
+	mdr := mdm.On("RegistryRegistered", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	mdr.Run(func(args mock.Arguments) {
+		m2p, err := tp.registryRegistered(args[0].(string), args[1].(uuid.UUID), args[2].(components.RegistryManagerToRegistry))
+		mdr.Return(m2p, err)
+	})
+	return mdm
 }
 
 func (tdm *testRegistryManager) UpsertTransportDetails(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
 	return tdm.upsertTransportDetails(ctx, req)
 }
 
-func newTestRegistryPluginController(t *testing.T, setup *testManagers) (context.Context, *pluginController, func()) {
+func newTestRegistryPluginManager(t *testing.T, setup *testManagers) (context.Context, *pluginManager, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	udsString := tempUDS(t)
-	loaderId := uuid.New()
-	allPlugins := setup.allPlugins()
-	pc, err := NewPluginController(ctx, udsString, loaderId, setup, &PluginControllerConfig{
-		GRPC: GRPCConfig{
-			ShutdownTimeout: confutil.P("1ms"),
-		},
-	})
-	assert.NoError(t, err)
+	pc := newTestPluginManager(t, setup)
 
-	err = pc.Start()
-	assert.NoError(t, err)
-
-	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), loaderId.String(), allPlugins)
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
@@ -91,7 +85,7 @@ func newTestRegistryPluginController(t *testing.T, setup *testManagers) (context
 		tpl.Run()
 	}()
 
-	return ctx, pc.(*pluginController), func() {
+	return ctx, pc, func() {
 		recovered := recover()
 		if recovered != nil {
 			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
@@ -107,7 +101,7 @@ func newTestRegistryPluginController(t *testing.T, setup *testManagers) (context
 
 func TestRegistryRequestsOK(t *testing.T) {
 
-	waitForAPI := make(chan RegistryManagerToRegistry, 1)
+	waitForAPI := make(chan components.RegistryManagerToRegistry, 1)
 	waitForCallbacks := make(chan plugintk.RegistryCallbacks, 1)
 
 	registryFunctions := &plugintk.RegistryAPIFunctions{
@@ -128,13 +122,13 @@ func TestRegistryRequestsOK(t *testing.T) {
 			return &prototk.UpsertTransportDetailsResponse{}, nil
 		},
 	}
-	trm.registryRegistered = func(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (plugintk.RegistryCallbacks, error) {
+	trm.registryRegistered = func(name string, id uuid.UUID, toRegistry components.RegistryManagerToRegistry) (plugintk.RegistryCallbacks, error) {
 		assert.Equal(t, "registry1", name)
 		waitForAPI <- toRegistry
 		return trm, nil
 	}
 
-	ctx, pc, done := newTestRegistryPluginController(t, &testManagers{
+	ctx, pc, done := newTestRegistryPluginManager(t, &testManagers{
 		testRegistryManager: trm,
 	})
 	defer done()
@@ -183,11 +177,11 @@ func TestRegistryRegisterFail(t *testing.T) {
 			},
 		},
 	}
-	tdm.registryRegistered = func(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (plugintk.RegistryCallbacks, error) {
+	tdm.registryRegistered = func(name string, id uuid.UUID, toRegistry components.RegistryManagerToRegistry) (plugintk.RegistryCallbacks, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, _, done := newTestRegistryPluginController(t, &testManagers{
+	_, _, done := newTestRegistryPluginManager(t, &testManagers{
 		testRegistryManager: tdm,
 	})
 	defer done()
@@ -223,11 +217,11 @@ func TestFromRegistryRequestBadReq(t *testing.T) {
 			},
 		},
 	}
-	trm.registryRegistered = func(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
+	trm.registryRegistered = func(name string, id uuid.UUID, toRegistry components.RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
 		return trm, nil
 	}
 
-	_, _, done := newTestRegistryPluginController(t, &testManagers{
+	_, _, done := newTestRegistryPluginManager(t, &testManagers{
 		testRegistryManager: trm,
 	})
 	defer done()

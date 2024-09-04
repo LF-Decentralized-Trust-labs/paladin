@@ -17,27 +17,15 @@ package plugins
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type RegistryManagerToRegistry interface {
-	plugintk.RegistryAPI
-	Initialized()
-}
-
-// The interface the rest of Paladin uses to integrate with Registry plugins
-type RegistryRegistration interface {
-	ConfiguredRegistries() map[string]*PluginConfig
-	RegistryRegistered(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error)
-}
-
 // The gRPC stream connected to by Registry plugins
-func (pc *pluginController) ConnectRegistry(stream prototk.PluginController_ConnectRegistryServer) error {
-	handler := newPluginHandler(pc, prototk.PluginInfo_REGISTRY, pc.registryPlugins, stream,
+func (pm *pluginManager) ConnectRegistry(stream prototk.PluginController_ConnectRegistryServer) error {
+	handler := newPluginHandler(pm, prototk.PluginInfo_REGISTRY, pm.registryPlugins, stream,
 		&plugintk.RegistryMessageWrapper{},
 		func(plugin *plugin[prototk.RegistryMessage], toPlugin managerToPlugin[prototk.RegistryMessage]) (pluginToManager pluginToManager[prototk.RegistryMessage], err error) {
 			br := &RegistryBridge{
@@ -47,7 +35,7 @@ func (pc *pluginController) ConnectRegistry(stream prototk.PluginController_Conn
 				pluginId:   plugin.id.String(),
 				toPlugin:   toPlugin,
 			}
-			br.manager, err = pc.registryManager.RegistryRegistered(plugin.name, plugin.id, br)
+			br.manager, err = pm.registryManager.RegistryRegistered(plugin.name, plugin.id, br)
 			if err != nil {
 				return nil, err
 			}

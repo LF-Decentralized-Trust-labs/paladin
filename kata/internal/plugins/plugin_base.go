@@ -52,7 +52,7 @@ type pluginToManager[M any] interface {
 type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M], err error)
 
 type plugin[M any] struct {
-	pc   *pluginController
+	pc   *pluginManager
 	name string
 	id   uuid.UUID
 	def  *prototk.PluginLoad
@@ -67,7 +67,7 @@ type pluginHandler[M any] struct {
 	cancelCtx context.CancelFunc
 
 	// Reference back to the section of the controller for this handler
-	pc         *pluginController
+	pc         *pluginManager
 	pluginType prototk.PluginInfo_PluginType
 	pluginMap  map[uuid.UUID]*plugin[M]
 
@@ -110,14 +110,14 @@ func (p *plugin[CB]) notifyStopped() {
 	p.pc.tapLoadingProgressed()
 }
 
-func newPluginHandler[M any](pc *pluginController,
+func newPluginHandler[M any](pm *pluginManager,
 	pluginType prototk.PluginInfo_PluginType,
 	pluginMap map[uuid.UUID]*plugin[M],
 	stream grpc.BidiStreamingServer[M, M],
 	wrapper plugintk.PluginMessageWrapper[M],
 	bridgeFactory pluginBridgeFactory[M]) *pluginHandler[M] {
 	ph := &pluginHandler[M]{
-		pc:            pc,
+		pc:            pm,
 		pluginType:    pluginType,
 		pluginMap:     pluginMap,
 		wrapper:       wrapper,

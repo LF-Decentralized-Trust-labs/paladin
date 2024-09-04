@@ -18,7 +18,8 @@ package components
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 type RegistryNodeTransportEntry struct {
@@ -27,8 +28,14 @@ type RegistryNodeTransportEntry struct {
 	TransportDetails string
 }
 
+type RegistryManagerToRegistry interface {
+	plugintk.RegistryAPI
+	Initialized()
+}
+
 type RegistryManager interface {
 	ManagerLifecycle
-	plugins.RegistryRegistration
+	ConfiguredRegistries() map[string]*PluginConfig
+	RegistryRegistered(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error)
 	GetNodeTransports(ctx context.Context, node string) ([]*RegistryNodeTransportEntry, error)
 }

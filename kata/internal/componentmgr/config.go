@@ -37,7 +37,7 @@ import (
 
 type Config struct {
 	domainmgr.DomainManagerConfig       `yaml:",inline"`
-	plugins.PluginControllerConfig      `yaml:",inline"`
+	plugins.PluginManagerConfig         `yaml:",inline"`
 	transportmgr.TransportManagerConfig `yaml:",inline"`
 	registrymgr.RegistryManagerConfig   `yaml:",inline"`
 	Log                                 log.Config          `yaml:"log"`

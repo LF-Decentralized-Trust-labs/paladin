@@ -15,12 +15,10 @@
 package plugins
 
 import (
-	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type PluginControllerConfig struct {
+type PluginManagerConfig struct {
 	GRPC GRPCConfig `yaml:"grpc"`
 }
 
@@ -30,33 +28,4 @@ type GRPCConfig struct {
 
 var DefaultGRPCConfig = &GRPCConfig{
 	ShutdownTimeout: confutil.P("10s"),
-}
-
-type LibraryType string
-
-const (
-	LibraryTypeCShared LibraryType = "c-shared"
-	LibraryTypeJar     LibraryType = "jar"
-)
-
-func (lt LibraryType) Enum() types.Enum[LibraryType] {
-	return types.Enum[LibraryType](lt)
-}
-
-func (pl LibraryType) Options() []string {
-	return []string{
-		string(LibraryTypeCShared),
-		string(LibraryTypeJar),
-	}
-}
-
-var golangToProtoLibTypeMap = map[LibraryType]prototk.PluginLoad_LibType{
-	LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
-	LibraryTypeJar:     prototk.PluginLoad_JAR,
-}
-
-type PluginConfig struct {
-	Type    types.Enum[LibraryType] `yaml:"type"`
-	Library string                  `yaml:"library"`
-	Class   *string                 `yaml:"class,omitempty"`
 }

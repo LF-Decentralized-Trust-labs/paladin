@@ -137,7 +137,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.AllComponents, domainAPI components.DomainSmartContract) *Orchestrator {
+func NewOrchestrator(ctx context.Context, contractAddress string, oc *OrchestratorConfig, components components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),

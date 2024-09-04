@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,8 +52,8 @@ func TestConfiguredTransports(t *testing.T) {
 	_, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{
 			"test1": {
-				Plugin: plugins.PluginConfig{
-					Type:    plugins.LibraryTypeCShared.Enum(),
+				Plugin: components.PluginConfig{
+					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
 			},
@@ -61,9 +61,9 @@ func TestConfiguredTransports(t *testing.T) {
 	})
 	defer done()
 
-	assert.Equal(t, map[string]*plugins.PluginConfig{
+	assert.Equal(t, map[string]*components.PluginConfig{
 		"test1": {
-			Type:    plugins.LibraryTypeCShared.Enum(),
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "some/where",
 		},
 	}, dm.ConfiguredTransports())

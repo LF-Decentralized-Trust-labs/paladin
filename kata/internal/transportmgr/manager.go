@@ -23,7 +23,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -38,27 +37,26 @@ type transportManager struct {
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
-
-	recvMessages chan *components.TransportMessage
 }
 
 func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) components.TransportManager {
 	return &transportManager{
 		bgCtx:            bgCtx,
 		conf:             conf,
-		recvMessages:     make(chan *components.TransportMessage, 1),
 		transportsByID:   make(map[uuid.UUID]*transport),
 		transportsByName: make(map[string]*transport),
 	}
 }
 
-func (tm *transportManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+func (tm *transportManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	// TransportManager does not rely on any other components during the pre-init phase (at the moment)
 	// for QoS we may need persistence in the future, and this will be the plug point for the registry
 	// when we have it
 
 	return &components.ManagerInitResult{}, nil
 }
+
+func (tm *transportManager) PostInit(c components.AllComponents) error { return nil }
 
 func (tm *transportManager) Start() error { return nil }
 
@@ -82,15 +80,15 @@ func (tm *transportManager) cleanupTransport(t *transport) {
 	delete(tm.transportsByName, t.name)
 }
 
-func (tm *transportManager) ConfiguredTransports() map[string]*plugins.PluginConfig {
-	pluginConf := make(map[string]*plugins.PluginConfig)
+func (tm *transportManager) ConfiguredTransports() map[string]*components.PluginConfig {
+	pluginConf := make(map[string]*components.PluginConfig)
 	for name, conf := range tm.conf.Transports {
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
 }
 
-func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTransport plugins.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
+func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {
 	tm.mux.Lock()
 	defer tm.mux.Unlock()
 
@@ -129,11 +127,6 @@ func (tm *transportManager) getTransportByName(ctx context.Context, name string)
 	return t, nil
 }
 
-// Internal callback method from the transports to the manager
-func (tm *transportManager) receiveExternalMessage(msg *components.TransportMessage) {
-	tm.recvMessages <- msg
-}
-
 // Send implements TransportManager
 func (tm *transportManager) Send(ctx context.Context, msgInput *components.TransportMessageInput) error {
 	// TODO: Plug point for calling through to the registry
@@ -146,7 +139,8 @@ func (tm *transportManager) Send(ctx context.Context, msgInput *components.Trans
 	}
 
 	if len(msgInput.Destination.Node) == 0 ||
-		len(msgInput.Destination.Identity) == 0 ||
+		// len(msgInput.Destination.Identity) == 0 ||
+		// len(msgInput.Destination.Component) == 0 ||
 		len(msgInput.ReplyToIdentity) == 0 ||
 		len(msgInput.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
@@ -197,23 +191,16 @@ func (tm *transportManager) GetTransportDetails(ctx context.Context, req *protot
 		}`}, nil
 }
 
-// Send implements TransportManager
-func (tm *transportManager) RegisterReceiver(onMessage func(ctx context.Context, message *components.TransportMessage) error) error {
-	go func() {
-		for {
-			select {
-			case <-tm.bgCtx.Done():
-				return
-			case message := <-tm.recvMessages:
-				{
-					err := onMessage(tm.bgCtx, message)
-					if err != nil {
-						log.L(tm.bgCtx).Errorf("error from receiver when processing new message: %v", err)
-					}
-				}
-			}
-		}
-	}()
-
+// This is called by the engine once initialized to receive the messages as they arrive from the nodes.
+// There's currently a single callback function, which might be called in parallel on multiple threads,
+// receiving from multiple nodes, on multiple transports.
+//
+// - It must be thread safe
+// - It must consider that blocking this function might block lots of traffic
+// - It must handle any errors encountered as the transport layer does not provide redelivery (at-most-once delivery)
+//
+// The expectation is it will be designed to pick a suitable channel to push the message to for downstream processing,
+// (and that it will consider the case that channel is full).
+func (tm *transportManager) RegisterReceiver(ctx context.Context, onMessage func(ctx context.Context, message *components.TransportMessage)) error {
 	return nil
 }

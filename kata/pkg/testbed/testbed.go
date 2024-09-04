@@ -43,7 +43,7 @@ type testbed struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 	rpcModule *rpcserver.RPCModule
-	c         components.AllComponents
+	c         components.PreInitComponentsAndManagers
 }
 
 func NewTestBed() (tb *testbed) {
@@ -64,7 +64,7 @@ func (tb *testbed) Start() error {
 
 func (tb *testbed) Stop() {}
 
-func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResult, error) {
+func (tb *testbed) Init(c components.PreInitComponentsAndManagers) (*components.ManagerInitResult, error) {
 	tb.c = c
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
@@ -74,7 +74,7 @@ func (tb *testbed) Init(c components.AllComponents) (*components.ManagerInitResu
 // redeclare the AllComponents interface to allow unit test
 // code in the same package to access the AllComponents interface
 // while keeping it internal
-type AllComponents components.AllComponents
+type AllComponents components.PreInitComponentsAndManagers
 
 type UTInitFunction struct {
 	PreManagerStart  func(c AllComponents) error
@@ -123,6 +123,10 @@ func unitTestComponentManagerStart(ctx context.Context, conf *componentmgr.Confi
 	return cm, err
 }
 
+func (tb *testbed) ReceiveTransportMessage(*components.TransportMessage) {
+	// no-op
+}
+
 func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error) {
 	ctx := context.Background()
 
@@ -134,8 +138,8 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 	conf.DomainManagerConfig.Domains = make(map[string]*domainmgr.DomainConfig, len(domains))
 	for name, domain := range domains {
 		conf.DomainManagerConfig.Domains[name] = &domainmgr.DomainConfig{
-			Plugin: plugins.PluginConfig{
-				Type:    plugins.LibraryTypeCShared.Enum(),
+			Plugin: components.PluginConfig{
+				Type:    components.LibraryTypeCShared.Enum(),
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config: domain.Config,
@@ -151,7 +155,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 				for name, domain := range domains {
 					loaderMap[name] = domain.Plugin
 				}
-				pc := c.PluginController()
+				pc := c.PluginManager()
 				pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
 				if err != nil {
 					return err

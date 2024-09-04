@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -33,7 +34,7 @@ import (
 type mockPlugin[T any] struct {
 	t *testing.T
 
-	conf            *PluginConfig
+	conf            *components.PluginConfig
 	preRegister     func(domainID string) *T
 	customResponses func(*T) []*T
 	expectClose     func(err error)
@@ -45,10 +46,10 @@ type mockPlugin[T any] struct {
 	handleResponse func(*T)
 }
 
-func (tp *mockPlugin[T]) Conf() *PluginConfig {
+func (tp *mockPlugin[T]) Conf() *components.PluginConfig {
 	if tp.conf == nil {
-		tp.conf = &PluginConfig{
-			Type:    types.Enum[LibraryType](LibraryTypeCShared),
+		tp.conf = &components.PluginConfig{
+			Type:    types.Enum[components.LibraryType](components.LibraryTypeCShared),
 			Library: "/any/where",
 		}
 	}
@@ -162,14 +163,14 @@ func TestPluginRequestsError(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		return tdm, nil
 	}
 	tdm.findAvailableStates = func(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, _, done := newTestDomainPluginController(t, &testManagers{
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -190,12 +191,12 @@ func TestSenderErrorHandling(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	_, _, done := newTestDomainPluginController(t, &testManagers{
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 
@@ -249,12 +250,12 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+	ctx, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -290,12 +291,12 @@ func TestDomainRequestsErrorWithMessage(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+	ctx, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -330,12 +331,12 @@ func TestDomainRequestsErrorNoMessage(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+	ctx, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -366,12 +367,12 @@ func TestReceiveAfterTimeout(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+	ctx, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -410,12 +411,12 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- id
 		return tdm, nil
 	}
 
-	_, _, done := newTestDomainPluginController(t, &testManagers{
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -444,12 +445,12 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	_, _, done := newTestDomainPluginController(t, &testManagers{
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -482,11 +483,11 @@ func TestDomainRegisterWrongID(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		return tdm, nil
 	}
 
-	_, _, done := newTestDomainPluginController(t, &testManagers{
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -550,12 +551,12 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 			},
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		waitForRegister <- toDomain
 		return tdm, nil
 	}
 
-	ctx, _, done := newTestDomainPluginController(t, &testManagers{
+	ctx, _, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()

@@ -24,7 +24,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -39,7 +38,7 @@ type transport struct {
 	tm   *transportManager
 	id   uuid.UUID
 	name string
-	api  plugins.TransportManagerToTransport
+	api  components.TransportManagerToTransport
 
 	initialized atomic.Bool
 	initRetry   *retry.Retry
@@ -48,7 +47,7 @@ type transport struct {
 	initDone  chan struct{}
 }
 
-func (tm *transportManager) newTransport(id uuid.UUID, name string, conf *TransportConfig, toTransport plugins.TransportManagerToTransport) *transport {
+func (tm *transportManager) newTransport(id uuid.UUID, name string, conf *TransportConfig, toTransport components.TransportManagerToTransport) *transport {
 	t := &transport{
 		tm:        tm,
 		conf:      conf,
@@ -122,7 +121,6 @@ func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequ
 		return nil, err
 	}
 
-	t.tm.receiveExternalMessage(transportMessage)
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 

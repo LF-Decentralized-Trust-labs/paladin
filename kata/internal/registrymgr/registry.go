@@ -25,7 +25,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -39,7 +38,7 @@ type registry struct {
 	tm   *registryManager
 	id   uuid.UUID
 	name string
-	api  plugins.RegistryManagerToRegistry
+	api  components.RegistryManagerToRegistry
 
 	// TODO: Replace with a cache-backed DB system
 	stateLock           sync.Mutex
@@ -52,7 +51,7 @@ type registry struct {
 	initDone  chan struct{}
 }
 
-func (tm *registryManager) newRegistry(id uuid.UUID, name string, conf *RegistryConfig, toRegistry plugins.RegistryManagerToRegistry) *registry {
+func (tm *registryManager) newRegistry(id uuid.UUID, name string, conf *RegistryConfig, toRegistry components.RegistryManagerToRegistry) *registry {
 	t := &registry{
 		tm:                  tm,
 		conf:                conf,

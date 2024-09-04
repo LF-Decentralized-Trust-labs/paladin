@@ -93,12 +93,9 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.RPCServer())
 	assert.NotNil(t, cm.BlockIndexer())
 	assert.NotNil(t, cm.DomainManager())
-	assert.NotNil(t, cm.DomainRegistration())
 	assert.NotNil(t, cm.TransportManager())
-	assert.NotNil(t, cm.TransportRegistration())
 	assert.NotNil(t, cm.RegistryManager())
-	assert.NotNil(t, cm.RegistryRegistration())
-	assert.NotNil(t, cm.PluginController())
+	assert.NotNil(t, cm.PluginManager())
 	assert.NotNil(t, cm.Engine())
 
 	cm.Stop()
@@ -134,10 +131,10 @@ func TestStartOK(t *testing.T) {
 	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
 	mockBlockIndexer.On("Stop").Return()
 
-	mockPluginController := componentmocks.NewPluginController(t)
-	mockPluginController.On("Start").Return(nil)
-	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
-	mockPluginController.On("Stop").Return()
+	mockPluginManager := componentmocks.NewPluginManager(t)
+	mockPluginManager.On("Start").Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything).Return(nil)
+	mockPluginManager.On("Stop").Return()
 
 	mockDomainManager := componentmocks.NewDomainManager(t)
 	mockDomainManager.On("Start").Return(nil)
@@ -179,9 +176,10 @@ func TestStartOK(t *testing.T) {
 		},
 	}
 	cm.blockIndexer = mockBlockIndexer
-	cm.pluginController = mockPluginController
+	cm.pluginManager = mockPluginManager
 	cm.domainManager = mockDomainManager
 	cm.transportManager = mockTransportManager
+	cm.registryManager = mockRegistryManager
 	cm.stateStore = mockStateStore
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine

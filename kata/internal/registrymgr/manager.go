@@ -23,7 +23,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
@@ -46,13 +45,15 @@ func NewRegistryManager(bgCtx context.Context, conf *RegistryManagerConfig) comp
 	}
 }
 
-func (rm *registryManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+func (rm *registryManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	// RegistryManager does not rely on any other components during the pre-init phase (at the moment)
 	// for QoS we may need persistence in the future, and this will be the plug point for the registry
 	// when we have it
 
 	return &components.ManagerInitResult{}, nil
 }
+
+func (rm *registryManager) PostInit(c components.AllComponents) error { return nil }
 
 func (rm *registryManager) Start() error { return nil }
 
@@ -76,15 +77,15 @@ func (rm *registryManager) cleanupRegistry(t *registry) {
 	delete(rm.registriesByName, t.name)
 }
 
-func (rm *registryManager) ConfiguredRegistries() map[string]*plugins.PluginConfig {
-	pluginConf := make(map[string]*plugins.PluginConfig)
+func (rm *registryManager) ConfiguredRegistries() map[string]*components.PluginConfig {
+	pluginConf := make(map[string]*components.PluginConfig)
 	for name, conf := range rm.conf.Registries {
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
 }
 
-func (rm *registryManager) RegistryRegistered(name string, id uuid.UUID, toRegistry plugins.RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
+func (rm *registryManager) RegistryRegistered(name string, id uuid.UUID, toRegistry components.RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error) {
 	rm.mux.Lock()
 	defer rm.mux.Unlock()
 

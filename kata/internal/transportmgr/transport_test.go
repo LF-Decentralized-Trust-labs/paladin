@@ -92,8 +92,7 @@ func TestSendMessage(t *testing.T) {
 
 	message := &components.TransportMessageInput{
 		Destination: components.TransportTarget{
-			Node:     "node1",
-			Identity: "identity1",
+			Node: "node1",
 		},
 		Payload: []byte("something"),
 	}
@@ -105,7 +104,7 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestReceiveMessages(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
+	ctx, _, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
@@ -120,11 +119,10 @@ func TestReceiveMessages(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	<-tm.recvMessages
 }
 
 func TestReceiveMessagesFailsWhenNotInitialized(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
+	ctx, _, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
@@ -138,5 +136,4 @@ func TestReceiveMessagesFailsWhenNotInitialized(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	<-tm.recvMessages
 }

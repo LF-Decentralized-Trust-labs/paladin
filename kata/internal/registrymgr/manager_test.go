@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -39,9 +39,12 @@ func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetu
 
 	tm := NewRegistryManager(ctx, conf)
 
-	initData, err := tm.Init(mc)
+	initData, err := tm.PreInit(mc)
 	assert.NoError(t, err)
 	assert.NotNil(t, initData)
+
+	err = tm.PostInit(mc)
+	assert.NoError(t, err)
 
 	err = tm.Start()
 	assert.NoError(t, err)
@@ -57,8 +60,8 @@ func TestConfiguredRegistries(t *testing.T) {
 	_, dm, done := newTestRegistryManager(t, &RegistryManagerConfig{
 		Registries: map[string]*RegistryConfig{
 			"test1": {
-				Plugin: plugins.PluginConfig{
-					Type:    plugins.LibraryTypeCShared.Enum(),
+				Plugin: components.PluginConfig{
+					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
 			},
@@ -66,9 +69,9 @@ func TestConfiguredRegistries(t *testing.T) {
 	})
 	defer done()
 
-	assert.Equal(t, map[string]*plugins.PluginConfig{
+	assert.Equal(t, map[string]*components.PluginConfig{
 		"test1": {
-			Type:    plugins.LibraryTypeCShared.Enum(),
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "some/where",
 		},
 	}, dm.ConfiguredRegistries())

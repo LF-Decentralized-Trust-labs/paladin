@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -90,7 +89,7 @@ type event_PaladinNewSmartContract_V0 struct {
 	Data   types.HexBytes   `json:"data"`
 }
 
-func (dm *domainManager) Init(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
+func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	dm.persistence = pic.Persistence()
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
@@ -103,6 +102,10 @@ func (dm *domainManager) Init(pic components.PreInitComponents) (*components.Man
 			},
 		},
 	}, nil
+}
+
+func (dm *domainManager) PostInit(c components.AllComponents) error {
+	return nil
 }
 
 func (dm *domainManager) Start() error { return nil }
@@ -130,15 +133,15 @@ func (dm *domainManager) cleanupDomain(d *domain) {
 	}
 }
 
-func (dm *domainManager) ConfiguredDomains() map[string]*plugins.PluginConfig {
-	pluginConf := make(map[string]*plugins.PluginConfig)
+func (dm *domainManager) ConfiguredDomains() map[string]*components.PluginConfig {
+	pluginConf := make(map[string]*components.PluginConfig)
 	for name, conf := range dm.conf.Domains {
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
 }
 
-func (dm *domainManager) DomainRegistered(name string, id uuid.UUID, toDomain plugins.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
+func (dm *domainManager) DomainRegistered(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
 

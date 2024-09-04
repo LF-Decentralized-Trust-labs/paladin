@@ -17,7 +17,7 @@ package domainmgr
 
 import (
 	"github.com/kaleido-io/paladin/kata/internal/cache"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 )
@@ -33,9 +33,9 @@ type DomainManagerManagerConfig struct {
 }
 
 type DomainConfig struct {
-	Init   DomainInitConfig     `yaml:"init"`
-	Plugin plugins.PluginConfig `yaml:"plugin"`
-	Config map[string]any       `yaml:"config"`
+	Init   DomainInitConfig        `yaml:"init"`
+	Plugin components.PluginConfig `yaml:"plugin"`
+	Config map[string]any          `yaml:"config"`
 }
 
 var ContractCacheDefaults = &cache.Config{
