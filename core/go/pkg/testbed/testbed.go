@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
@@ -27,11 +26,16 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/domainmgr"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/internal/rpcserver"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 type Testbed interface {
-	StartForTest(t *testing.T, configFile string, domains map[string]*TestbedDomain) (url string, done func())
+	components.Engine
+	StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error)
+	EthClientFactory() ethclient.EthClientFactory
+	BlockIndexer() blockindexer.BlockIndexer
 }
 
 type TestbedDomain struct {
@@ -46,8 +50,8 @@ type testbed struct {
 	c         components.PreInitComponentsAndManagers
 }
 
-func NewTestBed() (tb *testbed) {
-	tb = &testbed{}
+func NewTestBed() Testbed {
+	tb := &testbed{}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	tb.initRPC()
 	return tb
@@ -69,6 +73,14 @@ func (tb *testbed) Init(c components.PreInitComponentsAndManagers) (*components.
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
 	}, nil
+}
+
+func (tb *testbed) EthClientFactory() ethclient.EthClientFactory {
+	return tb.c.EthClientFactory()
+}
+
+func (tb *testbed) BlockIndexer() blockindexer.BlockIndexer {
+	return tb.c.BlockIndexer()
 }
 
 // redeclare the AllComponents interface to allow unit test
