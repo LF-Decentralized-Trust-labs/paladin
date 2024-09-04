@@ -585,7 +585,7 @@ func newSequencerForTesting(t *testing.T, nodeID uuid.UUID, mockResolver bool) (
 				resolver:                    resolverMock,
 				dispatcher:                  dispatcherMock,
 				graph:                       NewGraph(),
-				unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
+				unconfirmedStatesByID:       make(map[string]*unconfirmedState),
 				unconfirmedTransactionsByID: make(map[string]*transaction),
 				stateSpenders:               make(map[string]string),
 			},

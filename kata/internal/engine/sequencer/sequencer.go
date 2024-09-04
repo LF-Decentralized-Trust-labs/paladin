@@ -50,7 +50,7 @@ func NewSequencer(
 		nodeID:                      nodeID,
 		resolver:                    NewContentionResolver(),
 		graph:                       NewGraph(),
-		unconfirmedStatesByHash:     make(map[string]*unconfirmedState),
+		unconfirmedStatesByID:       make(map[string]*unconfirmedState),
 		unconfirmedTransactionsByID: make(map[string]*transaction),
 		stateSpenders:               make(map[string]string),
 		delegator:                   delegator,
@@ -95,7 +95,7 @@ type sequencer struct {
 	dispatcher                  types.Dispatcher
 	graph                       Graph
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
-	unconfirmedStatesByHash     map[string]*unconfirmedState
+	unconfirmedStatesByID       map[string]*unconfirmedState
 	unconfirmedTransactionsByID map[string]*transaction
 	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
 	lock                        sync.Mutex        //put one massive mutex around the whole sequencer for now.  We can optimise this later
@@ -142,7 +142,7 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
 	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
 	for _, stateID := range txn.inputStates {
-		unconfirmedState, ok := s.unconfirmedStatesByHash[stateID]
+		unconfirmedState, ok := s.unconfirmedStatesByID[stateID]
 		if !ok {
 			//this state is already confirmed
 			//TODO should we verify this is the case and not just the case that we have not learned about it yet?
@@ -329,7 +329,7 @@ func (s *sequencer) OnTransactionAssembled(ctx context.Context, event *pb.Transa
 		inputStates:      event.InputStateId,
 	}
 	for _, unconfirmedStateID := range event.OutputStateId {
-		s.unconfirmedStatesByHash[unconfirmedStateID] = &unconfirmedState{
+		s.unconfirmedStatesByID[unconfirmedStateID] = &unconfirmedState{
 			stateID:              unconfirmedStateID,
 			mintingTransactionID: event.TransactionId,
 		}
@@ -371,7 +371,7 @@ func (s *sequencer) OnTransactionConfirmed(ctx context.Context, event *pb.Transa
 	defer s.lock.Unlock()
 	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
 	for _, outputStateID := range outputStateIDes {
-		s.unconfirmedStatesByHash[outputStateID] = nil
+		s.unconfirmedStatesByID[outputStateID] = nil
 	}
 	s.unconfirmedTransactionsByID[event.TransactionId] = nil
 
