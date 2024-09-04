@@ -13,27 +13,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package types
+package components
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"context"
 )
 
-func TestForTypesAndMocks(t *testing.T) {
+type TransportMessage struct {
+	MessageType string
+	Payload     []byte
+}
 
-	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil)
-	assert.Nil(t, pfs.DependencyChecker())
-	assert.Nil(t, pfs.IdentityResolver())
-	assert.Nil(t, pfs.StateStore())
-
-	// mock object tests for coverage:
-	mIR := &MockIdentityResolver{}
-
-	assert.NoError(t, mIR.ConnectToBaseLeger())
-	assert.True(t, mIR.IsCurrentNode("current-node"))
-	assert.False(t, mIR.IsCurrentNode("not-current-node"))
-	assert.Empty(t, mIR.GetDispatchAddress(nil))
-	assert.Equal(t, "test", mIR.GetDispatchAddress([]string{"test"}))
+type TransportManager interface {
+	Send(ctx context.Context, message TransportMessage, nodeId string) error
+	RegisterReceiver(onMessage func(ctx context.Context, message TransportMessage) error) error
 }
