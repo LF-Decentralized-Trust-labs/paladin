@@ -37,7 +37,7 @@ type TransportRegistration interface {
 
 // The gRPC stream connected to by Transport plugins
 func (pc *pluginController) ConnectTransport(stream prototk.PluginController_ConnectTransportServer) error {
-	handler := newPluginHandler(pc, pc.transportPlugins, stream,
+	handler := newPluginHandler(pc, prototk.PluginInfo_TRANSPORT, pc.transportPlugins, stream,
 		&plugintk.TransportMessageWrapper{},
 		func(plugin *plugin[prototk.TransportMessage], toPlugin managerToPlugin[prototk.TransportMessage]) (pluginToManager pluginToManager[prototk.TransportMessage], err error) {
 			br := &TransportBridge{

@@ -37,7 +37,7 @@ type RegistryRegistration interface {
 
 // The gRPC stream connected to by Registry plugins
 func (pc *pluginController) ConnectRegistry(stream prototk.PluginController_ConnectRegistryServer) error {
-	handler := newPluginHandler(pc, pc.registryPlugins, stream,
+	handler := newPluginHandler(pc, prototk.PluginInfo_REGISTRY, pc.registryPlugins, stream,
 		&plugintk.RegistryMessageWrapper{},
 		func(plugin *plugin[prototk.RegistryMessage], toPlugin managerToPlugin[prototk.RegistryMessage]) (pluginToManager pluginToManager[prototk.RegistryMessage], err error) {
 			br := &RegistryBridge{

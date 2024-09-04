@@ -37,7 +37,7 @@ type DomainRegistration interface {
 
 // The gRPC stream connected to by domain plugins
 func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
-	handler := newPluginHandler(pc, pc.domainPlugins, stream,
+	handler := newPluginHandler(pc, prototk.PluginInfo_DOMAIN, pc.domainPlugins, stream,
 		&plugintk.DomainMessageWrapper{},
 		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage], err error) {
 			br := &domainBridge{

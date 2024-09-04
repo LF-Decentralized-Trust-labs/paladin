@@ -216,7 +216,7 @@ func (pc *pluginController) ReloadPluginList() (err error) {
 	}
 	for name, tp := range pc.registryManager.ConfiguredRegistries() {
 		if err == nil {
-			err = initPlugin(pc.bgCtx, pc, pc.transportPlugins, name, prototk.PluginInfo_REGISTRY, tp)
+			err = initPlugin(pc.bgCtx, pc, pc.registryPlugins, name, prototk.PluginInfo_REGISTRY, tp)
 		}
 	}
 	if err != nil {
@@ -363,6 +363,12 @@ func (pc *pluginController) sendPluginsToLoader(stream prototk.PluginController_
 		}
 		_, notInitializingTransports := unloadedPlugins(pc, pc.transportPlugins, prototk.PluginInfo_TRANSPORT, true)
 		for _, plugin := range notInitializingTransports {
+			if err == nil {
+				err = stream.Send(plugin.def)
+			}
+		}
+		_, notInitializingRegistries := unloadedPlugins(pc, pc.registryPlugins, prototk.PluginInfo_REGISTRY, true)
+		for _, plugin := range notInitializingRegistries {
 			if err == nil {
 				err = stream.Send(plugin.def)
 			}
