@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
 import {Groth16Verifier_CheckHashesValue, Groth16Verifier_CheckInputsOutputsValue, Groth16Verifier_Anon} from "zeto/contracts/zeto_anon.sol";
