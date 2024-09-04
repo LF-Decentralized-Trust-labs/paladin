@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -30,7 +31,7 @@ type mintHandler struct {
 }
 
 func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
-	var mintParams NotoMintParams
+	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	return &mintParams, nil
 }
 
-func (h *mintHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	if req.Transaction.From != tx.DomainConfig.NotaryLookup {
 		return nil, fmt.Errorf("mint can only be initiated by notary")
 	}
@@ -58,8 +59,8 @@ func (h *mintHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.I
 	}, nil
 }
 
-func (h *mintHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.(*NotoMintParams)
+func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
 
 	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
@@ -88,7 +89,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *
 	}, nil
 }
 
-func (h *mintHandler) validateAmounts(params *NotoMintParams, coins *gatheredCoins) error {
+func (h *mintHandler) validateAmounts(params *types.MintParams, coins *gatheredCoins) error {
 	if len(coins.inCoins) > 0 {
 		return fmt.Errorf("invalid inputs to 'mint': %v", coins.inCoins)
 	}
@@ -98,8 +99,8 @@ func (h *mintHandler) validateAmounts(params *NotoMintParams, coins *gatheredCoi
 	return nil
 }
 
-func (h *mintHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	params := tx.Params.(*NotoMintParams)
+func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
 	coins, err := h.noto.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
@@ -112,7 +113,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *p
 	}, nil
 }
 
-func (h *mintHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		outputs[i] = state.Id

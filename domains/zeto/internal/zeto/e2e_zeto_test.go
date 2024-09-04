@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 	"github.com/kaleido-io/paladin/kata/pkg/testbed"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -60,7 +61,7 @@ func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][
 	deployed := make(map[string]string, len(contracts))
 	for _, entry := range contracts {
 		for name, contract := range entry {
-			build := loadBuildLinked(contract, deployed)
+			build := domain.LoadBuildLinked(contract, deployed)
 			deployed[name], err = deployBytecode(ctx, rpc, build)
 			require.NoError(t, err)
 		}
@@ -86,7 +87,7 @@ func newTestDomain(t *testing.T, domainName string, config *Config) (context.Can
 	return done, domain, rpc
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *SolidityBuild) (string, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *domain.SolidityBuild) (string, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
 		controllerName, build.ABI, build.Bytecode.String(), `{}`)
@@ -144,7 +145,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
+		Function: *ZetoABI["mint"],
 		Inputs: toJSON(t, &ZetoMintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(10),
@@ -165,7 +166,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
+		Function: *ZetoABI["mint"],
 		Inputs: toJSON(t, &ZetoMintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(20),
@@ -188,7 +189,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
+		Function: *ZetoABI["mint"],
 		Inputs: toJSON(t, &ZetoMintParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(10),
@@ -202,7 +203,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
 		From:     controllerName,
 		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["transfer"].ABI,
+		Function: *ZetoABI["transfer"],
 		Inputs: toJSON(t, &ZetoTransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(25),

@@ -21,45 +21,35 @@ import (
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
 
-type DomainInterface = domain.DomainInterface[ZetoDomainConfig]
+type DomainHandler = domain.DomainHandler[ZetoDomainConfig]
 type ParsedTransaction = domain.ParsedTransaction[ZetoDomainConfig]
 
-func (z *Zeto) getInterface() DomainInterface {
-	return DomainInterface{
-		"constructor": {
-			ABI: &abi.Entry{
-				Type: abi.Constructor,
-				Inputs: abi.ParameterArray{
-					{Name: "from", Type: "string"},
-					{Name: "depositVerifier", Type: "address"},
-					{Name: "withdrawVerifier", Type: "address"},
-					{Name: "verifier", Type: "address"},
-				},
-			},
+var ZetoABI = domain.DomainABI{
+	"constructor": &abi.Entry{
+		Type: abi.Constructor,
+		Inputs: abi.ParameterArray{
+			{Name: "from", Type: "string"},
+			{Name: "depositVerifier", Type: "address"},
+			{Name: "withdrawVerifier", Type: "address"},
+			{Name: "verifier", Type: "address"},
 		},
-		"mint": {
-			ABI: &abi.Entry{
-				Name: "mint",
-				Type: abi.Function,
-				Inputs: abi.ParameterArray{
-					{Name: "to", Type: "string"},
-					{Name: "amount", Type: "uint256"},
-				},
-			},
-			Handler: &mintHandler{zeto: z},
+	},
+	"mint": &abi.Entry{
+		Name: "mint",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "to", Type: "string"},
+			{Name: "amount", Type: "uint256"},
 		},
-		"transfer": {
-			ABI: &abi.Entry{
-				Name: "transfer",
-				Type: abi.Function,
-				Inputs: abi.ParameterArray{
-					{Name: "to", Type: "string"},
-					{Name: "amount", Type: "uint256"},
-				},
-			},
-			Handler: &transferHandler{zeto: z},
+	},
+	"transfer": &abi.Entry{
+		Name: "transfer",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "to", Type: "string"},
+			{Name: "amount", Type: "uint256"},
 		},
-	}
+	},
 }
 
 type ZetoConstructorParams struct {
@@ -77,4 +67,15 @@ type ZetoMintParams struct {
 type ZetoTransferParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
+}
+
+func (z *Zeto) GetHandler(method string) DomainHandler {
+	switch method {
+	case "mint":
+		return &mintHandler{zeto: z}
+	case "transfer":
+		return &transferHandler{zeto: z}
+	default:
+		return nil
+	}
 }

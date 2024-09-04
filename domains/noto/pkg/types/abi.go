@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package noto
+package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -21,54 +21,41 @@ import (
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
 
-type DomainInterface = domain.DomainInterface[NotoDomainConfig]
-type ParsedTransaction = domain.ParsedTransaction[NotoDomainConfig]
-
-func (n *Noto) getInterface() DomainInterface {
-	return DomainInterface{
-		"constructor": {
-			ABI: &abi.Entry{
-				Type: abi.Constructor,
-				Inputs: abi.ParameterArray{
-					{Name: "notary", Type: "string"},
-				},
-			},
+var NotoABI = domain.DomainABI{
+	"constructor": &abi.Entry{
+		Type: abi.Constructor,
+		Inputs: abi.ParameterArray{
+			{Name: "notary", Type: "string"},
 		},
-		"mint": {
-			ABI: &abi.Entry{
-				Name: "mint",
-				Type: abi.Function,
-				Inputs: abi.ParameterArray{
-					{Name: "to", Type: "string"},
-					{Name: "amount", Type: "uint256"},
-				},
-			},
-			Handler: &mintHandler{noto: n},
+	},
+	"mint": &abi.Entry{
+		Name: "mint",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "to", Type: "string"},
+			{Name: "amount", Type: "uint256"},
 		},
-		"transfer": {
-			ABI: &abi.Entry{
-				Name: "transfer",
-				Type: abi.Function,
-				Inputs: abi.ParameterArray{
-					{Name: "to", Type: "string"},
-					{Name: "amount", Type: "uint256"},
-				},
-			},
-			Handler: &transferHandler{noto: n},
+	},
+	"transfer": &abi.Entry{
+		Name: "transfer",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "to", Type: "string"},
+			{Name: "amount", Type: "uint256"},
 		},
-	}
+	},
 }
 
-type NotoConstructorParams struct {
+type ConstructorParams struct {
 	Notary string `json:"notary"`
 }
 
-type NotoMintParams struct {
+type MintParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
-type NotoTransferParams struct {
+type TransferParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
 }

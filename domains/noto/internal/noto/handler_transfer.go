@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -32,7 +33,7 @@ type transferHandler struct {
 }
 
 func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
-	var transferParams NotoTransferParams
+	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	return &transferParams, nil
 }
 
-func (h *transferHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
@@ -57,8 +58,8 @@ func (h *transferHandler) Init(ctx context.Context, tx *ParsedTransaction, req *
 	}, nil
 }
 
-func (h *transferHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.(*NotoTransferParams)
+func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.TransferParams)
 
 	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
@@ -144,7 +145,7 @@ func (h *transferHandler) validateAmounts(coins *gatheredCoins) error {
 	return nil
 }
 
-func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
 	signature := domain.FindAttestation("sender", req.Signatures)
 	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
@@ -163,7 +164,7 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *Parse
 	return nil
 }
 
-func (h *transferHandler) validateOwners(tx *ParsedTransaction, coins *gatheredCoins) error {
+func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, coins *gatheredCoins) error {
 	for i, coin := range coins.inCoins {
 		if coin.Owner != tx.Transaction.From {
 			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.Transaction.From)
@@ -172,7 +173,7 @@ func (h *transferHandler) validateOwners(tx *ParsedTransaction, coins *gatheredC
 	return nil
 }
 
-func (h *transferHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	coins, err := h.noto.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
@@ -226,7 +227,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *ParsedTransaction, re
 	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.EndorsementRequest.Name)
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
