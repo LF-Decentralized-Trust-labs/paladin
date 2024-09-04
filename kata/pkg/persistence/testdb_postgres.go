@@ -24,7 +24,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
@@ -35,7 +35,7 @@ func NewUnitTestPersistence(ctx context.Context) (p Persistence, cleanup func(),
 	dbURL := func(dbname string) string {
 		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
 	}
-	utdbName := "ut_" + fftypes.NewUUID().String()
+	utdbName := "ut_" + uuid.New().String()
 	log.L(ctx).Infof("Unit test Postgres DB: %s", utdbName)
 
 	// First create the database - using the super user
