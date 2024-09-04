@@ -25,10 +25,10 @@ events that the sequence allocator can publish are:
  - a new sequence is created
 
 ## Contention resolution
-The sequencing of transactions is influenced heavily by the state(s) that each transaction has been assembled to spend.  Because the assembly of transactions happens concurrently, there are cases where 2 or more transactions are assembled to spend the same state.  This situation of contention must be resolved as a pre-req to the sequence allocation algorithm.  As a result of the contention resolution, exactly one of the the contenting transactions will procede into a sequence with intent to spend that state. All other transactions are re-assembled to spend different states.
+The sequencing of transactions is influenced heavily by the state(s) that each transaction has been assembled to spend.  Because the assembly of transactions happens concurrently, there are cases where 2 or more transactions are assembled to spend the same state.  This situation of contention must be resolved as a pre-req to the sequence allocation algorithm.  As a result of the contention resolution, exactly one of the the contenting transactions will proceed into a sequence with intent to spend that state. All other transactions are re-assembled to spend different states.
 
 ## Loop avoidance
-Given that transactions can attempt to spend multiple states, there are situations possible where 2 transactions are contenting for the same 2 states.  The content resolution algorithm is sensitive to this and avoids resolving contention of one state in favour of one transaction and resolving contention of the other state in favour of the other transaction.  If this were to happen then neither transaction would procede into a sequence.  Both would be re-assembled and there would be a potential for endless loop of assemble / contention resolution.  This is a trivial example of the loop scenarios but there are also more complex, less obvious situations, involving multiple transactions, that the algrithm is designed to avoid. We will explore these scenarios in more detail later as we enumerate the test cases that define the algorithm's functional behaviour.
+Given that transactions can attempt to spend multiple states, there are situations possible where 2 transactions are contenting for the same 2 states.  The content resolution algorithm is sensitive to this and avoids resolving contention of one state in favour of one transaction and resolving contention of the other state in favour of the other transaction.  If this were to happen then neither transaction would proceed into a sequence.  Both would be re-assembled and there would be a potential for endless loop of assemble / contention resolution.  This is a trivial example of the loop scenarios but there are also more complex, less obvious situations, involving multiple transactions, that the algorithm is designed to avoid. We will explore these scenarios in more detail later as we enumerate the test cases that define the algorithm's functional behaviour.
 
 ## Deadlock avoidance
 Given that transactions can be assembled to spend states that are predicted to exist in the future, once other transactions have been confirmed on the base ledger, the algorithm is designed to avoid the situation where one transaction is assembled to spend a state that is minted by another transaction while that  other transaction is also spending a state that is assembled to be spend a state that is being minted by the first transaction.
@@ -54,7 +54,7 @@ To help define these test cases, lets assuming the following object model, termi
 
 Transactions spend and mint states.  Each state can be spent only once. Transactions are organised into sequences and each sequence is allocated to a dispatcher for submission to the base ledger.  There is one dispatcher per domain instance per paladin node.
 
-For simplicity, we explore these test cases as though the sequence allocator is a singleton (albeit distrubuted across a set of nodes).  In reality, there is one sequence allocator per instance of each domain but for this discussion, we assume that all domains are independant from each other therfore what holds for one domain, will hold for multiple concurrent and independant domains.
+For simplicity, we explore these test cases as though the sequence allocator is a singleton (albeit distributed across a set of nodes).  In reality, there is one sequence allocator per instance of each domain but for this discussion, we assume that all domains are independent from each other therefore what holds for one domain, will hold for multiple concurrent and independent domains.
 
 #### state meta-states
 
@@ -62,9 +62,9 @@ When a transaction is assembled and before it has been endorsed/verified, any ou
 
 Once a transaction has been endorsed / verified, the `proposed` output states move to the `pending` output state and the system can optimistically assume that state will eventually become spendable. New transaction may be assembled to spend states in `pending` so long as they are sequenced behind the transaction that is predicted to mint that state.
 
-Once a transaction has been confirmed on the base ledger, its output states move to the `confirmed` meta state. `confirmed` states are availble for spending by transactions without any sequencing requirements.
+Once a transaction has been confirmed on the base ledger, its output states move to the `confirmed` meta state. `confirmed` states are available for spending by transactions without any sequencing requirements.
 
-When a transaction is assembled and before it has been endorsed/verified, any states that transaction intends to spend ( input to the transaction) are considered to be in the `claimed` state.  It is possible, and occassionally expected, that multiple transactions, assembled concurrently, could be associated with a `claimed` state. However, only one of those transactions should be endorsed/verified and submitted to the base ledger otherwise all but one will eventually be reverted by the double spend protection logic on the base ledger contract.
+When a transaction is assembled and before it has been endorsed/verified, any states that transaction intends to spend ( input to the transaction) are considered to be in the `claimed` state.  It is possible, and occasionally expected, that multiple transactions, assembled concurrently, could be associated with a `claimed` state. However, only one of those transactions should be endorsed/verified and submitted to the base ledger otherwise all but one will eventually be reverted by the double spend protection logic on the base ledger contract.
 
 Once a transaction has been endorsed/verified, its input states are moved to the `spending` metastate. At this point, there is an expectation that state will eventually be spent by that transaction and therefore there will be no further attempt for other transactions to `claim` that state.
 
@@ -93,7 +93,7 @@ Given a state is in confirmed meta-state
 
 When 2 transactions are assembled concurrently to spend that state 
 
-Then one transaction is allocated to a sequence of 1 and that sequence is assigned to the dispatcher on the same node that assembled that transaction and the other transaction is moved to the unassmebled state.
+Then one transaction is allocated to a sequence of 1 and that sequence is assigned to the dispatcher on the same node that assembled that transaction and the other transaction is moved to the unassembled state.
 
 ---
 
@@ -115,7 +115,7 @@ Given that a state is in the claimed state on the local node
 
 When a transactionAssembled event is received from a remote node attempting to claim the same state
 
-Then a determinisitic and fair contention resolver function will elect one of the transactions as the `spender` of that state 
+Then a deterministic and fair contention resolver function will elect one of the transactions as the `spender` of that state 
 
 ---
 
@@ -123,7 +123,7 @@ Given that a state is in the claimed state on the local node
 
 When a transactionEndorsed event is received
 
-Then the transaction is updated with an incremented number of endorsers and if endorsement rules are fulfilled, then the transaction is marked as `endorsed` and all of its `claimed` intput states are marked as `spending`
+Then the transaction is updated with an incremented number of endorsers and if endorsement rules are fulfilled, then the transaction is marked as `endorsed` and all of its `claimed` input states are marked as `spending`
 
 ### Properties of the contention resolver function
 Inputs are 
@@ -137,7 +137,7 @@ Behaviour
  - for any 2 given transaction ids and statistically significant set of randomly generated state ids, when invoked for each state id, it returns one of the transaction ids for near 50% of the state IDs and the other transaction id for near 50% of the state IDs
  - Is a pure function. For same inputs, will always return the same output, even if executed multiple times on completely separate nodes in the network 
  - Is commutative over the transaction ids. If invoked with the same 2 transaction ids (and same state id) will return the same answer regardless of the order of the transaction ids
- - Is associative.  When more than 2 transactions are contesting for the same state id, the contention resolver function can be invoked multiple times, taking the result of one invocation as one of the inputs to the next invocation untill all transactions have been included in at least one invocation, then the final winner will always be the same regardless of which order the transactions were included.  
+ - Is associative.  When more than 2 transactions are contesting for the same state id, the contention resolver function can be invoked multiple times, taking the result of one invocation as one of the inputs to the next invocation until all transactions have been included in at least one invocation, then the final winner will always be the same regardless of which order the transactions were included.  
   
 To explain these properties further.  Imagine there are 4 transactions contesting for the same state ID, lets call them `Ta`, `Tb`, `Tc` and `Td`. And lets write the contention resolver function between `Ta` and `Tb` for a given state `R(Ta,Tb)`
   
