@@ -39,12 +39,12 @@ To help define these test cases, lets assuming the following object model, termi
 
  - `state`
  - `meta-state`
+   - `proposed`
    - `pending`
    - `confirmed`
-   - `spent`
-   - `spending`
-   - `proposed`
    - `claimed`
+   - `spending`
+   - `spent`
  - `transaction`
  - `dispatcher` 
  - `sequence`
