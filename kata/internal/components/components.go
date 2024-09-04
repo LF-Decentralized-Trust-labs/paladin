@@ -90,6 +90,34 @@ type Engine interface {
 	Init(PreInitComponentsAndManagers) (*ManagerInitResult, error)
 	Start() error
 	Stop()
+
+	// This function is used by the transport manager to deliver messages to the engine.
+	//
+	// The implementation of this function:
+	// - MUST thread safe
+	// - SHOULD NOT perform any processing within the function call itself beyond routing
+	//
+	// There is no ack to the messages. They are at-most-once delivery. So there is no error return.
+	// Use it or lose it.
+	//
+	// The design assumption of the transport manager is that the engine is entirely responsible
+	// for determining what thread-of-control to dispatch any given message to.
+	// This is because the determination of that is not dependent on who it came from,
+	// but rather what its purpose is.
+	//
+	// Most likely processing pattern is:
+	// - Pick a suitable go channel for a thread-of-control that could process the message (existing or new)
+	// - Push the message into that go channel
+	// - Handle the situation where the go channel is full (mark a miss for that routine to go back and handle when it gets free)
+	//
+	// The TransportMessage wrapper for the payload contains some fields designed to help
+	// an engine perform this routing to the correct channel. These can be enhanced as required, but that
+	// does require change to each plugin to propagate that extra field.
+	//
+	// There is very limited ordering performed by the transport manager itself.
+	// It delivers messages to this function:
+	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
+	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
 	ReceiveTransportMessage(context.Context, *TransportMessage)
 }
 
