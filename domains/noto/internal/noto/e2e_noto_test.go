@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -54,7 +55,7 @@ func mapConfig(t *testing.T, config *Config) (m map[string]any) {
 func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]byte) map[string]string {
 	tb := testbed.NewTestBed()
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
@@ -62,7 +63,7 @@ func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]b
 	for name, contract := range contracts {
 		build := loadBuild(contract)
 		deployed[name], err = deployBytecode(ctx, rpc, build)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	return deployed
 }
@@ -120,7 +121,7 @@ func TestNoto(t *testing.T) {
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, &NotoConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
@@ -136,13 +137,13 @@ func TestNoto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
 	coins, err := noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 1)
+	require.NoError(t, err)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
 	assert.Equal(t, notaryName, coins[0].Owner)
 
@@ -156,7 +157,7 @@ func TestNoto(t *testing.T) {
 			Amount: ethtypes.NewHexInteger64(100),
 		}),
 	})
-	assert.NotNil(t, rpcerr)
+	require.NotNil(t, rpcerr)
 	assert.ErrorContains(t, rpcerr.Error(), "mint can only be initiated by notary")
 	assert.True(t, boolResult)
 
@@ -170,7 +171,7 @@ func TestNoto(t *testing.T) {
 			Amount: ethtypes.NewHexInteger64(150),
 		}),
 	})
-	assert.NotNil(t, rpcerr)
+	require.NotNil(t, rpcerr)
 	assert.Regexp(t, "insufficient funds", rpcerr.Error())
 
 	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
@@ -188,8 +189,8 @@ func TestNoto(t *testing.T) {
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 3)
+	require.NoError(t, err)
+	require.Len(t, coins, 3)
 
 	// This should have been spent
 	// TODO: why does it still exist?
@@ -217,8 +218,8 @@ func TestNoto(t *testing.T) {
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 4) // TODO: verify coins
+	require.NoError(t, err)
+	require.Len(t, coins, 4) // TODO: verify coins
 }
 
 func TestNotoSelfSubmit(t *testing.T) {
