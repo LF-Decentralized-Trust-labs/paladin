@@ -232,7 +232,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
-    delete '*.dylib', '*.so', '*.dll', 'libkata.h'
+    delete 'libkata.dylib', 'libkata.so', 'libkata.dll', 'libkata.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -241,6 +241,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     }
     delete 'coverage'
     delete 'mocks'
+    delete 'internal/domainmgr/abis'
     delete 'componenttest/abis'
 }
 
@@ -402,13 +403,13 @@ task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMock
 task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
 }
 
-task unitTestPostgres(type: UnitTests) {
-    dependsOn [
+task unitTestPostgres(type: UnitTests, dependsOn: [
         ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
-    ]
+    ]) {
     args '-tags', "testdbpostgres"
+    lockTestInfra(it)
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
@@ -417,8 +418,8 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
     tasks.goGet,
     tasks.copyContracts,
     ]) {
+    lockTestInfra(it)
 }
-
 
 task buildCoverageTxt(type: Exec, dependsOn: [
         tasks.protoc,
