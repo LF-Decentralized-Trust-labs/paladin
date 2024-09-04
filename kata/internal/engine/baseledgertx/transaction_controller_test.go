@@ -240,9 +240,6 @@ func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
 		managedTXEventNotifier:       mEN,
 		txConfirmationListener:       mCL,
 	}
-	go func() {
-		_, _ = existingEngine.Start(ctx)
-	}()
 	// already has a running engine for the address so no new engine should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Maybe()
@@ -252,6 +249,8 @@ func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
 	}
 	enh.ctx = ctx
 	enh.poll(ctx)
+	existingEngine.engineLoopDone = make(chan struct{})
+	existingEngine.engineLoop()
 	<-existingEngine.engineLoopDone
 	assert.Equal(t, TransactionEngineStateStopped, existingEngine.state)
 }
