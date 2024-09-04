@@ -371,9 +371,9 @@ func (s *sequencer) HandleTransactionConfirmedEvent(ctx context.Context, event *
 	defer s.lock.Unlock()
 	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
 	for _, outputStateID := range outputStateIDes {
-		s.unconfirmedStatesByID[outputStateID] = nil
+		delete(s.unconfirmedStatesByID, outputStateID)
 	}
-	s.unconfirmedTransactionsByID[event.TransactionId] = nil
+	delete(s.unconfirmedTransactionsByID, event.TransactionId)
 
 	s.updateBlockedTransactions(ctx, event)
 	delegatableTransactions := s.findDelegatableTransactions(ctx)
