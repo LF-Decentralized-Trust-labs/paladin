@@ -18,6 +18,7 @@ package components
 import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -40,6 +41,11 @@ type FullState struct {
 	ID     types.Bytes32
 	Schema types.Bytes32
 	Data   types.RawJSON
+}
+
+type EthTransfer struct {
+	To    types.EthAddress
+	Value *ethtypes.HexInteger
 }
 
 type EthTransaction struct {

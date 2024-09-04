@@ -19,12 +19,12 @@ package plugins
 import (
 	"context"
 	"encoding/json"
-	"net"
 	"fmt"
 	"io"
+	"net"
 
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	interPaladinProto "github.com/kaleido-io/talaria/pkg/plugins/proto"
 	pluginInterfaceProto "github.com/kaleido-io/talaria/pkg/talaria/proto"
 	"google.golang.org/grpc"
@@ -36,12 +36,12 @@ import (
 	nodes in the network. In theory, there's little stopping us connecting the gRPC transport
 	layer at Talaria directly to another Talaria, but a dedicated plugin here proves that the
 	plugin architecture not only works, but is in use.
-	
+
 	Here we implement 2 comms flows:
 
 	1. gRPC to boundary Talaria layer using unix domain sockets
 	2. gRPC over TLS to another gRPC residing on another Paladin node (potentially)
-	
+
 	It's important to note that it's possible for a transacting entity to need to send comms
 	to another transacting entity that is actually on the same node, if that's the case then
 	we still treat it as an outbound connection, but the actual call is to loopback.
@@ -58,7 +58,7 @@ type GRPCRoutingInformation struct {
 type GRPCTransportPlugin struct {
 	interPaladinProto.UnimplementedInterPaladinTransportServer
 	pluginInterfaceProto.UnimplementedPluginInterfaceServer
-	
+
 	SocketName string
 	port       int
 	messages   chan []byte
@@ -80,13 +80,13 @@ func (gtp *GRPCTransportPlugin) startInterPaladinMessageServer(ctx context.Conte
 	s := grpc.NewServer()
 	interPaladinProto.RegisterInterPaladinTransportServer(s, gtp)
 
-	go func(){
+	go func() {
 		<-ctx.Done()
 		s.Stop()
 		grpcLis.Close()
 	}()
 
-	go func(){
+	go func() {
 		log.L(ctx).Debugf("grpc server listening at %v", grpcLis.Addr())
 		if err := s.Serve(grpcLis); err != nil {
 			log.L(ctx).Errorf("failed to serve: %v", err)
@@ -114,13 +114,13 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 	s := grpc.NewServer()
 	pluginInterfaceProto.RegisterPluginInterfaceServer(s, gtp)
 
-	go func(){
+	go func() {
 		<-ctx.Done()
 		s.Stop()
 		lis.Close()
 	}()
 
-	go func(){
+	go func() {
 		log.L(ctx).Debugf("server listening at %v", lis.Addr())
 		if err := s.Serve(lis); err != nil {
 			log.L(ctx).Errorf("failed to serve: %v", err)
@@ -130,20 +130,21 @@ func (gtp *GRPCTransportPlugin) startPluginServer(ctx context.Context) {
 
 func (gtp *GRPCTransportPlugin) PluginMessageFlow(server pluginInterfaceProto.PluginInterface_PluginMessageFlowServer) error {
 	ctx := server.Context()
-	
+
 	// TODO: This flow fundamentally means right now that sending is blocked on recieving which is not correct
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case collectedMessage := <- gtp.messages: {
-			if err := server.Send(&pluginInterfaceProto.PaladinMessage{
-				Payload: collectedMessage,
-			}); err != nil {
-				log.L(ctx).Errorf("send error %v", err)
+		case collectedMessage := <-gtp.messages:
+			{
+				if err := server.Send(&pluginInterfaceProto.PaladinMessage{
+					Payload: collectedMessage,
+				}); err != nil {
+					log.L(ctx).Errorf("send error %v", err)
+				}
 			}
-		}
 		default:
 		}
 
@@ -195,11 +196,10 @@ func (gtp *GRPCTransportPlugin) Start(ctx context.Context) {
 	gtp.startInterPaladinMessageServer(ctx)
 }
 
-
 // TODO: Rip all of this out and replace it with whatever registration framework we get with kata
 func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 	return PluginRegistration{
-		Name: "grpc-transport-plugin",
+		Name:           "grpc-transport-plugin",
 		SocketLocation: gtp.SocketName,
 	}
 }
@@ -207,7 +207,7 @@ func (gtp *GRPCTransportPlugin) GetRegistration() PluginRegistration {
 // TODO: Config
 func NewGRPCTransportPlugin(port int) *GRPCTransportPlugin {
 	return &GRPCTransportPlugin{
-		port: port,
+		port:       port,
 		SocketName: fmt.Sprintf("/tmp/%s.sock", uuid.New().String()),
 		// Buffer size needs to be configurable
 		messages: make(chan []byte, 10),
