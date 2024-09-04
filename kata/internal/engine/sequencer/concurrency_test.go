@@ -267,9 +267,9 @@ func TestConcurrentSequencing(t *testing.T) {
 	delegatorMock3.addEngine(node1ID, node1Engine)
 	delegatorMock3.addEngine(node2ID, node2Engine)
 
-	transactionInvoker1 := newTransactionInvoker(node1ID, "transactionInvoker1", node1Engine)
-	transactionInvoker2 := newTransactionInvoker(node2ID, "transactionInvoker2", node2Engine)
-	transactionInvoker3 := newTransactionInvoker(node3ID, "transactionInvoker3", node3Engine)
+	testTransactionInvoker1 := newtestTransactionInvoker(node1ID, "testTransactionInvoker1", node1Engine)
+	testTransactionInvoker2 := newtestTransactionInvoker(node2ID, "testTransactionInvoker2", node2Engine)
+	testTransactionInvoker3 := newtestTransactionInvoker(node3ID, "testTransactionInvoker3", node3Engine)
 
 	targetNumberOfTransactions := 10
 	dispatcher1Mock.On("Dispatch", mock.Anything, mock.Anything).Return(nil).Times(targetNumberOfTransactions)
@@ -282,28 +282,28 @@ func TestConcurrentSequencing(t *testing.T) {
 	invoked := make(chan bool, targetNumberOfTransactions)
 
 	go func() {
-		transactionInvoker1.run(t, func() {
+		testTransactionInvoker1.run(t, func() {
 			invoked <- true
 		})
 		wg.Done()
 	}()
 
 	go func() {
-		transactionInvoker2.run(t, func() {
+		testTransactionInvoker2.run(t, func() {
 			invoked <- true
 		})
 		wg.Done()
 	}()
 
 	go func() {
-		transactionInvoker3.run(t, func() {
+		testTransactionInvoker3.run(t, func() {
 			invoked <- true
 
 		})
 		wg.Done()
 	}()
 
-	transactionInvoker1.next <- true
+	testTransactionInvoker1.next <- true
 
 	numInvoked := 0
 
@@ -323,29 +323,29 @@ func TestConcurrentSequencing(t *testing.T) {
 			case 0:
 				log.L(ctx).Info("passing baton to 1")
 
-				transactionInvoker1.next <- true
+				testTransactionInvoker1.next <- true
 			case 1:
 				log.L(ctx).Info("passing baton to 2")
 
-				transactionInvoker2.next <- true
+				testTransactionInvoker2.next <- true
 			case 2:
 				log.L(ctx).Info("passing baton to 3")
 
-				transactionInvoker3.next <- true
+				testTransactionInvoker3.next <- true
 
 			}
 		}
 	}
 
-	transactionInvoker1.stop(t)
-	transactionInvoker2.stop(t)
-	transactionInvoker3.stop(t)
+	testTransactionInvoker1.stop(t)
+	testTransactionInvoker2.stop(t)
+	testTransactionInvoker3.stop(t)
 
 	dispatcher1Mock.AssertExpectations(t)
 
 }
 
-type transactionInvoker struct {
+type testTransactionInvoker struct {
 	name    string
 	nodeID  uuid.UUID
 	engine  Engine
@@ -353,10 +353,10 @@ type transactionInvoker struct {
 	stopMsg chan bool
 }
 
-func (a *transactionInvoker) stop(_ *testing.T) {
+func (a *testTransactionInvoker) stop(_ *testing.T) {
 	a.stopMsg <- true
 }
-func (a *transactionInvoker) run(t *testing.T, postInvoke func()) {
+func (a *testTransactionInvoker) run(t *testing.T, postInvoke func()) {
 	ctx := log.WithLogField(context.Background(), "invoker", a.name)
 	for {
 		select {
@@ -373,8 +373,8 @@ func (a *transactionInvoker) run(t *testing.T, postInvoke func()) {
 
 }
 
-func newTransactionInvoker(nodeId uuid.UUID, name string, engine Engine) *transactionInvoker {
-	return &transactionInvoker{
+func newtestTransactionInvoker(nodeId uuid.UUID, name string, engine Engine) *testTransactionInvoker {
+	return &testTransactionInvoker{
 		name:    name,
 		nodeID:  nodeId,
 		engine:  engine,
