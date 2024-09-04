@@ -21,6 +21,7 @@ require (
 	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/rs/cors v1.11.0
+	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -39,8 +40,11 @@ require (
 )
 
 require (
+	github.com/Masterminds/squirrel v1.5.4 // indirect
+	github.com/karlseguin/ccache v2.0.3+incompatible // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b // indirect
 )
 
 require (

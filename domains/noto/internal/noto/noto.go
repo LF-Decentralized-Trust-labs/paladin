@@ -79,14 +79,6 @@ type NotoDeployParams struct {
 	Data          ethtypes.HexBytes0xPrefix `json:"data"`
 }
 
-type parsedTransaction struct {
-	transaction     *pb.TransactionSpecification
-	functionABI     *abi.Entry
-	contractAddress *ethtypes.Address0xHex
-	domainConfig    *NotoDomainConfig
-	params          interface{}
-}
-
 type gatheredCoins struct {
 	inCoins   []*NotoCoin
 	inStates  []*pb.StateRef
@@ -231,7 +223,7 @@ func (n *Noto) InitTransaction(ctx context.Context, req *pb.InitTransactionReque
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.functionABI.Name].handler.Init(ctx, tx, req)
+	return n.Interface[tx.FunctionABI.Name].Handler.Init(ctx, tx, req)
 }
 
 func (n *Noto) AssembleTransaction(ctx context.Context, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
@@ -239,7 +231,7 @@ func (n *Noto) AssembleTransaction(ctx context.Context, req *pb.AssembleTransact
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.functionABI.Name].handler.Assemble(ctx, tx, req)
+	return n.Interface[tx.FunctionABI.Name].Handler.Assemble(ctx, tx, req)
 }
 
 func (n *Noto) EndorseTransaction(ctx context.Context, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
@@ -247,7 +239,7 @@ func (n *Noto) EndorseTransaction(ctx context.Context, req *pb.EndorseTransactio
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.functionABI.Name].handler.Endorse(ctx, tx, req)
+	return n.Interface[tx.FunctionABI.Name].Handler.Endorse(ctx, tx, req)
 }
 
 func (n *Noto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
@@ -255,7 +247,7 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactio
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.functionABI.Name].handler.Prepare(ctx, tx, req)
+	return n.Interface[tx.FunctionABI.Name].Handler.Prepare(ctx, tx, req)
 }
 
 func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
@@ -278,7 +270,7 @@ func (n *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConst
 	return &params, err
 }
 
-func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*parsedTransaction, error) {
+func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*ParsedTransaction, error) {
 	var functionABI abi.Entry
 	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
 	if err != nil {
@@ -289,7 +281,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	if !found {
 		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := parser.handler.ValidateParams(tx.FunctionParamsJson)
+	params, err := parser.Handler.ValidateParams(tx.FunctionParamsJson)
 	if err != nil {
 		return nil, err
 	}
@@ -312,12 +304,12 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, err
 	}
 
-	return &parsedTransaction{
-		transaction:     tx,
-		functionABI:     &functionABI,
-		contractAddress: contractAddress,
-		domainConfig:    domainConfig,
-		params:          params,
+	return &ParsedTransaction{
+		Transaction:     tx,
+		FunctionABI:     &functionABI,
+		ContractAddress: contractAddress,
+		DomainConfig:    domainConfig,
+		Params:          params,
 	}, nil
 }
 
@@ -329,16 +321,16 @@ func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 	return sig.RecoverDirect(payload, n.chainID)
 }
 
-func (h *domainHandler) parseCoinList(label string, states []*pb.EndorsableState) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (n *Noto) parseCoinList(label string, states []*pb.EndorsableState) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var err error
 	coins := make([]*NotoCoin, len(states))
 	refs := make([]*pb.StateRef, len(states))
 	total := big.NewInt(0)
 	for i, input := range states {
-		if input.SchemaId != h.noto.coinSchema.Id {
+		if input.SchemaId != n.coinSchema.Id {
 			return nil, nil, nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
 		}
-		if coins[i], err = h.noto.makeCoin(input.StateDataJson); err != nil {
+		if coins[i], err = n.makeCoin(input.StateDataJson); err != nil {
 			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.Id, err)
 		}
 		refs[i] = &pb.StateRef{
@@ -350,12 +342,12 @@ func (h *domainHandler) parseCoinList(label string, states []*pb.EndorsableState
 	return coins, refs, total, nil
 }
 
-func (h *domainHandler) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
-	inCoins, inStates, inTotal, err := h.parseCoinList("input", inputs)
+func (n *Noto) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoins, error) {
+	inCoins, inStates, inTotal, err := n.parseCoinList("input", inputs)
 	if err != nil {
 		return nil, err
 	}
-	outCoins, outStates, outTotal, err := h.parseCoinList("output", outputs)
+	outCoins, outStates, outTotal, err := n.parseCoinList("output", outputs)
 	if err != nil {
 		return nil, err
 	}

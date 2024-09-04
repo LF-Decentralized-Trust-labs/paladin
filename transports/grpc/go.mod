@@ -3,12 +3,12 @@ module github.com/kaleido-io/paladin/transports/grpc
 go 1.22.5
 
 require (
-	github.com/go-resty/resty/v2 v2.14.0
-	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.14
+	github.com/google/uuid v1.6.0
 	github.com/kaleido-io/paladin/kata v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
+	google.golang.org/grpc v1.65.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -29,14 +29,16 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.7 // indirect
+	github.com/go-resty/resty/v2 v2.14.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.17.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915 // indirect
+	github.com/hyperledger/firefly-common v1.4.8 // indirect
+	github.com/hyperledger/firefly-signer v1.1.14 // indirect
 	github.com/iden3/go-iden3-crypto v0.0.16 // indirect
 	github.com/iden3/go-rapidsnark/prover v0.0.10 // indirect
 	github.com/iden3/go-rapidsnark/types v0.0.2 // indirect
@@ -97,12 +99,10 @@ require (
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988 // indirect
-	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlite v1.5.6 // indirect
 	gorm.io/gorm v1.25.11 // indirect

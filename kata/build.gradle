@@ -323,7 +323,7 @@ task buildTestPluginsSharedLibraries {
 }
 
 abstract class UnitTests extends Exec {
-    {
+    UnitTests() {
         inputs.files(project.goFiles)
         outputs.dir('coverage')
 
@@ -338,18 +338,12 @@ abstract class UnitTests extends Exec {
     }
 }
 
-
 abstract class ComponentTest extends Exec {
-    {
-        java.text.DateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-        df.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
-        Date startTime = new Date();
-
+    ComponentTest() {
         inputs.files(project.goFiles)
         inputs.files(project.fileTree("testbed") {
             include "**/*.json"
         })
-
         outputs.dir('coverage')
 
         workingDir '.'
@@ -362,23 +356,7 @@ abstract class ComponentTest extends Exec {
         args '-timeout=120s'
         args "-test.gocoverdir=${project.projectDir}/coverage"
 
-        ignoreExitValue true
-
-        doLast {
-            def ExecResult execResult = getExecutionResult().get();
-            def composeLogs = project.findProperty('composeLogs');
-            if (execResult.getExitValue() != 0) {
-                if (composeLogs == "true") {
-                    // TODO: can we use DockerCompose.dumpLogs() here?
-                    println "COMPONENT TEST FAILED - OUTPUTTING LOGS"
-                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-postgres-1"
-                        .execute().waitForProcessOutput(System.err,System.err)
-                    println "docker logs --since ${df.format(startTime)} paladin-testinfra-besu-1"
-                        .execute().waitForProcessOutput(System.err,System.err)
-                }
-                execResult.assertNormalExitValue();
-            }
-        }
+        project.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
     }
 }
 
