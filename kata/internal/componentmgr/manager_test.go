@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -42,6 +43,9 @@ func TestInitOK(t *testing.T) {
 	// We build a config that allows us to get through init successfully, as should be possible
 	// (anything that can't do this should have a separate Start() phase).
 	testConfig := &Config{
+		TransportManagerConfig: transportmgr.TransportManagerConfig{
+			NodeName: "node1",
+		},
 		DB: persistence.Config{
 			Type: "sqlite",
 			SQLite: persistence.SQLiteConfig{

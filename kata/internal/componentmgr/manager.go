@@ -209,12 +209,12 @@ func (cm *componentManager) StartManagers() (err error) {
 
 	if err == nil {
 		err = cm.transportManager.Start()
-		cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentTransportStartError)
+		err = cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentTransportStartError)
 	}
 
 	if err == nil {
 		err = cm.registryManager.Start()
-		cm.addIfStarted("registry_manager", cm.registryManager, err, msgs.MsgComponentRegistryStartError)
+		err = cm.addIfStarted("registry_manager", cm.registryManager, err, msgs.MsgComponentRegistryStartError)
 	}
 
 	if err == nil {

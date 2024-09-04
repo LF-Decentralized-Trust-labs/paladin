@@ -1,3 +1,4 @@
+nodeName: node1
 db:
   type: sqlite  
   sqlite:

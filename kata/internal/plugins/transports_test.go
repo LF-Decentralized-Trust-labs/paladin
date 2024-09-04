@@ -35,7 +35,7 @@ type testTransportManager struct {
 	transports          map[string]plugintk.Plugin
 	transportRegistered func(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
 	resolveTarget       func(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
-	receive             func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
+	receiveMessage      func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
 func transportConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.TransportMessage, prototk.TransportMessage], error) {
@@ -68,8 +68,8 @@ func (tp *testTransportManager) mock(t *testing.T) *componentmocks.TransportMana
 	return mdm
 }
 
-func (tp *testTransportManager) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	return tp.receive(ctx, req)
+func (tp *testTransportManager) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+	return tp.receiveMessage(ctx, req)
 }
 
 func (tp *testTransportManager) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
@@ -143,8 +143,8 @@ func TestTransportRequestsOK(t *testing.T) {
 			TransportDetails: "node1_details",
 		}, nil
 	}
-	ttm.receive = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-		assert.Equal(t, "body1", req.Body)
+	ttm.receiveMessage = func(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+		assert.Equal(t, "body1", string(req.Message.Payload))
 		return &prototk.ReceiveMessageResponse{}, nil
 	}
 
@@ -175,8 +175,10 @@ func TestTransportRequestsOK(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "node1_details", rts.TransportDetails)
-	rms, err := callbacks.Receive(ctx, &prototk.ReceiveMessageRequest{
-		Body: "body1",
+	rms, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		Message: &prototk.Message{
+			Payload: []byte("body1"),
+		},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, rms)

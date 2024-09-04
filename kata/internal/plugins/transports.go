@@ -73,7 +73,7 @@ func (br *TransportBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plu
 		)
 	case *prototk.TransportMessage_ReceiveMessage:
 		return callManagerImpl(ctx, req.ReceiveMessage,
-			br.manager.Receive,
+			br.manager.ReceiveMessage,
 			func(resMsg *prototk.TransportMessage, res *prototk.ReceiveMessageResponse) {
 				resMsg.ResponseToTransport = &prototk.TransportMessage_ReceiveMessageRes{
 					ReceiveMessageRes: res,
