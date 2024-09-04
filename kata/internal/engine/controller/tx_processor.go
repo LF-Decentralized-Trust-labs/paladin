@@ -22,10 +22,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 type stageContextAction int
@@ -185,7 +185,6 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 	if unProcessedBufferedStageEvents != nil {
 		ts.bufferedStageEvents = unProcessedBufferedStageEvents
 	}
-
 	if txUpdates != nil {
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)

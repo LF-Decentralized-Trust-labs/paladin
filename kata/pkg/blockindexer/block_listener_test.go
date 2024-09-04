@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -240,7 +241,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 							Message: "pop",
 						}
 					} else {
-						rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, fftypes.NewUUID()))
+						rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, uuid.New()))
 						// Spam with notifications
 						go func() {
 							defer close(pingerDone)
@@ -256,7 +257,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 						}()
 					}
 				case "eth_newBlockFilter":
-					rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, fftypes.NewUUID()))
+					rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, uuid.New()))
 				case "eth_getFilterChanges":
 					// ok we can close - the shoulder tap worked
 					complete = true
