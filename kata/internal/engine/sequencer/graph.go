@@ -103,7 +103,6 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 	}
 	//for each unique state hash, create an index of its minter and/or spender
 	stateToSpender := make(map[string]*int)
-	stateToMinter := make(map[string]*int)
 	for txnIndex, txn := range g.transactions {
 		for _, stateID := range txn.inputStates {
 			if stateToSpender[stateID] != nil {
@@ -113,14 +112,6 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is spent by multiple transactions")
 			}
 			stateToSpender[stateID] = ptrTo(txnIndex)
-		}
-		for _, stateID := range txn.inputStates {
-			if stateToMinter[stateID] != nil {
-				//This should never happen unless something has gone drastically wrong elsewhere
-				log.L(ctx).Errorf("State hash %s is minted by multiple transactions", stateID)
-				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is minted by multiple transactions")
-			}
-			stateToMinter[stateID] = ptrTo(txnIndex)
 		}
 	}
 
