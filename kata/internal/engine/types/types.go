@@ -115,30 +115,30 @@ type StageFoundationService interface {
 
 type Sequencer interface {
 	/*
-		HandleTransactionAssembledEvent is emitted whenever a transaction has been assembled by any node in the network, including the local node.
+		HandleTransactionAssembledEvent needs to be called whenever a transaction has been assembled by any node in the network, including the local node.
 	*/
 	HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error
 
 	/*
-		HandleTransactionEndorsedEvent is emitted whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
+		HandleTransactionEndorsedEvent needs to be called whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
 	*/
 	HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 
 	/*
-		HandleTransactionConfirmedEvent is emitted whenever a transaction has been confirmed on the base ledger
+		HandleTransactionConfirmedEvent needs to be called whenever a transaction has been confirmed on the base ledger
 		i.e. it has been included in a block with enough subsequent blocks to consider this final for that particular chain.
 	*/
 	HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error
 
 	/*
-		OnTransationReverted is emitted whenever a transaction has been rejected by any of the validation
+		OnTransationReverted needs to be called whenever a transaction has been rejected by any of the validation
 		steps on any nodes or the base leddger contract. The transaction may or may not be reassembled after this
-		event is emitted.
+		hanlder is called.
 	*/
 	HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error
 
 	/*
-		HandleTransactionDelegatedEvent is emitted whenever a transaction has been delegated from one node to another
+		HandleTransactionDelegatedEvent needs to be called whenever a transaction has been delegated from one node to another
 		this is an event that is broadcast to all nodes after the fact and should not be confused with the DelegateTransaction message which is
 		an instruction to the delegate node.
 	*/
