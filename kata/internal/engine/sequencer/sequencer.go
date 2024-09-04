@@ -67,10 +67,11 @@ type blockedTransaction struct {
 	blockedBy     []blockingTransaction
 }
 
-// a delegatable transaction is one that has only one dependency on a transaction that is owned by another node
+// a delegatable transaction is one that has dependencies on one or more transactions and all of those transactions
+// are owned by one single other node
 type delegatableTransaction struct {
-	transactionID string
-	nodeId        string
+	transactionID  string
+	delegateNodeId string
 }
 
 type unconfirmedState struct {
@@ -280,8 +281,8 @@ func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatab
 		if len(keys) == 1 && keys[0] != s.nodeID.String() {
 			// we are dependent on one other node so we can delegate
 			delegatableTransactions = append(delegatableTransactions, delegatableTransaction{
-				transactionID: blockedTransaction.transactionID,
-				nodeId:        keys[0],
+				transactionID:  blockedTransaction.transactionID,
+				delegateNodeId: keys[0],
 			})
 			continue
 
@@ -378,7 +379,7 @@ func (s *sequencer) HandleTransactionConfirmedEvent(ctx context.Context, event *
 	s.updateBlockedTransactions(ctx, event)
 	delegatableTransactions := s.findDelegatableTransactions(ctx)
 	for _, delegatableTransaction := range delegatableTransactions {
-		err := s.delegate(ctx, delegatableTransaction.transactionID, delegatableTransaction.nodeId)
+		err := s.delegate(ctx, delegatableTransaction.transactionID, delegatableTransaction.delegateNodeId)
 		if err != nil {
 			log.L(ctx).Errorf("Error delegating: %s", err)
 			return err
