@@ -83,8 +83,8 @@ type transaction struct {
 	sequencingNodeID string
 	assemblerNodeID  string
 	endorsed         bool
-	inputStates      []string
-	outputStates     []string
+	inputStateIDs    []string
+	outputStateIDs   []string
 }
 
 type sequencer struct {
@@ -140,8 +140,8 @@ func (s *sequencer) evaluateGraph(ctx context.Context) error {
 }
 
 func (s *sequencer) getUnconfirmedDependencies(ctx context.Context, txn transaction) ([]*transaction, error) {
-	mintingTransactions := make([]*transaction, 0, len(txn.inputStates))
-	for _, stateID := range txn.inputStates {
+	mintingTransactions := make([]*transaction, 0, len(txn.inputStateIDs))
+	for _, stateID := range txn.inputStateIDs {
 		unconfirmedState, ok := s.unconfirmedStatesByID[stateID]
 		if !ok {
 			//this state is already confirmed
@@ -303,7 +303,7 @@ func (s *sequencer) acceptTransaction(ctx context.Context, transaction *transact
 		return nil
 	}
 
-	err = s.graph.AddTransaction(ctx, transaction.id, transaction.inputStates, transaction.outputStates)
+	err = s.graph.AddTransaction(ctx, transaction.id, transaction.inputStateIDs, transaction.outputStateIDs)
 	if err != nil {
 		log.L(ctx).Errorf("Error adding transaction to graph: %s", err)
 		return err
@@ -325,8 +325,8 @@ func (s *sequencer) HandleTransactionAssembledEvent(ctx context.Context, event *
 		id:               event.TransactionId,
 		sequencingNodeID: event.NodeId, // assume it goes to its local sequencer until we hear otherwise
 		assemblerNodeID:  event.NodeId,
-		outputStates:     event.OutputStateId,
-		inputStates:      event.InputStateId,
+		outputStateIDs:   event.OutputStateId,
+		inputStateIDs:    event.InputStateId,
 	}
 	for _, unconfirmedStateID := range event.OutputStateId {
 		s.unconfirmedStatesByID[unconfirmedStateID] = &unconfirmedState{
@@ -369,7 +369,7 @@ func (s *sequencer) HandleTransactionConfirmedEvent(ctx context.Context, event *
 	log.L(ctx).Infof("Received transaction confirmed event: %s", event.String())
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStates
+	outputStateIDes := s.unconfirmedTransactionsByID[event.TransactionId].outputStateIDs
 	for _, outputStateID := range outputStateIDes {
 		delete(s.unconfirmedStatesByID, outputStateID)
 	}

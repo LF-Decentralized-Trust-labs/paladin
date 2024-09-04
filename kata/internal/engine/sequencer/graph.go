@@ -58,10 +58,10 @@ func NewGraph() Graph {
 
 func (g *graph) AddTransaction(ctx context.Context, txID string, inputStates []string, outputStates []string) error {
 	g.allTransactions[txID] = &transaction{
-		id:           txID,
-		endorsed:     false,
-		inputStates:  inputStates,
-		outputStates: outputStates,
+		id:             txID,
+		endorsed:       false,
+		inputStateIDs:  inputStates,
+		outputStateIDs: outputStates,
 	}
 
 	// TODO should probably cache this graph and only rebuild it when needed (e.g. on restart)
@@ -101,7 +101,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 	//for each unique state hash, create an index of its minter and/or spender
 	stateToSpender := make(map[string]*int)
 	for txnIndex, txn := range g.transactions {
-		for _, stateID := range txn.inputStates {
+		for _, stateID := range txn.inputStateIDs {
 			if stateToSpender[stateID] != nil {
 				//TODO this is expected in some cases and represents a contention that needs to be resolved
 				//TBC do we assert that it is resovled before we get to this point?
@@ -121,7 +121,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 		//TODO this is O(n^2) and could be optimised
 		//TODO what about input states that are not output states of any transaction? Do we assume that the minter transactions are already dispatched /
 		// or confirmed?
-		for _, stateID := range minter.outputStates {
+		for _, stateID := range minter.outputStateIDs {
 			if spenderIndex := stateToSpender[stateID]; spenderIndex != nil {
 				//we have a dependency relationship
 				g.transactionsMatrix[minterIndex][*spenderIndex] = append(g.transactionsMatrix[minterIndex][*spenderIndex], stateID)
