@@ -78,7 +78,7 @@ func TestDispatchStagePreReqCheck(t *testing.T) {
 	ctx := context.Background()
 	txNodeID := "current_node_id"
 	txSigningAddress := "0xb60e8dd61c5d32be8058bb8eb970870f07233155"
-	txDifferentSigningAddr := "0xCfcEcEFf128aE953a272A05Ea43969c9E5ba87dB"
+	txDifferentSigningAddr := "0xcfceceff128ae953a272a05ea43969c9e5ba87db"
 	testTxHash := "0x5c7f2a3d5e77b95e0dbb8d2b6b9b58ec19356f7096e50904b36baac6d0f11a89"
 
 	preReqTx := &transactionstore.TransactionWrapper{
