@@ -1,7 +1,7 @@
 # Sequence
 The responsibility of this package is to determine which transactions belong to which sequence and which paladin node is responsible for dispatching the sequence.
 
-The allocation of transaction to sequence is determined based on which other transactions it is dependant on (either explicitly as specified by the user or implicitly as a consequence of which state's it is trying to spend). This is a mutable association, until a certain point when the transaction is locked in to a given sequence.
+The allocation of a transaction to sequence is determined based on which other transactions it is dependent on (either explicitly as specified by the user or implicitly as a consequence of which state it is trying to spend). This is a mutable association. When the transaction is locked into a given sequence, the association will become immutable unless events from the base ledger revoke the validity of the association. 
 
 Once a transaction has been confirmed on the base ledger, then transactions behind it in the sequence are candidates for moving to another sequence should that be more optimal for the network.
 
