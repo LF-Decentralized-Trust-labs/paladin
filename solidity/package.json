@@ -8,7 +8,7 @@
     "test": "hardhat test --network hardhat"
   },
   "author": "",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@iden3/contracts": "^2.3.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
