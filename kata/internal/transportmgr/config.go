@@ -20,6 +20,7 @@ import (
 )
 
 type TransportManagerConfig struct {
+	NodeName   string                      `yaml:"nodeName"`
 	Transports map[string]*TransportConfig `yaml:"transports"`
 }
 

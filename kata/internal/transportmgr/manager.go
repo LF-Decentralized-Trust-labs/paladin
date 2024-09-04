@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -32,8 +33,10 @@ type transportManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	conf      *TransportManagerConfig
-	localNode string
+	conf            *TransportManagerConfig
+	localNodeName   string
+	registryManager components.RegistryManager
+	engine          components.Engine
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -43,20 +46,27 @@ func NewTransportManager(bgCtx context.Context, conf *TransportManagerConfig) co
 	return &transportManager{
 		bgCtx:            bgCtx,
 		conf:             conf,
+		localNodeName:    conf.NodeName,
 		transportsByID:   make(map[uuid.UUID]*transport),
 		transportsByName: make(map[string]*transport),
 	}
 }
 
 func (tm *transportManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
-	// TransportManager does not rely on any other components during the pre-init phase (at the moment)
-	// for QoS we may need persistence in the future, and this will be the plug point for the registry
-	// when we have it
-
+	if tm.localNodeName == "" {
+		return nil, i18n.NewError(tm.bgCtx, msgs.MsgTransportNodeNameNotConfigured)
+	}
 	return &components.ManagerInitResult{}, nil
 }
 
-func (tm *transportManager) PostInit(c components.AllComponents) error { return nil }
+func (tm *transportManager) PostInit(c components.AllComponents) error {
+	// Asserted to be thread safe to do initialization here without lock, as it's before the
+	// plugin manager starts, and thus before any domain would have started any go-routine
+	// that could have cached a nil value in memory.
+	tm.registryManager = c.RegistryManager()
+	tm.engine = c.Engine()
+	return nil
+}
 
 func (tm *transportManager) Start() error { return nil }
 
@@ -117,90 +127,70 @@ func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTra
 	return t, nil
 }
 
-func (tm *transportManager) getTransportByName(ctx context.Context, name string) (*transport, error) {
-	tm.mux.Lock()
-	defer tm.mux.Unlock()
-	t := tm.transportsByName[name]
-	if t == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgTransportNotFound, name)
-	}
-	return t, nil
+func (tm *transportManager) LocalNodeName() string {
+	return tm.localNodeName
 }
 
-// Send implements TransportManager
+// See docs in components package
 func (tm *transportManager) Send(ctx context.Context, msgInput *components.TransportMessageInput) error {
-	// TODO: Plug point for calling through to the registry
-	// TODO: Plugin determination
 
-	knownPlugin := "grpc"
-	transport, err := tm.getTransportByName(ctx, knownPlugin)
-	if err != nil {
-		return err
-	}
-
+	// Check the message is valid
 	if len(msgInput.Destination.Node) == 0 ||
 		// len(msgInput.Destination.Identity) == 0 ||
 		// len(msgInput.Destination.Component) == 0 ||
-		len(msgInput.ReplyToIdentity) == 0 ||
+		// len(msgInput.ReplyTo.Identity) == 0 ||
+		// len(msgInput.ReplyTo.Component) == 0 ||
 		len(msgInput.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msgInput)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	panic("TODO")
+	// Note the registry is responsible for caching to make this call as efficient as if
+	// we maintained the transport details in-memory ourselves.
+	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, msgInput.Destination.Node)
+	if err != nil {
+		return err
+	}
 
-	err = transport.Send(ctx, &components.TransportMessage{
-		// TODO
+	// See if any of the transports registered by the node, are configured on this local node
+	// Note: We just pick the first one if multiple are available, and there is no retry to
+	//       fallback to a secondary one currently.
+	var transport *transport
+	for _, rtd := range registeredTransportDetails {
+		transport = tm.transportsByName[rtd.Transport]
+	}
+	if transport == nil {
+		// If we didn't find one, then feedback to the caller which transports were registered
+		registeredTransportNames := []string{}
+		for _, rtd := range registeredTransportDetails {
+			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
+		}
+		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, msgInput.Destination.Node, registeredTransportNames)
+	}
+
+	// Call the selected transport to send
+	// Note: We do not push the transport details down to the plugin on every send, as they are very large
+	//       (KBs of certificates and other data).
+	//       The transport plugin uses GetTransportDetails to request them back from us, and then caches
+	//       these internally through use of a long lived connection / connection-pool.
+	var correlID *string
+	if msgInput.CorrelationID != nil {
+		correlID = confutil.P(msgInput.CorrelationID.String())
+	}
+	err = transport.send(ctx, &prototk.Message{
+		MessageId:     uuid.New().String(),
+		CorrelationId: correlID,
+		Destination: &prototk.Destination{
+			Node: msgInput.Destination.Node,
+		},
+		ReplyTo: &prototk.Destination{
+			Node: tm.localNodeName,
+		},
+		Payload: msgInput.Payload,
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func (tm *transportManager) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	if req.Node != "test" {
-		panic("unimplemented")
-	}
-	return &prototk.GetTransportDetailsResponse{TransportDetails: `
-		{
-			"address": ":8081",
-			"caCertificate": "-----BEGIN CERTIFICATE-----\n` +
-		`MIIDuzCCAqOgAwIBAgIUPTw5vaIfHg8yLutcS+IKqHAEWiwwDQYJKoZIhvcNAQEL\n` +
-		`BQAwbTELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVN0YXRlMREwDwYDVQQHDAhMb2Nh\n` +
-		`bGl0eTEVMBMGA1UECgwMT3JnYW5pemF0aW9uMRAwDgYDVQQLDAdPcmdVbml0MRIw\n` +
-		`EAYDVQQDDAlsb2NhbGhvc3QwHhcNMjQwODA4MTAzNTMwWhcNMzQwODA2MTAzNTMw\n` +
-		`WjBtMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFU3RhdGUxETAPBgNVBAcMCExvY2Fs\n` +
-		`aXR5MRUwEwYDVQQKDAxPcmdhbml6YXRpb24xEDAOBgNVBAsMB09yZ1VuaXQxEjAQ\n` +
-		`BgNVBAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\n` +
-		`AOsKJKuyMysGsmW0X9oYSd3NJgzS6X3o8FqJWuC0vM6tmJMNORLJKcgE7bzKS2J9\n` +
-		`pHEG9qU0VADy4cfkj2Jaf0nXiptGZWGF5M1TV3gA6K/ZQt1SwS8Y4LZNo13Ek4pm\n` +
-		`znav4HWP8hGjW1Ym70M2Ru9vAvh14pv1VPaDq0eQY7de/Wpt0NPfcrXv5dw+wZQh\n` +
-		`OhxczE4QW1hJVF+7uyTzqBVXnUuIpWEYH3WIO/VyQIJERN8ynApnndtglbHXoNhj\n` +
-		`xZcZV1gfrOMHXQURhy04KigIvx7lxYqz5MNkFgfFxCHrkkmKH6CTw2ALmHBlXF6X\n` +
-		`+qE1jyWYClh014v/yFik82cCAwEAAaNTMFEwHQYDVR0OBBYEFKzheOJklxwLUrx7\n` +
-		`qAi/wOKzRd7FMB8GA1UdIwQYMBaAFKzheOJklxwLUrx7qAi/wOKzRd7FMA8GA1Ud\n` +
-		`EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAAcQOJhQ9NhBjjvFJAfbF9S1\n` +
-		`+E1DrP+zjOm8vGWEvVi4NlGVqd4KJVBeHX7IWewMSvBQasdOAFP25VOBqoPFVhNS\n` +
-		`XrnBnErCwQyx3NzHQCv50tRDI6e3ms5xh+4bnP7q4fye7QdFJtY7P6CQQMJq46dp\n` +
-		`r4aQhKExbB4TgECsYvFLrEpqHI375nghkEKAZD2wmLWCPb7mi1jommXBzxsIyl8u\n` +
-		`dlHsczoHgXf2K90p0iqCAluHMB4WgOVZX39ljHN/2o3mQgPQZtDHAL0jCaXKN9io\n` +
-		`o4+luzQ1J0UWAGpVThWlEcC5IRrmo5+4+KqyE/wTYJF4dlG/noA8XxkNqM15kY0=\n` +
-		`-----END CERTIFICATE-----\n",
-		}`}, nil
-}
-
-// This is called by the engine once initialized to receive the messages as they arrive from the nodes.
-// There's currently a single callback function, which might be called in parallel on multiple threads,
-// receiving from multiple nodes, on multiple transports.
-//
-// - It must be thread safe
-// - It must consider that blocking this function might block lots of traffic
-// - It must handle any errors encountered as the transport layer does not provide redelivery (at-most-once delivery)
-//
-// The expectation is it will be designed to pick a suitable channel to push the message to for downstream processing,
-// (and that it will consider the case that channel is full).
-func (tm *transportManager) RegisterReceiver(ctx context.Context, onMessage func(ctx context.Context, message *components.TransportMessage)) error {
 	return nil
 }

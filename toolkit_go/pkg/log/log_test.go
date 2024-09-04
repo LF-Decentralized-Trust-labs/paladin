@@ -49,11 +49,13 @@ func TestSettingWarnLevel(t *testing.T) {
 
 func TestSettingDebugLevel(t *testing.T) {
 	SetLevel("DEBUG")
+	assert.True(t, IsDebugEnabled())
 	assert.Equal(t, logrus.DebugLevel, logrus.GetLevel())
 }
 
 func TestSettingTraceLevel(t *testing.T) {
 	SetLevel("trace")
+	assert.True(t, IsTraceEnabled())
 	assert.Equal(t, logrus.TraceLevel, logrus.GetLevel())
 }
 

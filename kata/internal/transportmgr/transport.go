@@ -27,7 +27,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"gopkg.in/yaml.v3"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type transport struct {
@@ -93,39 +94,102 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) Send(ctx context.Context, message *components.TransportMessage) error {
+func (t *transport) send(ctx context.Context, msg *prototk.Message) error {
 	if err := t.checkInit(ctx); err != nil {
 		return err
 	}
 
-	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
-		Node:    message.Destination.Node,
-		Payload: message.Payload,
-	})
+	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{Message: msg})
 	if err != nil {
 		return err
 	}
-
+	var correlIDStr string
+	if msg.CorrelationId != nil {
+		correlIDStr = *msg.CorrelationId
+	}
+	log.L(ctx).Debugf("transport %s message sent id=%s (cid=%s)", t.name, msg.MessageId, correlIDStr)
+	if log.IsTraceEnabled() {
+		log.L(ctx).Tracef("transport %s message sent: %s", t.name, protoToJSON(msg))
+	}
 	return nil
 }
 
+func protoToJSON(m proto.Message) (s string) {
+	b, err := protojson.Marshal(m)
+	if err == nil {
+		s = string(b)
+	}
+	return
+}
+
 // Transport callback to the transport manager when a message is received
-func (t *transport) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	if err := t.checkInit(ctx); err != nil {
 		return nil, err
 	}
 
-	transportMessage := &components.TransportMessage{}
-	err := yaml.Unmarshal([]byte(req.Body), transportMessage)
-	if err != nil {
-		return nil, err
+	msg := req.Message
+	if msg == nil || msg.Destination == nil || msg.ReplyTo == nil || len(msg.Payload) == 0 {
+		log.L(ctx).Errorf("Invalid message from transport: %s", protoToJSON(msg))
+		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
+	if msg.Destination.Node != t.tm.localNodeName {
+		return nil, i18n.NewError(ctx, msgs.MsgTransportWrongNode, t.tm.localNodeName, msg.Destination.Node)
+	}
+	msgID, err := uuid.Parse(msg.MessageId)
+	if err != nil {
+		log.L(ctx).Errorf("Invalid messageId from transport: %s", protoToJSON(msg))
+		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+	}
+	var pCorrelID *uuid.UUID
+	var correlIDStr string
+	if msg.CorrelationId != nil {
+		correlIDStr = *msg.CorrelationId
+		correlID, err := uuid.Parse(correlIDStr)
+		if err != nil {
+			log.L(ctx).Errorf("Invalid correlationId from transport: %s", protoToJSON(msg))
+			return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+		}
+		pCorrelID = &correlID
+	}
+
+	log.L(ctx).Debugf("transport %s message received id=%s (cid=%s)", t.name, msgID, correlIDStr)
+	if log.IsTraceEnabled() {
+		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
+	}
+	transportMessage := &components.TransportMessage{
+		MessageID:     msgID,
+		CorrelationID: pCorrelID,
+		Destination: components.TransportTarget{
+			Node: msg.Destination.Node,
+		},
+		ReplyTo: components.TransportTarget{
+			Node: msg.ReplyTo.Node,
+		},
+		Payload: msg.Payload,
+	}
+	t.tm.engine.ReceiveTransportMessage(transportMessage)
 
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
 func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	panic("todo")
+	// Do a cache-optimized in the registry manager to get the details of the transport.
+	// We expect this to succeed because we did it before sending (see notes on Send() function)
+	var transportDetails string
+	availableTransports, err := t.tm.registryManager.GetNodeTransports(ctx, req.Node)
+	for _, atd := range availableTransports {
+		if atd.Transport == t.name {
+			transportDetails = atd.TransportDetails
+			break
+		}
+	}
+	if transportDetails == "" {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportDetailsNotAvailable, t.name, req.Node)
+	}
+	return &prototk.GetTransportDetailsResponse{
+		TransportDetails: transportDetails,
+	}, nil
 }
 
 func (t *transport) close() {

@@ -17,29 +17,53 @@ package transportmgr
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 )
 
 type mockComponents struct {
+	c               *componentmocks.AllComponents
+	registryManager *componentmocks.RegistryManager
+	engine          *componentmocks.Engine
+}
+
+func newMockComponents(t *testing.T) *mockComponents {
+	mc := &mockComponents{c: componentmocks.NewAllComponents(t)}
+	mc.registryManager = componentmocks.NewRegistryManager(t)
+	mc.c.On("RegistryManager").Return(mc.registryManager).Maybe()
+	mc.engine = componentmocks.NewEngine(t)
+	mc.c.On("Engine").Return(mc.engine).Maybe()
+	return mc
 }
 
 func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	mc := &mockComponents{}
-
+	mc := newMockComponents(t)
 	for _, fn := range extraSetup {
 		fn(mc)
 	}
 
 	tm := NewTransportManager(ctx, conf)
 
-	err := tm.Start()
+	ir, err := tm.PreInit(mc.c)
 	assert.NoError(t, err)
+	assert.NotNil(t, ir)
+
+	err = tm.PostInit(mc.c)
+	assert.NoError(t, err)
+
+	err = tm.Start()
+	assert.NoError(t, err)
+
+	assert.Equal(t, conf.NodeName, tm.LocalNodeName())
 
 	return ctx, tm.(*transportManager), mc, func() {
 		cancelCtx()
@@ -48,8 +72,15 @@ func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSe
 	}
 }
 
+func TestMissingName(t *testing.T) {
+	tm := NewTransportManager(context.Background(), &TransportManagerConfig{})
+	_, err := tm.PreInit(newMockComponents(t).c)
+	assert.Regexp(t, "PD011902", err)
+}
+
 func TestConfiguredTransports(t *testing.T) {
 	_, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
+		NodeName: "node1",
 		Transports: map[string]*TransportConfig{
 			"test1": {
 				Plugin: components.PluginConfig{
@@ -71,20 +102,33 @@ func TestConfiguredTransports(t *testing.T) {
 
 func TestTransportRegisteredNotFound(t *testing.T) {
 	_, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
+		NodeName:   "node1",
 		Transports: map[string]*TransportConfig{},
 	})
 	defer done()
 
 	_, err := dm.TransportRegistered("unknown", uuid.New(), nil)
-	assert.Regexp(t, "PD011600", err)
+	assert.Regexp(t, "PD011901", err)
 }
 
-func TestGetTransportNotFound(t *testing.T) {
-	ctx, dm, _, done := newTestTransportManager(t, &TransportManagerConfig{
-		Transports: map[string]*TransportConfig{},
+func TestConfigureTransportFail(t *testing.T) {
+	_, tm, _, done := newTestTransportManager(t, &TransportManagerConfig{
+		NodeName: "node1",
+		Transports: map[string]*TransportConfig{
+			"test1": {
+				Config: map[string]any{"some": "conf"},
+			},
+		},
 	})
 	defer done()
 
-	_, err := dm.getTransportByName(ctx, "wrong")
-	assert.Regexp(t, "PD011600", err)
+	tp := newTestPlugin(nil)
+	tp.Functions = &plugintk.TransportAPIFunctions{
+		ConfigureTransport: func(ctx context.Context, ctr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
+			return nil, fmt.Errorf("pop")
+		},
+	}
+
+	registerTestTransport(t, tm, tp)
+	assert.Regexp(t, "pop", *tp.t.initError.Load())
 }

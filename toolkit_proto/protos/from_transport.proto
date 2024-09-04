@@ -17,8 +17,10 @@ syntax = "proto3";
 
 package github.com.kaleido_io.paladin.toolkit;
 
+import "to_transport.proto";
+
 message ReceiveMessageRequest {
-    string body = 1;
+    Message message = 1;
 }
 
 message ReceiveMessageResponse {

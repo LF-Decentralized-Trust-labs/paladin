@@ -26,9 +26,23 @@ message ConfigureTransportResponse {
 }
 
 message SendMessageRequest {
-    string node = 1;
-    bytes payload = 2;
+    Message message = 1;
 }
 
 message SendMessageResponse {
+}
+
+message Destination {
+    string node = 1;
+    // TODO: discuss with Hosie
+    // string component = 2;
+    // string identity = 3;
+}
+
+message Message {
+    string message_id = 1;
+    optional string correlation_id = 2;
+    Destination destination = 3;
+    Destination reply_to = 4;
+    bytes payload = 5;
 }

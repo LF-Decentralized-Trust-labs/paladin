@@ -268,8 +268,12 @@ var (
 	MsgEngineInvalidMessage = ffe("PD011804", "Invalid message received from transport")
 
 	// TransportManager module PD0119XX
-	MsgTransportInvalidMessage = ffe("PD011900", "Invalid message")
-	MsgTransportNotFound       = ffe("PD011901", "Transport %q not found")
+	MsgTransportInvalidMessage                = ffe("PD011900", "Invalid message")
+	MsgTransportNotFound                      = ffe("PD011901", "Transport %q not found")
+	MsgTransportNodeNameNotConfigured         = ffe("PD011902", "nodeName must be configured to set the identity of the local node")
+	MsgTransportNoTransportsConfiguredForNode = ffe("PD011903", "None of the transports registered by node '%s' are configured locally on this node: %v")
+	MsgTransportDetailsNotAvailable           = ffe("PD011904", "Transport '%s' not available for node '%s'")
+	MsgTransportWrongNode                     = ffe("PD011905", "Message received for wrong node expected='%s' received='%s'")
 
 	// RegistryManager module PD0120XX
 	MsgRegistryNodeEntiresNotFound = ffe("PD012000", "No entries found for node '%s'")

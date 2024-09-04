@@ -31,7 +31,7 @@ type TransportAPI interface {
 
 type TransportCallbacks interface {
 	GetTransportDetails(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
-	Receive(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
+	ReceiveMessage(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
 }
 
 type TransportFactory func(callbacks TransportCallbacks) TransportAPI
@@ -129,7 +129,7 @@ func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 	return th.Wrap(res), err
 }
 
-func (th *transportHandler) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+func (th *transportHandler) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 	res, err := th.proxy.RequestFromPlugin(ctx, th.Wrap(&prototk.TransportMessage{
 		RequestFromTransport: &prototk.TransportMessage_ReceiveMessage{
 			ReceiveMessage: req,

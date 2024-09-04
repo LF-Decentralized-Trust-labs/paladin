@@ -83,7 +83,7 @@ func TestTransportCallback_ReceiveMessage(t *testing.T) {
 			ReceiveMessageRes: &prototk.ReceiveMessageResponse{},
 		}
 	}
-	_, err := callbacks.Receive(ctx, &prototk.ReceiveMessageRequest{})
+	_, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{})
 	assert.NoError(t, err)
 }
 
