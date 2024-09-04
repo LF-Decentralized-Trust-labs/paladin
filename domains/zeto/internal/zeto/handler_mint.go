@@ -22,6 +22,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -31,7 +32,7 @@ type mintHandler struct {
 }
 
 func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
-	var mintParams ZetoMintParams
+	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
 	}
@@ -44,8 +45,8 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	return &mintParams, nil
 }
 
-func (h *mintHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.Params.(*ZetoMintParams)
+func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
 
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
@@ -57,8 +58,8 @@ func (h *mintHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.I
 	}, nil
 }
 
-func (h *mintHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.(*ZetoMintParams)
+func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
 
 	resolvedRecipient := domain.FindVerifier(params.To, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
@@ -95,13 +96,13 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *
 	}, nil
 }
 
-func (h *mintHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
 
-func (h *mintHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		coin, err := h.zeto.makeCoin(state.StateDataJson)

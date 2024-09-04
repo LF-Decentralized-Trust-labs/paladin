@@ -13,16 +13,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zeto
+package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
-
-type DomainHandler = domain.DomainHandler[ZetoDomainConfig]
-type ParsedTransaction = domain.ParsedTransaction[ZetoDomainConfig]
 
 var ZetoABI = domain.DomainABI{
 	"constructor": &abi.Entry{
@@ -52,30 +49,19 @@ var ZetoABI = domain.DomainABI{
 	},
 }
 
-type ZetoConstructorParams struct {
+type ConstructorParams struct {
 	From             string `json:"from"`
 	Verifier         string `json:"verifier"`
 	DepositVerifier  string `json:"depositVerifier"`
 	WithdrawVerifier string `json:"withdrawVerifier"`
 }
 
-type ZetoMintParams struct {
+type MintParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
-type ZetoTransferParams struct {
+type TransferParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
-}
-
-func (z *Zeto) GetHandler(method string) DomainHandler {
-	switch method {
-	case "mint":
-		return &mintHandler{zeto: z}
-	case "transfer":
-		return &transferHandler{zeto: z}
-	default:
-		return nil
-	}
 }
