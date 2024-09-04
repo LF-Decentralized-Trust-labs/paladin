@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 )
 
 type mockComponents struct {
@@ -47,12 +46,6 @@ func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSe
 		// pDone()
 		tm.Stop()
 	}
-}
-
-func yamlNode(t *testing.T, s string) (n yaml.Node) {
-	err := yaml.Unmarshal([]byte(s), &n)
-	assert.NoError(t, err)
-	return
 }
 
 func TestConfiguredTransports(t *testing.T) {
@@ -92,6 +85,6 @@ func TestGetTransportNotFound(t *testing.T) {
 	})
 	defer done()
 
-	_, err := dm.GetTransportByName(ctx, "wrong")
+	_, err := dm.getTransportByName(ctx, "wrong")
 	assert.Regexp(t, "PD011600", err)
 }

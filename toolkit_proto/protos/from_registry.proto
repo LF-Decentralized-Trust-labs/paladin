@@ -19,7 +19,8 @@ package github.com.kaleido_io.paladin.toolkit;
 
 message UpsertTransportDetails {
     string node = 1; // The node
-    string transport_details = 2; // The transport details (opaque to registry)
+    string transport = 2; // The name of the transport (such as "grpc")
+    string transport_details = 3; // The transport details (opaque to registry)
   }
 
 message UpsertTransportDetailsResponse {}

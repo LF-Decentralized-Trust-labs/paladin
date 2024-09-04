@@ -108,7 +108,7 @@ func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTra
 	conf := tm.conf.Transports[name]
 	if conf == nil {
 		// Shouldn't be possible
-		return nil, i18n.NewError(tm.bgCtx, msgs.MsgDomainNotFound, name)
+		return nil, i18n.NewError(tm.bgCtx, msgs.MsgTransportNotFound, name)
 	}
 
 	// Initialize
@@ -124,7 +124,7 @@ func (tm *transportManager) getTransportByName(ctx context.Context, name string)
 	defer tm.mux.Unlock()
 	t := tm.transportsByName[name]
 	if t == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainNotFound, name)
+		return nil, i18n.NewError(ctx, msgs.MsgTransportNotFound, name)
 	}
 	return t, nil
 }

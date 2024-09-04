@@ -18,6 +18,7 @@ package registrymgr
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -28,7 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"gopkg.in/yaml.v3"
 )
 
 type registry struct {
@@ -41,6 +41,10 @@ type registry struct {
 	name string
 	api  plugins.RegistryManagerToRegistry
 
+	// TODO: Replace with a cache-backed DB system
+	stateLock           sync.Mutex
+	inMemoryPlaceholder map[string][]*components.RegistryNodeTransportEntry
+
 	initialized atomic.Bool
 	initRetry   *retry.Retry
 
@@ -50,13 +54,14 @@ type registry struct {
 
 func (tm *registryManager) newRegistry(id uuid.UUID, name string, conf *RegistryConfig, toRegistry plugins.RegistryManagerToRegistry) *registry {
 	t := &registry{
-		tm:        tm,
-		conf:      conf,
-		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:      name,
-		id:        id,
-		api:       toRegistry,
-		initDone:  make(chan struct{}),
+		tm:                  tm,
+		conf:                conf,
+		initRetry:           retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:                name,
+		id:                  id,
+		api:                 toRegistry,
+		inMemoryPlaceholder: make(map[string][]*components.RegistryNodeTransportEntry),
+		initDone:            make(chan struct{}),
 	}
 	t.ctx, t.cancelCtx = context.WithCancel(log.WithLogField(tm.bgCtx, "registry", t.name))
 	return t
@@ -87,43 +92,37 @@ func (t *registry) init() {
 	}
 }
 
-func (t *registry) checkInit(ctx context.Context) error {
-	if !t.initialized.Load() {
-		return i18n.NewError(ctx, msgs.MsgDomainNotInitialized)
-	}
-	return nil
+func (t *registry) getNodeTransports(node string) []*components.RegistryNodeTransportEntry {
+	t.stateLock.Lock()
+	defer t.stateLock.Unlock()
+	return t.inMemoryPlaceholder[node]
 }
 
-func (t *registry) Send(ctx context.Context, message *components.RegistryMessage) error {
-	if err := t.checkInit(ctx); err != nil {
-		return err
+// Registry callback to the registry manager when new entries are available to upsert & cache
+// (can be called during and after initialization asynchronously as pre-configured and updated information becomes known)
+func (t *registry) UpsertTransportDetails(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
+
+	t.stateLock.Lock()
+	defer t.stateLock.Unlock()
+
+	if req.Node == "" || req.Transport == "" {
+		return nil, i18n.NewError(ctx, msgs.MsgRegistryInvalidEntry)
 	}
 
-	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
-		Node:    message.Destination.Node,
-		Payload: message.Payload,
+	existingEntries := t.inMemoryPlaceholder[req.Node]
+	deDuped := make([]*components.RegistryNodeTransportEntry, 0, len(existingEntries))
+	for _, existing := range existingEntries {
+		if existing.Node != req.Node || existing.Transport != req.Transport {
+			deDuped = append(deDuped, existing)
+		}
+	}
+	t.inMemoryPlaceholder[req.Node] = append(deDuped, &components.RegistryNodeTransportEntry{
+		Node:             req.Node,
+		Transport:        req.Transport,
+		TransportDetails: req.TransportDetails,
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
-}
-
-// Registry callback to the registry manager when a message is received
-func (t *registry) Receive(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	if err := t.checkInit(ctx); err != nil {
-		return nil, err
-	}
-
-	registryMessage := &components.RegistryMessage{}
-	err := yaml.Unmarshal([]byte(req.Body), registryMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	t.tm.receiveExternalMessage(*registryMessage)
-	return &prototk.ReceiveMessageResponse{}, nil
+	return &prototk.UpsertTransportDetailsResponse{}, nil
 }
 
 func (t *registry) close() {

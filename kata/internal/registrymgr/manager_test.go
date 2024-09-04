@@ -17,21 +17,21 @@ package registrymgr
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 )
 
-type mockComponents struct {
-}
-
-func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *registryManager, *mockComponents, func()) {
+func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetup ...func(mc *componentmocks.AllComponents)) (context.Context, *registryManager, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	mc := &mockComponents{}
+	mc := componentmocks.NewAllComponents(t)
 
 	for _, fn := range extraSetup {
 		fn(mc)
@@ -39,24 +39,22 @@ func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetu
 
 	tm := NewRegistryManager(ctx, conf)
 
-	err := tm.Start()
+	initData, err := tm.Init(mc)
+	assert.NoError(t, err)
+	assert.NotNil(t, initData)
+
+	err = tm.Start()
 	assert.NoError(t, err)
 
-	return ctx, tm.(*registryManager), mc, func() {
+	return ctx, tm.(*registryManager), func() {
 		cancelCtx()
 		// pDone()
 		tm.Stop()
 	}
 }
 
-func yamlNode(t *testing.T, s string) (n yaml.Node) {
-	err := yaml.Unmarshal([]byte(s), &n)
-	assert.NoError(t, err)
-	return
-}
-
 func TestConfiguredRegistries(t *testing.T) {
-	_, dm, _, done := newTestRegistryManager(t, &RegistryManagerConfig{
+	_, dm, done := newTestRegistryManager(t, &RegistryManagerConfig{
 		Registries: map[string]*RegistryConfig{
 			"test1": {
 				Plugin: plugins.PluginConfig{
@@ -77,21 +75,32 @@ func TestConfiguredRegistries(t *testing.T) {
 }
 
 func TestRegistryRegisteredNotFound(t *testing.T) {
-	_, dm, _, done := newTestRegistryManager(t, &RegistryManagerConfig{
+	_, dm, done := newTestRegistryManager(t, &RegistryManagerConfig{
 		Registries: map[string]*RegistryConfig{},
 	})
 	defer done()
 
 	_, err := dm.RegistryRegistered("unknown", uuid.New(), nil)
-	assert.Regexp(t, "PD011600", err)
+	assert.Regexp(t, "PD012002", err)
 }
 
-func TestGetRegistryNotFound(t *testing.T) {
-	ctx, dm, _, done := newTestRegistryManager(t, &RegistryManagerConfig{
-		Registries: map[string]*RegistryConfig{},
+func TestConfigureRegistryFail(t *testing.T) {
+	_, tm, done := newTestRegistryManager(t, &RegistryManagerConfig{
+		Registries: map[string]*RegistryConfig{
+			"test1": {
+				Config: map[string]any{"some": "conf"},
+			},
+		},
 	})
 	defer done()
 
-	_, err := dm.GetRegistryByName(ctx, "wrong")
-	assert.Regexp(t, "PD011600", err)
+	tp := newTestPlugin(nil)
+	tp.Functions = &plugintk.RegistryAPIFunctions{
+		ConfigureRegistry: func(ctx context.Context, ctr *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
+			return nil, fmt.Errorf("pop")
+		},
+	}
+
+	registerTestRegistry(t, tm, tp)
+	assert.Regexp(t, "pop", *tp.r.initError.Load())
 }

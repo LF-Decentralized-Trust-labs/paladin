@@ -21,8 +21,14 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
 )
 
+type RegistryNodeTransportEntry struct {
+	Node             string
+	Transport        string
+	TransportDetails string
+}
+
 type RegistryManager interface {
 	ManagerLifecycle
 	plugins.RegistryRegistration
-	ResolveTransportDetails(ctx context.Context, node string) (string, error)
+	GetNodeTransports(ctx context.Context, node string) ([]*RegistryNodeTransportEntry, error)
 }

@@ -48,11 +48,11 @@ func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestTransport(t *testing.T, transportConfig *prototk.TransportConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+func newTestTransport(t *testing.T, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
 	ctx, tm, _, done := newTestTransportManager(t, &TransportManagerConfig{
 		Transports: map[string]*TransportConfig{
 			"test1": {
-				Config: yamlNode(t, `{"some":"conf"}`),
+				Config: map[string]any{"some": "conf"},
 			},
 		},
 	}, extraSetup...)
@@ -61,13 +61,8 @@ func newTestTransport(t *testing.T, transportConfig *prototk.TransportConfig, ex
 	tp.Functions = &plugintk.TransportAPIFunctions{
 		ConfigureTransport: func(ctx context.Context, ctr *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 			assert.Equal(t, "test1", ctr.Name)
-			assert.YAMLEq(t, `{"some":"conf"}`, ctr.ConfigYaml)
-			return &prototk.ConfigureTransportResponse{
-				TransportConfig: transportConfig,
-			}, nil
-		},
-		InitTransport: func(ctx context.Context, idr *prototk.InitTransportRequest) (*prototk.InitTransportResponse, error) {
-			return &prototk.InitTransportResponse{}, nil
+			assert.JSONEq(t, `{"some":"conf"}`, ctr.ConfigJson)
+			return &prototk.ConfigureTransportResponse{}, nil
 		},
 		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 			tp.sendMessages <- smr
@@ -84,39 +79,38 @@ func registerTestTransport(t *testing.T, tm *transportManager, tp *testPlugin) {
 	_, err := tm.TransportRegistered("test1", transportID, tp)
 	assert.NoError(t, err)
 
-	ta, err := tm.GetTransportByName(context.Background(), "test1")
+	ta, err := tm.getTransportByName(context.Background(), "test1")
 	assert.NoError(t, err)
-	tp.t = ta.(*transport)
+	tp.t = ta
 	tp.t.initRetry.UTSetMaxAttempts(1)
 	<-tp.t.initDone
 }
 
 func TestSendMessage(t *testing.T) {
-	ctx, _, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+	ctx, tm, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
 	defer done()
 
-	message := &components.TransportMessage{
-		Node:    "node1",
+	message := &components.TransportMessageInput{
+		Destination: components.TransportTarget{
+			Node:     "node1",
+			Identity: "identity1",
+		},
 		Payload: []byte("something"),
 	}
-	serializedMessage, err := yaml.Marshal(message)
-	assert.NoError(t, err)
 
-	transportDetails := ""
-
-	err = tp0.t.Send(ctx, string(serializedMessage), transportDetails)
+	err := tm.Send(ctx, message)
 	assert.NoError(t, err)
 
 	<-tp0.sendMessages
 }
 
-func TestRecieveMessages(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+func TestReceiveMessages(t *testing.T) {
+	ctx, tm, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
-		MessageType: "something",
-		Payload:     []byte("something"),
+		MessageID: uuid.New(),
+		Payload:   []byte("something"),
 	}
 	serializedMessage, err := yaml.Marshal(message)
 	assert.NoError(t, err)
@@ -129,13 +123,12 @@ func TestRecieveMessages(t *testing.T) {
 	<-tm.recvMessages
 }
 
-func TestRecieveMessagesFailsWhenNotInitialized(t *testing.T) {
-	ctx, tm, tp0, done := newTestTransport(t, &prototk.TransportConfig{}, func(mc *mockComponents) {})
+func TestReceiveMessagesFailsWhenNotInitialized(t *testing.T) {
+	ctx, tm, tp0, done := newTestTransport(t, func(mc *mockComponents) {})
 	defer done()
 
 	message := &components.TransportMessage{
-		MessageType: "something",
-		Payload:     []byte("something"),
+		Payload: []byte("something"),
 	}
 	serializedMessage, err := yaml.Marshal(message)
 	assert.NoError(t, err)

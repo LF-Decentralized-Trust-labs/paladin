@@ -22,16 +22,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 )
 
 type testPlugin struct {
 	plugintk.RegistryAPIBase
 	initialized  atomic.Bool
-	t            *registry
+	r            *registry
 	sendMessages chan *prototk.SendMessageRequest
 }
 
@@ -48,11 +48,11 @@ func newTestPlugin(registryFuncs *plugintk.RegistryAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestRegistry(t *testing.T, registryConfig *prototk.RegistryConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *registryManager, *testPlugin, func()) {
-	ctx, tm, _, done := newTestRegistryManager(t, &RegistryManagerConfig{
+func newTestRegistry(t *testing.T, extraSetup ...func(mc *componentmocks.AllComponents)) (context.Context, *registryManager, *testPlugin, func()) {
+	ctx, tm, done := newTestRegistryManager(t, &RegistryManagerConfig{
 		Registries: map[string]*RegistryConfig{
 			"test1": {
-				Config: yamlNode(t, `{"some":"conf"}`),
+				Config: map[string]any{"some": "conf"},
 			},
 		},
 	}, extraSetup...)
@@ -61,17 +61,8 @@ func newTestRegistry(t *testing.T, registryConfig *prototk.RegistryConfig, extra
 	tp.Functions = &plugintk.RegistryAPIFunctions{
 		ConfigureRegistry: func(ctx context.Context, ctr *prototk.ConfigureRegistryRequest) (*prototk.ConfigureRegistryResponse, error) {
 			assert.Equal(t, "test1", ctr.Name)
-			assert.YAMLEq(t, `{"some":"conf"}`, ctr.ConfigYaml)
-			return &prototk.ConfigureRegistryResponse{
-				RegistryConfig: registryConfig,
-			}, nil
-		},
-		InitRegistry: func(ctx context.Context, idr *prototk.InitRegistryRequest) (*prototk.InitRegistryResponse, error) {
-			return &prototk.InitRegistryResponse{}, nil
-		},
-		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-			tp.sendMessages <- smr
-			return &prototk.SendMessageResponse{}, nil
+			assert.JSONEq(t, `{"some":"conf"}`, ctr.ConfigJson)
+			return &prototk.ConfigureRegistryResponse{}, nil
 		},
 	}
 
@@ -79,71 +70,93 @@ func newTestRegistry(t *testing.T, registryConfig *prototk.RegistryConfig, extra
 	return ctx, tm, tp, done
 }
 
-func registerTestRegistry(t *testing.T, tm *registryManager, tp *testPlugin) {
+func registerTestRegistry(t *testing.T, rm *registryManager, tp *testPlugin) {
 	registryID := uuid.New()
-	_, err := tm.RegistryRegistered("test1", registryID, tp)
+	_, err := rm.RegistryRegistered("test1", registryID, tp)
 	assert.NoError(t, err)
 
-	ta, err := tm.GetRegistryByName(context.Background(), "test1")
-	assert.NoError(t, err)
-	tp.t = ta.(*registry)
-	tp.t.initRetry.UTSetMaxAttempts(1)
-	<-tp.t.initDone
+	ra := rm.registriesByName["test1"]
+	assert.NotNil(t, ra)
+	tp.r = ra
+	tp.r.initRetry.UTSetMaxAttempts(1)
+	<-tp.r.initDone
 }
 
-func TestSendMessage(t *testing.T) {
-	ctx, _, tp0, done := newTestRegistry(t, &prototk.RegistryConfig{}, func(mc *mockComponents) {})
+func TestDoubleRegisterReplaces(t *testing.T) {
+
+	_, rm, tp0, done := newTestRegistry(t)
 	defer done()
+	assert.Nil(t, tp0.r.initError.Load())
+	assert.True(t, tp0.initialized.Load())
 
-	message := &components.RegistryMessage{
-		Node:    "node1",
-		Payload: []byte("something"),
-	}
-	serializedMessage, err := yaml.Marshal(message)
-	assert.NoError(t, err)
+	// Register again
+	tp1 := newTestPlugin(nil)
+	tp1.Functions = tp0.Functions
+	registerTestRegistry(t, rm, tp1)
+	assert.Nil(t, tp1.r.initError.Load())
+	assert.True(t, tp1.initialized.Load())
 
-	registryDetails := ""
+	// Check we get the second from all the maps
+	byName := rm.registriesByName[tp1.r.name]
+	assert.Same(t, tp1.r, byName)
+	byUUID := rm.registriesByID[tp1.r.id]
+	assert.Same(t, tp1.r, byUUID)
 
-	err = tp0.t.Send(ctx, string(serializedMessage), registryDetails)
-	assert.NoError(t, err)
-
-	<-tp0.sendMessages
 }
 
-func TestRecieveMessages(t *testing.T) {
-	ctx, tm, tp0, done := newTestRegistry(t, &prototk.RegistryConfig{}, func(mc *mockComponents) {})
+func TestRecordAndResolveInformation(t *testing.T) {
+	ctx, rm, tp, done := newTestRegistry(t)
 	defer done()
 
-	message := &components.RegistryMessage{
-		MessageType: "something",
-		Payload:     []byte("something"),
+	_, err := rm.GetNodeTransports(ctx, "node1")
+	assert.Regexp(t, "PD012000", err)
+
+	// Upsert bad entry
+	_, err = tp.r.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{})
+	assert.Regexp(t, "PD012001", err)
+
+	entry1 := &prototk.UpsertTransportDetails{
+		Node:             "node1",
+		Transport:        "grpc",
+		TransportDetails: "things and stuff",
 	}
-	serializedMessage, err := yaml.Marshal(message)
+
+	// Upsert first entry
+	res, err := tp.r.UpsertTransportDetails(ctx, entry1)
 	assert.NoError(t, err)
+	assert.NotNil(t, res)
 
-	_, err = tp0.t.Receive(ctx, &prototk.ReceiveMessageRequest{
-		Body: string(serializedMessage),
-	})
+	// Check we get it
+	transports, err := rm.GetNodeTransports(ctx, "node1")
 	assert.NoError(t, err)
+	assert.Len(t, transports, 1)
+	assert.Equal(t, components.RegistryNodeTransportEntry{
+		Node:             "node1",
+		Transport:        "grpc",
+		TransportDetails: "things and stuff",
+	}, *transports[0])
 
-	<-tm.recvMessages
-}
-
-func TestRecieveMessagesFailsWhenNotInitialized(t *testing.T) {
-	ctx, tm, tp0, done := newTestRegistry(t, &prototk.RegistryConfig{}, func(mc *mockComponents) {})
-	defer done()
-
-	message := &components.RegistryMessage{
-		MessageType: "something",
-		Payload:     []byte("something"),
+	// Upsert second entry
+	entry2 := &prototk.UpsertTransportDetails{
+		Node:             "node1",
+		Transport:        "websockets",
+		TransportDetails: "more things and stuff",
 	}
-	serializedMessage, err := yaml.Marshal(message)
-	assert.NoError(t, err)
 
-	_, err = tp0.t.Receive(ctx, &prototk.ReceiveMessageRequest{
-		Body: string(serializedMessage),
-	})
+	// Upsert second entry
+	res, err = tp.r.UpsertTransportDetails(ctx, entry2)
 	assert.NoError(t, err)
+	transports, err = rm.GetNodeTransports(ctx, "node1")
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, transports, 2)
 
-	<-tm.recvMessages
+	// Upsert first entry again
+	res, err = tp.r.UpsertTransportDetails(ctx, entry1)
+	assert.NoError(t, err)
+	transports, err = rm.GetNodeTransports(ctx, "node1")
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, transports, 2)
+
 }

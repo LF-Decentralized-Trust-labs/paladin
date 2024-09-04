@@ -267,4 +267,10 @@ var (
 
 	// TransportManager module PD0119XX
 	MsgTransportInvalidMessage = ffe("PD011900", "Invalid message")
+	MsgTransportNotFound       = ffe("PD011901", "Transport %q not found")
+
+	// RegistryManager module PD0120XX
+	MsgRegistryNodeEntiresNotFound = ffe("PD012000", "No entries found for node '%s'")
+	MsgRegistryInvalidEntry        = ffe("PD012001", "Invalid entry")
+	MsgRegistryNotFound            = ffe("PD012002", "Registry %q not found")
 )
