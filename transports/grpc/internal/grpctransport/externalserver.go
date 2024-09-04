@@ -44,24 +44,18 @@ type TransportDetails struct {
 }
 
 type ExternalServer interface {
-	QueueMessageForSend(msg *proto.ExternalMessage)
-	GetMessages() chan *proto.Message
 	Shutdown()
 }
 
 type externalGRPCServer struct {
-	proto.UnimplementedInterPaladinTransportServer
+	proto.UnimplementedPaladinGRPCTransportServer
 
 	grpcListener      net.Listener
 	server            *grpc.Server
 	clientCertificate *tls.Certificate
 	serverCertificate *tls.Certificate
 	serverCertPool    *x509.CertPool
-
-	// TODO: We probably don't want to do this, what happens when we're not consuming messages correctly?
-	recvMessages chan *prototk.TransportMessage
-	sendMessages chan *ExternalMessage
-	port         int
+	port              int
 }
 
 func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls.Certificate, clientCertificate *tls.Certificate) (*externalGRPCServer, error) {
@@ -74,14 +68,12 @@ func NewExternalGRPCServer(ctx context.Context, port int, serverCertificate *tls
 	}
 
 	server := &externalGRPCServer{
-		recvMessages:      make(chan *prototk.TransportMessage, 1),
-		sendMessages:      make(chan *ExternalMessage, 1),
 		port:              port,
 		clientCertificate: clientCertificate,
 		serverCertificate: serverCertificate,
 	}
 
-	err := server.initializeExternalListener(ctx)
+	err := server.initializeListener(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("grpcexternal: Error initializing external listener: %v", err)
 		return nil, err
@@ -108,7 +100,7 @@ func (egs *externalGRPCServer) Shutdown() {
 	egs.grpcListener.Close()
 }
 
-func (egs *externalGRPCServer) initializeExternalListener(ctx context.Context) error {
+func (egs *externalGRPCServer) initializeListener(ctx context.Context) error {
 	var serverTLSConfig *tls.Config
 	if egs.serverCertificate != nil {
 		rootCAs, err := x509.SystemCertPool()
