@@ -16,34 +16,16 @@
 package noto
 
 import (
-	"context"
-
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
 
-type DomainInterface map[string]*DomainEntry
-
-type DomainEntry struct {
-	ABI     *abi.Entry
-	handler DomainHandler
-}
-
-type DomainHandler interface {
-	ValidateParams(params string) (interface{}, error)
-	Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
-	Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
-	Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)
-	Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error)
-}
-
-type domainHandler struct {
-	noto *Noto
-}
+type DomainInterface = domain.DomainInterface[NotoDomainConfig]
+type ParsedTransaction = domain.ParsedTransaction[NotoDomainConfig]
 
 func (n *Noto) getInterface() DomainInterface {
-	iface := DomainInterface{
+	return DomainInterface{
 		"constructor": {
 			ABI: &abi.Entry{
 				Type: abi.Constructor,
@@ -61,6 +43,7 @@ func (n *Noto) getInterface() DomainInterface {
 					{Name: "amount", Type: "uint256"},
 				},
 			},
+			Handler: &mintHandler{noto: n},
 		},
 		"transfer": {
 			ABI: &abi.Entry{
@@ -71,17 +54,9 @@ func (n *Noto) getInterface() DomainInterface {
 					{Name: "amount", Type: "uint256"},
 				},
 			},
+			Handler: &transferHandler{noto: n},
 		},
 	}
-
-	iface["mint"].handler = &mintHandler{
-		domainHandler: domainHandler{noto: n},
-	}
-	iface["transfer"].handler = &transferHandler{
-		domainHandler: domainHandler{noto: n},
-	}
-
-	return iface
 }
 
 type NotoConstructorParams struct {

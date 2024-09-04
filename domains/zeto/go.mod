@@ -8,6 +8,7 @@ require (
 	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14-0.20240827185235-2fe278d0353f
 	github.com/iden3/go-iden3-crypto v0.0.16
+	github.com/kaleido-io/paladin/domains/common v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/kata v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
@@ -109,6 +110,8 @@ require (
 
 replace github.com/kaleido-io/paladin/kata => ../../kata
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
-
 replace github.com/hyperledger-labs/zeto/go-sdk => ../../zeto/go-sdk
+
+replace github.com/kaleido-io/paladin/domains/common => ../common
+
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go

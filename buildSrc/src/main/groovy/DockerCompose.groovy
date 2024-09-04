@@ -44,10 +44,7 @@ class DockerCompose extends DefaultTask {
         if (startTime != null) {
             cmd += ['--since', dateFormat.format(startTime)]
         }
-        if (service == '') {
-            println 'Dumping Docker logs'
-        } else {
-            println "Dumping Docker logs for ${service}"
+        if (service != '') {
             cmd << service
         }
         project.exec { commandLine cmd }
@@ -59,6 +56,7 @@ class DockerCompose extends DefaultTask {
         List<String> cmd = [*dockerCommand(), *args]
         ExecResult execResult = project.exec { commandLine cmd }
         if (execResult.exitValue != 0) {
+            println "\nDocker command failed: '${cmd}'. Dumping Docker logs."
             dumpLogs()
         }
         execResult.assertNormalExitValue()

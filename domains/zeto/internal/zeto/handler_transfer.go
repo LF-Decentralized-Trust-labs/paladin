@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 	katapb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -30,7 +31,7 @@ import (
 )
 
 type transferHandler struct {
-	domainHandler
+	zeto *Zeto
 }
 
 func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
@@ -44,16 +45,16 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	if transferParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
-	return transferParams, nil
+	return &transferParams, nil
 }
 
-func (h *transferHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.params.(ZetoTransferParams)
+func (h *transferHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*ZetoTransferParams)
 
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    tx.transaction.From,
+				Lookup:    tx.Transaction.From,
 				Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 			},
 			{
@@ -118,14 +119,14 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCo
 	return proto.Marshal(payload)
 }
 
-func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.params.(ZetoTransferParams)
+func (h *transferHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*ZetoTransferParams)
 
-	resolvedSender := findVerifier(tx.transaction.From, req.ResolvedVerifiers)
+	resolvedSender := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
 	if resolvedSender == nil {
-		return nil, fmt.Errorf("failed to resolve: %s", tx.transaction.From)
+		return nil, fmt.Errorf("failed to resolve: %s", tx.Transaction.From)
 	}
-	resolvedRecipient := findVerifier(params.To, req.ResolvedVerifiers)
+	resolvedRecipient := domain.FindVerifier(params.To, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
 		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}
@@ -139,7 +140,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.zeto.prepareInputs(ctx, tx.transaction.From, params.Amount)
+	inputCoins, inputStates, total, err := h.zeto.prepareInputs(ctx, tx.Transaction.From, params.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.zeto.prepareOutputs(tx.transaction.From, senderKey, ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := h.zeto.prepareOutputs(tx.Transaction.From, senderKey, ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
@@ -174,19 +175,19 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *parsedTransaction, r
 				AttestationType: pb.AttestationType_SIGN,
 				Algorithm:       algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 				Payload:         payloadBytes,
-				Parties:         []string{tx.transaction.From},
+				Parties:         []string{tx.Transaction.From},
 			},
 			{
 				Name:            "submitter",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.transaction.From},
+				Parties:         []string{tx.Transaction.From},
 			},
 		},
 	}, nil
 }
 
-func (h *transferHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *transferHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
@@ -204,9 +205,9 @@ func (h *transferHandler) encodeProof(proof *katapb.SnarkProof) map[string]inter
 	}
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *transferHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	var proof katapb.SnarkProof
-	result := findAttestation("sender", req.AttestationResult)
+	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
 		return nil, fmt.Errorf("did not find 'sender' attestation")
 	}

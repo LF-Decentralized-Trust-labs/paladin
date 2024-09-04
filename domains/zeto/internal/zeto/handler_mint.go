@@ -21,12 +21,13 @@ import (
 	"fmt"
 
 	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type mintHandler struct {
-	domainHandler
+	zeto *Zeto
 }
 
 func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
@@ -40,11 +41,11 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	if mintParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
-	return mintParams, nil
+	return &mintParams, nil
 }
 
-func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.params.(ZetoMintParams)
+func (h *mintHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*ZetoMintParams)
 
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
@@ -56,10 +57,10 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 	}, nil
 }
 
-func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.params.(ZetoMintParams)
+func (h *mintHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*ZetoMintParams)
 
-	resolvedRecipient := findVerifier(params.To, req.ResolvedVerifiers)
+	resolvedRecipient := domain.FindVerifier(params.To, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
 		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}
@@ -88,19 +89,19 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 				Name:            "submitter",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.transaction.From},
+				Parties:         []string{tx.Transaction.From},
 			},
 		},
 	}, nil
 }
 
-func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *mintHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
 
-func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *mintHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		coin, err := h.zeto.makeCoin(state.StateDataJson)
