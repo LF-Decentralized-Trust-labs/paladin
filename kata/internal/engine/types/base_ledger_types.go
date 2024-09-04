@@ -143,9 +143,6 @@ type BalanceManager interface {
 }
 
 type AutoFuelTransactionHandler interface {
-	GetPendingFuelingTransaction(ctx context.Context, sourceAddress string, destinationAddress string) (tx *ManagedTX, err error)
-	CheckTransactionCompleted(ctx context.Context, tx *ManagedTX) (completed bool)
-	HandleNewTransaction(ctx context.Context, reqOptions *RequestOptions, txPayload interface{}) (mtx *ManagedTX, submissionRejected bool, err error)
 }
 
 // AddressAccount provides the following feature:
@@ -249,6 +246,10 @@ type BaseLedgerTxEngine interface {
 	HandleTransactionConfirmations(ctx context.Context, txID string, notification *ConfirmationsNotification) (err error)
 	// HandleTransactionReceiptReceived - handles receipt of blockchain transactions for a managed transaction
 	HandleTransactionReceiptReceived(ctx context.Context, txID string, receipt *ethclient.TransactionReceiptResponse) (err error)
+
+	// Functions for auto-fueling
+	GetPendingFuelingTransaction(ctx context.Context, sourceAddress string, destinationAddress string) (tx *ManagedTX, err error)
+	CheckTransactionCompleted(ctx context.Context, tx *ManagedTX) (completed bool)
 }
 
 // Handler checks received transaction process events and dispatch them to an event
@@ -551,7 +552,7 @@ const (
 	// persistenceUpdateDelete                              // Instructs that the transaction should be removed completely from persistence - not sure it's safe to do so
 )
 
-type TransactionEngineContext struct {
+type OrchestratorContext struct {
 	// input from transaction engine
 	AvailableToSpend         *big.Int
 	PreviousNonceCostUnknown bool
@@ -572,7 +573,7 @@ type InFlightTransactionStateManager interface {
 	// stage management
 	StartNewStageContext(ctx context.Context, stage InFlightTxStage, substatus BaseTxSubStatus)
 	GetStage(ctx context.Context) InFlightTxStage
-	SetTransactionEngineContext(ctx context.Context, tec *TransactionEngineContext)
+	SetOrchestratorContext(ctx context.Context, tec *OrchestratorContext)
 	SetTransientPreviousStageOutputs(tpso *TransientPreviousStageOutputs)
 	GetRunningStageContext(ctx context.Context) *RunningStageContext
 	GetStageTriggerError(ctx context.Context) error

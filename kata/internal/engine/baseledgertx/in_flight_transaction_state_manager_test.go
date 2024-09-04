@@ -81,12 +81,12 @@ func TestStateManagerStageManagementCanSubmit(t *testing.T) {
 	ctx := context.Background()
 	testStateManagerWithMocks := newTestInFlightTransactionStateManager(t)
 	stateManager := testStateManagerWithMocks.stateManager
-	stateManager.SetTransactionEngineContext(ctx, &baseTypes.TransactionEngineContext{
+	stateManager.SetOrchestratorContext(ctx, &baseTypes.OrchestratorContext{
 		PreviousNonceCostUnknown: false,
 		// no available to spent provided, this means we don't need to check balance
 	})
 	assert.True(t, testStateManagerWithMocks.stateManager.CanSubmit(context.Background(), big.NewInt(0)))
-	stateManager.SetTransactionEngineContext(ctx, &baseTypes.TransactionEngineContext{
+	stateManager.SetOrchestratorContext(ctx, &baseTypes.OrchestratorContext{
 		PreviousNonceCostUnknown: false,
 		AvailableToSpend:         big.NewInt(30),
 	})
@@ -95,7 +95,7 @@ func TestStateManagerStageManagementCanSubmit(t *testing.T) {
 	assert.False(t, testStateManagerWithMocks.stateManager.CanSubmit(context.Background(), big.NewInt(31)))
 	assert.False(t, testStateManagerWithMocks.stateManager.CanSubmit(context.Background(), nil)) //unknown cost for the current transaction
 
-	stateManager.SetTransactionEngineContext(ctx, &baseTypes.TransactionEngineContext{
+	stateManager.SetOrchestratorContext(ctx, &baseTypes.OrchestratorContext{
 		PreviousNonceCostUnknown: true,
 		AvailableToSpend:         big.NewInt(30),
 	})

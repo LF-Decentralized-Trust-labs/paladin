@@ -33,12 +33,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type InFlightTransaction struct {
+type InFlightTransactionStageController struct {
 	testOnlyNoActionMode bool // Note: this flag can never be set in normal code path, exposed for testing only
 	testOnlyNoEventMode  bool // Note: this flag can never be set in normal code path, exposed for testing only
 
-	// a reference to the transaction engine
-	*transactionEngine
+	// a reference to the transaction orchestrator
+	*orchestrator
 	txInflightTime         time.Time
 	txInDBTime             time.Time
 	txTimeline             []PointOfTime
@@ -93,16 +93,16 @@ type BasicActionError struct {
 	ErrorMessage string `json:"errorMsg"`
 }
 
-func NewInFlightTransaction(
-	enth *enterpriseTransactionHandler,
-	te *transactionEngine,
+func NewInFlightTransactionStageController(
+	enth *baseLedgerTxEngine,
+	te *orchestrator,
 	mtx *baseTypes.ManagedTX,
-) *InFlightTransaction {
+) *InFlightTransactionStageController {
 
-	ift := &InFlightTransaction{
-		transactionEngine: te,
-		txInflightTime:    time.Now(),
-		txInDBTime:        *mtx.Created.Time(),
+	ift := &InFlightTransactionStageController{
+		orchestrator:   te,
+		txInflightTime: time.Now(),
+		txInDBTime:     *mtx.Created.Time(),
 		txTimeline: []PointOfTime{
 			{
 				name:      "wait_in_db",
@@ -117,7 +117,7 @@ func NewInFlightTransaction(
 	return ift
 }
 
-func (it *InFlightTransaction) MarkTime(eventName string) {
+func (it *InFlightTransactionStageController) MarkTime(eventName string) {
 	if it.timeLineLoggingEnabled {
 		it.txTimeline[len(it.txTimeline)-1].tillNextEvent = time.Since(it.txTimeline[len(it.txTimeline)-1].timestamp)
 		it.txTimeline = append(it.txTimeline, PointOfTime{
@@ -126,7 +126,7 @@ func (it *InFlightTransaction) MarkTime(eventName string) {
 		})
 	}
 }
-func (it *InFlightTransaction) MarkHistoricalTime(eventName string, t time.Time) {
+func (it *InFlightTransactionStageController) MarkHistoricalTime(eventName string, t time.Time) {
 	if it.timeLineLoggingEnabled {
 		it.txTimeline[len(it.txTimeline)-1].tillNextEvent = t.Sub(it.txTimeline[len(it.txTimeline)-1].timestamp)
 		it.txTimeline = append(it.txTimeline, PointOfTime{
@@ -136,7 +136,7 @@ func (it *InFlightTransaction) MarkHistoricalTime(eventName string, t time.Time)
 	}
 }
 
-func (it *InFlightTransaction) PrintTimeline() string {
+func (it *InFlightTransactionStageController) PrintTimeline() string {
 	ptString := ""
 	if it.timeLineLoggingEnabled {
 		for index, tl := range it.txTimeline {
@@ -153,7 +153,7 @@ func (it *InFlightTransaction) PrintTimeline() string {
 func (pot *PointOfTime) String() string {
 	return fmt.Sprintf("Event: %s, start: %s, duration: %s", pot.name, pot.timestamp.Format(time.RFC3339Nano), pot.tillNextEvent.String())
 }
-func (it *InFlightTransaction) TriggerNewStageRun(ctx context.Context, stage baseTypes.InFlightTxStage, substatus baseTypes.BaseTxSubStatus, signedMessage []byte) {
+func (it *InFlightTransactionStageController) TriggerNewStageRun(ctx context.Context, stage baseTypes.InFlightTxStage, substatus baseTypes.BaseTxSubStatus, signedMessage []byte) {
 	it.MarkTime(fmt.Sprintf("stage_%s_wait_to_trigger_async_execution", string(stage)))
 	if signedMessage != nil {
 		it.stateManager.SetTransientPreviousStageOutputs(&baseTypes.TransientPreviousStageOutputs{
@@ -167,14 +167,14 @@ func (it *InFlightTransaction) TriggerNewStageRun(ctx context.Context, stage bas
 //   - a locking mechanism to ensure each in-flight transaction only have 1 in-flight stage context at a given time
 //   - check and complete existing stage context when criteria is met
 //   - produce new stage context when the criteria is met
-func (it *InFlightTransaction) ProduceLatestInFlightStageContext(ctx context.Context, tIn *baseTypes.TransactionEngineContext) (tOut *TriggerNextStageOutput) {
+func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(ctx context.Context, tIn *baseTypes.OrchestratorContext) (tOut *TriggerNextStageOutput) {
 	tOut = &TriggerNextStageOutput{}
 	log.L(ctx).Debugf("ProduceLatestInFlightStageContext entry for tx %s", it.stateManager.GetTxID())
 	// Take a snapshot of the pending state under the lock
 	it.transactionMux.Lock()
 	defer it.transactionMux.Unlock()
-	// update the transaction engine context
-	it.stateManager.SetTransactionEngineContext(ctx, tIn)
+	// update the transaction orchestrator context
+	it.stateManager.SetOrchestratorContext(ctx, tIn)
 	if it.stateManager.GetRunningStageContext(ctx) != nil {
 		rsc := it.stateManager.GetRunningStageContext(ctx)
 		log.L(ctx).Debugf("ProduceLatestInFlightStageContext for tx %s, on stage: %s , current stage context lived: %s , stage lived: %s, last stage error: %+v", it.stateManager.GetTxID(), it.stateManager.GetStage(ctx), time.Since(rsc.StageStartTime), time.Since(it.stateManager.GetStageStartTime(ctx)), it.stateManager.GetStageTriggerError(ctx))
@@ -580,7 +580,7 @@ func (it *InFlightTransaction) ProduceLatestInFlightStageContext(ctx context.Con
 		} else if it.stateManager.IsComplete() || it.stateManager.IsSuspended() {
 			// then calculate the latest stage based on the managed transaction to kick off the next stage
 			// if there isn't any running context and the transaction status is no longer in pending
-			// we can wait for the transaction engine to remove it from the in-flight transaction queue. It's either paused or completed
+			// we can wait for the transaction orchestrator to remove it from the in-flight transaction queue. It's either paused or completed
 			log.L(ctx).Debugf("Transaction with ID %s is waiting for removal in status: %s.", it.stateManager.GetTxID(), it.stateManager.GetStatus())
 		} else if it.stateManager.GetGasPriceObject() == nil {
 			// no gas price fetched, go and fetch gas price
@@ -625,7 +625,7 @@ func (it *InFlightTransaction) ProduceLatestInFlightStageContext(ctx context.Con
 	return tOut
 }
 
-func (it *InFlightTransaction) calculateNewGasPrice(ctx context.Context, existingGpo *baseTypes.GasPriceObject, newGpo *baseTypes.GasPriceObject) *baseTypes.GasPriceObject {
+func (it *InFlightTransactionStageController) calculateNewGasPrice(ctx context.Context, existingGpo *baseTypes.GasPriceObject, newGpo *baseTypes.GasPriceObject) *baseTypes.GasPriceObject {
 	if existingGpo == nil {
 		log.L(ctx).Debugf("First time assigning gas price to transaction with ID: %s, gas price object: %+v.", it.stateManager.GetTxID(), newGpo)
 		return newGpo
@@ -677,7 +677,7 @@ func calculateGasRequiredForTransaction(ctx context.Context, gpo *baseTypes.GasP
 
 }
 
-func (it *InFlightTransaction) NotifyStatusUpdate(ctx context.Context, status *baseTypes.BaseTxStatus) (updateRequired bool, err error) {
+func (it *InFlightTransactionStageController) NotifyStatusUpdate(ctx context.Context, status *baseTypes.BaseTxStatus) (updateRequired bool, err error) {
 	if it.stateManager.GetStatus() == *status {
 		// already on the current status, no op
 		return false, nil
@@ -693,7 +693,7 @@ func (it *InFlightTransaction) NotifyStatusUpdate(ctx context.Context, status *b
 	return true, nil
 }
 
-func (it *InFlightTransaction) TriggerRetrieveGasPrice(ctx context.Context) error {
+func (it *InFlightTransactionStageController) TriggerRetrieveGasPrice(ctx context.Context) error {
 	it.executeAsync(func() {
 		gasPrice, err := it.gasPriceClient.GetGasPriceObject(ctx)
 		it.stateManager.AddGasPriceOutput(ctx, gasPrice, err)
@@ -701,7 +701,7 @@ func (it *InFlightTransaction) TriggerRetrieveGasPrice(ctx context.Context) erro
 	return nil
 }
 
-func (it *InFlightTransaction) TriggerStatusUpdate(ctx context.Context) error {
+func (it *InFlightTransactionStageController) TriggerStatusUpdate(ctx context.Context) error {
 	it.executeAsync(func() {
 		rsc := it.stateManager.GetRunningStageContext(ctx)
 		rsc.SetNewPersistenceUpdateOutput()
@@ -714,7 +714,7 @@ func (it *InFlightTransaction) TriggerStatusUpdate(ctx context.Context) error {
 	}, ctx, it.stateManager.GetStage(ctx), false)
 	return nil
 }
-func (it *InFlightTransaction) TriggerTracking(ctx context.Context) error {
+func (it *InFlightTransactionStageController) TriggerTracking(ctx context.Context) error {
 	it.executeAsync(func() {
 		transactionHashToBeTracked := it.stateManager.GetTransactionHash()
 		policyInfo := it.stateManager.GetPolicyInfo()
@@ -755,7 +755,7 @@ func (it *InFlightTransaction) TriggerTracking(ctx context.Context) error {
 	}, ctx, it.stateManager.GetStage(ctx), false)
 	return nil
 }
-func (it *InFlightTransaction) TriggerSignTx(ctx context.Context) error {
+func (it *InFlightTransactionStageController) TriggerSignTx(ctx context.Context) error {
 	it.executeAsync(func() {
 		signedMessage, txHash, err := it.signTx(ctx, it.stateManager.GetTx())
 		log.L(ctx).Debugf("Adding signed message to output, hash %s, signedMessage not nil %t, err %+v", txHash, signedMessage != nil, err)
@@ -764,7 +764,7 @@ func (it *InFlightTransaction) TriggerSignTx(ctx context.Context) error {
 	return nil
 }
 
-func (it *InFlightTransaction) TriggerSubmitTx(ctx context.Context, signedMessage []byte) error {
+func (it *InFlightTransactionStageController) TriggerSubmitTx(ctx context.Context, signedMessage []byte) error {
 	it.executeAsync(func() {
 		txHash, submissionTime, errReason, submissionOutcome, err := it.submitTX(ctx, it.stateManager.GetTx(), signedMessage)
 		it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, submissionOutcome, errReason, err)
@@ -772,7 +772,7 @@ func (it *InFlightTransaction) TriggerSubmitTx(ctx context.Context, signedMessag
 	return nil
 }
 
-func (it *InFlightTransaction) TriggerPersistTxState(ctx context.Context) error {
+func (it *InFlightTransactionStageController) TriggerPersistTxState(ctx context.Context) error {
 	it.executeAsync(func() {
 		stage, persistenceTime, err := it.stateManager.PersistTxState(ctx)
 		it.stateManager.AddPersistenceOutput(ctx, stage, persistenceTime, err)
@@ -786,7 +786,7 @@ type TriggerNextStageOutput struct {
 	Error                error
 }
 
-func (it *InFlightTransaction) executeAsync(funcToExecute func(), ctx context.Context, stage baseTypes.InFlightTxStage, isPersistence bool) {
+func (it *InFlightTransactionStageController) executeAsync(funcToExecute func(), ctx context.Context, stage baseTypes.InFlightTxStage, isPersistence bool) {
 	if it.testOnlyNoActionMode {
 		return
 	}
@@ -797,7 +797,7 @@ func (it *InFlightTransaction) executeAsync(funcToExecute func(), ctx context.Co
 				log.L(ctx).Errorf("Panic error detected for transaction %s, when executing: %s, error: %+v", it.stateManager.GetTxID(), stage, err)
 				it.stateManager.AddPanicOutput(ctx, stage)
 			}
-			// trigger another loop of in-flight engine
+			// trigger another loop of in-flight orchestrator
 			it.MarkInFlightTxStale()
 		}()
 		if isPersistence {

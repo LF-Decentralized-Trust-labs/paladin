@@ -33,56 +33,56 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestNewControllerNoNewEngine(t *testing.T) {
+func TestNewEngineNoNewOrchestrator(t *testing.T) {
 	ctx := context.Background()
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble, _ := NewTestTransactionEngine(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 1
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 1
+	ble.enginePollingInterval = 1 * time.Hour
 
-	// already has a running engine for the address so no new engine should be started
-	enh.InFlightEngines = map[string]*transactionEngine{
-		testMainSigningAddress: {state: TransactionEngineStateIdle, stateEntryTime: time.Now()}, // already has an engine for 0x1
+	// already has a running orchestrator for the address so no new orchestrator should be started
+	ble.InFlightOrchestrators = map[string]*orchestrator{
+		testMainSigningAddress: {state: OrchestratorStateIdle, stateEntryTime: time.Now()}, // already has an orchestrator for 0x1
 	}
-	_, _ = enh.Start(ctx)
+	_, _ = ble.Start(ctx)
 }
 
-func TestNewControllerPollingCancelledContext(t *testing.T) {
+func TestNewEnginePollingCancelledContext(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	qFields := &ffapi.QueryFields{}
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
+	ble, _ := NewTestTransactionEngine(t)
 
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 1
-	enh.controllerPollingInterval = 1 * time.Hour
-	// already has a running engine for the address so no new engine should be started
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 1
+	ble.enginePollingInterval = 1 * time.Hour
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Once()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, fmt.Errorf("error")).Run(func(args mock.Arguments) {
 		cancelCtx()
 	}).Once()
-	enh.ctx = ctx
-	polled, _ := enh.poll(ctx)
+	ble.ctx = ctx
+	polled, _ := ble.poll(ctx)
 	assert.Equal(t, -1, polled)
 }
 
-func TestNewControllerPollingReAddStoppedEngine(t *testing.T) {
+func TestNewEnginePollingReAddStoppedOrchestrator(t *testing.T) {
 	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
@@ -102,31 +102,31 @@ func TestNewControllerPollingReAddStoppedEngine(t *testing.T) {
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
+	ble, _ := NewTestTransactionEngine(t)
 
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 1
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 1
+	ble.enginePollingInterval = 1 * time.Hour
 
-	// already has a running engine for the address so no new engine should be started
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Once()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Once()
-	enh.InFlightEngines = map[string]*transactionEngine{
-		testMainSigningAddress: {state: TransactionEngineStateStopped, stateEntryTime: time.Now()}, // already has an engine for 0x1
+	ble.InFlightOrchestrators = map[string]*orchestrator{
+		testMainSigningAddress: {state: OrchestratorStateStopped, stateEntryTime: time.Now()}, // already has an orchestrator for 0x1
 	}
-	enh.ctx = ctx
-	enh.poll(ctx)
-	assert.Equal(t, TransactionEngineStateNew, enh.InFlightEngines[testMainSigningAddress].state)
+	ble.ctx = ctx
+	ble.poll(ctx)
+	assert.Equal(t, OrchestratorStateNew, ble.InFlightOrchestrators[testMainSigningAddress].state)
 }
 
-func TestNewControllerPollingStoppingAnEngineAndSelf(t *testing.T) {
+func TestNewEnginePollingStoppingAnOrchestratorAndSelf(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
@@ -146,53 +146,53 @@ func TestNewControllerPollingStoppingAnEngineAndSelf(t *testing.T) {
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
+	ble, _ := NewTestTransactionEngine(t)
 
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 2
-	enh.ctx = ctx
-	enh.controllerPollingInterval = 1 * time.Hour
-	enh.controllerLoopDone = make(chan struct{})
-	// already has a running engine for the address so no new engine should be started
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 2
+	ble.ctx = ctx
+	ble.enginePollingInterval = 1 * time.Hour
+	ble.engineLoopDone = make(chan struct{})
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Once()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Maybe()
-	go enh.controllerLoop()
-	existingEngine := &transactionEngine{
-		enterpriseTransactionHandler: enh,
-		enginePollingInterval:        enh.controllerPollingInterval,
-		state:                        TransactionEngineStateIdle,
-		stateEntryTime:               time.Now().Add(-enh.maxEngineIdle).Add(-1 * time.Minute),
-		InFlightTxsStale:             make(chan bool, 1),
-		stopProcess:                  make(chan bool, 1),
-		txStore:                      mTS,
-		ethClient:                    mEC,
-		managedTXEventNotifier:       mEN,
-		txConfirmationListener:       mCL,
-		maxInFlightTxs:               0,
+	go ble.engineLoop()
+	existingOrchestrator := &orchestrator{
+		baseLedgerTxEngine:          ble,
+		orchestratorPollingInterval: ble.enginePollingInterval,
+		state:                       OrchestratorStateIdle,
+		stateEntryTime:              time.Now().Add(-ble.maxOrchestratorIdle).Add(-1 * time.Minute),
+		InFlightTxsStale:            make(chan bool, 1),
+		stopProcess:                 make(chan bool, 1),
+		txStore:                     mTS,
+		ethClient:                   mEC,
+		managedTXEventNotifier:      mEN,
+		txConfirmationListener:      mCL,
+		maxInFlightTxs:              0,
 	}
-	enh.InFlightEngines = map[string]*transactionEngine{
-		testMainSigningAddress: existingEngine, // already has an engine for 0x1
+	ble.InFlightOrchestrators = map[string]*orchestrator{
+		testMainSigningAddress: existingOrchestrator, // already has an orchestrator for 0x1
 	}
-	_, _ = existingEngine.Start(ctx)
-	enh.MarkInFlightEnginesStale()
-	<-existingEngine.engineLoopDone
-	assert.Equal(t, TransactionEngineStateStopped, existingEngine.state)
+	_, _ = existingOrchestrator.Start(ctx)
+	ble.MarkInFlightOrchestratorsStale()
+	<-existingOrchestrator.orchestratorLoopDone
+	assert.Equal(t, OrchestratorStateStopped, existingOrchestrator.state)
 
 	//stops OK
 	cancelCtx()
-	<-enh.controllerLoopDone
+	<-ble.engineLoopDone
 	time.Sleep(2 * time.Second)
 }
 
-func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
+func TestNewEnginePollingStoppingAnOrchestratorForFairnessControl(t *testing.T) {
 	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
@@ -212,102 +212,102 @@ func TestNewControllerPollingStoppingAnEngineForFairnessControl(t *testing.T) {
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
+	ble, _ := NewTestTransactionEngine(t)
 
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 1
-	enh.ctx = ctx
-	enh.controllerPollingInterval = 1 * time.Hour
-	enh.controllerLoopDone = make(chan struct{})
-	enh.maxInFlightEngines = 1
-	existingEngine := &transactionEngine{
-		engineBirthTime:              time.Now().Add(-1 * time.Hour),
-		enterpriseTransactionHandler: enh,
-		enginePollingInterval:        enh.controllerPollingInterval,
-		state:                        TransactionEngineStateRunning,
-		stateEntryTime:               time.Now().Add(-enh.maxEngineIdle).Add(-1 * time.Minute),
-		InFlightTxsStale:             make(chan bool, 1),
-		stopProcess:                  make(chan bool, 1),
-		txStore:                      mTS,
-		ethClient:                    mEC,
-		managedTXEventNotifier:       mEN,
-		txConfirmationListener:       mCL,
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 1
+	ble.ctx = ctx
+	ble.enginePollingInterval = 1 * time.Hour
+	ble.engineLoopDone = make(chan struct{})
+	ble.maxInFlightOrchestrators = 1
+	existingOrchestrator := &orchestrator{
+		orchestratorBirthTime:       time.Now().Add(-1 * time.Hour),
+		baseLedgerTxEngine:          ble,
+		orchestratorPollingInterval: ble.enginePollingInterval,
+		state:                       OrchestratorStateRunning,
+		stateEntryTime:              time.Now().Add(-ble.maxOrchestratorIdle).Add(-1 * time.Minute),
+		InFlightTxsStale:            make(chan bool, 1),
+		stopProcess:                 make(chan bool, 1),
+		txStore:                     mTS,
+		ethClient:                   mEC,
+		managedTXEventNotifier:      mEN,
+		txConfirmationListener:      mCL,
 	}
-	// already has a running engine for the address so no new engine should be started
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Maybe()
-	enh.InFlightEngines = map[string]*transactionEngine{
-		testMainSigningAddress: existingEngine, // already has an engine for 0x1
+	ble.InFlightOrchestrators = map[string]*orchestrator{
+		testMainSigningAddress: existingOrchestrator, // already has an orchestrator for 0x1
 	}
-	enh.ctx = ctx
-	enh.poll(ctx)
-	existingEngine.engineLoopDone = make(chan struct{})
-	existingEngine.engineLoop()
-	<-existingEngine.engineLoopDone
-	assert.Equal(t, TransactionEngineStateStopped, existingEngine.state)
+	ble.ctx = ctx
+	ble.poll(ctx)
+	existingOrchestrator.orchestratorLoopDone = make(chan struct{})
+	existingOrchestrator.orchestratorLoop()
+	<-existingOrchestrator.orchestratorLoopDone
+	assert.Equal(t, OrchestratorStateStopped, existingOrchestrator.state)
 }
 
-func TestNewControllerPollingExcludePausedEngine(t *testing.T) {
+func TestNewEnginePollingExcludePausedOrchestrator(t *testing.T) {
 	ctx := context.Background()
 	qFields := &ffapi.QueryFields{}
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
+	ble, _ := NewTestTransactionEngine(t)
 
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.maxInFlightEngines = 1
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.maxInFlightOrchestrators = 1
+	ble.enginePollingInterval = 1 * time.Hour
 
-	// already has a running engine for the address so no new engine should be started
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Once()
 	listed := make(chan struct{})
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Run(func(args mock.Arguments) {
 		close(listed)
 	}).Once()
-	enh.InFlightEngines = map[string]*transactionEngine{}
-	enh.SigningAddressesPausedUntil = map[string]time.Time{testMainSigningAddress: time.Now().Add(1 * time.Hour)}
-	_, _ = enh.Start(ctx)
+	ble.InFlightOrchestrators = map[string]*orchestrator{}
+	ble.SigningAddressesPausedUntil = map[string]time.Time{testMainSigningAddress: time.Now().Add(1 * time.Hour)}
+	_, _ = ble.Start(ctx)
 	<-listed
-	assert.Empty(t, enh.InFlightEngines)
+	assert.Empty(t, ble.InFlightOrchestrators)
 }
 
-func TestNewControllerCheckNoDefaultHandlers(t *testing.T) {
+func TestNewEngineCheckNoDefaultHandlers(t *testing.T) {
 	ctx := context.Background()
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble, _ := NewTestTransactionEngine(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.enginePollingInterval = 1 * time.Hour
 
-	err := enh.HandleTransactionConfirmations(ctx, "", nil)
+	err := ble.HandleTransactionConfirmations(ctx, "", nil)
 	assert.Regexp(t, "PD011922", err)
-	err = enh.HandleTransactionReceiptReceived(ctx, "", nil)
+	err = ble.HandleTransactionReceiptReceived(ctx, "", nil)
 	assert.Regexp(t, "PD011923", err)
 }
 
-func TestNewControllerGetPendingFuelingTxs(t *testing.T) {
+func TestNewEngineGetPendingFuelingTxs(t *testing.T) {
 	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID: uuid.New().String(),
@@ -320,32 +320,32 @@ func TestNewControllerGetPendingFuelingTxs(t *testing.T) {
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble, _ := NewTestTransactionEngine(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.ctx = ctx
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.ctx = ctx
+	ble.enginePollingInterval = 1 * time.Hour
 
-	// already has a running engine for the address so no new engine should be started
+	// already has a running orchestrator for the address so no new orchestrator should be started
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1}, nil, nil).Once()
-	tx, err := enh.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
+	tx, err := ble.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
 	assert.Equal(t, mockManagedTx1, tx)
 	assert.NoError(t, err)
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return(nil, nil, fmt.Errorf("List transaction errored")).Once()
-	tx, err = enh.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
+	tx, err = ble.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
 	assert.Nil(t, tx)
 	assert.Error(t, err)
 	assert.Regexp(t, "errored", err)
 }
 
-func TestNewControllerCheckTxCompleteness(t *testing.T) {
+func TestNewEngineCheckTxCompleteness(t *testing.T) {
 	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
 		ID:     uuid.New().String(),
@@ -359,18 +359,18 @@ func TestNewControllerCheckTxCompleteness(t *testing.T) {
 
 	mockTransactionFilter := qFields.NewFilter(ctx)
 
-	enh, _ := NewTestEnterpriseTransactionHandler(t)
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble, _ := NewTestTransactionEngine(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 
 	mEC := componentmocks.NewEthClient(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.ctx = ctx
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.ctx = ctx
 	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Maybe()
-	enh.controllerPollingInterval = 1 * time.Hour
+	ble.enginePollingInterval = 1 * time.Hour
 
 	// when no nonce cached
 
@@ -383,7 +383,7 @@ func TestNewControllerCheckTxCompleteness(t *testing.T) {
 		},
 	}
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Once()
-	assert.False(t, enh.CheckTransactionCompleted(ctx, testTxWithZeroNonce))
+	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxWithZeroNonce))
 
 	// for transactions with a non-zero nonce
 	testTxToCheck := &baseTypes.ManagedTX{
@@ -395,21 +395,21 @@ func TestNewControllerCheckTxCompleteness(t *testing.T) {
 	}
 	// return false when retrieve transactions failed
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return(nil, nil, fmt.Errorf("List transaction errored")).Once()
-	assert.False(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
+	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 	// return false when no transactions retrieved
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Once()
-	assert.False(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
+	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 	// return false when the retrieved transaction has a lower nonce
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1}, nil, nil).Once()
-	assert.False(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
+	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 
 	// try to update nonce when transaction incomplete shouldn't take affect
 
-	enh.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
-	assert.False(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
+	ble.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
+	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 
 	// try to update the nonce with a completed transaction works
 	testTxToCheck.Status = baseTypes.BaseTxStatusFailed
-	enh.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
-	assert.True(t, enh.CheckTransactionCompleted(ctx, testTxToCheck))
+	ble.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
+	assert.True(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 }

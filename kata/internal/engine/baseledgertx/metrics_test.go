@@ -28,7 +28,7 @@ func TestMetrics(t *testing.T) {
 	btem.RecordCompletedTransactionCountMetrics(ctx, "success")
 	btem.RecordOperationMetrics(ctx, "test", "success", 12)
 	btem.RecordStageChangeMetrics(ctx, "test", 12)
-	btem.RecordInFlightEnginePoolMetrics(ctx, nil, 1)
+	btem.RecordInFlightOrchestratorPoolMetrics(ctx, nil, 1)
 	btem.RecordInFlightTxQueueMetrics(ctx, nil, 1)
 	btem.RecordCompletedTransactionCountMetrics(ctx, "test")
 }

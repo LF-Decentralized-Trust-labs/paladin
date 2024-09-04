@@ -23,28 +23,25 @@ import (
 )
 
 func TestInitConfigOK(t *testing.T) {
-	enterpriseTHFactory := TransactionHandlerFactory{}
 	conf := config.RootSection("unittest")
-	enterpriseTHFactory.InitConfig(conf)
-
-	assert.Equal(t, "enterprise", enterpriseTHFactory.Name())
+	InitConfig(conf)
 
 	// gas price defaults check
 	gasPriceConf := conf.SubSection(GasPriceSection)
 	assert.Equal(t, defaultGasPriceCacheEnabled, gasPriceConf.GetBool(GasPriceCacheEnabled))
 	assert.Equal(t, defaultGasPriceCacheTTL, gasPriceConf.GetString(GasPriceCacheTTLDurationString))
 
-	// transaction controller defaults check
-	controllerConf := conf.SubSection(TransactionControllerSection)
-	assert.Equal(t, defaultTransactionControllerMaxInFlightEngine, controllerConf.GetInt(TransactionControllerMaxInFlightEngineInt))
-	assert.Equal(t, defaultTransactionControllerInterval, controllerConf.GetString(TransactionControllerIntervalDurationString))
-	assert.Equal(t, defaultTransactionControllerRetryFactor, controllerConf.GetFloat64(TransactionControllerRetryFactorFloat))
-	assert.Equal(t, defaultTransactionControllerRetryInitDelay, controllerConf.GetString(TransactionControllerRetryInitDelayDurationString))
-	assert.Equal(t, defaultTransactionControllerRetryMaxDelay, controllerConf.GetString(TransactionControllerRetryMaxDelayDurationString))
-
 	// transaction engine defaults check
 	engineConf := conf.SubSection(TransactionEngineSection)
+	assert.Equal(t, defaultTransactionEngineMaxInFlightOrchestrators, engineConf.GetInt(TransactionEngineMaxInFlightOrchestratorsInt))
 	assert.Equal(t, defaultTransactionEngineInterval, engineConf.GetString(TransactionEngineIntervalDurationString))
-	assert.Equal(t, defaultTransactionEngineMaxInFlight, engineConf.GetInt(TransactionEngineMaxInFlightTransactionsInt))
-	assert.Equal(t, defaultTransactionEngineResubmitInterval, engineConf.GetString(TransactionEngineResubmitIntervalDurationString))
+	assert.Equal(t, defaultTransactionEngineRetryFactor, engineConf.GetFloat64(TransactionEngineRetryFactorFloat))
+	assert.Equal(t, defaultTransactionEngineRetryInitDelay, engineConf.GetString(TransactionEngineRetryInitDelayDurationString))
+	assert.Equal(t, defaultTransactionEngineRetryMaxDelay, engineConf.GetString(TransactionEngineRetryMaxDelayDurationString))
+
+	// transaction orchestrator defaults check
+	orchestratorConf := conf.SubSection(OrchestratorSection)
+	assert.Equal(t, defaultOrchestratorInterval, orchestratorConf.GetString(OrchestratorIntervalDurationString))
+	assert.Equal(t, defaultOrchestratorMaxInFlight, orchestratorConf.GetInt(OrchestratorMaxInFlightTransactionsInt))
+	assert.Equal(t, defaultOrchestratorResubmitInterval, orchestratorConf.GetString(OrchestratorResubmitIntervalDurationString))
 }

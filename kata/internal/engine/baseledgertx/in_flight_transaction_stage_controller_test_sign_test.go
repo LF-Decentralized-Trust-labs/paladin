@@ -40,7 +40,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	mtx.TransactionHash = ""
 	mTS := testInFlightTransactionStateManagerWithMocks.mTS
 	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -58,7 +58,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	// test panic error that doesn't belong to the current stage gets ignored
 	it.stateManager.AddPanicOutput(ctx, baseTypes.InFlightTxStageRetrieveGasPrice)
 	it.stateManager.AddSignOutput(ctx, signedMsg, txHash, nil)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -76,7 +76,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	rsc = it.stateManager.GetRunningStageContext(ctx)
 	assert.Equal(t, baseTypes.InFlightTxStageSigning, rsc.Stage)
 	rsc.StageOutputsToBePersisted = nil
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -91,7 +91,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	it.persistenceRetryTimeout = 5 * time.Second
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSigning, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist signing sub-status error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -103,7 +103,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	it.persistenceRetryTimeout = 0
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSigning, time.Now(), fmt.Errorf("persist signing sub-status error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -116,7 +116,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSigning, time.Now(), nil)
 	assert.NotNil(t, rsc.StageOutput.SignOutput.Err)
 	mTS.On("AddSubStatusAction", mock.Anything, mtx.ID, baseTypes.BaseTxSubStatusReceived, baseTypes.BaseTxActionSign, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -131,7 +131,7 @@ func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
 	rsc.StageOutput.SignOutput.Err = nil
 	rsc.StageOutput.SignOutput.SignedMessage = signedMsg
 	rsc.StageErrored = false
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -153,7 +153,7 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 	mtx := it.stateManager.GetTx()
 	mtx.TransactionHash = ""
 	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -168,7 +168,7 @@ func TestProduceLatestInFlightStageContextSigningPanic(t *testing.T) {
 	rsc = it.stateManager.GetRunningStageContext(ctx)
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPanicOutput(ctx, baseTypes.InFlightTxStageSigning)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})

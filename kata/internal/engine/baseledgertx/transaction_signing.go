@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func (it *InFlightTransaction) signTx(ctx context.Context, mtx *baseTypes.ManagedTX) ([]byte, string, error) {
+func (it *InFlightTransactionStageController) signTx(ctx context.Context, mtx *baseTypes.ManagedTX) ([]byte, string, error) {
 
 	log.L(ctx).Debugf("signTx entry")
 	signStart := time.Now()

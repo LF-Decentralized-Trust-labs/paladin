@@ -40,7 +40,7 @@ type inFlightTransactionState struct {
 	txConfirmationListener baseTypes.TransactionConfirmationListener
 	// input that should be set once the stage is running
 	*baseTypes.TransientPreviousStageOutputs
-	transactionEngineContext *baseTypes.TransactionEngineContext
+	orchestratorContext *baseTypes.OrchestratorContext
 
 	baseTypes.InFlightStageActionTriggers
 	baseTypes.InMemoryTxStateManager
@@ -49,7 +49,7 @@ type inFlightTransactionState struct {
 	// this is the core of in-flight transaction processing.
 	// only 1 stage context can exist at any given time for a specific transaction.
 	// in flight transaction contains the logic to process each stage to its completion,
-	// any stage will have at least 1 asynchronous action, in-flight transaction relies on transaction engine
+	// any stage will have at least 1 asynchronous action, in-flight transaction relies on transaction orchestrator
 	// to give it signal to collect result of those async actions.
 	// Therefore, any coordination required cross in-flight transaction can be taken into consideration for next stage.
 	//    e.g. even if the transaction is ready for submission, we might not want to submit it if the other transactions
@@ -68,15 +68,15 @@ type inFlightTransactionState struct {
 }
 
 func (iftxs *inFlightTransactionState) CanSubmit(ctx context.Context, cost *big.Int) bool {
-	log.L(ctx).Tracef("ProcessInFlightTransaction transaction entry, transaction engine context: %+v, cost: %s", iftxs.transactionEngineContext, cost.String())
-	if iftxs.transactionEngineContext.AvailableToSpend == nil {
-		log.L(ctx).Tracef("ProcessInFlightTransaction transaction can be submitted for zero gas price chain, engine context: %+v", iftxs.transactionEngineContext)
+	log.L(ctx).Tracef("ProcessInFlightTransaction transaction entry, transaction orchestrator context: %+v, cost: %s", iftxs.orchestratorContext, cost.String())
+	if iftxs.orchestratorContext.AvailableToSpend == nil {
+		log.L(ctx).Tracef("ProcessInFlightTransaction transaction can be submitted for zero gas price chain, orchestrator context: %+v", iftxs.orchestratorContext)
 		return true
 	}
 	if cost != nil {
-		return iftxs.transactionEngineContext.AvailableToSpend.Cmp(cost) != -1 && !iftxs.transactionEngineContext.PreviousNonceCostUnknown
+		return iftxs.orchestratorContext.AvailableToSpend.Cmp(cost) != -1 && !iftxs.orchestratorContext.PreviousNonceCostUnknown
 	}
-	log.L(ctx).Debugf("ProcessInFlightTransaction cannot submit transaction, transaction engine context: %+v, cost: %s", iftxs.transactionEngineContext, cost.String())
+	log.L(ctx).Debugf("ProcessInFlightTransaction cannot submit transaction, transaction orchestrator context: %+v, cost: %s", iftxs.orchestratorContext, cost.String())
 	return false
 }
 
@@ -138,8 +138,8 @@ func (iftxs *inFlightTransactionState) ValidatedTransactionHashMatchState(ctx co
 	return iftxs.validatedTransactionHashMatchState
 }
 
-func (iftxs *inFlightTransactionState) SetTransactionEngineContext(ctx context.Context, tec *baseTypes.TransactionEngineContext) {
-	iftxs.transactionEngineContext = tec
+func (iftxs *inFlightTransactionState) SetOrchestratorContext(ctx context.Context, tec *baseTypes.OrchestratorContext) {
+	iftxs.orchestratorContext = tec
 }
 
 func (iftxs *inFlightTransactionState) SetTransientPreviousStageOutputs(tpso *baseTypes.TransientPreviousStageOutputs) {

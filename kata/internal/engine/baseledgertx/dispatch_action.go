@@ -39,14 +39,14 @@ type APIResponse struct {
 	status int // http status code (200 Ok vs. 202 Accepted) - only set for success cases
 }
 
-func (enterpriseHandler *enterpriseTransactionHandler) dispatchAction(ctx context.Context, mtx *baseTypes.ManagedTX, action APIRequestType) APIResponse {
+func (baseLedgerEngine *baseLedgerTxEngine) dispatchAction(ctx context.Context, mtx *baseTypes.ManagedTX, action APIRequestType) APIResponse {
 	response := make(chan APIResponse, 1)
 	startTime := time.Now()
 	var err error
 
 	go func() {
-		enterpriseHandler.InFlightEngineMux.Lock()
-		defer enterpriseHandler.InFlightEngineMux.Unlock()
+		baseLedgerEngine.InFlightOrchestratorMux.Lock()
+		defer baseLedgerEngine.InFlightOrchestratorMux.Unlock()
 		switch action {
 		case ActionSuspend, ActionResume:
 			// Just update the DB directly, as we're not inflight right now.
@@ -54,11 +54,11 @@ func (enterpriseHandler *enterpriseTransactionHandler) dispatchAction(ctx contex
 			if action == ActionSuspend {
 				newStatus = baseTypes.BaseTxStatusSuspended
 			}
-			inFlightEngine, signingEngineInFlight := enterpriseHandler.InFlightEngines[string(mtx.From)]
-			if !signingEngineInFlight {
-				// no in-flight engine for the signing address, it's OK to update the DB directly
+			inFlightOrchestrator, orchestratorInFlight := baseLedgerEngine.InFlightOrchestrators[string(mtx.From)]
+			if !orchestratorInFlight {
+				// no in-flight orchestrator for the signing address, it's OK to update the DB directly
 				log.L(ctx).Infof("Setting status to '%s' for transaction %s", newStatus, mtx.ID)
-				err = enterpriseHandler.txStore.UpdateTransaction(ctx, mtx.ID, &baseTypes.BaseTXUpdates{
+				err = baseLedgerEngine.txStore.UpdateTransaction(ctx, mtx.ID, &baseTypes.BaseTXUpdates{
 					Status: &newStatus,
 				})
 				if err != nil {
@@ -68,7 +68,7 @@ func (enterpriseHandler *enterpriseTransactionHandler) dispatchAction(ctx contex
 				mtx.Status = newStatus
 				response <- APIResponse{tx: mtx, status: http.StatusOK}
 			} else {
-				inFlightEngine.dispatchAction(ctx, mtx, action, response)
+				inFlightOrchestrator.dispatchAction(ctx, mtx, action, response)
 			}
 		}
 	}()
@@ -78,17 +78,17 @@ func (enterpriseHandler *enterpriseTransactionHandler) dispatchAction(ctx contex
 		return res
 	case <-ctx.Done():
 		return APIResponse{
-			err: i18n.NewError(ctx, msgs.MsgTransactionHandlerRequestTimeout, time.Since(startTime).Seconds()),
+			err: i18n.NewError(ctx, msgs.MsgTransactionEngineRequestTimeout, time.Since(startTime).Seconds()),
 		}
 	}
 }
 
-func (te *transactionEngine) dispatchAction(ctx context.Context, mtx *baseTypes.ManagedTX, action APIRequestType, response chan<- APIResponse) {
+func (te *orchestrator) dispatchAction(ctx context.Context, mtx *baseTypes.ManagedTX, action APIRequestType, response chan<- APIResponse) {
 	switch action {
 	case ActionSuspend, ActionResume:
 		te.InFlightTxsMux.Lock()
 		defer te.InFlightTxsMux.Unlock()
-		var pending *InFlightTransaction
+		var pending *InFlightTransactionStageController
 		for _, inflight := range te.InFlightTxs {
 			if inflight.stateManager.GetTxID() == mtx.ID {
 				pending = inflight

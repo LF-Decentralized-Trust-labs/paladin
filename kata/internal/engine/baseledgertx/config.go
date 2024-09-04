@@ -21,9 +21,9 @@ import (
 
 const HTTPClientSection = "HTTPClient"
 
-func (f *TransactionHandlerFactory) InitConfig(conf config.Section) {
-	InitTransactionControllerConfig(conf)
+func InitConfig(conf config.Section) {
 	InitTransactionEngineConfig(conf)
+	InitOrchestratorConfig(conf)
 	InitGasPriceConfig(conf)
 	InitBalanceManagerConfig(conf)
 }

@@ -38,7 +38,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	mTS := testInFlightTransactionStateManagerWithMocks.mTS
 	// set validated to enter tracking
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -51,7 +51,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	// receipt error
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddReceiptOutput(ctx, nil, fmt.Errorf("receipt error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -71,7 +71,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	}
 	it.stateManager.AddReceiptOutput(ctx, testReceipt, nil)
 	mTS.On("AddSubStatusAction", mock.Anything, mtx.ID, baseTypes.BaseTxSubStatusReceived, baseTypes.BaseTxActionSubmitTransaction, fftypes.JSONAnyPtr(`{"protocolId":"`+testReceipt.ProtocolID+`"}`), (*fftypes.JSONAny)(nil), mock.Anything).Return(nil).Maybe()
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -86,7 +86,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	it.persistenceRetryTimeout = 5 * time.Second
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageReceipting, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist receipt error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -99,7 +99,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	it.persistenceRetryTimeout = 0
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageReceipting, time.Now(), fmt.Errorf("persist receipt error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -113,7 +113,7 @@ func TestProduceLatestInFlightStageContextReceipting(t *testing.T) {
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageReceipting, time.Now(), nil)
 	rsc.StageErrored = false
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -163,7 +163,7 @@ func TestProduceLatestInFlightStageContextReceiptingCheckExistingHashes(t *testi
 		addMock.Return(nil)
 		eventHandlerCalled <- true
 	}).Maybe()
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -206,7 +206,7 @@ func TestProduceLatestInFlightStageContextReceiptingCheckExistingHashesPersisten
 		persistenceCalled <- true
 	}).Return(fmt.Errorf("failed")).Maybe()
 
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -254,7 +254,7 @@ func TestProduceLatestInFlightStageContextReceiptingCheckExistingHashesTrackingF
 		addMock.Return(fmt.Errorf("failed to add"))
 		eventHandlerCalled <- true
 	}).Maybe()
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -276,7 +276,7 @@ func TestProduceLatestInFlightStageContextReceiptingExceededTimeout(t *testing.T
 
 	// set validated to enter tracking
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -300,7 +300,7 @@ func TestProduceLatestInFlightStageContextReceiptingExceededTimeout(t *testing.T
 		LastWarnTime: &expiredTime,
 	}
 
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -318,7 +318,7 @@ func TestProduceLatestInFlightStageContextReceiptingExceededTimeoutIgnoreRemoval
 
 	// set validated to enter tracking
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -344,7 +344,7 @@ func TestProduceLatestInFlightStageContextReceiptingExceededTimeoutIgnoreRemoval
 		LastWarnTime: &expiredTime,
 	}
 
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -364,7 +364,7 @@ func TestProduceLatestInFlightStageContextReceiptingErroredAndExceededStageTimeo
 
 	// set validated to enter tracking
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -379,7 +379,7 @@ func TestProduceLatestInFlightStageContextReceiptingErroredAndExceededStageTimeo
 	rsc.StageErrored = true
 	assert.NotNil(t, rsc)
 	assert.Equal(t, baseTypes.InFlightTxStageReceipting, rsc.Stage)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -401,7 +401,7 @@ func TestProduceLatestInFlightStageContextReceiptPanic(t *testing.T) {
 
 	// set validated to enter tracking
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, true)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -418,7 +418,7 @@ func TestProduceLatestInFlightStageContextReceiptPanic(t *testing.T) {
 	// unexpected error
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPanicOutput(ctx, baseTypes.InFlightTxStageReceipting)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})

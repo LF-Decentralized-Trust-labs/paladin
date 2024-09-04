@@ -44,7 +44,7 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 	// unexpected error
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPanicOutput(ctx, baseTypes.InFlightTxStageSubmitting)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -81,7 +81,7 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	submissionTime := fftypes.Now()
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, baseTypes.SubmissionOutcomeSubmittedNew, ethclient.ErrorReason(""), nil)
 	rsc.StageOutputsToBePersisted = nil
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -102,7 +102,7 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 	imtxs.policyInfo = &baseTypes.EnterprisePolicyInfo{}
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, baseTypes.SubmissionOutcomeNonceTooLow, ethclient.ErrorReason(""), nil)
 	rsc.StageOutputsToBePersisted = nil
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -137,7 +137,7 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 		SubmittedTxHashes: []string{},
 	}
 
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         big.NewInt(0),
 		PreviousNonceCostUnknown: true, // previous cost unknown, cannot submit
 	})
@@ -153,7 +153,7 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 	}
 	mtx.GasLimit = ethtypes.NewHexInteger64(-1) // invalid limit
 	it.stateManager.SetValidatedTransactionHashMatchState(ctx, false)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         big.NewInt(0),
 		PreviousNonceCostUnknown: true, // previous cost unknown, cannot submit
 	})
@@ -192,7 +192,7 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 		SubmittedTxHashes: []string{txHash},
 	}
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, baseTypes.SubmissionOutcomeAlreadyKnown, ethclient.ErrorReason(""), nil)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -232,7 +232,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	rsc.StageOutputsToBePersisted = nil
 	rsc = it.stateManager.GetRunningStageContext(ctx)
 	it.stateManager.AddSubmitOutput(ctx, txHash, submissionTime, baseTypes.SubmissionOutcomeFailedRequiresRetry, ethclient.ErrorReasonTransactionReverted, submissionErr)
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -260,7 +260,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	newWarnTime := fftypes.Now()
 	mtx.TransactionHash = txHash
 	it.stateManager.AddSubmitOutput(ctx, "", newWarnTime, baseTypes.SubmissionOutcomeFailedRequiresRetry, ethclient.ErrorReasonTransactionReverted, submissionErr)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -287,7 +287,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	it.persistenceRetryTimeout = 5 * time.Second
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSubmitting, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist signing sub-status error"))
-	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -303,7 +303,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	}
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSubmitting, time.Now(), nil)
-	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -314,7 +314,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 	it.persistenceRetryTimeout = 0
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageSubmitting, time.Now(), fmt.Errorf("persist submit error"))
-	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -352,7 +352,7 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 			Err:               fmt.Errorf("insufficient funds"),
 		},
 	}
-	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})
@@ -386,7 +386,7 @@ func TestProduceLatestInFlightStageContextSubmitSuccess(t *testing.T) {
 			SubmissionOutcome: baseTypes.SubmissionOutcomeSubmittedNew,
 		},
 	}
-	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: false,
 	})

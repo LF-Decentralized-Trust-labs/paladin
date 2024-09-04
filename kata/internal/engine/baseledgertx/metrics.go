@@ -47,7 +47,7 @@ func (thm *baseLedgerTxEngineMetrics) RecordStageChangeMetrics(ctx context.Conte
 	// TODO
 }
 
-func (thm *baseLedgerTxEngineMetrics) RecordInFlightEnginePoolMetrics(ctx context.Context, usedCountPerState map[string]int, freeCount int) {
+func (thm *baseLedgerTxEngineMetrics) RecordInFlightOrchestratorPoolMetrics(ctx context.Context, usedCountPerState map[string]int, freeCount int) {
 	log.L(ctx).Tracef("RecordInFlightEnginePoolMetrics")
 	// TODO
 }

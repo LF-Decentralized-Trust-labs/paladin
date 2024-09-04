@@ -29,7 +29,7 @@ import (
 )
 
 type testInFlightTransactionWithMocksAndConf struct {
-	it   *InFlightTransaction
+	it   *InFlightTransactionStageController
 	mCL  *enginemocks.TransactionConfirmationListener
 	mEC  *componentmocks.EthClient
 	mEN  *enginemocks.ManagedTxEventNotifier
@@ -42,19 +42,19 @@ type testInFlightTransactionWithMocksAndConf struct {
 func NewTestInFlightTransactionWithMocks(t *testing.T) *testInFlightTransactionWithMocksAndConf {
 	ctx := context.Background()
 	imtxs := NewTestInMemoryTxState(t)
-	enh, conf := NewTestEnterpriseTransactionHandler(t)
+	ble, conf := NewTestTransactionEngine(t)
 	mockBalanceManager, mEC, _ := NewTestBalanceManager(context.Background(), t)
-	enh.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
+	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
 	mCL := enginemocks.NewTransactionConfirmationListener(t)
 	mTS := enginemocks.NewTransactionStore(t)
 	mEN := enginemocks.NewManagedTxEventNotifier(t)
 	mKM := componentmocks.NewKeyManager(t)
-	enh.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	enh.ctx = ctx
-	enh.balanceManager = mockBalanceManager
-	engineConf := conf.SubSection(TransactionEngineSection)
-	te := NewTransactionEngine(enh, imtxs.GetTx(), engineConf)
-	it := NewInFlightTransaction(enh, te, imtxs.GetTx())
+	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
+	ble.ctx = ctx
+	ble.balanceManager = mockBalanceManager
+	orchestratorConf := conf.SubSection(OrchestratorSection)
+	te := NewOrchestrator(ble, imtxs.GetFrom(), orchestratorConf)
+	it := NewInFlightTransactionStageController(ble, te, imtxs.GetTx())
 	it.timeLineLoggingEnabled = true
 	it.testOnlyNoActionMode = true
 	return &testInFlightTransactionWithMocksAndConf{
@@ -79,7 +79,7 @@ func TestProduceLatestInFlightStageContextTriggerStageError(t *testing.T) {
 	mtx.TransactionHash = ""
 
 	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -92,7 +92,7 @@ func TestProduceLatestInFlightStageContextTriggerStageError(t *testing.T) {
 	inFlightStageManager := it.stateManager.(*inFlightTransactionState)
 	inFlightStageManager.stageTriggerError = fmt.Errorf("trigger stage error")
 
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -127,7 +127,7 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	it.persistenceRetryTimeout = 5 * time.Second
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageStatusUpdate, time.Now().Add(it.persistenceRetryTimeout*2), fmt.Errorf("persist gas price error"))
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -136,7 +136,7 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	it.persistenceRetryTimeout = 0
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageStatusUpdate, time.Now(), fmt.Errorf("persist gas price error"))
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -147,7 +147,7 @@ func TestProduceLatestInFlightStageContextStatusChange(t *testing.T) {
 	mtx.Status = suspended
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPersistenceOutput(ctx, baseTypes.InFlightTxStageStatusUpdate, time.Now(), nil)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -189,7 +189,7 @@ func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
 	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
 	suspend := baseTypes.BaseTxStatusSuspended
 	it.newStatus = &suspend
-	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut := it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
@@ -206,7 +206,7 @@ func TestProduceLatestInFlightStageContextStatusUpdatePanic(t *testing.T) {
 	rsc = it.stateManager.GetRunningStageContext(ctx)
 	inFlightStageMananger.bufferedStageOutputs = make([]*baseTypes.StageOutput, 0)
 	it.stateManager.AddPanicOutput(ctx, baseTypes.InFlightTxStageStatusUpdate)
-	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.TransactionEngineContext{
+	tOut = it.ProduceLatestInFlightStageContext(ctx, &baseTypes.OrchestratorContext{
 		AvailableToSpend:         nil,
 		PreviousNonceCostUnknown: true,
 	})
