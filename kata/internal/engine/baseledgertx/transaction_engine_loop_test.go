@@ -26,7 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/ffapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
@@ -385,11 +385,11 @@ func TestNewEngineCheckTxCompleteness(t *testing.T) {
 
 	// try to update nonce when transaction incomplete shouldn't take affect
 
-	ble.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
+	ble.updateCompletedTxNonce(testTxToCheck) // nonce stayed at 0
 	assert.False(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 
 	// try to update the nonce with a completed transaction works
 	testTxToCheck.Status = baseTypes.BaseTxStatusFailed
-	ble.updateCompletedTxNonce(ctx, testTxToCheck) // nonce stayed at 0
+	ble.updateCompletedTxNonce(testTxToCheck) // nonce stayed at 0
 	assert.True(t, ble.CheckTransactionCompleted(ctx, testTxToCheck))
 }

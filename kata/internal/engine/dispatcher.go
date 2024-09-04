@@ -20,11 +20,11 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func NewDispatcher(contractAddress string, publisher types.Publisher) types.Dispatcher {
+func NewDispatcher(contractAddress string, publisher enginespi.Publisher) enginespi.Dispatcher {
 	return &dispatcher{
 		publisher:       publisher,
 		contractAddress: contractAddress,
@@ -34,7 +34,7 @@ func NewDispatcher(contractAddress string, publisher types.Publisher) types.Disp
 
 type dispatcher struct {
 	sequencedTransactions []uuid.UUID
-	publisher             types.Publisher
+	publisher             enginespi.Publisher
 	contractAddress       string
 	nextNonce             uint64
 	nextNonceLock         sync.Mutex
@@ -53,18 +53,18 @@ func (p *dispatcher) Dispatch(ctx context.Context, transactionIDs []uuid.UUID) e
 	//Placeholder for actual interface to hand over to dispatcher
 	p.sequencedTransactions = append(p.sequencedTransactions, transactionIDs...)
 	for _, transactionID := range transactionIDs {
-		err := p.publisher.PublishStageEvent(ctx, &types.StageEvent{
+		err := p.publisher.PublishStageEvent(ctx, &enginespi.StageEvent{
 			Stage:           "attestation",
 			ContractAddress: p.contractAddress,
 			TxID:            transactionID.String(),
-			Data:            &types.TransactionDispatched{},
+			Data:            &enginespi.TransactionDispatched{},
 		})
 		if err != nil {
 			//TODO think about how best to handle this error
 			log.L(ctx).Errorf("Error publishing stage event: %s", err)
 			return err
 		}
-		err = p.publisher.PublishEvent(ctx, &types.TransactionDispatchedEvent{
+		err = p.publisher.PublishEvent(ctx, &enginespi.TransactionDispatchedEvent{
 			TransactionID:  transactionID.String(),
 			Nonce:          p.NextNonce(),
 			SigningAddress: "0x1234567890abcdef",

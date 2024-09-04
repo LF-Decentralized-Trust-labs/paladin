@@ -280,8 +280,8 @@ func TestReceiveMessage(t *testing.T) {
 	receivedMessages := make(chan *components.TransportMessage, 1)
 
 	ctx, _, tp, done := newTestTransport(t, func(mc *mockComponents) {
-		mc.engine.On("ReceiveTransportMessage", mock.Anything).Return().Run(func(args mock.Arguments) {
-			receivedMessages <- args[0].(*components.TransportMessage)
+		mc.engine.On("ReceiveTransportMessage", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
+			receivedMessages <- args[1].(*components.TransportMessage)
 		})
 	})
 	defer done()

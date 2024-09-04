@@ -23,10 +23,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
-	ptypes "github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,19 +38,19 @@ type Engine interface {
 	HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 	HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error
 	HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error
-	ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error)
+	ApproveEndorsement(ctx context.Context, endorsementRequest enginespi.EndorsementRequest) (bool, error)
 	DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction) error
 }
 
 type fakeEngine struct {
 	nodeID         string
-	sequencer      types.Sequencer
+	sequencer      enginespi.Sequencer
 	currentState   string
 	transportLayer *fakeTransportLayer
 	t              *testing.T
 }
 
-func newFakeEngine(t *testing.T, nodeID string, sequencer types.Sequencer, seedState string, transportLayer *fakeTransportLayer) *fakeEngine {
+func newFakeEngine(t *testing.T, nodeID string, sequencer enginespi.Sequencer, seedState string, transportLayer *fakeTransportLayer) *fakeEngine {
 	return &fakeEngine{
 		nodeID:         nodeID,
 		sequencer:      sequencer,
@@ -64,7 +64,7 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 	// Assemble a transaction
-	newState := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
+	newState := types.NewBytes32FromSlice(types.RandBytes(32))
 	txnID := uuid.New()
 	log.L(ctx).Infof("Assembling transaction %s", txnID)
 
@@ -116,7 +116,7 @@ func (f *fakeEngine) HandleTransactionRevertedEvent(ctx context.Context, event *
 	return f.sequencer.HandleTransactionRevertedEvent(ctx, event)
 }
 
-func (f *fakeEngine) ApproveEndorsement(ctx context.Context, endorsementRequest types.EndorsementRequest) (bool, error) {
+func (f *fakeEngine) ApproveEndorsement(ctx context.Context, endorsementRequest enginespi.EndorsementRequest) (bool, error) {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
 	// Implement the logic for approving an endorsement request.
@@ -163,7 +163,7 @@ func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event interface{}
 	return nil
 }
 
-func (f *fakeTransportLayer) PublishStageEvent(ctx context.Context, stageEvent *types.StageEvent) error {
+func (f *fakeTransportLayer) PublishStageEvent(ctx context.Context, stageEvent *enginespi.StageEvent) error {
 	panic("unimplemented")
 }
 
@@ -227,7 +227,7 @@ func TestConcurrentSequencing(t *testing.T) {
 
 	internodeTransportLayer := NewFakeTransportLayer(t)
 
-	seedState := ptypes.NewBytes32FromSlice(ptypes.RandBytes(32))
+	seedState := types.NewBytes32FromSlice(types.RandBytes(32))
 
 	delegatorMock1 := NewFakeDelegator(t, node1ID.String())
 

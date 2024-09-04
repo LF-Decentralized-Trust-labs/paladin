@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
@@ -40,22 +40,22 @@ func (tsp *testStageProcessor) Name() string {
 	return "test"
 }
 
-func (tsp *testStageProcessor) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (tsp *testStageProcessor) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 	return nil
 }
 
-func (tsp *testStageProcessor) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (tsp *testStageProcessor) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	return true
 }
 
-func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
-	unprocessedStageEvents = []*types.StageEvent{}
-	nextStep = types.NextStepWait
+func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
+	unprocessedStageEvents = []*enginespi.StageEvent{}
+	nextStep = enginespi.NextStepWait
 	for _, se := range stageEvents {
 		if string(se.Stage) == testStage {
 			// pretend we processed it
 			if se.Data.(*testActionOutput).Message == "complete" {
-				nextStep = types.NextStepNewStage
+				nextStep = enginespi.NextStepNewStage
 			} else {
 				txUpdates = &transactionstore.TransactionUpdate{
 					SequenceID: confutil.P(uuid.New()),
@@ -67,7 +67,7 @@ func (tsp *testStageProcessor) ProcessEvents(ctx context.Context, tsg transactio
 	}
 	return
 }
-func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	if tsg.GetContractAddress(ctx) == "0x000000error" {
 		return nil, errors.New("pop")
 	} else if tsg.GetContractAddress(ctx) == "0x000complete" {
@@ -82,7 +82,7 @@ func (tsp *testStageProcessor) PerformAction(ctx context.Context, tsg transactio
 }
 
 func newTestStageController(ctx context.Context) *PaladinStageController {
-	sc := NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
+	sc := NewPaladinStageController(ctx, enginespi.NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil), []TxStageProcessor{&testStageProcessor{}}).(*PaladinStageController)
 	return sc
 }
 
@@ -104,7 +104,7 @@ func TestBasicStageController(t *testing.T) {
 	assert.Equal(t, "complete", output.(*testActionOutput).Message)
 	assert.Empty(t, err)
 
-	events, txUpdates, completed := sc.ProcessEventsForStage(ctx, testStage, testTx, []*types.StageEvent{
+	events, txUpdates, completed := sc.ProcessEventsForStage(ctx, testStage, testTx, []*enginespi.StageEvent{
 		{
 			Stage: testStage,
 			Data:  output,
@@ -112,7 +112,7 @@ func TestBasicStageController(t *testing.T) {
 	})
 	assert.Empty(t, events)
 	assert.Empty(t, txUpdates)
-	assert.Equal(t, types.NextStepNewStage, completed)
+	assert.Equal(t, enginespi.NextStepNewStage, completed)
 
 	// panic when stage is unknown
 	unknownStage := "unknown"
@@ -122,6 +122,6 @@ func TestBasicStageController(t *testing.T) {
 	})
 
 	assert.Panics(t, func() {
-		_, _, _ = sc.ProcessEventsForStage(ctx, unknownStage, testTx, []*types.StageEvent{})
+		_, _, _ = sc.ProcessEventsForStage(ctx, unknownStage, testTx, []*enginespi.StageEvent{})
 	})
 }

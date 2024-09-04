@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 )
 

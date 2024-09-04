@@ -18,8 +18,7 @@ package stages
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
-
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
@@ -36,13 +35,13 @@ func (ds *DispatchStage) Name() string {
 	return "dispatch"
 }
 
-func (ds *DispatchStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (ds *DispatchStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 	return nil
 }
 
-func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
-	unprocessedStageEvents = []*types.StageEvent{}
-	nextStep = types.NextStepWait
+func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
+	unprocessedStageEvents = []*enginespi.StageEvent{}
+	nextStep = enginespi.NextStepWait
 	for _, se := range stageEvents {
 		if string(se.Stage) != ds.Name() {
 			unprocessedStageEvents = append(unprocessedStageEvents, se)
@@ -51,12 +50,12 @@ func (ds *DispatchStage) ProcessEvents(ctx context.Context, tsg transactionstore
 	return
 }
 
-func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (ds *DispatchStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
 	return tx.Signer != ""
 }
 
-func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (ds *DispatchStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	//for now, we just get stuck in the dispatch stage indefinitely
 	//there is code coming in another branch to replace the dispatch stage with a number of new stages to nurture the transaction throught to sumbission and confirmation on the base ledger
 	return nil, nil

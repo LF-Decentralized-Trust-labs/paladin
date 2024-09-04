@@ -26,7 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
@@ -432,7 +432,7 @@ func NewBalanceManagerWithInMemoryTracking(ctx context.Context, conf config.Sect
 	bm := &BalanceManagerWithInMemoryTracking{
 		sourceAddress:                    afConfig.GetString(BalanceManagerAutoFuelingSourceAddressString),
 		ethClient:                        ethClient,
-		txEngine:                        txEngine,
+		txEngine:                         txEngine,
 		balanceCache:                     cm,
 		minSourceBalance:                 minSourceBalance,
 		proactiveFuelingTransactionTotal: afConfig.GetInt(BalanceManagerAutoFuelingProactiveFuelingTransactionTotalInt),

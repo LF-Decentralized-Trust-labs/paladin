@@ -16,6 +16,8 @@
 package components
 
 import (
+	"context"
+
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
@@ -88,7 +90,7 @@ type Engine interface {
 	Init(PreInitComponentsAndManagers) (*ManagerInitResult, error)
 	Start() error
 	Stop()
-	ReceiveTransportMessage(*TransportMessage)
+	ReceiveTransportMessage(context.Context, *TransportMessage)
 }
 
 type AllComponents interface {

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"math/big"
 
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 
 	"github.com/hyperledger/firefly-common/pkg/cache"
 	"github.com/hyperledger/firefly-common/pkg/config"

@@ -170,7 +170,7 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		ReplyTo:       types.PrivateIdentityLocator(msg.ReplyTo),
 		Payload:       msg.Payload,
 	}
-	t.tm.engine.ReceiveTransportMessage(transportMessage)
+	t.tm.engine.ReceiveTransportMessage(ctx, transportMessage)
 
 	return &prototk.ReceiveMessageResponse{}, nil
 }

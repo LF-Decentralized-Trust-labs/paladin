@@ -118,7 +118,7 @@ func TestTransportRequestsOK(t *testing.T) {
 			return &prototk.ConfigureTransportResponse{}, nil
 		},
 		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-			assert.Equal(t, "node1", smr.Message.Destination.Node)
+			assert.Equal(t, "node1", smr.Message.Destination)
 			return &prototk.SendMessageResponse{}, nil
 		},
 	}
@@ -138,7 +138,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	}
 
 	ttm.resolveTarget = func(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-		assert.Equal(t, "node1", req.Node)
+		assert.Equal(t, "node1", req.Destination)
 		return &prototk.GetTransportDetailsResponse{
 			TransportDetails: "node1_details",
 		}, nil
@@ -159,7 +159,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{Destination: &prototk.Destination{Node: "node1"}},
+		Message: &prototk.Message{Destination: "node1"},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, smr)
@@ -171,7 +171,7 @@ func TestTransportRequestsOK(t *testing.T) {
 
 	callbacks := <-waitForCallbacks
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-		Node: "node1",
+		Destination: "node1",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "node1_details", rts.TransportDetails)

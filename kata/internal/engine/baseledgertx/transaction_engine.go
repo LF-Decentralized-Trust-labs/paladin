@@ -28,7 +28,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 

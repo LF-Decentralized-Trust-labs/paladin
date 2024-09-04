@@ -123,7 +123,7 @@ func unitTestComponentManagerStart(ctx context.Context, conf *componentmgr.Confi
 	return cm, err
 }
 
-func (tb *testbed) ReceiveTransportMessage(*components.TransportMessage) {
+func (tb *testbed) ReceiveTransportMessage(context.Context, *components.TransportMessage) {
 	// no-op
 }
 
