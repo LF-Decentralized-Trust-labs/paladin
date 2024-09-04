@@ -13,27 +13,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package types
+package engine
 
 import (
-	"testing"
+	"context"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 )
 
-func TestForTypesAndMocks(t *testing.T) {
+func NewDelegator() types.Delegator {
+	return &delegator{}
+}
 
-	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil)
-	assert.Nil(t, pfs.DependencyChecker())
-	assert.Nil(t, pfs.IdentityResolver())
-	assert.Nil(t, pfs.StateStore())
+type delegator struct {
+}
 
-	// mock object tests for coverage:
-	mIR := &MockIdentityResolver{}
-
-	assert.NoError(t, mIR.ConnectToBaseLeger())
-	assert.True(t, mIR.IsCurrentNode("current-node"))
-	assert.False(t, mIR.IsCurrentNode("not-current-node"))
-	assert.Empty(t, mIR.GetDispatchAddress(nil))
-	assert.Equal(t, "test", mIR.GetDispatchAddress([]string{"test"}))
+// Delegate implements types.Delegator.
+func (p *delegator) Delegate(ctx context.Context, transactionId string, delegateNodeId string) error {
+	panic("unimplemented")
 }

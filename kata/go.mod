@@ -38,6 +38,8 @@ require (
 
 )
 
+require github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b // indirect
+
 require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/karlseguin/ccache v2.0.3+incompatible // indirect
