@@ -241,12 +241,6 @@ type BaseLedgerTxEngine interface {
 	// HandleResumeTransaction - handles event of resuming a suspended managed transaction
 	HandleResumeTransaction(ctx context.Context, txID string) (mtx *ManagedTX, err error)
 
-	// Informational events:
-	// HandleTransactionConfirmations - handles confirmations of blockchain transactions for a managed transaction
-	HandleTransactionConfirmations(ctx context.Context, txID string, notification *ConfirmationsNotification) (err error)
-	// HandleTransactionReceiptReceived - handles receipt of blockchain transactions for a managed transaction
-	HandleTransactionReceiptReceived(ctx context.Context, txID string, receipt *ethclient.TransactionReceiptResponse) (err error)
-
 	// Functions for auto-fueling
 	GetPendingFuelingTransaction(ctx context.Context, sourceAddress string, destinationAddress string) (tx *ManagedTX, err error)
 	CheckTransactionCompleted(ctx context.Context, tx *ManagedTX) (completed bool)

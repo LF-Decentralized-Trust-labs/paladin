@@ -22,10 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffapi"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -298,15 +295,4 @@ func (ble *baseLedgerTxEngine) updateCompletedTxNonce(ctx context.Context, tx *b
 		updated = true
 	}
 	return updated
-}
-
-func (ble *baseLedgerTxEngine) HandleTransactionConfirmations(ctx context.Context, txID string, notification *baseTypes.ConfirmationsNotification) (err error) {
-	// enterprise handler doesn't implement the default call back
-	// we pass in transaction specific callback to use the extra info in the disclosure
-	return i18n.NewError(ctx, msgs.MsgConfirmationHandlerNotFound)
-}
-func (ble *baseLedgerTxEngine) HandleTransactionReceiptReceived(ctx context.Context, txID string, receipt *ethclient.TransactionReceiptResponse) (err error) {
-	// enterprise handler doesn't implement the default call back
-	// we pass in transaction specific callback to use the extra info in the disclosure
-	return i18n.NewError(ctx, msgs.MsgReceiptHandlerNotFound)
 }

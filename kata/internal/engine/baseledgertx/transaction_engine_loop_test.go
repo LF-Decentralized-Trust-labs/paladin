@@ -287,26 +287,6 @@ func TestNewEnginePollingExcludePausedOrchestrator(t *testing.T) {
 	assert.Empty(t, ble.InFlightOrchestrators)
 }
 
-func TestNewEngineCheckNoDefaultHandlers(t *testing.T) {
-	ctx := context.Background()
-
-	ble, _ := NewTestTransactionEngine(t)
-	ble.gasPriceClient = NewTestFixedPriceGasPriceClient(t)
-	mTS := enginemocks.NewTransactionStore(t)
-	mCL := enginemocks.NewTransactionConfirmationListener(t)
-	mEN := enginemocks.NewManagedTxEventNotifier(t)
-
-	mEC := componentmocks.NewEthClient(t)
-	mKM := componentmocks.NewKeyManager(t)
-	ble.Init(ctx, mEC, mKM, mTS, mEN, mCL)
-	ble.enginePollingInterval = 1 * time.Hour
-
-	err := ble.HandleTransactionConfirmations(ctx, "", nil)
-	assert.Regexp(t, "PD011922", err)
-	err = ble.HandleTransactionReceiptReceived(ctx, "", nil)
-	assert.Regexp(t, "PD011923", err)
-}
-
 func TestNewEngineGetPendingFuelingTxs(t *testing.T) {
 	ctx := context.Background()
 	mockManagedTx1 := &baseTypes.ManagedTX{
