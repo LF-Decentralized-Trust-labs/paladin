@@ -50,8 +50,8 @@ task copySolidity(type: Copy,) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
-        include 'contracts/multicall/MultiCall.sol/MultiCall.json'
-        include 'contracts/multicall/MultiCall.sol/MultiCallFactory.json'
+        include 'contracts/atom/Atom.sol/Atom.json'
+        include 'contracts/atom/Atom.sol/AtomFactory.json'
     }
     into 'abis'
 

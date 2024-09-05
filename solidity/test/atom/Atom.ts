@@ -1,32 +1,16 @@
 import { expect } from "chai";
 import { ContractTransactionReceipt, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
-import { MultiCall } from "../typechain-types";
+import { Atom } from "../typechain-types";
 import { fakeTXO, newTransferHash, randomBytes32 } from "../noto/Noto";
 
-enum OperationType {
-  EncodedCall = 0,
-}
-
-const newOperation = (
-  op: Partial<MultiCall.OperationInputStruct> &
-    Pick<MultiCall.OperationInputStruct, "opType" | "contractAddress">
-): MultiCall.OperationInputStruct => {
-  return {
-    data: "0x",
-    ...op,
-  };
-};
-
-describe("MultiCall", function () {
+describe("Atom", function () {
   it("atomic operation with 2 encoded calls", async function () {
     const [notary1, notary2, anybody1, anybody2] = await ethers.getSigners();
 
     const Noto = await ethers.getContractFactory("Noto");
-    const MultiCallFactory = await ethers.getContractFactory(
-      "MultiCallFactory"
-    );
-    const MultiCall = await ethers.getContractFactory("MultiCall");
+    const AtomFactory = await ethers.getContractFactory("AtomFactory");
+    const Atom = await ethers.getContractFactory("Atom");
     const ERC20Simple = await ethers.getContractFactory("ERC20Simple");
 
     // Deploy two contracts
@@ -67,23 +51,21 @@ describe("MultiCall", function () {
     ]);
 
     // Deploy the delegation contract
-    const multiCallFactory = await MultiCallFactory.connect(anybody1).deploy();
-    const mcFactoryInvoke = await multiCallFactory.connect(anybody1).create([
-      newOperation({
-        opType: OperationType.EncodedCall,
+    const atomFactory = await AtomFactory.connect(anybody1).deploy();
+    const mcFactoryInvoke = await atomFactory.connect(anybody1).create([
+      {
         contractAddress: noto,
-        data: encoded1,
-      }),
-      newOperation({
-        opType: OperationType.EncodedCall,
+        callData: encoded1,
+      },
+      {
         contractAddress: erc20,
-        data: encoded2,
-      }),
+        callData: encoded2,
+      },
     ]);
     const createMF = await mcFactoryInvoke.wait();
     const createMFEvent = createMF?.logs
-      .map((l) => MultiCallFactory.interface.parseLog(l))
-      .find((l) => l?.name === "MultiCallDeployed");
+      .map((l) => AtomFactory.interface.parseLog(l))
+      .find((l) => l?.name === "AtomDeployed");
     const mcAddr = createMFEvent?.args.addr;
 
     // Do the delegation/approval transactions
@@ -100,8 +82,8 @@ describe("MultiCall", function () {
     await erc20.approve(mcAddr, 1000);
 
     // Run the atomic op (anyone can initiate)
-    const multiCall = MultiCall.connect(anybody2).attach(mcAddr) as MultiCall;
-    await multiCall.execute();
+    const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
+    await atom.execute();
 
     // Now we should find the final TXOs/tokens in both contracts in the right states
     expect(await noto.isUnspent(f1txo1)).to.equal(false);
@@ -116,10 +98,8 @@ describe("MultiCall", function () {
     const [notary1, anybody1, anybody2] = await ethers.getSigners();
 
     const Noto = await ethers.getContractFactory("Noto");
-    const MultiCallFactory = await ethers.getContractFactory(
-      "MultiCallFactory"
-    );
-    const MultiCall = await ethers.getContractFactory("MultiCall");
+    const AtomFactory = await ethers.getContractFactory("AtomFactory");
+    const Atom = await ethers.getContractFactory("Atom");
 
     // Deploy noto contract
     const noto = await Noto.connect(notary1).deploy(
@@ -147,23 +127,22 @@ describe("MultiCall", function () {
     ]);
 
     // Deploy the delegation contract
-    const multiCallFactory = await MultiCallFactory.connect(anybody1).deploy();
-    const mcFactoryInvoke = await multiCallFactory.connect(anybody1).create([
-      newOperation({
-        opType: OperationType.EncodedCall,
+    const atomFactory = await AtomFactory.connect(anybody1).deploy();
+    const mcFactoryInvoke = await atomFactory.connect(anybody1).create([
+      {
         contractAddress: noto,
-        data: encoded1,
-      }),
+        callData: encoded1,
+      },
     ]);
     const createMF = await mcFactoryInvoke.wait();
     const createMFEvent = createMF?.logs
-      .map((l) => MultiCallFactory.interface.parseLog(l))
-      .find((l) => l?.name === "MultiCallDeployed");
+      .map((l) => AtomFactory.interface.parseLog(l))
+      .find((l) => l?.name === "AtomDeployed");
     const mcAddr = createMFEvent?.args.addr;
 
     // Run the atomic op (will revert because delegation was never actually created)
-    const multiCall = MultiCall.connect(anybody2).attach(mcAddr) as MultiCall;
-    await expect(multiCall.execute())
+    const atom = Atom.connect(anybody2).attach(mcAddr) as Atom;
+    await expect(atom.execute())
       .to.be.revertedWithCustomError(Noto, "NotoInvalidDelegate")
       .withArgs(multiTXF1Part.hash, ZeroAddress, mcAddr);
   });

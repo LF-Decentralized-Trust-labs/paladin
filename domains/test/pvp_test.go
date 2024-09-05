@@ -41,11 +41,11 @@ import (
 //go:embed abis/NotoFactory.json
 var notoFactoryJSON []byte // From "gradle copySolidity"
 
-//go:embed abis/MultiCallFactory.json
-var multicallFactoryJSON []byte // From "gradle copySolidity"
+//go:embed abis/AtomFactory.json
+var atomFactoryJSON []byte // From "gradle copySolidity"
 
-//go:embed abis/MultiCall.json
-var multicallJSON []byte // From "gradle copySolidity"
+//go:embed abis/Atom.json
+var atomJSON []byte // From "gradle copySolidity"
 
 var (
 	notaryName     = "notary1"
@@ -53,19 +53,12 @@ var (
 	recipient2Name = "recipient2"
 )
 
-type OperationType int
-
-const (
-	EncodedCall OperationType = iota
-)
-
 type OperationInput struct {
-	OpType          OperationType             `json:"opType"`
 	ContractAddress ethtypes.Address0xHex     `json:"contractAddress"`
-	Data            ethtypes.HexBytes0xPrefix `json:"data"`
+	CallData        ethtypes.HexBytes0xPrefix `json:"callData"`
 }
 
-type MultiCallDeployed struct {
+type AtomDeployed struct {
 	Address ethtypes.Address0xHex `json:"addr"`
 }
 
@@ -204,8 +197,8 @@ func TestPvP(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying factories")
 	contractSource := map[string][]byte{
-		"noto":      notoFactoryJSON,
-		"multicall": multicallFactoryJSON,
+		"noto": notoFactoryJSON,
+		"atom": atomFactoryJSON,
 	}
 	contracts := deployContracts(ctx, t, contractSource)
 	for name, address := range contracts {
@@ -220,16 +213,16 @@ func TestPvP(t *testing.T) {
 	})
 	defer done()
 
-	multicallAddress, err := ethtypes.NewAddress(contracts["multicall"])
+	atomAddress, err := ethtypes.NewAddress(contracts["atom"])
 	assert.NoError(t, err)
 
 	// Prepare ABI clients for direct calls
 	eth := tb.Components().EthClientFactory().HTTPClient()
-	multicallFactoryBuild := domain.LoadBuild(multicallFactoryJSON)
-	multicallFactory, err := eth.ABI(ctx, multicallFactoryBuild.ABI)
+	atomFactoryBuild := domain.LoadBuild(atomFactoryJSON)
+	atomFactory, err := eth.ABI(ctx, atomFactoryBuild.ABI)
 	assert.NoError(t, err)
-	multicallBuild := domain.LoadBuild(multicallJSON)
-	multicall, err := eth.ABI(ctx, multicallBuild.ABI)
+	atomBuild := domain.LoadBuild(atomJSON)
+	atom, err := eth.ABI(ctx, atomBuild.ABI)
 	assert.NoError(t, err)
 
 	log.L(ctx).Infof("Deploying 2 instances of Noto")
@@ -247,23 +240,21 @@ func TestPvP(t *testing.T) {
 	transferGold := notoPrepareTransfer(ctx, t, rpc, notoGoldAddress, recipient1Name, recipient2Name, 1)
 	transferSiler := notoPrepareTransfer(ctx, t, rpc, notoSilverAddress, recipient2Name, recipient1Name, 10)
 
-	log.L(ctx).Infof("Create MultiCall instance")
-	create, err := multicallFactory.Function(ctx, "create")
+	log.L(ctx).Infof("Create Atom instance")
+	create, err := atomFactory.Function(ctx, "create")
 	assert.NoError(t, err)
 	txHash, err := create.R(ctx).
 		Signer(recipient1Name).
-		To(multicallAddress).
+		To(atomAddress).
 		Input(map[string][]*OperationInput{
 			"operations": {
 				{
-					OpType:          EncodedCall,
 					ContractAddress: notoGoldAddress,
-					Data:            transferGold,
+					CallData:        transferGold,
 				},
 				{
-					OpType:          EncodedCall,
 					ContractAddress: notoSilverAddress,
-					Data:            transferSiler,
+					CallData:        transferSiler,
 				},
 			},
 		}).
@@ -271,11 +262,11 @@ func TestPvP(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = tb.Components().BlockIndexer().WaitForTransaction(ctx, *txHash)
 	assert.NoError(t, err)
-	events, err := tb.Components().BlockIndexer().DecodeTransactionEvents(ctx, *txHash, multicallFactory.ABI())
+	events, err := tb.Components().BlockIndexer().DecodeTransactionEvents(ctx, *txHash, atomFactory.ABI())
 	assert.NoError(t, err)
-	deployedEvent := findEvent(t, events, multicallFactory.ABI(), "MultiCallDeployed")
+	deployedEvent := findEvent(t, events, atomFactory.ABI(), "AtomDeployed")
 	assert.NotNil(t, deployedEvent)
-	var deployedParams MultiCallDeployed
+	var deployedParams AtomDeployed
 	err = json.Unmarshal(deployedEvent.Data, &deployedParams)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, deployedParams.Address)
@@ -285,7 +276,7 @@ func TestPvP(t *testing.T) {
 	notoApprove(ctx, t, rpc, notoSilverAddress, recipient2Name, deployedParams.Address, transferSiler)
 
 	log.L(ctx).Infof("Execute the atomic operation")
-	execute, err := multicall.Function(ctx, "execute")
+	execute, err := atom.Function(ctx, "execute")
 	assert.NoError(t, err)
 	txHash, err = execute.R(ctx).
 		Signer(recipient1Name).
