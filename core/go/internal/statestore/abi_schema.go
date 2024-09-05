@@ -29,7 +29,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type abiSchema struct {
@@ -59,7 +60,7 @@ func newABISchema(ctx context.Context, domainID string, def *abi.Parameter) (*ab
 		as.SchemaPersisted.Signature, err = as.FullSignature(ctx)
 	}
 	if err == nil {
-		as.ID = types.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
+		as.ID = tktypes.Bytes32Keccak([]byte(as.SchemaPersisted.Signature))
 	}
 	if err != nil {
 		return nil, err
@@ -282,7 +283,7 @@ type parsedStateData struct {
 	labelValues filters.PassthroughValueSet
 }
 
-func (as *abiSchema) parseStateData(ctx context.Context, data types.RawJSON) (*parsedStateData, error) {
+func (as *abiSchema) parseStateData(ctx context.Context, data tktypes.RawJSON) (*parsedStateData, error) {
 	var psd parsedStateData
 	err := json.Unmarshal([]byte(data), &psd.jsonTree)
 	if err != nil {
@@ -322,7 +323,7 @@ func (as *abiSchema) parseStateData(ctx context.Context, data types.RawJSON) (*p
 
 // Take the state, parse the value into the type tree of this schema, and from that
 // build the label values to store in the DB for comparison appropriate to the type.
-func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error) {
+func (as *abiSchema) ProcessState(ctx context.Context, data tktypes.RawJSON) (*StateWithLabels, error) {
 
 	psd, err := as.parseStateData(ctx, data)
 	if err != nil {
@@ -338,20 +339,20 @@ func (as *abiSchema) ProcessState(ctx context.Context, data types.RawJSON) (*Sta
 	// - Standardize formatting of all the data elements so domains do not need to worry
 	var jsonData []byte
 	if err == nil {
-		jsonData, err = types.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
+		jsonData, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, psd.cv)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	hashID := types.NewBytes32FromSlice(hash)
+	hashID := tktypes.NewBytes32FromSlice(hash)
 	for i := range psd.labels {
 		psd.labels[i].State = hashID
 	}
 	for i := range psd.int64Labels {
 		psd.int64Labels[i].State = hashID
 	}
-	now := types.TimestampNow()
+	now := tktypes.TimestampNow()
 	return &StateWithLabels{
 		State: &State{
 			ID:          hashID,

@@ -26,8 +26,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +64,7 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 	// Assemble a transaction
-	newState := types.NewBytes32FromSlice(types.RandBytes(32))
+	newState := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 	txnID := uuid.New()
 	log.L(ctx).Infof("Assembling transaction %s", txnID)
 
@@ -227,7 +227,7 @@ func TestConcurrentSequencing(t *testing.T) {
 
 	internodeTransportLayer := NewFakeTransportLayer(t)
 
-	seedState := types.NewBytes32FromSlice(types.RandBytes(32))
+	seedState := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	delegatorMock1 := NewFakeDelegator(t, node1ID.String())
 

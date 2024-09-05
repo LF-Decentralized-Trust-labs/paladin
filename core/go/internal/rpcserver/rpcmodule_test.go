@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +36,7 @@ func TestRCPModule(t *testing.T) {
 		})),
 	)
 
-	var jsonResponse types.RawJSON
+	var jsonResponse tktypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",

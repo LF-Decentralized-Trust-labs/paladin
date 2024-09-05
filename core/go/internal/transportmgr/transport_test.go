@@ -23,11 +23,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -251,16 +251,16 @@ func TestSendMessageDestWrong(t *testing.T) {
 
 	message := testMessage()
 
-	message.Destination = types.PrivateIdentityLocator("no_node")
+	message.Destination = tktypes.PrivateIdentityLocator("no_node")
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD012007", err)
 
-	message.Destination = types.PrivateIdentityLocator("this_is_local@node1")
+	message.Destination = tktypes.PrivateIdentityLocator("this_is_local@node1")
 	err = tm.Send(ctx, message)
 	assert.Regexp(t, "PD012007", err)
 
-	message.Destination = types.PrivateIdentityLocator("ok@node2")
-	message.ReplyTo = types.PrivateIdentityLocator("wrong@@syntax")
+	message.Destination = tktypes.PrivateIdentityLocator("ok@node2")
+	message.ReplyTo = tktypes.PrivateIdentityLocator("wrong@@syntax")
 	err = tm.Send(ctx, message)
 	assert.Regexp(t, "PD012006", err)
 

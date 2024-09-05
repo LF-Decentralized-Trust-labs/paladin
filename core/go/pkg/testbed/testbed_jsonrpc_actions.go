@@ -26,9 +26,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/rpcserver"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (tb *testbed) initRPC() {
@@ -76,8 +76,8 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod4(func(ctx context.Context,
 		from string,
 		abi abi.ABI,
-		bytecode types.HexBytes,
-		params types.RawJSON,
+		bytecode tktypes.HexBytes,
+		params tktypes.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
 		var constructor ethclient.ABIFunctionClient
@@ -109,8 +109,8 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
 		domainName string,
-		constructorParams types.RawJSON,
-	) (*types.EthAddress, error) {
+		constructorParams tktypes.RawJSON,
+	) (*tktypes.EthAddress, error) {
 
 		domain, err := tb.c.DomainManager().GetDomainByName(ctx, domainName)
 		if err != nil {
@@ -172,7 +172,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 
 func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		invocation types.PrivateContractInvoke,
+		invocation tktypes.PrivateContractInvoke,
 	) (bool, error) {
 
 		psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)

@@ -21,8 +21,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -47,18 +48,18 @@ func (est EventStreamType) Options() []string {
 		string(EventStreamTypeInternal),
 	}
 }
-func (est EventStreamType) Enum() types.Enum[EventStreamType] {
-	return types.Enum[EventStreamType](est)
+func (est EventStreamType) Enum() tktypes.Enum[EventStreamType] {
+	return tktypes.Enum[EventStreamType](est)
 }
 
 type EventStream struct {
-	ID      uuid.UUID                   `json:"id"             gorm:"primaryKey"`
-	Name    string                      `json:"name"`
-	Created types.Timestamp             `json:"created"        gorm:"autoCreateTime:nano"`
-	Updated types.Timestamp             `json:"updated"        gorm:"autoUpdateTime:nano"`
-	Type    types.Enum[EventStreamType] `json:"type"`
-	Config  EventStreamConfig           `json:"config"         gorm:"type:bytes;serializer:json"`
-	ABI     abi.ABI                     `json:"abi,omitempty"  gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
+	ID      uuid.UUID                     `json:"id"             gorm:"primaryKey"`
+	Name    string                        `json:"name"`
+	Created tktypes.Timestamp             `json:"created"        gorm:"autoCreateTime:nano"`
+	Updated tktypes.Timestamp             `json:"updated"        gorm:"autoUpdateTime:nano"`
+	Type    tktypes.Enum[EventStreamType] `json:"type"`
+	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
+	ABI     abi.ABI                       `json:"abi,omitempty"  gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
 }
 
 type EventStreamCheckpoint struct {
@@ -67,8 +68,8 @@ type EventStreamCheckpoint struct {
 }
 
 type EventStreamSignature struct {
-	Stream        uuid.UUID     `json:"stream"                 gorm:"primaryKey"`
-	SignatureHash types.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
+	Stream        uuid.UUID       `json:"stream"                 gorm:"primaryKey"`
+	SignatureHash tktypes.Bytes32 `json:"signatureHash"          gorm:"primaryKey"`
 }
 
 type EventWithData struct {
@@ -80,8 +81,8 @@ type EventWithData struct {
 	// Things like whitespace etc. subject to change (so should not stored for later comparison)
 	SoliditySignature string `json:"soliditySignature"`
 
-	Address types.EthAddress `json:"address"`
-	Data    types.RawJSON    `json:"data"`
+	Address tktypes.EthAddress `json:"address"`
+	Data    tktypes.RawJSON    `json:"data"`
 }
 
 type EventDeliveryBatch struct {

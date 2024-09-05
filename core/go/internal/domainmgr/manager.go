@@ -32,10 +32,10 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -59,9 +59,9 @@ func NewDomainManager(bgCtx context.Context, conf *DomainManagerConfig) componen
 		conf:             conf,
 		domainsByID:      make(map[uuid.UUID]*domain),
 		domainsByName:    make(map[string]*domain),
-		domainsByAddress: make(map[types.EthAddress]*domain),
+		domainsByAddress: make(map[tktypes.EthAddress]*domain),
 		contractWaiter:   inflight.NewInflightManager[uuid.UUID, *PrivateSmartContract](uuid.Parse),
-		contractCache:    cache.NewCache[types.EthAddress, *domainContract](&conf.DomainManager.ContractCache, ContractCacheDefaults),
+		contractCache:    cache.NewCache[tktypes.EthAddress, *domainContract](&conf.DomainManager.ContractCache, ContractCacheDefaults),
 	}
 }
 
@@ -77,16 +77,16 @@ type domainManager struct {
 
 	domainsByID      map[uuid.UUID]*domain
 	domainsByName    map[string]*domain
-	domainsByAddress map[types.EthAddress]*domain
+	domainsByAddress map[tktypes.EthAddress]*domain
 
 	contractWaiter *inflight.InflightManager[uuid.UUID, *PrivateSmartContract]
-	contractCache  cache.Cache[types.EthAddress, *domainContract]
+	contractCache  cache.Cache[tktypes.EthAddress, *domainContract]
 }
 
 type event_PaladinNewSmartContract_V0 struct {
-	TXId   types.Bytes32    `json:"txId"`
-	Domain types.EthAddress `json:"domain"`
-	Data   types.HexBytes   `json:"data"`
+	TXId   tktypes.Bytes32    `json:"txId"`
+	Domain tktypes.EthAddress `json:"domain"`
+	Data   tktypes.HexBytes   `json:"data"`
 }
 
 func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
@@ -213,7 +213,7 @@ func (dm *domainManager) setDomainAddress(d *domain) {
 	dm.domainsByAddress[*d.factoryContractAddress] = d
 }
 
-func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *types.EthAddress) (d *domain, _ error) {
+func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *tktypes.EthAddress) (d *domain, _ error) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
 	if addr != nil {
@@ -225,7 +225,7 @@ func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *types.Eth
 	return d, nil
 }
 
-func (dm *domainManager) GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (components.DomainSmartContract, error) {
+func (dm *domainManager) GetSmartContractByAddress(ctx context.Context, addr tktypes.EthAddress) (components.DomainSmartContract, error) {
 	dc, isCached := dm.contractCache.Get(addr)
 	if isCached {
 		return dc, nil
@@ -293,7 +293,7 @@ func mustParseEventSoliditySignature(a abi.ABI, eventName string) string {
 	return solString
 }
 
-func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
+func mustParseEventSignatureHash(a abi.ABI, eventName string) tktypes.Bytes32 {
 	event := a.Events()[eventName]
 	if event == nil {
 		panic("ABI missing " + eventName)
@@ -302,5 +302,5 @@ func mustParseEventSignatureHash(a abi.ABI, eventName string) types.Bytes32 {
 	if err != nil {
 		panic(err)
 	}
-	return types.NewBytes32FromSlice(sig)
+	return tktypes.NewBytes32FromSlice(sig)
 }

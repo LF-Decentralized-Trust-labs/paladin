@@ -14,14 +14,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
 	"unicode"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 const DefaultNameMaxLen = 128
@@ -40,7 +40,7 @@ func ValidateSafeCharsStartEndAlphaNum(ctx context.Context, val string, maxLen i
 		}
 	}
 	if !valid {
-		return i18n.NewError(ctx, msgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
+		return i18n.NewError(ctx, tkmsgs.MsgTypesInvalidNameSafeCharAlphaBoxed, fieldName, maxLen, val)
 	}
 	return nil
 }

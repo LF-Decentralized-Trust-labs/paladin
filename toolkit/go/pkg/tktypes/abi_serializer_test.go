@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -131,9 +131,9 @@ func TestABIsMustMatchSubMatch(t *testing.T) {
 
 	// Fails match on whole (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
-	assert.Regexp(t, "PD011103.*mismatchedFunction", err)
+	assert.Regexp(t, "PD020004.*mismatchedFunction", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
-	assert.Regexp(t, "PD011103.*mismatchedFunction", err)
+	assert.Regexp(t, "PD020004.*mismatchedFunction", err)
 
 	// Is ok for a sub-match on just the events (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
@@ -187,13 +187,13 @@ func TestABIsMustMatchExtra(t *testing.T) {
 
 	// Fails match on whole (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
-	assert.Regexp(t, "PD011103.*extraFunction", err)
+	assert.Regexp(t, "PD020004.*extraFunction", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
-	assert.Regexp(t, "PD011103.*extraFunction", err)
+	assert.Regexp(t, "PD020004.*extraFunction", err)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Function)
-	assert.Regexp(t, "PD011103.*extraFunction", err)
+	assert.Regexp(t, "PD020004.*extraFunction", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Function)
-	assert.Regexp(t, "PD011103.*extraFunction", err)
+	assert.Regexp(t, "PD020004.*extraFunction", err)
 
 	// Is ok for a sub-match on just the events (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
@@ -316,9 +316,9 @@ func TestABIsDeepMisMatchName(t *testing.T) {
 
 	// Fails match simply due to that one missing _ on _sku vs. sku
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
-	assert.Regexp(t, "PD011103.*NestedTypeEvent", err)
+	assert.Regexp(t, "PD020004.*NestedTypeEvent", err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
-	assert.Regexp(t, "PD011103.*NestedTypeEvent", err)
+	assert.Regexp(t, "PD020004.*NestedTypeEvent", err)
 
 	hashA, err := ABISolDefinitionHash(context.Background(), abiA)
 	assert.NoError(t, err)

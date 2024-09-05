@@ -22,7 +22,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type SchemaType string
@@ -44,13 +45,13 @@ const (
 )
 
 type SchemaPersisted struct {
-	ID         types.Bytes32   `json:"id"          gorm:"primaryKey"`
-	CreatedAt  types.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
-	DomainID   string          `json:"domain"`
-	Type       SchemaType      `json:"type"`
-	Signature  string          `json:"signature"`
-	Definition types.RawJSON   `json:"definition"`
-	Labels     []string        `json:"labels"      gorm:"type:text[]; serializer:json"`
+	ID         tktypes.Bytes32   `json:"id"          gorm:"primaryKey"`
+	CreatedAt  tktypes.Timestamp `json:"created"     gorm:"autoCreateTime:nano"`
+	DomainID   string            `json:"domain"`
+	Type       SchemaType        `json:"type"`
+	Signature  string            `json:"signature"`
+	Definition tktypes.RawJSON   `json:"definition"`
+	Labels     []string          `json:"labels"      gorm:"type:text[]; serializer:json"`
 }
 
 type schemaLabelInfo struct {
@@ -61,7 +62,7 @@ type schemaLabelInfo struct {
 }
 
 type idOnly struct {
-	ID types.Bytes32 `gorm:"primaryKey"`
+	ID tktypes.Bytes32 `gorm:"primaryKey"`
 }
 
 type Schema interface {
@@ -69,7 +70,7 @@ type Schema interface {
 	IDString() string
 	Signature() string
 	Persisted() *SchemaPersisted
-	ProcessState(ctx context.Context, data types.RawJSON) (*StateWithLabels, error)
+	ProcessState(ctx context.Context, data tktypes.RawJSON) (*StateWithLabels, error)
 	RecoverLabels(ctx context.Context, s *State) (*StateWithLabels, error)
 }
 
@@ -77,7 +78,7 @@ type labelInfoAccess interface {
 	labelInfo() []*schemaLabelInfo
 }
 
-func schemaCacheKey(domainID string, id types.Bytes32) string {
+func schemaCacheKey(domainID string, id tktypes.Bytes32) string {
 	return domainID + "/" + id.String()
 }
 
@@ -89,14 +90,14 @@ func (ss *stateStore) PersistSchema(ctx context.Context, s Schema) error {
 }
 
 func (ss *stateStore) GetSchema(ctx context.Context, domainID, schemaID string, failNotFound bool) (Schema, error) {
-	id, err := types.ParseBytes32Ctx(ctx, schemaID)
+	id, err := tktypes.ParseBytes32Ctx(ctx, schemaID)
 	if err != nil {
 		return nil, err
 	}
 	return ss.getSchemaByID(ctx, domainID, id, failNotFound)
 }
 
-func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID types.Bytes32, failNotFound bool) (Schema, error) {
+func (ss *stateStore) getSchemaByID(ctx context.Context, domainID string, schemaID tktypes.Bytes32, failNotFound bool) (Schema, error) {
 
 	cacheKey := schemaCacheKey(domainID, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +30,7 @@ func TestExecuteBatchOpsInsertBadOp(t *testing.T) {
 	defer done()
 
 	txOp := &writeOperation{
-		id:   types.ShortID(),
+		id:   tktypes.ShortID(),
 		done: make(chan error, 1),
 	}
 	ss.writer.queue(ctx, txOp)
@@ -69,7 +69,7 @@ func TestFlushTimeout(t *testing.T) {
 	defer done()
 
 	txOp := &writeOperation{
-		id:     types.ShortID(),
+		id:     tktypes.ShortID(),
 		done:   make(chan error, 1),
 		domain: "domain1",
 	}
@@ -85,7 +85,7 @@ func TestFlushClosed(t *testing.T) {
 	defer done()
 
 	txOp := &writeOperation{
-		id:     types.ShortID(),
+		id:     tktypes.ShortID(),
 		done:   make(chan error, 1),
 		domain: "domain1",
 	}
@@ -100,7 +100,7 @@ func TestFlushCallerClosed(t *testing.T) {
 	defer done()
 
 	txOp := &writeOperation{
-		id:     types.ShortID(),
+		id:     tktypes.ShortID(),
 		done:   make(chan error, 1),
 		domain: "domain1",
 	}

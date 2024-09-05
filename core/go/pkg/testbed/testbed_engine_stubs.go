@@ -27,15 +27,15 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/proto"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
 
 	var abiFunc ethclient.ABIFunctionClient
 	ec := tb.c.EthClientFactory().HTTPClient()
-	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, types.HexBytes(txInstruction.Bytecode))
+	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, tktypes.HexBytes(txInstruction.Bytecode))
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 }
 
 func mustParseBuildABI(buildJSON []byte) abi.ABI {
-	var buildParsed map[string]types.RawJSON
+	var buildParsed map[string]tktypes.RawJSON
 	var buildABI abi.ABI
 	err := json.Unmarshal(buildJSON, &buildParsed)
 	if err == nil {
@@ -180,9 +180,9 @@ func mustParseBuildABI(buildJSON []byte) abi.ABI {
 	return buildABI
 }
 
-func mustParseBuildBytecode(buildJSON []byte) types.HexBytes {
-	var buildParsed map[string]types.RawJSON
-	var byteCode types.HexBytes
+func mustParseBuildBytecode(buildJSON []byte) tktypes.HexBytes {
+	var buildParsed map[string]tktypes.RawJSON
+	var byteCode tktypes.HexBytes
 	err := json.Unmarshal(buildJSON, &buildParsed)
 	if err == nil {
 		err = json.Unmarshal(buildParsed["bytecode"], &byteCode)

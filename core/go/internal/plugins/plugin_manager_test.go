@@ -114,7 +114,7 @@ func TestInitPluginManagerBadPlugin(t *testing.T) {
 	}}
 	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &PluginManagerConfig{})
 	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentMocks(t))
-	assert.Regexp(t, "PD011106", err)
+	assert.Regexp(t, "PD020005", err)
 }
 
 func TestInitPluginManagerBadSocket(t *testing.T) {

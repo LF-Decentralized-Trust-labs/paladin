@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -22,11 +22,11 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"gopkg.in/yaml.v3"
 )
 
-// Just like types.RawJSON, but with ability to SQL serialize to string as well
+// Just like tktypes.RawJSON, but with ability to SQL serialize to string as well
 type RawJSON []byte
 
 func JSONString(s any) RawJSON {
@@ -98,7 +98,7 @@ func (m RawJSON) MarshalJSON() ([]byte, error) {
 
 func (m *RawJSON) UnmarshalJSON(data []byte) error {
 	if m == nil {
-		return i18n.NewError(context.Background(), msgs.MsgTypesUnmarshalNil)
+		return i18n.NewError(context.Background(), tkmsgs.MsgTypesUnmarshalNil)
 	}
 	*m = append((*m)[0:0], data...)
 	return nil
@@ -128,6 +128,6 @@ func (m *RawJSON) Scan(src interface{}) error {
 		*m = nil
 		return nil
 	default:
-		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, m)
+		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, m)
 	}
 }

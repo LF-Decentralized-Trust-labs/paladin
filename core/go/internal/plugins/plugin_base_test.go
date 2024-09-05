@@ -21,11 +21,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -49,7 +49,7 @@ type mockPlugin[T any] struct {
 func (tp *mockPlugin[T]) Conf() *components.PluginConfig {
 	if tp.conf == nil {
 		tp.conf = &components.PluginConfig{
-			Type:    types.Enum[components.LibraryType](components.LibraryTypeCShared),
+			Type:    tktypes.Enum[components.LibraryType](components.LibraryTypeCShared),
 			Library: "/any/where",
 		}
 	}

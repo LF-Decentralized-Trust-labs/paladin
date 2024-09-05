@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +59,7 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, sc
 		var ij map[string]interface{}
 		err := json.Unmarshal([]byte(w), &ij)
 		assert.NoError(t, err)
-		ij["salt"] = types.RandHex(32)
+		ij["salt"] = tktypes.RandHex(32)
 		withSalt, err := json.Marshal(ij)
 		assert.NoError(t, err)
 		states[i], err = ss.PersistState(ctx, domainID, schemaID, withSalt)
@@ -198,7 +198,7 @@ func TestStateStatusQualifierJSON(t *testing.T) {
 	assert.Regexp(t, "PD010117", err)
 
 	u := uuid.New().String()
-	err = json.Unmarshal(types.JSONString(u), &q)
+	err = json.Unmarshal(tktypes.JSONString(u), &q)
 	assert.NoError(t, err)
 	assert.Equal(t, u, (string)(q))
 }

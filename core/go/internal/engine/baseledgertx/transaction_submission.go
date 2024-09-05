@@ -26,23 +26,23 @@ import (
 	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"golang.org/x/crypto/sha3"
 )
 
-func calculateTransactionHash(rawTxnData []byte) *types.Bytes32 {
+func calculateTransactionHash(rawTxnData []byte) *tktypes.Bytes32 {
 	if rawTxnData == nil {
 		return nil
 	}
 	msgHash := sha3.NewLegacyKeccak256()
 	msgHash.Write(rawTxnData)
-	hashBytes := types.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
+	hashBytes := tktypes.MustParseBytes32(hex.EncodeToString(msgHash.Sum(nil)))
 	return &hashBytes
 }
 
 func (it *InFlightTransactionStageController) submitTX(ctx context.Context, mtx *baseTypes.ManagedTX, signedMessage []byte) (string, *fftypes.FFTime, ethclient.ErrorReason, baseTypes.SubmissionOutcome, error) {
-	var txHash *types.Bytes32
+	var txHash *tktypes.Bytes32
 	sendStart := time.Now()
 	calculatedTxHash := calculateTransactionHash(signedMessage)
 	log.L(ctx).Debugf("Sending raw transaction %s at nonce %s / %d (lastSubmit=%s), Hash= %s, Data=%s", mtx.ID, mtx.From, mtx.Nonce.Int64(), mtx.LastSubmit, txHash, mtx.Data)
@@ -53,7 +53,7 @@ func (it *InFlightTransactionStageController) submitTX(ctx context.Context, mtx 
 	var submissionError error
 
 	retryError := it.transactionSubmissionRetry.Do(ctx, fmt.Sprintf("tx submission  %s/%s", mtx.ID, calculatedTxHash), func(attempt int) ( /*retry*/ bool, error) {
-		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, types.HexBytes(types.MustParseHexBytes(string(signedMessage)).HexString0xPrefix()))
+		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, tktypes.HexBytes(tktypes.MustParseHexBytes(string(signedMessage)).HexString0xPrefix()))
 		if submissionError == nil {
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())
 			if txHash != nil {

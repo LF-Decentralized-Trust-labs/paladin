@@ -24,8 +24,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,7 +57,7 @@ func newTestHDWalletKeyManager(t *testing.T) (*simpleKeyManager, func()) {
 				Keys: map[string]api.StaticKeyEntryConfig{
 					"seed": {
 						Encoding: "hex",
-						Inline:   types.RandHex(32),
+						Inline:   tktypes.RandHex(32),
 					},
 				},
 			},

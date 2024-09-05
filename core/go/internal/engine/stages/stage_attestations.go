@@ -25,9 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type AttestationResult struct {
@@ -163,7 +163,7 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 				}
 				err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
 					MessageType: "endorsementRequest",
-					Destination: types.PrivateIdentityLocator(party),
+					Destination: tktypes.PrivateIdentityLocator(party),
 					Payload:     messageBytes,
 				})
 				if err != nil {

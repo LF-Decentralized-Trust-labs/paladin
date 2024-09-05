@@ -23,8 +23,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
 )
@@ -131,7 +131,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 			assert.False(t, gasLimit)
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			assert.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
@@ -144,7 +144,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 
 			cv, err := testABI.ABI().Functions()["newWidget"].DecodeCallData(tx.Data)
 			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
 			assert.NoError(t, err)
 			assert.JSONEq(t, `{
 				"widget": {
@@ -209,7 +209,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var key1 string
 	var err error
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
 			} else if withBlockRef {
@@ -218,14 +218,14 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 				assert.Equal(t, "latest", s)
 			}
 			if withFrom {
-				assert.Equal(t, types.JSONString(key1), types.RawJSON(tx.From))
+				assert.Equal(t, tktypes.JSONString(key1), tktypes.RawJSON(tx.From))
 			} else {
 				assert.Nil(t, tx.From)
 			}
 			cv, err := testABI.ABI().Functions()["getWidgets"].DecodeCallData(tx.Data)
 			assert.NoError(t, err)
 			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
 			assert.NoError(t, err)
 			assert.JSONEq(t, `{
 				"sku":      "1122334455"
@@ -396,7 +396,7 @@ func TestABIFunctionShortcutsOK(t *testing.T) {
 
 func TestCallFunctionFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -411,7 +411,7 @@ func TestCallFunctionFail(t *testing.T) {
 
 func TestSignAndSendMissingFrom(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -474,7 +474,7 @@ func TestBuildCallData(t *testing.T) {
 
 	req := newWidget.R(ctx).To(to)
 
-	err = req.Input(types.RawJSON(`{
+	err = req.Input(tktypes.RawJSON(`{
 		"widget": {
 			"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
 			"sku":      "1122334455",
@@ -527,7 +527,7 @@ func TestInvokeConstructor(t *testing.T) {
 		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
 			assert.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
@@ -536,7 +536,7 @@ func TestInvokeConstructor(t *testing.T) {
 
 			cv, err := testABI.ABI().Constructor().Inputs.DecodeABIData(tx.Data, len(fakeBytecode))
 			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
 			assert.NoError(t, err)
 			assert.JSONEq(t, `{
 				"supplier": "0xfb75836dc4130a9462fafd8fe96c8ee376e2f32e"

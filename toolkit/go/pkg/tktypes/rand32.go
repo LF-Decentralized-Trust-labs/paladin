@@ -14,15 +14,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"crypto/rand"
+	"encoding/hex"
 )
 
-func TestShortID(t *testing.T) {
-	id := ShortID()
-	assert.Regexp(t, "[a-zA-Z0-9_-]{8}", id)
+var randReader = rand.Reader
+
+func RandHex(count int) string {
+	return hex.EncodeToString(RandBytes(count))
+}
+
+func RandBytes(count int) []byte {
+	b := make([]byte, count)
+	i, err := randReader.Read(b)
+	if err != nil || i != count {
+		panic(err)
+	}
+	return b
 }

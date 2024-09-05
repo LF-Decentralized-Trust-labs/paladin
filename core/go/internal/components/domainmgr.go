@@ -19,9 +19,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type DomainManagerToDomain interface {
@@ -35,7 +35,7 @@ type DomainManager interface {
 	ConfiguredDomains() map[string]*PluginConfig
 	DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
-	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
+	GetSmartContractByAddress(ctx context.Context, addr tktypes.EthAddress) (DomainSmartContract, error)
 	WaitForDeploy(ctx context.Context, txID uuid.UUID) (DomainSmartContract, error)
 }
 
@@ -43,7 +43,7 @@ type DomainManager interface {
 type Domain interface {
 	Initialized() bool
 	Name() string
-	Address() *types.EthAddress
+	Address() *tktypes.EthAddress
 	Configuration() *prototk.DomainConfig
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error
@@ -53,8 +53,8 @@ type Domain interface {
 // External interface for other components to call against a private smart contract
 type DomainSmartContract interface {
 	Domain() Domain
-	Address() types.EthAddress
-	ConfigBytes() types.HexBytes
+	Address() tktypes.EthAddress
+	ConfigBytes() tktypes.HexBytes
 
 	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error

@@ -17,12 +17,12 @@
 package blockindexer
 
 import (
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type IndexedBlock struct {
-	Number int64         `json:"number"`
-	Hash   types.Bytes32 `json:"hash"                                     gorm:"primaryKey"`
+	Number int64           `json:"number"`
+	Hash   tktypes.Bytes32 `json:"hash"                                     gorm:"primaryKey"`
 }
 
 type EthTransactionResult string
@@ -32,8 +32,8 @@ const (
 	TXResult_SUCCESS EthTransactionResult = "success"
 )
 
-func (lt EthTransactionResult) Enum() types.Enum[EthTransactionResult] {
-	return types.Enum[EthTransactionResult](lt)
+func (lt EthTransactionResult) Enum() tktypes.Enum[EthTransactionResult] {
+	return tktypes.Enum[EthTransactionResult](lt)
 }
 
 func (pl EthTransactionResult) Options() []string {
@@ -44,21 +44,21 @@ func (pl EthTransactionResult) Options() []string {
 }
 
 type IndexedTransaction struct {
-	Hash             types.Bytes32                    `json:"hash"                      gorm:"primaryKey"`
-	BlockNumber      int64                            `json:"blockNumber"`
-	TransactionIndex int64                            `json:"transactionIndex"`
-	From             *types.EthAddress                `json:"from"`
-	To               *types.EthAddress                `json:"to,omitempty"`
-	ContractAddress  *types.EthAddress                `json:"contractAddress,omitempty"`
-	Result           types.Enum[EthTransactionResult] `json:"result,omitempty"`
+	Hash             tktypes.Bytes32                    `json:"hash"                      gorm:"primaryKey"`
+	BlockNumber      int64                              `json:"blockNumber"`
+	TransactionIndex int64                              `json:"transactionIndex"`
+	From             *tktypes.EthAddress                `json:"from"`
+	To               *tktypes.EthAddress                `json:"to,omitempty"`
+	ContractAddress  *tktypes.EthAddress                `json:"contractAddress,omitempty"`
+	Result           tktypes.Enum[EthTransactionResult] `json:"result,omitempty"`
 }
 
 type IndexedEvent struct {
 	BlockNumber      int64               `json:"blockNumber"             gorm:"primaryKey"`
 	TransactionIndex int64               `json:"transactionIndex"        gorm:"primaryKey"`
 	LogIndex         int64               `json:"logIndex"                gorm:"primaryKey"`
-	TransactionHash  types.Bytes32       `json:"transactionHash"`
-	Signature        types.Bytes32       `json:"signature"`
+	TransactionHash  tktypes.Bytes32     `json:"transactionHash"`
+	Signature        tktypes.Bytes32     `json:"signature"`
 	Transaction      *IndexedTransaction `json:"transaction,omitempty"   gorm:"foreignKey:block_number,transaction_index;references:block_number,transaction_index"`
 	Block            *IndexedBlock       `json:"block,omitempty"         gorm:"foreignKey:number;references:block_number"`
 }

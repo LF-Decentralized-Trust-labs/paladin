@@ -33,10 +33,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/proto"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -47,7 +47,7 @@ type EthClient interface {
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
-	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode types.HexBytes) (_ ABIFunctionClient, err error)
+	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode tktypes.HexBytes) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
 	ChainID() int64
 
@@ -57,9 +57,9 @@ type EthClient interface {
 	GasEstimate(ctx context.Context, tx *ethsigner.Transaction) (gasLimit *ethtypes.HexInteger, err error)
 	GetTransactionCount(ctx context.Context, fromAddr string) (transactionCount *ethtypes.HexUint64, err error)
 	GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error)
-	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error)
-	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error)
-	SendRawTransaction(ctx context.Context, rawTX types.HexBytes) (*types.Bytes32, error)
+	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data tktypes.HexBytes, err error)
+	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (tktypes.HexBytes, error)
+	SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error)
 }
 
 type KeyManager interface {
@@ -110,14 +110,14 @@ func (ec *ethClient) setupChainID(ctx context.Context) error {
 	return nil
 }
 
-func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data types.HexBytes, err error) {
+func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string) (data tktypes.HexBytes, err error) {
 
 	if from != nil {
 		_, fromAddr, err := ec.keymgr.ResolveKey(ctx, *from, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 		if err != nil {
 			return nil, err
 		}
-		tx.From = json.RawMessage(types.JSONString(fromAddr))
+		tx.From = json.RawMessage(tktypes.JSONString(fromAddr))
 	}
 
 	if rpcErr := ec.rpc.CallRPC(ctx, &data, "eth_call", tx, block); rpcErr != nil {
@@ -222,13 +222,13 @@ func (ec *ethClient) GetTransactionCount(ctx context.Context, fromAddr string) (
 	return &transactionCount, nil
 }
 
-func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (types.HexBytes, error) {
+func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction) (tktypes.HexBytes, error) {
 	// Resolve the key (directly with the signer - we have no key manager here in the teseced)
 	keyHandle, fromAddr, err := ec.keymgr.ResolveKey(ctx, from, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	if err != nil {
 		return nil, err
 	}
-	tx.From = json.RawMessage(types.JSONString(fromAddr))
+	tx.From = json.RawMessage(tktypes.JSONString(fromAddr))
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
 	if tx.Nonce == nil {
@@ -271,7 +271,7 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	signature, err := ec.keymgr.Sign(ctx, &proto.SignRequest{
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		KeyHandle: keyHandle,
-		Payload:   types.HexBytes(hash.Sum(nil)),
+		Payload:   tktypes.HexBytes(hash.Sum(nil)),
 	})
 	var sig *secp256k1.SignatureData
 	if err == nil {
@@ -295,11 +295,11 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	return rawTX, nil
 }
 
-func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX types.HexBytes) (*types.Bytes32, error) {
+func (ec *ethClient) SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error) {
 
 	// Submit
-	var txHash types.Bytes32
-	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", types.HexBytes(rawTX)); rpcErr != nil {
+	var txHash tktypes.Bytes32
+	if rpcErr := ec.rpc.CallRPC(ctx, &txHash, "eth_sendRawTransaction", tktypes.HexBytes(rawTX)); rpcErr != nil {
 		addr, decodedTX, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), ec.chainID)
 		if err != nil {
 			log.L(ctx).Errorf("Invalid transaction build during signing: %s", err)

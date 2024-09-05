@@ -19,8 +19,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type LibraryType string
@@ -30,8 +31,8 @@ const (
 	LibraryTypeJar     LibraryType = "jar"
 )
 
-func (lt LibraryType) Enum() types.Enum[LibraryType] {
-	return types.Enum[LibraryType](lt)
+func (lt LibraryType) Enum() tktypes.Enum[LibraryType] {
+	return tktypes.Enum[LibraryType](lt)
 }
 
 func (pl LibraryType) Options() []string {
@@ -41,17 +42,17 @@ func (pl LibraryType) Options() []string {
 	}
 }
 
-func MapLibraryTypeToProto(t types.Enum[LibraryType]) (prototk.PluginLoad_LibType, error) {
-	return types.MapEnum(t, map[LibraryType]prototk.PluginLoad_LibType{
+func MapLibraryTypeToProto(t tktypes.Enum[LibraryType]) (prototk.PluginLoad_LibType, error) {
+	return tktypes.MapEnum(t, map[LibraryType]prototk.PluginLoad_LibType{
 		LibraryTypeCShared: prototk.PluginLoad_C_SHARED,
 		LibraryTypeJar:     prototk.PluginLoad_JAR,
 	})
 }
 
 type PluginConfig struct {
-	Type    types.Enum[LibraryType] `yaml:"type"`
-	Library string                  `yaml:"library"`
-	Class   *string                 `yaml:"class,omitempty"`
+	Type    tktypes.Enum[LibraryType] `yaml:"type"`
+	Library string                    `yaml:"library"`
+	Class   *string                   `yaml:"class,omitempty"`
 }
 
 type PluginManager interface {

@@ -25,10 +25,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	core "github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +101,7 @@ func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *domain.S
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
-	domainName := "zeto_" + core.RandHex(8)
+	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
 	log.L(ctx).Infof("Deploying Zeto libraries+factory")
@@ -143,9 +143,9 @@ func TestZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
 	var boolResult bool
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &core.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       core.EthAddress(zetoAddress),
+		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
@@ -164,9 +164,9 @@ func TestZeto(t *testing.T) {
 	assert.Equal(t, controllerName, coins[0].Owner)
 
 	log.L(ctx).Infof("Mint 20 from controller to controller")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &core.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       core.EthAddress(zetoAddress),
+		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
@@ -187,9 +187,9 @@ func TestZeto(t *testing.T) {
 	assert.Equal(t, controllerName, coins[1].Owner)
 
 	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &core.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     recipient1Name,
-		To:       core.EthAddress(zetoAddress),
+		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     recipient1Name,
@@ -201,9 +201,9 @@ func TestZeto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &core.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       core.EthAddress(zetoAddress),
+		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,

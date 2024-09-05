@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type EnumStringOptions interface {
@@ -62,7 +62,7 @@ func (p Enum[O]) Validate() (O, error) {
 			return O(o), nil
 		}
 	}
-	return "", i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(validator.Options(), ","))
+	return "", i18n.NewError(context.Background(), tkmsgs.MsgTypesEnumValueInvalid, strings.Join(validator.Options(), ","))
 }
 
 func MapEnum[O EnumStringOptions, T any](p Enum[O], mapped map[O]T) (ret T, err error) {
@@ -81,7 +81,7 @@ func MapEnum[O EnumStringOptions, T any](p Enum[O], mapped map[O]T) (ret T, err 
 				}
 			}
 		}
-		err = i18n.NewError(context.Background(), msgs.MsgTypesEnumValueInvalid, strings.Join(mappedOpts, ","))
+		err = i18n.NewError(context.Background(), tkmsgs.MsgTypesEnumValueInvalid, strings.Join(mappedOpts, ","))
 		return
 	}
 	return
@@ -102,7 +102,7 @@ func (p *Enum[O]) Scan(src interface{}) error {
 	case nil:
 		*p = ""
 	default:
-		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, "")
+		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, "")
 	}
 	validated, err := p.Validate()
 	if err != nil {

@@ -14,15 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
-import "github.com/aidarkhanov/nanoid"
+import (
+	"testing"
 
-const (
-	// ShortIDalphabet is designed for easy double-click select
-	ShortIDalphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
+	"github.com/stretchr/testify/assert"
 )
 
-func ShortID() string {
-	return nanoid.Must(nanoid.Generate(ShortIDalphabet, 8))
+func TestShortID(t *testing.T) {
+	id := ShortID()
+	assert.Regexp(t, "[a-zA-Z0-9_-]{8}", id)
 }

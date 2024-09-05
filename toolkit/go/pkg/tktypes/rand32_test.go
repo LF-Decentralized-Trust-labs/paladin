@@ -14,16 +14,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
-	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"crypto/rand"
+	"fmt"
+	"testing"
+	"testing/iotest"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Specification for the invocation of a private smart contract
-type PrivateContractInvoke struct {
-	From     string     `json:"from"`               // the authorizing identity for this transaction
-	To       EthAddress `json:"to"`                 // the private smart contract to invoke (must already have been deployed and indexed)
-	Function abi.Entry  `json:"function,omitempty"` // ABI definition of the function to invoke
-	Inputs   RawJSON    `json:"inputs,omitempty"`   // JSON encoded inputs - which will be validated against the function spec
+func TestRandHex(t *testing.T) {
+
+	r1 := RandHex(32)
+	assert.Len(t, r1, 64)
+
+	randReader = iotest.ErrReader(fmt.Errorf("pop"))
+	defer func() { randReader = rand.Reader }()
+
+	assert.Panics(t, func() {
+		_ = RandHex(32)
+	})
+
 }

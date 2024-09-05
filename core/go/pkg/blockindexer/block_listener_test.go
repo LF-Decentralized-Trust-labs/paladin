@@ -31,8 +31,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/rpcclient"
 	"github.com/kaleido-io/paladin/core/mocks/rpcbackendmocks"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -123,10 +123,10 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	bl.blockPollingInterval = 1 * time.Microsecond
 	bl.unstableHeadLength = 2 // check wrapping
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -293,10 +293,10 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -374,7 +374,7 @@ func TestBlockListenerBlockNotAvailableAfterNotify(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -412,11 +412,11 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -507,13 +507,13 @@ func TestBlockListenerGap(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1004Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1005Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1004Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1005Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -635,10 +635,10 @@ func TestBlockListenerRebuildToHead(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -719,12 +719,12 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -811,11 +811,11 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
 
-	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1001Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -907,7 +907,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
-	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -941,7 +941,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	_, bl, mRPC, done := newTestBlockListener(t)
 	bl.blockPollingInterval = 1 * time.Microsecond
-	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexUint64)
@@ -1040,8 +1040,8 @@ func TestBlockListenerRebuildCanonicalFailTerminate(t *testing.T) {
 	defer done()
 	bl.canonicalChain.PushBack(&BlockInfoJSONRPC{
 		Number:     1000,
-		Hash:       ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
-		ParentHash: ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+		Hash:       ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
+		ParentHash: ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
 	})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
