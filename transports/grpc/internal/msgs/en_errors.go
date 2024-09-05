@@ -32,7 +32,7 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 
 var (
 	// Generic PD0200XX
-	MsgListenerAddressRequired              = ffe("PD030000", "Listener address is required")
+	MsgListenerPortAndAddressRequired       = ffe("PD030000", "port and address for listener are required")
 	MsgInvalidTransportConfig               = ffe("PD030001", "Invalid transport configuration")
 	MsgConfIncompatibleWithDirectCertVerify = ffe("PD030002", "When directCertVerification is enabled, TLS and clientAuth must be enabled, with no additional CA configuration or insecureSkipHostVerify")
 	MsgInvalidSubjectRegexp                 = ffe("PD030003", "subjectMatchRegex is invalid")

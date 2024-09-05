@@ -40,7 +40,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaladinGRPCTransportClient interface {
-	MessageStream(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Message, error)
+	MessageStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Message, Message], error)
 }
 
 type paladinGRPCTransportClient struct {
@@ -51,21 +51,24 @@ func NewPaladinGRPCTransportClient(cc grpc.ClientConnInterface) PaladinGRPCTrans
 	return &paladinGRPCTransportClient{cc}
 }
 
-func (c *paladinGRPCTransportClient) MessageStream(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Message, error) {
+func (c *paladinGRPCTransportClient) MessageStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Message, Message], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Message)
-	err := c.cc.Invoke(ctx, PaladinGRPCTransport_MessageStream_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &PaladinGRPCTransport_ServiceDesc.Streams[0], PaladinGRPCTransport_MessageStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[Message, Message]{ClientStream: stream}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PaladinGRPCTransport_MessageStreamClient = grpc.BidiStreamingClient[Message, Message]
 
 // PaladinGRPCTransportServer is the server API for PaladinGRPCTransport service.
 // All implementations must embed UnimplementedPaladinGRPCTransportServer
 // for forward compatibility.
 type PaladinGRPCTransportServer interface {
-	MessageStream(context.Context, *Message) (*Message, error)
+	MessageStream(grpc.BidiStreamingServer[Message, Message]) error
 	mustEmbedUnimplementedPaladinGRPCTransportServer()
 }
 
@@ -76,8 +79,8 @@ type PaladinGRPCTransportServer interface {
 // pointer dereference when methods are called.
 type UnimplementedPaladinGRPCTransportServer struct{}
 
-func (UnimplementedPaladinGRPCTransportServer) MessageStream(context.Context, *Message) (*Message, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MessageStream not implemented")
+func (UnimplementedPaladinGRPCTransportServer) MessageStream(grpc.BidiStreamingServer[Message, Message]) error {
+	return status.Errorf(codes.Unimplemented, "method MessageStream not implemented")
 }
 func (UnimplementedPaladinGRPCTransportServer) mustEmbedUnimplementedPaladinGRPCTransportServer() {}
 func (UnimplementedPaladinGRPCTransportServer) testEmbeddedByValue()                              {}
@@ -100,23 +103,12 @@ func RegisterPaladinGRPCTransportServer(s grpc.ServiceRegistrar, srv PaladinGRPC
 	s.RegisterService(&PaladinGRPCTransport_ServiceDesc, srv)
 }
 
-func _PaladinGRPCTransport_MessageStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Message)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PaladinGRPCTransportServer).MessageStream(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: PaladinGRPCTransport_MessageStream_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaladinGRPCTransportServer).MessageStream(ctx, req.(*Message))
-	}
-	return interceptor(ctx, in, info, handler)
+func _PaladinGRPCTransport_MessageStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PaladinGRPCTransportServer).MessageStream(&grpc.GenericServerStream[Message, Message]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type PaladinGRPCTransport_MessageStreamServer = grpc.BidiStreamingServer[Message, Message]
 
 // PaladinGRPCTransport_ServiceDesc is the grpc.ServiceDesc for PaladinGRPCTransport service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -124,12 +116,14 @@ func _PaladinGRPCTransport_MessageStream_Handler(srv interface{}, ctx context.Co
 var PaladinGRPCTransport_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "github.com.kaleido_io.paladin.transports.grpc.PaladinGRPCTransport",
 	HandlerType: (*PaladinGRPCTransportServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "MessageStream",
-			Handler:    _PaladinGRPCTransport_MessageStream_Handler,
+			StreamName:    "MessageStream",
+			Handler:       _PaladinGRPCTransport_MessageStream_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "pkg/proto/paladin.proto",
 }
