@@ -65,7 +65,6 @@ var (
 	MsgComponentRegistryStartError     = ffe("PD010022", "Error starting registry manager")
 
 	// States PD0101XX
-	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")
 	MsgStateInvalidLength             = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
 	MsgStateInvalidABIParam           = ffe("PD010102", "Invalid ABI parameter")
 	MsgStateInvalidSchemaType         = ffe("PD010103", "Invalid state schema type: %s")
@@ -155,14 +154,6 @@ var (
 	MsgJSONRPCIncorrectParamCount = ffe("PD011003", "method %s requires %d params (supplied=%d)")
 	MsgJSONRPCInvalidParam        = ffe("PD011004", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
-
-	// Types PD0111XX
-	MsgTypesUnmarshalNil                  = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail                      = ffe("PD011101", "Unable to scan type %T into type %T")
-	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
-	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
-	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
-	MsgTypesPrivateIdentityLocatorInvalid = ffe("PD011107", "Locator string %s is invalid")
 
 	// Plugin controller PD0112XX
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")

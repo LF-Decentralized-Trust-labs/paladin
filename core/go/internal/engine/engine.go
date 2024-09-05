@@ -29,10 +29,11 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // MOCK implementations of engine, plugins etc. Function signatures are just examples
@@ -107,7 +108,7 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	if tx.Inputs == nil || tx.Inputs.Domain == "" {
 		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
-	contractAddr, err := types.ParseEthAddress(tx.Inputs.Domain)
+	contractAddr, err := tktypes.ParseEthAddress(tx.Inputs.Domain)
 	if err != nil {
 		return "", err
 	}

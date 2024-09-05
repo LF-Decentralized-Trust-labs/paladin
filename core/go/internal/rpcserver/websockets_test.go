@@ -23,7 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -113,9 +113,9 @@ func TestWebSocketEthSubscribeUnsubscribe(t *testing.T) {
 		}
 	}
 
-	rpcErr := client.CallRPC(context.Background(), &types.RawJSON{}, "eth_subscribe")
+	rpcErr := client.CallRPC(context.Background(), &tktypes.RawJSON{}, "eth_subscribe")
 	assert.Regexp(t, "PD011004", rpcErr.Message)
-	rpcErr = client.CallRPC(context.Background(), &types.RawJSON{}, "eth_unsubscribe")
+	rpcErr = client.CallRPC(context.Background(), &tktypes.RawJSON{}, "eth_unsubscribe")
 	assert.Regexp(t, "PD011004", rpcErr.Message)
 
 	sub1, rpcErr := client.Subscribe(context.Background(), "myEvents", map[string]interface{}{"extra": "params"})

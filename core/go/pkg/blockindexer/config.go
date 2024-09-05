@@ -17,13 +17,13 @@
 package blockindexer
 
 import (
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Config struct {
-	FromBlock             types.RawJSON      `yaml:"fromBlock,omitempty"`
+	FromBlock             tktypes.RawJSON    `yaml:"fromBlock,omitempty"`
 	CommitBatchSize       *int               `yaml:"commitBatchSize"`
 	CommitBatchTimeout    *string            `yaml:"commitBatchTimeout"`
 	RequiredConfirmations *int               `yaml:"requiredConfirmations"`
@@ -44,7 +44,7 @@ var DefaultEventStreamsConfig = &EventStreamsConfig{
 }
 
 var DefaultConfig = &Config{
-	FromBlock:             types.RawJSON(`0`),
+	FromBlock:             tktypes.RawJSON(`0`),
 	CommitBatchSize:       confutil.P(50),
 	CommitBatchTimeout:    confutil.P("100ms"),
 	RequiredConfirmations: confutil.P(0),

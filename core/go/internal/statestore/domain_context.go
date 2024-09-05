@@ -25,8 +25,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type DomainContextFunction func(ctx context.Context, dsi DomainStateInterface) error
@@ -394,9 +395,9 @@ func (dc *domainContext) UpsertStates(transactionID *uuid.UUID, stateUpserts []*
 }
 
 func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []string, setLockState func(*StateLock)) (err error) {
-	stateIDs := make([]types.Bytes32, len(stateIDStrings))
+	stateIDs := make([]tktypes.Bytes32, len(stateIDStrings))
 	for i, id := range stateIDStrings {
-		stateIDs[i], err = types.ParseBytes32Ctx(dc.ctx, id)
+		stateIDs[i], err = tktypes.ParseBytes32Ctx(dc.ctx, id)
 		if err != nil {
 			return err
 		}
@@ -419,7 +420,7 @@ func (dc *domainContext) lockStates(transactionID uuid.UUID, stateIDStrings []st
 	return nil
 }
 
-func (dc *domainContext) setUnFlushedLock(transactionID uuid.UUID, stateID types.Bytes32, setLockState func(*StateLock)) (*StateLock, error) {
+func (dc *domainContext) setUnFlushedLock(transactionID uuid.UUID, stateID tktypes.Bytes32, setLockState func(*StateLock)) (*StateLock, error) {
 	// Update an existing un-flushed record if one exists
 	for _, l := range dc.unFlushed.stateLocks {
 		if l.State == stateID {

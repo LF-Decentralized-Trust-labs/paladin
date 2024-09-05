@@ -25,15 +25,16 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type PrivateSmartContract struct {
-	DeployTX      uuid.UUID        `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	DomainAddress types.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
-	Address       types.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes   types.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+	DeployTX      uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	DomainAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
+	Address       tktypes.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes   tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
 }
 
 type domainContract struct {
@@ -75,14 +76,14 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 	}
 	if err == nil {
 		// Serialize to standardized JSON before passing to domain
-		paramsJSON, err = types.StandardABISerializer().SerializeJSONCtx(ctx, inputValues)
+		paramsJSON, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, inputValues)
 	}
 	if err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidFunctionParams, txi.Function.SolString())
 	}
 
 	txSpec := &prototk.TransactionSpecification{
-		TransactionId:      types.Bytes32UUIDFirst16(tx.ID).String(),
+		TransactionId:      tktypes.Bytes32UUIDFirst16(tx.ID).String(),
 		ContractAddress:    dc.info.Address.String(),
 		ContractConfig:     dc.info.ConfigBytes,
 		From:               txi.From,
@@ -180,7 +181,7 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 		}
 		newStatesToWrite[i] = &statestore.StateUpsert{
 			SchemaID: schema.IDString(),
-			Data:     types.RawJSON(s.StateDataJson),
+			Data:     tktypes.RawJSON(s.StateDataJson),
 			// These are marked as locked and creating in the transaction
 			Creating: true,
 		}
@@ -378,11 +379,11 @@ func (dc *domainContract) Domain() components.Domain {
 	return dc.d
 }
 
-func (dc *domainContract) Address() types.EthAddress {
+func (dc *domainContract) Address() tktypes.EthAddress {
 	return dc.info.Address
 }
 
-func (dc *domainContract) ConfigBytes() types.HexBytes {
+func (dc *domainContract) ConfigBytes() tktypes.HexBytes {
 	return dc.info.ConfigBytes
 }
 
@@ -393,17 +394,17 @@ func (dc *domainContract) allAttestations(tx *components.PrivateTransaction) []*
 }
 
 func (dc *domainContract) loadStates(ctx context.Context, refs []*prototk.StateRef) ([]*components.FullState, error) {
-	rawIDsBySchema := make(map[string][]types.RawJSON)
-	stateIDs := make([]types.Bytes32, len(refs))
+	rawIDsBySchema := make(map[string][]tktypes.RawJSON)
+	stateIDs := make([]tktypes.Bytes32, len(refs))
 	for i, s := range refs {
-		stateID, err := types.ParseBytes32Ctx(ctx, s.Id)
+		stateID, err := tktypes.ParseBytes32Ctx(ctx, s.Id)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgDomainInvalidStateIDFromDomain, s.Id, i)
 		}
-		rawIDsBySchema[s.SchemaId] = append(rawIDsBySchema[s.SchemaId], types.JSONString(stateID.String()))
+		rawIDsBySchema[s.SchemaId] = append(rawIDsBySchema[s.SchemaId], tktypes.JSONString(stateID.String()))
 		stateIDs[i] = stateID
 	}
-	statesByID := make(map[types.Bytes32]*statestore.State)
+	statesByID := make(map[tktypes.Bytes32]*statestore.State)
 	err := dc.dm.stateStore.RunInDomainContext(dc.d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) error {
 		for schemaID, stateIDs := range rawIDsBySchema {
 			statesForSchema, err := dsi.FindAvailableStates(schemaID, &filters.QueryJSON{

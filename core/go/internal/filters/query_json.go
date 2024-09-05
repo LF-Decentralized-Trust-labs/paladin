@@ -16,9 +16,7 @@
 
 package filters
 
-import (
-	"github.com/kaleido-io/paladin/core/pkg/types"
-)
+import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
 type QueryJSON struct {
 	Statements
@@ -47,12 +45,12 @@ type Op struct {
 
 type OpSingleVal struct {
 	Op
-	Value types.RawJSON `json:"value,omitempty"`
+	Value tktypes.RawJSON `json:"value,omitempty"`
 }
 
 type OpMultiVal struct {
 	Op
-	Values []types.RawJSON `json:"values,omitempty"`
+	Values []tktypes.RawJSON `json:"values,omitempty"`
 }
 
 type Statements struct {

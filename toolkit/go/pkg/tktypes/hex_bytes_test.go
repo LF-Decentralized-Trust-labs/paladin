@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"encoding/json"
@@ -91,7 +91,7 @@ func TestHexBytesMarshalingJSON(t *testing.T) {
 	}`, (string)(jOut))
 
 	err = json.Unmarshal(([]byte)(`{"id1":"wrong"}`), &s1)
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 
 }
 
@@ -112,9 +112,9 @@ func TestHexBytesScanValue(t *testing.T) {
 	assert.Equal(t, "0xfeedbeef", scanner.String())
 
 	err = scanner.Scan("0xWRONG!85A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 
 	err = scanner.Scan(false)
-	assert.Regexp(t, "PD011101", err)
+	assert.Regexp(t, "PD020002", err)
 
 }

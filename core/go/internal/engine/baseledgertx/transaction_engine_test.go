@@ -32,9 +32,9 @@ import (
 	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -137,7 +137,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		ID:       &txID,
 		SignerID: string(testEthTxInput.From),
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NotNil(t, err)
@@ -151,7 +151,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		ID:       &txID,
 		SignerID: string(testEthTxInput.From),
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NotNil(t, err)
@@ -165,7 +165,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		ID:       &txID,
 		SignerID: string(testEthTxInput.From),
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NotNil(t, err)
@@ -188,7 +188,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		ID:       &txID,
 		SignerID: string(testEthTxInput.From),
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 
@@ -216,7 +216,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		ID:       &txID,
 		SignerID: string(testEthTxInput.From),
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NoError(t, err)
@@ -265,7 +265,7 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NoError(t, err)
@@ -313,7 +313,7 @@ func TestHandleNewTransactionTransferAndInvalidType(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(testEthTxInput.To.String()),
+		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
 	assert.NoError(t, err)
@@ -351,7 +351,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: &abi.Entry{},
 		Inputs:      &abi.ComponentValue{},
 	})
@@ -367,7 +367,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
@@ -388,7 +388,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
@@ -409,7 +409,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
@@ -430,7 +430,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
@@ -465,7 +465,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		SignerID: string(testEthTxInput.From),
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthTransaction{
-		To:          *types.MustEthAddress(testEthTxInput.To.String()),
+		To:          *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
@@ -516,7 +516,7 @@ func TestHandleNewDeployment(t *testing.T) {
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthDeployTransaction{
 		ConstructorABI: nil,
-		Bytecode:       types.HexBytes(testTransactionData),
+		Bytecode:       tktypes.HexBytes(testTransactionData),
 		Inputs:         nil,
 	})
 	assert.NotNil(t, err)
@@ -536,7 +536,7 @@ func TestHandleNewDeployment(t *testing.T) {
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthDeployTransaction{
 		ConstructorABI: nil,
-		Bytecode:       types.HexBytes(testTransactionData),
+		Bytecode:       tktypes.HexBytes(testTransactionData),
 		Inputs:         nil,
 	})
 	assert.NotNil(t, err)
@@ -556,7 +556,7 @@ func TestHandleNewDeployment(t *testing.T) {
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthDeployTransaction{
 		ConstructorABI: nil,
-		Bytecode:       types.HexBytes(testTransactionData),
+		Bytecode:       tktypes.HexBytes(testTransactionData),
 		Inputs:         nil,
 	})
 	assert.NotNil(t, err)
@@ -590,7 +590,7 @@ func TestHandleNewDeployment(t *testing.T) {
 		GasLimit: testEthTxInput.GasLimit,
 	}, &components.EthDeployTransaction{
 		ConstructorABI: nil,
-		Bytecode:       types.HexBytes(testTransactionData),
+		Bytecode:       tktypes.HexBytes(testTransactionData),
 		Inputs:         nil,
 	})
 	assert.NoError(t, err)

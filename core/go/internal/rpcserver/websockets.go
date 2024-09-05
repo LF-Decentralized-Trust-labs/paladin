@@ -29,8 +29,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
@@ -38,7 +39,7 @@ func (s *rpcServer) newWSConnection(conn *websocket.Conn) {
 	defer s.wsMux.Unlock()
 
 	c := &webSocketConnection{
-		id:      types.ShortID(),
+		id:      tktypes.ShortID(),
 		server:  s,
 		conn:    conn,
 		send:    make(chan []byte),
@@ -81,7 +82,7 @@ func (s *rpcServer) processSubscribe(ctx context.Context, rpcReq *rpcbackend.RPC
 		return rpcbackend.RPCErrorResponse(i18n.NewError(ctx, msgs.MsgJSONRPCInvalidParam, rpcReq.Method, 0, ""),
 			rpcReq.ID, rpcbackend.RPCCodeInvalidRequest), false
 	}
-	var params1 types.RawJSON
+	var params1 tktypes.RawJSON
 	if len(rpcReq.Params) > 1 {
 		params1 = rpcReq.Params[1].Bytes()
 	}
@@ -156,7 +157,7 @@ type ethSubscription struct {
 	c         *webSocketConnection
 	id        string
 	eventType string
-	params    types.RawJSON
+	params    tktypes.RawJSON
 }
 
 type webSocketConnection struct {

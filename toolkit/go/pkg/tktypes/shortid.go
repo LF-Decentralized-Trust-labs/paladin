@@ -14,24 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
-import (
-	"crypto/rand"
-	"encoding/hex"
+import "github.com/aidarkhanov/nanoid"
+
+const (
+	// ShortIDalphabet is designed for easy double-click select
+	ShortIDalphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 )
 
-var randReader = rand.Reader
-
-func RandHex(count int) string {
-	return hex.EncodeToString(RandBytes(count))
-}
-
-func RandBytes(count int) []byte {
-	b := make([]byte, count)
-	i, err := randReader.Read(b)
-	if err != nil || i != count {
-		panic(err)
-	}
-	return b
+func ShortID() string {
+	return nanoid.Must(nanoid.Generate(ShortIDalphabet, 8))
 }

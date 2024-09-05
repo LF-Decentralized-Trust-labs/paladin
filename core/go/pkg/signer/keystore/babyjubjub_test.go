@@ -25,7 +25,7 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -78,7 +78,7 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 }
 
 func TestStaticStoreFileFileWithTrimForBJJ(t *testing.T) {
-	keyData := types.RandHex(32)
+	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
 	assert.NoError(t, err)

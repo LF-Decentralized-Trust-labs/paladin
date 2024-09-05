@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Traverser[T any] interface {
@@ -52,7 +52,7 @@ var justCaseInsensitive = []string{"caseInsensitive"}
 type FieldResolver interface {
 	SupportsLIKE() bool
 	SQLColumn() string
-	SQLValue(ctx context.Context, v types.RawJSON) (driver.Value, error)
+	SQLValue(ctx context.Context, v tktypes.RawJSON) (driver.Value, error)
 }
 
 // FieldSet is an interface (rather than a simple map) as the function
@@ -133,7 +133,7 @@ func resolveField(ctx context.Context, fieldSet FieldSet, fieldName string) (Fie
 	return nil, i18n.NewError(ctx, msgs.MsgFiltersUnknownField, fieldName)
 }
 
-func resolveValue(ctx context.Context, fieldName string, field FieldResolver, jsonValue types.RawJSON) (driver.Value, error) {
+func resolveValue(ctx context.Context, fieldName string, field FieldResolver, jsonValue tktypes.RawJSON) (driver.Value, error) {
 	if len(jsonValue) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgFiltersValueMissing, fieldName)
 	}
@@ -144,7 +144,7 @@ func resolveValue(ctx context.Context, fieldName string, field FieldResolver, js
 	return value, nil
 }
 
-func resolveFieldAndValue(ctx context.Context, fieldSet FieldSet, fieldName string, jsonValue types.RawJSON) (FieldResolver, driver.Value, error) {
+func resolveFieldAndValue(ctx context.Context, fieldSet FieldSet, fieldName string, jsonValue tktypes.RawJSON) (FieldResolver, driver.Value, error) {
 	field, err := resolveField(ctx, fieldSet, fieldName)
 	if err != nil {
 		return nil, nil, err
@@ -156,7 +156,7 @@ func resolveFieldAndValue(ctx context.Context, fieldSet FieldSet, fieldName stri
 	return field, value, nil
 }
 
-func resolveFieldAndValues(ctx context.Context, fieldSet FieldSet, fieldName string, jsonValues []types.RawJSON) (FieldResolver, []driver.Value, error) {
+func resolveFieldAndValues(ctx context.Context, fieldSet FieldSet, fieldName string, jsonValues []tktypes.RawJSON) (FieldResolver, []driver.Value, error) {
 	field, err := resolveField(ctx, fieldSet, fieldName)
 	if err != nil {
 		return nil, nil, err

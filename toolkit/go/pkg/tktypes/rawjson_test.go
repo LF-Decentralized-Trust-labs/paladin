@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"encoding/json"
@@ -45,7 +45,7 @@ func TestRawJSON(t *testing.T) {
 	assert.Nil(t, s1.F3.Value())
 
 	err = (*RawJSON)(nil).UnmarshalJSON(nil)
-	assert.Regexp(t, "PD011100", err)
+	assert.Regexp(t, "PD020001", err)
 
 	err = (&s1.F1).Scan(nil)
 	assert.NoError(t, err)
@@ -62,7 +62,7 @@ func TestRawJSON(t *testing.T) {
 	assert.YAMLEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.YAML())
 
 	err = (&s1.F1).Scan(42)
-	assert.Regexp(t, "PD011101", err)
+	assert.Regexp(t, "PD020002", err)
 
 	pettyErr := RawJSON(`[!!!! wrong`).Pretty()
 	assert.Regexp(t, "invalid", pettyErr)

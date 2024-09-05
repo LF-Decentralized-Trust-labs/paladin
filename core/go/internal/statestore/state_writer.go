@@ -24,8 +24,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -88,7 +89,7 @@ func newStateWriter(bgCtx context.Context, ss *stateStore, conf *StateWriterConf
 
 func (sw *stateWriter) newWriteOp(domain string) *writeOperation {
 	return &writeOperation{
-		id:     types.ShortID(),
+		id:     tktypes.ShortID(),
 		domain: domain,
 		done:   make(chan error, 1), // 1 slot to ensure we don't block the writer
 	}

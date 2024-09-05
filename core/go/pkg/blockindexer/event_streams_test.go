@@ -29,8 +29,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/mocks/rpcbackendmocks"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -212,7 +212,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 
 	bi, err = newBlockIndexer(ctx, &Config{
 		CommitBatchSize: confutil.P(1),
-		FromBlock:       types.RawJSON(`0`),
+		FromBlock:       tktypes.RawJSON(`0`),
 	}, bi.persistence, bi.blockListener)
 	assert.NoError(t, err)
 	err = bi.Start(&InternalEventStream{
@@ -242,7 +242,7 @@ func TestStartBadInternalEventStream(t *testing.T) {
 	defer blDone()
 
 	err := bi.Start(&InternalEventStream{})
-	assert.Regexp(t, "PD011106", err)
+	assert.Regexp(t, "PD020005", err)
 
 }
 
@@ -259,8 +259,8 @@ func TestTestNotifyEventStreamDoesNotBlock(t *testing.T) {
 		blocks: make(chan *eventStreamBlock),
 	}
 
-	blockHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
-	txHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+	blockHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+	txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 	bi.notifyEventStreams(ctx, &blockWriterBatch{
 		blocks: []*BlockInfoJSONRPC{
 			{
@@ -314,7 +314,7 @@ func TestUpsertInternalEventStreamMismatchExisting(t *testing.T) {
 			Name: "testing",
 		},
 	})
-	assert.Regexp(t, "PD011103", err)
+	assert.Regexp(t, "PD020004", err)
 
 	assert.NoError(t, p.Mock.ExpectationsWereMet())
 }
@@ -452,8 +452,8 @@ func testReturnToCatchupAfterStart(t *testing.T, headBlock int64) {
 		blockNumber: 10,
 		events: []*LogJSONRPC{
 			{
-				BlockHash:        ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
-				TransactionHash:  ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+				BlockHash:        ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
+				TransactionHash:  ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
 				BlockNumber:      10,
 				TransactionIndex: 0,
 				LogIndex:         0,
@@ -571,7 +571,7 @@ func TestDispatcherRunLateHandler(t *testing.T) {
 		ctx: ctx,
 		definition: &EventStream{
 			ID:   uuid.New(),
-			Type: types.Enum[EventStreamType]("wrong"),
+			Type: tktypes.Enum[EventStreamType]("wrong"),
 			ABI:  testABI,
 		},
 		eventABIs:      testABI,
@@ -616,7 +616,7 @@ func TestDispatcherRunMissingHandler(t *testing.T) {
 		ctx: ctx,
 		definition: &EventStream{
 			ID:   uuid.New(),
-			Type: types.Enum[EventStreamType]("wrong"),
+			Type: tktypes.Enum[EventStreamType]("wrong"),
 			ABI:  testABI,
 		},
 		eventABIs:      testABI,
@@ -661,7 +661,7 @@ func TestProcessCatchupEventPageFailRPC(t *testing.T) {
 	ctx, bi, mRPC, p, done := newMockBlockIndexer(t, &Config{})
 	defer done()
 
-	txHash := types.MustParseBytes32(types.RandHex(32))
+	txHash := tktypes.MustParseBytes32(tktypes.RandHex(32))
 
 	bi.retry.UTSetMaxAttempts(2)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", ethtypes.MustNewHexBytes0xPrefix(txHash.String())).

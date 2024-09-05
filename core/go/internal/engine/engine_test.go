@@ -28,9 +28,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -71,9 +71,9 @@ func TestEngineSimpleTransaction(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     types.Bytes32(types.RandBytes(32)),
-					Schema: types.Bytes32(types.RandBytes(32)),
-					Data:   types.JSONString("foo"),
+					ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+					Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+					Data:   tktypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -146,7 +146,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	attestationResult := prototk.AttestationResult{
 		Name:            "notary",
 		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         types.RandBytes(32),
+		Payload:         tktypes.RandBytes(32),
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
@@ -205,9 +205,9 @@ func TestEngineDependantTransaction(t *testing.T) {
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
 	states := []*components.FullState{
 		{
-			ID:     types.Bytes32(types.RandBytes(32)),
-			Schema: types.Bytes32(types.RandBytes(32)),
-			Data:   types.JSONString("foo"),
+			ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+			Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+			Data:   tktypes.JSONString("foo"),
 		},
 	}
 
@@ -300,7 +300,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 	attestationResult := prototk.AttestationResult{
 		Name:            "notary",
 		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         types.RandBytes(32),
+		Payload:         tktypes.RandBytes(32),
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
@@ -384,7 +384,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	dependenciesByTransactionID := make(map[string][]string) // populated during assembly stage
 	nonceByTransactionID := make(map[string]uint64)          // populated when dispatch event recieved and used later to check that the nonce order matchs the dependency order
 
-	unclaimedPendingStatesToMintingTransaction := make(map[types.Bytes32]string)
+	unclaimedPendingStatesToMintingTransaction := make(map[tktypes.Bytes32]string)
 
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
 
@@ -413,7 +413,7 @@ func TestEngineMiniLoad(t *testing.T) {
 			// chose a random unclaimed pending state to spend
 			stateIndex := r.Intn(len(unclaimedPendingStatesToMintingTransaction))
 
-			keys := make([]types.Bytes32, len(unclaimedPendingStatesToMintingTransaction))
+			keys := make([]tktypes.Bytes32, len(unclaimedPendingStatesToMintingTransaction))
 			keyIndex := 0
 			for keyName := range unclaimedPendingStatesToMintingTransaction {
 
@@ -434,7 +434,7 @@ func TestEngineMiniLoad(t *testing.T) {
 		numOutputStates := r.Intn(4)
 		outputStates := make([]*components.FullState, numOutputStates)
 		for i := 0; i < numOutputStates; i++ {
-			stateID := types.Bytes32(types.RandBytes(32))
+			stateID := tktypes.Bytes32(tktypes.RandBytes(32))
 			outputStates[i] = &components.FullState{
 				ID: stateID,
 			}
@@ -526,7 +526,7 @@ func TestEngineMiniLoad(t *testing.T) {
 				attestationResult := prototk.AttestationResult{
 					Name:            "notary",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					Payload:         types.RandBytes(32),
+					Payload:         tktypes.RandBytes(32),
 				}
 
 				attestationResultAny, err := anypb.New(&attestationResult)
@@ -616,8 +616,8 @@ type dependencyMocks struct {
 	stateStore           *componentmocks.StateStore
 }
 
-func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddress) {
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *tktypes.EthAddress) {
+	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
 
 	mocks := &dependencyMocks{
 		allComponents:        componentmocks.NewAllComponents(t),

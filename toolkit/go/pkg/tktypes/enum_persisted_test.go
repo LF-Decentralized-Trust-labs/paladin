@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"encoding/json"
@@ -54,7 +54,7 @@ func TestEnumValue(t *testing.T) {
 
 	var v2 Enum[TestEnum] = "option4"
 	_, err = v2.Value()
-	assert.Regexp(t, "PD011102", err)
+	assert.Regexp(t, "PD020003", err)
 }
 
 func TestEnumJSON(t *testing.T) {
@@ -92,8 +92,8 @@ func TestMapEnum(t *testing.T) {
 		"option1": 111,
 		"option2": 222,
 	})
-	assert.Regexp(t, "PD011102.*option1", err)
-	assert.Regexp(t, "PD011102.*option2", err)
+	assert.Regexp(t, "PD020003.*option1", err)
+	assert.Regexp(t, "PD020003.*option2", err)
 	// Would be confusing for error to include the value that isn't in the type mapping
 	assert.NotRegexp(t, "option3", err.Error())
 
@@ -104,9 +104,9 @@ func TestMapEnum(t *testing.T) {
 		"option3":  333,
 		"option99": 999,
 	})
-	assert.Regexp(t, "PD011102.*option1", err)
-	assert.Regexp(t, "PD011102.*option2", err)
-	assert.Regexp(t, "PD011102.*option3", err)
+	assert.Regexp(t, "PD020003.*option1", err)
+	assert.Regexp(t, "PD020003.*option2", err)
+	assert.Regexp(t, "PD020003.*option3", err)
 	assert.NotRegexp(t, "option99", err.Error())
 }
 
@@ -126,8 +126,8 @@ func TestEnumScan(t *testing.T) {
 	assert.Equal(t, "option3", string(v))
 
 	err = (&v).Scan(false)
-	assert.Regexp(t, "PD011101", err)
+	assert.Regexp(t, "PD020002", err)
 
 	err = (&v).Scan("option4")
-	assert.Regexp(t, "PD011102", err)
+	assert.Regexp(t, "PD020003", err)
 }

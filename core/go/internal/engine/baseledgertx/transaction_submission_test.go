@@ -22,7 +22,7 @@ import (
 
 	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -34,8 +34,8 @@ const testWrongTxHash string = "0x0503bb2e013a6ecfe29c6c3e073d6f0cf834edf6d30560
 
 func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
-	textTxHashByte32 := types.MustParseBytes32(testTxHash)
-	textWrongTxHashByte32 := types.MustParseBytes32(testWrongTxHash)
+	textTxHashByte32 := tktypes.MustParseBytes32(testTxHash)
+	textWrongTxHashByte32 := tktypes.MustParseBytes32(testWrongTxHash)
 	ctx := context.Background()
 	testInFlightTransactionStateManagerWithMocks := NewTestInFlightTransactionWithMocks(t)
 	it := testInFlightTransactionStateManagerWithMocks.it
@@ -45,8 +45,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	// successful send with tx hash returned
 	txSendMock := mEC.On("SendRawTransaction", ctx, mock.Anything)
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(&textTxHashByte32, nil)
 	}).Once()
 
@@ -58,8 +58,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// successful send with tx hash missing
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, nil)
 	}).Once()
 
@@ -71,8 +71,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// error send due to tx hash mismatch
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(&textWrongTxHashByte32, nil)
 	}).Once()
 
@@ -84,8 +84,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// underpriced
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("transaction underpriced"))
 	}).Once()
 
@@ -96,8 +96,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash)
 	// reverted
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("execution reverted"))
 	}).Once()
 
@@ -108,8 +108,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash)
 	// known transaction
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("known transaction"))
 	}).Once()
 
@@ -120,8 +120,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 	assert.Equal(t, testTxHash, txHash) // able to use the calculated hash
 	// nonce too low
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("nonce too low"))
 	}).Once()
 
@@ -133,8 +133,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 	// other error
 	txSendMock.Run(func(args mock.Arguments) {
-		txRawMessage := args[1].(types.HexBytes)
-		assert.Equal(t, types.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
+		txRawMessage := args[1].(tktypes.HexBytes)
+		assert.Equal(t, tktypes.MustParseHexBytes(testHashedSignedMessage), txRawMessage)
 		txSendMock.Return(nil, fmt.Errorf("error submitting transaction"))
 	}).Once()
 
@@ -147,8 +147,8 @@ func TestTxSubmissionWithSignedMessage(t *testing.T) {
 
 func TestTxSubmissionWithSignedMessageWithRetry(t *testing.T) {
 
-	textTxHashByte32 := types.MustParseBytes32(testTxHash)
-	textWrongTxHashByte32 := types.MustParseBytes32(testWrongTxHash)
+	textTxHashByte32 := tktypes.MustParseBytes32(testTxHash)
+	textWrongTxHashByte32 := tktypes.MustParseBytes32(testWrongTxHash)
 	ctx := context.Background()
 	testInFlightTransactionStateManagerWithMocks := NewTestInFlightTransactionWithMocks(t)
 	it := testInFlightTransactionStateManagerWithMocks.it

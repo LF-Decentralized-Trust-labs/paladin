@@ -28,8 +28,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/rpcclient"
 	"github.com/kaleido-io/paladin/core/internal/rpcserver"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,8 +41,8 @@ type mockEth struct {
 	eth_getTransactionCount   func(context.Context, ethtypes.Address0xHex, string) (ethtypes.HexUint64, error)
 	eth_getTransactionReceipt func(context.Context, ethtypes.HexBytes0xPrefix) (*txReceiptJSONRPC, error)
 	eth_estimateGas           func(context.Context, ethsigner.Transaction) (ethtypes.HexInteger, error)
-	eth_sendRawTransaction    func(context.Context, types.HexBytes) (types.HexBytes, error)
-	eth_call                  func(context.Context, ethsigner.Transaction, string) (types.HexBytes, error)
+	eth_sendRawTransaction    func(context.Context, tktypes.HexBytes) (tktypes.HexBytes, error)
+	eth_call                  func(context.Context, ethsigner.Transaction, string) (tktypes.HexBytes, error)
 }
 
 func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) (rpcServer rpcserver.RPCServer, done func()) {
