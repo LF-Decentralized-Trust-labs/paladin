@@ -47,6 +47,7 @@ type tlsVerifierAuthInfo struct {
 	credentials.CommonAuthInfo
 	cert             *x509.Certificate
 	transportDetails *PublishedTransportDetails
+	remoteAddr       string
 	verifiedNodeName string
 }
 
@@ -60,6 +61,7 @@ func (tv *tlsVerifier) ClientHandshake(ctx context.Context, s string, c net.Conn
 	if err != nil {
 		return nil, nil, err
 	}
+	ai.remoteAddr = c.RemoteAddr().String()
 	log.L(tv.t.bgCtx).Infof("TLS client handshake completed. TLS authInfo=%s", tlsAuthInfo.AuthType())
 	return c, authInfo.Load(), nil
 }
@@ -74,6 +76,7 @@ func (tv *tlsVerifier) ServerHandshake(c net.Conn) (net.Conn, credentials.AuthIn
 	if err != nil {
 		return nil, nil, err
 	}
+	ai.remoteAddr = c.RemoteAddr().String()
 	log.L(tv.t.bgCtx).Infof("TLS server handshake completed. TLS authInfo=%s", tlsAuthInfo.AuthType())
 	return c, authInfo.Load(), nil
 }

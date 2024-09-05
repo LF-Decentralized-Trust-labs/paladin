@@ -123,7 +123,7 @@ func newTestPlugin(t *testing.T, certSubject pkix.Name, conf *Config) (*grpcTran
 	}
 }
 
-func TestGRPCTransportE2E(t *testing.T) {
+func TestGRPCTransportPingPong(t *testing.T) {
 
 	ctx := context.Background()
 
@@ -136,6 +136,12 @@ func TestGRPCTransportE2E(t *testing.T) {
 		CommonName: "node2",
 	}, &Config{})
 	defer done2()
+
+	received := make(chan *prototk.Message)
+	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+		received <- rmr.Message
+		return &prototk.ReceiveMessageResponse{}, nil
+	}
 
 	// Register nodes
 	fakeRegistry := func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
@@ -159,5 +165,7 @@ func TestGRPCTransportE2E(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, sendRes)
+
+	<-received
 
 }

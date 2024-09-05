@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/transports/grpc/internal/msgs"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 )
 
 type Server interface {
@@ -173,7 +174,17 @@ func (t *grpcTransport) serve() {
 }
 
 func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[proto.Message, proto.Empty]) error {
-	// ctx := stream.Context()
+	ctx := stream.Context()
+	var ai *tlsVerifierAuthInfo
+	peer, ok := peer.FromContext(ctx)
+	if ok && peer.AuthInfo != nil {
+		ai, ok = peer.AuthInfo.(*tlsVerifierAuthInfo)
+	}
+	if !ok {
+		return i18n.NewError(ctx, msgs.MsgAuthContextNotAvailable)
+	}
+	ctx = log.WithLogField(ctx, "remote", ai.remoteAddr)
+	log.L(ctx).Infof("GRPC message stream established from node %s", ai.verifiedNodeName)
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
@@ -240,7 +251,8 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (grp
 
 	// Ok - try connecting
 	conn, err := grpc.NewClient(transportDetails.Endpoint,
-		grpc.WithTransportCredentials(t.peerVerifier.Clone()))
+		grpc.WithTransportCredentials(t.peerVerifier.Clone()),
+	)
 	if err != nil {
 		return nil, err
 	}
