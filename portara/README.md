@@ -1,17 +1,17 @@
 # Portara
 
-This is the main process for paladin.  To run this, you will need to have the kata library built and in the same directory as the jar file.  The kata library is a Go library that is used to orchestrate a transaction through assembly, endorsement, notarisation, and submission to the EVM base ledger.  The kata library is built using the following commands:
+This is the main process for paladin.  To run this, you will need to have the core library built and in the same directory as the jar file.  The core library is a Go library that is used to orchestrate a transaction through assembly, endorsement, notarisation, and submission to the EVM base ledger.  The core library is built using the following commands:
 
- - build the kata library
+ - build the core library
 ```
 pushd ../core/go
 make
 popd
 ```
 
- - copy the kata library to the current directory
+ - copy the core library to the current directory
 ```
-cp ../core/go/kata.so .
+cp ../core/go/core.so .
 ```
 TODO: LD_LIBRARY_PATH / LIBPATH do not seem to work on MacOS.  Need to find a way to set the library path for the JVM on MacOS.
 
