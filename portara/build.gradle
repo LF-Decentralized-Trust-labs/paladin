@@ -35,7 +35,7 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    libkata {
+    libcore {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -87,7 +87,7 @@ dependencies {
 
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
 
-    testImplementation project(path: ":core:go", configuration: "libkata")
+    testImplementation project(path: ":core:go", configuration: "libcore")
     testImplementation project(path: ":toolkit_go", configuration: "libstarter")
     testImplementation project(path: ":solidity", configuration: "compiledContracts")
 

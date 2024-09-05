@@ -18,7 +18,7 @@ import org.apache.tools.ant.filters.LineContains
 
 ext {
     goFiles = fileTree(".") {
-        include "kata.go"
+        include "core.go"
         include "internal/**/*.go"
         include "pkg/**/*.go"
         include "componenttest/**/*.go"
@@ -48,7 +48,7 @@ configurations {
     }
 
     // Consumable configurations
-    libkata {
+    libcore {
         canBeConsumed = true
         canBeResolved = false
     }
@@ -226,7 +226,7 @@ task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, task
 }
 
 task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
-    delete 'libkata.dylib', 'libkata.so', 'libkata.dll', 'libkata.h'
+    delete 'libcore.dylib', 'libcore.so', 'libcore.dll', 'libcore.h'
     delete fileTree("bin") {
         exclude "README.md", ".gitignore"
     }
@@ -257,15 +257,15 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
 
     def libName
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        libName = "libkata.dll"
+        libName = "libcore.dll"
     } else if (Os.isFamily(Os.FAMILY_MAC)) {
-        libName = "libkata.dylib"
+        libName = "libcore.dylib"
     } else {
-        libName = "libkata.so"
+        libName = "libcore.so"
     }
 
     inputs.files(goFiles)
-    outputs.files(libName, 'libkata.h')
+    outputs.files(libName, 'libcore.h')
 
     environment("CGO_ENABLED", "1")
 
@@ -273,7 +273,7 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     args 'build'
     args '-o', libName
     args '-buildmode=c-shared'
-    args 'kata.go'
+    args 'core.go'
 }
 
 task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
@@ -460,7 +460,7 @@ task build {
 }
 
 dependencies {
-    libkata files(buildSharedLibrary)
+    libcore files(buildSharedLibrary)
     protoCompiled files(protoc)
 }
 

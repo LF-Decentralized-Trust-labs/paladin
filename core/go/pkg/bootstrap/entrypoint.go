@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package kata
+package bootstrap
 
 import "sync/atomic"
 

@@ -27,7 +27,7 @@ public class KataJNA {
     }
 
     public static PaladinGo Load() {
-        return Native.load("kata", PaladinGo.class);
+        return Native.load("core", PaladinGo.class);
     }
 
 }

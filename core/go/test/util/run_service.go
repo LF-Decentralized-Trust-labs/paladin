@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/core/pkg/kata"
+	"github.com/kaleido-io/paladin/core/pkg/bootstrap"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,7 +62,7 @@ plugins:
 	configFile.Close()
 
 	// Start the server
-	go kata.TestCommsBusRun(ctx, configFile.Name())
+	go bootstrap.TestCommsBusRun(ctx, configFile.Name())
 
 	// todo do we really need to sleep here?
 	time.Sleep(time.Second * 2)

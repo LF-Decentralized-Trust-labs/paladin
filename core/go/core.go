@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/kaleido-io/paladin/core/pkg/kata"
+	"github.com/kaleido-io/paladin/core/pkg/bootstrap"
 )
 
 // Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function
@@ -38,7 +38,7 @@ func Run(grpcTargetPtr, loaderUUIDPtr, configFilePtr, engineNamePtr *C.char) (rc
 			rc = 1
 		}
 	}()
-	kRC := kata.Run(
+	kRC := bootstrap.Run(
 		C.GoString(grpcTargetPtr),
 		C.GoString(loaderUUIDPtr),
 		C.GoString(configFilePtr),
@@ -50,7 +50,7 @@ func Run(grpcTargetPtr, loaderUUIDPtr, configFilePtr, engineNamePtr *C.char) (rc
 
 //export Stop
 func Stop() {
-	kata.Stop()
+	bootstrap.Stop()
 }
 
 func main() {}

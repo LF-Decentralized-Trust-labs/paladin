@@ -17,7 +17,7 @@
 Test Kata component with no mocking of any internal units.
 Starts the GRPC server and drives the internal functions via GRPC messages
 */
-package kata
+package componenttest
 
 import (
 	"context"
@@ -33,8 +33,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/bootstrap"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/kata"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto"
 	transactionsPB "github.com/kaleido-io/paladin/core/pkg/proto/transaction"
@@ -135,7 +135,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.CommsBusStop(ctx, socketAddress)
+	bootstrap.CommsBusStop(ctx, socketAddress)
 }
 
 func TestRunSimpleStorageEthTransaction(t *testing.T) {
@@ -281,13 +281,13 @@ commsBus:
 	configFile.Close()
 
 	// Start the server
-	go kata.TestCommsBusRun(ctx, configFile.Name())
+	go bootstrap.TestCommsBusRun(ctx, configFile.Name())
 
 	// Wait until the engine is listening - otherwise our messages will be discarded
 	// TODO: This is a temporary situation as the transactional model of the engine forms
 waitForEngine:
 	for {
-		commsBus := kata.CommsBus()
+		commsBus := bootstrap.CommsBus()
 		time.Sleep(10 * time.Millisecond)
 		if commsBus == nil {
 			continue
@@ -398,7 +398,7 @@ func TestRunPointToPoint(t *testing.T) {
 
 	stopListener()
 	// Stop the server
-	kata.CommsBusStop(ctx, socketAddress)
+	bootstrap.CommsBusStop(ctx, socketAddress)
 }
 
 func TestPubSub(t *testing.T) {
@@ -532,5 +532,5 @@ func TestPubSub(t *testing.T) {
 
 	stopListeners()
 	// Stop the server
-	kata.CommsBusStop(ctx, socketAddress)
+	bootstrap.CommsBusStop(ctx, socketAddress)
 }
