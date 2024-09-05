@@ -88,7 +88,7 @@ task downloadZetoTestProvingKeys {
     outputs.file(f)
 }
 
-task extraZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
+task extractZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
     executable 'tar'
     args '-xzvf'
     args "${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz"
@@ -103,7 +103,7 @@ task extraZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
     outputs.dir(zkpOut)
 }
 
-task extraZetoTestProvingKeys(type: Exec, dependsOn: [extraZetoProver, downloadZetoTestProvingKeys]) {
+task extractZetoTestProvingKeys(type: Exec, dependsOn: [extractZetoProver, downloadZetoTestProvingKeys]) {
     executable 'tar'
     args '-xzvf'
     args "${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz"
@@ -132,8 +132,8 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn extraZetoProver
-    dependsOn extraZetoTestProvingKeys
+    dependsOn extractZetoProver
+    dependsOn extractZetoTestProvingKeys
     dependsOn ':testinfra:startTestInfra'
     lockTestInfra(it)
     dumpLogsOnFailure(it, ':testinfra:startTestInfra')
