@@ -1,4 +1,4 @@
-./portara/.gitignore .gradle
+./core/java/.gitignore .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
