@@ -34,7 +34,7 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    kataProtoCompiled {
+    coreProtoCompiled {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -43,7 +43,7 @@ configurations {
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
     toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
-    kataProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
+    coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
 }
 
 task copySolidity(type: Copy) {
@@ -118,7 +118,7 @@ task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
 
 task test(type: Exec) {
     inputs.files(configurations.toolkitProtoCompiled)
-    inputs.files(configurations.kataProtoCompiled)
+    inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
