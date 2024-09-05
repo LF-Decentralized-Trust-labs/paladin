@@ -66,14 +66,12 @@ type outboundConn struct {
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewTransport(func(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
-		return newGRPCTransport(ctx, callbacks)
-	})
+	return plugintk.NewTransport(grpcTransportFactory)
 }
 
-func newGRPCTransport(ctx context.Context, callbacks plugintk.TransportCallbacks) *grpcTransport {
+func grpcTransportFactory(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
 	return &grpcTransport{
-		bgCtx:               ctx,
+		bgCtx:               context.Background(),
 		callbacks:           callbacks,
 		connLock:            *sync.NewCond(new(sync.Mutex)),
 		outboundConnections: make(map[string]*outboundConn),
@@ -106,7 +104,9 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 		}
 	}
 
+	// We only support mutual-TLS in this transport (with direct trust of certificates via registry, or use of a CA)
 	t.conf.TLS.Enabled = true
+	t.conf.TLS.ClientAuth = true // Note if this is unset the ClientCAs will not be configured
 	baseTLSConfig, err := tlsconf.BuildTLSConfig(ctx, &t.conf.TLS, tlsconf.ServerType)
 	if err != nil {
 		return nil, err

@@ -104,6 +104,17 @@ func (tv *tlsVerifier) OverrideServerName(s string) error {
 	return errors.ErrUnsupported
 }
 
+func getCertFromPEM(ctx context.Context, pemBytes []byte) (cert *x509.Certificate, err error) {
+	block, _ := pem.Decode(pemBytes)
+	if block != nil {
+		cert, err = x509.ParseCertificate(block.Bytes)
+	}
+	if block == nil || err != nil || block.Type != "CERTIFICATE" {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgPEMCertificateInvalid)
+	}
+	return cert, err
+}
+
 func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], credentials.TransportCredentials) {
 	authInfo := new(atomic.Pointer[tlsVerifierAuthInfo])
 	tlsConfig := tv.baseTLSConfig.Clone()
@@ -140,13 +151,9 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 
 		// If we need to check the issuer, do that now
 		if tv.directCertVerification {
-			var issuerCert *x509.Certificate
-			block, _ := pem.Decode([]byte(ai.transportDetails.Issuer))
-			if block != nil {
-				issuerCert, err = x509.ParseCertificate(block.Bytes)
-			}
-			if block == nil || err != nil {
-				return i18n.WrapError(ctx, err, msgs.MsgPeerTransportDetailsInvalid, node)
+			issuerCert, err := getCertFromPEM(ctx, []byte(ai.transportDetails.Issuer))
+			if err != nil {
+				return err
 			}
 			rootPool := x509.NewCertPool()
 			rootPool.AddCert(issuerCert)
@@ -156,7 +163,7 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 				// We do not verify key usages
 				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 			}); err != nil {
-				return i18n.WrapError(ctx, err, msgs.MsgPeerCertificateInvalid,
+				return i18n.WrapError(ctx, err, msgs.MsgPeerCertificateIssuerInvalid,
 					node, issuerCert.Subject.String(), ai.cert.Issuer.String(),
 				)
 			}

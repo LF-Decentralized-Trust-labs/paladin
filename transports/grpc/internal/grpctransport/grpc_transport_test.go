@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,16 @@ func (tc *testCallbacks) ReceiveMessage(ctx context.Context, req *prototk.Receiv
 	return tc.receiveMessage(ctx, req)
 }
 
-func buildSelfSignedTLSKeyPair(t *testing.T, subject pkix.Name) (string, string) {
+func getRSAKeyFromPEM(t *testing.T, pemBytes string) *rsa.PrivateKey {
+	block, _ := pem.Decode([]byte(pemBytes))
+	assert.NotNil(t, block)
+	assert.Equal(t, "RSA PRIVATE KEY", block.Type)
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	assert.NoError(t, err)
+	return privateKey
+}
+
+func buildTestCertificate(t *testing.T, subject pkix.Name, ca *x509.Certificate, caKey *rsa.PrivateKey) (string, string) {
 	// Create an X509 certificate pair
 	privatekey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publickey := &privatekey.PublicKey
@@ -64,12 +74,20 @@ func buildSelfSignedTLSKeyPair(t *testing.T, subject pkix.Name) (string, string)
 		Subject:               subject,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(100 * time.Second),
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1)},
+		DNSNames:              []string{"127.0.0.1", "localhost"},
 	}
 	require.NoError(t, err)
-	derBytes, err := x509.CreateCertificate(rand.Reader, x509Template, x509Template, publickey, privatekey)
+	if ca == nil {
+		ca = x509Template
+		caKey = privatekey
+		x509Template.IsCA = true
+		x509Template.KeyUsage |= x509.KeyUsageCertSign
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, x509Template, ca, publickey, caKey)
 	require.NoError(t, err)
 	publicKeyPEM := &strings.Builder{}
 	err = pem.Encode(publicKeyPEM, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
@@ -77,7 +95,7 @@ func buildSelfSignedTLSKeyPair(t *testing.T, subject pkix.Name) (string, string)
 	return publicKeyPEM.String(), privateKeyPEM.String()
 }
 
-func newTestPlugin(t *testing.T, certSubject pkix.Name, conf *Config) (*grpcTransport, *PublishedTransportDetails, *testCallbacks, func()) {
+func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) (*grpcTransport, *PublishedTransportDetails, *testCallbacks, func()) {
 	// Grab a localhost port to use and put that in config
 	portGrabber, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
@@ -87,8 +105,7 @@ func newTestPlugin(t *testing.T, certSubject pkix.Name, conf *Config) (*grpcTran
 	conf.Port = &port
 	conf.Address = confutil.P("127.0.0.1")
 
-	// Build the certs for the config
-	nodeCert, nodeKey := buildSelfSignedTLSKeyPair(t, certSubject)
+	// Put the certs in the config
 	conf.TLS.Cert = nodeCert
 	conf.TLS.Key = nodeKey
 
@@ -97,10 +114,9 @@ func newTestPlugin(t *testing.T, certSubject pkix.Name, conf *Config) (*grpcTran
 	assert.NoError(t, err)
 
 	//  construct the plugin
-	ctx := context.Background()
 	callbacks := &testCallbacks{}
-	transport := newGRPCTransport(ctx, callbacks)
-	res, err := transport.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	res, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: string(jsonConf),
 	})
@@ -123,18 +139,22 @@ func newTestPlugin(t *testing.T, certSubject pkix.Name, conf *Config) (*grpcTran
 	}
 }
 
-func TestGRPCTransportPingPong(t *testing.T) {
+func TestPluginLifecycle(t *testing.T) {
+	pb := NewPlugin(context.Background())
+	assert.NotNil(t, pb)
+}
+
+func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 
 	ctx := context.Background()
 
-	plugin1, transportDetails1, callbacks1, done1 := newTestPlugin(t, pkix.Name{
-		CommonName: "node1",
-	}, &Config{})
+	// the default config is direct cert verification
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
+	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{})
 	defer done1()
 
-	_, transportDetails2, callbacks2, done2 := newTestPlugin(t, pkix.Name{
-		CommonName: "node2",
-	}, &Config{})
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
+	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
 	defer done2()
 
 	received := make(chan *prototk.Message)
@@ -167,6 +187,69 @@ func TestGRPCTransportPingPong(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sendRes)
 
-	<-received
+	if err == nil {
+		<-received
+	}
+
+}
+
+func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
+
+	ctx := context.Background()
+
+	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "ca"}, nil, nil)
+	ca, err := getCertFromPEM(ctx, []byte(caCert))
+	assert.NoError(t, err)
+	caKey := getRSAKeyFromPEM(t, caKeyPEM)
+
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, ca, caKey)
+	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{
+		TLS:                    tlsconf.Config{CA: caCert},
+		DirectCertVerification: confutil.P(false),
+	})
+	defer done1()
+	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, ca, caKey)
+	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{
+		TLS:                    tlsconf.Config{CA: caCert},
+		DirectCertVerification: confutil.P(false),
+	})
+	defer done2()
+	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+
+	received := make(chan *prototk.Message)
+	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+		received <- rmr.Message
+		return &prototk.ReceiveMessageResponse{}, nil
+	}
+
+	// Register nodes
+	fakeRegistry := func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+		reg := map[string]string{
+			"node1": tktypes.JSONString(transportDetails1).String(),
+			"node2": tktypes.JSONString(transportDetails2).String(),
+		}
+		assert.Contains(t, reg, gtdr.Node)
+		return &prototk.GetTransportDetailsResponse{
+			TransportDetails: reg[gtdr.Node],
+		}, nil
+	}
+	callbacks1.getTransportDetails = fakeRegistry
+	callbacks2.getTransportDetails = fakeRegistry
+
+	// Connect plugin1 to plugin2
+	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+		Message: &prototk.Message{
+			ReplyTo:     "to.me@node1",
+			Destination: "to.you@node2",
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, sendRes)
+
+	if err == nil {
+		<-received
+	}
 
 }
