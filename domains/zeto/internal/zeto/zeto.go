@@ -29,22 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type SolidityBuild struct {
-	ABI      abi.ABI                   `json:"abi"`
-	Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
-}
-
-type SolidityBuildWithLinks struct {
-	ABI            abi.ABI                                       `json:"abi"`
-	Bytecode       string                                        `json:"bytecode"`
-	LinkReferences map[string]map[string][]SolidityLinkReference `json:"linkReferences"`
-}
-
-type SolidityLinkReference struct {
-	Start  int `json:"start"`
-	Length int `json:"length"`
-}
-
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
@@ -56,25 +40,6 @@ type Zeto struct {
 	tokenName   string
 	factoryAbi  abi.ABI
 	contractAbi abi.ABI
-}
-
-type ZetoSetImplementationParams struct {
-	Name           string                 `json:"name"`
-	Implementation ZetoImplementationInfo `json:"implementation"`
-}
-
-type ZetoImplementationInfo struct {
-	Implementation   string `json:"implementation"`
-	Verifier         string `json:"verifier"`
-	DepositVerifier  string `json:"depositVerifier"`
-	WithdrawVerifier string `json:"withdrawVerifier"`
-}
-
-type ZetoDeployParams struct {
-	TransactionID string                    `json:"transactionId"`
-	Data          ethtypes.HexBytes0xPrefix `json:"data"`
-	TokenName     string                    `json:"tokenName"`
-	InitialOwner  string                    `json:"initialOwner"`
 }
 
 func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
