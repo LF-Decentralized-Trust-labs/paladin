@@ -217,7 +217,7 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := handler.ValidateParams(tx.FunctionParamsJson)
+	params, err := handler.ValidateParams(ctx, tx.FunctionParamsJson)
 	if err != nil {
 		return nil, nil, err
 	}

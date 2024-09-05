@@ -59,7 +59,12 @@ func (tb *testbed) initRPC() {
 		// - INIT_TRANSACTION     (sender node)
 		// - ASSEMBLE_TRANSACTION (sender node)
 		// - PREPARE_TRANSACTION  (submitter node)
-		Add("testbed_invoke", tb.rpcTestbedInvoke())
+		Add("testbed_invoke", tb.rpcTestbedInvoke()).
+
+		// Prepares a privacy preserving smart contract invocation, but
+		// does not actually invoke.
+		// Returns an ABI encoded function call.
+		Add("testbed_prepare", tb.rpcTestbedPrepare())
 }
 
 func (tb *testbed) rpcListDomains() rpcserver.RPCHandler {
@@ -170,88 +175,97 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	})
 }
 
+func (tb *testbed) prepareTransaction(ctx context.Context, invocation tktypes.PrivateContractInvoke) (*components.PrivateTransaction, error) {
+	psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &components.PrivateTransaction{
+		ID: uuid.New(),
+		Inputs: &components.TransactionInputs{
+			Function: &invocation.Function,
+			Domain:   psc.Domain().Name(),
+			From:     invocation.From,
+			To:       psc.Address(),
+			Inputs:   invocation.Inputs,
+		},
+	}
+
+	// First we call init on the smart contract to:
+	// - validate the transaction ABI is understood by the contract
+	// - get an initial list of verifiers that need to be resolved
+	if err := psc.InitTransaction(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	// Gather the addresses - in the testbed we assume these all to be local
+	keyMgr := tb.c.KeyManager()
+	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
+	for i, v := range tx.PreAssembly.RequiredVerifiers {
+		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
+		}
+		tx.PreAssembly.Verifiers[i] = &prototk.ResolvedVerifier{
+			Lookup:    v.Lookup,
+			Algorithm: v.Algorithm,
+			Verifier:  verifier,
+		}
+	}
+
+	// Now call assemble
+	if err := psc.AssembleTransaction(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	// The testbed only handles the OK result
+	switch tx.PostAssembly.AssemblyResult {
+	case prototk.AssembleTransactionResponse_OK:
+	default:
+		return nil, fmt.Errorf("assemble result was %s", tx.PostAssembly.AssemblyResult)
+	}
+
+	// The testbed always chooses to take the assemble output and progress to endorse
+	// (no complex sequence selection routine that might result in abandonment).
+	// So just write the states
+	if err := psc.WritePotentialStates(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	// Gather signatures
+	if err = tb.gatherSignatures(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	// Gather endorsements (this would be a distributed activity across nodes in the real engine)
+	if err := tb.gatherEndorsements(ctx, psc, tx); err != nil {
+		return nil, err
+	}
+
+	log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d",
+		len(tx.PostAssembly.InputStates), len(tx.PostAssembly.OutputStates), len(tx.PostAssembly.Signatures), len(tx.PostAssembly.Endorsements))
+
+	// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
+	if err := psc.ResolveDispatch(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	// Prepare the transaction
+	if err := psc.PrepareTransaction(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
 func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		invocation tktypes.PrivateContractInvoke,
 	) (bool, error) {
 
-		psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
+		tx, err := tb.prepareTransaction(ctx, invocation)
 		if err != nil {
-			return false, err
-		}
-
-		tx := &components.PrivateTransaction{
-			ID: uuid.New(),
-			Inputs: &components.TransactionInputs{
-				Function: &invocation.Function,
-				Domain:   psc.Domain().Name(),
-				From:     invocation.From,
-				To:       psc.Address(),
-				Inputs:   invocation.Inputs,
-			},
-		}
-
-		// First we call init on the smart contract to:
-		// - validate the transaction ABI is understood by the contract
-		// - get an initial list of verifiers that need to be resolved
-		if err := psc.InitTransaction(ctx, tx); err != nil {
-			return false, err
-		}
-
-		// Gather the addresses - in the testbed we assume these all to be local
-		keyMgr := tb.c.KeyManager()
-		tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
-		for i, v := range tx.PreAssembly.RequiredVerifiers {
-			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
-			if err != nil {
-				return false, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
-			}
-			tx.PreAssembly.Verifiers[i] = &prototk.ResolvedVerifier{
-				Lookup:    v.Lookup,
-				Algorithm: v.Algorithm,
-				Verifier:  verifier,
-			}
-		}
-
-		// Now call assemble
-		if err := psc.AssembleTransaction(ctx, tx); err != nil {
-			return false, err
-		}
-
-		// The testbed only handles the OK result
-		switch tx.PostAssembly.AssemblyResult {
-		case prototk.AssembleTransactionResponse_OK:
-		default:
-			return false, fmt.Errorf("assemble result was %s", tx.PostAssembly.AssemblyResult)
-		}
-
-		// The testbed always chooses to take the assemble output and progress to endorse
-		// (no complex sequence selection routine that might result in abandonment).
-		// So just write the states
-		if err := psc.WritePotentialStates(ctx, tx); err != nil {
-			return false, err
-		}
-
-		// Gather signatures
-		if err = tb.gatherSignatures(ctx, tx); err != nil {
-			return false, err
-		}
-
-		// Gather endorsements (this would be a distributed activity across nodes in the real engine)
-		if err := tb.gatherEndorsements(ctx, psc, tx); err != nil {
-			return false, err
-		}
-
-		log.L(ctx).Infof("Assembled and endorsed inputs=%d outputs=%d signatures=%d endorsements=%d",
-			len(tx.PostAssembly.InputStates), len(tx.PostAssembly.OutputStates), len(tx.PostAssembly.Signatures), len(tx.PostAssembly.Endorsements))
-
-		// Pick the signer for the base ledger transaction - now logically we're picking which node would do the prepare + submit phases
-		if err := psc.ResolveDispatch(ctx, tx); err != nil {
-			return false, err
-		}
-
-		// Prepare the transaction
-		if err := psc.PrepareTransaction(ctx, tx); err != nil {
 			return false, err
 		}
 
@@ -262,5 +276,18 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 		// TODO: state confirmation by TXID
 		return true, nil
+	})
+}
+
+func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		invocation tktypes.PrivateContractInvoke,
+	) ([]byte, error) {
+
+		tx, err := tb.prepareTransaction(ctx, invocation)
+		if err != nil {
+			return nil, err
+		}
+		return tx.PreparedTransaction.FunctionABI.EncodeCallDataCtx(ctx, tx.PreparedTransaction.Inputs)
 	})
 }

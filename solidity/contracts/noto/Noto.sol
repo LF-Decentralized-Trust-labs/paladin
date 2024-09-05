@@ -52,13 +52,14 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
         _;
     }
 
-    constructor(bytes32 transactionId, address domain, address notary, bytes memory data) EIP712("noto", "0.0.1") {
+    constructor(
+        bytes32 transactionId,
+        address domain,
+        address notary,
+        bytes memory data
+    ) EIP712("noto", "0.0.1") {
         _notary = notary;
-        emit PaladinNewSmartContract_V0(
-            transactionId,
-            domain,
-            data
-        );
+        emit PaladinNewSmartContract_V0(transactionId, domain, data);
     }
 
     /// @dev query whether a TXO is currently in the unspent list

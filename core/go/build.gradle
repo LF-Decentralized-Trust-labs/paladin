@@ -466,6 +466,5 @@ task build {
 
 dependencies {
     libcore files(buildSharedLibrary)
-    goSource files(goFiles, protoc, makeMocks)
+    goSource files(goFiles, protoc, makeMocks, copyContracts)
 }
-

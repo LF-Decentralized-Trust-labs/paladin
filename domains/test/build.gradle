@@ -15,8 +15,7 @@
 
 ext {
     goFiles = fileTree(".") {
-        include "internal/**/*.go"
-        include "pkg/**/*.go"
+        include "*.go"
     }
 }
 
@@ -34,11 +33,9 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-
-    // Consumable configurations
-    goSource {
-        canBeConsumed = true
-        canBeResolved = false
+    notoGo {
+        canBeConsumed = false
+        canBeResolved = true
     }
 }
 
@@ -46,17 +43,17 @@ dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
     toolkitGo project(path: ":toolkit:go", configuration: "goSource")
     coreGo project(path: ":core:go", configuration: "goSource")
+    notoGo project(path: ":domains:noto", configuration: "goSource")
 }
 
-task copySolidity(type: Copy) {
+task copySolidity(type: Copy,) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
-        include 'contracts/noto/Noto.sol/Noto.json'
-        include 'contracts/noto/NotoSelfSubmitFactory.sol/NotoSelfSubmitFactory.json'
-        include 'contracts/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
+        include 'contracts/multicall/MultiCall.sol/MultiCall.json'
+        include 'contracts/multicall/MultiCall.sol/MultiCallFactory.json'
     }
-    into 'internal/noto/abis'
+    into 'abis'
 
     // Flatten all paths into the destination folder
     eachFile { path = name }
@@ -66,14 +63,14 @@ task copySolidity(type: Copy) {
 task test(type: Exec) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
+    inputs.files(configurations.notoGo)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
     workingDir '.'
     executable 'go'
     args 'test'
-    args './internal/...'
-    args './pkg/...'
+    args './...'
     args '-cover'
     args '-covermode=atomic'
     args '-timeout=30s'
@@ -90,9 +87,5 @@ task build {
 
 task clean(type: Delete) {
     delete 'coverage'
-    delete 'internal/noto/abis'
-}
-
-dependencies {
-    goSource files(goFiles, copySolidity)
+    delete 'abis'
 }

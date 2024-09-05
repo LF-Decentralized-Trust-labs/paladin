@@ -52,6 +52,8 @@ type Noto struct {
 	chainID    int64
 	domainID   string
 	coinSchema *pb.StateSchema
+	factory    *domain.SolidityBuild
+	contract   *domain.SolidityBuild
 }
 
 type NotoDeployParams struct {
@@ -79,25 +81,23 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
-	var factory *domain.SolidityBuild
-	var contract *domain.SolidityBuild
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		factory = domain.LoadBuild(notoFactoryJSON)
-		contract = domain.LoadBuild(notoJSON)
+		n.factory = domain.LoadBuild(notoFactoryJSON)
+		n.contract = domain.LoadBuild(notoJSON)
 	case "NotoSelfSubmit":
-		factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
-		contract = domain.LoadBuild(notoSelfSubmitJSON)
+		n.factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
+		n.contract = domain.LoadBuild(notoSelfSubmitJSON)
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	factoryJSON, err := json.Marshal(factory.ABI)
+	factoryJSON, err := json.Marshal(n.factory.ABI)
 	if err != nil {
 		return nil, err
 	}
-	notoJSON, err := json.Marshal(contract.ABI)
+	notoJSON, err := json.Marshal(n.contract.ABI)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := handler.ValidateParams(tx.FunctionParamsJson)
+	params, err := handler.ValidateParams(ctx, tx.FunctionParamsJson)
 	if err != nil {
 		return nil, nil, err
 	}
