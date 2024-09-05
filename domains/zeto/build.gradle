@@ -20,7 +20,7 @@ ext {
         include "internal/**/*.go"
         include "pkg/**/*.go"
     }
-    jsCircuits = "${rootDir}/zeto/zkp/circuits"
+    zetoVersion = "v0.0.2"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"
 }
@@ -71,8 +71,10 @@ task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
     inputs.files(fileTree("${rootDir}/zeto/solidity/artifacts"))
     from fileTree("${rootDir}/zeto/solidity/artifacts") {
         include 'contracts/zeto_anon.sol/Zeto_Anon.json'
+        include 'contracts/zeto_anon_enc.sol/Zeto_AnonEnc.json'
         include 'contracts/zeto_nf_anon.sol/Zeto_NfAnon.json'
         include 'contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
+        include 'contracts/lib/verifier_anon_enc.sol/Groth16Verifier_AnonEnc.json'
         include 'contracts/lib/verifier_nf_anon.sol/Groth16Verifier_NfAnon.json'
         include 'contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
         include 'contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
@@ -87,32 +89,9 @@ task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
     includeEmptyDirs = false
 }
 
-// TODO: should circuits logic move to a separate project?
-task circuitsInstall(type: Exec) {
-    executable 'npm'
-    args 'install'
-    workingDir "${rootDir}/zeto/zkp/circuits"
-
-    inputs.files("${rootDir}/zeto/zkp/circuits/package.json", "${rootDir}/zeto/zkp/circuits/package-lock.json")
-    outputs.files("${rootDir}/zeto/zkp/circuits/package-lock.json")
-    outputs.dir("${rootDir}/zeto/zkp/circuits/node_modules")
-}
-
-task installCircom {
-    def filename
-    def outname
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        filename = "circom-windows-amd64.exe"
-        outname = "circom.exe"
-    } else if (Os.isFamily(Os.FAMILY_MAC)) {
-        filename = "circom-macos-amd64"
-        outname = "circom"
-    } else {
-        filename = "circom-linux-amd64"
-        outname = "circom"
-    }
-
-    def url = "https://github.com/iden3/circom/releases/download/v2.1.9/${filename}"
+task downloadZetoProver {
+    def outname = "zeto-wasm-${zetoVersion}.tar.gz"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
     doFirst {
         mkdir(f.parent)
@@ -122,19 +101,40 @@ task installCircom {
     outputs.file(f)
 }
 
-task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
-    executable 'npm'
-    args 'run', 'gen'
-    args '--', '-c', 'anon'
-    workingDir "${rootDir}/zeto/zkp/circuits"
+task downloadZetoTestProvingKeys {
+    def outname = "zeto-test-proving-keys-${zetoVersion}.tar.gz"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
+    def f = new File(toolsOut, outname)
+    doFirst {
+        mkdir(f.parent)
+        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
+        f.setExecutable(true)
+    }
+    outputs.file(f)
+}
 
-    environment 'PATH', "${toolsOut}${File.pathSeparator}${environment.PATH}"
+task extractZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
+    executable 'tar'
+    args '-xzvf'
+    args "${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz"
+    workingDir zkpOut
+
     environment "CIRCUITS_ROOT", zkpOut
-    environment "PROVING_KEYS_ROOT", zkpOut
-    environment "PTAU_DOWNLOAD_PATH", zkpOut
     doFirst {
         mkdir(zkpOut)
     }
+
+    inputs.dir(workingDir)
+    outputs.dir(zkpOut)
+}
+
+task extractZetoTestProvingKeys(type: Exec, dependsOn: [extractZetoProver, downloadZetoTestProvingKeys]) {
+    executable 'tar'
+    args '-xzvf'
+    args "${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz"
+    workingDir zkpOut
+
+    environment "PROVING_KEYS_ROOT", zkpOut
 
     inputs.dir(workingDir)
     outputs.dir(zkpOut)
@@ -159,7 +159,8 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn circuitsGen
+    dependsOn extractZetoProver
+    dependsOn extractZetoTestProvingKeys
     dependsOn ':testinfra:startTestInfra'
     lockTestInfra(it)
     dumpLogsOnFailure(it, ':testinfra:startTestInfra')

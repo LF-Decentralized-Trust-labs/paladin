@@ -7,3 +7,5 @@ use (
 	./testinfra
 	./toolkit/go
 )
+
+replace github.com/hyperledger-labs/zeto/go-sdk => ./zeto

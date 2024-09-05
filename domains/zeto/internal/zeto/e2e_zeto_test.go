@@ -37,8 +37,9 @@ import (
 )
 
 var (
-	controllerName = "controller"
-	recipient1Name = "recipient1"
+	controllerName  = "controller"
+	recipient1Name  = "recipient1"
+	domainContracts *zetoDomainContracts
 )
 
 //go:embed zeto.config.yaml
@@ -79,13 +80,10 @@ func newTestDomain(t *testing.T, domainName string, tokenName string, config *ty
 	return done, domain, rpc
 }
 
-func TestZeto(t *testing.T) {
+func TestZeto_DeployZetoContracts(t *testing.T) {
 	ctx := context.Background()
-	log.L(ctx).Infof("TestZeto")
-	domainName := "zeto_" + tktypes.RandHex(8)
-	log.L(ctx).Infof("Domain name = %s", domainName)
+	log.L(ctx).Infof("Deploy Zeto Contracts")
 
-	log.L(ctx).Infof("Deploying Zeto libraries+factory")
 	tb := testbed.NewTestBed()
 	var ec ethclient.EthClient
 	var bi blockindexer.BlockIndexer
@@ -106,18 +104,23 @@ func TestZeto(t *testing.T) {
 	err = yaml.Unmarshal(testZetoConfigYaml, &config)
 	assert.NoError(t, err)
 
-	domainContracts, err := deployDomainContracts(ctx, rpc, controllerName, &config)
+	domainContracts, err = deployDomainContracts(ctx, rpc, controllerName, &config)
 	assert.NoError(t, err)
 
 	err = configureFactoryContract(ctx, ec, bi, controllerName, domainContracts)
 	assert.NoError(t, err)
+}
 
-	done, zeto, rpc := newTestDomain(t, domainName, "Zeto_Anon", &types.Config{
+func testZetoFungible(t *testing.T, tokenName string) {
+	ctx := context.Background()
+	domainName := "zeto_" + tktypes.RandHex(8)
+	log.L(ctx).Infof("Domain name = %s", domainName)
+	done, zeto, rpc := newTestDomain(t, domainName, tokenName, &types.Config{
 		FactoryAddress: domainContracts.factoryAddress.String(),
 	}, domainContracts)
 	defer done()
 
-	log.L(ctx).Infof("Deploying an instance of Zeto")
+	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
 	var zetoAddress ethtypes.Address0xHex
 	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		domainName, &ZetoConstructorParams{

@@ -13,23 +13,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zkp
+package snark
 
 import (
 	"context"
 	"errors"
-	"math/big"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
 	"github.com/kaleido-io/paladin/core/internal/cache"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/signer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -106,13 +103,7 @@ func (sp *snarkProver) Sign(ctx context.Context, privateKey []byte, req *pb.Sign
 		provingKey = p
 	}
 
-	var wtns []byte
-	switch inputs.CircuitId {
-	case "anon":
-		// no further input fields are needed
-		wtns, err = calculateWitness_anon(inputs.Common, keyEntry, circuit)
-	}
-
+	wtns, err := calculateWitness(inputs.CircuitId, inputs.Common, keyEntry, circuit)
 	if err != nil {
 		return nil, err
 	}
@@ -171,67 +162,16 @@ func serializeProof(proof *types.ZKProof) ([]byte, error) {
 	return proto.Marshal(&snark)
 }
 
-func calculateWitness_anon(commonInputs *pb.ProvingRequestCommon, keyEntry *core.KeyEntry, circuit witness.Calculator) ([]byte, error) {
-	// construct the output UTXOs based on the values and owner public keys
-	outputCommitments := make([]*big.Int, len(commonInputs.OutputValues))
-	outputSalts := make([]*big.Int, len(commonInputs.OutputValues))
-	outputOwnerPublicKeys := make([][]*big.Int, len(commonInputs.OutputValues))
-	outputValues := make([]*big.Int, len(commonInputs.OutputValues))
-
-	for i := 0; i < len(commonInputs.OutputSalts); i++ {
-		salt, ok := new(big.Int).SetString(commonInputs.OutputSalts[i], 16)
-		if !ok {
-			return nil, errors.New("failed to parse output salt")
-		}
-		outputSalts[i] = salt
-
-		if salt.Cmp(big.NewInt(0)) == 0 {
-			outputOwnerPublicKeys[i] = []*big.Int{big.NewInt(0), big.NewInt(0)}
-			outputValues[i] = big.NewInt(0)
-			outputCommitments[i] = big.NewInt(0)
-		} else {
-			ownerPubKey, err := common.DecodePublicKey(commonInputs.OutputOwners[i])
-			if err != nil {
-				return nil, err
-			}
-			outputOwnerPublicKeys[i] = []*big.Int{ownerPubKey.X, ownerPubKey.Y}
-			value := commonInputs.OutputValues[i]
-			outputValues[i] = new(big.Int).SetUint64(value)
-			u := utxo.NewFungible(new(big.Int).SetUint64(value), ownerPubKey, salt)
-			hash, err := u.GetHash()
-			if err != nil {
-				return nil, err
-			}
-			outputCommitments[i] = hash
-		}
+func calculateWitness(circuitId string, commonInputs *pb.ProvingRequestCommon, keyEntry *core.KeyEntry, circuit witness.Calculator) ([]byte, error) {
+	inputs, err := buildCircuitInputs(commonInputs)
+	if err != nil {
+		return nil, err
 	}
 
-	inputCommitments := make([]*big.Int, len(commonInputs.InputCommitments))
-	inputValues := make([]*big.Int, len(commonInputs.InputValues))
-	inputSalts := make([]*big.Int, len(commonInputs.InputSalts))
-	for i, c := range commonInputs.InputCommitments {
-		commitment, ok := new(big.Int).SetString(c, 16)
-		if !ok {
-			return nil, errors.New("failed to parse input commitment")
-		}
-		inputCommitments[i] = commitment
-		inputValues[i] = new(big.Int).SetUint64(commonInputs.InputValues[i])
-		salt, ok := new(big.Int).SetString(commonInputs.InputSalts[i], 16)
-		if !ok {
-			return nil, errors.New("failed to parse input salt")
-		}
-		inputSalts[i] = salt
-	}
-
-	witnessInputs := map[string]interface{}{
-		"inputCommitments":      inputCommitments,
-		"inputValues":           inputValues,
-		"inputSalts":            inputSalts,
-		"inputOwnerPrivateKey":  keyEntry.PrivateKeyForZkp,
-		"outputCommitments":     outputCommitments,
-		"outputValues":          outputValues,
-		"outputSalts":           outputSalts,
-		"outputOwnerPublicKeys": outputOwnerPublicKeys,
+	var witnessInputs map[string]interface{}
+	switch circuitId {
+	case "anon":
+		witnessInputs = assembleInputs_anon(inputs, keyEntry)
 	}
 
 	wtns, err := circuit.CalculateWTNSBin(witnessInputs, true)

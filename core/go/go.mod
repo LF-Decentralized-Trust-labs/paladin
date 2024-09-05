@@ -267,3 +267,5 @@ require (
 )
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+
+replace github.com/hyperledger-labs/zeto/go-sdk => ../../zeto/go-sdk
