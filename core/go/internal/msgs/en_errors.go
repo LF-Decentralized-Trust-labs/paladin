@@ -24,16 +24,16 @@ import (
 	"golang.org/x/text/language"
 )
 
-const kataPrefix = "PD01"
+const paladinCoreGoPrefix = "PD01"
 
 var registered = false
 var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	if !registered {
-		i18n.RegisterPrefix(kataPrefix, "Paladin Transaction Manager")
+		i18n.RegisterPrefix(paladinCoreGoPrefix, "Paladin Transaction Manager")
 		registered = true
 	}
-	if !strings.HasPrefix(key, kataPrefix) {
-		panic(fmt.Errorf("must have prefix '%s': %s", kataPrefix, key))
+	if !strings.HasPrefix(key, paladinCoreGoPrefix) {
+		panic(fmt.Errorf("must have prefix '%s': %s", paladinCoreGoPrefix, key))
 	}
 	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
 }
