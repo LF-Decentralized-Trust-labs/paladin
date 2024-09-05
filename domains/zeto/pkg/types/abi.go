@@ -18,11 +18,10 @@ package types
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
 
-var ZetoABI = domain.DomainABI{
-	"constructor": &abi.Entry{
+var ZetoABI = abi.ABI{
+	&abi.Entry{
 		Type: abi.Constructor,
 		Inputs: abi.ParameterArray{
 			{Name: "from", Type: "string"},
@@ -31,7 +30,7 @@ var ZetoABI = domain.DomainABI{
 			{Name: "verifier", Type: "address"},
 		},
 	},
-	"mint": &abi.Entry{
+	&abi.Entry{
 		Name: "mint",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{
@@ -39,7 +38,7 @@ var ZetoABI = domain.DomainABI{
 			{Name: "amount", Type: "uint256"},
 		},
 	},
-	"transfer": &abi.Entry{
+	&abi.Entry{
 		Name: "transfer",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{

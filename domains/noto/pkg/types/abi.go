@@ -18,17 +18,16 @@ package types
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
 )
 
-var NotoABI = domain.DomainABI{
-	"constructor": &abi.Entry{
+var NotoABI = abi.ABI{
+	{
 		Type: abi.Constructor,
 		Inputs: abi.ParameterArray{
 			{Name: "notary", Type: "string"},
 		},
 	},
-	"mint": &abi.Entry{
+	{
 		Name: "mint",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{
@@ -36,7 +35,7 @@ var NotoABI = domain.DomainABI{
 			{Name: "amount", Type: "uint256"},
 		},
 	},
-	"transfer": &abi.Entry{
+	{
 		Name: "transfer",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{

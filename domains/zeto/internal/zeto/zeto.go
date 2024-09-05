@@ -86,7 +86,7 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	if err != nil {
 		return nil, err
 	}
-	constructorJSON, err := json.Marshal(types.ZetoABI["constructor"])
+	constructorJSON, err := json.Marshal(types.ZetoABI.Constructor())
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, nil, err
 	}
 
-	abi := types.ZetoABI[functionABI.Name]
+	abi := types.ZetoABI.Functions()[functionABI.Name]
 	handler := z.GetHandler(functionABI.Name)
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)

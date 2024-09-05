@@ -23,8 +23,6 @@ import (
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type DomainABI map[string]*abi.Entry
-
 type ParsedTransaction[C any] struct {
 	Transaction     *pb.TransactionSpecification
 	FunctionABI     *abi.Entry

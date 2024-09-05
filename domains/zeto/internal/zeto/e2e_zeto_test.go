@@ -146,7 +146,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     controllerName,
 		To:       kata.EthAddress(zetoAddress),
-		Function: *types.ZetoABI["mint"],
+		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(10),
@@ -167,7 +167,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     controllerName,
 		To:       kata.EthAddress(zetoAddress),
-		Function: *types.ZetoABI["mint"],
+		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(20),
@@ -190,7 +190,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       kata.EthAddress(zetoAddress),
-		Function: *types.ZetoABI["mint"],
+		Function: *types.ZetoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(10),
@@ -204,7 +204,7 @@ func TestZeto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     controllerName,
 		To:       kata.EthAddress(zetoAddress),
-		Function: *types.ZetoABI["transfer"],
+		Function: *types.ZetoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(25),

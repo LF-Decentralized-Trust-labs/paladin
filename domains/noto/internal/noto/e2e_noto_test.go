@@ -132,7 +132,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     notaryName,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["mint"],
+		Function: *types.NotoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     notaryName,
 			Amount: ethtypes.NewHexInteger64(100),
@@ -153,7 +153,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["mint"],
+		Function: *types.NotoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(100),
@@ -167,7 +167,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     notaryName,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["transfer"],
+		Function: *types.NotoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(150),
@@ -180,7 +180,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     notaryName,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["transfer"],
+		Function: *types.NotoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(50),
@@ -209,7 +209,7 @@ func TestNoto(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["transfer"],
+		Function: *types.NotoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient2Name,
 			Amount: ethtypes.NewHexInteger64(50),
@@ -259,7 +259,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     notaryName,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["mint"],
+		Function: *types.NotoABI.Functions()["mint"],
 		Inputs: toJSON(t, &types.MintParams{
 			To:     notaryName,
 			Amount: ethtypes.NewHexInteger64(100),
@@ -280,7 +280,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     notaryName,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["transfer"],
+		Function: *types.NotoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(50),
@@ -298,7 +298,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &kata.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       kata.EthAddress(notoAddress),
-		Function: *types.NotoABI["transfer"],
+		Function: *types.NotoABI.Functions()["transfer"],
 		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient2Name,
 			Amount: ethtypes.NewHexInteger64(50),

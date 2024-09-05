@@ -101,7 +101,7 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	if err != nil {
 		return nil, err
 	}
-	constructorJSON, err := json.Marshal(types.NotoABI["constructor"])
+	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, nil, err
 	}
 
-	abi := types.NotoABI[functionABI.Name]
+	abi := types.NotoABI.Functions()[functionABI.Name]
 	handler := n.GetHandler(functionABI.Name)
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
