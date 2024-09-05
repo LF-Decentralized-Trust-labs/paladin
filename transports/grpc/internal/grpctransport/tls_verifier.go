@@ -35,6 +35,7 @@ import (
 type tlsVerifier struct {
 	tlsVerifierStatic
 	baseTLSConfig *tls.Config
+	expectedNode  string
 }
 
 type tlsVerifierStatic struct {
@@ -126,6 +127,12 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 			node = match[1]
 		} else {
 			node = ai.cert.Subject.CommonName
+		}
+
+		// On the client side we connect expecting to find a particular node on the other side
+		if tv.expectedNode != "" && node != tv.expectedNode {
+			log.L(ctx).Errorf("Expected node '%s', received node '%s'", tv.expectedNode, node)
+			return i18n.NewError(ctx, msgs.MsgConnectionToWrongNode, node)
 		}
 
 		// Ask the Paladin server/registry for details of the node we are peering with

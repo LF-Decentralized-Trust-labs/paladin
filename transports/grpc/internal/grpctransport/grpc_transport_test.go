@@ -160,7 +160,8 @@ func TestGRPCTransportPingPong(t *testing.T) {
 	// Connect plugin1 to plugin2
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			Destination: "anything@node2",
+			ReplyTo:     "to.me@node1",
+			Destination: "to.you@node2",
 		},
 	})
 	assert.NoError(t, err)

@@ -151,20 +151,6 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	return &prototk.ConfigureTransportResponse{}, nil
 }
 
-// // Override the accept on the listener to wrap in our connection
-// func (gcl *grpcConnectionListener) Accept() (net.Conn, error) {
-// 	gc := &grpcConnection{
-// 		t:         gcl.t,
-// 		gcl:       gcl,
-// 		direction: "inbound",
-// 	}
-// 	c, err := gcl.Listener.Accept()
-// 	if err == nil {
-// 		c, err = gc.tlsInit(c)
-// 	}
-// 	return c, err
-// }
-
 func (t *grpcTransport) serve() {
 	defer close(t.serverDone)
 
@@ -173,7 +159,12 @@ func (t *grpcTransport) serve() {
 	log.L(t.bgCtx).Infof("gRPC server for plugin %s stopped (err=%v)", t.name, err)
 }
 
+// The server side of a send-stream, which receives messages from the client and delivers them
+// to our local Paladin server
 func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[proto.Message, proto.Empty]) error {
+
+	// The TLS authentication will have done its job by this point, and we can pop it out of the context
+	// where it is the AuthInfo() provider on the peer.
 	ctx := stream.Context()
 	var ai *tlsVerifierAuthInfo
 	peer, ok := peer.FromContext(ctx)
@@ -183,14 +174,44 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 	if !ok {
 		return i18n.NewError(ctx, msgs.MsgAuthContextNotAvailable)
 	}
-	ctx = log.WithLogField(ctx, "remote", ai.remoteAddr)
+
+	// Go into the long-lived receive loop until the client disconnects
+	ctx = log.WithLogField(log.WithLogField(ctx, "remote", ai.remoteAddr), "node", ai.verifiedNodeName)
 	log.L(ctx).Infof("GRPC message stream established from node %s", ai.verifiedNodeName)
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
+			log.L(ctx).Infof("GRPC message stream from %s closing (err=%v)", ai.verifiedNodeName, err)
 			return err
 		}
-		panic(msg)
+
+		// Check the message is from the node we expect.
+		// Note the destination node is checked by Paladin - just just have to verify the sender.
+		replyToNode, err := tktypes.PrivateIdentityLocator(msg.ReplyTo).Node(ctx, false)
+		if err == nil && replyToNode != ai.verifiedNodeName {
+			err = i18n.NewError(ctx, msgs.MsgInvalidReplyToNode)
+		}
+		if err != nil {
+			log.L(ctx).Errorf("Invalid replyTo: %s", tktypes.ProtoToJSON(msg))
+			return err
+		}
+
+		// Deliver it to Paladin
+		_, err = t.callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+			Message: &prototk.Message{
+				MessageId:     msg.MessageId,
+				CorrelationId: msg.CorrelationId,
+				Destination:   msg.Destination,
+				ReplyTo:       msg.ReplyTo,
+				MessageType:   msg.MessageType,
+				Payload:       msg.Payload,
+			},
+		})
+		if err != nil {
+			log.L(ctx).Errorf("Receive failed (err=%s): %s", err, tktypes.ProtoToJSON(msg))
+			return err
+		}
+
 	}
 }
 
@@ -250,8 +271,10 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (grp
 	}
 
 	// Ok - try connecting
+	individualNodeVerifier := t.peerVerifier.Clone().(*tlsVerifier)
+	individualNodeVerifier.expectedNode = nodeName
 	conn, err := grpc.NewClient(transportDetails.Endpoint,
-		grpc.WithTransportCredentials(t.peerVerifier.Clone()),
+		grpc.WithTransportCredentials(individualNodeVerifier),
 	)
 	if err != nil {
 		return nil, err

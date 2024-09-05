@@ -42,4 +42,6 @@ var (
 	MsgPeerCertificateInvalid               = ffe("PD030007", "peer '%s' did not provide a certificate signed by expected issuer expected=%s received=%s")
 	MsgTLSNegotiationFailed                 = ffe("PD030008", "TLS negotiation did not result in a verified peer node name")
 	MsgAuthContextNotAvailable              = ffe("PD030009", "server failed to retrieve the auth context")
+	MsgInvalidReplyToNode                   = ffe("PD030010", "replyTo node does not match sending node")
+	MsgConnectionToWrongNode                = ffe("PD030011", "the TLS identity of the node '%s' does not match the expected identity")
 )
