@@ -16,6 +16,7 @@ contracts:
   # contracts to be set
   implementations:
     - name: Zeto_Anon
+      circuitId: anon
       cloneable: true
       address:
       abiAndBytecode:
@@ -28,6 +29,7 @@ contracts:
         - Groth16Verifier_CheckHashesValue
         - Groth16Verifier_CheckInputsOutputsValue
     - name: Zeto_AnonEnc
+      circuitId: anon_enc
       cloneable: true
       address:
       abiAndBytecode:
@@ -40,6 +42,7 @@ contracts:
         - Groth16Verifier_CheckHashesValue
         - Groth16Verifier_CheckInputsOutputsValue
     - name: Zeto_NfAnon
+      circuitId: nf_anon
       cloneable: true
       address:
       abiAndBytecode:

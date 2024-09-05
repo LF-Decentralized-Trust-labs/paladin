@@ -172,6 +172,8 @@ func calculateWitness(circuitId string, commonInputs *pb.ProvingRequestCommon, k
 	switch circuitId {
 	case "anon":
 		witnessInputs = assembleInputs_anon(inputs, keyEntry)
+	case "anon_enc":
+		witnessInputs = assembleInputs_anon_enc(inputs, keyEntry)
 	}
 
 	wtns, err := circuit.CalculateWTNSBin(witnessInputs, true)

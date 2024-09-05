@@ -18,6 +18,7 @@ package zeto
 import (
 	"testing"
 
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -74,7 +75,7 @@ contracts:
 `
 
 func TestSortContracts(t *testing.T) {
-	var config ZetoDomainConfig
+	var config types.DomainConfig
 	err := yaml.Unmarshal([]byte(testConfig), &config)
 	assert.NoError(t, err)
 

@@ -100,7 +100,7 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	var config ZetoDomainConfig
+	var config types.DomainConfig
 	err = yaml.Unmarshal(testZetoConfigYaml, &config)
 	assert.NoError(t, err)
 
@@ -109,6 +109,10 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 
 	err = configureFactoryContract(ctx, ec, bi, controllerName, domainContracts)
 	assert.NoError(t, err)
+}
+
+func TestZeto_Anon(t *testing.T) {
+	testZetoFungible(t, "Zeto_Anon")
 }
 
 func testZetoFungible(t *testing.T, tokenName string) {

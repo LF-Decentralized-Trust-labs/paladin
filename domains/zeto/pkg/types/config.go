@@ -26,6 +26,31 @@ type Config struct {
 }
 
 type DomainConfig struct {
+	DomainContracts DomainContracts `yaml:"contracts"`
+}
+
+type DomainContracts struct {
+	Factory         DomainContract   `yaml:"factory"`
+	Implementations []DomainContract `yaml:"implementations"`
+}
+
+type DomainContract struct {
+	Name            string         `yaml:"name"`
+	CircuitId       string         `yaml:"circuitId"`
+	ContractAddress string         `yaml:"address"`
+	AbiAndBytecode  AbiAndBytecode `yaml:"abiAndBytecode"`
+	Libraries       []string       `yaml:"libraries"`
+	Cloneable       bool           `yaml:"cloneable"`
+}
+
+type AbiAndBytecode struct {
+	Path string             `yaml:"path"`
+	Json AbiAndBytecodeJSON `yaml:"json"`
+}
+
+type AbiAndBytecodeJSON struct {
+	Abi      map[string]interface{} `yaml:"abi"`
+	Bytecode string                 `yaml:"bytecode"`
 }
 
 var DomainConfigABI = &abi.ParameterArray{}

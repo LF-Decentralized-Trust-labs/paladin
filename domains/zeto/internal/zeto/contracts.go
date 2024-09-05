@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
@@ -51,7 +52,7 @@ func newZetoDomainContracts() *zetoDomainContracts {
 	}
 }
 
-func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *ZetoDomainConfig) (*zetoDomainContracts, error) {
+func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *types.DomainConfig) (*zetoDomainContracts, error) {
 	if len(config.DomainContracts.Implementations) == 0 {
 		return nil, fmt.Errorf("no implementations specified for factory contract")
 	}
@@ -87,7 +88,7 @@ func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer
 	return ctrs, nil
 }
 
-func findCloneableContracts(config *ZetoDomainConfig) []string {
+func findCloneableContracts(config *types.DomainConfig) []string {
 	var cloneableContracts []string
 	for _, contract := range config.DomainContracts.Implementations {
 		if contract.Cloneable {
@@ -100,8 +101,8 @@ func findCloneableContracts(config *ZetoDomainConfig) []string {
 // when contracts include a `libraries` section, the libraries must be deployed first
 // we build a sorted list of contracts, with the dependencies first, and the depending
 // contracts later
-func sortContracts(config *ZetoDomainConfig) ([]ZetoDomainContract, error) {
-	var contracts []ZetoDomainContract
+func sortContracts(config *types.DomainConfig) ([]types.DomainContract, error) {
+	var contracts []types.DomainContract
 	contracts = append(contracts, config.DomainContracts.Implementations...)
 
 	sort.Slice(contracts, func(i, j int) bool {
@@ -132,7 +133,7 @@ func sortContracts(config *ZetoDomainConfig) ([]ZetoDomainContract, error) {
 	return contracts, nil
 }
 
-func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []ZetoDomainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
+func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []types.DomainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
 	deployedContracts := make(map[string]*ethtypes.Address0xHex)
 	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
@@ -148,7 +149,7 @@ func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer strin
 	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *ZetoDomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *types.DomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
@@ -164,7 +165,7 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 	return addr, build.ABI, nil
 }
 
-func getContractSpec(contract *ZetoDomainContract) (*SolidityBuild, error) {
+func getContractSpec(contract *types.DomainContract) (*SolidityBuild, error) {
 	var build SolidityBuild
 	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
 		abiBytecode := make(map[string]interface{})

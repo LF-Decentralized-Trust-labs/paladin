@@ -115,8 +115,8 @@ github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
-github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915 h1:QIiSMgnbWcOGTYPuB/psz4UG/LiCglPHn9QtuRo63jE=
-github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915/go.mod h1:5QXncuG69tskksWX4hLBsISsshM8NudzJKTIc3WUENw=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240904203542-f0cbf0065c12 h1:nW3h11zogD+x9sTF+GNvaj9YvWBBCjYTHhzfzH23Ro4=
+github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240904203542-f0cbf0065c12/go.mod h1:5QXncuG69tskksWX4hLBsISsshM8NudzJKTIc3WUENw=
 github.com/hyperledger/firefly-common v1.4.8 h1:0o1Qp1c5YzQo8nbnX+gAo9SVd2tR4Z9U2t8Y4zEzyaA=
 github.com/hyperledger/firefly-common v1.4.8/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
 github.com/hyperledger/firefly-signer v1.1.14 h1:gSGwdBHTLPchGlmLOKk2Y2nawfMhlH2CDm2owt0lIUE=
