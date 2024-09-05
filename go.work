@@ -6,4 +6,5 @@ use (
 	./kata
 	./testinfra
 	./toolkit_go
+	./transports/grpc
 )

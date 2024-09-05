@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,7 +53,7 @@ func TestMissingPort(t *testing.T) {
 func TestBadTLSConfig(t *testing.T) {
 	_, err := NewServer(context.Background(), "unittest", &Config{
 		Port: confutil.P(0),
-		TLS: tls.Config{
+		TLS: tlsconf.Config{
 			Enabled: true,
 			CAFile:  "!!!!!badness",
 		},

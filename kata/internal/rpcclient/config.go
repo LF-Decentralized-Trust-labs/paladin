@@ -25,9 +25,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 )
 
 type ConfigAuth struct {
@@ -39,7 +39,7 @@ type HTTPConfig struct {
 	URL         string                 `yaml:"url"`
 	HTTPHeaders map[string]interface{} `yaml:"httpHeaders"`
 	Auth        ConfigAuth             `yaml:"auth"`
-	TLS         tls.Config             `yaml:"tls"`
+	TLS         tlsconf.Config         `yaml:"tls"`
 }
 
 type WSConfig struct {
@@ -67,9 +67,9 @@ func ParseWSConfig(ctx context.Context, config *WSConfig) (*wsclient.WSConfig, e
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEthClientInvalidWebSocketURL, u)
 	}
 	if u.Scheme == "wss" {
-		config.TLS.Enabled = true
+		config.tlsconf.Enabled = true
 	}
-	tlsConfig, err := tls.BuildTLSConfig(ctx, &config.TLS, tls.ClientType)
+	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &config.TLS, tlsconf.ClientType)
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +95,9 @@ func ParseHTTPConfig(ctx context.Context, config *HTTPConfig) (*resty.Client, er
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEthClientInvalidHTTPURL, u)
 	}
 	if u.Scheme == "https" {
-		config.TLS.Enabled = true
+		config.tlsconf.Enabled = true
 	}
-	tlsConfig, err := tls.BuildTLSConfig(ctx, &config.TLS, tls.ClientType)
+	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &config.TLS, tlsconf.ClientType)
 	if err != nil {
 		return nil, err
 	}

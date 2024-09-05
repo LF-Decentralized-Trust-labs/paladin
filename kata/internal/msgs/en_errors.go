@@ -139,15 +139,6 @@ var (
 	MsgHTTPServerMissingPort        = ffe("PD010801", "HTTP server port must be specified for '%s'")
 	MsgHTTPServerNoWSUpgradeSupport = ffe("PD010802", "HTTP server does not support WebSocket upgrade (%T)")
 
-	// TLS PD0198XX
-	MsgTLSInvalidCAFile             = ffe("PD010900", "Invalid CA certificates file")
-	MsgTLSConfigFailed              = ffe("PD010901", "Failed to initialize TLS configuration")
-	MsgTLSInvalidKeyPairFiles       = ffe("PD010902", "Invalid certificate and key pair files")
-	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010903", "Unknown DN attribute '%s'")
-	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010904", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
-	MsgTLSInvalidTLSDnChain         = ffe("PD010905", "Cannot match subject distinguished name as cert chain is not verified")
-	MsgTLSInvalidTLSDnMismatch      = ffe("PD010906", "Certificate subject does not meet requirements")
-
 	// JSON/RPC PD0110XX
 	MsgJSONRPCInvalidRequest      = ffe("PD011000", "Invalid JSON/RPC request data")
 	MsgJSONRPCMissingRequestID    = ffe("PD011001", "Invalid JSON/RPC request. Must set request ID")

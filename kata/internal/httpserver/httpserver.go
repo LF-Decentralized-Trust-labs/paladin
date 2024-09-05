@@ -27,10 +27,10 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/tls"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 )
 
 type Server interface {
@@ -69,7 +69,7 @@ func NewServer(ctx context.Context, description string, conf *Config, handler ht
 	}
 	log.L(ctx).Infof("%s server listening on %s", description, s.listener.Addr())
 
-	tlsConfig, err := tls.BuildTLSConfig(ctx, &conf.TLS, tls.ServerType)
+	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &conf.TLS, tlsconf.ServerType)
 	if err != nil {
 		return nil, err
 	}

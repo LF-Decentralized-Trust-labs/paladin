@@ -1,0 +1,109 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+ext {
+    goFiles = fileTree(".") {
+        include "internal/**/*.go"
+        include "pkg/**/*.go"
+        include "main.go"
+    }
+}
+
+configurations {
+    // Resolvable configurations
+    toolkitProtoCompiled {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
+}
+
+task installTools(type: Exec) {
+    workingDir '.'
+    environment('GOBIN', "${projectDir}/bin")
+    executable 'go'
+    args 'install'
+    inputs.files('go.mod','go.sum')
+    outputs.files(
+        "bin/protoc-gen-go",
+        "bin/protoc-gen-go-grpc",
+        "bin/golangci-lint",
+        "bin/mockery",
+    )
+    // We use go.mod for dependency version management
+    // tools/tools.go tracks deps too - to avoid go mod tidy discarding them all
+    args 'google.golang.org/protobuf/cmd/protoc-gen-go'
+    args 'google.golang.org/grpc/cmd/protoc-gen-go-grpc'
+    args 'github.com/golangci/golangci-lint/cmd/golangci-lint'
+    args 'github.com/vektra/mockery/v2'
+}
+
+task protoc(type: ProtoCompile, dependsOn: [tasks.installTools]) {
+    protocPath "bin"
+    protoPath projectDir
+    protoFiles fileTree("pkg/proto") {
+        include "**/*.proto"
+    }
+    plugins {
+        go {
+            out projectDir
+        }
+        go_grpc {
+            out projectDir
+        }
+    }
+}
+
+task lint(type: Exec, dependsOn:[tasks.protoc]) {
+    workingDir '.'
+
+    inputs.files(goFiles);
+    environment 'GOGC', '20'
+
+    executable "bin/golangci-lint"
+    args 'run'
+    args '-v'
+    args '--color=always'
+    args '--timeout', '5m'
+}
+
+task test(type: Exec, dependsOn:[tasks.protoc]) {
+    inputs.files(configurations.toolkitProtoCompiled)
+    inputs.files(goFiles)
+    outputs.dir('coverage')
+
+    workingDir '.'
+    executable 'go'
+    args 'test'
+    args './internal/...'
+    args '-cover'
+    args '-covermode=atomic'
+    args '-timeout=30s'
+    args "-test.gocoverdir=${projectDir}/coverage"
+
+    dependsOn ':testinfra:startTestInfra'
+}
+
+task build {
+    dependsOn lint
+    dependsOn test
+}
+
+task clean(type: Delete) {
+    delete 'coverage'
+}

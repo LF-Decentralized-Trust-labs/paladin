@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/tls"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,7 +47,7 @@ func TestWSConfigBadURL(t *testing.T) {
 
 func TestWSConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
-	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}}})
+	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}}})
 	assert.Regexp(t, "PD010901", err)
 }
 
@@ -73,6 +73,6 @@ func TestHTTPConfigBadURL(t *testing.T) {
 
 func TestHTTPConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
-	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}})
+	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}})
 	assert.Regexp(t, "PD010901", err)
 }

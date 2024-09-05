@@ -47,4 +47,13 @@ var (
 	MsgPluginUnsupportedRequest   = ffe("PD020300", "Unsupported request %T")
 	MsgPluginUnexpectedResponse   = ffe("PD020301", "Unexpected response %T (expected %T)")
 	MsgPluginUnimplementedRequest = ffe("PD020302", "Unimplemented plugin request %T")
+
+	// TLS PD0204XX
+	MsgTLSInvalidCAFile             = ffe("PD020400", "Invalid CA certificates file")
+	MsgTLSConfigFailed              = ffe("PD020401", "Failed to initialize TLS configuration")
+	MsgTLSInvalidKeyPairFiles       = ffe("PD020402", "Invalid certificate and key pair files")
+	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD020403", "Unknown DN attribute '%s'")
+	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD020404", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
+	MsgTLSInvalidTLSDnChain         = ffe("PD020405", "Cannot match subject distinguished name as cert chain is not verified")
+	MsgTLSInvalidTLSDnMismatch      = ffe("PD020406", "Certificate subject does not meet requirements")
 )
