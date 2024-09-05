@@ -22,6 +22,7 @@ repositories {
 }
 
 test {
+    dependsOn ':testinfra:startTestInfra'
     testLogging {
         showStandardStreams = true
     }
