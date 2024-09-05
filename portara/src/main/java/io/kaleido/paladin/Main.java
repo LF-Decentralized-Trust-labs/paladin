@@ -27,15 +27,15 @@ public class Main {
 
     private static final Logger LOGGER = LogManager.getLogger(Main.class);
 
-    static KataJNA.PaladinGo kata;
+    static CoreJNA.PaladinGo paladinGo;
 
     static RuntimeInfo instance;
 
-    public static synchronized KataJNA.PaladinGo ensureLoaded() {
-        if (kata == null) {
-            kata = KataJNA.Load();
+    public static synchronized CoreJNA.PaladinGo ensureLoaded() {
+        if (paladinGo == null) {
+            paladinGo = CoreJNA.Load();
         }
-        return kata;
+        return paladinGo;
     }
 
     private static synchronized RuntimeInfo setRunning(RuntimeInfo newInstance) {

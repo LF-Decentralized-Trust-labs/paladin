@@ -17,7 +17,7 @@ package io.kaleido.paladin;
 import com.sun.jna.Native;
 import com.sun.jna.Library;
 
-public class KataJNA {
+public class CoreJNA {
 
     private PaladinGo paladinGo;
 
