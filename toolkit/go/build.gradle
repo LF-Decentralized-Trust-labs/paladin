@@ -125,7 +125,8 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
 task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
-    inputs.files(goFiles);
+    lockResource(it, "lint.lock")
+    inputs.files(goFiles)
     environment 'GOGC', '20'
 
     executable "${projectDir}/bin/golangci-lint"

@@ -75,7 +75,7 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
-    lockTestInfra(it)
+    lockResource(it, "testinfra.lock")
     dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
