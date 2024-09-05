@@ -13,26 +13,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package domain
+package types
 
 import (
-	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 )
 
-func FindVerifier(lookup string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
-	for _, verifier := range verifiers {
-		if verifier.Lookup == lookup {
-			return verifier
-		}
-	}
-	return nil
+type NotoCoin struct {
+	Salt   string               `json:"salt"`
+	Owner  string               `json:"owner"`
+	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
-func FindAttestation(name string, attestations []*pb.AttestationResult) *pb.AttestationResult {
-	for _, attestation := range attestations {
-		if attestation.Name == name {
-			return attestation
-		}
-	}
-	return nil
+var NotoCoinABI = &abi.Parameter{
+	Type:         "tuple",
+	InternalType: "struct NotoCoin",
+	Components: abi.ParameterArray{
+		{Name: "salt", Type: "bytes32"},
+		{Name: "owner", Type: "string", Indexed: true},
+		{Name: "amount", Type: "uint256", Indexed: true},
+	},
 }

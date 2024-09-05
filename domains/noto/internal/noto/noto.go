@@ -25,8 +25,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	kata "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -43,34 +45,13 @@ var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/NotoSelfSubmit.json
 var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 
-type Config struct {
-	FactoryAddress string `json:"factoryAddress"`
-	Variant        string `json:"variant"`
-}
-
-type SolidityBuild struct {
-	ABI      abi.ABI                   `json:"abi"`
-	Bytecode ethtypes.HexBytes0xPrefix `json:"bytecode"`
-}
-
 type Noto struct {
-	Interface DomainInterface
+	Callbacks plugintk.DomainCallbacks
 
-	config     *Config
-	callbacks  plugintk.DomainCallbacks
+	config     *types.Config
 	chainID    int64
 	domainID   string
 	coinSchema *pb.StateSchema
-}
-
-type NotoDomainConfig struct {
-	NotaryLookup  string `json:"notaryLookup"`
-	NotaryAddress string `json:"notaryAddress"`
-}
-
-var NotoDomainConfigABI = &abi.ParameterArray{
-	{Name: "notaryLookup", Type: "string"},
-	{Name: "notaryAddress", Type: "address"},
 }
 
 type NotoDeployParams struct {
@@ -80,33 +61,16 @@ type NotoDeployParams struct {
 }
 
 type gatheredCoins struct {
-	inCoins   []*NotoCoin
+	inCoins   []*types.NotoCoin
 	inStates  []*pb.StateRef
 	inTotal   *big.Int
-	outCoins  []*NotoCoin
+	outCoins  []*types.NotoCoin
 	outStates []*pb.StateRef
 	outTotal  *big.Int
 }
 
-func loadBuild(buildOutput []byte) *SolidityBuild {
-	var build SolidityBuild
-	err := json.Unmarshal(buildOutput, &build)
-	if err != nil {
-		panic(err)
-	}
-	return &build
-}
-
-func New(callbacks plugintk.DomainCallbacks) *Noto {
-	noto := &Noto{
-		callbacks: callbacks,
-	}
-	noto.Interface = noto.getInterface()
-	return noto
-}
-
 func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
-	var config Config
+	var config types.Config
 	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
@@ -115,16 +79,16 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
-	var factory *SolidityBuild
-	var contract *SolidityBuild
+	var factory *domain.SolidityBuild
+	var contract *domain.SolidityBuild
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		factory = loadBuild(notoFactoryJSON)
-		contract = loadBuild(notoJSON)
+		factory = domain.LoadBuild(notoFactoryJSON)
+		contract = domain.LoadBuild(notoJSON)
 	case "NotoSelfSubmit":
-		factory = loadBuild(notoSelfSubmitFactoryJSON)
-		contract = loadBuild(notoSelfSubmitJSON)
+		factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
+		contract = domain.LoadBuild(notoSelfSubmitJSON)
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
@@ -137,11 +101,11 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	if err != nil {
 		return nil, err
 	}
-	constructorJSON, err := json.Marshal(n.Interface["constructor"].ABI)
+	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
 	if err != nil {
 		return nil, err
 	}
-	schemaJSON, err := json.Marshal(NotoCoinABI)
+	schemaJSON, err := json.Marshal(types.NotoCoinABI)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +150,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
-	config := &NotoDomainConfig{
+	config := &types.DomainConfig{
 		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
 		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
 	}
@@ -194,7 +158,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
-	data, err := NotoDomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+	data, err := types.DomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -219,98 +183,99 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 }
 
 func (n *Noto) InitTransaction(ctx context.Context, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	tx, err := n.validateTransaction(ctx, req.Transaction)
+	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.FunctionABI.Name].Handler.Init(ctx, tx, req)
+	return handler.Init(ctx, tx, req)
 }
 
 func (n *Noto) AssembleTransaction(ctx context.Context, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	tx, err := n.validateTransaction(ctx, req.Transaction)
+	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.FunctionABI.Name].Handler.Assemble(ctx, tx, req)
+	return handler.Assemble(ctx, tx, req)
 }
 
 func (n *Noto) EndorseTransaction(ctx context.Context, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	tx, err := n.validateTransaction(ctx, req.Transaction)
+	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.FunctionABI.Name].Handler.Endorse(ctx, tx, req)
+	return handler.Endorse(ctx, tx, req)
 }
 
 func (n *Noto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	tx, err := n.validateTransaction(ctx, req.Transaction)
+	tx, handler, err := n.validateTransaction(ctx, req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	return n.Interface[tx.FunctionABI.Name].Handler.Prepare(ctx, tx, req)
+	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*NotoDomainConfig, error) {
-	configValues, err := NotoDomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
+func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainConfig, error) {
+	configValues, err := types.DomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
 		return nil, err
 	}
-	configJSON, err := types.StandardABISerializer().SerializeJSON(configValues)
+	configJSON, err := kata.StandardABISerializer().SerializeJSON(configValues)
 	if err != nil {
 		return nil, err
 	}
-	var config NotoDomainConfig
+	var config types.DomainConfig
 	err = json.Unmarshal(configJSON, &config)
 	return &config, err
 }
 
-func (n *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*NotoConstructorParams, error) {
-	var params NotoConstructorParams
+func (n *Noto) validateDeploy(tx *pb.DeployTransactionSpecification) (*types.ConstructorParams, error) {
+	var params types.ConstructorParams
 	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }
 
-func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*ParsedTransaction, error) {
+func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecification) (*types.ParsedTransaction, types.DomainHandler, error) {
 	var functionABI abi.Entry
 	err := json.Unmarshal([]byte(tx.FunctionAbiJson), &functionABI)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	parser, found := n.Interface[functionABI.Name]
-	if !found {
-		return nil, fmt.Errorf("unknown function: %s", functionABI.Name)
+	abi := types.NotoABI.Functions()[functionABI.Name]
+	handler := n.GetHandler(functionABI.Name)
+	if abi == nil || handler == nil {
+		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := parser.Handler.ValidateParams(tx.FunctionParamsJson)
+	params, err := handler.ValidateParams(tx.FunctionParamsJson)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	signature, _, err := parser.ABI.SolidityDefCtx(ctx)
+	signature, _, err := abi.SolidityDefCtx(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if tx.FunctionSignature != signature {
-		return nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
+		return nil, nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
 	}
 
 	domainConfig, err := n.decodeDomainConfig(ctx, tx.ContractConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	contractAddress, err := ethtypes.NewAddress(tx.ContractAddress)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &ParsedTransaction{
+	return &types.ParsedTransaction{
 		Transaction:     tx,
 		FunctionABI:     &functionABI,
 		ContractAddress: contractAddress,
 		DomainConfig:    domainConfig,
 		Params:          params,
-	}, nil
+	}, handler, nil
 }
 
 func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
@@ -321,9 +286,9 @@ func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 	return sig.RecoverDirect(payload, n.chainID)
 }
 
-func (n *Noto) parseCoinList(label string, states []*pb.EndorsableState) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (n *Noto) parseCoinList(label string, states []*pb.EndorsableState) ([]*types.NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var err error
-	coins := make([]*NotoCoin, len(states))
+	coins := make([]*types.NotoCoin, len(states))
 	refs := make([]*pb.StateRef, len(states))
 	total := big.NewInt(0)
 	for i, input := range states {
@@ -359,4 +324,19 @@ func (n *Noto) gatherCoins(inputs, outputs []*pb.EndorsableState) (*gatheredCoin
 		outStates: outStates,
 		outTotal:  outTotal,
 	}, nil
+}
+
+func (n *Noto) FindCoins(ctx context.Context, query string) ([]*types.NotoCoin, error) {
+	states, err := n.findAvailableStates(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	coins := make([]*types.NotoCoin, len(states))
+	for i, state := range states {
+		if coins[i], err = n.makeCoin(state.DataJson); err != nil {
+			return nil, err
+		}
+	}
+	return coins, err
 }
