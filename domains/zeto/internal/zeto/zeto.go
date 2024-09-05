@@ -33,7 +33,6 @@ type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
 	config      *types.Config
-	callbacks   plugintk.DomainCallbacks
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
