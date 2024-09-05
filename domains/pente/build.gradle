@@ -22,7 +22,7 @@ test {
         showStandardStreams = true
     }
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
 }
 
 repositories {

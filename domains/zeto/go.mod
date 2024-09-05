@@ -112,4 +112,4 @@ replace github.com/kaleido-io/paladin/core => ../../core/go
 
 replace github.com/hyperledger-labs/zeto/go-sdk => ../../zeto/go-sdk
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go

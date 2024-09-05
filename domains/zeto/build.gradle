@@ -43,7 +43,7 @@ configurations {
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
+    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
     coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
 }
 

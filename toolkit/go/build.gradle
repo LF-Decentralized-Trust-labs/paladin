@@ -47,7 +47,7 @@ configurations {
 }
 
 dependencies {
-    protoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+    protoDefinitions project(path: ":toolkit:proto", configuration: "protoDefinitions")
 }
 
 task installTools(type:Exec) {

@@ -14,7 +14,7 @@ task wrapper(type: Wrapper){}
 
 application {
     applicationDefaultJvmArgs = ["-Djna.library.path=" +
-        file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath ]
+        file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath ]
 }
 
 repositories {
@@ -27,7 +27,7 @@ test {
         showStandardStreams = true
     }
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
 }
 
 configurations {
@@ -86,10 +86,10 @@ dependencies {
 
     implementation 'org.apache.logging.log4j:log4j-core:2.23+'
 
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+    toolkitProtoDefinitions project(path: ":toolkit:proto", configuration: "protoDefinitions")
 
     testImplementation project(path: ":core:go", configuration: "libcore")
-    testImplementation project(path: ":toolkit_go", configuration: "libstarter")
+    testImplementation project(path: ":toolkit:go", configuration: "libstarter")
     testImplementation project(path: ":solidity", configuration: "compiledContracts")
 
     implementation 'net.java.dev.jna:jna-platform:5.14+'
@@ -99,7 +99,7 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testImplementation project(path: ':toolkit_go', configuration: 'libstarter')
+    testImplementation project(path: ':toolkit:go', configuration: 'libstarter')
 
 }
 

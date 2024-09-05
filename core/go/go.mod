@@ -266,4 +266,4 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 )
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go

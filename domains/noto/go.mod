@@ -110,4 +110,4 @@ require (
 
 replace github.com/kaleido-io/paladin/core => ../../core/go
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go

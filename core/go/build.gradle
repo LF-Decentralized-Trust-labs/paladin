@@ -60,7 +60,7 @@ configurations {
 
 dependencies {
     compiledContracts project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
+    toolkitProtoDefinitions project(path: ":toolkit:proto", configuration: "protoDefinitions")
 }
 
 task installTools(type: Exec) {
@@ -130,7 +130,7 @@ task copyContracts(dependsOn:[
 ])
 
 task protoc(type: ProtoCompile, dependsOn: [
-        ":toolkit_go:protoc",
+        ":toolkit:go:protoc",
         tasks.installTools,
         tasks.copyTestContracts,
     ]) {
@@ -149,7 +149,7 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit_go:goGet"]) {
+task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit:go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
