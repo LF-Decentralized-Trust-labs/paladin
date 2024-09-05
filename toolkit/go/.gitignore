@@ -1,0 +1,3 @@
+libstarter.h
+**/*.pb.go
+!.vscode/settings.json

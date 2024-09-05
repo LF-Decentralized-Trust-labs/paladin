@@ -31,4 +31,4 @@ require (
 
 replace github.com/kaleido-io/paladin/kata => ../../kata
 
-replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
+replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go

@@ -23,9 +23,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/kaleido-io/paladin/domains/common/pkg/domain"
-	katapb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	corepb "github.com/kaleido-io/paladin/core/pkg/proto"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"google.golang.org/protobuf/proto"
 )
@@ -35,7 +36,7 @@ type transferHandler struct {
 }
 
 func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
-	var transferParams ZetoTransferParams
+	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
 	}
@@ -48,8 +49,8 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 	return &transferParams, nil
 }
 
-func (h *transferHandler) Init(ctx context.Context, tx *ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.Params.(*ZetoTransferParams)
+func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*types.TransferParams)
 
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
@@ -73,7 +74,7 @@ func (h *transferHandler) loadBabyJubKey(payload []byte) (*babyjub.PublicKey, er
 	return keyCompressed.Decompress()
 }
 
-func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCoin) ([]byte, error) {
+func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.ZetoCoin) ([]byte, error) {
 	inputCommitments := make([]string, INPUT_COUNT)
 	inputValueInts := make([]uint64, INPUT_COUNT)
 	inputSalts := make([]string, INPUT_COUNT)
@@ -104,9 +105,9 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCo
 		}
 	}
 
-	payload := &katapb.ProvingRequest{
+	payload := &corepb.ProvingRequest{
 		CircuitId: "anon",
-		Common: &katapb.ProvingRequestCommon{
+		Common: &corepb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
 			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
@@ -119,8 +120,8 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*ZetoCo
 	return proto.Marshal(payload)
 }
 
-func (h *transferHandler) Assemble(ctx context.Context, tx *ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.(*ZetoTransferParams)
+func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.TransferParams)
 
 	resolvedSender := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
 	if resolvedSender == nil {
@@ -187,13 +188,13 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *ParsedTransaction, r
 	}, nil
 }
 
-func (h *transferHandler) Endorse(ctx context.Context, tx *ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
 
-func (h *transferHandler) encodeProof(proof *katapb.SnarkProof) map[string]interface{} {
+func (h *transferHandler) encodeProof(proof *corepb.SnarkProof) map[string]interface{} {
 	// Convert the proof json to the format that the Solidity verifier expects
 	return map[string]interface{}{
 		"pA": []string{proof.A[0], proof.A[1]},
@@ -205,8 +206,8 @@ func (h *transferHandler) encodeProof(proof *katapb.SnarkProof) map[string]inter
 	}
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	var proof katapb.SnarkProof
+func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+	var proof corepb.SnarkProof
 	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
 		return nil, fmt.Errorf("did not find 'sender' attestation")

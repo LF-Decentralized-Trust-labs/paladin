@@ -22,28 +22,12 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
-
-type NotoCoin struct {
-	Salt   string               `json:"salt"`
-	Owner  string               `json:"owner"`
-	Amount *ethtypes.HexInteger `json:"amount"`
-}
-
-var NotoCoinABI = &abi.Parameter{
-	Type:         "tuple",
-	InternalType: "struct NotoCoin",
-	Components: abi.ParameterArray{
-		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "string", Indexed: true},
-		{Name: "amount", Type: "uint256", Indexed: true},
-	},
-}
 
 var EIP712DomainName = "noto"
 var EIP712DomainVersion = "0.0.1"
@@ -80,13 +64,13 @@ var NotoTransferMaskedTypeSet = eip712.TypeSet{
 	},
 }
 
-func (n *Noto) makeCoin(stateData string) (*NotoCoin, error) {
-	coin := &NotoCoin{}
+func (n *Noto) makeCoin(stateData string) (*types.NotoCoin, error) {
+	coin := &types.NotoCoin{}
 	err := json.Unmarshal([]byte(stateData), &coin)
 	return coin, err
 }
 
-func (n *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
+func (n *Noto) makeNewState(coin *types.NotoCoin) (*pb.NewState, error) {
 	coinJSON, err := json.Marshal(coin)
 	if err != nil {
 		return nil, err
@@ -97,11 +81,11 @@ func (n *Noto) makeNewState(coin *NotoCoin) (*pb.NewState, error) {
 	}, nil
 }
 
-func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
-	coins := []*NotoCoin{}
+	coins := []*types.NotoCoin{}
 	for {
 		// Simple oldest coin first algorithm
 		// TODO: make this configurable
@@ -151,16 +135,16 @@ func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 	}
 }
 
-func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*NotoCoin, []*pb.NewState, error) {
+func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
-	newCoin := &NotoCoin{
-		Salt:   types.RandHex(32),
+	newCoin := &types.NotoCoin{
+		Salt:   tktypes.RandHex(32),
 		Owner:  owner,
 		Amount: amount,
 	}
 	newState, err := n.makeNewState(newCoin)
-	return []*NotoCoin{newCoin}, []*pb.NewState{newState}, err
+	return []*types.NotoCoin{newCoin}, []*pb.NewState{newState}, err
 }
 
 func (n *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.StoredState, error) {
@@ -168,29 +152,14 @@ func (n *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.Sto
 		SchemaId:  n.coinSchema.Id,
 		QueryJson: query,
 	}
-	res, err := n.callbacks.FindAvailableStates(ctx, req)
+	res, err := n.Callbacks.FindAvailableStates(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return res.States, nil
 }
 
-func (n *Noto) FindCoins(ctx context.Context, query string) ([]*NotoCoin, error) {
-	states, err := n.findAvailableStates(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-
-	coins := make([]*NotoCoin, len(states))
-	for i, state := range states {
-		if coins[i], err = n.makeCoin(state.DataJson); err != nil {
-			return nil, err
-		}
-	}
-	return coins, err
-}
-
-func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	messageInputs := make([]interface{}, len(inputs))
 	for i, input := range inputs {
 		messageInputs[i] = map[string]interface{}{

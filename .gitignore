@@ -1,7 +1,6 @@
 **/coverage*.txt
 **/debug.test
 **/__debug_*
-.vscode/*.log
 **/.DS_Store
 **/*.so
 **/*.dylib
@@ -52,6 +51,7 @@ bin/
 
 ### VS Code ###
 .vscode/
+!.vscode/settings.json
 
 ### Mac OS ###
 .DS_Store

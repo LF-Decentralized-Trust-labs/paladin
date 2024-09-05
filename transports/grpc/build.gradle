@@ -30,7 +30,7 @@ configurations {
 }
 
 dependencies {
-    toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
+    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
 }
 
 task installTools(type: Exec) {
