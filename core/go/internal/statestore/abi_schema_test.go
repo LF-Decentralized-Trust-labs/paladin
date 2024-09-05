@@ -24,7 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -105,7 +105,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	schemaID := as.Persisted().ID.String()
 
 	// Check it handles data
-	state1, err := ss.PersistState(ctx, "domain1", schemaID, types.RawJSON(`{
+	state1, err := ss.PersistState(ctx, "domain1", schemaID, tktypes.RawJSON(`{
 		"field1": "0x0123456789012345678901234567890123456789",
 		"field2": "hello world",
 		"field3": 42,
@@ -254,7 +254,7 @@ func TestGetSchemaInvalidJSON(t *testing.T) {
 		[]string{"type", "content"},
 	).AddRow(SchemaTypeABI, "!!! { bad json"))
 
-	_, err := ss.GetSchema(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), true)
+	_, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), true)
 	assert.Regexp(t, "PD010113", err)
 }
 
@@ -264,7 +264,7 @@ func TestRestoreABISchemaInvalidType(t *testing.T) {
 	defer done()
 
 	_, err := newABISchemaFromDB(ctx, &SchemaPersisted{
-		Definition: types.RawJSON(`{}`),
+		Definition: tktypes.RawJSON(`{}`),
 	})
 	assert.Regexp(t, "PD010114", err)
 
@@ -276,7 +276,7 @@ func TestRestoreABISchemaInvalidTypeTree(t *testing.T) {
 	defer done()
 
 	_, err := newABISchemaFromDB(ctx, &SchemaPersisted{
-		Definition: types.RawJSON(`{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`),
+		Definition: tktypes.RawJSON(`{"type":"tuple","internalType":"struct MyType","components":[{"type":"wrong"}]}`),
 	})
 	assert.Regexp(t, "FF22025.*wrong", err)
 
@@ -429,7 +429,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010103", err)
 }
 
@@ -461,7 +461,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1": 12345}`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010110", err)
 }
 
@@ -497,7 +497,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{!!! wrong`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{!!! wrong`))
 	assert.Regexp(t, "PD010116", err)
 }
 
@@ -522,7 +522,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":{}}`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":{}}`))
 	assert.Regexp(t, "FF22030", err)
 }
 
@@ -547,7 +547,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 
@@ -572,7 +572,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
 	assert.NoError(t, err)
-	_, err = as.ProcessState(ctx, types.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
+	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
 

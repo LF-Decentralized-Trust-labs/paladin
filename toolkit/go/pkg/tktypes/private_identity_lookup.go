@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // The locator for private identities is split into two parts separate by an `@` symbol
@@ -43,17 +43,17 @@ func (pil PrivateIdentityLocator) Validate(ctx context.Context, defaultNode stri
 		identity = parts[0]
 		node = parts[1]
 	default:
-		return "", "", i18n.NewError(ctx, msgs.MsgTypesPrivateIdentityLocatorInvalid, node)
+		return "", "", i18n.NewError(ctx, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, node)
 	}
 	if node == "" {
 		node = defaultNode
 	}
 	if err := ValidateSafeCharsStartEndAlphaNum(ctx, identity, DefaultNameMaxLen, "identity"); err != nil {
-		return "", "", i18n.WrapError(ctx, err, msgs.MsgTypesPrivateIdentityLocatorInvalid, identity)
+		return "", "", i18n.WrapError(ctx, err, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, identity)
 	}
 	if !allowEmptyNode {
 		if err := ValidateSafeCharsStartEndAlphaNum(ctx, node, DefaultNameMaxLen, "node"); err != nil {
-			return "", "", i18n.WrapError(ctx, err, msgs.MsgTypesPrivateIdentityLocatorInvalid, node)
+			return "", "", i18n.WrapError(ctx, err, tkmsgs.MsgTypesPrivateIdentityLocatorInvalid, node)
 		}
 	}
 	return identity, node, nil

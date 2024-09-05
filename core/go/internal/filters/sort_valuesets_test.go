@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +34,7 @@ func (v *testValuesResolved) ValueSet() ValueSet {
 }
 
 func (v *testValuesResolved) MarshalJSON() ([]byte, error) {
-	return json.Marshal((map[string]types.RawJSON)(v.vs))
+	return json.Marshal((map[string]tktypes.RawJSON)(v.vs))
 }
 
 type testValuesPassthrough struct {
@@ -48,13 +48,13 @@ func (v *testValuesPassthrough) ValueSet() ValueSet {
 func TestValueSetSorter2D(t *testing.T) {
 
 	values := []*testValuesResolved{
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"MMM"`), "field2": types.RawJSON("500")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"EEE"`), "field2": types.RawJSON("600")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"AAA"`), "field2": types.RawJSON("300")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"aaa"`), "field2": types.RawJSON("300")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"TTT"`), "field2": types.RawJSON("600")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"EEE"`), "field2": types.RawJSON("100")}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"EEE"`), "field2": types.RawJSON("600")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"MMM"`), "field2": tktypes.RawJSON("500")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"EEE"`), "field2": tktypes.RawJSON("600")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"AAA"`), "field2": tktypes.RawJSON("300")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"aaa"`), "field2": tktypes.RawJSON("300")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"TTT"`), "field2": tktypes.RawJSON("600")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"EEE"`), "field2": tktypes.RawJSON("100")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"EEE"`), "field2": tktypes.RawJSON("600")}},
 	}
 
 	fieldSet := FieldMap{"field1": StringField("field_1"), "field2": Int64Field("field_2")}
@@ -109,9 +109,9 @@ func TestValueSetSorterMissingSortField(t *testing.T) {
 
 func TestValueSetSorterBadValue(t *testing.T) {
 	values := []*testValuesResolved{
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`100`)}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON(`"wrong"`)}},
-		{vs: ResolvingValueSet{"field1": types.RawJSON("500")}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`100`)}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON(`"wrong"`)}},
+		{vs: ResolvingValueSet{"field1": tktypes.RawJSON("500")}},
 	}
 	_, err := SortedValueSetCopy(context.Background(), FieldMap{"field1": Int64Field("field_1")}, values, "field1")
 	assert.Regexp(t, "PD010703", err)

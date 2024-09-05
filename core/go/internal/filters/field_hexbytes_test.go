@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,21 +28,21 @@ func TestHexBytesField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
+	_, err := HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`[]`))
+	_, err = HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010705", err)
 
-	_, err = HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`"not hex"`))
+	_, err = HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`"not hex"`))
 	assert.Regexp(t, "PD010711", err)
 
-	v, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`"0xAAbbCCdd"`))
+	v, err := HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xAAbbCCdd"`))
 	assert.NoError(t, err)
 	assert.Equal(t, "aabbccdd", v)
 	assert.Equal(t, "test", HexBytesField("test").SQLColumn())
 
-	nv, err := HexBytesField("test").SQLValue(ctx, (types.RawJSON)(`null`))
+	nv, err := HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
 	assert.NoError(t, err)
 	assert.Nil(t, nv)
 

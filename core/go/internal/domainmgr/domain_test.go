@@ -27,11 +27,11 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -149,15 +149,15 @@ const fakeCoinFactoryABI = `[
 ]`
 
 type fakeState struct {
-	Salt   types.Bytes32        `json:"salt"`
-	Owner  types.EthAddress     `json:"owner"`
+	Salt   tktypes.Bytes32      `json:"salt"`
+	Owner  tktypes.EthAddress   `json:"owner"`
 	Amount *ethtypes.HexInteger `json:"amount"`
 }
 
 type fakeExecute struct {
-	Inputs  []types.Bytes32 `json:"inputs"`
-	Outputs []types.Bytes32 `json:"outputs"`
-	Data    types.HexBytes  `json:"data"`
+	Inputs  []tktypes.Bytes32 `json:"inputs"`
+	Outputs []tktypes.Bytes32 `json:"outputs"`
+	Data    tktypes.HexBytes  `json:"data"`
 }
 
 type testPlugin struct {
@@ -227,7 +227,7 @@ func goodDomainConf() *prototk.DomainConfig {
 			OneTimeUsePrefix: "one/time/keys/",
 		},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: fakeCoinFactoryABI,
 		PrivateContractAbiJson: fakeCoinPrivateABI,
 		AbiStateSchemasJson: []string{
@@ -250,7 +250,7 @@ func TestDomainInitStates(t *testing.T) {
 
 	assert.Nil(t, tp.d.initError.Load())
 	assert.True(t, tp.initialized.Load())
-	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
 	assert.NoError(t, err)
 	assert.Equal(t, tp.d, byAddr)
 	assert.True(t, tp.d.Initialized())
@@ -274,7 +274,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 	assert.True(t, tp1.initialized.Load())
 
 	// Check we get the second from all the maps
-	byAddr, err := dm.getDomainByAddress(ctx, types.MustEthAddress(domainConf.FactoryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
 	assert.NoError(t, err)
 	assert.Same(t, tp1.d, byAddr)
 	byName, err := dm.GetDomainByName(ctx, "test1")
@@ -290,7 +290,7 @@ func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: fakeCoinFactoryABI,
 		PrivateContractAbiJson: fakeCoinPrivateABI,
 		AbiStateSchemasJson: []string{
@@ -306,7 +306,7 @@ func TestDomainInitBadConstructor(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `!!!wrong`,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
 		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
@@ -322,7 +322,7 @@ func TestDomainInitBadConstructorType(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
 		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
@@ -338,7 +338,7 @@ func TestDomainInitSchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
 		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
@@ -370,7 +370,7 @@ func TestDomainInitFactoryABIInvalid(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `!!!wrong`,
 		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
@@ -386,7 +386,7 @@ func TestDomainInitPrivateABIInvalid(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
 		PrivateContractAbiJson: `!!!wrong`,
 		AbiStateSchemasJson: []string{
@@ -402,7 +402,7 @@ func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: types.MustEthAddress(types.RandHex(20)).String(),
+		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
 		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
@@ -483,8 +483,8 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 
 func storeState(t *testing.T, dm *domainManager, tp *testPlugin, txID uuid.UUID, amount *ethtypes.HexInteger) *fakeState {
 	state := &fakeState{
-		Salt:   types.Bytes32(types.RandBytes(32)),
-		Owner:  types.EthAddress(types.RandBytes(20)),
+		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: amount,
 	}
 	stateJSON, err := json.Marshal(state)
@@ -530,7 +530,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 		SchemaId: tp.stateSchemas[0].Id,
 		QueryJson: `{
 		  "eq": [
-		    { "field": "owner", "value": "` + types.EthAddress(types.RandBytes(20)).String() + `" }
+		    { "field": "owner", "value": "` + tktypes.EthAddress(tktypes.RandBytes(20)).String() + `" }
 		  ]
 		}`,
 	})
@@ -566,7 +566,7 @@ func TestDomainInitDeployOK(t *testing.T) {
 	domain := tp.d
 	tx := &components.PrivateContractDeploy{
 		ID: txID,
-		Inputs: types.RawJSON(`{
+		Inputs: tktypes.RawJSON(`{
 		  "notary": "notary1",
 		  "name": "token1",
 		  "symbol": "TKN1"
@@ -602,7 +602,7 @@ func TestDomainInitDeployBadConstructorParams(t *testing.T) {
 	domain := tp.d
 	tx := &components.PrivateContractDeploy{
 		ID: txID,
-		Inputs: types.RawJSON(`{
+		Inputs: tktypes.RawJSON(`{
 		  "notary": "notary1",
 		  "name": 12345,
 		  "symbol": "TKN1"
@@ -626,7 +626,7 @@ func TestDomainInitDeployError(t *testing.T) {
 	domain := tp.d
 	tx := &components.PrivateContractDeploy{
 		ID: txID,
-		Inputs: types.RawJSON(`{
+		Inputs: tktypes.RawJSON(`{
 		  "notary": "notary1",
 		  "name": "token1",
 		  "symbol": "TKN1"
@@ -641,13 +641,13 @@ func goodTXForDeploy() *components.PrivateContractDeploy {
 	txID := uuid.New()
 	return &components.PrivateContractDeploy{
 		ID:                       uuid.New(),
-		Inputs:                   types.RawJSON(`{}`),
-		TransactionSpecification: &prototk.DeployTransactionSpecification{TransactionId: types.Bytes32UUIDFirst16(txID).String()},
+		Inputs:                   tktypes.RawJSON(`{}`),
+		TransactionSpecification: &prototk.DeployTransactionSpecification{TransactionId: tktypes.Bytes32UUIDFirst16(txID).String()},
 		Verifiers: []*prototk.ResolvedVerifier{
 			{
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				Lookup:    "notary",
-				Verifier:  types.EthAddress(types.RandBytes(20)).String(),
+				Verifier:  tktypes.EthAddress(tktypes.RandBytes(20)).String(),
 			},
 		},
 	}

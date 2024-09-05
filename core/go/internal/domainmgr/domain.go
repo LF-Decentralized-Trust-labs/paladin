@@ -28,10 +28,11 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type domain struct {
@@ -51,7 +52,7 @@ type domain struct {
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry
-	factoryContractAddress *types.EthAddress
+	factoryContractAddress *tktypes.EthAddress
 	factoryContractABI     abi.ABI
 	privateContractABI     abi.ABI
 
@@ -72,7 +73,7 @@ func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
 	}
-	log.L(dm.bgCtx).Debugf("Domain %s configured. Config: %s", name, types.JSONString(conf.Config))
+	log.L(dm.bgCtx).Debugf("Domain %s configured. Config: %s", name, tktypes.JSONString(conf.Config))
 	d.ctx, d.cancelCtx = context.WithCancel(log.WithLogField(dm.bgCtx, "domain", d.name))
 	return d
 }
@@ -109,7 +110,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
-	d.factoryContractAddress, err = types.ParseEthAddress(d.config.FactoryContractAddress)
+	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
 	if err != nil {
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
 	}
@@ -153,7 +154,7 @@ func (d *domain) init() {
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
 			Name:       d.name,
 			ChainId:    d.dm.ethClientFactory.ChainID(),
-			ConfigJson: types.JSONString(d.conf.Config).String(),
+			ConfigJson: tktypes.JSONString(d.conf.Config).String(),
 		})
 		if err != nil {
 			return true, err
@@ -196,7 +197,7 @@ func (d *domain) Name() string {
 	return d.name
 }
 
-func (d *domain) Address() *types.EthAddress {
+func (d *domain) Address() *tktypes.EthAddress {
 	return d.factoryContractAddress
 }
 
@@ -261,7 +262,7 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 	}
 	if err == nil {
 		// Serialize to standardized JSON before passing to domain
-		paramsJSON, err = types.StandardABISerializer().SerializeJSONCtx(ctx, constructorValues)
+		paramsJSON, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, constructorValues)
 	}
 	if err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidConstructorParams, d.constructorABI.SolString())
@@ -269,7 +270,7 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 
 	txSpec := &prototk.DeployTransactionSpecification{}
 	tx.TransactionSpecification = txSpec
-	txSpec.TransactionId = types.Bytes32UUIDFirst16(tx.ID).String()
+	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
 	txSpec.ConstructorAbi = string(abiJSON)
 	txSpec.ConstructorParamsJson = string(paramsJSON)
 

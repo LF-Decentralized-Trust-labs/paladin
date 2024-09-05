@@ -23,7 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type StringField string
@@ -36,7 +36,7 @@ func (sf StringField) SupportsLIKE() bool {
 	return true
 }
 
-func (sf StringField) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+func (sf StringField) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

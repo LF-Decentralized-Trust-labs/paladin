@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 // The serializer we should use in all places that go from ABI validated data,
@@ -62,7 +62,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inB := byDefsB[sig]; !inB {
-				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, tkmsgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 			delete(byDefsB, sig)
 		}
@@ -77,7 +77,7 @@ func ABIsMustMatch(ctx context.Context, a, b abi.ABI, subMatch ...abi.EntryType)
 		}
 		if mustMatch {
 			if _, inA := byDefsA[sig]; !inA {
-				return i18n.NewError(ctx, msgs.MsgTypesABIDefNotInBothStructs, sig)
+				return i18n.NewError(ctx, tkmsgs.MsgTypesABIDefNotInBothStructs, sig)
 			}
 		}
 	}

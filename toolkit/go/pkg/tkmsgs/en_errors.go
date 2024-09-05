@@ -31,8 +31,16 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 }
 
 var (
-	// Generic PD0200XX
-	MsgContextCanceled = ffe("PD020000", "Context canceled")
+	// Types PD0200XX
+	MsgContextCanceled                    = ffe("PD020000", "Context canceled")
+	MsgTypesUnmarshalNil                  = ffe("PD020001", "UnmarshalJSON on nil pointer")
+	MsgTypesScanFail                      = ffe("PD020002", "Unable to scan type %T into type %T")
+	MsgTypesEnumValueInvalid              = ffe("PD020003", "Value must be one of %s")
+	MsgTypesABIDefNotInBothStructs        = ffe("PD020004", "ABI is not equal due to mismatch on: %s")
+	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD020005", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
+	MsgTypesPrivateIdentityLocatorInvalid = ffe("PD020006", "Locator string %s is invalid")
+	MsgTypesInvalidHex                    = ffe("PD020007", "Invalid hex: %s")
+	MsgTypesValueInvalidHexBytes32        = ffe("PD020008", "Failed to parse value as 32 byte hex string (parsedBytes=%d)")
 
 	// Inflight PD0201XX
 	MsgInflightRequestCancelled = ffe("PD020100", "Request cancelled after %s")

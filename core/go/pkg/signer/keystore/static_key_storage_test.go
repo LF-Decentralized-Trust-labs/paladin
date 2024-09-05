@@ -25,7 +25,7 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +44,7 @@ func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) 
 
 func TestStaticStoreFileFileWithTrim(t *testing.T) {
 
-	keyData := types.RandHex(32)
+	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestStaticStoreFileFileWithTrim(t *testing.T) {
 
 func TestStaticStoreHexLoadFile(t *testing.T) {
 
-	keyData := types.RandHex(32)
+	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData), 0644)
 	assert.NoError(t, err)
@@ -88,7 +88,7 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 
 func TestStaticStoreBase64InConf(t *testing.T) {
 
-	keyData, err := hex.DecodeString(types.RandHex(32))
+	keyData, err := hex.DecodeString(tktypes.RandHex(32))
 	assert.NoError(t, err)
 	b64KeyData := base64.StdEncoding.EncodeToString(keyData)
 

@@ -29,8 +29,8 @@ import (
 	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // Balance manager is a component that provides the following services
@@ -347,7 +347,7 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 		ID:       &txID,
 		SignerID: af.sourceAddress,
 	}, &components.EthTransfer{
-		To:    *types.MustEthAddress(destAddress),
+		To:    *tktypes.MustEthAddress(destAddress),
 		Value: ethtypes.NewHexInteger(value),
 	})
 

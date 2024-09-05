@@ -25,7 +25,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Bytes32Field string
@@ -38,7 +38,7 @@ func (sf Bytes32Field) SupportsLIKE() bool {
 	return false
 }
 
-func (sf Bytes32Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+func (sf Bytes32Field) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

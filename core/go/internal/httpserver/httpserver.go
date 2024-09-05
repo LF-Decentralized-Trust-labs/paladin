@@ -28,9 +28,10 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/tls"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Server interface {
@@ -90,7 +91,7 @@ func NewServer(ctx context.Context, description string, conf *Config, handler ht
 		ReadHeaderTimeout: readTimeout, // safe for this to always be the read timeout - should be short
 		TLSConfig:         tlsConfig,
 		ConnContext: func(newCtx context.Context, c net.Conn) context.Context {
-			l := log.L(ctx).WithField("req", types.ShortID())
+			l := log.L(ctx).WithField("req", tktypes.ShortID())
 			newCtx = log.WithLogger(newCtx, l)
 			l.Debugf("New %s connection: remote=%s local=%s", description, c.RemoteAddr().String(), c.LocalAddr().String())
 			return newCtx

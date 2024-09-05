@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -51,10 +51,10 @@ func Bytes32Keccak(b []byte) Bytes32 {
 func ParseBytes32Ctx(ctx context.Context, s string) (Bytes32, error) {
 	h, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
 	if err != nil {
-		return Bytes32{}, i18n.NewError(ctx, msgs.MsgStateInvalidHex, err)
+		return Bytes32{}, i18n.NewError(ctx, tkmsgs.MsgTypesInvalidHex, err)
 	}
 	if len(h) != 32 {
-		return Bytes32{}, i18n.NewError(ctx, msgs.MsgFiltersValueInvalidHexBytes32, len(h))
+		return Bytes32{}, i18n.NewError(ctx, tkmsgs.MsgTypesValueInvalidHexBytes32, len(h))
 	}
 	return NewBytes32FromSlice(h), nil
 }
@@ -160,10 +160,10 @@ func (id *Bytes32) Scan(src interface{}) error {
 			}
 			*id = b
 		} else {
-			return i18n.NewError(context.Background(), msgs.MsgFiltersValueInvalidHexBytes32, len(v))
+			return i18n.NewError(context.Background(), tkmsgs.MsgTypesValueInvalidHexBytes32, len(v))
 		}
 		return nil
 	default:
-		return i18n.NewError(context.Background(), msgs.MsgTypesScanFail, src, id)
+		return i18n.NewError(context.Background(), tkmsgs.MsgTypesScanFail, src, id)
 	}
 }

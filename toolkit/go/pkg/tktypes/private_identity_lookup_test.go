@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -76,14 +76,14 @@ func TestPrivateIdentityLocator(t *testing.T) {
 
 func TestPrivateIdentityLocatorErrors(t *testing.T) {
 	_, _, err := PrivateIdentityLocator("@").Validate(context.Background(), "", false)
-	assert.Regexp(t, "PD011107", err)
+	assert.Regexp(t, "PD020005", err)
 
 	_, _, err = PrivateIdentityLocator("me@some@where").Validate(context.Background(), "", false)
-	assert.Regexp(t, "PD011107", err)
+	assert.Regexp(t, "PD020006", err)
 
 	_, _, err = PrivateIdentityLocator("me@_").Validate(context.Background(), "", false)
-	assert.Regexp(t, "PD011107", err)
+	assert.Regexp(t, "PD020005", err)
 
 	_, err = PrivateIdentityLocator("_@").FullyQualified(context.Background(), "")
-	assert.Regexp(t, "PD011107", err)
+	assert.Regexp(t, "PD020005", err)
 }

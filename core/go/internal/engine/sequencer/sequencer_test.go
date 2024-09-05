@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -63,7 +63,7 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 	err := node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
@@ -108,7 +108,7 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	node1ID := uuid.New()
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, node1ID, false)
 
 	err := node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -158,7 +158,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
 
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -211,9 +211,9 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 	txn2ID := uuid.New()
 	txn3ID := uuid.New()
 
-	stateIDA := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateIDA := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
-	stateIDB := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateIDB := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -285,9 +285,9 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 	txn2ID := uuid.New()
 	txn3ID := uuid.New()
 
-	stateIDA := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateIDA := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
-	stateIDB := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateIDB := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	node1Sequencer, node1SequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -345,7 +345,7 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 
 	txn4ID := uuid.New()
 
-	stateIDC := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateIDC := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
 		TransactionId: txn4ID.String(),
@@ -375,9 +375,9 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	dependency1TransactionID := uuid.New()
 	dependency2TransactionID := uuid.New()
 
-	stateID1 := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID1 := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
-	stateID2 := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID2 := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	//create a sequencer for the local node
 	localNodeSequencer, localNodeSequencerMockDependencies := newSequencerForTesting(t, localNodeId, false)
@@ -465,7 +465,7 @@ func TestSequencerApproveEndorsement(t *testing.T) {
 	ctx := context.Background()
 	nodeID := uuid.New()
 	txn1ID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
@@ -485,7 +485,7 @@ func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
 	remoteNodeID := uuid.New()
 
 	txn1ID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	node1Sequencer, _ := newSequencerForTesting(t, nodeID, false)
 	err := node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -507,7 +507,7 @@ func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
 
 	ctx := context.Background()
 	nodeID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()
@@ -533,7 +533,7 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 	ctx := context.Background()
 	nodeID := uuid.New()
 	remoteNodeID := uuid.New()
-	stateID := types.NewBytes32FromSlice(types.RandBytes(32))
+	stateID := tktypes.NewBytes32FromSlice(tktypes.RandBytes(32))
 
 	txn1ID := uuid.New()
 	txn2ID := uuid.New()

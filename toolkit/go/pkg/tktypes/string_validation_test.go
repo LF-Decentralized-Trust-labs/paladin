@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package tktypes
 
 import (
 	"context"
@@ -36,17 +36,17 @@ func TestValidate64SafeCharsStartEndAlphaNum(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "_wrong", DefaultNameMaxLen, "name")
-	assert.Regexp(t, "PD011106.*name", err)
+	assert.Regexp(t, "PD020005.*name", err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "w!ong", DefaultNameMaxLen, "name")
-	assert.Regexp(t, "PD011106.*name", err)
+	assert.Regexp(t, "PD020005.*name", err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "01234567890123456789012345678901234567890123456789012345678901234", 64, "name")
-	assert.Regexp(t, "PD011106.*name", err)
+	assert.Regexp(t, "PD020005.*name", err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "", DefaultNameMaxLen, "name")
-	assert.Regexp(t, "PD011106.*name", err)
+	assert.Regexp(t, "PD020005.*name", err)
 	assert.True(t, unicode.IsLetter('À'))
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "not_Àll_ascii", DefaultNameMaxLen, "name")
-	assert.Regexp(t, "PD011106.*name", err)
+	assert.Regexp(t, "PD020005.*name", err)
 }
