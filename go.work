@@ -1,9 +1,9 @@
 go 1.22.5
 
 use (
+	./core/go
 	./domains/noto
 	./domains/zeto
-	./kata
 	./testinfra
-	./toolkit_go
+	./toolkit/go
 )

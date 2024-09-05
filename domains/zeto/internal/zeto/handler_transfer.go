@@ -23,8 +23,8 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
+	corepb "github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	katapb "github.com/kaleido-io/paladin/kata/pkg/proto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -105,9 +105,9 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.
 		}
 	}
 
-	payload := &katapb.ProvingRequest{
+	payload := &corepb.ProvingRequest{
 		CircuitId: "anon",
-		Common: &katapb.ProvingRequestCommon{
+		Common: &corepb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
 			InputValues:      inputValueInts,
 			InputSalts:       inputSalts,
@@ -194,7 +194,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func (h *transferHandler) encodeProof(proof *katapb.SnarkProof) map[string]interface{} {
+func (h *transferHandler) encodeProof(proof *corepb.SnarkProof) map[string]interface{} {
 	// Convert the proof json to the format that the Solidity verifier expects
 	return map[string]interface{}{
 		"pA": []string{proof.A[0], proof.A[1]},
@@ -207,7 +207,7 @@ func (h *transferHandler) encodeProof(proof *katapb.SnarkProof) map[string]inter
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	var proof katapb.SnarkProof
+	var proof corepb.SnarkProof
 	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
 		return nil, fmt.Errorf("did not find 'sender' attestation")

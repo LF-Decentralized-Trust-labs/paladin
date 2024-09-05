@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 
 public class PenteDomainTests {
 
-    private final Testbed.Setup testbedSetup = new Testbed.Setup("../../kata/db/migrations/sqlite", 5000);
+    private final Testbed.Setup testbedSetup = new Testbed.Setup("../../core/go/db/migrations/sqlite", 5000);
 
     String deployFactory() throws Exception {
         try (Testbed deployBed = new Testbed(testbedSetup)) {

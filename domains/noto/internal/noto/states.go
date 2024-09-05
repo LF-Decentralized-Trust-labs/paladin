@@ -25,8 +25,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
-	kata "github.com/kaleido-io/paladin/kata/pkg/types"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 var EIP712DomainName = "noto"
@@ -139,7 +139,7 @@ func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*typ
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoCoin{
-		Salt:   kata.RandHex(32),
+		Salt:   tktypes.RandHex(32),
 		Owner:  owner,
 		Amount: amount,
 	}

@@ -24,10 +24,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	kata "github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 //go:embed abis/Commonlib.json
@@ -190,7 +190,7 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	if err != nil {
 		return nil, err
 	}
-	configJSON, err := kata.StandardABISerializer().SerializeJSON(configValues)
+	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
 	if err != nil {
 		return nil, err
 	}
