@@ -16,6 +16,7 @@
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
+        include "pkg/**/*.go"
     }
 }
 
@@ -66,6 +67,7 @@ task test(type: Exec) {
     executable 'go'
     args 'test'
     args './internal/...'
+    args './pkg/...'
     args '-cover'
     args '-covermode=atomic'
     args '-timeout=30s'

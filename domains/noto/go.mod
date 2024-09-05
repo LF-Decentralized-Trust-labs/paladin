@@ -6,7 +6,6 @@ require (
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14
-	github.com/kaleido-io/paladin/domains/common v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
@@ -112,5 +111,3 @@ require (
 replace github.com/kaleido-io/paladin/core => ../../core/go
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go
-
-replace github.com/kaleido-io/paladin/domains/common => ../common
