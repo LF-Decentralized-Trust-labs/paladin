@@ -50,7 +50,7 @@ bin/
 /.nb-gradle/
 
 ### VS Code ###
-.vscode/
+**/.vscode/**
 !.vscode/settings.json
 
 ### Mac OS ###
