@@ -242,7 +242,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
 task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
     workingDir '.'
 
-    lockResource(it, "lint.lock")
+    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles)
     environment 'GOGC', '20'
 
@@ -357,7 +357,7 @@ abstract class ComponentTest extends Exec {
         args '-timeout=120s'
         args "-test.gocoverdir=${project.projectDir}/coverage"
 
-        project.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
     }
 }
 
@@ -378,7 +378,7 @@ task unitTestSQLite(type: UnitTests, dependsOn: [
         setupCoverage,
         goGet,
     ]) {
-    lockResource(it, "testinfra.lock")
+    helpers.lockResource(it, "testinfra.lock")
 }
 
 task unitTestPostgres(type: UnitTests, dependsOn: [
@@ -387,7 +387,7 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
         goGet,
     ]) {
     args '-tags', "testdbpostgres"
-    lockResource(it, "testinfra.lock")
+    helpers.lockResource(it, "testinfra.lock")
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
@@ -396,7 +396,7 @@ task componentTestSQLite(type: ComponentTest, dependsOn: [
         tasks.goGet,
         tasks.copyContracts,
     ]) {
-    lockResource(it, "testinfra.lock")
+    helpers.lockResource(it, "testinfra.lock")
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [

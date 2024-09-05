@@ -125,7 +125,7 @@ task goGet(type:Exec, dependsOn:tasks.protoc) {
 task lint(type: Exec, dependsOn:tasks.protoc) {
     workingDir '.'
 
-    lockResource(it, "lint.lock")
+    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles)
     environment 'GOGC', '20'
 

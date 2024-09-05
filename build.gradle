@@ -6,28 +6,30 @@ group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
 
 ext {
-    lockResource = { task, lockFile ->
-        // If two tasks share an output file, they will not be able to run concurrently.
-        // This helper creates an empty "lock" file in the root build directory, which allows
-        // tasks to use it as a representation of some shared resource.
-        def f = new File(task.project.rootProject.buildDir, lockFile)
-        task.outputs.file(f)
-        task.doLast { f.createNewFile() }
-    }
+    helpers = [
+        lockResource: { task, lockFile ->
+            // If two tasks share an output file, they will not be able to run concurrently.
+            // This helper creates an empty "lock" file in the root build directory, which allows
+            // tasks to use it as a representation of some shared resource.
+            def f = new File(task.project.rootProject.buildDir, lockFile)
+            task.outputs.file(f)
+            task.doLast { f.createNewFile() }
+        },
 
-    dumpLogsOnFailure = { task, dockerTaskPath ->
-        // If invoked with -PcomposeLogs=true and the given Exec task fails, look up the
-        // DockerCompose task specified, and ask it to dump logs.
-        task.ignoreExitValue(true)
-        task.doLast {
-            def execResult = getExecutionResult().get()
-            def composeLogs = project.findProperty('composeLogs')
-            if (execResult.exitValue != 0 && composeLogs == "true") {
-                def docker = project.tasks.getByPath(dockerTaskPath)
-                println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
-                docker.dumpLogs()
+        dumpLogsOnFailure: { task, dockerTaskPath ->
+            // If invoked with -PcomposeLogs=true and the given Exec task fails, look up the
+            // DockerCompose task specified, and ask it to dump logs.
+            task.ignoreExitValue(true)
+            task.doLast {
+                def execResult = getExecutionResult().get()
+                def composeLogs = project.findProperty('composeLogs')
+                if (execResult.exitValue != 0 && composeLogs == "true") {
+                    def docker = project.tasks.getByPath(dockerTaskPath)
+                    println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
+                    docker.dumpLogs()
+                }
+                execResult.assertNormalExitValue()
             }
-            execResult.assertNormalExitValue()
         }
-    }
+    ]
 }
