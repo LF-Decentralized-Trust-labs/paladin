@@ -133,8 +133,7 @@ task test(type: Exec) {
     dependsOn extractZetoProver
     dependsOn extractZetoTestProvingKeys
     dependsOn ':testinfra:startTestInfra'
-    lockTestInfra(it)
-    dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task build {

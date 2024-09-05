@@ -50,7 +50,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build with Gradle
-        run: ./gradlew -PcomposeLogs=true build
+        run: ./gradlew -PcomposeLogs=true --parallel build
 
         # env:
         #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
