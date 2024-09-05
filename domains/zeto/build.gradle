@@ -72,6 +72,7 @@ task downloadZetoProver {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
         f.setExecutable(true)
+        mkdir(zkpOut)
     }
     outputs.file(f)
 }
@@ -95,9 +96,6 @@ task extractZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
     workingDir zkpOut
 
     environment "CIRCUITS_ROOT", zkpOut
-    doFirst {
-        mkdir(zkpOut)
-    }
 
     inputs.dir(workingDir)
     outputs.dir(zkpOut)
