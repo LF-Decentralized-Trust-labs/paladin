@@ -23,6 +23,8 @@ test {
     }
     useJUnitPlatform()
     systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
+    dependsOn ':testinfra:startTestInfra'
+    lockTestInfra(it)
 }
 
 repositories {
@@ -75,9 +77,4 @@ dependencies {
     implementation 'io.tmio:tuweni-units:2.4.2'
 
     implementation project(path: ":core:java")
-
-}
-
-test {
-    useJUnitPlatform()
 }
