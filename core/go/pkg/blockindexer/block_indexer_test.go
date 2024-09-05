@@ -28,6 +28,13 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/core/internal/rpcclient"
+	"github.com/kaleido-io/paladin/core/mocks/rpcbackendmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -253,7 +260,7 @@ func TestNewBlockIndexerBadTLS(t *testing.T) {
 			},
 		},
 	}, nil)
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {

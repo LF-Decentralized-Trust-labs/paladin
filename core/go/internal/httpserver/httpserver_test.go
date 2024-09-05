@@ -58,7 +58,7 @@ func TestBadTLSConfig(t *testing.T) {
 			CAFile:  "!!!!!badness",
 		},
 	}, nil)
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestBadAddress(t *testing.T) {

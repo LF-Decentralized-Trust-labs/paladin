@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
@@ -66,7 +67,7 @@ func ParseWSConfig(ctx context.Context, config *WSConfig) (*wsclient.WSConfig, e
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEthClientInvalidWebSocketURL, u)
 	}
 	if u.Scheme == "wss" {
-		config.tlsconf.Enabled = true
+		config.TLS.Enabled = true
 	}
 	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &config.TLS, tlsconf.ClientType)
 	if err != nil {
@@ -94,7 +95,7 @@ func ParseHTTPConfig(ctx context.Context, config *HTTPConfig) (*resty.Client, er
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEthClientInvalidHTTPURL, u)
 	}
 	if u.Scheme == "https" {
-		config.tlsconf.Enabled = true
+		config.TLS.Enabled = true
 	}
 	tlsConfig, err := tlsconf.BuildTLSConfig(ctx, &config.TLS, tlsconf.ClientType)
 	if err != nil {

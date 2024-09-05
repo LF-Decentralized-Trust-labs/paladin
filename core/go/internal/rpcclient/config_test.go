@@ -48,7 +48,7 @@ func TestWSConfigBadURL(t *testing.T) {
 func TestWSConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
 	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}}})
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestHTTPonfigOK(t *testing.T) {
@@ -74,5 +74,5 @@ func TestHTTPConfigBadURL(t *testing.T) {
 func TestHTTPConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
 	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}})
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
