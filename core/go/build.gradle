@@ -372,7 +372,12 @@ task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMock
     }
 }
 
-task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
+task unitTestSQLite(type: UnitTests, dependsOn: [
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+    ]) {
+    lockTestInfra(it)
 }
 
 task unitTestPostgres(type: UnitTests, dependsOn: [
@@ -385,10 +390,10 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
-    ':testinfra:startTestInfra',
-    tasks.setupCoverage,
-    tasks.goGet,
-    tasks.copyContracts,
+        ':testinfra:startTestInfra',
+        tasks.setupCoverage,
+        tasks.goGet,
+        tasks.copyContracts,
     ]) {
     lockTestInfra(it)
 }
