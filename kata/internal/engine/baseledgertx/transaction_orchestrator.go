@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/ffapi"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/retry"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -331,7 +331,7 @@ func (te *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 	log.L(ctx).Debugf("Orchestrator poll and process, stage counts: %+v", stageCounts)
 
 	if latestCompleted != nil {
-		te.updateCompletedTxNonce(ctx, latestCompleted)
+		te.updateCompletedTxNonce(latestCompleted)
 	}
 	oldLen := len(te.InFlightTxs)
 	total = oldLen

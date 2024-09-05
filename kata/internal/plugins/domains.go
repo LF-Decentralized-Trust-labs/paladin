@@ -17,27 +17,15 @@ package plugins
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type DomainManagerToDomain interface {
-	plugintk.DomainAPI
-	Initialized()
-}
-
-// The interface the rest of Paladin uses to integrate with domain plugins
-type DomainRegistration interface {
-	ConfiguredDomains() map[string]*PluginConfig
-	DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
-}
-
 // The gRPC stream connected to by domain plugins
-func (pc *pluginController) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
-	handler := newPluginHandler(pc, pc.domainPlugins, stream,
+func (pm *pluginManager) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
+	handler := newPluginHandler(pm, prototk.PluginInfo_DOMAIN, pm.domainPlugins, stream,
 		&plugintk.DomainMessageWrapper{},
 		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage], err error) {
 			br := &domainBridge{
@@ -47,7 +35,7 @@ func (pc *pluginController) ConnectDomain(stream prototk.PluginController_Connec
 				pluginId:   plugin.id.String(),
 				toPlugin:   toPlugin,
 			}
-			br.manager, err = pc.domainManager.DomainRegistered(plugin.name, plugin.id, br)
+			br.manager, err = pm.domainManager.DomainRegistered(plugin.name, plugin.id, br)
 			if err != nil {
 				return nil, err
 			}

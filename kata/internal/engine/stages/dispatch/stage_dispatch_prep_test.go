@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
@@ -120,7 +120,7 @@ func TestDispatchPrepStageProcessEvents(t *testing.T) {
 	testEthTx := &components.EthTransaction{}
 
 	dps := &DispatchPrepStage{}
-	testUnprocessedEvents := []*types.StageEvent{
+	testUnprocessedEvents := []*enginespi.StageEvent{
 		{
 			Stage: "unknown",
 			Data:  "unknown",
@@ -134,7 +134,7 @@ func TestDispatchPrepStageProcessEvents(t *testing.T) {
 	mSFS := enginemocks.NewStageFoundationService(t)
 	unprocessedStageEvents, txUpdate, nextStep := dps.ProcessEvents(ctx, testTx, mSFS, testUnprocessedEvents)
 	assert.NotNil(t, txUpdate)
-	assert.Equal(t, types.NextStepNewStage, nextStep)
+	assert.Equal(t, enginespi.NextStepNewStage, nextStep)
 	assert.Len(t, unprocessedStageEvents, 1)
 	assert.Equal(t, "unknown", unprocessedStageEvents[0].Stage)
 }

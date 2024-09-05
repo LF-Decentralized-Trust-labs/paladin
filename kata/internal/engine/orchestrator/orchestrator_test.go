@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
@@ -130,8 +130,8 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	// feed in an event for process
 	mSC.On("ProcessEventsForStage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
 		waitForProcessEvent <- true
-	}).Return(nil, nil, types.NextStepWait /*just wait, don't trigger new stage etc*/)
-	testOc.HandleEvent(ctx, &types.StageEvent{
+	}).Return(nil, nil, enginespi.NextStepWait /*just wait, don't trigger new stage etc*/)
+	testOc.HandleEvent(ctx, &enginespi.StageEvent{
 		ID:    uuid.NewString(),
 		Stage: "test",
 		TxID:  testTx.GetTxID(ctx),
@@ -148,8 +148,8 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("test")
 	mSC.On("ProcessEventsForStage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Run(func(args mock.Arguments) {
 		waitForProcessEvent <- true
-	}).Return(nil, nil, types.NextStepWait /*just wait, don't trigger new stage etc*/)
-	testOc.HandleEvent(ctx, &types.StageEvent{
+	}).Return(nil, nil, enginespi.NextStepWait /*just wait, don't trigger new stage etc*/)
+	testOc.HandleEvent(ctx, &enginespi.StageEvent{
 		ID:    uuid.NewString(),
 		Stage: "test",
 		TxID:  testTx.GetTxID(ctx),

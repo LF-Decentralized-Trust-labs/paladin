@@ -19,15 +19,21 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
+
+type DomainManagerToDomain interface {
+	plugintk.DomainAPI
+	Initialized()
+}
 
 // Domain manager is the boundary between the paladin core / testbed and the domains
 type DomainManager interface {
 	ManagerLifecycle
-	plugins.DomainRegistration
+	ConfiguredDomains() map[string]*PluginConfig
+	DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
 	GetSmartContractByAddress(ctx context.Context, addr types.EthAddress) (DomainSmartContract, error)
 	WaitForDeploy(ctx context.Context, txID uuid.UUID) (DomainSmartContract, error)

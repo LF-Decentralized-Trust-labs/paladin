@@ -19,10 +19,10 @@ package github.com.kaleido_io.paladin.toolkit;
 
 import "to_domain.proto";
 import "from_domain.proto";
-
-enum PluginType {
-  DOMAIN = 0;
-}
+import "to_transport.proto";
+import "from_transport.proto";
+import "to_registry.proto";
+import "from_registry.proto";
 
 message Header {
   enum MessageType {
@@ -76,6 +76,52 @@ message DomainMessage {
     
 }
 
+message TransportMessage {
+  Header header = 1;
+
+  oneof request_to_transport {
+    ConfigureTransportRequest configure_transport =         1010;
+    SendMessageRequest send_message =                       1020;
+  }
+
+  oneof response_from_transport {
+    ConfigureTransportResponse configure_transport_res =    1011;
+    SendMessageResponse send_message_res =                  1021;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_transport {
+    GetTransportDetailsRequest get_transport_details =      2010;
+    ReceiveMessageRequest receive_message =                 2020;
+  }
+
+  oneof response_to_transport {
+    GetTransportDetailsResponse get_transport_details_res = 2011;
+    ReceiveMessageResponse receive_message_res =            2021;
+  }
+}
+
+message RegistryMessage {
+  Header header = 1;
+
+  oneof request_to_registry {
+    ConfigureRegistryRequest configure_registry =                   1010;
+  }
+
+  oneof response_from_registry {
+    ConfigureRegistryResponse configure_registry_res =              1011;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_registry {
+    UpsertTransportDetails upsert_transport_details =               2010;
+  }
+
+  oneof response_to_registry {
+    UpsertTransportDetailsResponse upsert_transport_details_res   = 2011;
+  }
+}
+
 // establishes the long-lived connection
 message PluginLoaderInit {
   string id = 1; // UUID that is unique the plugin loader that it shared with the controller out of band to start the channel
@@ -84,6 +130,8 @@ message PluginLoaderInit {
 message PluginInfo {
   enum PluginType {
     DOMAIN = 0;
+    TRANSPORT = 1;
+    REGISTRY = 2;
   }
   string id = 1; // UUID that is unique to this runtime instance of the domain
   string name = 2; // The plugin manager ensures only once instance is loaded with this ID
@@ -118,4 +166,10 @@ service PluginController {
 
   // Connect as a domain plugin establishing the bidirectional stream of communications
   rpc ConnectDomain(stream DomainMessage) returns (stream DomainMessage) {}
+
+  // Connect as a transport plugin establishing the bidirectional stream of communications
+  rpc ConnectTransport(stream TransportMessage) returns (stream TransportMessage) {}
+
+  // Connect as a registry plugin establishing the bidirectional stream of communications
+  rpc ConnectRegistry(stream RegistryMessage) returns (stream RegistryMessage) {}
 }

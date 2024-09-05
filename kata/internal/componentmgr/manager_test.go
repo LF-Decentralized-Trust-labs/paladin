@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/rpcclient"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -42,6 +43,9 @@ func TestInitOK(t *testing.T) {
 	// We build a config that allows us to get through init successfully, as should be possible
 	// (anything that can't do this should have a separate Start() phase).
 	testConfig := &Config{
+		TransportManagerConfig: transportmgr.TransportManagerConfig{
+			NodeName: "node1",
+		},
 		DB: persistence.Config{
 			Type: "sqlite",
 			SQLite: persistence.SQLiteConfig{
@@ -93,8 +97,9 @@ func TestInitOK(t *testing.T) {
 	assert.NotNil(t, cm.RPCServer())
 	assert.NotNil(t, cm.BlockIndexer())
 	assert.NotNil(t, cm.DomainManager())
-	assert.NotNil(t, cm.DomainRegistration())
-	assert.NotNil(t, cm.PluginController())
+	assert.NotNil(t, cm.TransportManager())
+	assert.NotNil(t, cm.RegistryManager())
+	assert.NotNil(t, cm.PluginManager())
 	assert.NotNil(t, cm.Engine())
 
 	cm.Stop()
@@ -130,14 +135,22 @@ func TestStartOK(t *testing.T) {
 	mockBlockIndexer.On("GetBlockListenerHeight", mock.Anything).Return(uint64(12345), nil)
 	mockBlockIndexer.On("Stop").Return()
 
-	mockPluginController := componentmocks.NewPluginController(t)
-	mockPluginController.On("Start").Return(nil)
-	mockPluginController.On("WaitForInit", mock.Anything).Return(nil)
-	mockPluginController.On("Stop").Return()
+	mockPluginManager := componentmocks.NewPluginManager(t)
+	mockPluginManager.On("Start").Return(nil)
+	mockPluginManager.On("WaitForInit", mock.Anything).Return(nil)
+	mockPluginManager.On("Stop").Return()
 
 	mockDomainManager := componentmocks.NewDomainManager(t)
 	mockDomainManager.On("Start").Return(nil)
 	mockDomainManager.On("Stop").Return()
+
+	mockTransportManager := componentmocks.NewTransportManager(t)
+	mockTransportManager.On("Start").Return(nil)
+	mockTransportManager.On("Stop").Return()
+
+	mockRegistryManager := componentmocks.NewRegistryManager(t)
+	mockRegistryManager.On("Start").Return(nil)
+	mockRegistryManager.On("Stop").Return()
 
 	mockStateStore := componentmocks.NewStateStore(t)
 	mockStateStore.On("RPCModule").Return(rpcserver.NewRPCModule("utss"))
@@ -167,8 +180,10 @@ func TestStartOK(t *testing.T) {
 		},
 	}
 	cm.blockIndexer = mockBlockIndexer
-	cm.pluginController = mockPluginController
+	cm.pluginManager = mockPluginManager
 	cm.domainManager = mockDomainManager
+	cm.transportManager = mockTransportManager
+	cm.registryManager = mockRegistryManager
 	cm.stateStore = mockStateStore
 	cm.rpcServer = mockRPCServer
 	cm.engine = mockEngine

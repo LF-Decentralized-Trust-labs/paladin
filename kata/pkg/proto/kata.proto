@@ -27,7 +27,7 @@ service KataMessageService {
   // for now, the listeners thread will stop when the context is cancelled (e.g. connection is dopped)
   //rpc StopListener() returns (stream Message) {}
   // Simple RPC to Subscribe to an event, request provides the destination name for the listener
-  // to recieve events on the given topic
+  // to receive events on the given topic
   rpc SubscribeToTopic(SubscribeToTopicRequest) returns (SubscribeToTopicResponse) {}
 
   rpc UnsubscribeFromTopic(UnsubscribeFromTopicRequest) returns (UnsubscribeFromTopicResponse) {}
@@ -60,6 +60,11 @@ message ListenRequest {
   // unique id for this destination, can be used by other plugins to send messages directly to this listener
   // and also used when subscribing to events
   string destination = 1;
+}
+
+message ExternalMessage {
+  google.protobuf.Any transportInformation = 1;
+  google.protobuf.Any body = 2;
 }
 
 message Message {

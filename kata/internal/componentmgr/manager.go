@@ -25,8 +25,10 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/registrymgr"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -35,7 +37,7 @@ import (
 )
 
 type ComponentManager interface {
-	components.AllComponents
+	components.PreInitComponentsAndManagers
 	Init() error
 	StartComponents() error
 	StartManagers() error
@@ -56,10 +58,11 @@ type componentManager struct {
 	stateStore       statestore.StateStore
 	blockIndexer     blockindexer.BlockIndexer
 	rpcServer        rpcserver.RPCServer
-	// post-init
-	pluginController plugins.PluginController
 	// managers
-	domainManager components.DomainManager
+	domainManager    components.DomainManager
+	transportManager components.TransportManager
+	registryManager  components.RegistryManager
+	pluginManager    components.PluginManager
 	// engine
 	engine components.Engine
 	// init to start tracking
@@ -119,17 +122,29 @@ func (cm *componentManager) Init() (err error) {
 		err = cm.wrapIfErr(err, msgs.MsgComponentRPCServerInitError)
 	}
 
-	// init managers
+	// pre-init managers
 	if err == nil {
 		cm.domainManager = domainmgr.NewDomainManager(cm.bgCtx, &cm.conf.DomainManagerConfig)
-		cm.initResults["domain_mgr"], err = cm.domainManager.Init(cm)
+		cm.initResults["domain_mgr"], err = cm.domainManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentDomainInitError)
 	}
 
-	// using init of managers, for post-init components
 	if err == nil {
-		cm.pluginController, err = plugins.NewPluginController(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, cm, &cm.conf.PluginControllerConfig)
-		err = cm.wrapIfErr(err, msgs.MsgComponentPluginCtrlInitError)
+		cm.transportManager = transportmgr.NewTransportManager(cm.bgCtx, &cm.conf.TransportManagerConfig)
+		cm.initResults["transports_mgr"], err = cm.transportManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentTransportInitError)
+	}
+
+	if err == nil {
+		cm.registryManager = registrymgr.NewRegistryManager(cm.bgCtx, &cm.conf.RegistryManagerConfig)
+		cm.initResults["registry_mgr"], err = cm.registryManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentRegistryInitError)
+	}
+
+	if err == nil {
+		cm.pluginManager = plugins.NewPluginManager(cm.bgCtx, cm.grpcTarget, cm.instanceUUID, &cm.conf.PluginManagerConfig)
+		cm.initResults["plugin_mgr"], err = cm.pluginManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentPluginInitError)
 	}
 
 	// init engine
@@ -137,6 +152,28 @@ func (cm *componentManager) Init() (err error) {
 		cm.initResults[cm.engine.EngineName()], err = cm.engine.Init(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentEngineInitError)
 	}
+
+	// post-init the managers
+	if err == nil {
+		err = cm.domainManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentDomainInitError)
+	}
+
+	if err == nil {
+		err = cm.transportManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentTransportInitError)
+	}
+
+	if err == nil {
+		err = cm.transportManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentRegistryInitError)
+	}
+
+	if err == nil {
+		err = cm.pluginManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentPluginInitError)
+	}
+
 	return err
 }
 
@@ -170,17 +207,26 @@ func (cm *componentManager) StartManagers() (err error) {
 	err = cm.domainManager.Start()
 	err = cm.addIfStarted("domain_manager", cm.domainManager, err, msgs.MsgComponentDomainStartError)
 
-	// start the plugin controller
 	if err == nil {
-		err = cm.pluginController.Start()
-		err = cm.addIfStarted("plugin_controller", cm.pluginController, err, msgs.MsgComponentPluginCtrlStartError)
+		err = cm.transportManager.Start()
+		err = cm.addIfStarted("transport_manager", cm.transportManager, err, msgs.MsgComponentTransportStartError)
+	}
+
+	if err == nil {
+		err = cm.registryManager.Start()
+		err = cm.addIfStarted("registry_manager", cm.registryManager, err, msgs.MsgComponentRegistryStartError)
+	}
+
+	if err == nil {
+		err = cm.pluginManager.Start()
+		err = cm.addIfStarted("plugin_manager", cm.pluginManager, err, msgs.MsgComponentPluginStartError)
 	}
 	return err
 }
 
 func (cm *componentManager) CompleteStart() error {
 	// Wait for the plugins to all start
-	err := cm.pluginController.WaitForInit(cm.bgCtx)
+	err := cm.pluginManager.WaitForInit(cm.bgCtx)
 	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
 
 	// start the engine
@@ -314,28 +360,16 @@ func (cm *componentManager) DomainManager() components.DomainManager {
 	return cm.domainManager
 }
 
-type stubTransportManager struct{}
-
-// Receive implements components.TransportManager.
-func (s stubTransportManager) RegisterReceiver(onMessage func(ctx context.Context, message components.TransportMessage) error) error {
-	return nil
-}
-
-// Send implements components.TransportManager.
-func (s stubTransportManager) Send(ctx context.Context, message components.TransportMessage, nodeId string) error {
-	return nil
-}
-
 func (cm *componentManager) TransportManager() components.TransportManager {
-	return stubTransportManager{}
+	return cm.transportManager
 }
 
-func (cm *componentManager) DomainRegistration() plugins.DomainRegistration {
-	return cm.domainManager
+func (cm *componentManager) RegistryManager() components.RegistryManager {
+	return cm.registryManager
 }
 
-func (cm *componentManager) PluginController() plugins.PluginController {
-	return cm.pluginController
+func (cm *componentManager) PluginManager() components.PluginManager {
+	return cm.pluginManager
 }
 
 func (cm *componentManager) Engine() components.Engine {

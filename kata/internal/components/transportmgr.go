@@ -17,14 +17,41 @@ package components
 
 import (
 	"context"
+
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 type TransportMessage struct {
-	MessageType string
-	Payload     []byte
+	MessageID     uuid.UUID
+	CorrelationID *uuid.UUID
+	Destination   types.PrivateIdentityLocator
+	ReplyTo       types.PrivateIdentityLocator
+	MessageType   string
+	Payload       []byte
+}
+
+type TransportManagerToTransport interface {
+	plugintk.TransportAPI
+	Initialized()
 }
 
 type TransportManager interface {
-	Send(ctx context.Context, message TransportMessage, nodeId string) error
-	RegisterReceiver(onMessage func(ctx context.Context, message TransportMessage) error) error
+	ManagerLifecycle
+	ConfiguredTransports() map[string]*PluginConfig
+	TransportRegistered(name string, id uuid.UUID, toTransport TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error)
+	LocalNodeName() string
+
+	// Send a message - performs a cache-optimized registry lookup of the transport to use for the node,
+	// then synchronously calls the transport to *accept* the message for sending.
+	// The caller should assume this could involve I/O and hence might block the calling routine.
+	// However, how much actual I/O is performed in-line with the function call is transport plugin dependent.
+	//
+	// The transport tries to feedback failure when it is immediate, but the transport has no guarantees
+	// on delivery, and the target failing to process the message should be considered a possible
+	// situation to recover from (although not critical path).
+	//
+	// e.g. at-most-once delivery semantics
+	Send(ctx context.Context, message *TransportMessage) error
 }

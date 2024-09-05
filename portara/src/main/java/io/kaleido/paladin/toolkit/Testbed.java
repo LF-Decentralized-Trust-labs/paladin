@@ -93,6 +93,7 @@ public class Testbed implements Closeable {
 
     private String baseConfig() {
         return """
+                nodeName: node1
                 db:
                   type: sqlite
                   sqlite:

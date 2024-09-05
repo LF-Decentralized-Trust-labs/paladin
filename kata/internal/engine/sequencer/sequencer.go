@@ -22,11 +22,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
 // an ordered list of transactions that are handed over to the dispatcher to be submitted to the base ledger in that order
@@ -35,15 +35,15 @@ type Sequence []*transactionstore.Transaction
 func NewSequencer(
 	nodeID uuid.UUID,
 
-	publisher types.Publisher,
-	delegator types.Delegator,
+	publisher enginespi.Publisher,
+	delegator enginespi.Delegator,
 
 	/*
 		dispatcher is the reciever of the sequenced transactions and will be responsible for submitting them to the base ledger in the correct order
 	*/
-	dispatcher types.Dispatcher,
+	dispatcher enginespi.Dispatcher,
 
-) types.Sequencer {
+) enginespi.Sequencer {
 	return &sequencer{
 		publisher:                   publisher,
 		dispatcher:                  dispatcher,
@@ -90,10 +90,10 @@ type transaction struct {
 
 type sequencer struct {
 	nodeID                      uuid.UUID
-	publisher                   types.Publisher
-	delegator                   types.Delegator
+	publisher                   enginespi.Publisher
+	delegator                   enginespi.Delegator
 	resolver                    ContentionResolver
-	dispatcher                  types.Dispatcher
+	dispatcher                  enginespi.Dispatcher
 	graph                       Graph
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 	unconfirmedStatesByID       map[string]*unconfirmedState
@@ -247,7 +247,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction *tran
 	return false, nil
 }
 
-func (s *sequencer) updateBlockedTransactions(ctx context.Context, event *pb.TransactionConfirmedEvent) {
+func (s *sequencer) updateBlockedTransactions(event *pb.TransactionConfirmedEvent) {
 	for _, blockedTransaction := range s.blockedTransactions {
 		for i, dependency := range blockedTransaction.blockedBy {
 			if dependency.transactionID == event.TransactionId {
@@ -259,7 +259,7 @@ func (s *sequencer) updateBlockedTransactions(ctx context.Context, event *pb.Tra
 	}
 }
 
-func (s *sequencer) findDelegatableTransactions(ctx context.Context) []delegatableTransaction {
+func (s *sequencer) findDelegatableTransactions() []delegatableTransaction {
 	delegatableTransactions := make([]delegatableTransaction, 0, len(s.blockedTransactions))
 	//if I have any transactions in blocked that are dependant on this confirmed transaction, then I need to re-evaluate them
 
@@ -376,8 +376,8 @@ func (s *sequencer) HandleTransactionConfirmedEvent(ctx context.Context, event *
 	}
 	delete(s.unconfirmedTransactionsByID, event.TransactionId)
 
-	s.updateBlockedTransactions(ctx, event)
-	delegatableTransactions := s.findDelegatableTransactions(ctx)
+	s.updateBlockedTransactions(event)
+	delegatableTransactions := s.findDelegatableTransactions()
 	for _, delegatableTransaction := range delegatableTransactions {
 		err := s.delegate(ctx, delegatableTransaction.transactionID, delegatableTransaction.delegateNodeId)
 		if err != nil {
@@ -436,7 +436,7 @@ func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
 	return s.acceptTransaction(ctx, txn)
 }
 
-func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst types.EndorsementRequest) (bool, error) {
+func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst enginespi.EndorsementRequest) (bool, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	contentionFound := false

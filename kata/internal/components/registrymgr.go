@@ -13,27 +13,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package types
+package components
 
 import (
-	"testing"
+	"context"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
-func TestForTypesAndMocks(t *testing.T) {
+type RegistryNodeTransportEntry struct {
+	Node             string
+	Transport        string
+	TransportDetails string
+}
 
-	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil)
-	assert.Nil(t, pfs.DependencyChecker())
-	assert.Nil(t, pfs.IdentityResolver())
-	assert.Nil(t, pfs.StateStore())
+type RegistryManagerToRegistry interface {
+	plugintk.RegistryAPI
+	Initialized()
+}
 
-	// mock object tests for coverage:
-	mIR := &MockIdentityResolver{}
-
-	assert.NoError(t, mIR.ConnectToBaseLeger())
-	assert.True(t, mIR.IsCurrentNode("current-node"))
-	assert.False(t, mIR.IsCurrentNode("not-current-node"))
-	assert.Empty(t, mIR.GetDispatchAddress(nil))
-	assert.Equal(t, "test", mIR.GetDispatchAddress([]string{"test"}))
+type RegistryManager interface {
+	ManagerLifecycle
+	ConfiguredRegistries() map[string]*PluginConfig
+	RegistryRegistered(name string, id uuid.UUID, toRegistry RegistryManagerToRegistry) (fromRegistry plugintk.RegistryCallbacks, err error)
+	GetNodeTransports(ctx context.Context, node string) ([]*RegistryNodeTransportEntry, error)
 }

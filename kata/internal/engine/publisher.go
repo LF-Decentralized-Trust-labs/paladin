@@ -18,11 +18,11 @@ package engine
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func NewPublisher(e *engine) types.Publisher {
+func NewPublisher(e *engine) enginespi.Publisher {
 	return &publisher{
 		engine: e,
 	}
@@ -32,15 +32,15 @@ type publisher struct {
 	engine *engine
 }
 
-// PublishStageEvent implements types.Publisher.
-func (p *publisher) PublishStageEvent(ctx context.Context, stageEvent *types.StageEvent) error {
+// PublishStageEvent implements enginespi.Publisher.
+func (p *publisher) PublishStageEvent(ctx context.Context, stageEvent *enginespi.StageEvent) error {
 
 	p.engine.HandleNewEvent(ctx, stageEvent)
 	return nil
 
 }
 
-// PublishEvent implements types.Publisher.
+// PublishEvent implements enginespi.Publisher.
 func (p *publisher) PublishEvent(ctx context.Context, eventPayload interface{}) error {
 	//TODO really need to decide when to use protobufs and when to use json
 	// current assumption is that we would use golang structs for internal messages within a single engine,

@@ -209,3 +209,13 @@ func TestDomainFunction_PrepareTransaction(t *testing.T) {
 		assert.IsType(t, &prototk.DomainMessage_PrepareTransactionRes{}, res.ResponseFromDomain)
 	})
 }
+
+func TestDomainRequestError(t *testing.T) {
+	_, exerciser, _, _, _, done := setupDomainTests(t)
+	defer done()
+
+	// Check responseToPluginAs handles nil
+	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {}, func(res *prototk.DomainMessage) {
+		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
+	})
+}

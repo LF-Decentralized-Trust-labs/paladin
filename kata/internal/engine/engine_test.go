@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	engineTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	engineTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	pbEngine "github.com/kaleido-io/paladin/kata/pkg/proto/engine"
@@ -96,16 +96,6 @@ func TestEngineSimpleTransaction(t *testing.T) {
 		sentEndorsementRequest <- struct{}{}
 	}).Return(nil).Maybe()
 
-	onMessage := func(ctx context.Context, message components.TransportMessage) error {
-		assert.Fail(t, "onMessage has not been set")
-		return nil
-	}
-	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
-	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
-
-	}).Return(nil).Maybe()
-
 	//TODO do we need this?
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
@@ -173,12 +163,10 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	engineMessageBytes, err := proto.Marshal(&engineMessage)
 	assert.NoError(t, err)
 
-	//now send the endorsement back
-	err = onMessage(ctx, components.TransportMessage{
+	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
 		MessageType: "endorsement",
 		Payload:     engineMessageBytes,
 	})
-	assert.NoError(t, err)
 
 	timeout := time.After(2 * time.Second)
 	tick := time.Tick(100 * time.Millisecond)
@@ -282,16 +270,6 @@ func TestEngineDependantTransaction(t *testing.T) {
 		sentEndorsementRequest <- struct{}{}
 	}).Return(nil).Maybe()
 
-	onMessage := func(ctx context.Context, message components.TransportMessage) error {
-		assert.Fail(t, "onMessage has not been set")
-		return nil
-	}
-	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
-	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
-
-	}).Return(nil).Maybe()
-
 	//TODO do we need this?
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
@@ -344,11 +322,10 @@ func TestEngineDependantTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	//now send the endorsement back
-	err = onMessage(ctx, components.TransportMessage{
+	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
 		MessageType: "endorsement",
 		Payload:     engineMessageBytes,
 	})
-	assert.NoError(t, err)
 
 	//unless the tests are running in short mode, wait a second to ensure that the transaction is not dispatched
 	if !testing.Short() {
@@ -374,11 +351,10 @@ func TestEngineDependantTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	//now send the endorsement back
-	err = onMessage(ctx, components.TransportMessage{
+	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
 		MessageType: "endorsement",
 		Payload:     engineMessageBytes,
 	})
-	assert.NoError(t, err)
 
 	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, tx1ID, 2*time.Second)
 	assert.Equal(t, "dispatch", status)
@@ -501,16 +477,6 @@ func TestEngineMiniLoad(t *testing.T) {
 		}
 	}).Return(nil).Maybe()
 
-	onMessage := func(ctx context.Context, message components.TransportMessage) error {
-		assert.Fail(t, "onMessage has not been set")
-		return nil
-	}
-	// mock Recieve(component string, onMessage func(ctx context.Context, message TransportMessage) error) error
-	mocks.transportManager.On("RegisterReceiver", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		onMessage = args.Get(0).(func(ctx context.Context, message components.TransportMessage) error)
-
-	}).Return(nil).Maybe()
-
 	//TODO do we need this?
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
@@ -576,11 +542,10 @@ func TestEngineMiniLoad(t *testing.T) {
 				assert.NoError(t, err)
 
 				//now send the endorsement back
-				err = onMessage(ctx, components.TransportMessage{
+				engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
 					MessageType: "endorsement",
 					Payload:     engineMessageBytes,
 				})
-				assert.NoError(t, err)
 			}()
 		}
 	}()

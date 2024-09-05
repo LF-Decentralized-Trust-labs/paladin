@@ -16,8 +16,9 @@
 package components
 
 import (
+	"context"
+
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
@@ -37,20 +38,8 @@ type PreInitComponents interface {
 	RPCServer() rpcserver.RPCServer
 }
 
-// PostInitComponents depend on instructions/configuration that is initialized by managers
-// to determine their initialization
-//
-// However, they are not managers in their own right and can be re-used across managers.
-//
-// Each component defines the subset of our "components" interface that they require
-// at initialization time, so they can still be independent go packages with their
-// own interfaces (they must not depend on the "components" package themselves).
-type PostInitComponents interface {
-	PluginController() plugins.PluginController
-}
-
 // Managers are initialized after base components with access to them, and provide
-// output that is used to finalize startup of the LateBoundComponents..
+// output that is used to finalize startup of the LateBoundComponents.
 //
 // Their start informs the configuration of the late bound components, so they
 // must start before them. But they still have access to those.
@@ -60,11 +49,16 @@ type PostInitComponents interface {
 type Managers interface {
 	DomainManager() DomainManager
 	TransportManager() TransportManager
+	RegistryManager() RegistryManager
+	PluginManager() PluginManager
 }
 
 // All managers conform to a standard lifecycle
 type ManagerLifecycle interface {
-	Init(PreInitComponents) (*ManagerInitResult, error)
+	// Init only depends on the configuration and components - no other managers
+	PreInit(PreInitComponents) (*ManagerInitResult, error)
+	// Post-init allows the manager to cross-bind to other components, or the Engine
+	PostInit(AllComponents) error
 	Start() error
 	Stop()
 }
@@ -82,9 +76,8 @@ type ManagerInitResult struct {
 	RPCModules   []*rpcserver.RPCModule
 }
 
-type AllComponents interface {
+type PreInitComponentsAndManagers interface {
 	PreInitComponents
-	PostInitComponents
 	Managers
 }
 
@@ -94,7 +87,42 @@ type AllComponents interface {
 // The other component do not know or care which engine is orchestrating them.
 type Engine interface {
 	EngineName() string
-	Init(AllComponents) (*ManagerInitResult, error)
+	Init(PreInitComponentsAndManagers) (*ManagerInitResult, error)
 	Start() error
 	Stop()
+
+	// This function is used by the transport manager to deliver messages to the engine.
+	//
+	// The implementation of this function:
+	// - MUST thread safe
+	// - SHOULD NOT perform any processing within the function call itself beyond routing
+	//
+	// There is no ack to the messages. They are at-most-once delivery. So there is no error return.
+	// Use it or lose it.
+	//
+	// The design assumption of the transport manager is that the engine is entirely responsible
+	// for determining what thread-of-control to dispatch any given message to.
+	// This is because the determination of that is not dependent on who it came from,
+	// but rather what its purpose is.
+	//
+	// Most likely processing pattern is:
+	// - Pick a suitable go channel for a thread-of-control that could process the message (existing or new)
+	// - Push the message into that go channel
+	// - Handle the situation where the go channel is full (mark a miss for that routine to go back and handle when it gets free)
+	//
+	// The TransportMessage wrapper for the payload contains some fields designed to help
+	// an engine perform this routing to the correct channel. These can be enhanced as required, but that
+	// does require change to each plugin to propagate that extra field.
+	//
+	// There is very limited ordering performed by the transport manager itself.
+	// It delivers messages to this function:
+	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
+	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
+	ReceiveTransportMessage(context.Context, *TransportMessage)
+}
+
+type AllComponents interface {
+	PreInitComponents
+	Managers
+	Engine() Engine
 }

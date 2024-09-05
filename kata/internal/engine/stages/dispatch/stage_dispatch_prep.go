@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
@@ -30,13 +30,13 @@ func (dps *DispatchPrepStage) Name() string {
 	return "dispatch_prep"
 }
 
-func (dps *DispatchPrepStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (dps *DispatchPrepStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 	return nil
 }
 
-func (dps *DispatchPrepStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
-	unprocessedStageEvents = []*types.StageEvent{}
-	nextStep = types.NextStepWait
+func (dps *DispatchPrepStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
+	unprocessedStageEvents = []*enginespi.StageEvent{}
+	nextStep = enginespi.NextStepWait
 	for _, se := range stageEvents {
 		if string(se.Stage) == dps.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
@@ -45,7 +45,7 @@ func (dps *DispatchPrepStage) ProcessEvents(ctx context.Context, tsg transaction
 					txUpdates = &transactionstore.TransactionUpdate{
 						PreparedTransaction: v,
 					}
-					nextStep = types.NextStepNewStage
+					nextStep = enginespi.NextStepNewStage
 				}
 			}
 		} else {
@@ -55,11 +55,11 @@ func (dps *DispatchPrepStage) ProcessEvents(ctx context.Context, tsg transaction
 	return
 }
 
-func (dps *DispatchPrepStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (dps *DispatchPrepStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	return tsg.HACKGetPrivateTx().PreAssembly != nil && tsg.HACKGetPrivateTx().PostAssembly != nil && tsg.HACKGetPrivateTx().PreparedTransaction == nil
 }
 
-func (dps *DispatchPrepStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (dps *DispatchPrepStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	prepError := sfs.DomainAPI().PrepareTransaction(ctx, tsg.HACKGetPrivateTx())
 
 	if prepError != nil {

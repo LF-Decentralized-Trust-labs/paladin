@@ -54,11 +54,15 @@ var (
 	MsgComponentRPCServerStartError    = ffe("PD010011", "Error starting RPC server ")
 	MsgComponentDomainInitError        = ffe("PD010012", "Error initializing domains")
 	MsgComponentDomainStartError       = ffe("PD010013", "Error starting domain manager")
-	MsgComponentPluginCtrlInitError    = ffe("PD010014", "Error initializing plugin controller")
-	MsgComponentPluginCtrlStartError   = ffe("PD010015", "Error starting plugin controller ")
+	MsgComponentPluginInitError        = ffe("PD010014", "Error initializing plugin manager")
+	MsgComponentPluginStartError       = ffe("PD010015", "Error starting plugin manager ")
 	MsgComponentWaitPluginStartError   = ffe("PD010016", "Error waiting for plugins to start")
 	MsgComponentEngineInitError        = ffe("PD010017", "Error initializing engine")
 	MsgComponentEngineStartError       = ffe("PD010018", "Error starting engine")
+	MsgComponentTransportInitError     = ffe("PD010019", "Error initializing transport manager")
+	MsgComponentTransportStartError    = ffe("PD010020", "Error starting transport manager")
+	MsgComponentRegistryInitError      = ffe("PD010021", "Error initializing registry manager")
+	MsgComponentRegistryStartError     = ffe("PD010022", "Error starting registry manager")
 
 	// States PD0101XX
 	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")
@@ -158,6 +162,7 @@ var (
 	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
 	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
 	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
+	MsgTypesPrivateIdentityLocatorInvalid = ffe("PD011107", "Locator string %s is invalid")
 
 	// Plugin controller PD0112XX
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
@@ -261,7 +266,7 @@ var (
 	MsgEngineInternalError    = ffe("PD011801", "Unexpected error in engine")
 	MsgEngineAssembleError    = ffe("PD011802", "Error assembling transaction")
 	MsgEngineParseFailed      = ffe("PD011803", "Failed to parse message")
-	MsgEngineInvalidMessage   = ffe("PD011804", "Invalid message recieved from transport")
+	MsgEngineInvalidMessage   = ffe("PD011804", "Invalid message received from transport")
 	MsgSequencerInternalError = ffe("PD011805", "Sequencer internal error %s, ")
 
 	// Base Ledger engine PD0119XX
@@ -292,4 +297,20 @@ var (
 	MsgErrorFromSigningService         = ffe("PD011927", "Error from signing service: %s")
 	MsgErrorMissingSignerID            = ffe("PD011928", "Signer Identifier must be provided")
 	MsgInvalidTransactionType          = ffe("PD011929", "Transaction type invalid")
+
+	// TransportManager module PD0120XX
+	MsgTransportInvalidMessage                = ffe("PD012000", "Invalid message")
+	MsgTransportNotFound                      = ffe("PD012001", "Transport %q not found")
+	MsgTransportNodeNameNotConfigured         = ffe("PD012002", "nodeName must be configured to set the identity of the local node")
+	MsgTransportNoTransportsConfiguredForNode = ffe("PD012003", "None of the transports registered by node '%s' are configured locally on this node: %v")
+	MsgTransportDetailsNotAvailable           = ffe("PD012004", "Transport '%s' not available for node '%s'")
+	MsgTransportInvalidDestinationReceived    = ffe("PD012005", "Message received with invalid destination for local node '%s': '%s'")
+	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
+	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
+	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
+
+	// RegistryManager module PD0121XX
+	MsgRegistryNodeEntiresNotFound = ffe("PD012100", "No entries found for node '%s'")
+	MsgRegistryInvalidEntry        = ffe("PD012101", "Invalid entry")
+	MsgRegistryNotFound            = ffe("PD012102", "Registry %q not found")
 )

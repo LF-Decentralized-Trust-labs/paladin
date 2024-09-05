@@ -4,7 +4,6 @@ use (
 	./domains/noto
 	./domains/zeto
 	./kata
-	./talaria
 	./testinfra
 	./toolkit_go
 )

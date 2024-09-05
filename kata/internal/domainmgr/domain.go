@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -43,7 +42,7 @@ type domain struct {
 	dm   *domainManager
 	id   uuid.UUID
 	name string
-	api  plugins.DomainManagerToDomain
+	api  components.DomainManagerToDomain
 
 	stateLock              sync.Mutex
 	initialized            atomic.Bool
@@ -60,7 +59,7 @@ type domain struct {
 	initDone  chan struct{}
 }
 
-func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain plugins.DomainManagerToDomain) *domain {
+func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
 		dm:        dm,
 		conf:      conf,

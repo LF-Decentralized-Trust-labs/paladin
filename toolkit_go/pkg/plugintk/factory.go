@@ -34,14 +34,14 @@ type PluginConnector[M any] func(ctx context.Context, client prototk.PluginContr
 
 type pluginFactory[M any] struct {
 	mux        sync.Mutex
-	pluginType prototk.PluginType
+	pluginType prototk.PluginInfo_PluginType
 	instances  map[string]*pluginInstance[M]
 	connector  PluginConnector[M]
 	impl       PluginImplementation[M]
 }
 
 func NewPluginBase[M any](
-	pluginType prototk.PluginType,
+	pluginType prototk.PluginInfo_PluginType,
 	connector PluginConnector[M],
 	impl PluginImplementation[M],
 ) PluginBase {

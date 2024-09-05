@@ -18,10 +18,10 @@ package engine
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 )
 
-func NewDelegator() types.Delegator {
+func NewDelegator() enginespi.Delegator {
 	return &delegator{}
 }
 

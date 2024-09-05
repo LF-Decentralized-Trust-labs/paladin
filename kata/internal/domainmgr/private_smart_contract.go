@@ -24,7 +24,6 @@ import (
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/filters"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -40,7 +39,7 @@ type PrivateSmartContract struct {
 type domainContract struct {
 	dm   *domainManager
 	d    *domain
-	api  plugins.DomainManagerToDomain
+	api  components.DomainManagerToDomain
 	info *PrivateSmartContract
 }
 

@@ -18,7 +18,7 @@ package orchestrator
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 )
 
@@ -32,6 +32,6 @@ func (oc *Orchestrator) GetPreReqDispatchAddresses(ctx context.Context, preReqTx
 	// TODO
 	return nil
 }
-func (oc *Orchestrator) RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *types.TxProcessPreReq) {
+func (oc *Orchestrator) RegisterPreReqTrigger(ctx context.Context, txID string, txPreReq *enginespi.TxProcessPreReq) {
 	// TODO
 }

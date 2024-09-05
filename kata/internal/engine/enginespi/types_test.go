@@ -13,22 +13,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package plugins
+package enginespi
 
 import (
-	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Almost certainly not right, but works well enough for now
-type PluginRegistration struct {
-	Name           string
-	SocketLocation string
-}
+func TestForTypesAndMocks(t *testing.T) {
 
-// All plugins are required to implement this interface in order to be managed by talaria
-type TransportPlugin interface {
+	pfs := NewPaladinStageFoundationService(nil, nil, nil, nil, nil, nil)
+	assert.Nil(t, pfs.DependencyChecker())
+	assert.Nil(t, pfs.IdentityResolver())
+	assert.Nil(t, pfs.StateStore())
 
-	// Methods specifically for plugin lifecycle
-	GetRegistration() PluginRegistration
-	Start(ctx context.Context)
+	// mock object tests for coverage:
+	mIR := &MockIdentityResolver{}
+
+	assert.NoError(t, mIR.ConnectToBaseLeger())
+	assert.True(t, mIR.IsCurrentNode("current-node"))
+	assert.False(t, mIR.IsCurrentNode("not-current-node"))
+	assert.Empty(t, mIR.GetDispatchAddress(nil))
+	assert.Equal(t, "test", mIR.GetDispatchAddress([]string{"test"}))
 }

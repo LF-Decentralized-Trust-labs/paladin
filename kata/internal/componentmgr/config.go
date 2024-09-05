@@ -22,8 +22,10 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
 	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/registrymgr"
 	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
+	"github.com/kaleido-io/paladin/kata/internal/transportmgr"
 	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -34,16 +36,18 @@ import (
 )
 
 type Config struct {
-	domainmgr.DomainManagerConfig  `yaml:",inline"`
-	plugins.PluginControllerConfig `yaml:",inline"`
-	Log                            log.Config          `yaml:"log"`
-	Blockchain                     ethclient.Config    `yaml:"blockchain"`
-	DB                             persistence.Config  `yaml:"db"`
-	RPCServer                      rpcserver.Config    `yaml:"rpcServer"`
-	StateStore                     statestore.Config   `yaml:"statestore"`
-	BlockIndexer                   blockindexer.Config `yaml:"blockIndexer"`
-	Signer                         api.Config          `yaml:"signer"`
-	TempDir                        *string             `yaml:"tempDir"`
+	domainmgr.DomainManagerConfig       `yaml:",inline"`
+	plugins.PluginManagerConfig         `yaml:",inline"`
+	transportmgr.TransportManagerConfig `yaml:",inline"`
+	registrymgr.RegistryManagerConfig   `yaml:",inline"`
+	Log                                 log.Config          `yaml:"log"`
+	Blockchain                          ethclient.Config    `yaml:"blockchain"`
+	DB                                  persistence.Config  `yaml:"db"`
+	RPCServer                           rpcserver.Config    `yaml:"rpcServer"`
+	StateStore                          statestore.Config   `yaml:"statestore"`
+	BlockIndexer                        blockindexer.Config `yaml:"blockIndexer"`
+	Signer                              api.Config          `yaml:"signer"`
+	TempDir                             *string             `yaml:"tempDir"`
 }
 
 func ReadAndParseYAMLFile(ctx context.Context, filePath string, config interface{}) error {

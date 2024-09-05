@@ -47,11 +47,6 @@ func TestResponseToPluginAs(t *testing.T) {
 	ctx, exerciser, _, _, _, done := setupDomainTests(t)
 	defer done()
 
-	// Check responseToPluginAs handles nil
-	exerciser.doExchangeToPlugin(func(req *prototk.DomainMessage) {}, func(res *prototk.DomainMessage) {
-		assert.Regexp(t, "PD020300", *res.Header.ErrorMessage)
-	})
-
 	// Check responseToPluginAs handles error passthrough
 	_, err := responseToPluginAs(ctx, exerciser.wrapper.Wrap(&prototk.DomainMessage{}),
 		fmt.Errorf("pop"), // this will just get passed through

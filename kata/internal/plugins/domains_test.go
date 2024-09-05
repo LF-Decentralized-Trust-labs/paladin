@@ -16,43 +16,92 @@ package plugins
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"runtime/debug"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc"
 )
 
 type testDomainManager struct {
 	domains             map[string]plugintk.Plugin
-	domainRegistered    func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
+	domainRegistered    func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
 }
 
-func (tp *testDomainManager) ConfiguredDomains() map[string]*PluginConfig {
-	pluginMap := make(map[string]*PluginConfig)
+func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
+	return client.ConnectDomain(context.Background())
+}
+
+func domainHeaderAccessor(msg *prototk.DomainMessage) *prototk.Header {
+	if msg.Header == nil {
+		msg.Header = &prototk.Header{}
+	}
+	return msg.Header
+}
+
+func (tp *testDomainManager) mock(t *testing.T) *componentmocks.DomainManager {
+	mdm := componentmocks.NewDomainManager(t)
+	pluginMap := make(map[string]*components.PluginConfig)
 	for name := range tp.domains {
-		pluginMap[name] = &PluginConfig{
-			Type:    LibraryTypeCShared.Enum(),
+		pluginMap[name] = &components.PluginConfig{
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "/tmp/not/applicable",
 		}
 	}
-	return pluginMap
+	mdm.On("ConfiguredDomains").Return(pluginMap).Maybe()
+	mdr := mdm.On("DomainRegistered", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	mdr.Run(func(args mock.Arguments) {
+		m2p, err := tp.domainRegistered(args[0].(string), args[1].(uuid.UUID), args[2].(components.DomainManagerToDomain))
+		mdr.Return(m2p, err)
+	})
+	return mdm
 }
 
 func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
 	return tp.findAvailableStates(ctx, req)
 }
 
-func (tdm *testDomainManager) DomainRegistered(name string, id uuid.UUID, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error) {
-	return tdm.domainRegistered(name, id, toDomain)
+func newTestDomainPluginManager(t *testing.T, setup *testManagers) (context.Context, *pluginManager, func()) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+
+	pc := newTestPluginManager(t, setup)
+
+	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tpl.Run()
+	}()
+
+	return ctx, pc, func() {
+		recovered := recover()
+		if recovered != nil {
+			fmt.Fprintf(os.Stderr, "%v: %s", recovered, debug.Stack())
+			panic(recovered)
+		}
+		cancelCtx()
+		pc.Stop()
+		tpl.Stop()
+		<-done
+	}
+
 }
 
 func TestDomainRequestsOK(t *testing.T) {
 
-	waitForAPI := make(chan DomainManagerToDomain, 1)
+	waitForAPI := make(chan components.DomainManagerToDomain, 1)
 	waitForCallbacks := make(chan plugintk.DomainCallbacks, 1)
 
 	var domainID string
@@ -119,7 +168,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			}),
 		},
 	}
-	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
 		assert.Equal(t, "domain1", name)
 		domainID = id.String()
 		waitForAPI <- toDomain
@@ -135,7 +184,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		}, nil
 	}
 
-	ctx, pc, done := newTestDomainPluginController(t, &testManagers{
+	ctx, pc, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
 	defer done()
@@ -212,4 +261,81 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "12345", fas.States[0].Id)
+}
+
+func TestDomainRegisterFail(t *testing.T) {
+
+	waitForError := make(chan error, 1)
+
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin[prototk.DomainMessage]{
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
+				preRegister: func(domainID string) *prototk.DomainMessage {
+					return &prototk.DomainMessage{
+						Header: &prototk.Header{
+							MessageType: prototk.Header_REGISTER,
+							PluginId:    domainID,
+							MessageId:   uuid.NewString(),
+						},
+					}
+				},
+				expectClose: func(err error) {
+					waitForError <- err
+				},
+			},
+		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
+		testDomainManager: tdm,
+	})
+	defer done()
+
+	assert.Regexp(t, "pop", <-waitForError)
+}
+
+func TestFromDomainRequestBadReq(t *testing.T) {
+
+	waitForResponse := make(chan struct{}, 1)
+
+	msgID := uuid.NewString()
+	tdm := &testDomainManager{
+		domains: map[string]plugintk.Plugin{
+			"domain1": &mockPlugin[prototk.DomainMessage]{
+				connectFactory: domainConnectFactory,
+				headerAccessor: domainHeaderAccessor,
+				sendRequest: func(domainID string) *prototk.DomainMessage {
+					return &prototk.DomainMessage{
+						Header: &prototk.Header{
+							PluginId:    domainID,
+							MessageId:   msgID,
+							MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
+							// Missing payload
+						},
+					}
+				},
+				handleResponse: func(dm *prototk.DomainMessage) {
+					assert.Equal(t, msgID, *dm.Header.CorrelationId)
+					assert.Regexp(t, "PD011203", *dm.Header.ErrorMessage)
+					close(waitForResponse)
+				},
+			},
+		},
+	}
+	tdm.domainRegistered = func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (plugintk.DomainCallbacks, error) {
+		return tdm, nil
+	}
+
+	_, _, done := newTestDomainPluginManager(t, &testManagers{
+		testDomainManager: tdm,
+	})
+	defer done()
+
+	<-waitForResponse
+
 }

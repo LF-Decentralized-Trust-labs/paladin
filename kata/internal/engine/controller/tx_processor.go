@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -37,13 +37,13 @@ const (
 )
 
 type TxProcessor interface {
-	GetStageContext(ctx context.Context) *types.StageContext
+	GetStageContext(ctx context.Context) *enginespi.StageContext
 	GetStageTriggerError(ctx context.Context) error
 
 	// stage outputs management
-	AddStageEvent(ctx context.Context, stageEvent *types.StageEvent)
+	AddStageEvent(ctx context.Context, stageEvent *enginespi.StageEvent)
 	Init(ctx context.Context)
-	GetTxStatus(ctx context.Context) (types.TxStatus, error)
+	GetTxStatus(ctx context.Context) (enginespi.TxStatus, error)
 }
 
 func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.TxStateManager, sc StageController) TxProcessor {
@@ -51,13 +51,13 @@ func NewPaladinTransactionProcessor(ctx context.Context, tsm transactionstore.Tx
 		tsm:                 tsm,
 		stageController:     sc,
 		stageErrorRetry:     10 * time.Second,
-		bufferedStageEvents: make([]*types.StageEvent, 0),
+		bufferedStageEvents: make([]*enginespi.StageEvent, 0),
 	}
 }
 
 type PaladinTxProcessor struct {
 	stageContextMutex sync.Mutex
-	stageContext      *types.StageContext
+	stageContext      *enginespi.StageContext
 	stageTriggerError error
 	stageErrorRetry   time.Duration
 	tsm               transactionstore.TxStateManager
@@ -65,7 +65,7 @@ type PaladinTxProcessor struct {
 	stageController StageController
 
 	bufferedStageEventsMapMutex sync.Mutex
-	bufferedStageEvents         []*types.StageEvent
+	bufferedStageEvents         []*enginespi.StageEvent
 }
 
 func (ts *PaladinTxProcessor) Init(ctx context.Context) {
@@ -82,7 +82,7 @@ func (ts *PaladinTxProcessor) createStageContext(ctx context.Context, action sta
 	}
 	nowTime := time.Now() // pin the now time
 	stage := ts.stageController.CalculateStage(ctx, ts.tsm)
-	nextStepContext := &types.StageContext{
+	nextStepContext := &enginespi.StageContext{
 		Stage:          stage,
 		ID:             uuid.NewString(),
 		StageEntryTime: nowTime,
@@ -120,7 +120,7 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 		synchronousActionOutput, err := ts.stageController.PerformActionForStage(ctx, string(stageContext.Stage), ts.tsm)
 		ts.stageTriggerError = err
 		if synchronousActionOutput != nil {
-			ts.AddStageEvent(ts.stageContext.Ctx, &types.StageEvent{
+			ts.AddStageEvent(ts.stageContext.Ctx, &enginespi.StageEvent{
 				ID:    stageContext.ID,
 				TxID:  ts.tsm.GetTxID(ctx),
 				Stage: stageContext.Stage,
@@ -139,11 +139,11 @@ func (ts *PaladinTxProcessor) PerformActionForStageAsync(ctx context.Context) {
 	}, ctx)
 }
 
-func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc types.StageContext) {
+func (ts *PaladinTxProcessor) addPanicOutput(ctx context.Context, sc enginespi.StageContext) {
 	start := time.Now()
 	// unexpected error, set an empty input for the stage
 	// so that the stage handler will handle this as unexpected error
-	ts.AddStageEvent(ctx, &types.StageEvent{
+	ts.AddStageEvent(ctx, &enginespi.StageEvent{
 		Stage: sc.Stage,
 		ID:    sc.ID,
 		TxID:  ts.tsm.GetTxID(ctx),
@@ -165,7 +165,7 @@ func (ts *PaladinTxProcessor) executeAsync(funcToExecute func(), ctx context.Con
 	}()
 }
 
-func (ts *PaladinTxProcessor) GetStageContext(ctx context.Context) *types.StageContext {
+func (ts *PaladinTxProcessor) GetStageContext(ctx context.Context) *enginespi.StageContext {
 	return ts.stageContext
 }
 
@@ -173,7 +173,7 @@ func (ts *PaladinTxProcessor) GetStageTriggerError(ctx context.Context) error {
 	return ts.stageTriggerError
 }
 
-func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *types.StageEvent) {
+func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *enginespi.StageEvent) {
 	ts.bufferedStageEventsMapMutex.Lock()
 	defer ts.bufferedStageEventsMapMutex.Unlock()
 	ts.bufferedStageEvents = append(ts.bufferedStageEvents, stageEvent)
@@ -189,22 +189,22 @@ func (ts *PaladinTxProcessor) AddStageEvent(ctx context.Context, stageEvent *typ
 		// persistence is synchronous, so it must NOT run on the main go routine to avoid blocking
 		ts.tsm.ApplyTxUpdates(ctx, txUpdates)
 	}
-	if nextStep == types.NextStepNewStage {
+	if nextStep == enginespi.NextStepNewStage {
 		ts.createStageContext(ctx, switchStage)
-	} else if nextStep == types.NextStepNewAction {
+	} else if nextStep == enginespi.NextStepNewAction {
 		ts.PerformActionForStageAsync(ctx)
 	}
 	// other wise, the stage told the processor to wait for async events
 }
 
-func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (types.TxStatus, error) {
+func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (enginespi.TxStatus, error) {
 	stageContext := ts.GetStageContext(ctx)
 	if stageContext != nil {
-		return types.TxStatus{
+		return enginespi.TxStatus{
 			TxID:   ts.tsm.GetTxID(ctx),
 			Status: stageContext.Stage,
 		}, nil
 	}
 	//TODO what error condition can cause this?
-	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
+	return enginespi.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }

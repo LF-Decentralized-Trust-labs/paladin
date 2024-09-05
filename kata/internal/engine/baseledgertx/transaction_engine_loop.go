@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffapi"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -264,7 +264,7 @@ func (ble *baseLedgerTxEngine) CheckTransactionCompleted(ctx context.Context, tx
 			return false
 		}
 		if len(txs) > 0 {
-			ble.updateCompletedTxNonce(ctx, txs[0])
+			ble.updateCompletedTxNonce(txs[0])
 			completedTxNonce = *txs[0].Nonce.BigInt()
 			// found completed fueling transaction, do the comparison
 			completed = completedTxNonce.Cmp(tx.Nonce.BigInt()) >= 0
@@ -280,7 +280,7 @@ func (ble *baseLedgerTxEngine) CheckTransactionCompleted(ctx context.Context, tx
 
 }
 
-func (ble *baseLedgerTxEngine) updateCompletedTxNonce(ctx context.Context, tx *baseTypes.ManagedTX) (updated bool) {
+func (ble *baseLedgerTxEngine) updateCompletedTxNonce(tx *baseTypes.ManagedTX) (updated bool) {
 	updated = false
 	// no need for locking here as outdated information is OK given we do frequent retires
 	ble.completedTxNoncePerAddressMutex.Lock()

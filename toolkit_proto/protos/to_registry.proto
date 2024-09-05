@@ -15,21 +15,11 @@
 
 syntax = "proto3";
 
-package protos.PluginInterface;
-option go_package = "pkg/talaria/proto";
+package github.com.kaleido_io.paladin.toolkit;
 
-service PluginInterface {
-  rpc PluginMessageFlow(stream PaladinMessage) returns (stream PaladinMessage) {}
-  rpc Status(StatusRequest) returns (PluginStatus) {}
-}
+message ConfigureRegistryRequest {
+    string name = 1; // The name
+    string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
+  }
 
-message StatusRequest {}
-
-message PluginStatus {
-  bool ok = 1;
-}
-
-message PaladinMessage {
-  bytes routingInformation = 1;
-  bytes payload = 2;
-}
+message ConfigureRegistryResponse {}

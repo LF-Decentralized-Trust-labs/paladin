@@ -52,7 +52,7 @@ type pluginToManager[M any] interface {
 type pluginBridgeFactory[M any] func(plugin *plugin[M], toPlugin managerToPlugin[M]) (fromPlugin pluginToManager[M], err error)
 
 type plugin[M any] struct {
-	pc   *pluginController
+	pc   *pluginManager
 	name string
 	id   uuid.UUID
 	def  *prototk.PluginLoad
@@ -67,8 +67,9 @@ type pluginHandler[M any] struct {
 	cancelCtx context.CancelFunc
 
 	// Reference back to the section of the controller for this handler
-	pc        *pluginController
-	pluginMap map[uuid.UUID]*plugin[M]
+	pc         *pluginManager
+	pluginType prototk.PluginInfo_PluginType
+	pluginMap  map[uuid.UUID]*plugin[M]
 
 	// Reference to the manager
 	wrapper       plugintk.PluginMessageWrapper[M]
@@ -109,9 +110,15 @@ func (p *plugin[CB]) notifyStopped() {
 	p.pc.tapLoadingProgressed()
 }
 
-func newPluginHandler[M any](pc *pluginController, pluginMap map[uuid.UUID]*plugin[M], stream grpc.BidiStreamingServer[M, M], wrapper plugintk.PluginMessageWrapper[M], bridgeFactory pluginBridgeFactory[M]) *pluginHandler[M] {
+func newPluginHandler[M any](pm *pluginManager,
+	pluginType prototk.PluginInfo_PluginType,
+	pluginMap map[uuid.UUID]*plugin[M],
+	stream grpc.BidiStreamingServer[M, M],
+	wrapper plugintk.PluginMessageWrapper[M],
+	bridgeFactory pluginBridgeFactory[M]) *pluginHandler[M] {
 	ph := &pluginHandler[M]{
-		pc:            pc,
+		pc:            pm,
+		pluginType:    pluginType,
 		pluginMap:     pluginMap,
 		wrapper:       wrapper,
 		bridgeFactory: bridgeFactory,
@@ -160,7 +167,7 @@ func (ph *pluginHandler[M]) serve() error {
 				log.L(serverCtx).Warnf("Plugin sent request duplicate registration: %s", plugintk.PluginMessageToJSON(msg))
 				continue
 			}
-			plugin, err = getPluginByIDString(ph.pc, ph.pluginMap, header.PluginId, prototk.PluginInfo_DOMAIN)
+			plugin, err = getPluginByIDString(ph.pc, ph.pluginMap, header.PluginId, ph.pluginType)
 			if err != nil {
 				log.L(serverCtx).Errorf("Request to register an unknown plugin %s", header.PluginId)
 				// Close the connection to this plugin

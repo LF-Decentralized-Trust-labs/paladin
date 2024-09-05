@@ -21,10 +21,11 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/kata/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -33,10 +34,10 @@ type AttestationResult struct {
 }
 
 type AttestationStage struct {
-	sequencer types.Sequencer
+	sequencer enginespi.Sequencer
 }
 
-func NewAttestationStage(sequencer types.Sequencer) *AttestationStage {
+func NewAttestationStage(sequencer enginespi.Sequencer) *AttestationStage {
 	return &AttestationStage{
 		sequencer: sequencer,
 	}
@@ -46,16 +47,16 @@ func (as *AttestationStage) Name() string {
 	return "attestation"
 }
 
-func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 
 	return nil
 }
 
-func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
 	tx := tsg.HACKGetPrivateTx()
 
-	unprocessedStageEvents = []*types.StageEvent{}
-	nextStep = types.NextStepWait
+	unprocessedStageEvents = []*enginespi.StageEvent{}
+	nextStep = enginespi.NextStepWait
 	for _, se := range stageEvents {
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
@@ -81,10 +82,10 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 							log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
 						}
 					}
-				case *types.TransactionDispatched:
+				case *enginespi.TransactionDispatched:
 					if isEndorsed(tx) {
 						tx.Signer = "TODO"
-						nextStep = types.NextStepNewStage
+						nextStep = enginespi.NextStepNewStage
 					} else {
 						//TODO this is an error, we should never have gotten here without endorsements
 						log.L(ctx).Errorf("Transaction dispatched without endorsements")
@@ -114,14 +115,14 @@ func isEndorsed(tx *components.PrivateTransaction) bool {
 		len(tx.PostAssembly.Endorsements) >= len(tx.PostAssembly.AttestationPlan)
 }
 
-func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
 	// any asembled transactions are in this stage until they are dispatched
 	return isAssembled(tx) && !isDispatched(tx)
 
 }
 
-func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	tx := tsg.HACKGetPrivateTx()
 	log.L(ctx).Debugf("AttestationStage.PerformAction tx: %s", tx.ID.String())
 
@@ -148,7 +149,7 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		}
 		if toBeComplete {
 			for _, party := range ap.GetParties() {
-				message := types.StageEvent{
+				message := enginespi.StageEvent{
 					Stage:           as.Name(),
 					Data:            ap.GetPayload(),
 					ContractAddress: tx.Inputs.Domain,
@@ -160,10 +161,11 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 					log.L(ctx).Errorf("Failed to marshal message payload: %s", err)
 					return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
 				}
-				err = sfs.TransportManager().Send(ctx, components.TransportMessage{
+				err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
 					MessageType: "endorsementRequest",
+					Destination: types.PrivateIdentityLocator(party),
 					Payload:     messageBytes,
-				}, party)
+				})
 				if err != nil {
 					//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
 					log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)

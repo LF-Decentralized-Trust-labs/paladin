@@ -25,8 +25,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/engine/controller"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/engine/stages"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
@@ -106,7 +106,7 @@ type Orchestrator struct {
 	persistenceRetryTimeout time.Duration
 
 	StageController controller.StageController
-	sequencer       types.Sequencer
+	sequencer       enginespi.Sequencer
 
 	// each orchestrator has its own go routine
 	initiated       time.Time     // when orchestrator is created
@@ -144,7 +144,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.AllComponents, domainAPI components.DomainSmartContract, publisher types.Publisher, sequencer types.Sequencer) *Orchestrator {
+func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract, publisher enginespi.Publisher, sequencer enginespi.Sequencer) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -169,7 +169,7 @@ func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress stri
 
 	newOrchestrator.sequencer = sequencer
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, types.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &types.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, enginespi.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &enginespi.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
 		&stages.DispatchStage{},
 		stages.NewAttestationStage(sequencer),
@@ -314,7 +314,7 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tsm transacti
 	return false
 }
 
-func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *types.StageEvent) {
+func (oc *Orchestrator) HandleEvent(ctx context.Context, stageEvent *enginespi.StageEvent) {
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
 	txProc := oc.incompleteTxSProcessMap[stageEvent.TxID]
@@ -373,7 +373,7 @@ func (oc *Orchestrator) TriggerOrchestratorEvaluation() {
 	}
 }
 
-func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status types.TxStatus, err error) {
+func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status enginespi.TxStatus, err error) {
 	//TODO This is primarily here to help with testing for now
 	// this needs to be revisited ASAP as part of a holisitic review of the persistence model
 	oc.incompleteTxProcessMapMutex.Lock()
@@ -382,5 +382,5 @@ func (oc *Orchestrator) GetTxStatus(ctx context.Context, txID string) (status ty
 		return txProc.GetTxStatus(ctx)
 	}
 	//TODO should be possible to query the status of a transaction that is not inflight
-	return types.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
+	return enginespi.TxStatus{}, i18n.NewError(ctx, msgs.MsgEngineInternalError)
 }

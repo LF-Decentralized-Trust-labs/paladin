@@ -24,7 +24,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
+	"github.com/kaleido-io/paladin/kata/internal/components"
 	"github.com/kaleido-io/paladin/kata/internal/statestore"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/pkg/persistence"
@@ -54,12 +54,12 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 	}
 
 	// Blockchain stuff is always mocked
-	preMocks := componentmocks.NewPreInitComponents(t)
-	preMocks.On("EthClientFactory").Return(mc.ethClientFactory)
+	componentMocks := componentmocks.NewAllComponents(t)
+	componentMocks.On("EthClientFactory").Return(mc.ethClientFactory)
 	mc.ethClientFactory.On("ChainID").Return(int64(12345)).Maybe()
 	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
 	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
-	preMocks.On("BlockIndexer").Return(mc.blockIndexer)
+	componentMocks.On("BlockIndexer").Return(mc.blockIndexer)
 
 	var p persistence.Persistence
 	var err error
@@ -68,7 +68,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 		p, pDone, err = persistence.NewUnitTestPersistence(ctx)
 		assert.NoError(t, err)
 		realStateStore := statestore.NewStateStore(ctx, &statestore.Config{}, p)
-		preMocks.On("StateStore").Return(realStateStore)
+		componentMocks.On("StateStore").Return(realStateStore)
 	} else {
 		mp, err := mockpersistence.NewSQLMockProvider()
 		assert.NoError(t, err)
@@ -77,7 +77,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 		pDone = func() {
 			assert.NoError(t, mp.Mock.ExpectationsWereMet())
 		}
-		preMocks.On("StateStore").Return(mc.stateStore)
+		componentMocks.On("StateStore").Return(mc.stateStore)
 		mridc := mc.stateStore.On("RunInDomainContext", mock.Anything, mock.Anything)
 		mridc.Run(func(args mock.Arguments) {
 			mridc.Return((args[1].(statestore.DomainContextFunction))(
@@ -91,14 +91,16 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 			))
 		}).Maybe()
 	}
-	preMocks.On("Persistence").Return(p)
+	componentMocks.On("Persistence").Return(p)
 
 	for _, fn := range extraSetup {
 		fn(mc)
 	}
 
 	dm := NewDomainManager(ctx, conf)
-	initInstructions, err := dm.Init(preMocks)
+	initInstructions, err := dm.PreInit(componentMocks)
+	assert.NoError(t, err)
+	err = dm.PostInit(componentMocks)
 	assert.NoError(t, err)
 	assert.Len(t, initInstructions.EventStreams, 1)
 
@@ -116,8 +118,8 @@ func TestConfiguredDomains(t *testing.T) {
 	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Plugin: plugins.PluginConfig{
-					Type:    plugins.LibraryTypeCShared.Enum(),
+				Plugin: components.PluginConfig{
+					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
 			},
@@ -125,9 +127,9 @@ func TestConfiguredDomains(t *testing.T) {
 	})
 	defer done()
 
-	assert.Equal(t, map[string]*plugins.PluginConfig{
+	assert.Equal(t, map[string]*components.PluginConfig{
 		"test1": {
-			Type:    plugins.LibraryTypeCShared.Enum(),
+			Type:    components.LibraryTypeCShared.Enum(),
 			Library: "some/where",
 		},
 	}, dm.ConfiguredDomains())

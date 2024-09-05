@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/types"
+	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
 	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
@@ -101,13 +101,10 @@ func TestNewOrchestratorPolling(t *testing.T) {
 func TestNewOrchestratorPollingContextCancelled(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	mockManagedTx1 := &baseTypes.ManagedTX{
-		ID:     uuid.New().String(),
-		Status: baseTypes.BaseTxStatusPending,
 		Transaction: &ethsigner.Transaction{
 			From:  json.RawMessage(testMainSigningAddress),
 			Nonce: ethtypes.NewHexInteger64(1),
 		},
-		Created: fftypes.Now(),
 	}
 
 	qFields := &ffapi.QueryFields{}

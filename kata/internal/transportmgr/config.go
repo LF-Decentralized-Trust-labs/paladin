@@ -12,18 +12,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+package transportmgr
 
-syntax = "proto3";
+import (
+	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+)
 
-package protos.InterPaladinTransport;
-option go_package = "pkg/plugins/proto";
-
-service InterPaladinTransport {
-  rpc SendInterPaladinMessage(InterPaladinMessage) returns (Empty) {}
+type TransportManagerConfig struct {
+	NodeName   string                      `yaml:"nodeName"`
+	Transports map[string]*TransportConfig `yaml:"transports"`
 }
 
-message Empty {}
+type TransportInitConfig struct {
+	Retry retry.Config `yaml:"retry"`
+}
 
-message InterPaladinMessage {
-  bytes payload = 1;
+type TransportConfig struct {
+	Init   TransportInitConfig     `yaml:"init"`
+	Plugin components.PluginConfig `yaml:"plugin"`
+	Config map[string]any          `yaml:"config"`
 }

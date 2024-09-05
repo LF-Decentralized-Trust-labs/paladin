@@ -20,22 +20,22 @@ import (
 	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/engine/types"
+	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/kata/internal/msgs"
 	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
 	"github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type AssembleStage struct {
-	sequencer types.Sequencer
+	sequencer enginespi.Sequencer
 	nodeID    string
 	lock      sync.Mutex
 }
 
-func NewAssembleStage(sequencer types.Sequencer, nodeID string) *AssembleStage {
+func NewAssembleStage(sequencer enginespi.Sequencer, nodeID string) *AssembleStage {
 	return &AssembleStage{
 		sequencer: sequencer,
 		nodeID:    nodeID,
@@ -45,7 +45,7 @@ func (as *AssembleStage) Name() string {
 	return "assemble"
 }
 
-func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) *types.TxProcessPreReq {
+func (as *AssembleStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 	//TODO for now we don't have any pre-reqs for assemble stage
 
 	return nil
@@ -62,10 +62,10 @@ func stateIDs(states []*components.FullState) []string {
 	return stateIDs
 }
 
-func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService, stageEvents []*types.StageEvent) (unprocessedStageEvents []*types.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep types.StageProcessNextStep) {
+func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
 	tx := tsg.HACKGetPrivateTx()
 
-	unprocessedStageEvents = []*types.StageEvent{}
+	unprocessedStageEvents = []*enginespi.StageEvent{}
 	if len(stageEvents) > 0 {
 		for _, event := range stageEvents {
 
@@ -82,17 +82,17 @@ func (as *AssembleStage) ProcessEvents(ctx context.Context, tsg transactionstore
 					log.L(ctx).Errorf("HandleTransactionAssembledEvent failed: %s", err)
 					panic("todo")
 				}
-				return nil, nil, types.NextStepNewStage
+				return nil, nil, enginespi.NextStepNewStage
 			default:
 				unprocessedStageEvents = append(unprocessedStageEvents, event)
 			}
 		}
-		return stageEvents, nil, types.NextStepNewStage
+		return stageEvents, nil, enginespi.NextStepNewStage
 	}
-	return nil, nil, types.NextStepWait
+	return nil, nil, enginespi.NextStepWait
 }
 
-func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) bool {
+func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
 
 	// if we have a private transaction but do not have a post assemble payload, we are in the assemble stage
@@ -100,7 +100,7 @@ func (as *AssembleStage) MatchStage(ctx context.Context, tsg transactionstore.Tx
 
 }
 
-func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs types.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (as *AssembleStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	// temporary hack.  components.PrivateTx should be passed in as a parameter
 	tx := tsg.HACKGetPrivateTx()
 	log.L(ctx).Debugf("AssembleStage.PerformAction tx: %s", tx.ID.String())
