@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/wrapperspb"

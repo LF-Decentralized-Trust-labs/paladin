@@ -32,7 +32,7 @@ public class TestStartTestbedWithNoopDomains {
         System.out.println(System.getProperty("java.library.path"));
 
         Testbed testBed = new Testbed(
-                new Testbed.Setup("../kata/db/migrations/sqlite", 5000),
+                new Testbed.Setup("../core/go/db/migrations/sqlite", 5000),
                 new Testbed.ConfigDomain(
                         "domain1",
                         new Testbed.ConfigPlugin("c-shared", "starter", ""),

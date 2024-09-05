@@ -17,7 +17,7 @@
 package httpserver
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/tls"
+	"github.com/kaleido-io/paladin/core/internal/tls"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 )
 

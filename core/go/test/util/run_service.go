@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/core/pkg/kata"
 	"github.com/stretchr/testify/require"
 )
 

@@ -21,7 +21,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
+	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"

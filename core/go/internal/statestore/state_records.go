@@ -18,7 +18,7 @@ package statestore
 
 import (
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/pkg/types"
 )
 
 // State record can be updated before, during and after confirm records are written

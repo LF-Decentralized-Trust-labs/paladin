@@ -23,12 +23,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	engineTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/mocks/componentmocks"
-	pbEngine "github.com/kaleido-io/paladin/kata/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/internal/components"
+	engineTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/internal/statestore"
+	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
+	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -460,7 +460,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	}).Return(nil)
 
 	endorsementRequests := make(chan string, 10)
-	//mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.AnythingOfType("github.com/kaleido-io/paladin/kata/internal/components.TransportMessage")).Run(func(args mock.Arguments) {
+	//mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.AnythingOfType("github.com/kaleido-io/paladin/core/internal/components.TransportMessage")).Run(func(args mock.Arguments) {
 	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		transportMessage := args.Get(1)
 		switch transportMessage := transportMessage.(type) {

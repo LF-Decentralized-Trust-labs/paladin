@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/commsbus"
+	"github.com/kaleido-io/paladin/core/internal/commsbus"
 	"github.com/stretchr/testify/require"
 )
 

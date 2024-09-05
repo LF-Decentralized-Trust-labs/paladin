@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/kaleido-io/paladin/kata/pkg/kata"
+	"github.com/kaleido-io/paladin/core/pkg/kata"
 )
 
 // Runs until an error occurs, or interrupted via a signal, or calling of the Stop() function

@@ -15,7 +15,7 @@
 
 package transaction
 
-import "github.com/kaleido-io/paladin/kata/pkg/persistence"
+import "github.com/kaleido-io/paladin/core/pkg/persistence"
 
 type Config struct {
 	Persistence persistence.Config `yaml:"persistence"`

@@ -15,7 +15,7 @@
 package registrymgr
 
 import (
-	"github.com/kaleido-io/paladin/kata/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 )
 

@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
-	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
+	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

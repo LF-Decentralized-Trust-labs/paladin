@@ -24,12 +24,12 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/key"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
-	sepc256k1Signer "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/secp256k1"
-	zkpSigner "github.com/kaleido-io/paladin/kata/pkg/signer/in-memory/snark"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/keystore"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/proto"
+	"github.com/kaleido-io/paladin/core/pkg/signer/api"
+	sepc256k1Signer "github.com/kaleido-io/paladin/core/pkg/signer/in-memory/secp256k1"
+	zkpSigner "github.com/kaleido-io/paladin/core/pkg/signer/in-memory/snark"
+	"github.com/kaleido-io/paladin/core/pkg/signer/keystore"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 )
 

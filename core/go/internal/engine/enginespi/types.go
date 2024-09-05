@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/statestore"
-	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/statestore"
+	"github.com/kaleido-io/paladin/core/internal/transactionstore"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
 )
 
 type StageProcessNextStep int

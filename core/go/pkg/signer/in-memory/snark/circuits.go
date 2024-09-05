@@ -22,7 +22,7 @@ import (
 
 	"github.com/iden3/go-rapidsnark/witness/v2"
 	"github.com/iden3/go-rapidsnark/witness/wasmer"
-	"github.com/kaleido-io/paladin/kata/pkg/signer/api"
+	"github.com/kaleido-io/paladin/core/pkg/signer/api"
 )
 
 func loadCircuit(circuitName string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {

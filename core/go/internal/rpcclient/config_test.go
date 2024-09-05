@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/tls"
+	"github.com/kaleido-io/paladin/core/internal/tls"
 	"github.com/stretchr/testify/assert"
 )
 

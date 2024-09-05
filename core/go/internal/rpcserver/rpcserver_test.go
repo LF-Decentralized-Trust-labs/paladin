@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/httpserver"
+	"github.com/kaleido-io/paladin/core/internal/httpserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 )

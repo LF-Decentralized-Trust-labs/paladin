@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 

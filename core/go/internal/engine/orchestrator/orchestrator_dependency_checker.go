@@ -18,8 +18,8 @@ package orchestrator
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
-	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
+	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 )
 
 // dependency checker functions are used to efficiently figure out the states of pre-req transactions based on their tx IDs

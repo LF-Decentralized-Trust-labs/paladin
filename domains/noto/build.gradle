@@ -38,7 +38,7 @@ configurations {
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
     toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
-    kataProtoCompiled project(path: ":kata", configuration: "protoCompiled")
+    kataProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
 }
 
 task copySolidity(type: Copy) {

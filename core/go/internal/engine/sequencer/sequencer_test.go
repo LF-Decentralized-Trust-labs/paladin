@@ -22,10 +22,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
-	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto/sequence"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

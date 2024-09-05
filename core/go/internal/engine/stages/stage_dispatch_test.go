@@ -19,9 +19,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/transactionstore"
-	"github.com/kaleido-io/paladin/kata/mocks/enginemocks"
+	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/transactionstore"
+	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -33,6 +33,7 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace github.com/kaleido-io/paladin/kata => ../../kata
+replace github.com/kaleido-io/paladin/core => ../../core/go
+
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit_go

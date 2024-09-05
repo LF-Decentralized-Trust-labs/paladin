@@ -24,8 +24,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	baseTypes "github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	baseTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 )
 
 type inMemoryTxState struct {

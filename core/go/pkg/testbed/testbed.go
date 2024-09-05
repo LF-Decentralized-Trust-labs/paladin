@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/componentmgr"
-	"github.com/kaleido-io/paladin/kata/internal/components"
-	"github.com/kaleido-io/paladin/kata/internal/domainmgr"
-	"github.com/kaleido-io/paladin/kata/internal/plugins"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
+	"github.com/kaleido-io/paladin/core/internal/componentmgr"
+	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/domainmgr"
+	"github.com/kaleido-io/paladin/core/internal/plugins"
+	"github.com/kaleido-io/paladin/core/internal/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 

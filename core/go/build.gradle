@@ -28,11 +28,11 @@ ext {
     targetCoverage = 94.3
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
-        'github.com/kaleido-io/paladin/kata/pkg/proto',
-        'github.com/kaleido-io/paladin/kata/pkg/proto/transaction',
+        'github.com/kaleido-io/paladin/core/pkg/proto',
+        'github.com/kaleido-io/paladin/core/pkg/proto/transaction',
         'github.com/kaleido-io/paladin/toolkit/prototk',
-        'github.com/kaleido-io/paladin/kata/internal/plugins/loader',
-        'github.com/kaleido-io/paladin/kata/pkg/testbed',
+        'github.com/kaleido-io/paladin/core/internal/plugins/loader',
+        'github.com/kaleido-io/paladin/core/pkg/testbed',
     ]
 }
 
@@ -351,7 +351,7 @@ abstract class ComponentTest extends Exec {
         args 'test'
         args './componenttest', './pkg/testbed'
         args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/kata/..." // toolkit handled seperately
+        args "-coverpkg=github.com/kaleido-io/paladin/core/..." // toolkit handled seperately
         args '-covermode=atomic'
         args '-timeout=120s'
         args "-test.gocoverdir=${project.projectDir}/coverage"
@@ -432,7 +432,7 @@ task checkCoverage(dependsOn: [aggregateCoverage]) {
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
             throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
         } else if ( totalCoverage.toFloat() - targetCoverage > maxCoverageBarGap) {
-            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./kata/build.gradle file")
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./core/go/build.gradle file")
         } else {
             println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
         }

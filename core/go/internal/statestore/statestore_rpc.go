@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/kata/internal/filters"
-	"github.com/kaleido-io/paladin/kata/internal/rpcserver"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/internal/filters"
+	"github.com/kaleido-io/paladin/core/internal/rpcserver"
+	"github.com/kaleido-io/paladin/core/pkg/types"
 )
 
 func (ss *stateStore) RPCModule() *rpcserver.RPCModule {

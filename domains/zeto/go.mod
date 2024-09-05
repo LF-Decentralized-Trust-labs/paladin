@@ -9,7 +9,7 @@ require (
 	github.com/hyperledger/firefly-signer v1.1.14
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/kaleido-io/paladin/domains/common v0.0.0-00010101000000-000000000000
-	github.com/kaleido-io/paladin/kata v0.0.0-00010101000000-000000000000
+	github.com/kaleido-io/paladin/core v0.0.0-00010101000000-000000000000
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/protobuf v1.34.2
@@ -109,7 +109,7 @@ require (
 	gorm.io/gorm v1.25.11 // indirect
 )
 
-replace github.com/kaleido-io/paladin/kata => ../../kata
+replace github.com/kaleido-io/paladin/core => ../../core/go
 
 replace github.com/hyperledger-labs/zeto/go-sdk => ../../zeto/go-sdk
 

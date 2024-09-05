@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/kaleido-io/paladin/kata/internal/engine/enginespi"
+	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 

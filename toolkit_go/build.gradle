@@ -186,7 +186,7 @@ task checkCoverage(dependsOn: [tasks.aggregateCoverage]) {
         if (totalCoverage && totalCoverage.toFloat() < targetCoverage) {
             throw new GradleException("ERROR: Coverage is below ${targetCoverage}% (current coverage: ${totalCoverage}%)")
         } else if ( totalCoverage.toFloat() - targetCoverage > maxCoverageBarGap) {
-            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./kata/build.gradle file")
+            throw new GradleException("ERROR: The target coverage ${targetCoverage}% is below the current coverage: ${totalCoverage}% for more than ${maxCoverageBarGap}%, please update the targetCoverage value in ./core/go/build.gradle file")
         } else {
             println "Coverage is above ${targetCoverage}%, current coverage: ${totalCoverage}%"
         }

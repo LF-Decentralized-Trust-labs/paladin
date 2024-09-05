@@ -18,7 +18,7 @@ package api
 import (
 	"context"
 
-	"github.com/kaleido-io/paladin/kata/pkg/proto"
+	"github.com/kaleido-io/paladin/core/pkg/proto"
 )
 
 type InMemorySigner interface {

@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/kata/internal/msgs"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 )
 
 // HexBytes is byte slice that is formatted in JSON with an 0x prefix, and stored in the DB as hex

@@ -14,7 +14,7 @@ task wrapper(type: Wrapper){}
 
 application {
     applicationDefaultJvmArgs = ["-Djna.library.path=" +
-        file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath ]
+        file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath ]
 }
 
 repositories {
@@ -26,7 +26,7 @@ test {
         showStandardStreams = true
     }
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/kata").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit_go").absolutePath
 }
 
 configurations {
@@ -63,7 +63,7 @@ tasks.named('processResources') {
 }
 
 tasks.named('processResources') {
-    dependsOn ':kata:protoc'
+    dependsOn ':core:go:protoc'
 }
 
 tasks.named('clean') {
@@ -87,7 +87,7 @@ dependencies {
 
     toolkitProtoDefinitions project(path: ":toolkit_proto", configuration: "protoDefinitions")
 
-    testImplementation project(path: ":kata", configuration: "libkata")
+    testImplementation project(path: ":core:go", configuration: "libkata")
     testImplementation project(path: ":toolkit_go", configuration: "libstarter")
     testImplementation project(path: ":solidity", configuration: "compiledContracts")
 

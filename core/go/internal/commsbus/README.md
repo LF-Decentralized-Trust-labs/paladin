@@ -2,7 +2,7 @@
 
 Package commsbus provides a message broker that facilitates communication between different components and a gRPC interface 
 to allow communication with components that are developed in different programming langagues.  Components within the 
-`github.com/kaleido-io/paladin/kata` module are expected to use the `broker` interface ( although nothing to stop them using gRPC)
+`github.com/kaleido-io/paladin/core` module are expected to use the `broker` interface ( although nothing to stop them using gRPC)
 and other components, whichever language they are developed in, are expected to use gRPc. 
  
 It allows sending messages to specific destinations or broadcasting messages to all destinations subscribed to a topic.
@@ -64,7 +64,7 @@ However, following a convention as above to define and document all message type
 Construct the body as any you would for any golang object, using the go types that were genenerated from the `.proto` files and then assign that object to the `Body` field of the message.
 e.g.
 ```golang
-import	pb "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
+import	pb "github.com/kaleido-io/paladin/core/pkg/proto/plugin"
 
 createInstanceMessage := &pb.CreateInstance{
 	...
@@ -82,12 +82,12 @@ err := p.commsBus.Broker().SendMessage(ctx, busMessage)
 The body of the message is a `google.protobuf.Any` which is a serialised encoding of the data and the type.  The way you would marshal depends on your programming language.
 
 ##### Golang
-Construct the golang object for the mesage body using the go types that were generated from the .proto files and then use that object to construct the `github.com/kaleido-io/paladin/kata/pkg/proto.Message` by first converting it to a `google.golang.org/protobuf/types/known/anypb.Any`  e.g. ...
+Construct the golang object for the mesage body using the go types that were generated from the .proto files and then use that object to construct the `github.com/kaleido-io/paladin/core/pkg/proto.Message` by first converting it to a `google.golang.org/protobuf/types/known/anypb.Any`  e.g. ...
 
 ```golang
 import (
-	pb "github.com/kaleido-io/paladin/kata/pkg/proto"
-	transactionsPB "github.com/kaleido-io/paladin/kata/pkg/proto/transaction"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto"
+	transactionsPB "github.com/kaleido-io/paladin/core/pkg/proto/transaction"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 ...
@@ -143,7 +143,7 @@ The body of the message is a `google.protobuf.Any` which is a serialised encodin
 The type of the message should correspond to the name of the `message` in the .proto file, qualified by the name of the `package`.  E.g. the type for a `NewListenerEvent` event from the main kata.proto file is `github.com.kaleido_io.paladin.kata.NewListenerEvent` and the type for a `PluginReadyEvent` from the `plugin.proto` file is `github.com.kaleido_io.paladin.kata.plugin.PluginReadyEvent`
 
 ##### Golang
-To unpack the type the payload, assuming `receivedMessage` is a `Message` object as defined by the generated code in `github.com/kaleido-io/paladin/kata/pkg/proto`
+To unpack the type the payload, assuming `receivedMessage` is a `Message` object as defined by the generated code in `github.com/kaleido-io/paladin/core/pkg/proto`
 ```golang
  receivedBody1, err := receivedMessage.GetBody().UnmarshalNew
 ```
@@ -208,8 +208,8 @@ and compare it to what you expected using TypeFor
 ```golang
 import (
   "reflect"
-  pluginPB "github.com/kaleido-io/paladin/kata/pkg/proto/plugin"
-  kataPB "github.com/kaleido-io/paladin/kata/pkg/proto"
+  pluginPB "github.com/kaleido-io/paladin/core/pkg/proto/plugin"
+  kataPB "github.com/kaleido-io/paladin/core/pkg/proto"
 )
 ...
 if reflect.TypeOf(receivedEvent.Body) == reflect.TypeFor[*pluginPB.PluginReadyEvent]
