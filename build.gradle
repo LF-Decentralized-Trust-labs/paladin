@@ -4,3 +4,29 @@ plugins {
 
 group = 'io.kaleido'
 version = '1.0-SNAPSHOT'
+
+ext {
+    testInfraLocks = []
+
+    lockTestInfra = { task ->
+        // Add this task to the end of the list of tasks that need the shared test infra
+        task.mustRunAfter(*testInfraLocks)
+        testInfraLocks << task.path
+    }
+
+    dumpLogsOnFailure = { task, dockerTaskPath ->
+        // If invoked with -PcomposeLogs=true and the given Exec task fails, look up the
+        // DockerCompose task specified, and ask it to dump logs
+        task.ignoreExitValue(true)
+        task.doLast {
+            def execResult = getExecutionResult().get()
+            def composeLogs = project.findProperty('composeLogs')
+            if (execResult.exitValue != 0 && composeLogs == "true") {
+                def docker = project.tasks.getByPath(dockerTaskPath)
+                println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
+                docker.dumpLogs()
+            }
+            execResult.assertNormalExitValue()
+        }
+    }
+}

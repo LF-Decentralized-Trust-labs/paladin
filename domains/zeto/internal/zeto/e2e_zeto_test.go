@@ -25,12 +25,15 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
-	"github.com/kaleido-io/paladin/kata/pkg/testbed"
-	"github.com/kaleido-io/paladin/kata/pkg/types"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,16 +47,16 @@ var testZetoConfigYaml []byte
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return result
 }
 
-func yamlConfig(t *testing.T, config *Config) (yn yaml.Node) {
-	configYAML, err := yaml.Marshal(&config)
-	assert.NoError(t, err)
-	err = yaml.Unmarshal(configYAML, &yn)
-	assert.NoError(t, err)
-	return yn
+func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
+	configJSON, err := json.Marshal(&config)
+	require.NoError(t, err)
+	err = json.Unmarshal(configJSON, &m)
+	require.NoError(t, err)
+	return m
 }
 
 func newTestDomain(t *testing.T, domainName string, tokenName string, config *Config, domainContracts *zetoDomainContracts) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
@@ -68,11 +71,11 @@ func newTestDomain(t *testing.T, domainName string, tokenName string, config *Co
 	})
 	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
 		domainName: {
-			Config: yamlConfig(t, config),
+			Config: mapConfig(t, config),
 			Plugin: plugin,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, domain, rpc
 }
@@ -80,7 +83,7 @@ func newTestDomain(t *testing.T, domainName string, tokenName string, config *Co
 func TestZeto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestZeto")
-	domainName := "zeto_" + types.RandHex(8)
+	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
 	log.L(ctx).Infof("Deploying Zeto libraries+factory")
@@ -128,11 +131,11 @@ func TestZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
 	var boolResult bool
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
-		Inputs: toJSON(t, &ZetoMintParams{
+		To:       tktypes.EthAddress(zetoAddress),
+		Function: *types.ZetoABI.Functions()["mint"],
+		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(10),
 		}),
@@ -143,17 +146,17 @@ func TestZeto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	coins, err := zeto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 1)
+	require.NoError(t, err)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
 	assert.Equal(t, controllerName, coins[0].Owner)
 
 	log.L(ctx).Infof("Mint 20 from controller to controller")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
-		Inputs: toJSON(t, &ZetoMintParams{
+		To:       tktypes.EthAddress(zetoAddress),
+		Function: *types.ZetoABI.Functions()["mint"],
+		Inputs: toJSON(t, &types.MintParams{
 			To:     controllerName,
 			Amount: ethtypes.NewHexInteger64(20),
 		}),
@@ -164,33 +167,33 @@ func TestZeto(t *testing.T) {
 	assert.True(t, boolResult)
 
 	coins, err = zeto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
-	assert.Len(t, coins, 2)
+	require.NoError(t, err)
+	require.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
 	assert.Equal(t, controllerName, coins[0].Owner)
 	assert.Equal(t, int64(20), coins[1].Amount.Int64())
 	assert.Equal(t, controllerName, coins[1].Owner)
 
 	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     recipient1Name,
-		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["mint"].ABI,
-		Inputs: toJSON(t, &ZetoMintParams{
+		To:       tktypes.EthAddress(zetoAddress),
+		Function: *types.ZetoABI.Functions()["mint"],
+		Inputs: toJSON(t, &types.MintParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(10),
 		}),
 	})
-	assert.NotNil(t, rpcerr)
+	require.NotNil(t, rpcerr)
 	assert.EqualError(t, rpcerr.Error(), "failed to send base ledger transaction: Execution reverted")
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &types.PrivateContractInvoke{
+	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
-		To:       types.EthAddress(zetoAddress),
-		Function: *zeto.Interface["transfer"].ABI,
-		Inputs: toJSON(t, &ZetoTransferParams{
+		To:       tktypes.EthAddress(zetoAddress),
+		Function: *types.ZetoABI.Functions()["transfer"],
+		Inputs: toJSON(t, &types.TransferParams{
 			To:     recipient1Name,
 			Amount: ethtypes.NewHexInteger64(25),
 		}),

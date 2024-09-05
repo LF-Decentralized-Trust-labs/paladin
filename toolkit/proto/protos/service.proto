@@ -1,0 +1,175 @@
+/*
+ * Copyright © 2024 Kaleido, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+syntax = "proto3";
+
+package github.com.kaleido_io.paladin.toolkit;
+
+import "to_domain.proto";
+import "from_domain.proto";
+import "to_transport.proto";
+import "from_transport.proto";
+import "to_registry.proto";
+import "from_registry.proto";
+
+message Header {
+  enum MessageType {
+    REGISTER = 0;
+    ERROR_RESPONSE = 1;
+    REQUEST_TO_PLUGIN = 2;
+    RESPONSE_FROM_PLUGIN = 3;
+    REQUEST_FROM_PLUGIN= 4;
+    RESPONSE_TO_PLUGIN = 5;
+  }
+  string plugin_id = 1; // unique runtime identifier for this domain
+  string message_id = 2; // a unique identifier for this message
+  optional string correlation_id = 3; // for replies the identifier of the request (for publications TBD)
+  optional string error_message = 4;
+  MessageType message_type = 5;
+}
+
+message DomainMessage {
+  Header header = 1;
+  // Request/reply exchanges initiated by the paladin node, to the domain
+  oneof request_to_domain {
+    ConfigureDomainRequest      configure_domain =          1010;
+    InitDomainRequest           init_domain =               1020;
+    InitDeployRequest           init_deploy =               1030;
+    PrepareDeployRequest        prepare_deploy =            1040;
+    InitTransactionRequest      init_transaction =          1050;
+    AssembleTransactionRequest  assemble_transaction =      1060;
+    EndorseTransactionRequest   endorse_transaction =       1070;
+    PrepareTransactionRequest   prepare_transaction =       1080;
+  }
+
+  oneof response_from_domain {
+    ConfigureDomainResponse     configure_domain_res =      1011;
+    InitDomainResponse          init_domain_res =           1021;
+    InitDeployResponse          init_deploy_res =           1031;
+    PrepareDeployResponse       prepare_deploy_res =        1041;
+    InitTransactionResponse     init_transaction_res =      1051;
+    AssembleTransactionResponse assemble_transaction_res =  1061;
+    EndorseTransactionResponse  endorse_transaction_res =   1071;
+    PrepareTransactionResponse  prepare_transaction_res =   1081;
+  }
+
+  // Request/reply exchanges initiated by the domain, to the paladin node
+  oneof request_from_domain {
+    FindAvailableStatesRequest  find_available_states =     2010;
+  }
+
+  oneof response_to_domain {
+    FindAvailableStatesResponse find_available_states_res = 2011;
+  }
+    
+}
+
+message TransportMessage {
+  Header header = 1;
+
+  oneof request_to_transport {
+    ConfigureTransportRequest configure_transport =         1010;
+    SendMessageRequest send_message =                       1020;
+  }
+
+  oneof response_from_transport {
+    ConfigureTransportResponse configure_transport_res =    1011;
+    SendMessageResponse send_message_res =                  1021;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_transport {
+    GetTransportDetailsRequest get_transport_details =      2010;
+    ReceiveMessageRequest receive_message =                 2020;
+  }
+
+  oneof response_to_transport {
+    GetTransportDetailsResponse get_transport_details_res = 2011;
+    ReceiveMessageResponse receive_message_res =            2021;
+  }
+}
+
+message RegistryMessage {
+  Header header = 1;
+
+  oneof request_to_registry {
+    ConfigureRegistryRequest configure_registry =                   1010;
+  }
+
+  oneof response_from_registry {
+    ConfigureRegistryResponse configure_registry_res =              1011;
+  }
+
+  // Request/reply exchanges initiated by the transport, to the paladin node
+  oneof request_from_registry {
+    UpsertTransportDetails upsert_transport_details =               2010;
+  }
+
+  oneof response_to_registry {
+    UpsertTransportDetailsResponse upsert_transport_details_res   = 2011;
+  }
+}
+
+// establishes the long-lived connection
+message PluginLoaderInit {
+  string id = 1; // UUID that is unique the plugin loader that it shared with the controller out of band to start the channel
+}
+
+message PluginInfo {
+  enum PluginType {
+    DOMAIN = 0;
+    TRANSPORT = 1;
+    REGISTRY = 2;
+  }
+  string id = 1; // UUID that is unique to this runtime instance of the domain
+  string name = 2; // The plugin manager ensures only once instance is loaded with this ID
+  PluginType plugin_type = 3; // The type of the plugin
+}
+
+message PluginLoadFailed {
+  PluginInfo plugin = 1; // The information about the plugin
+  string error_message = 2; // The error
+}
+
+message EmptyResponse {
+}
+
+// sent by the plugin controller to the plugin loader over its long lived channel
+message PluginLoad {
+  enum LibType {
+    C_SHARED = 0;
+    JAR = 1;
+  }
+  PluginInfo plugin = 1; // The information about the plugin
+  LibType lib_type = 2; // The binary type of the plugin
+  string lib_location = 3; // The location of the plugin (such as a Java Jar file or C library load spec)
+  optional string class = 4; // For JAR type we need to specify a class inside the Jar as well
+}
+
+service PluginController {
+  // The one-time init of the loader
+  rpc InitLoader(PluginLoaderInit) returns (stream PluginLoad) {}
+  // Notification of a load failure
+  rpc LoadFailed(PluginLoadFailed) returns (EmptyResponse) {}
+
+  // Connect as a domain plugin establishing the bidirectional stream of communications
+  rpc ConnectDomain(stream DomainMessage) returns (stream DomainMessage) {}
+
+  // Connect as a transport plugin establishing the bidirectional stream of communications
+  rpc ConnectTransport(stream TransportMessage) returns (stream TransportMessage) {}
+
+  // Connect as a registry plugin establishing the bidirectional stream of communications
+  rpc ConnectRegistry(stream RegistryMessage) returns (stream RegistryMessage) {}
+}

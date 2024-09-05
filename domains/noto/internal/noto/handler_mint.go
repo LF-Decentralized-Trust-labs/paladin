@@ -20,16 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type mintHandler struct {
-	domainHandler
+	noto *Noto
 }
 
 func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
-	var mintParams NotoMintParams
+	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
 	}
@@ -39,17 +41,17 @@ func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
 	if mintParams.Amount.BigInt().Sign() != 1 {
 		return nil, fmt.Errorf("parameter 'amount' must be greater than 0")
 	}
-	return mintParams, nil
+	return &mintParams, nil
 }
 
-func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	if req.Transaction.From != tx.domainConfig.NotaryLookup {
+func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	if req.Transaction.From != tx.DomainConfig.NotaryLookup {
 		return nil, fmt.Errorf("mint can only be initiated by notary")
 	}
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    tx.domainConfig.NotaryLookup,
+				Lookup:    tx.DomainConfig.NotaryLookup,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 			// TODO: should we also resolve "To" party?
@@ -57,11 +59,11 @@ func (h *mintHandler) Init(ctx context.Context, tx *parsedTransaction, req *pb.I
 	}, nil
 }
 
-func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.params.(NotoMintParams)
+func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
 
-	notary := findVerifier(tx.domainConfig.NotaryLookup, req.ResolvedVerifiers)
-	if notary == nil || notary.Verifier != tx.domainConfig.NotaryAddress {
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
@@ -81,13 +83,13 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *parsedTransaction, req *
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
 				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
-				Parties:         []string{tx.domainConfig.NotaryLookup},
+				Parties:         []string{tx.DomainConfig.NotaryLookup},
 			},
 		},
 	}, nil
 }
 
-func (h *mintHandler) validateAmounts(params *NotoMintParams, coins *gatheredCoins) error {
+func (h *mintHandler) validateAmounts(params *types.MintParams, coins *gatheredCoins) error {
 	if len(coins.inCoins) > 0 {
 		return fmt.Errorf("invalid inputs to 'mint': %v", coins.inCoins)
 	}
@@ -97,13 +99,13 @@ func (h *mintHandler) validateAmounts(params *NotoMintParams, coins *gatheredCoi
 	return nil
 }
 
-func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	params := tx.params.(NotoMintParams)
-	coins, err := h.gatherCoins(req.Inputs, req.Outputs)
+func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
+	coins, err := h.noto.gatherCoins(req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.validateAmounts(&params, coins); err != nil {
+	if err := h.validateAmounts(params, coins); err != nil {
 		return nil, err
 	}
 	return &pb.EndorseTransactionResponse{
@@ -111,7 +113,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *parsedTransaction, req *p
 	}, nil
 }
 
-func (h *mintHandler) Prepare(ctx context.Context, tx *parsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		outputs[i] = state.Id

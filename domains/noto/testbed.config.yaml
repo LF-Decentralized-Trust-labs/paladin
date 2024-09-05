@@ -1,9 +1,10 @@
+nodeName: node1
 db:
   type: sqlite
   sqlite:
     uri: ':memory:'
     autoMigrate: true
-    migrationsDir: '../../../../kata/db/migrations/sqlite'
+    migrationsDir: '../../../../core/go/db/migrations/sqlite'
 rpcServer:
   http:
     port: 0

@@ -1,0 +1,83 @@
+plugins {
+    id 'java'
+}
+
+group = 'io.kaleido'
+version = '1.0-SNAPSHOT'
+
+configurations {
+    // Resolvable configurations
+    toolkitProtoDefinitions {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    libcore {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+test {
+    testLogging {
+        showStandardStreams = true
+    }
+    useJUnitPlatform()
+    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
+}
+
+repositories {
+    maven {
+        url 'https://hyperledger.jfrog.io/hyperledger/besu-maven'
+        content { includeGroupByRegex('org\\.hyperledger\\..*') }
+    }
+    maven {
+        url 'https://artifacts.consensys.net/public/maven/maven/'
+        content { includeGroupByRegex('tech\\.pegasys(\\..*)?') }
+    }
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
+    mavenCentral()
+}
+
+def grpcVersion = '1.65+'
+def protobufVersion = '3.25+'
+
+dependencies {
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-services:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    implementation "io.grpc:grpc-netty:${grpcVersion}"
+    implementation "com.google.protobuf:protobuf-java-util:${protobufVersion}"
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
+
+    implementation 'io.netty:netty-all:4.1+'
+    implementation 'org.apache.logging.log4j:log4j-core:2.23+'
+
+    testImplementation project(path: ":core:go", configuration: "libcore")
+    testImplementation project(path: ":solidity", configuration: "compiledContracts")
+
+    testImplementation platform('org.junit:junit-bom:5.9+')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.mockito:mockito-core:5.12+'
+    testImplementation 'org.slf4j:slf4j-reload4j:2.0+'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17+'
+
+    implementation 'org.hyperledger.besu:evm:24.5.4'
+    implementation 'org.hyperledger.besu:besu-datatypes:24.5.4'
+    implementation 'org.hyperledger.besu.internal:trie:24.5.4'
+
+    implementation 'org.web3j:rlp:4+'
+    implementation 'org.web3j:core:4+'
+
+    implementation 'commons-io:commons-io:2.16.1'
+    implementation 'io.tmio:tuweni-bytes:2.4.2'
+    implementation 'io.tmio:tuweni-units:2.4.2'
+
+    implementation project(path: ":core:java")
+
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -18,6 +18,7 @@ import org.apache.tools.ant.taskdefs.condition.Os
 ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
+        include "pkg/**/*.go"
     }
     jsCircuits = "${rootDir}/zeto/zkp/circuits"
     zkpOut = "${projectDir}/zkp"
@@ -34,7 +35,7 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    kataProtoCompiled {
+    coreProtoCompiled {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -42,8 +43,8 @@ configurations {
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoCompiled project(path: ":toolkit_go", configuration: "protoCompiled")
-    kataProtoCompiled project(path: ":kata", configuration: "protoCompiled")
+    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
+    coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
 }
 
 task installZeto(type: Exec) {
@@ -141,7 +142,7 @@ task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
 
 task test(type: Exec) {
     inputs.files(configurations.toolkitProtoCompiled)
-    inputs.files(configurations.kataProtoCompiled)
+    inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
     inputs.file('./internal/zeto/zeto.config.yaml')
     outputs.dir('coverage')
@@ -151,6 +152,7 @@ task test(type: Exec) {
     args 'test'
     args '-v'
     args './internal/...'
+    args './pkg/...'
     args '-cover'
     args '-covermode=atomic'
     args '-timeout=30s'
@@ -159,6 +161,8 @@ task test(type: Exec) {
     dependsOn copySolidity
     dependsOn circuitsGen
     dependsOn ':testinfra:startTestInfra'
+    lockTestInfra(it)
+    dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task build {
