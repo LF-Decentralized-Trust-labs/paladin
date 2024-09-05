@@ -18,8 +18,11 @@ package github.com.kaleido_io.paladin.transports.grpc;
 option go_package = "pkg/proto";
 
 service PaladinGRPCTransport {
-  rpc MessageStream(stream Message) returns (stream Message) {}
+  // The sender of messages connects a unidirectional stream, and the server should hold it open for us indefinitely.
+  rpc ConnectSendStream(stream Message) returns (Empty) {}
 }
+
+message Empty {}
 
 message Message {
   string message_id = 1;

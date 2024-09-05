@@ -37,12 +37,8 @@ type Config struct {
 }
 
 var ConfigDefaults = &Config{
-	Address: confutil.P("0.0.0.0"), // public connectivity
-	TLS: tlsconf.Config{
-		Enabled:    true, // with TLS on by default
-		ClientAuth: true, // set to mutual-TLS
-	},
-	DirectCertVerification: confutil.P(true), // with self-signed certificates
+	Address:                confutil.P("0.0.0.0"), // public connectivity
+	DirectCertVerification: confutil.P(true),      // with self-signed certificates
 }
 
 // This is the JSON structure that any node in the network must share to be connectable

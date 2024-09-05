@@ -24,7 +24,7 @@ import (
 var registered = false
 var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey {
 	if !registered {
-		i18n.RegisterPrefix("PD02", "Paladin Toolkit")
+		i18n.RegisterPrefix("PD03", "Paladin GRPC Transport")
 		registered = true
 	}
 	return i18n.FFE(language.AmericanEnglish, key, translation, statusHint...)
@@ -38,7 +38,7 @@ var (
 	MsgInvalidSubjectRegexp                 = ffe("PD030003", "subjectMatchRegex is invalid")
 	MsgVerifierRequiresOneCert              = ffe("PD030004", "certificate verifier expected exactly one certificate from peer certs=%d")
 	MsgSubjectRegexpMismatch                = ffe("PD030005", "subjectMatchRegex did not match with exactly one additional capture group (expected=2,match=%d)")
-	MsgMTLSCannotBeDisabled                 = ffe("PD030006", "Mutual TLS cannot be disabled")
-	MsgPeerTransportDetailsInvalid          = ffe("PD030007", "published peer transport details for node '%s' are invalid")
-	MsgPeerCertificateInvalid               = ffe("PD030008", "peer '%s' did not provide a certificate signed by expected issuer expected=%s received=%s")
+	MsgPeerTransportDetailsInvalid          = ffe("PD030006", "published peer transport details for node '%s' are invalid")
+	MsgPeerCertificateInvalid               = ffe("PD030007", "peer '%s' did not provide a certificate signed by expected issuer expected=%s received=%s")
+	MsgTLSNegotiationFailed                 = ffe("PD030008", "TLS negotiation did not result in a verified peer node name")
 )

@@ -18,7 +18,6 @@ package grpctransport
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -30,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/kaleido-io/paladin/transports/grpc/internal/msgs"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
@@ -42,47 +42,47 @@ type Server interface {
 }
 
 type grpcTransport struct {
+	proto.UnimplementedPaladinGRPCTransportServer
+
 	bgCtx     context.Context
 	callbacks plugintk.TransportCallbacks
 
-	name string
+	name         string
+	listener     net.Listener
+	grpcServer   *grpc.Server
+	serverDone   chan struct{}
+	peerVerifier *tlsVerifier
 
-	conf        Config
-	connLock    sync.Mutex
-	connections map[string]*grpcConnection
+	conf                Config
+	connLock            sync.Cond
+	outboundConnections map[string]*outboundConn
 }
 
-type grpcConnectionListener struct {
-	net.Listener // this is the standard convention for overriding default listener
-	proto.UnimplementedPaladinGRPCTransportServer
-	t                      *grpcTransport
-	grpcServer             *grpc.Server
-	directCertVerification bool
-	subjectMatchRegex      *regexp.Regexp
-	serverDone             chan struct{}
-}
-
-type grpcConnection struct {
-	net.Conn         // we embed the TLS connection, and are the object available on transport.GetConnection from the gRPC server
-	bgCtx            context.Context
-	t                *grpcTransport
-	gcl              *grpcConnectionListener
-	transportDetails *PublishedTransportDetails
-	direction        string
-	node             string
-	cert             *x509.Certificate
+type outboundConn struct {
+	connecting bool
+	connError  error
+	stream     grpc.ClientStreamingClient[proto.Message, proto.Empty]
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
 	return plugintk.NewTransport(func(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
-		return &grpcTransport{bgCtx: ctx, callbacks: callbacks}
+		return newGRPCTransport(ctx, callbacks)
 	})
+}
+
+func newGRPCTransport(ctx context.Context, callbacks plugintk.TransportCallbacks) *grpcTransport {
+	return &grpcTransport{
+		bgCtx:               ctx,
+		callbacks:           callbacks,
+		connLock:            *sync.NewCond(new(sync.Mutex)),
+		outboundConnections: make(map[string]*outboundConn),
+	}
 }
 
 func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 	// Hold the connlock while setting our state (as we'll read it when creating new conns)
-	t.connLock.Lock()
-	defer t.connLock.Unlock()
+	t.connLock.L.Lock()
+	defer t.connLock.L.Unlock()
 
 	t.name = req.Name
 
@@ -97,19 +97,6 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	}
 	listenAddr = fmt.Sprintf("%s:%d", listenAddr, *t.conf.Port)
 
-	// TLS is the only way we know who we're talking to, and we are a privacy system, so it cannot be disabled
-	if !t.conf.TLS.Enabled || !t.conf.TLS.ClientAuth {
-		return nil, i18n.NewError(ctx, msgs.MsgMTLSCannotBeDisabled)
-	}
-
-	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
-	if directCertVerification {
-		// Check the tls default settings haven't been set with conflicting config
-		if t.conf.TLS.CAFile != "" || t.conf.TLS.CA != "" || t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
-			return nil, i18n.NewError(ctx, msgs.MsgConfIncompatibleWithDirectCertVerify)
-		}
-	}
-
 	var subjectMatchRegex *regexp.Regexp
 	certSubjectMatcher := confutil.StringOrEmpty(t.conf.CertSubjectMatcher, "")
 	if certSubjectMatcher != "" {
@@ -118,175 +105,168 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 		}
 	}
 
-	// We need to generate a connection for each accept, so we need to do our own
-	// TLS wrapping
-	l, err := net.Listen("tcp", listenAddr)
+	t.conf.TLS.Enabled = true
+	baseTLSConfig, err := tlsconf.BuildTLSConfig(ctx, &t.conf.TLS, tlsconf.ServerType)
 	if err != nil {
 		return nil, err
 	}
 
-	gcl := &grpcConnectionListener{
-		Listener:               l,
-		t:                      t,
-		directCertVerification: directCertVerification,
-		subjectMatchRegex:      subjectMatchRegex,
-		serverDone:             make(chan struct{}),
+	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
+	baseTLSConfig.InsecureSkipVerify = false
+	baseTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	if directCertVerification {
+		// Check the tls default settings haven't been set with conflicting config
+		if t.conf.TLS.CAFile != "" || t.conf.TLS.CA != "" || t.conf.TLS.InsecureSkipHostVerify || len(t.conf.TLS.RequiredDNAttributes) > 0 {
+			return nil, i18n.NewError(ctx, msgs.MsgConfIncompatibleWithDirectCertVerify)
+		}
+		// Set InsecureSkipVerify and RequireAnyClientCert to skip the default
+		// validation we are replacing. This will not disable VerifyConnection.
+		baseTLSConfig.InsecureSkipVerify = true
+		baseTLSConfig.ClientAuth = tls.RequireAnyClientCert
 	}
-	gcl.grpcServer = grpc.NewServer(grpc.Creds(gcl))
-	proto.RegisterPaladinGRPCTransportServer(gcl.grpcServer, gcl)
+
+	t.listener, err = net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	t.peerVerifier = &tlsVerifier{
+		tlsVerifierStatic: tlsVerifierStatic{
+			t:                      t,
+			directCertVerification: directCertVerification,
+			subjectMatchRegex:      subjectMatchRegex,
+		},
+		baseTLSConfig: baseTLSConfig,
+	}
+	t.grpcServer = grpc.NewServer(grpc.Creds(t.peerVerifier))
+	proto.RegisterPaladinGRPCTransportServer(t.grpcServer, t)
 
 	// Kick off the gRPC listener
-	go gcl.serve()
-
-	return nil, nil
-}
-
-func (gc *grpcConnection) tlsInit(rawConn net.Conn) (net.Conn, error) {
-	gc.t.connLock.Lock()
-	defer gc.t.connLock.Unlock()
-
-	// From this point we can log with the remote connection details
-	gc.bgCtx = log.WithLogField(gc.t.bgCtx, "remote", rawConn.RemoteAddr().String())
-
-	serverTlsConf, err := tlsconf.BuildTLSConfig(gc.bgCtx, &gc.t.conf.TLS, tlsconf.ServerType)
-	if err != nil {
-		return nil, err
+	if t.serverDone == nil {
+		t.serverDone = make(chan struct{})
+		go t.serve()
 	}
 
-	if gc.gcl.directCertVerification {
-		// Do not verify the remote certificate
-		serverTlsConf.ClientAuth = tls.RequireAnyClientCert
-	}
-
-	// Note we will only add ourselves to the list of connections if we can establish the
-	// identity of the other side as a result of a successful TLS handshake
-	serverTlsConf.VerifyPeerCertificate = gc.peerValidator
-
-	// We wrap the TLS server connection, so that transport.GetConnection gives us back
-	// at the gRPC interceptor layer.
-	gc.Conn, err = tls.Server(rawConn, serverTlsConf), nil
-	return gc, err
+	return &prototk.ConfigureTransportResponse{}, nil
 }
 
-// Override the accept on the listener to wrap in our connection
-func (gcl *grpcConnectionListener) Accept() (net.Conn, error) {
-	gc := &grpcConnection{
-		t:         gcl.t,
-		gcl:       gcl,
-		direction: "inbound",
-	}
-	c, err := gcl.Listener.Accept()
-	if err == nil {
-		c, err = gc.tlsInit(c)
-	}
-	return c, err
+// // Override the accept on the listener to wrap in our connection
+// func (gcl *grpcConnectionListener) Accept() (net.Conn, error) {
+// 	gc := &grpcConnection{
+// 		t:         gcl.t,
+// 		gcl:       gcl,
+// 		direction: "inbound",
+// 	}
+// 	c, err := gcl.Listener.Accept()
+// 	if err == nil {
+// 		c, err = gc.tlsInit(c)
+// 	}
+// 	return c, err
+// }
+
+func (t *grpcTransport) serve() {
+	defer close(t.serverDone)
+
+	log.L(t.bgCtx).Infof("gRPC server for plugin %s starting on %s", t.name, t.listener.Addr())
+	err := t.grpcServer.Serve(t.listener)
+	log.L(t.bgCtx).Infof("gRPC server for plugin %s stopped (err=%v)", t.name, err)
 }
 
-func (gcl *grpcConnectionListener) serve() {
-	defer close(gcl.serverDone)
-
-	log.L(gcl.t.bgCtx).Infof("gRPC server for plugin %s starting on %s", gcl.t.name, gcl.Listener.Addr())
-	err := gcl.grpcServer.Serve(gcl.Listener)
-	log.L(gcl.t.bgCtx).Infof("gRPC server for plugin %s stopped (err=%v)", gcl.t.name, err)
-}
-
-func (gcl *grpcConnectionListener) streamInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	// We need to get back to the conn
-	ss.Context()
-
-}
-
-func (gcl *grpcConnectionListener) MessageStream(stream grpc.BidiStreamingServer[proto.Message, proto.Message]) error {
-	ctx := stream.Context()
-	gc, ok := transport.GetConnection(ctx).(*grpcConnection)
-	if !ok {
-		return i18n.NewError(ctx, msgs.MsgConfIncompatibleWithDirectCertVerify)
-	}
-	ctx = log.WithLogField(ctx, "remote", "")
-
-	panic("unimplemented")
-}
-
-func (t *grpcTransport) getOrCreateConn(ctx context.Context, node string) (*grpcConnection, error) {
-	panic("unimplemented")
-}
-
-func (t *grpcTransport) SendMessage(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-	panic("unimplemented")
-}
-
-func (gc *grpcConnection) peerValidator(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) (err error) {
-
-	if len(rawCerts) != 1 {
-		// We currently require exactly one certificate to be provided by the peer
-		return i18n.NewError(gc.bgCtx, msgs.MsgVerifierRequiresOneCert, len(rawCerts))
-	}
-
-	// Parse the certificate we are provided
-	gc.cert, err = x509.ParseCertificate(rawCerts[0])
-	if err != nil {
-		return err
-	}
-
-	log.L(gc.bgCtx).Infof("Received certificate %s (serial=%s)", gc.cert.Subject.String(), gc.cert.SerialNumber.Text(16))
-
-	if gc.gcl.subjectMatchRegex != nil {
-		match := gc.gcl.subjectMatchRegex.FindStringSubmatch(gc.cert.Subject.String())
-		if len(match) != 2 /* we require one capture group */ {
-			return i18n.NewError(gc.bgCtx, msgs.MsgSubjectRegexpMismatch, len(match))
+func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[proto.Message, proto.Empty]) error {
+	// ctx := stream.Context()
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			return err
 		}
-		gc.node = match[1]
-	} else {
-		gc.node = gc.cert.Subject.CommonName
+		panic(msg)
 	}
+}
 
-	// Ask the Paladin server/registry for details of the node we are peering with
-	gtdr, err := gc.t.callbacks.GetTransportDetails(gc.bgCtx, &prototk.GetTransportDetailsRequest{
-		Destination: "certcheck@" + gc.node,
+func (t *grpcTransport) getTransportDetails(ctx context.Context, node string) (transportDetails *PublishedTransportDetails, err error) {
+	gtdr, err := t.callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
+		Node: node,
 	})
 	if err != nil {
-		log.L(gc.bgCtx).Errorf("lookup failed for node %s: %s", gc.node, err)
-		return err
+		log.L(ctx).Errorf("lookup failed for node %s: %s", node, err)
+		return nil, err
 	}
 
 	// Parse the details
-	if err = json.Unmarshal([]byte(gtdr.TransportDetails), &gc.transportDetails); err != nil {
-		return i18n.WrapError(gc.bgCtx, err, msgs.MsgPeerTransportDetailsInvalid, gc.node)
+	if err = json.Unmarshal([]byte(gtdr.TransportDetails), &transportDetails); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgPeerTransportDetailsInvalid, node)
 	}
 
-	// If we need to check the issuer, do that now
-	if gc.gcl.directCertVerification {
-		issuerCert, err := x509.ParseCertificate([]byte(gc.transportDetails.Issuer))
-		if err != nil {
-			return i18n.WrapError(gc.bgCtx, err, msgs.MsgPeerTransportDetailsInvalid, gc.node)
-		}
-		rootPool := x509.NewCertPool()
-		rootPool.AddCert(issuerCert)
-		if _, err = gc.cert.Verify(x509.VerifyOptions{
-			// Only need to verify up to that issuer
-			Roots: rootPool,
-			// We do not verify key usages
-			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		}); err != nil {
-			return i18n.WrapError(gc.bgCtx, err, msgs.MsgPeerCertificateInvalid,
-				gc.node, issuerCert.Subject.String(), gc.cert.Issuer.String(),
-			)
-		}
-	}
+	return transportDetails, nil
+}
 
-	// Grab the conn lock at this point
-	gc.t.connLock.Lock()
-	defer gc.t.connLock.Unlock()
-
-	// Ok - we know who we are talking to, and we are happy!
-	// Add this to the connection list - we close any existing connection
-	existing := gc.t.connections[gc.node]
+func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (grpc.ClientStreamingClient[proto.Message, proto.Empty], error) {
+	t.connLock.L.Lock()
+	existing := t.outboundConnections[nodeName]
 	if existing != nil {
-		log.L(gc.bgCtx).Infof("Connection %s (%s) is replaced by connection %s (%s)",
-			existing.netConn.RemoteAddr(), existing.direction, gc.netConn.RemoteAddr(), gc.direction)
-		// Just close the connection
-		_ = existing.netConn.Close()
+		// Multiple routines might try to connect concurrently, so we have a condition
+		defer t.connLock.L.Unlock() // unlock on return on this path
+		for existing.connecting {
+			t.connLock.Wait()
+		}
+		return existing.stream, existing.connError
 	}
-	gc.t.connections[gc.node] = gc
-	return nil
+	// We need to create the connection - put the placeholder in the map
+	newConn := &outboundConn{connecting: true}
+	t.outboundConnections[nodeName] = newConn
+	t.connLock.L.Unlock()
+
+	// We must ensure we complete the newConn (for good or bad)
+	// and notify everyone waiting to check status before we return
+	var err error
+	defer func() {
+		t.connLock.L.Lock()
+		newConn.connecting = false
+		if err != nil {
+			// copy our error to anyone queuing - everybody fails
+			newConn.connError = err
+			// remove this entry, so the next one will try again
+			delete(t.outboundConnections, nodeName)
+		}
+		t.connLock.Broadcast()
+		t.connLock.L.Unlock()
+	}()
+
+	// We need to get the connection details
+	transportDetails, err := t.getTransportDetails(ctx, nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ok - try connecting
+	conn, err := grpc.NewClient(transportDetails.Endpoint,
+		grpc.WithTransportCredentials(t.peerVerifier.Clone()))
+	if err != nil {
+		return nil, err
+	}
+	client := proto.NewPaladinGRPCTransportClient(conn)
+	newConn.stream, err = client.ConnectSendStream(ctx)
+	return newConn.stream, err
+}
+
+func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+	node, err := tktypes.PrivateIdentityLocator(req.Message.Destination).Node(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := t.getConnection(ctx, node)
+	if err == nil {
+		err = stream.Send(&proto.Message{
+			MessageId:     req.Message.MessageId,
+			CorrelationId: req.Message.CorrelationId,
+			Destination:   req.Message.Destination,
+			ReplyTo:       req.Message.ReplyTo,
+			MessageType:   req.Message.MessageType,
+			Payload:       req.Message.Payload,
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &prototk.SendMessageResponse{}, nil
 }
