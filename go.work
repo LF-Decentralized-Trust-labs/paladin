@@ -3,7 +3,7 @@ go 1.22.5
 use (
 	./domains/noto
 	./domains/zeto
-	./kata
+	./core/go
 	./testinfra
-	./toolkit_go
+	./toolkit/go
 )

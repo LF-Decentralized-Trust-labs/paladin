@@ -1,0 +1,5 @@
+libstarter.h
+**/abis
+mocks
+!.vscode/settings.json
+libcore.h
