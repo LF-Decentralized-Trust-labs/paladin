@@ -136,8 +136,7 @@ task test(type: Exec) {
     dependsOn copySolidity
     dependsOn circuitsGen
     dependsOn ':testinfra:startTestInfra'
-    lockTestInfra(it)
-    dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task build {
