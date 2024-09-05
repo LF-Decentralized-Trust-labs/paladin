@@ -24,7 +24,6 @@ test {
     useJUnitPlatform()
     systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
     dependsOn ':testinfra:startTestInfra'
-    helpers.lockResource(it, "testinfra.lock")
 }
 
 repositories {

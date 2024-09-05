@@ -75,7 +75,6 @@ task test(type: Exec) {
 
     dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
-    helpers.lockResource(it, "testinfra.lock")
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
