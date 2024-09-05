@@ -53,7 +53,7 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 			var parsedEvent event_PaladinNewSmartContractByFactory_V0
 			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
 			if parseErr != nil {
-				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, types.JSONString(ev))
+				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{

@@ -26,8 +26,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/kata/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/kata/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -43,7 +44,7 @@ type zetoDomainContracts struct {
 }
 
 func newZetoDomainContracts() *zetoDomainContracts {
-	factory := loadBuildLinked(zetoFactoryJSON, map[string]string{})
+	factory := domain.LoadBuildLinked(zetoFactoryJSON, map[string]string{})
 
 	return &zetoDomainContracts{
 		factoryAbi: factory.ABI,

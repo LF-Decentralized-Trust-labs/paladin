@@ -24,15 +24,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
-
-type Config struct {
-	FactoryAddress string `json:"factoryAddress" yaml:"factoryAddress"`
-}
 
 type SolidityBuild struct {
 	ABI      abi.ABI                   `json:"abi"`
@@ -53,7 +48,7 @@ type SolidityLinkReference struct {
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config      *Config
+	config      *types.Config
 	callbacks   plugintk.DomainCallbacks
 	chainID     int64
 	domainID    string
@@ -62,11 +57,6 @@ type Zeto struct {
 	factoryAbi  abi.ABI
 	contractAbi abi.ABI
 }
-
-type ZetoDomainAbiConfig struct {
-}
-
-var ZetoDomainConfigABI = &abi.ParameterArray{}
 
 type ZetoSetImplementationParams struct {
 	Name           string                 `json:"name"`
@@ -97,10 +87,7 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.config = &config
 	z.chainID = req.ChainId
 
-	factory := domain.LoadBuildLinked(zetoFactoryJSON, config.Libraries)
-	contract := domain.LoadBuildLinked(zetoJSON, config.Libraries)
-
-	factoryJSON, err := json.Marshal(factory.ABI)
+	factoryJSON, err := json.Marshal(z.factoryAbi)
 	if err != nil {
 		return nil, err
 	}

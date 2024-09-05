@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -59,11 +58,11 @@ func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
 	return m
 }
 
-func newTestDomain(t *testing.T, domainName string, tokenName string, config *Config, domainContracts *zetoDomainContracts) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
+func newTestDomain(t *testing.T, domainName string, tokenName string, config *types.Config, domainContracts *zetoDomainContracts) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
 	var domain *Zeto
 	tb := testbed.NewTestBed()
 	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		domain = New(callbacks)
+		domain = &Zeto{Callbacks: callbacks}
 		domain.tokenName = tokenName
 		domain.factoryAbi = domainContracts.factoryAbi
 		domain.contractAbi = domainContracts.deployedContractAbis[tokenName]
@@ -113,7 +112,7 @@ func TestZeto(t *testing.T) {
 	err = configureFactoryContract(ctx, ec, bi, controllerName, domainContracts)
 	assert.NoError(t, err)
 
-	done, zeto, rpc := newTestDomain(t, domainName, "Zeto_Anon", &Config{
+	done, zeto, rpc := newTestDomain(t, domainName, "Zeto_Anon", &types.Config{
 		FactoryAddress: domainContracts.factoryAddress.String(),
 	}, domainContracts)
 	defer done()
