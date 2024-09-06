@@ -112,15 +112,23 @@ func (tv *tlsVerifier) OverrideServerName(s string) error {
 	return errors.ErrUnsupported
 }
 
-func getCertFromPEM(ctx context.Context, pemBytes []byte) (cert *x509.Certificate, err error) {
-	block, _ := pem.Decode(pemBytes)
-	if block != nil {
-		cert, err = x509.ParseCertificate(block.Bytes)
+func getCertListFromPEM(ctx context.Context, pemBytes []byte) (certs []*x509.Certificate, err error) {
+	for {
+		block, remaining := pem.Decode(pemBytes)
+		if block == nil {
+			break
+		}
+		pemBytes = remaining
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgPEMCertificateInvalid)
+		}
+		certs = append(certs, cert)
 	}
-	if block == nil || err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgPEMCertificateInvalid)
+	if len(certs) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgPEMCertificateInvalid)
 	}
-	return cert, err
+	return certs, err
 }
 
 func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], credentials.TransportCredentials) {
@@ -164,12 +172,16 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 
 		// If we need to check the issuer, do that now
 		if tv.directCertVerification {
-			issuerCert, err := getCertFromPEM(ctx, []byte(ai.transportDetails.Issuer))
+			issuerCerts, err := getCertListFromPEM(ctx, []byte(ai.transportDetails.Issuers))
 			if err != nil {
 				return err
 			}
 			rootPool := x509.NewCertPool()
-			rootPool.AddCert(issuerCert)
+			issuerSubjects := []string{}
+			for _, issuerCert := range issuerCerts {
+				rootPool.AddCert(issuerCert)
+				issuerSubjects = append(issuerSubjects, issuerCert.Subject.String())
+			}
 			if _, err = ai.cert.Verify(x509.VerifyOptions{
 				// Only need to verify up to that issuer
 				Roots: rootPool,
@@ -177,7 +189,7 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 			}); err != nil {
 				return i18n.WrapError(ctx, err, msgs.MsgPeerCertificateIssuerInvalid,
-					node, issuerCert.Subject.String(), ai.cert.Issuer.String(),
+					node, ai.cert.Issuer.String(), issuerSubjects,
 				)
 			}
 		}

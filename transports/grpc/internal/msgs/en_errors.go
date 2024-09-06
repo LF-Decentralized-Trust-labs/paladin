@@ -39,7 +39,7 @@ var (
 	MsgVerifierRequiresOneCert              = ffe("PD030004", "certificate verifier expected exactly one certificate from peer certs=%d")
 	MsgSubjectRegexpMismatch                = ffe("PD030005", "subjectMatchRegex did not match the subject in the certificate")
 	MsgPeerTransportDetailsInvalid          = ffe("PD030006", "published peer transport details for node '%s' are invalid")
-	MsgPeerCertificateIssuerInvalid         = ffe("PD030007", "peer '%s' did not provide a certificate signed by expected issuer expected=%s received=%s")
+	MsgPeerCertificateIssuerInvalid         = ffe("PD030007", "peer '%s' did not provide a certificate signed an expected issuer received=%s issuers=%v")
 	MsgTLSNegotiationFailed                 = ffe("PD030008", "TLS negotiation did not result in a verified peer node name")
 	MsgAuthContextNotAvailable              = ffe("PD030009", "server failed to retrieve the auth context")
 	MsgInvalidReplyToNode                   = ffe("PD030010", "replyTo node does not match sending node")

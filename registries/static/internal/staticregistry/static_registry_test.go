@@ -83,7 +83,7 @@ func TestRegistryObjectEntry(t *testing.T) {
 		upsertTransportDetails: func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
 			assert.Equal(t, "node1", req.Node)
 			assert.Equal(t, "transport1", req.Transport)
-			assert.JSONEq(t, `{"endpoint": "dns:///127.0.0.1:12345", "issuer": "certificate\ndata\nhere"}`, req.TransportDetails)
+			assert.JSONEq(t, `{"endpoint": "dns:///127.0.0.1:12345", "issuers": "certificate\ndata\nhere"}`, req.TransportDetails)
 			return &prototk.UpsertTransportDetailsResponse{}, nil
 		},
 	}
@@ -96,7 +96,7 @@ func TestRegistryObjectEntry(t *testing.T) {
 			   "transports": {
 			      "transport1": {
 				  	"endpoint": "dns:///127.0.0.1:12345",
-					"issuer": "certificate\ndata\nhere"
+					"issuers": "certificate\ndata\nhere"
 				  }
 			   }
 			 }

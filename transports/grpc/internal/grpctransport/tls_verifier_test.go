@@ -115,7 +115,7 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 	// Build the transport details for this plugin
 	transportDetails := &PublishedTransportDetails{
 		Endpoint: "dns:///" + transport.listener.Addr().String(),
-		Issuer:   nodeCert, // self-signed
+		Issuers:  nodeCert, // self-signed
 	}
 
 	return transport, transportDetails, callbacks, func() {
@@ -195,32 +195,76 @@ func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 
 }
 
+func TestGRPCTransport_DirectCertVerificationWithKeyRotation_OK(t *testing.T) {
+	ctx := context.Background()
+
+	received := make(chan *prototk.Message)
+
+	// the default config is direct cert verification
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
+	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{})
+	defer done1()
+
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
+	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
+	defer done2()
+
+	// Add an old cert to the PEM ahead of the good one
+	node1CertOld, _ := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
+	transportDetails1.Issuers = fmt.Sprintf("%s\n%s", node1CertOld, node1Cert)
+
+	// Register nodes
+	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
+	mockRegistry(callbacks1, ptds)
+	mockRegistry(callbacks2, ptds)
+
+	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+		received <- rmr.Message
+		return &prototk.ReceiveMessageResponse{}, nil
+	}
+
+	// Connect and send from plugin1 to plugin2
+	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+		Message: &prototk.Message{
+			ReplyTo:     "to.me@node1",
+			Destination: "to.you@node2",
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, sendRes)
+
+	if err == nil {
+		<-received
+	}
+
+}
+
 func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
 
 	ctx := context.Background()
 
 	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "ca"}, nil, nil)
-	ca, err := getCertFromPEM(ctx, []byte(caCert))
+	cas, err := getCertListFromPEM(ctx, []byte(caCert))
 	assert.NoError(t, err)
 	caKey := getRSAKeyFromPEM(t, caKeyPEM)
 
-	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, ca, caKey)
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, cas[0], caKey)
 	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{
 		TLS:                    tlsconf.Config{CA: caCert},
 		DirectCertVerification: confutil.P(false),
 		CertSubjectMatcher:     confutil.P(`^.*CN=([0-9A-Za-z._-]+).*$`),
 	})
 	defer done1()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
-	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, ca, caKey)
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, cas[0], caKey)
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{
 		TLS:                    tlsconf.Config{CA: caCert},
 		DirectCertVerification: confutil.P(false),
 		CertSubjectMatcher:     confutil.P(`^.*CN=([0-9A-Za-z._-]+).*$`),
 	})
 	defer done2()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
 	received := make(chan *prototk.Message)
 	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
@@ -254,17 +298,17 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 	ctx := context.Background()
 
 	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "ca"}, nil, nil)
-	ca, err := getCertFromPEM(ctx, []byte(caCert))
+	cas, err := getCertListFromPEM(ctx, []byte(caCert))
 	assert.NoError(t, err)
 	caKey := getRSAKeyFromPEM(t, caKeyPEM)
 
-	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, ca, caKey)
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, cas[0], caKey)
 	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{
 		TLS:                    tlsconf.Config{CA: caCert},
 		DirectCertVerification: confutil.P(false),
 	})
 	defer done1()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
 	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{
@@ -272,7 +316,7 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 		DirectCertVerification: confutil.P(false),
 	})
 	defer done2()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
 	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
 	mockRegistry(callbacks1, ptds)
@@ -293,7 +337,7 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 	ctx := context.Background()
 
 	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "ca"}, nil, nil)
-	ca, err := getCertFromPEM(ctx, []byte(caCert))
+	cas, err := getCertListFromPEM(ctx, []byte(caCert))
 	assert.NoError(t, err)
 	caKey := getRSAKeyFromPEM(t, caKeyPEM)
 
@@ -303,15 +347,15 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 		DirectCertVerification: confutil.P(false),
 	})
 	defer done1()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
-	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, ca, caKey)
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, cas[0], caKey)
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{
 		TLS:                    tlsconf.Config{CA: caCert},
 		DirectCertVerification: confutil.P(false),
 	})
 	defer done2()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
+	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
 	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
 	mockRegistry(callbacks1, ptds)
@@ -341,7 +385,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerServer(t *testing.T) {
 	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
 	defer done2()
-	transportDetails2.Issuer = anotherCert
+	transportDetails2.Issuers = anotherCert
 
 	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
 	mockRegistry(callbacks1, ptds)
@@ -367,7 +411,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
 	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{})
 	defer done1()
-	transportDetails1.Issuer = anotherCert
+	transportDetails1.Issuers = anotherCert
 
 	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
@@ -384,6 +428,33 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 		},
 	})
 	assert.Regexp(t, "bad certificate", err)
+
+}
+
+func TestGRPCTransport_DirectCertVerification_BadIssuersServer(t *testing.T) {
+
+	ctx := context.Background()
+
+	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
+	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{})
+	defer done1()
+
+	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
+	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
+	defer done2()
+	transportDetails2.Issuers = "Not a PEM"
+
+	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
+	mockRegistry(callbacks1, ptds)
+	mockRegistry(callbacks2, ptds)
+
+	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+		Message: &prototk.Message{
+			ReplyTo:     "to.me@node1",
+			Destination: "to.you@node2",
+		},
+	})
+	assert.Regexp(t, "PD030012", err)
 
 }
 
@@ -483,7 +554,7 @@ func TestGRPCTransport_BadTransportIssuerPEM(t *testing.T) {
 	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
 	defer done2()
 	// Put the the private key rather than a PEM certificate
-	transportDetails2.Issuer = node2Key
+	transportDetails2.Issuers = node2Key
 
 	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
 	mockRegistry(callbacks1, ptds)

@@ -46,9 +46,9 @@ var ConfigDefaults = &Config{
 // time otherwise we cannot start up.
 type PublishedTransportDetails struct {
 	Endpoint string `json:"endpoint"` // a GRPC target string that other nodes can use to connect to this node
-	// optional certificate to check is an exact match for the issuer of the cert provided
-	// - required for direct cert validation with TLS
+	// A node specific PEM certificate/certificate-set to use to validate the certificate provided by a node
+	// - used in direct certificate validation mode only
 	// - can be the certificate itself for self-signed
 	// - must be the direct parent (not the root of a chain - for that use normal CA verification)
-	Issuer string `json:"issuer,omitempty"`
+	Issuers string `json:"issuers,omitempty"`
 }
