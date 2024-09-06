@@ -118,6 +118,20 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 		Issuers:  nodeCert, // self-signed
 	}
 
+	// Wait until the socket is up
+	startTime := time.Now()
+	for {
+		c, err := net.Dial("tcp", transport.listener.Addr().String())
+		if err == nil {
+			c.Close()
+			break
+		}
+		if time.Since(startTime) > 2*time.Second {
+			require.Failf(t, "server took too long to start: %s", err.Error())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	return transport, transportDetails, callbacks, func() {
 		panicked := recover()
 		if panicked != nil {
