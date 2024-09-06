@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestRPCServer(t *testing.T) (context.Context, rpcbackend.Backend, func()) {
@@ -40,9 +41,9 @@ func newTestRPCServer(t *testing.T) (context.Context, rpcbackend.Backend, func()
 		},
 		WS: rpcserver.WSEndpointConfig{Disabled: true},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = s.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	s.Register(ss.RPCModule())
 
@@ -54,7 +55,7 @@ func newTestRPCServer(t *testing.T) (context.Context, rpcbackend.Backend, func()
 
 func jsonTestLog(t *testing.T, desc string, f interface{}) {
 	b, err := json.MarshalIndent(f, "", "  ")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	fmt.Printf(desc+": %s\n", b)
 }
 

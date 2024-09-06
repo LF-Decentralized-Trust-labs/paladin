@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type testPlugin struct {
@@ -79,7 +80,7 @@ func newTestTransport(t *testing.T, extraSetup ...func(mc *mockComponents)) (con
 func registerTestTransport(t *testing.T, tm *transportManager, tp *testPlugin) {
 	transportID := uuid.New()
 	_, err := tm.TransportRegistered("test1", transportID, tp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ta := tm.transportsByName["test1"]
 	assert.NotNil(t, ta)
@@ -147,7 +148,7 @@ func TestSendMessage(t *testing.T) {
 		gtdr, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
 			Node: strings.Split(message.Destination.String(), "@")[1],
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, gtdr.TransportDetails)
 
 		sentMessages <- sent
@@ -155,7 +156,7 @@ func TestSendMessage(t *testing.T) {
 	}
 
 	err := tm.Send(ctx, message)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	<-sentMessages
 }
@@ -298,7 +299,7 @@ func TestReceiveMessage(t *testing.T) {
 	rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, rmr)
 
 	<-receivedMessages

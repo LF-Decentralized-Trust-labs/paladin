@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -86,7 +87,7 @@ func newTestTransportPluginManager(t *testing.T, setup *testManagers) (context.C
 	pc := newTestPluginManager(t, setup)
 
 	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	done := make(chan struct{})
 	go func() {
@@ -156,31 +157,31 @@ func TestTransportRequestsOK(t *testing.T) {
 	transportAPI := <-waitForAPI
 
 	_, err := transportAPI.ConfigureTransport(ctx, &prototk.ConfigureTransportRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{Destination: "node1"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, smr)
 
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
 	transportAPI.Initialized()
-	assert.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx))
 
 	callbacks := <-waitForCallbacks
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
 		Node: "node1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "node1_details", rts.TransportDetails)
 	rms, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: &prototk.Message{
 			Payload: []byte("body1"),
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, rms)
 
 }
@@ -192,6 +193,7 @@ func TestTransportRegisterFail(t *testing.T) {
 	tdm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
 			"transport1": &mockPlugin[prototk.TransportMessage]{
+				t:              t,
 				connectFactory: transportConnectFactory,
 				headerAccessor: transportHeaderAccessor,
 				preRegister: func(transportID string) *prototk.TransportMessage {
@@ -229,6 +231,7 @@ func TestFromTransportRequestBadReq(t *testing.T) {
 	ttm := &testTransportManager{
 		transports: map[string]plugintk.Plugin{
 			"transport1": &mockPlugin[prototk.TransportMessage]{
+				t:              t,
 				connectFactory: transportConnectFactory,
 				headerAccessor: transportHeaderAccessor,
 				sendRequest: func(pluginID string) *prototk.TransportMessage {

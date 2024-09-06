@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInFlightLifecycleOK(t *testing.T) {
@@ -42,7 +43,7 @@ func TestInFlightLifecycleOK(t *testing.T) {
 		req.Complete("hello")
 	}()
 	v, err := req.Wait()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "hello", v)
 
 	// caller always responsible for cancelling

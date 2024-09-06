@@ -41,6 +41,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed abis/SIMDomain.json
@@ -51,7 +52,7 @@ var simTokenBuild []byte // comes from Hardhat build
 
 func toJSONString(t *testing.T, v interface{}) string {
 	b, err := json.Marshal(v)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return string(b)
 }
 
@@ -219,17 +220,17 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			assert.Equal(t, "function transfer(string memory from, string memory to, uint256 amount) external { }", tx.FunctionSignature)
 			var inputs fakeTransferParser
 			err := json.Unmarshal([]byte(tx.FunctionParamsJson), &inputs)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Greater(t, inputs.Amount.BigInt().Sign(), 0)
 			contractAddr, err := ethtypes.NewAddress(tx.ContractAddress)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			configValues, err := contractDataABI.DecodeABIData(tx.ContractConfig, 0)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			var config fakeCoinConfigParser
 			err = json.Unmarshal(configJSON, &config)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotEmpty(t, config.NotaryLocator)
 			return contractAddr, config.NotaryLocator, &inputs
 		}
@@ -312,20 +313,20 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 				// In this test we deploy the factory in-line
 				ec, err := ec.ABI(ctx, simDomainABI)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simDomainBuild))
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				deployTXHash, err := cc.R(ctx).
 					Signer("domain1_admin").
 					Input(`{}`).
 					SignAndSend()
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				bi := *blockIndexer.Load()
 				deployTx, err := bi.WaitForTransaction(ctx, *deployTXHash)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if deployTx.Result.V() != blockindexer.TXResult_SUCCESS {
 					return nil, fmt.Errorf("Transaction %s reverted", deployTx.Hash)
 				}
@@ -462,7 +463,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					})
 				}
 				eip712Payload, err := typedDataV4TransferWithSalts(contractAddr, coinsToSpend, newCoins)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				return &prototk.AssembleTransactionResponse{
 					AssembledTransaction: &prototk.AssembledTransaction{
 						InputStates:  stateRefsToSpend,
@@ -515,7 +516,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 				// Recover the signature
 				signaturePayload, err := typedDataV4TransferWithSalts(contractAddr, inCoins, outCoins)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				var signerVerification *prototk.AttestationResult
 				for _, ar := range req.Signatures {
 					if ar.AttestationType == prototk.AttestationType_SIGN &&
@@ -527,9 +528,9 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				}
 				assert.NotNil(t, signerVerification)
 				sig, err := secp256k1.DecodeCompactRSV(context.Background(), signerVerification.Payload)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				signerAddr, err := sig.RecoverDirect(signaturePayload, chainID)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// There would need to be minting/spending rules here - we just check the signature
 				assert.Equal(t, signerAddr.String(), signerVerification.Verifier.Verifier)
@@ -604,7 +605,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		blockIndexer.Store(&bi)
 		return nil
 	}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer done()
 
 	tbRPC := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))

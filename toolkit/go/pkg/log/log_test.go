@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogContext(t *testing.T) {
@@ -122,6 +123,6 @@ func TestSetFormattingFile(t *testing.T) {
 	L(context.Background()).Infof("File logs")
 
 	fileExists, err := os.Stat(logFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, fileExists.IsDir())
 }

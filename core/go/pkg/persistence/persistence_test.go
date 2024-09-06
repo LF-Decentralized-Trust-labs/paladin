@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMigrateUpDown(t *testing.T) {
@@ -30,13 +31,13 @@ func TestMigrateUpDown(t *testing.T) {
 
 	// Up runs as part of the init
 	p, done, err := NewUnitTestPersistence(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, p.DB())
 	defer done()
 
 	// Get the migration drive directly using the internal function, to run Down()
 	err = p.(*provider).runMigration(ctx, func(m *migrate.Migrate) error { return m.Down() })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 

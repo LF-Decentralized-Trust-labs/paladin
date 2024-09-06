@@ -36,6 +36,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitOK(t *testing.T) {
@@ -88,7 +89,7 @@ func TestInitOK(t *testing.T) {
 	mockEngine.On("Init", mock.Anything).Return(&components.ManagerInitResult{}, nil)
 	cm := NewComponentManager(context.Background(), tempSocketFile(t), uuid.New(), testConfig, mockEngine).(*componentManager)
 	err := cm.Init()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotNil(t, cm.KeyManager())
 	assert.NotNil(t, cm.EthClientFactory())
@@ -117,7 +118,7 @@ func tempSocketFile(t *testing.T) (fileName string) {
 	if err == nil {
 		err = os.Remove(fileName)
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.Remove(fileName)
 	})
@@ -189,14 +190,14 @@ func TestStartOK(t *testing.T) {
 	cm.engine = mockEngine
 
 	err := cm.StartComponents()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = cm.StartManagers()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = cm.CompleteStart()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cm.Stop()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestBuildInternalEventStreamsError(t *testing.T) {

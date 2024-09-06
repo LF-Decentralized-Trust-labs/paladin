@@ -26,11 +26,12 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEngineFactory(t *testing.T) {
 	tb, err := engineFactory(context.Background(), "testbed")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, tb)
 
 	_, err = engineFactory(context.Background(), "wrong")

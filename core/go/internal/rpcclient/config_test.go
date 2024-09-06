@@ -22,19 +22,20 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWSConfigOK(t *testing.T) {
 	ctx := context.Background()
 	wsc, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "ws://localhost:8545"}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "ws://localhost:8545", wsc.WebSocketURL)
 }
 
 func TestWSConfigTLSOK(t *testing.T) {
 	ctx := context.Background()
 	wsc, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545"}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "wss://localhost:8545", wsc.WebSocketURL)
 	assert.NotNil(t, wsc.TLSClientConfig)
 }
@@ -54,14 +55,14 @@ func TestWSConfigBadTLS(t *testing.T) {
 func TestHTTPonfigOK(t *testing.T) {
 	ctx := context.Background()
 	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "http://localhost:8545"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:8545", r.BaseURL)
 }
 
 func TestHTTPConfigTLSOK(t *testing.T) {
 	ctx := context.Background()
 	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "https://localhost:8545", r.BaseURL)
 }
 

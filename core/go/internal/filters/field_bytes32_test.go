@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBytes32Field(t *testing.T) {
@@ -41,12 +42,12 @@ func TestBytes32Field(t *testing.T) {
 	assert.Regexp(t, "PD010719.*4", err)
 
 	v, err := Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0x0001020304050607080910111213141516171819202122232425262728293031"`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0001020304050607080910111213141516171819202122232425262728293031", v)
 	assert.Equal(t, "test", Bytes32Field("test").SQLColumn())
 
 	nv, err := Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, Bytes32Field("test").SupportsLIKE())

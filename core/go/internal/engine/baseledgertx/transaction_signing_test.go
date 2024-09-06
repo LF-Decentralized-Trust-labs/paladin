@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInFlightTxSign(t *testing.T) {
@@ -65,6 +66,6 @@ func TestInFlightTxSign(t *testing.T) {
 		assert.Equal(t, ethtypes.MustNewHexBytes0xPrefix(testTransactionData), txObj.Data)
 	}).Return(tktypes.MustParseHexBytes(testHashedSignedMessage), nil).Once()
 	_, txHash, err = it.signTx(ctx, mtx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testTxHash, txHash)
 }

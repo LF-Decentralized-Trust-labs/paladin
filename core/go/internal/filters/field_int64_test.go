@@ -23,6 +23,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInt64Field(t *testing.T) {
@@ -42,14 +43,14 @@ func TestInt64Field(t *testing.T) {
 
 	// We handle bool -> Int64 conversion
 	iTrue, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`true`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, (int64)(1), iTrue)
 	iFalse, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`false`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, (int64)(0), iFalse)
 
 	nv, err := Int64Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, Int64Field("test").SupportsLIKE())

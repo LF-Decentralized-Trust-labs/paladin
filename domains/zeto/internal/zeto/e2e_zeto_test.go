@@ -137,7 +137,7 @@ func TestZeto(t *testing.T) {
 			WithdrawVerifier: contracts["withdrawVerifier"],
 		})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
@@ -153,7 +153,7 @@ func TestZeto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
@@ -174,7 +174,7 @@ func TestZeto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
@@ -211,6 +211,6 @@ func TestZeto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 }

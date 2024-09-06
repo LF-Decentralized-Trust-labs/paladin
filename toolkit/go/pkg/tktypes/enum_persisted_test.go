@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestEnum string
@@ -47,7 +48,7 @@ func TestEnumValue(t *testing.T) {
 
 	var v1 Enum[TestEnum] = "OPTION1"
 	sqlV1, err := v1.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option1", sqlV1)
 
 	assert.Equal(t, TestEnum("OPTION1"), v1.V())
@@ -65,16 +66,16 @@ func TestEnumJSON(t *testing.T) {
 
 	var v1 myStruct
 	err := json.Unmarshal(([]byte)(`{}`), &v1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, myStruct{
 		Field1: "",
 		Field2: nil,
 	}, v1)
 	testVal, err := v1.Field1.MapToString()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option2", testVal)
 	testVal, err = v1.Field1.MapToString()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option2", testVal)
 }
 
@@ -85,7 +86,7 @@ func TestMapEnum(t *testing.T) {
 		"option2": 222,
 		"option3": 333,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 333, i)
 
 	_, err = MapEnum(v, map[TestEnum]int{
@@ -114,15 +115,15 @@ func TestEnumScan(t *testing.T) {
 	var v Enum[TestEnum]
 
 	err := (&v).Scan(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option2", string(v))
 
 	err = (&v).Scan("OPTION1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option1", string(v))
 
 	err = (&v).Scan(([]byte)("Option3"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "option3", string(v))
 
 	err = (&v).Scan(false)

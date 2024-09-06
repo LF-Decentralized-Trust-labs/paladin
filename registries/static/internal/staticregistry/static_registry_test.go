@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testCallbacks struct {
@@ -73,7 +74,7 @@ func TestRegistryStringEntry(t *testing.T) {
 		  }
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -103,7 +104,7 @@ func TestRegistryObjectEntry(t *testing.T) {
 		  }
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 

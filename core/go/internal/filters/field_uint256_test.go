@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUint256Field(t *testing.T) {
@@ -35,22 +36,22 @@ func TestUint256Field(t *testing.T) {
 	assert.Regexp(t, "FF22091", err)
 
 	vBigPos, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", vBigPos)
 	assert.Len(t, vBigPos, 64)
 
 	vZero, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`0`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", vZero)
 	assert.Len(t, vZero, 64)
 
 	vSmallPos, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`12345`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000003039", vSmallPos)
 	assert.Len(t, vSmallPos, 64)
 
 	nv, err := Uint256Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, Uint256Field("test").SupportsLIKE())

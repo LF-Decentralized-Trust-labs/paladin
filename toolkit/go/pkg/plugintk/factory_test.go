@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -49,7 +50,7 @@ func newTestController(t *testing.T) (context.Context, *testController, func()) 
 	prototk.RegisterPluginControllerServer(tc.server, tc)
 
 	l, err := net.Listen("unix", tc.socketFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	serverDone := make(chan struct{})
 	go func() {
@@ -79,12 +80,12 @@ func (tc *testController) ConnectRegistry(stream grpc.BidiStreamingServer[protot
 func tempSocketFile(t *testing.T) string {
 	// note socket filenames need to be <108 chars
 	f, err := os.CreateTemp("", "ptk.*.sock")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	fileName := f.Name()
 	err = f.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.Remove(fileName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.Remove(fileName)
 	})
@@ -127,7 +128,7 @@ func (pe *pluginExerciser[M]) controller(stream grpc.BidiStreamingServer[M, M]) 
 	go func() {
 		for msg := range pe.sendChl {
 			err := stream.Send(msg)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}()
 	for {
@@ -153,7 +154,7 @@ func (pe *pluginExerciser[M]) controller(stream grpc.BidiStreamingServer[M, M]) 
 			assert.NotNil(t, mapper, fmt.Sprintf("MISSING: %s", reqType))
 			mapper(reply.Message())
 			err = stream.Send(reply.Message())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		case prototk.Header_RESPONSE_FROM_PLUGIN, prototk.Header_ERROR_RESPONSE:
 			pe.recvChl <- msg.Message()
 		default:

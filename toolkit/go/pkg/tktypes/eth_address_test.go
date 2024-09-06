@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEthAddress(t *testing.T) {
@@ -33,7 +34,7 @@ func TestEthAddress(t *testing.T) {
 	assert.Equal(t, "0xfeedbeef00000000000000000000000000000000", a.String())
 
 	a, err = ParseEthAddress("0xacA6D8Ba6BFf0fa5c8a06A58368CB6097285d5c5")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0xaca6d8ba6bff0fa5c8a06a58368cb6097285d5c5", a.String())
 	assert.Equal(t, "0xacA6D8Ba6BFf0fa5c8a06A58368CB6097285d5c5", a.Checksummed())
 
@@ -42,26 +43,26 @@ func TestEthAddress(t *testing.T) {
 
 	var a1 *EthAddress
 	err = a1.Scan(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, a1)
 
 	a2 := &EthAddress{}
 	err = a2.Scan(a.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, a, a2)
 
 	v2, err := a2.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, strings.TrimPrefix(a.String(), "0x"), v2)
 
 	a3 := &EthAddress{}
 	err = a3.Scan(([]byte)(a[:]))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, a, a3)
 
 	a4 := &EthAddress{}
 	err = a4.Scan(([]byte)(a.String()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, a, a4)
 
 	a5 := &EthAddress{}
@@ -89,10 +90,10 @@ func TestEthAddressJSON(t *testing.T) {
 
 	var s1 *testStruct
 	err := json.Unmarshal([]byte(`{}`), &s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	b1, err := json.Marshal(s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{
 	  "a1": "0x0000000000000000000000000000000000000000",
 	  "a2": null
@@ -103,10 +104,10 @@ func TestEthAddressJSON(t *testing.T) {
 	  "a1": "0x67377A61Bb38d8Cf2cc2A255E2f0e96f6b0874E7",
 	  "a2": "16C076fDE0350249d200a960952e6c8c43eD7986"
 	}`), &s2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	b2, err := json.Marshal(s2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{
 	  "a1": "0x67377a61bb38d8cf2cc2a255e2f0e96f6b0874e7",
 	  "a2": "0x16c076fde0350249d200a960952e6c8c43ed7986"

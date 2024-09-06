@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testExtension struct {
@@ -151,13 +152,13 @@ func TestExtensionKeyStoreListOK(t *testing.T) {
 			Type: "ext-store",
 		},
 	}, te)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err := sm.List(context.Background(), &proto.ListKeysRequest{
 		Limit:    10,
 		Continue: "key12345",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testRes, res)
 
 	sm.(*signingModule).disableKeyListing = true
@@ -189,7 +190,7 @@ func TestExtensionKeyStoreListFail(t *testing.T) {
 			Type: "ext-store",
 		},
 	}, te)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.List(context.Background(), &proto.ListKeysRequest{
 		Limit:    10,
@@ -224,13 +225,13 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 			Type: "ext-store",
 		},
 	}, te)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resResolve, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0x98a356e0814382587d42b62bd97871ee59d10b69", resResolve.Identifiers[0].Identifier)
 
 	resSign, err := sm.Sign(context.Background(), &proto.SignRequest{
@@ -238,7 +239,7 @@ func TestExtensionKeyStoreResolveSignSECP256K1OK(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// R, S, V compact encoding
 	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000301", hex.EncodeToString(resSign.Payload))
 }
@@ -262,7 +263,7 @@ func TestExtensionKeyStoreResolveSECP256K1Fail(t *testing.T) {
 			Type: "ext-store",
 		},
 	}, te)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Name:       "key1",
@@ -294,7 +295,7 @@ func TestExtensionKeyStoreSignSECP256K1Fail(t *testing.T) {
 			Type: "ext-store",
 		},
 	}, te)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
@@ -312,7 +313,7 @@ func TestSignInMemoryFailBadKey(t *testing.T) {
 			Type: api.KeyStoreTypeStatic,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: "key1",
@@ -333,13 +334,13 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, resolveRes.KeyHandle)
 	assert.Equal(t, "key1", resolveRes.KeyHandle)
 	assert.Equal(t, algorithms.ECDSA_SECP256K1_PLAINBYTES, resolveRes.Identifiers[0].Algorithm)
@@ -350,7 +351,7 @@ func TestResolveSignWithNewKeyCreation(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("sign me"),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, signRes.Payload)
 
 }
@@ -365,7 +366,7 @@ func TestResolveUnsupportedAlgo(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{"wrong"},
@@ -385,7 +386,7 @@ func TestResolveMissingAlgo(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Name: "key1",
@@ -409,13 +410,13 @@ func TestInMemorySignFailures(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resolveRes, err := sm.Resolve(context.Background(), &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = sm.Sign(context.Background(), &proto.SignRequest{
 		KeyHandle: resolveRes.KeyHandle,
@@ -458,7 +459,7 @@ func TestZKPSigningModuleKeyResolution(t *testing.T) {
 			},
 		},
 	}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp1, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES, algorithms.ZKP_BABYJUBJUB_PLAINBYTES},
@@ -467,6 +468,6 @@ func TestZKPSigningModuleKeyResolution(t *testing.T) {
 			{Name: "alice"},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, len(resp1.Identifiers))
 }

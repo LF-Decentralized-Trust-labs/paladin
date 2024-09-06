@@ -26,12 +26,13 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testABIParam(t *testing.T, jsonParam string) *abi.Parameter {
 	var a abi.Parameter
 	err := json.Unmarshal([]byte(jsonParam), &a)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return &a
 }
 
@@ -92,7 +93,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, SchemaTypeABI, as.Persisted().Type)
 	assert.Equal(t, SchemaTypeABI, as.Type())
 	assert.NotNil(t, as.definition)
@@ -101,7 +102,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	assert.Equal(t, cacheKey, schemaCacheKey(as.Persisted().DomainID, as.Persisted().ID))
 
 	err = ss.PersistSchema(ctx, as)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	schemaID := as.Persisted().ID.String()
 
 	// Check it handles data
@@ -117,8 +118,8 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		"field9": "things and stuff",
 		"cruft": "to remove"
 	}`))
-	assert.NoError(t, err)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []*StateLabel{
 		// uint256 written as zero padded string
 		{State: state1.ID, Label: "field1", Value: "0000000000000000000000000123456789012345678901234567890123456789"},
@@ -157,15 +158,15 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 
 	// Second should succeed, but not do anything
 	err = ss.PersistSchema(ctx, as)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	schemaID = as.IDString()
 
 	getValidate := func() {
 		as1, err := ss.GetSchema(ctx, as.Persisted().DomainID, schemaID, true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, as1)
 		as1Sig, err := as1.(*abiSchema).FullSignature(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, as1.Persisted().Signature, as1Sig)
 	}
 
@@ -181,7 +182,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 
 	// Get the state back too
 	state1a, err := ss.GetState(ctx, as.Persisted().DomainID, state1.ID.String(), true, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, state1.State, state1a)
 
 	// Do a query on just one state, based on all the label fields
@@ -198,9 +199,9 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		  {"field":"field8","value":12345}
 		]
 	}`), &query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	states, err := ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query, "all")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, states, 1)
 
 	// Do a query that should fail on a string based label
@@ -209,9 +210,9 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		  {"field":"field2","value":"hello sun"}
 		]
 	}`), &query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	states, err = ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query, "all")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, states, 0)
 
 	// Do a query that should fail on an integer base label
@@ -220,9 +221,9 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		  {"field":"field3","value":43}
 		]
 	}`), &query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	states, err = ss.FindStates(ctx, as.Persisted().DomainID, schemaID, query, "all")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, states, 0)
 }
 
@@ -389,7 +390,7 @@ func TestABISchemaGetLabelTypeBadType(t *testing.T) {
 		},
 	}
 	tc, err := as.definition.TypeComponentTree()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = as.getLabelType(ctx, "f1", tc.TupleChildren()[0])
 	assert.Regexp(t, "PD010103", err)
@@ -428,7 +429,7 @@ func TestABISchemaProcessStateInvalidType(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010103", err)
 }
@@ -460,7 +461,7 @@ func TestABISchemaProcessStateLabelMissing(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1": 12345}`))
 	assert.Regexp(t, "PD010110", err)
 }
@@ -496,7 +497,7 @@ func TestABISchemaProcessStateBadValue(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{!!! wrong`))
 	assert.Regexp(t, "PD010116", err)
 }
@@ -521,7 +522,7 @@ func TestABISchemaProcessStateMismatchValue(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":{}}`))
 	assert.Regexp(t, "FF22030", err)
 }
@@ -546,7 +547,7 @@ func TestABISchemaProcessStateEIP712Failure(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
@@ -571,7 +572,7 @@ func TestABISchemaProcessStateDataFailure(t *testing.T) {
 	}
 	var err error
 	as.tc, err = as.definition.TypeComponentTreeCtx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = as.ProcessState(ctx, tktypes.RawJSON(`{"field1":"0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2"}`))
 	assert.Regexp(t, "FF22073", err)
 }
@@ -615,9 +616,9 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 		},
 	}
 	tc, err := as.definition.Components[0].TypeComponentTree()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cv, err := tc.ParseExternal("0x753A7decf94E48a05Fa1B342D8984acA9bFaf6B2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// bad type
 	_, _, err = as.mapValueToLabel(ctx, "", -1, cv)
@@ -644,9 +645,9 @@ func TestABISchemaMapValueToLabelTypeErrors(t *testing.T) {
 	assert.Regexp(t, "PD010109", err)
 
 	tc, err = as.definition.Components[1].TypeComponentTree()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cv, err = tc.ParseExternal("0x12345")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// bytes
 	_, _, err = as.mapValueToLabel(ctx, "", labelTypeBytes, cv)

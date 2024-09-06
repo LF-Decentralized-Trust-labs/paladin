@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockComponents struct {
@@ -54,14 +55,14 @@ func newTestTransportManager(t *testing.T, conf *TransportManagerConfig, extraSe
 	tm := NewTransportManager(ctx, conf)
 
 	ir, err := tm.PreInit(mc.c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, ir)
 
 	err = tm.PostInit(mc.c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = tm.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, conf.NodeName, tm.LocalNodeName())
 

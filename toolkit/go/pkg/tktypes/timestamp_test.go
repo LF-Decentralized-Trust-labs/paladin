@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type UTTimeTest struct {
@@ -51,14 +52,14 @@ func TestTimestampJSONSerialization(t *testing.T) {
 		T7: &t7,
 	}
 	b, err := json.Marshal(&utTimeTest)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf(
 		`{"t1":null,"t3":null,"t4":null,"t5":"%s","t6":"2021-05-15T18:37:32.123456789Z","t7":"2021-05-15T18:36:37Z"}`,
 		now.Time().UTC().Format(time.RFC3339Nano)), string(b))
 
 	var utTimeTest2 UTTimeTest
 	err = json.Unmarshal(b, &utTimeTest2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, utTimeTest.T1)
 	assert.Nil(t, utTimeTest.T2)
 	assert.Nil(t, nil, utTimeTest.T3)
@@ -77,7 +78,7 @@ func TestTimestampJSONUnmarshalFail(t *testing.T) {
 func TestTimestampJSONUnmarshalNumber(t *testing.T) {
 	var utTimeTest UTTimeTest
 	err := json.Unmarshal([]byte(`{"t1": 981173106}`), &utTimeTest)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2001-02-03T04:05:06Z", utTimeTest.T1.String())
 }
 
@@ -94,27 +95,27 @@ func TestTimestampDatabaseSerialization(t *testing.T) {
 
 	var ts *Timestamp
 	v, err := ts.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, v)
 
 	ts = &zero
 	v, err = ts.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(0), v)
 
 	ts = &now
 	v, err = ts.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, now.UnixNano(), v)
 
 	ts1 := TimestampFromUnix(1621103852123456789)
 	v, err = ts1.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(1621103852123456789), v)
 
 	ts2 := TimestampFromUnix(1621103797)
 	v, err = ts2.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(1621103797000000000), v)
 
 }
@@ -144,29 +145,29 @@ func TestTimestampParseValue(t *testing.T) {
 
 	// Unix Nanosecs
 	err := ts.Scan("1621108144123456789")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2021-05-15T19:49:04.123456789Z", ts.String())
 	assert.Equal(t, "2021-05-15T19:49:04.123456789Z", ts.Time().UTC().Format(time.RFC3339Nano))
 
 	// Unix Millis
 	err = ts.Scan("1621108144123")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2021-05-15T19:49:04.123Z", ts.String())
 	assert.Equal(t, "2021-05-15T19:49:04.123Z", ts.Time().UTC().Format(time.RFC3339Nano))
 
 	// Unix Secs
 	err = ts.Scan("1621108144")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2021-05-15T19:49:04Z", ts.String())
 
 	// RFC3339 Secs - timezone to UTC
 	err = ts.Scan("2021-05-15T19:49:04-05:00")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2021-05-16T00:49:04Z", ts.String())
 
 	// RFC3339 Nanosecs
 	err = ts.Scan("2021-05-15T19:49:04.123456789Z")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2021-05-15T19:49:04.123456789Z", ts.String())
 
 	// A bad string
@@ -175,17 +176,17 @@ func TestTimestampParseValue(t *testing.T) {
 
 	// Nil
 	err = ts.Scan(nil)
-	assert.NoError(t, nil, err)
+	require.NoError(t, nil, err)
 	assert.True(t, ts == 0)
 
 	// Zero
 	err = ts.Scan(int64(0))
-	assert.NoError(t, nil, err)
+	require.NoError(t, nil, err)
 	assert.True(t, ts == 0)
 
 	// Unix time
 	err = ts.Scan(int64(1621108144123))
-	assert.NoError(t, nil, err)
+	require.NoError(t, nil, err)
 	assert.Equal(t, "2021-05-15T19:49:04.123Z", ts.String())
 
 	// A bad type

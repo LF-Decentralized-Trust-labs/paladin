@@ -68,14 +68,14 @@ func buildSelfSignedTLSKeyPair(t *testing.T, subject pkix.Name) (string, string)
 func buildSelfSignedTLSKeyPairFiles(t *testing.T, subject pkix.Name) (string, string) {
 	// Create an X509 certificate pair
 	privatekey, err := rsa.GenerateKey(rand.Reader, 2048)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	publickey := &privatekey.PublicKey
 	var privateKeyBytes []byte = x509.MarshalPKCS1PrivateKey(privatekey)
 	tmpDir := t.TempDir()
 	privateKeyFile, _ := os.CreateTemp(tmpDir, "key.pem")
 	privateKeyBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}
 	err = pem.Encode(privateKeyFile, privateKeyBlock)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	x509Template := &x509.Certificate{
 		SerialNumber:          serialNumber,
@@ -87,11 +87,11 @@ func buildSelfSignedTLSKeyPairFiles(t *testing.T, subject pkix.Name) (string, st
 		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1)},
 	}
 	derBytes, err := x509.CreateCertificate(rand.Reader, x509Template, x509Template, publickey, privatekey)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	publicKeyFile, err := os.CreateTemp(tmpDir, "cert.pem")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = pem.Encode(publicKeyFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return publicKeyFile.Name(), privateKeyFile.Name()
 }
 
@@ -99,11 +99,11 @@ func buildTLSListener(t *testing.T, conf *Config, tlsType TLSType) (string, func
 
 	// Create the TLS Config with the CA pool and enable Client certificate validation
 	tlsConfig, err := BuildTLSConfig(context.Background(), conf, tlsType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a Server instance to listen on port 8443 with the TLS config
 	server, err := tls.Listen("tcp4", "127.0.0.1:0", tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	listenerDone := make(chan struct{})
 	go func() {
@@ -123,14 +123,14 @@ func buildTLSListener(t *testing.T, conf *Config, tlsType TLSType) (string, func
 					break
 				}
 				_, err = tlsConn.Write(oneByte)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			tlsConn.Close()
 		}
 	}()
 	return server.Addr().String(), func() {
 		err := server.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		<-listenerDone
 	}
 
@@ -139,7 +139,7 @@ func buildTLSListener(t *testing.T, conf *Config, tlsType TLSType) (string, func
 func TestNilIfNotEnabled(t *testing.T) {
 
 	tlsConfig, err := BuildTLSConfig(context.Background(), &Config{}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, tlsConfig)
 
 }
@@ -149,7 +149,7 @@ func TestTLSDefault(t *testing.T) {
 	tlsConfig, err := BuildTLSConfig(context.Background(), &Config{
 		Enabled: true,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, tlsConfig)
 
 	assert.False(t, tlsConfig.InsecureSkipVerify)
@@ -240,15 +240,15 @@ func TestMTLSOk(t *testing.T) {
 		Cert:    clientPublicKey,
 		Key:     clientKey,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	conn, err := tls.Dial("tcp4", addr, tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	written, err := conn.Write([]byte{42})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, written, 1)
 	readBytes := []byte{0}
 	readCount, err := conn.Read(readBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, readCount, 1)
 	assert.Equal(t, []byte{42}, readBytes)
 	_ = conn.Close()
@@ -274,9 +274,9 @@ func TestMTLSMissingClientCert(t *testing.T) {
 		Enabled: true,
 		CAFile:  serverPublicKeyFile,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	conn, err := tls.Dial("tcp4", addr, tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, _ = conn.Write([]byte{1})
 	_, err = conn.Read([]byte{1})
 	assert.Regexp(t, "certificate required", err)
@@ -327,15 +327,15 @@ func TestMTLSMatchFullSubject(t *testing.T) {
 		CertFile: clientPublicKeyFile,
 		KeyFile:  clientKeyFile,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	conn, err := tls.Dial("tcp4", addr, tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	written, err := conn.Write([]byte{42})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, written, 1)
 	readBytes := []byte{0}
 	readCount, err := conn.Read(readBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, readCount, 1)
 	assert.Equal(t, []byte{42}, readBytes)
 	_ = conn.Close()
@@ -369,9 +369,9 @@ func TestMTLSMismatchSubject(t *testing.T) {
 		CertFile: clientPublicKeyFile,
 		KeyFile:  clientKeyFile,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	conn, err := tls.Dial("tcp4", addr, tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, _ = conn.Write([]byte{1})
 	_, err = conn.Read([]byte{1})
 	assert.Regexp(t, "bad certificate", err)
@@ -414,7 +414,7 @@ func TestMTLSDNValidatorNotVerified(t *testing.T) {
 	testValidator, err := buildDNValidator(context.Background(), map[string]string{
 		"cn": "test",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = testValidator(nil, nil)
 	assert.Regexp(t, "PD020405", err)
@@ -425,7 +425,7 @@ func TestMTLSDNValidatorEmptyChain(t *testing.T) {
 	testValidator, err := buildDNValidator(context.Background(), map[string]string{
 		"cn": "test",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = testValidator(nil, [][]*x509.Certificate{{}})
 	assert.Regexp(t, "PD020405", err)
@@ -450,15 +450,15 @@ func TestConnectSkipVerification(t *testing.T) {
 		Enabled:                true,
 		InsecureSkipHostVerify: true,
 	}, ClientType)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	conn, err := tls.Dial("tcp4", addr, tlsConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	written, err := conn.Write([]byte{42})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, written, 1)
 	readBytes := []byte{0}
 	readCount, err := conn.Read(readBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, readCount, 1)
 	assert.Equal(t, []byte{42}, readBytes)
 	_ = conn.Close()

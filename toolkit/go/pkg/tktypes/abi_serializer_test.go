@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStandardABISerializer(t *testing.T) {
@@ -54,7 +55,7 @@ func TestStandardABISerializer(t *testing.T) {
 	}`
 	var exampleABIFunc abi.Entry
 	err := json.Unmarshal([]byte(exampleABIFuncJSON), &exampleABIFunc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	values, err := exampleABIFunc.Inputs.ParseJSON(([]byte)(`{
 		"salt": "769838A38E4A8559266667738BDF99F0DEE9A6A1C72F2BFEB142640259C67829",
@@ -63,10 +64,10 @@ func TestStandardABISerializer(t *testing.T) {
 		"score": "-0x3E8",
 		"shiny": "true"
 	}`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	standardizedJSON, err := StandardABISerializer().SerializeJSON(values)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.JSONEq(t, `{
 		"salt": "0x769838a38e4a8559266667738bdf99f0dee9a6a1c72f2bfeb142640259c67829",
@@ -102,7 +103,7 @@ func TestABIsMustMatchSubMatch(t *testing.T) {
 			]
 		}
 	]`), &abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var abiB abi.ABI
 	err = json.Unmarshal(([]byte)(`[
@@ -127,7 +128,7 @@ func TestABIsMustMatchSubMatch(t *testing.T) {
 			]
 		}
 	]`), &abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Fails match on whole (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
@@ -137,9 +138,9 @@ func TestABIsMustMatchSubMatch(t *testing.T) {
 
 	// Is ok for a sub-match on just the events (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Event)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -168,7 +169,7 @@ func TestABIsMustMatchExtra(t *testing.T) {
 			]
 		}
 	]`), &abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var abiB abi.ABI
 	err = json.Unmarshal(([]byte)(`[
@@ -183,7 +184,7 @@ func TestABIsMustMatchExtra(t *testing.T) {
 			]
 		}
 	]`), &abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Fails match on whole (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
@@ -197,9 +198,9 @@ func TestABIsMustMatchExtra(t *testing.T) {
 
 	// Is ok for a sub-match on just the events (either direction)
 	err = ABIsMustMatch(context.Background(), abiA, abiB, abi.Event)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA, abi.Event)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -228,7 +229,7 @@ func TestABIsMustMatchOrder(t *testing.T) {
 			]
 		}
 	]`), &abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var abiB abi.ABI
 	err = json.Unmarshal(([]byte)(`[
@@ -253,17 +254,17 @@ func TestABIsMustMatchOrder(t *testing.T) {
 			]
 		}
 	]`), &abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ABIsMustMatch(context.Background(), abiB, abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	hashA, err := ABISolDefinitionHash(context.Background(), abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	hashB, err := ABISolDefinitionHash(context.Background(), abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *hashA, *hashB)
 
 }
@@ -290,7 +291,7 @@ func TestABIsDeepMisMatchName(t *testing.T) {
 			]
 		}
 	]`), &abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var abiB abi.ABI
 	err = json.Unmarshal(([]byte)(`[
@@ -312,7 +313,7 @@ func TestABIsDeepMisMatchName(t *testing.T) {
 			]
 		}
 	]`), &abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Fails match simply due to that one missing _ on _sku vs. sku
 	err = ABIsMustMatch(context.Background(), abiA, abiB)
@@ -321,9 +322,9 @@ func TestABIsDeepMisMatchName(t *testing.T) {
 	assert.Regexp(t, "PD020004.*NestedTypeEvent", err)
 
 	hashA, err := ABISolDefinitionHash(context.Background(), abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	hashB, err := ABISolDefinitionHash(context.Background(), abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, *hashA, *hashB)
 
 }
@@ -343,11 +344,11 @@ func TestABIsBadTypes(t *testing.T) {
 			]
 		}
 	]`), &abiA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var abiB abi.ABI
 	err = json.Unmarshal(([]byte)(`[]`), &abiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Fails match simply due to that one missing _ on _sku vs. sku
 	err = ABIsMustMatch(context.Background(), abiA, abiB)

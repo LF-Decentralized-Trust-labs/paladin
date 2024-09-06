@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -77,7 +78,7 @@ func newTestRegistryPluginManager(t *testing.T, setup *testManagers) (context.Co
 	pc := newTestPluginManager(t, setup)
 
 	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	done := make(chan struct{})
 	go func() {
@@ -136,19 +137,19 @@ func TestRegistryRequestsOK(t *testing.T) {
 	registryAPI := <-waitForAPI
 
 	_, err := registryAPI.ConfigureRegistry(ctx, &prototk.ConfigureRegistryRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// This is the point the registry manager would call us to say the registry is initialized
 	// (once it's happy it's updated its internal state)
 	registryAPI.Initialized()
-	assert.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx))
 
 	callbacks := <-waitForCallbacks
 
 	utr, err := callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{
 		Node: "node1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, utr)
 
 }
@@ -160,6 +161,7 @@ func TestRegistryRegisterFail(t *testing.T) {
 	tdm := &testRegistryManager{
 		registries: map[string]plugintk.Plugin{
 			"registry1": &mockPlugin[prototk.RegistryMessage]{
+				t:              t,
 				connectFactory: registryConnectFactory,
 				headerAccessor: registryHeaderAccessor,
 				preRegister: func(registryID string) *prototk.RegistryMessage {
@@ -197,6 +199,7 @@ func TestFromRegistryRequestBadReq(t *testing.T) {
 	trm := &testRegistryManager{
 		registries: map[string]plugintk.Plugin{
 			"registry1": &mockPlugin[prototk.RegistryMessage]{
+				t:              t,
 				connectFactory: registryConnectFactory,
 				headerAccessor: registryHeaderAccessor,
 				sendRequest: func(pluginID string) *prototk.RegistryMessage {

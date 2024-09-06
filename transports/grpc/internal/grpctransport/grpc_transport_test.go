@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -243,17 +244,17 @@ func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 
 	serverDone := make(chan struct{})
 	l, err := net.Listen("tcp", "127.0.0.1:0")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	go func() {
 		defer close(serverDone)
 		_ = unsecuredServer.Serve(l)
 	}()
 
 	conn, err := grpc.NewClient("dns:///"+l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := proto.NewPaladinGRPCTransportClient(conn)
 	s, err := client.ConnectSendStream(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for err == nil {
 		err = s.Send(&proto.Message{

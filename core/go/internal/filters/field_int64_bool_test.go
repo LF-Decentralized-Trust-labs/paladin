@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBoolField(t *testing.T) {
@@ -35,7 +36,7 @@ func TestBoolField(t *testing.T) {
 	assert.Regexp(t, "PD010704", err)
 
 	nv, err := Int64BoolField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, Int64BoolField("test").SupportsLIKE())

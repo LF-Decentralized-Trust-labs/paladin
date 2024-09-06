@@ -25,6 +25,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRCPMethod0(t *testing.T) {
@@ -47,7 +48,7 @@ func TestRCPMethod0(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -80,7 +81,7 @@ func TestRCPMethod1(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -115,7 +116,7 @@ func TestRCPMethod2(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -152,7 +153,7 @@ func TestRCPMethod3(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -191,7 +192,7 @@ func TestRCPMethod4(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -232,7 +233,7 @@ func TestRCPMethod5(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -267,7 +268,7 @@ func TestRCPMethodNullParamPointerPassed(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -302,7 +303,7 @@ func TestRCPMethodNullParamNonPointerEmptyVal(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",
@@ -332,7 +333,7 @@ func TestRCPMethodInvalidValue(t *testing.T) {
 		}`).
 		SetError(&errResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
 	assert.Regexp(t, "PD011004", errResponse.Error.Message)
@@ -359,7 +360,7 @@ func TestRCPMethodWrongParamCount(t *testing.T) {
 		}`).
 		SetError(&errResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
 	assert.Regexp(t, "PD011003", errResponse.Error.Message)
@@ -385,7 +386,7 @@ func TestRCPMethodBadResult(t *testing.T) {
 		}`).
 		SetError(&errResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInternalError), errResponse.Error.Code)
 	assert.Regexp(t, "PD011005", errResponse.Error.Message)
