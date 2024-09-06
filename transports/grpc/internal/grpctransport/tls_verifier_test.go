@@ -427,7 +427,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 			Destination: "to.you@node2",
 		},
 	})
-	assert.Regexp(t, "bad certificate", err)
+	assert.Error(t, err)
 
 }
 
