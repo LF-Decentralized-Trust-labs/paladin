@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupDomainTests(t *testing.T) (context.Context, *pluginExerciser[prototk.DomainMessage], *DomainAPIFunctions, DomainCallbacks, map[string]func(*prototk.DomainMessage), func()) {
@@ -71,7 +72,7 @@ func TestDomainCallback_FindAvailableStates(t *testing.T) {
 		}
 	}
 	_, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestDomainFunction_ConfigureDomain(t *testing.T) {

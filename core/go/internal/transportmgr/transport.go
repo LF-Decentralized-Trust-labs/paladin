@@ -176,15 +176,14 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 }
 
 func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	node, err := tktypes.PrivateIdentityLocator(req.Destination).Node(ctx, false)
-	if err != nil || node == t.tm.localNodeName {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidDestinationSend, t.tm.localNodeName, req.Destination)
+	if req.Node == t.tm.localNodeName {
+		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidLocalNode, req.Node)
 	}
 
 	// Do a cache-optimized in the registry manager to get the details of the transport.
 	// We expect this to succeed because we did it before sending (see notes on Send() function)
 	var transportDetails string
-	availableTransports, err := t.tm.registryManager.GetNodeTransports(ctx, node)
+	availableTransports, err := t.tm.registryManager.GetNodeTransports(ctx, req.Node)
 	for _, atd := range availableTransports {
 		if atd.Transport == t.name {
 			transportDetails = atd.TransportDetails
@@ -192,7 +191,7 @@ func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTra
 		}
 	}
 	if transportDetails == "" {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportDetailsNotAvailable, t.name, node)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportDetailsNotAvailable, t.name, req.Node)
 	}
 	return &prototk.GetTransportDetailsResponse{
 		TransportDetails: transportDetails,

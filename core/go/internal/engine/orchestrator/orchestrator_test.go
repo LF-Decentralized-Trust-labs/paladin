@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
@@ -175,7 +176,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 	mockSequencer := enginemocks.NewSequencer(t)
 	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
 	testOc.Stop()
 	<-ocDone
@@ -195,7 +196,7 @@ func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	<-ocDone
 }
 
@@ -224,7 +225,7 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 	testOc.StageController = &mSC
 
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	waitForAction := make(chan bool, 1)
 	mSC.On("GetAllStages").Maybe().Return([]string{"test"})
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("remove")

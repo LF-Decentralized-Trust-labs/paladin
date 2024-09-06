@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -33,16 +34,16 @@ func writeTestConfig(t *testing.T) (configFile string) {
 
 	var conf *componentmgr.Config
 	err := componentmgr.ReadAndParseYAMLFile(ctx, "../../test/config/sqlite.memory.config.yaml", &conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// For running in this unit test the dirs are different to the sample config
 	conf.DB.SQLite.MigrationsDir = "../../db/migrations/sqlite"
 	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
 	configFile = path.Join(t.TempDir(), "test.config.yaml")
 	f, err := os.Create(configFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer f.Close()
 	err = yaml.NewEncoder(f).Encode(conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return configFile
 }
@@ -86,7 +87,7 @@ log:
 `
 	var conf componentmgr.Config
 	err := yaml.Unmarshal([]byte(yamlConf), &conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotNil(t, conf.DomainManagerConfig.Domains["pente"].Config)
 }

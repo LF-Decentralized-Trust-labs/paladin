@@ -32,6 +32,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const testAutoFuelingSourceAddress = "0x4e598f6e918321dd47c86e7a077b4ab0e7414846"
@@ -56,7 +57,7 @@ func NewTestBalanceManager(ctx context.Context, t *testing.T) (*BalanceManagerWi
 	mockAFTxEngine := enginemocks.NewBaseLedgerTxEngine(t)
 
 	testManagerWithMocks, err := NewBalanceManagerWithInMemoryTracking(ctx, bmConf, mEthClient, mockAFTxEngine)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return testManagerWithMocks.(*BalanceManagerWithInMemoryTracking), mEthClient, mockAFTxEngine
 }
@@ -132,13 +133,13 @@ func TestIsAutoFuelingEnabled(t *testing.T) {
 	afConfig.Set(BalanceManagerAutoFuelingSourceAddressString, testAutoFuelingSourceAddress)
 
 	bm, err := NewBalanceManagerWithInMemoryTracking(ctx, bmConf, mEthClient, mockAFTxEngine)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, bm.IsAutoFuelingEnabled(ctx))
 
 	afConfig.Set(BalanceManagerAutoFuelingSourceAddressString, "") // TODO: validate the address
 	bm, err = NewBalanceManagerWithInMemoryTracking(ctx, bmConf, mEthClient, mockAFTxEngine)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, bm.IsAutoFuelingEnabled(ctx))
 }
 
@@ -161,19 +162,19 @@ func TestGetAddressBalance(t *testing.T) {
 
 	mEthClient.On("GetBalance", mock.Anything, testAutoFuelingSourceAddress, "latest").Return(nil, errors.New("pop")).Once()
 	addressAccount, err := bm.GetAddressBalance(ctx, testAutoFuelingSourceAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, addressAccount)
 	assert.Equal(t, testSourceAddressBalanceString, addressAccount.Balance.String())
 
 	// next get should use the cache
 	addressAccount, err = bm.GetAddressBalance(ctx, testAutoFuelingSourceAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testSourceAddressBalanceString, addressAccount.Balance.String())
 
 	// next get should retrieve the balance again
 	bm.NotifyAddressBalanceChanged(ctx, testAutoFuelingSourceAddress)
 	addressAccount, err = bm.GetAddressBalance(ctx, testAutoFuelingSourceAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testSourceAddressBalanceNewString, addressAccount.Balance.String())
 
 	// test error
@@ -189,7 +190,7 @@ func TestAddressAccountSpend(t *testing.T) {
 
 	mEthClient.On("GetBalance", mock.Anything, testAutoFuelingSourceAddress, "latest").Return(ethtypes.NewHexInteger64(testSourceAddressBalance), nil).Once()
 	addressAccount, err := bm.GetAddressBalance(ctx, testAutoFuelingSourceAddress)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, addressAccount)
 	assert.Equal(t, testSourceAddressBalanceString, addressAccount.Balance.String())
 	assert.Equal(t, "0", addressAccount.Spent.String())
@@ -269,7 +270,7 @@ func TestTopUpAddressNoOpScenarios(t *testing.T) {
 	fuelingTx, err := bm.TopUpAccount(ctx, &baseTypes.AddressAccount{
 		Spent: big.NewInt(0),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 
 	// enough balance
@@ -277,7 +278,7 @@ func TestTopUpAddressNoOpScenarios(t *testing.T) {
 		Spent:   big.NewInt(10),
 		Balance: big.NewInt(10),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 
 	// destination address already reached max amount
@@ -287,7 +288,7 @@ func TestTopUpAddressNoOpScenarios(t *testing.T) {
 		Balance:               big.NewInt(100),
 		SpentTransactionCount: 10,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 
 	// no source address configured
@@ -297,7 +298,7 @@ func TestTopUpAddressNoOpScenarios(t *testing.T) {
 		Balance:               big.NewInt(0),
 		SpentTransactionCount: 10,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 
 }
@@ -342,7 +343,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction1, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction1, fuelingTx)
 
 	// Test no new fueling transaction when the current one is pending
@@ -357,7 +358,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	// return not yet completed, so should return the existing pending transaction
 	mockAFTxEngine.On("CheckTransactionCompleted", mock.Anything, expectedFuelingTransaction1).Return(false).Once()
 	newFuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction1, newFuelingTx)
 
 	// current transaction completed, replace with new transaction
@@ -371,7 +372,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount2) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction2, false, nil).Once()
 	fuelingTx2, err := bm.TopUpAccount(ctx, accountToTopUp2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction2, fuelingTx2)
 
 	// test when couldn't record the result of the submitted transaction
@@ -404,7 +405,7 @@ func TestTopUpWithNoAmountModificationWithMultipleFuelingTxs(t *testing.T) {
 	mockAFTxEngine.On("GetPendingFuelingTransaction", mock.Anything, testAutoFuelingSourceAddress, testDestAddress).Return(expectedFuelingTransaction3, nil).Once()
 	mockAFTxEngine.On("CheckTransactionCompleted", mock.Anything, expectedFuelingTransaction3).Return(false).Once()
 	fuelingTx3, err := bm.TopUpAccount(ctx, accountToTopUp3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction3, fuelingTx3)
 }
 
@@ -441,7 +442,7 @@ func TestTopUpSuccessTopUpMinAheadUseMin(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction, fuelingTx)
 
 }
@@ -479,7 +480,7 @@ func TestTopUpSuccessTopUpMinAheadUseMax(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction, fuelingTx)
 
 }
@@ -517,7 +518,7 @@ func TestTopUpSuccessTopUpMinAheadUseAvg(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction, fuelingTx)
 
 }
@@ -551,7 +552,7 @@ func TestTopUpSuccessUseMinDestBalance(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction, fuelingTx)
 }
 
@@ -585,7 +586,7 @@ func TestTopUpSuccessUseMaxDestBalance(t *testing.T) {
 		return transfer.Value.BigInt().Cmp(expectedTopUpAmount) == 0 && transfer.To.String() == testDestAddress
 	})).Return(expectedFuelingTransaction, false, nil).Once()
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedFuelingTransaction, fuelingTx)
 }
 
@@ -607,7 +608,7 @@ func TestTopUpNoOpAlreadyAboveMaxDestBalance(t *testing.T) {
 	// set max top up to balance to 90, which is below the balance
 	bm.maxDestBalance = big.NewInt(90)
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 }
 
@@ -629,7 +630,7 @@ func TestTopUpNoOpAmountBelowMinThreshold(t *testing.T) {
 	// set minimum top up threshold to 150, which is above the required amount
 	bm.minThreshold = big.NewInt(150)
 	fuelingTx, err := bm.TopUpAccount(ctx, accountToTopUp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, fuelingTx)
 }
 

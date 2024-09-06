@@ -57,7 +57,7 @@ bar: 123
 	result := testConfigType{}
 
 	err = ReadAndParseYAMLFile(ctx, tempFile.Name(), &result)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, result.Foo)
 	assert.Equal(t, *expectedResult.Foo, *result.Foo)
 	require.NotNil(t, result.Bar)
@@ -105,7 +105,7 @@ baz: 456
 	result := testConfigType{}
 
 	err = ReadAndParseYAMLFile(ctx, tempFile.Name(), &result)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, result.Child)
 	require.NotNil(t, result.Child.Foo)
 	assert.Equal(t, *expectedResult.Child.Foo, *result.Child.Foo)
@@ -159,7 +159,7 @@ baz: 456
 	result := testConfigType{}
 
 	err = ReadAndParseYAMLFile(ctx, tempFile.Name(), &result)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, result.Child)
 	require.NotNil(t, result.Child.Foo)
 	assert.Equal(t, *expectedResult.Child.Foo, *result.Child.Foo)

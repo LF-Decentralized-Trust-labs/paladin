@@ -36,6 +36,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestBlockListener(t *testing.T) (context.Context, *blockListener, *rpcbackendmocks.WebSocketRPCClient, func()) {
@@ -66,7 +67,7 @@ func newTestBlockListenerConf(t *testing.T, ctx context.Context, config *Config)
 
 	bl, err := newBlockListener(ctx, config, &rpcclient.WSConfig{
 		HTTPConfig: rpcclient.HTTPConfig{URL: "ws://localhost:0" /* unused per below re-wire to mRPC */}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	bl.wsConn = mRPC
 	return bl, mRPC
 }
@@ -86,7 +87,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 
 	h, err := bl.getHighestBlock(ctx)
 	assert.Equal(t, uint64(12345), h)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	done() // Stop immediately in this case, while we're in the polling interval
 
 	<-bl.listenLoopDone
@@ -211,7 +212,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 	}, &rpcclient.WSConfig{
 		HTTPConfig: rpcclient.HTTPConfig{URL: url},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer cancelCtx()
 
 	svrDone := make(chan struct{})
@@ -224,7 +225,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 			case rpcStr := <-toServer:
 				var rpcReq rpcbackend.RPCRequest
 				err := json.Unmarshal([]byte(rpcStr), &rpcReq)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				rpcRes := &rpcbackend.RPCResponse{
 					JSONRpc: rpcReq.JSONRpc,
 					ID:      rpcReq.ID,
@@ -267,7 +268,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 					assert.Fail(t, "unexpected RPC call: %+v", rpcReq)
 				}
 				b, err := json.Marshal(rpcRes)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				fromServer <- string(b)
 			case <-ctx.Done():
 				return

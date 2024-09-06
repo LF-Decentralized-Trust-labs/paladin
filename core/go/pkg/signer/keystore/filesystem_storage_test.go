@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
@@ -37,7 +38,7 @@ func newTestFilesystemStore(t *testing.T) (context.Context, *filesystemStore) {
 	store, err := NewFilesystemStore(ctx, api.FileSystemConfig{
 		Path: confutil.P(t.TempDir()),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	store.Close()
 
@@ -54,7 +55,7 @@ func TestFileSystemStoreBadDir(t *testing.T) {
 	assert.Regexp(t, "PD011400", err)
 
 	err = os.WriteFile(badPath, []byte{}, 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = NewFilesystemStore(context.Background(), api.FileSystemConfig{
 		Path: confutil.P(badPath),
@@ -66,13 +67,13 @@ func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
 	ctx, fs := newTestFilesystemStore(t)
 
 	key0, err := secp256k1.GenerateSecp256k1KeyPair()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
 		Name: "42",
 		Path: []*proto.ResolveKeyPathSegment{{Name: "bob"}, {Name: "blue"}},
 	}, func() ([]byte, error) { return key0.PrivateKeyBytes(), nil })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, keyBytes, key0.PrivateKeyBytes())
 	assert.Equal(t, "bob/blue/42", keyHandle)
@@ -80,21 +81,21 @@ func TestFileSystemStoreCreateSecp256k1(t *testing.T) {
 	assert.NotNil(t, cached)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyBytes, key0.PrivateKeyBytes())
 
 	fs.cache.Delete(keyHandle)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyBytes, key0.PrivateKeyBytes())
 
 	// Check the JSON doesn't contain an address
 	var jsonWallet map[string]interface{}
 	b, err := os.ReadFile(path.Join(fs.path, "_bob", "_blue", "-42.key"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = json.Unmarshal(b, &jsonWallet)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, hasAddressProperty := jsonWallet["address"]
 	assert.False(t, hasAddressProperty)
 
@@ -112,7 +113,7 @@ func TestFileSystemStoreCreateBabyjubjub(t *testing.T) {
 			{Name: "blue"},
 		},
 	}, func() ([]byte, error) { return privKey[:], nil })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, keyBytes, privKey[:])
 	assert.Equal(t, "bob/blue/42", keyHandle)
@@ -120,13 +121,13 @@ func TestFileSystemStoreCreateBabyjubjub(t *testing.T) {
 	assert.NotNil(t, cached)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyBytes, privKey[:])
 
 	fs.cache.Delete(keyHandle)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyBytes, privKey[:])
 
 }
@@ -139,7 +140,7 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 	keyBytes, keyHandle, err := fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
 		Name: "sally",
 	}, func() ([]byte, error) { return phrase, nil })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, phrase, keyBytes)
 	assert.Equal(t, "sally", keyHandle)
@@ -147,13 +148,13 @@ func TestFileSystemStoreCreateReloadMnemonic(t *testing.T) {
 	assert.NotNil(t, cached)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, phrase, keyBytes)
 
 	fs.cache.Delete(keyHandle)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, phrase, keyBytes)
 
 }
@@ -176,7 +177,7 @@ func TestFileSystemClashes(t *testing.T) {
 	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "-clash"), fs.dirMode)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, _, err = fs.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
 		Name: "clash",
@@ -189,7 +190,7 @@ func TestCreateWalletFileFail(t *testing.T) {
 	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "clash.key"), fs.dirMode)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = fs.createWalletFile(ctx, path.Join(fs.path, "clash.key"), path.Join(fs.path, "clash.pwd"),
 		func() ([]byte, error) { return []byte{}, nil })
@@ -205,7 +206,7 @@ func TestReadWalletFileFail(t *testing.T) {
 	ctx, fs := newTestFilesystemStore(t)
 
 	err := os.MkdirAll(path.Join(fs.path, "dir.key"), fs.dirMode)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = fs.readWalletFile(ctx, path.Join(fs.path, "dir"), "")
 	assert.Regexp(t, "PD011401", err)
@@ -219,10 +220,10 @@ func TestReadPassFileFail(t *testing.T) {
 
 	_, err := fs.createWalletFile(ctx, keyFilePath, passwordFilePath,
 		func() ([]byte, error) { return []byte{0x01}, nil })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = os.Remove(passwordFilePath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = fs.readWalletFile(ctx, keyFilePath, passwordFilePath)
 	assert.Regexp(t, "PD011402", err)

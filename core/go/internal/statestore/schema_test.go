@@ -23,6 +23,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetSchemaNotFoundNil(t *testing.T) {
@@ -32,7 +33,7 @@ func TestGetSchemaNotFoundNil(t *testing.T) {
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	s, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, s)
 }
 

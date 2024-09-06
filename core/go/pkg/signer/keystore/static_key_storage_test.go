@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) (context.Context, *staticStore) {
@@ -35,7 +36,7 @@ func newTestStaticStore(t *testing.T, keys map[string]api.StaticKeyEntryConfig) 
 	store, err := NewStaticKeyStore(ctx, api.StaticKeyStorageConfig{
 		Keys: keys,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	store.Close()
 
@@ -47,7 +48,7 @@ func TestStaticStoreFileFileWithTrim(t *testing.T) {
 	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
@@ -58,7 +59,7 @@ func TestStaticStoreFileFileWithTrim(t *testing.T) {
 	})
 
 	loadedKey, err := store.LoadKeyMaterial(ctx, "myKey")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ([]byte)(keyData), loadedKey)
 
 }
@@ -68,7 +69,7 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
@@ -79,9 +80,9 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 	})
 
 	loadedKey, err := store.LoadKeyMaterial(ctx, "myKey")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	keyDataDecoded, err := hex.DecodeString(keyData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyDataDecoded, loadedKey)
 
 }
@@ -89,7 +90,7 @@ func TestStaticStoreHexLoadFile(t *testing.T) {
 func TestStaticStoreBase64InConf(t *testing.T) {
 
 	keyData, err := hex.DecodeString(tktypes.RandHex(32))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b64KeyData := base64.StdEncoding.EncodeToString(keyData)
 
 	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
@@ -100,7 +101,7 @@ func TestStaticStoreBase64InConf(t *testing.T) {
 	})
 
 	loadedKey, err := store.LoadKeyMaterial(ctx, "myKey")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyData, loadedKey)
 
 }
@@ -193,7 +194,7 @@ func TestStaticStoreResolveOK(t *testing.T) {
 			{Name: "shiny"},
 		},
 	}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "my/shiny/key%20ten", keyHandle)
 	assert.Equal(t, ([]byte)("my key"), keyData)
 

@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetup ...func(mc *componentmocks.AllComponents)) (context.Context, *registryManager, func()) {
@@ -40,14 +41,14 @@ func newTestRegistryManager(t *testing.T, conf *RegistryManagerConfig, extraSetu
 	tm := NewRegistryManager(ctx, conf)
 
 	initData, err := tm.PreInit(mc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, initData)
 
 	err = tm.PostInit(mc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = tm.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return ctx, tm.(*registryManager), func() {
 		cancelCtx()

@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -77,7 +78,7 @@ func newTestDomainPluginManager(t *testing.T, setup *testManagers) (context.Cont
 	pc := newTestPluginManager(t, setup)
 
 	tpl, err := NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.loaderID.String(), setup.allPlugins())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	done := make(chan struct{})
 	go func() {
@@ -194,25 +195,25 @@ func TestDomainRequestsOK(t *testing.T) {
 	cdr, err := domainAPI.ConfigureDomain(ctx, &prototk.ConfigureDomainRequest{
 		ChainId: int64(12345),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "ABI1", cdr.DomainConfig.ConstructorAbiJson)
 
 	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
 		DomainUuid: domainID,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// This is the point the domain manager would call us to say the domain is initialized
 	// (once it's happy it's updated its internal state)
 	domainAPI.Initialized()
-	assert.NoError(t, pc.WaitForInit(ctx))
+	require.NoError(t, pc.WaitForInit(ctx))
 
 	idr, err := domainAPI.InitDeploy(ctx, &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
 			TransactionId: "deploy_tx1_init",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "lookup1", idr.RequiredVerifiers[0].Lookup)
 
 	pdr, err := domainAPI.PrepareDeploy(ctx, &prototk.PrepareDeployRequest{
@@ -220,7 +221,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			TransactionId: "deploy_tx1_prepare",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "signing1", *pdr.Signer)
 
 	itr, err := domainAPI.InitTransaction(ctx, &prototk.InitTransactionRequest{
@@ -228,7 +229,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			TransactionId: "tx2_init",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "lookup2", itr.RequiredVerifiers[0].Lookup)
 
 	atr, err := domainAPI.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
@@ -236,7 +237,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			TransactionId: "tx2_prepare",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, atr.AssemblyResult)
 
 	etr, err := domainAPI.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
@@ -244,7 +245,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			TransactionId: "tx2_endorse",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_SIGN, etr.EndorsementResult)
 
 	ptr, err := domainAPI.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
@@ -252,14 +253,14 @@ func TestDomainRequestsOK(t *testing.T) {
 			TransactionId: "tx2_prepare",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
 
 	callbacks := <-waitForCallbacks
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: "schema1",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "12345", fas.States[0].Id)
 }
 
@@ -270,6 +271,7 @@ func TestDomainRegisterFail(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
@@ -307,6 +309,7 @@ func TestFromDomainRequestBadReq(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				sendRequest: func(domainID string) *prototk.DomainMessage {

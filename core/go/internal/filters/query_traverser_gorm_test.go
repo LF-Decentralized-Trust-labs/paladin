@@ -23,6 +23,7 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -100,10 +101,10 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
@@ -112,7 +113,7 @@ func TestBuildQueryJSONNestedAndOr(t *testing.T) {
 			"masked":   Int64BoolField("masked"),
 			"cid":      Int256Field("correl_id"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 
@@ -134,16 +135,16 @@ func TestBuildQuerySingleNestedOr(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a'", generatedSQL)
@@ -164,10 +165,10 @@ func TestBuildQuerySingleNestedWithResolverErrorTag(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{}).Count(&count)
@@ -191,10 +192,10 @@ func TestBuildQuerySingleNestedWithResolverErrorValue(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
@@ -215,10 +216,10 @@ func TestBuildQueryResolverErrorMissing(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
@@ -269,10 +270,10 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
@@ -282,7 +283,7 @@ func TestBuildQueryJSONEqual(t *testing.T) {
 			"cid":      Int256Field("correl_id"),
 			"created":  TimestampField("created_at"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE created_at = 981173106000000000 AND tag != 'abc' AND LOWER(tag) = LOWER('ABC') AND LOWER(tag) != LOWER('abc') AND correl_id IS NOT NULL LIMIT 10", generatedSQL)
@@ -317,10 +318,10 @@ func TestBuildQueryJSONLike(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
@@ -330,7 +331,7 @@ func TestBuildQueryJSONLike(t *testing.T) {
 			"cid":      Int256Field("correl_id"),
 			"created":  Int64Field("created_at"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 
@@ -350,16 +351,16 @@ func TestBuildQueryJSONGreaterThan(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"sequence": Int64Field("sequence"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence > 0 LIMIT 10", generatedSQL)
@@ -382,17 +383,17 @@ func TestBuildQueryJSONLessThan(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"amount": Uint256Field("amount"),
 			"delta":  Int256Field("delta"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE amount < '0000000000000000000000000000000000000000000000000000000000003039' AND delta < '0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9c' LIMIT 10", generatedSQL)
@@ -415,17 +416,17 @@ func TestBuildQueryJSONGreaterThanOrEqual(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"sequence": Int64Field("sequence"),
 			"delta":    Int256Field("delta"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence >= 0 AND delta >= '10000000000000000000000000000000000000000000000000000000000000064' LIMIT 10", generatedSQL)
@@ -444,16 +445,16 @@ func TestBuildQueryJSONLessThanOrEqual(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"sequence": Int64Field("sequence"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 LIMIT 10", generatedSQL)
@@ -477,16 +478,16 @@ func TestBuildQueryJSONIn(t *testing.T) {
 			}
 		]
 	}`), &qf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"tag": StringField("tag"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag IN ('a','b','c') AND tag NOT IN ('x','y','z') LIMIT 10", generatedSQL)
@@ -495,12 +496,12 @@ func TestBuildQueryJSONIn(t *testing.T) {
 func TestBuildQueryJSONBadModifiers(t *testing.T) {
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testJSON := func(j string) error {
 		var qf QueryJSON
 		err := json.Unmarshal([]byte(j), &qf)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		var count int64
 		db := qf.BuildGORM(context.Background(), p.P.DB().Table("test"), FieldMap{
 			"tag": StringField("tag"),
@@ -531,12 +532,12 @@ func TestBuildQueryJSONBadModifiers(t *testing.T) {
 func TestBuildQueryJSONBadFields(t *testing.T) {
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testJSON := func(j string) error {
 		var qf QueryJSON
 		err := json.Unmarshal([]byte(j), &qf)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		var count int64
 		db := qf.BuildGORM(context.Background(), p.P.DB().Table("test"), FieldMap{
 			"tag": StringField("tag"),
@@ -583,16 +584,16 @@ func TestBuildQueryJSONContainsShortNames(t *testing.T) {
 			}
 		]
 	}`), &qf1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	generatedSQL := p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf1.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"sequence": Int64Field("sequence"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence = 12345", generatedSQL)
@@ -612,14 +613,14 @@ func TestBuildQueryJSONContainsShortNames(t *testing.T) {
 			}
 		]
 	}`), &qf2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	generatedSQL = p.P.DB().ToSQL(func(tx *gorm.DB) *gorm.DB {
 		var count int64
 		db := qf2.BuildGORM(context.Background(), tx.Table("test"), FieldMap{
 			"sequence": Int64Field("sequence"),
 		}).Count(&count)
-		assert.NoError(t, db.Error)
+		require.NoError(t, db.Error)
 		return db
 	})
 	assert.Equal(t, "SELECT count(*) FROM `test` WHERE sequence <= 12345 AND sequence > 12345", generatedSQL)

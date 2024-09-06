@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOrchestratorPolling(t *testing.T) {
@@ -384,7 +385,7 @@ func TestOrchestratorStopWhenBalanceUnavailable(t *testing.T) {
 	mEC.On("GetBalance", mock.Anything, testMainSigningAddress, "latest").Return(nil, fmt.Errorf("failed getting balance")).Once()
 	te.unavailableBalanceHandlingStrategy = OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyContinue
 	waitingForBalance, err := te.ProcessInFlightTransaction(ctx, []*InFlightTransactionStageController{mockIT})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, waitingForBalance)
 	assert.Equal(t, OrchestratorStateRunning, te.state)
 
@@ -392,7 +393,7 @@ func TestOrchestratorStopWhenBalanceUnavailable(t *testing.T) {
 	mEC.On("GetBalance", mock.Anything, testMainSigningAddress, "latest").Return(nil, fmt.Errorf("failed getting balance")).Once()
 	te.unavailableBalanceHandlingStrategy = OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyWait
 	waitingForBalance, err = te.ProcessInFlightTransaction(ctx, []*InFlightTransactionStageController{mockIT})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, waitingForBalance)
 	assert.Equal(t, OrchestratorStateRunning, te.state)
 
@@ -401,7 +402,7 @@ func TestOrchestratorStopWhenBalanceUnavailable(t *testing.T) {
 	te.unavailableBalanceHandlingStrategy = OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyStop
 	te.stopProcess = make(chan bool, 1)
 	waitingForBalance, err = te.ProcessInFlightTransaction(ctx, []*InFlightTransactionStageController{mockIT})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, waitingForBalance)
 	<-te.stopProcess
 }
@@ -442,7 +443,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	mEC.On("GetBalance", mock.Anything, testMainSigningAddress, "latest").Return(ethtypes.NewHexInteger64(100), nil).Once()
 	te.unavailableBalanceHandlingStrategy = OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyContinue
 	waitingForBalance, err := te.ProcessInFlightTransaction(ctx, []*InFlightTransactionStageController{mockIT})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, waitingForBalance)
 	assert.Equal(t, OrchestratorStateRunning, te.state)
 
@@ -450,7 +451,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	mockManagedTx1.GasPrice = nil
 	te.unavailableBalanceHandlingStrategy = OrchestratorBalanceCheckUnavailableBalanceHandlingStrategyContinue
 	waitingForBalance, err = te.ProcessInFlightTransaction(ctx, []*InFlightTransactionStageController{mockIT})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, waitingForBalance)
 	assert.Equal(t, OrchestratorStateRunning, te.state)
 }
@@ -500,7 +501,7 @@ func TestOrchestratorReceiptHandler(t *testing.T) {
 
 	// added receipt
 	err := receiptHandler(ctx, mockIT1.stateManager.GetTxID(), testReceipt)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	iftxs := mockIT1.stateManager.(*inFlightTransactionState)
 	assert.Equal(t, testReceipt, iftxs.bufferedStageOutputs[0].ReceiptOutput.Receipt)
@@ -554,7 +555,7 @@ func TestOrchestratorConfirmationHandler(t *testing.T) {
 
 	// added confirmation
 	err := confirmationHandler(ctx, mockIT1.stateManager.GetTxID(), testConfirmation)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	iftxs := mockIT1.stateManager.(*inFlightTransactionState)
 	assert.Equal(t, testConfirmation, iftxs.bufferedStageOutputs[0].ConfirmationOutput.Confirmations)

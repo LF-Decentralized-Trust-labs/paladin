@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupRegistryTests(t *testing.T) (context.Context, *pluginExerciser[prototk.RegistryMessage], *RegistryAPIFunctions, RegistryCallbacks, map[string]func(*prototk.RegistryMessage), func()) {
@@ -71,7 +72,7 @@ func TestRegistryallback_UpsertTransportDetails(t *testing.T) {
 		}
 	}
 	_, err := callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestRegistryFunction_ConfigureRegistry(t *testing.T) {

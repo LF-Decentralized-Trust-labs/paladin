@@ -92,7 +92,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		break
 	}
 	// We just unsubscribe straight away
@@ -100,7 +100,7 @@ func TestRunTransactionSubmission(t *testing.T) {
 		Topic:       "anything-it-does-not-matter",
 		Destination: "test-destination",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	submitTransaction := transactionsPB.SubmitTransactionRequest{
 		From:            "fromID",
@@ -178,7 +178,7 @@ signer:
 	indexer, err := blockindexer.NewBlockIndexer(ctx, &blockindexer.Config{
 		FromBlock: tktypes.RawJSON(`"latest"`), // don't want earlier events
 	}, &testConfig.Blockchain.WS, p)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	type solBuild struct {
 		ABI      abi.ABI                   `json:"abi"`
@@ -220,27 +220,27 @@ signer:
 	ethClient := ecf.HTTPClient()
 
 	simpleStorage, err := ethClient.ABI(ctx, simpleStorageBuild.ABI)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	txHash1, err := simpleStorage.MustConstructor(tktypes.HexBytes(simpleStorageBuild.Bytecode)).R(ctx).
 		Signer("key1").Input(`{"x":11223344}`).SignAndSend()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	deployTX, err := indexer.WaitForTransaction(ctx, *txHash1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	contractAddr := deployTX.ContractAddress.Address0xHex()
 
 	getX1, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{"x":"11223344"}`, string(getX1))
 
 	txHash2, err := simpleStorage.MustFunction("set").R(ctx).
 		Signer("key1").To(contractAddr).Input(`{"_x":99887766}`).SignAndSend()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = indexer.WaitForTransaction(ctx, *txHash2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	getX2, err := simpleStorage.MustFunction("get").R(ctx).To(contractAddr).CallJSON()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{"x":"99887766"}`, string(getX2))
 
 	// Expect our event listener to be queued up with two Changed events
@@ -293,7 +293,7 @@ waitForEngine:
 			continue
 		}
 		destinations, err := commsBus.Broker().ListDestinations(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		for _, d := range destinations {
 			if d == "kata-txn-engine" {
 				// The engine is listening

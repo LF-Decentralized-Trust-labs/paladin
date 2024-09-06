@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testInFlightTransactionWithMocksAndConf struct {
@@ -168,7 +169,7 @@ func TestProduceLatestInFlightStageContextTriggerStatusUpdate(t *testing.T) {
 	mtx.TransactionHash = ""
 	assert.Nil(t, it.stateManager.GetRunningStageContext(ctx))
 	err := it.TriggerStatusUpdate(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	for len(inFlightStageMananger.bufferedStageOutputs) == 0 {
 		// wait for event

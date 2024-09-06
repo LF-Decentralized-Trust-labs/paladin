@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -99,7 +100,7 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Expect to get 15 * 2 events (1 TX x 3 Events per block, but we only listen to two)
 	for i := 0; i < len(blocks)*2; i++ {
@@ -158,7 +159,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 
 	// Do a full start now without a block listener, and wait for the ut notification of all the blocks
 	err := bi.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	for i := 0; i < len(blocks); i++ {
 		b := <-bi.utBatchNotify
 		assert.Len(t, b.blocks, 1)
@@ -182,7 +183,7 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 		Definition: internalESConfig,
 		Handler:    handler,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// And start it
 	es.start()
@@ -214,17 +215,17 @@ func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 		CommitBatchSize: confutil.P(1),
 		FromBlock:       tktypes.RawJSON(`0`),
 	}, bi.persistence, bi.blockListener)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = bi.Start(&InternalEventStream{
 		Definition: internalESConfig,
 		Handler:    handler,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check it's back to the checkpoint we expect
 	es = bi.eventStreams[uuid.MustParse(esID)]
 	cp, err := es.processCheckpoint()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(14), cp)
 
 	// And check we don't get any events
@@ -316,7 +317,7 @@ func TestUpsertInternalEventStreamMismatchExisting(t *testing.T) {
 	})
 	assert.Regexp(t, "PD020004", err)
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
@@ -341,7 +342,7 @@ func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
 	})
 	assert.Regexp(t, "pop", err)
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
@@ -363,7 +364,7 @@ func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
 	})
 	assert.Regexp(t, "pop", err)
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestProcessCheckpointFail(t *testing.T) {
@@ -381,7 +382,7 @@ func TestProcessCheckpointFail(t *testing.T) {
 	}
 	es.detector()
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestGetHighestIndexedBlockFail(t *testing.T) {
@@ -400,7 +401,7 @@ func TestGetHighestIndexedBlockFail(t *testing.T) {
 	}
 	es.detector()
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestReturnToCatchupAfterStartHead(t *testing.T) {
@@ -467,7 +468,7 @@ func testReturnToCatchupAfterStart(t *testing.T, headBlock int64) {
 	cancelCtx()
 	<-es.detectorDone
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestExitInCatchupPhase(t *testing.T) {
@@ -496,7 +497,7 @@ func TestExitInCatchupPhase(t *testing.T) {
 	}()
 	<-es.detectorDone
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestSendToDispatcherClosedNoBlock(t *testing.T) {

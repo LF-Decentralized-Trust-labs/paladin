@@ -20,21 +20,22 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/internal/tls"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWSConfigOK(t *testing.T) {
 	ctx := context.Background()
 	wsc, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "ws://localhost:8545"}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "ws://localhost:8545", wsc.WebSocketURL)
 }
 
 func TestWSConfigTLSOK(t *testing.T) {
 	ctx := context.Background()
 	wsc, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545"}})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "wss://localhost:8545", wsc.WebSocketURL)
 	assert.NotNil(t, wsc.TLSClientConfig)
 }
@@ -47,21 +48,21 @@ func TestWSConfigBadURL(t *testing.T) {
 
 func TestWSConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
-	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}}})
-	assert.Regexp(t, "PD010901", err)
+	_, err := ParseWSConfig(ctx, &WSConfig{HTTPConfig: HTTPConfig{URL: "wss://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}}})
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestHTTPonfigOK(t *testing.T) {
 	ctx := context.Background()
 	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "http://localhost:8545"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:8545", r.BaseURL)
 }
 
 func TestHTTPConfigTLSOK(t *testing.T) {
 	ctx := context.Background()
 	r, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "https://localhost:8545", r.BaseURL)
 }
 
@@ -73,6 +74,6 @@ func TestHTTPConfigBadURL(t *testing.T) {
 
 func TestHTTPConfigBadTLS(t *testing.T) {
 	ctx := context.Background()
-	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tls.Config{CAFile: t.TempDir()}})
-	assert.Regexp(t, "PD010901", err)
+	_, err := ParseHTTPConfig(ctx, &HTTPConfig{URL: "https://localhost:8545", TLS: tlsconf.Config{CAFile: t.TempDir()}})
+	assert.Regexp(t, "PD020401", err)
 }

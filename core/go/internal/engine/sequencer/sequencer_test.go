@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSequencerGraphOfOne(t *testing.T) {
@@ -42,16 +43,16 @@ func TestSequencerGraphOfOne(t *testing.T) {
 		TransactionId: txn1ID.String(),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID}).Return(nil).Once()
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	node1SequencerMockDependencies.dispatcherMock.AssertExpectations(t)
 }
 
@@ -71,16 +72,16 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 		OutputStateId: []string{stateID.String()},
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID}).Return(nil).Once()
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//now add a second transaction that is dependant on the first (before the first is confirmed)
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -88,16 +89,16 @@ func TestSequencerTwoGraphsOfOne(t *testing.T) {
 		TransactionId: txn2ID.String(),
 		InputStateId:  []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn2ID}).Return(nil).Once()
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestSequencerLocalUnendorsedDependency(t *testing.T) {
@@ -116,25 +117,25 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 		TransactionId: txn1ID.String(),
 		OutputStateId: []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = node1Sequencer.AssignTransaction(ctx, txn1ID.String())
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
 		NodeId:        node1ID.String(),
 		TransactionId: txn2ID.String(),
 		InputStateId:  []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// add the mock for dispatch now because we need to assert that it is called but not before txn1 is endorsed
 	node1SequencerMockDependencies.dispatcherMock.On("Dispatch", ctx, []uuid.UUID{txn1ID, txn2ID}).Return(nil).Once()
@@ -143,7 +144,7 @@ func TestSequencerLocalUnendorsedDependency(t *testing.T) {
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.dispatcherMock.AssertExpectations(t)
 }
@@ -169,7 +170,7 @@ func TestSequencerRemoteDependency(t *testing.T) {
 		NodeId:        remoteNodeId.String(),
 		OutputStateId: []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.delegatorMock.On("Delegate", ctx, txn2ID.String(), remoteNodeId.String()).Return(nil)
 
@@ -178,22 +179,22 @@ func TestSequencerRemoteDependency(t *testing.T) {
 		NodeId:        localNodeId.String(),
 		InputStateId:  []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//Second transaction (the spender of that state) is assembled on the local node
 	err = node1Sequencer.AssignTransaction(ctx, txn2ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -224,7 +225,7 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 		NodeId:        remoteNode1Id.String(),
 		OutputStateId: []string{stateIDA.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -233,14 +234,14 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 		InputStateId:  []string{stateIDA.String()},
 		OutputStateId: []string{stateIDB.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionDelegatedEvent(ctx, &pb.TransactionDelegatedEvent{
 		TransactionId:    txn2ID.String(),
 		DelegatingNodeId: remoteNode2Id.String(),
 		DelegateNodeId:   remoteNode1Id.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -248,25 +249,25 @@ func TestSequencerTransitiveRemoteDependency(t *testing.T) {
 		NodeId:        localNodeId.String(),
 		InputStateId:  []string{stateIDB.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should see an event relinquishing ownership of this this transaction to the first remote node
 	// even though the transaction's direct dependency is on the second remote node
 	node1SequencerMockDependencies.delegatorMock.On("Delegate", ctx, txn3ID.String(), remoteNode1Id.String()).Return(nil)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn3ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
@@ -298,7 +299,7 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 		NodeId:        remoteNode1Id.String(),
 		OutputStateId: []string{stateIDA.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Second transaction (the spender of that state and minter of a new state) is assembled on another remote node
 	err = node1Sequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -307,7 +308,7 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 		InputStateId:  []string{stateIDA.String()},
 		OutputStateId: []string{stateIDB.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//Third transaction (the spender of the output of the second transaction) is assembled on the local node
 	//but the local node has not been notified that txn2 has been delegated to remoteNode1 yet
@@ -316,24 +317,24 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 		NodeId:        localNodeId.String(),
 		InputStateId:  []string{stateIDB.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should see an event relinquishing ownership of this this transaction to the second remote node
 	node1SequencerMockDependencies.delegatorMock.On("Delegate", ctx, txn3ID.String(), remoteNode2Id.String()).Return(nil)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn3ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//We shouldn't see any dispatch, from the local sequencer, even when both transactions are endorsed
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = node1Sequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: txn2ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//Now a 4th node comes along and delegates txn4 (which has a dependency on txn3)
 	// this 4th node (remoteNode3) is in the same possition as the local node was.
@@ -353,12 +354,12 @@ func TestSequencerTransitiveRemoteDependencyTiming(t *testing.T) {
 		InputStateId:  []string{stateIDB.String()},
 		OutputStateId: []string{stateIDC.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1SequencerMockDependencies.delegatorMock.On("Delegate", ctx, txn4ID.String(), remoteNode2Id.String()).Return(nil)
 
 	err = node1Sequencer.AssignTransaction(ctx, txn4ID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -389,7 +390,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 		NodeId:        remoteNode1Id.String(),
 		OutputStateId: []string{stateID1.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Second transaction (the minter of the other state) is assembled on a different remote node
 	err = localNodeSequencer.HandleTransactionAssembledEvent(ctx, &pb.TransactionAssembledEvent{
@@ -397,7 +398,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 		NodeId:        remoteNode2Id.String(),
 		OutputStateId: []string{stateID2.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should see an event moving this transaction to the blocked stage
 	transportMock1.On("PublishEvent", ctx, mock.Anything).Run(func(args mock.Arguments) {
@@ -412,10 +413,10 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 		NodeId:        localNodeId.String(),
 		InputStateId:  []string{stateID1.String(), stateID2.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = localNodeSequencer.AssignTransaction(ctx, newTransactionID.String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	transportMock1.AssertExpectations(t)
 
@@ -423,17 +424,17 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	err = localNodeSequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: dependency1TransactionID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = localNodeSequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: dependency2TransactionID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = localNodeSequencer.HandleTransactionEndorsedEvent(ctx, &pb.TransactionEndorsedEvent{
 		TransactionId: newTransactionID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// once all bar one transaction is confirmed, should see the dependant transaction being delegated
 	// Should see an event relinquishing ownership of this this transaction
@@ -442,7 +443,7 @@ func TestSequencerMultipleRemoteDependencies(t *testing.T) {
 	err = localNodeSequencer.HandleTransactionConfirmedEvent(ctx, &pb.TransactionConfirmedEvent{
 		TransactionId: dependency2TransactionID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// TODO I know I have a bug where I am leaving the transaction in the `blockedTransactions` array even after it has been delegated.  I need to fix that but first I need to write a test that proves it is wrong.
 }
 
@@ -473,7 +474,7 @@ func TestSequencerApproveEndorsement(t *testing.T) {
 		TransactionID: txn1ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, approved)
 }
 
@@ -493,13 +494,13 @@ func TestSequencerApproveEndorsementForRemoteTransaction(t *testing.T) {
 		TransactionId: txn1ID.String(),
 		InputStateId:  []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, enginespi.EndorsementRequest{
 		TransactionID: txn1ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, approved)
 }
 
@@ -517,14 +518,14 @@ func TestSequencerApproveEndorsementDoubleSpendAvoidance(t *testing.T) {
 		TransactionID: txn1ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, approved)
 
 	approved, err = node1Sequencer.ApproveEndorsement(ctx, enginespi.EndorsementRequest{
 		TransactionID: txn2ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, approved)
 }
 
@@ -543,26 +544,26 @@ func TestSequencerApproveEndorsementReleaseStateOnRevert(t *testing.T) {
 		TransactionId: txn1ID.String(),
 		InputStateId:  []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//with no other information, a sequencer should have no reason not to approve endorsement
 	approved, err := node1Sequencer.ApproveEndorsement(ctx, enginespi.EndorsementRequest{
 		TransactionID: txn1ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, approved)
 
 	err = node1Sequencer.HandleTransactionRevertedEvent(ctx, &pb.TransactionRevertedEvent{
 		TransactionId: txn1ID.String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	approved, err = node1Sequencer.ApproveEndorsement(ctx, enginespi.EndorsementRequest{
 		TransactionID: txn2ID.String(),
 		InputStates:   []string{stateID.String()},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, approved)
 }
 

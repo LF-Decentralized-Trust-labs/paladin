@@ -22,18 +22,19 @@ import (
 	"unicode"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidate64SafeCharsStartEndAlphaNum(t *testing.T) {
 
 	err := ValidateSafeCharsStartEndAlphaNum(context.Background(), "good.n_ess-4", DefaultNameMaxLen, "name")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "good.n_ess-4", DefaultNameMaxLen, "name")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "i_domain_mgr_0x91c02c04d77f397c4153f177736ebd19939bad5a4ee3849e1c70adbc96c2c9bb", DefaultNameMaxLen, "name")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "_wrong", DefaultNameMaxLen, "name")
 	assert.Regexp(t, "PD020005.*name", err)

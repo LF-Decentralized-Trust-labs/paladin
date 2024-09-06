@@ -23,6 +23,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGormInitFail(t *testing.T) {
@@ -45,7 +46,7 @@ func TestGormMigrationMissingDir(t *testing.T) {
 	// We can make migration fail by pointing it at a file
 	tempFile := t.TempDir() + "/wrong"
 	err := os.WriteFile(tempFile, []byte{}, 0664)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = newSQLiteProvider(context.Background(), &Config{
 		Type: "sqlite",
 		SQLite: SQLiteConfig{
@@ -65,7 +66,7 @@ func TestGormMigrationFail(t *testing.T) {
 	// We can make migration fail by pointing it at a file
 	tempFile := t.TempDir() + "/wrong"
 	err := os.WriteFile(tempFile, []byte{}, 0664)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = newSQLiteProvider(context.Background(), &Config{
 		Type: "sqlite",
 		SQLite: SQLiteConfig{

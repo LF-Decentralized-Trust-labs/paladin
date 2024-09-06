@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testPlugin struct {
@@ -73,7 +74,7 @@ func newTestRegistry(t *testing.T, extraSetup ...func(mc *componentmocks.AllComp
 func registerTestRegistry(t *testing.T, rm *registryManager, tp *testPlugin) {
 	registryID := uuid.New()
 	_, err := rm.RegistryRegistered("test1", registryID, tp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ra := rm.registriesByName["test1"]
 	assert.NotNil(t, ra)
@@ -123,12 +124,12 @@ func TestRecordAndResolveInformation(t *testing.T) {
 
 	// Upsert first entry
 	res, err := tp.r.UpsertTransportDetails(ctx, entry1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 
 	// Check we get it
 	transports, err := rm.GetNodeTransports(ctx, "node1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, transports, 1)
 	assert.Equal(t, components.RegistryNodeTransportEntry{
 		Node:             "node1",
@@ -145,17 +146,17 @@ func TestRecordAndResolveInformation(t *testing.T) {
 
 	// Upsert second entry
 	res, err = tp.r.UpsertTransportDetails(ctx, entry2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	transports, err = rm.GetNodeTransports(ctx, "node1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, transports, 2)
 
 	// Upsert first entry again
 	res, err = tp.r.UpsertTransportDetails(ctx, entry1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	transports, err = rm.GetNodeTransports(ctx, "node1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, transports, 2)
 

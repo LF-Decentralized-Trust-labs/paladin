@@ -17,20 +17,20 @@
 package httpserver
 
 import (
-	"github.com/kaleido-io/paladin/core/internal/tls"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 )
 
 type Config struct {
-	TLS                   tls.Config `yaml:"tls"`
-	CORS                  CORSConfig `yaml:"cors"`
-	Address               *string    `yaml:"address"`
-	Port                  *int       `yaml:"port"`
-	DefaultRequestTimeout *string    `yaml:"defaultRequestTimeout"`
-	MaxRequestTimeout     *string    `yaml:"maxRequestTimeout"`
-	ReadTimeout           *string    `yaml:"readTimeout"`
-	WriteTimeout          *string    `yaml:"writeTimeout"`
-	ShutdownTimeout       *string    `yaml:"shutdownTimeout"`
+	TLS                   tlsconf.Config `yaml:"tls"`
+	CORS                  CORSConfig     `yaml:"cors"`
+	Address               *string        `yaml:"address"`
+	Port                  *int           `yaml:"port"`
+	DefaultRequestTimeout *string        `yaml:"defaultRequestTimeout"`
+	MaxRequestTimeout     *string        `yaml:"maxRequestTimeout"`
+	ReadTimeout           *string        `yaml:"readTimeout"`
+	WriteTimeout          *string        `yaml:"writeTimeout"`
+	ShutdownTimeout       *string        `yaml:"shutdownTimeout"`
 }
 
 var HTTPDefaults = &Config{

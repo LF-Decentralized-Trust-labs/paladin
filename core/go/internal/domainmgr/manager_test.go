@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockComponents struct {
@@ -66,16 +67,16 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 	var pDone func()
 	if realDB {
 		p, pDone, err = persistence.NewUnitTestPersistence(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		realStateStore := statestore.NewStateStore(ctx, &statestore.Config{}, p)
 		componentMocks.On("StateStore").Return(realStateStore)
 	} else {
 		mp, err := mockpersistence.NewSQLMockProvider()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		p = mp.P
 		mc.db = mp.Mock
 		pDone = func() {
-			assert.NoError(t, mp.Mock.ExpectationsWereMet())
+			require.NoError(t, mp.Mock.ExpectationsWereMet())
 		}
 		componentMocks.On("StateStore").Return(mc.stateStore)
 		mridc := mc.stateStore.On("RunInDomainContext", mock.Anything, mock.Anything)
@@ -99,13 +100,13 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 
 	dm := NewDomainManager(ctx, conf)
 	initInstructions, err := dm.PreInit(componentMocks)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = dm.PostInit(componentMocks)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, initInstructions.EventStreams, 1)
 
 	err = dm.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return ctx, dm.(*domainManager), mc, func() {
 		cancelCtx()

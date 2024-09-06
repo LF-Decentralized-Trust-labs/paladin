@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHexBytesStatic(t *testing.T) {
@@ -71,7 +72,7 @@ func TestHexBytesMarshalingJSON(t *testing.T) {
 
 	var s1 myStruct
 	err := json.Unmarshal(inJSON, &s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Nil(t, s1.ID1)
 	assert.Nil(t, s1.ID2)
@@ -80,7 +81,7 @@ func TestHexBytesMarshalingJSON(t *testing.T) {
 	assert.Equal(t, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", s1.ID5.String())
 
 	jOut, err := json.Marshal(&s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{
 		"id1": null,
 		"id3": "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad",
@@ -98,17 +99,17 @@ func TestHexBytesMarshalingJSON(t *testing.T) {
 func TestHexBytesScanValue(t *testing.T) {
 
 	v, err := MustParseHexBytes("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD").Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", v)
 
 	scanner := &HexBytes{}
 
 	err = scanner.Scan("0xfeedbeef")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0xfeedbeef", scanner.String())
 
 	err = scanner.Scan([]byte{0xfe, 0xed, 0xbe, 0xef})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "0xfeedbeef", scanner.String())
 
 	err = scanner.Scan("0xWRONG!85A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")

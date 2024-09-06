@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewEngineNoNewOrchestrator(t *testing.T) {
@@ -317,7 +318,7 @@ func TestNewEngineGetPendingFuelingTxs(t *testing.T) {
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1}, nil, nil).Once()
 	tx, err := ble.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
 	assert.Equal(t, mockManagedTx1, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return(nil, nil, fmt.Errorf("List transaction errored")).Once()
 	tx, err = ble.GetPendingFuelingTransaction(ctx, "0x0", testMainSigningAddress)
 	assert.Nil(t, tx)

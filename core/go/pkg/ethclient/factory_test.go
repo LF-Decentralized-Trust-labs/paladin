@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockEth struct {
@@ -72,7 +73,7 @@ func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) 
 	}
 
 	rpcServer, err := rpcserver.NewRPCServer(ctx, rpcServerConf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if mEth.eth_chainId == nil {
 		mEth.eth_chainId = func(ctx context.Context) (ethtypes.HexUint64, error) {
@@ -93,7 +94,7 @@ func newTestServer(t *testing.T, ctx context.Context, isWS bool, mEth *mockEth) 
 	)
 
 	err = rpcServer.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return rpcServer, func() {
 		rpcServer.Stop()
@@ -137,10 +138,10 @@ func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _
 	}
 
 	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = ecf.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(12345), ecf.ChainID())
 
 	return ctx, ecf.(*ethClientFactory), func() {
@@ -155,7 +156,7 @@ func TestNewEthClientFactoryBadConfig(t *testing.T) {
 	kmgr, err := NewSimpleTestKeyManager(context.Background(), &api.Config{
 		KeyStore: api.StoreConfig{Type: api.KeyStoreTypeStatic},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = NewEthClientFactory(context.Background(), kmgr, &Config{
 		HTTP: rpcclient.HTTPConfig{
 			URL: "http://ok.example.com",
@@ -201,7 +202,7 @@ func TestNewEthClientFactoryChainIDFail(t *testing.T) {
 			URL: fmt.Sprintf("http://%s", rpcServer.HTTPAddr().String()),
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ecf.Start()
 	assert.Regexp(t, "PD011508.*pop", err)
 
@@ -236,7 +237,7 @@ func TestMismatchedChainID(t *testing.T) {
 	}
 
 	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ecf.Start()
 	assert.Regexp(t, "PD011512", err)
 

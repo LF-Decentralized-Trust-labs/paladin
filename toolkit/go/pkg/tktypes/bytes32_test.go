@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBytes32Static(t *testing.T) {
@@ -91,7 +92,7 @@ func TestBytes32MarshalingJSON(t *testing.T) {
 
 	var s1 myStruct
 	err := json.Unmarshal(inJSON, &s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Nil(t, s1.ID1)
 	assert.Nil(t, s1.ID2)
@@ -102,7 +103,7 @@ func TestBytes32MarshalingJSON(t *testing.T) {
 	assert.True(t, s1.ID7.IsZero())
 
 	jOut, err := json.Marshal(&s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{
 		"id1": null,
 		"id3": "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad",
@@ -120,27 +121,27 @@ func TestBytes32MarshalingJSON(t *testing.T) {
 func TestBytes32ScanValue(t *testing.T) {
 
 	v, err := MustParseBytes32("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD").Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", v)
 
 	scanner := &Bytes32{}
 	err = scanner.Scan(([]byte)("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
 
 	scanner = &Bytes32{}
 	err = scanner.Scan(MustParseBytes32("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD").Bytes())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
 
 	scanner = &Bytes32{}
 	err = scanner.Scan("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
 
 	scanner = &Bytes32{}
 	err = scanner.Scan("0x47173285A8D7341E5E972FC677286384F802F8EF42A5EC5F03BBFA254CB01FAD")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", scanner.HexString())
 
 	err = scanner.Scan("0xfeedbeef")

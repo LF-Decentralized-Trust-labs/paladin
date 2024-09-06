@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegister(t *testing.T) {
@@ -34,13 +35,13 @@ func TestRegister(t *testing.T) {
 
 func TestNewSigner(t *testing.T) {
 	keypair, err := k1.GenerateSecp256k1KeyPair()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	signer := &sepc256k1Signer{}
 	res, err := signer.Sign(context.Background(), keypair.PrivateKeyBytes(), &proto.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("something to sign"),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStringField(t *testing.T) {
@@ -35,7 +36,7 @@ func TestStringField(t *testing.T) {
 	assert.Regexp(t, "PD010705", err)
 
 	nv, err := StringField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.True(t, StringField("test").SupportsLIKE())

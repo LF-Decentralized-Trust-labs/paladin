@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHexBytesField(t *testing.T) {
@@ -38,12 +39,12 @@ func TestHexBytesField(t *testing.T) {
 	assert.Regexp(t, "PD010711", err)
 
 	v, err := HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xAAbbCCdd"`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "aabbccdd", v)
 	assert.Equal(t, "test", HexBytesField("test").SQLColumn())
 
 	nv, err := HexBytesField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, HexBytesField("test").SupportsLIKE())

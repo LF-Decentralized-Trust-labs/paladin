@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSQLLikeToRegexp(t *testing.T) {
@@ -27,7 +28,7 @@ func TestSQLLikeToRegexp(t *testing.T) {
 	escapeChar := '\\'
 	checkMapping := func(sqlLike, expectedRegex, test, negTest string) {
 		r, err := sqlLikeToRegexp(sqlLike, false, escapeChar)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expectedRegex, r.String())
 		assert.True(t, r.MatchString(test))
 		assert.False(t, r.MatchString(negTest))

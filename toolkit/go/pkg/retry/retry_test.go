@@ -24,6 +24,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRetryEventuallyOk(t *testing.T) {
@@ -37,7 +38,7 @@ func TestRetryEventuallyOk(t *testing.T) {
 		}
 		return true, err
 	})
-	assert.NoError(t, err, "pop")
+	require.NoError(t, err, "pop")
 }
 
 func TestRetryDeadlineTimeout(t *testing.T) {
