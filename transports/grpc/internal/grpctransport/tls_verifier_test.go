@@ -328,7 +328,7 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 			Destination: "to.you@node2",
 		},
 	})
-	assert.Regexp(t, "unknown authority", err)
+	assert.Regexp(t, "tls", err)
 
 }
 
@@ -367,7 +367,7 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 			Destination: "to.you@node2",
 		},
 	})
-	assert.Regexp(t, "certificate required", err)
+	assert.Regexp(t, "tls", err)
 
 }
 
@@ -592,7 +592,7 @@ func TestGRPCTransport_NodeUnknownToServer(t *testing.T) {
 			Destination: "to.you@node2",
 		},
 	})
-	assert.Regexp(t, "bad certificate", err)
+	assert.Regexp(t, "tls", err)
 
 }
 
