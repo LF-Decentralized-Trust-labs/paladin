@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/types"
@@ -118,9 +118,9 @@ func TestSnarkProve(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -139,7 +139,7 @@ func TestSnarkProve(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -346,9 +346,9 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -399,9 +399,9 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -450,9 +450,9 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -471,7 +471,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
@@ -492,7 +492,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
