@@ -18,6 +18,7 @@ package stages
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -52,6 +53,36 @@ func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg tr
 	return nil
 }
 
+type endorsementResponse struct {
+	revertReason *string
+	endorsement  *prototk.AttestationResult
+}
+type attestationActionResult struct {
+	endorsementResponses []*endorsementResponse
+}
+
+func hasOutstandingEndorsementRequests(tx *components.PrivateTransaction) bool {
+	outstandingEndorsementRequests := false
+out:
+	for _, attRequest := range tx.PostAssembly.AttestationPlan {
+		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
+			found := false
+			for _, endorsement := range tx.PostAssembly.Endorsements {
+				if endorsement.Name == attRequest.Name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				outstandingEndorsementRequests = true
+				// no point checking any further, we have at least one outstanding endorsement request
+				break out
+			}
+		}
+	}
+	return outstandingEndorsementRequests
+}
+
 func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
 	tx := tsg.HACKGetPrivateTx()
 
@@ -61,27 +92,44 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case *prototk.AttestationResult: // TODO, we need to check the attestation matches the current version
-					if txUpdates == nil {
-						txUpdates = &transactionstore.TransactionUpdate{}
-					}
-					tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, v)
+				case *attestationActionResult:
+					// process any enodrsements or signatures that have been gathered
+					log.L(ctx).Debugf("Processing %d endorsements for transaction %s", len(v.endorsementResponses), tx.ID.String())
+					for _, er := range v.endorsementResponses {
+						if er.revertReason != nil {
+							log.L(ctx).Infof("Endorsement for transaction %s was rejected: %s", tx.ID.String(), *er.revertReason)
+							//TODO
+						} else {
+							log.L(ctx).Infof("Adding endorsement to transaction %s", tx.ID.String())
+							tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, er.endorsement)
+							if er.endorsement.Constraints != nil {
+								for _, constraint := range er.endorsement.Constraints {
+									switch constraint {
+									case prototk.AttestationResult_ENDORSER_MUST_SUBMIT:
+										//TODO endorser must submit?
+										//TODO other constraints
 
-					if len(tx.PostAssembly.Endorsements) < len(tx.PostAssembly.AttestationPlan) {
-						log.L(ctx).Infof("Transaction %s has %d endorsements out of %d", tx.ID.String(), len(tx.PostAssembly.Endorsements), len(tx.PostAssembly.AttestationPlan))
-					} else {
-						//TODO should really call out to the engine to publish this event because it needs
-						// to go to other nodes too?
+									default:
+										log.L(ctx).Errorf("Unsupported constraint: %s", constraint)
+									}
+								}
+							}
+							if !hasOutstandingEndorsementRequests(tx) {
+								//TODO should really call out to the engine to publish this event because it needs
+								// to go to other nodes too?
 
-						//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
-						err := as.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
-							TransactionId: tx.ID.String(),
-						})
-						if err != nil {
-							//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
-							log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
+								//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
+								err := as.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
+									TransactionId: tx.ID.String(),
+								})
+								if err != nil {
+									//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+									log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
+								}
+							}
 						}
 					}
+
 				case *enginespi.TransactionDispatched:
 					if isEndorsed(tx) {
 						tx.Signer = "TODO"
@@ -118,7 +166,7 @@ func isEndorsed(tx *components.PrivateTransaction) bool {
 func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
 	// any asembled transactions are in this stage until they are dispatched
-	return isAssembled(tx) && !isDispatched(tx)
+	return isAssembled(tx) && !isDispatched(tx) && !hasOutstandingSignatureRequests(tx) && hasOutstandingEndorsementRequests(tx)
 
 }
 
@@ -136,43 +184,86 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		log.L(ctx).Errorf("Failed to assign transaction to sequencer: %s", err)
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
 	}
+	attestationActionResult := &attestationActionResult{}
 
 	attPlan := tx.PostAssembly.AttestationPlan
 	attResults := tx.PostAssembly.Endorsements
-	for _, ap := range attPlan {
-		toBeComplete := true
-		for _, ar := range attResults {
-			if ar.GetAttestationType().Type() == ap.GetAttestationType().Type() {
-				toBeComplete = false
-				break
-			}
-		}
-		if toBeComplete {
-			for _, party := range ap.GetParties() {
-				message := enginespi.StageEvent{
-					Stage:           as.Name(),
-					Data:            ap.GetPayload(),
-					ContractAddress: tx.Inputs.Domain,
-					TxID:            tx.ID.String(),
-				}
-				messageBytes, err := json.Marshal(message)
-				if err != nil {
-					//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
-					log.L(ctx).Errorf("Failed to marshal message payload: %s", err)
-					return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
-				}
-				err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
-					MessageType: "endorsementRequest",
-					Destination: types.PrivateIdentityLocator(party),
-					Payload:     messageBytes,
-				})
-				if err != nil {
-					//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
-					log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
-					return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+	for _, attRequest := range attPlan {
+		switch attRequest.AttestationType {
+		case prototk.AttestationType_SIGN:
+			// no op. Signatures are gathered in the GatherSignaturesStage
+
+		case prototk.AttestationType_ENDORSE:
+			//TODO not sure this is the best way to check toBeComplete - take a closer look and think about this
+			toBeComplete := true
+			for _, ar := range attResults {
+				if ar.GetAttestationType().Type() == attRequest.GetAttestationType().Type() {
+					toBeComplete = false
+					break
 				}
 			}
+			if toBeComplete {
+
+				for _, party := range attRequest.GetParties() {
+
+					message := enginespi.StageEvent{
+						Stage:           as.Name(),
+						Data:            attRequest.GetPayload(),
+						ContractAddress: tx.Inputs.Domain,
+						TxID:            tx.ID.String(),
+					}
+					messageBytes, err := json.Marshal(message)
+					if err != nil {
+						//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+						log.L(ctx).Errorf("Failed to marshal message payload: %s", err)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+					}
+
+					partyLocator := types.PrivateIdentityLocator(party)
+					partyNode, err := partyLocator.Node(ctx, true)
+					if err != nil {
+						log.L(ctx).Errorf("Failed to get node name from locator %s: %s", party, err)
+						return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+					}
+
+					if sfs.IdentityResolver().IsCurrentNode(partyNode) || partyNode == "" {
+						// This is a local party, so we can endorse it directly
+						endorsement, revertReason, err := sfs.EndorsementGatherer().GatherEndorsement(ctx, tx, party, attRequest)
+						if err != nil {
+							log.L(ctx).Errorf("Failed to gather endorsement for party %s: %s", party, err)
+							//TODO specific error message
+							return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+						}
+						attestationActionResult.endorsementResponses = append(attestationActionResult.endorsementResponses, &endorsementResponse{
+							revertReason: revertReason,
+							endorsement:  endorsement,
+						})
+
+					} else {
+						err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
+							MessageType: "endorsementRequest",
+							Destination: types.PrivateIdentityLocator(party),
+							Payload:     messageBytes,
+						})
+						if err != nil {
+							//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+							log.L(ctx).Errorf("Failed to send endorsement request to party %s: %s", party, err)
+							return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
+						}
+					}
+				}
+			}
+
+		case prototk.AttestationType_GENERATE_PROOF:
+			errorMessage := "AttestationType_GENERATE_PROOF is not implemented yet"
+			log.L(ctx).Error(errorMessage)
+			return nil, i18n.NewError(ctx, msgs.MsgEngineInternalError, errorMessage)
+		default:
+			errorMessage := fmt.Sprintf("Unsupported attestation type: %s", attRequest.AttestationType)
+			log.L(ctx).Error(errorMessage)
+			return nil, i18n.NewError(ctx, msgs.MsgEngineInternalError, errorMessage)
 		}
+
 	}
-	return nil, nil
+	return attestationActionResult, nil
 }
