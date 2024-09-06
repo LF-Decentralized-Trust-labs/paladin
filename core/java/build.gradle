@@ -81,6 +81,7 @@ dependencies {
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78+'
     implementation 'io.netty:netty-all:4.1+'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
 

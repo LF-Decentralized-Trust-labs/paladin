@@ -15,13 +15,19 @@
 
 package io.kaleido.pente.domain;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.DomainInstance;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HexFormat;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.web3j.abi.datatypes.Bytes;
+
 public class PenteDomain extends DomainInstance {
     private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
 
@@ -62,7 +68,61 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            PenteConfiguration.PrivacyGroupConstructorParamsJSON params =
+                    new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+                            PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
+
+            // Only support one string right now for endorsement type.
+            // The intention is that more validation options (BLS and/or ZKP based) can be added later.
+            //
+            // Note the threshold is 100% right now, as there are architectural considerations for
+            // supporting gap-fil of missed transactions for members that miss transitions because
+            // they were not required to endorse every transaction.
+            if (params.endorsementType() == null || !params.endorsementType().equalsIgnoreCase(
+                    PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES)) {
+                throw new Exception("endorsementTypes supported: %s".formatted(
+                        Collections.singletonList(PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES)
+                ));
+            }
+
+            if (params.group() == null || params.group().members() == null || params.group().members().length < 1) {
+                throw new Exception("privacy group must have at least one member");
+            }
+
+            // Salt must be a 32byte hex string
+            if (params.group().salt() == null || !params.group().salt().startsWith("0x") ||
+                params.group().salt().length() != 66) {
+                throw new Exception("salt must be an 0x hex encoded bytes32 value");
+            }
+            String salt = HexFormat.of().parseHex(params.group().salt().substring(2));
+
+            // To deploy a new Privacy Group we need to collect unique endorsement addresses that
+            // mask the identities of all the participants.
+            // We use the salt of the privacy group to do this. This salt is basically a shared
+            // secret between all parties that is used to mask their identities.
+            ToDomain.InitDeployResponse.Builder response = ToDomain.InitDeployResponse.newBuilder();
+            for (String member : params.group().members()) {
+                String[] locatorSplit = member.split("@");
+                String identity;
+                String atNode;
+                switch (locatorSplit.length) {
+                    case 1 -> {
+                        identity = locatorSplit[0];
+                        atNode = "";
+                    }
+                    case 2 -> {
+                        identity = locatorSplit[0];
+                        atNode = "@" + locatorSplit[1];
+                    }
+                }
+
+            }
+
+            return CompletableFuture.completedFuture(response.build());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

@@ -18,12 +18,10 @@ package io.kaleido.pente.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.web3j.abi.datatypes.Address;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -67,12 +65,31 @@ public class PenteConfiguration {
 
     public static final String ENDORSEMENT_TYPE_GROUP_SCOPED_KEYS = "groupScopedKeys";
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static record GroupTupleJSON(
+            @JsonProperty
+            String salt,
+            @JsonProperty
+            String[] members
+    ) {}
+
     private static JsonABI.Parameter abiTuple_group() {
         return JsonABI.newTuple("group", "Group", JsonABI.newParameters(
                 JsonABI.newParameter("salt", "bytes32"),
                 JsonABI.newParameter("members", "string[]")
         ));
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static record PrivacyGroupConstructorParamsJSON(
+            @JsonProperty
+            GroupTupleJSON group,
+            @JsonProperty
+            String endorsementType
+    ) {}
+
+    public static String ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES =
+            "group_scoped_identities";
 
     JsonABI.Entry abiEntry_privateConstructor() {
         return JsonABI.newConstructor(JsonABI.newParameters(
