@@ -42,7 +42,9 @@ task compile(type: Exec, dependsOn: install) {
         include "contracts/**/*.sol"
         include "test/**/*.ts"
     })
-    inputs.files(fileTree(dir: "../zeto/solidity", include: "**/*.sol"))
+    inputs.files(fileTree("./node_modules/zeto/solidity") {
+        include "**/*.sol"
+    })
     outputs.dirs(buildOutput, "cache", "typechain-types")
 }
 

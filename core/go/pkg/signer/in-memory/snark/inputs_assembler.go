@@ -1,8 +1,8 @@
 package snark
 
 import (
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
 )
 
 func assembleInputs_anon(inputs *commonWitnessInputs, keyEntry *core.KeyEntry) map[string]interface{} {
@@ -20,7 +20,7 @@ func assembleInputs_anon(inputs *commonWitnessInputs, keyEntry *core.KeyEntry) m
 }
 
 func assembleInputs_anon_enc(inputs *commonWitnessInputs, keyEntry *core.KeyEntry) map[string]interface{} {
-	nonce := utxo.NewEncryptionNonce()
+	nonce := crypto.NewEncryptionNonce()
 	witnessInputs := map[string]interface{}{
 		"inputCommitments":      inputs.inputCommitments,
 		"inputValues":           inputs.inputValues,

@@ -53,7 +53,11 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 			var parsedEvent event_PaladinNewSmartContractByFactory_V0
 			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
 			if parseErr != nil {
+<<<<<<< Updated upstream
 				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
+=======
+				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, types.JSONString(ev))
+>>>>>>> Stashed changes
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{
@@ -63,7 +67,6 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 				ConfigBytes:   parsedEvent.Data,
 			})
 		}
-	}
 
 	if len(contracts) > 0 {
 		// We have some contracts to persist

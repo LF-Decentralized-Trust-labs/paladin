@@ -47,48 +47,6 @@ dependencies {
     coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
 }
 
-task installZeto(type: Exec) {
-    workingDir "${rootDir}/zeto/solidity"
-
-    executable 'npm'
-    args 'install'
-    inputs.files("package.json")
-    outputs.files("package-lock.json")
-    outputs.dir("node_modules")
-}
-
-task compileZeto(type: Exec, dependsOn: installZeto) {
-    workingDir "${rootDir}/zeto/solidity"
-
-    executable 'npx'
-    args 'hardhat'
-    args 'compile'
-
-    inputs.files(fileTree(dir: "../../zeto/solidity", include: "**/*.sol"))
-}
-
-task copySolidity(type: Copy, dependsOn: [compileZeto, ":solidity:compile"]) {
-    inputs.files(fileTree("${rootDir}/zeto/solidity/artifacts"))
-    from fileTree("${rootDir}/zeto/solidity/artifacts") {
-        include 'contracts/zeto_anon.sol/Zeto_Anon.json'
-        include 'contracts/zeto_anon_enc.sol/Zeto_AnonEnc.json'
-        include 'contracts/zeto_nf_anon.sol/Zeto_NfAnon.json'
-        include 'contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
-        include 'contracts/lib/verifier_anon_enc.sol/Groth16Verifier_AnonEnc.json'
-        include 'contracts/lib/verifier_nf_anon.sol/Groth16Verifier_NfAnon.json'
-        include 'contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
-        include 'contracts/lib/verifier_check_inputs_outputs_value.sol/Groth16Verifier_CheckInputsOutputsValue.json'
-    }
-    from fileTree("${rootDir}/solidity/artifacts") {
-        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
-    }
-    into 'internal/zeto/abis'
-
-    // Flatten all paths into the destination folder
-    eachFile { path = name }
-    includeEmptyDirs = false
-}
-
 task downloadZetoProver {
     def outname = "zeto-wasm-${zetoVersion}.tar.gz"
     def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
@@ -97,7 +55,6 @@ task downloadZetoProver {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
         f.setExecutable(true)
-        mkdir(zkpOut)
     }
     outputs.file(f)
 }
@@ -114,31 +71,53 @@ task downloadZetoTestProvingKeys {
     outputs.file(f)
 }
 
-task extractZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
-    executable 'tar'
-    args '-xzvf'
-    args "${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz"
-    workingDir zkpOut
+task downloadZetoCompiledContracts {
+    def outname = "zeto-contracts-${zetoVersion}.tar.gz"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
+    def f = new File(toolsOut, outname)
+    doFirst {
+        mkdir(f.parent)
+        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
+        f.setExecutable(true)
+    }
+    outputs.file(f)
+}
 
-    environment "CIRCUITS_ROOT", zkpOut
+task extractZetoProverArtifacts(type: Copy, dependsOn: [downloadZetoProver, downloadZetoTestProvingKeys]) {
+    from tarTree("${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz")
+    from tarTree("${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz")
+    into zkpOut
 
-    inputs.dir(workingDir)
     outputs.dir(zkpOut)
 }
 
-task extractZetoTestProvingKeys(type: Exec, dependsOn: [extractZetoProver, downloadZetoTestProvingKeys]) {
-    executable 'tar'
-    args '-xzvf'
-    args "${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz"
-    workingDir zkpOut
+task extractZetoContracts(type: Copy, dependsOn: [downloadZetoCompiledContracts]) {
+    from tarTree("${toolsOut}/zeto-contracts-${zetoVersion}.tar.gz")
+    into "${zkpOut}/contracts"
 
-    environment "PROVING_KEYS_ROOT", zkpOut
-
-    inputs.dir(workingDir)
     outputs.dir(zkpOut)
+}
+
+task copySolidity(type: Copy, dependsOn: [extractZetoContracts, ":solidity:compile"]) {
+    inputs.files(fileTree("${zkpOut}/contracts"))
+    from fileTree("${zkpOut}/contracts") {
+        include '**/*.json'
+        exclude '**/*.dbg.json'
+    }
+    from fileTree("${rootDir}/solidity/artifacts") {
+        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
+    }
+    into 'internal/zeto/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
 }
 
 task test(type: Exec) {
+    environment "CIRCUITS_ROOT", zkpOut
+    environment "PROVING_KEYS_ROOT", zkpOut
+
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
@@ -157,8 +136,7 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn extractZetoProver
-    dependsOn extractZetoTestProvingKeys
+    dependsOn extractZetoProverArtifacts
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }

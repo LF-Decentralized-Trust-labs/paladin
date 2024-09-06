@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zeto
+package integration_test
 
 import (
 	"context"
@@ -113,6 +113,10 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 
 func TestZeto_Anon(t *testing.T) {
 	testZetoFungible(t, "Zeto_Anon")
+}
+
+func TestZeto_AnonEnc(t *testing.T) {
+	testZetoFungible(t, "Zeto_AnonEnc")
 }
 
 func testZetoFungible(t *testing.T, tokenName string) {

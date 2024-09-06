@@ -84,17 +84,29 @@ func TestEventIndexingWithDB(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
+<<<<<<< Updated upstream
 						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContractByFactory_V0,
 					},
 					Data: tktypes.RawJSON(`{
 						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
+=======
+						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						Signature:        eventSig_PaladinNewSmartContractByFactory_V0,
+					},
+					Data: types.RawJSON(`{
+						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+>>>>>>> Stashed changes
 						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"instance": "` + contractAddr.String() + `",
 						"data": "0xfeedbeef"
 					}`),
+<<<<<<< Updated upstream
 				},
 			},
+=======
+				}},
+>>>>>>> Stashed changes
 		})
 		return err
 	})

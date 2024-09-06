@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zeto
+package integratino_test
 
 import (
 	"context"
@@ -165,8 +165,8 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 	return addr, build.ABI, nil
 }
 
-func getContractSpec(contract *types.DomainContract) (*SolidityBuild, error) {
-	var build SolidityBuild
+func getContractSpec(contract *types.DomainContract) (*domain.SolidityBuild, error) {
+	var build domain.SolidityBuild
 	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
 		abiBytecode := make(map[string]interface{})
 		abiBytecode["abi"] = contract.AbiAndBytecode.Json.Abi
@@ -192,7 +192,7 @@ func getContractSpec(contract *types.DomainContract) (*SolidityBuild, error) {
 	return &build, nil
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *SolidityBuild) (*ethtypes.Address0xHex, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*ethtypes.Address0xHex, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
@@ -241,9 +241,9 @@ func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainC
 	if !ok {
 		return fmt.Errorf("withdraw verifier contract not found among the deployed contracts")
 	}
-	params := &ZetoSetImplementationParams{
+	params := &setImplementationParams{
 		Name: name,
-		Implementation: ZetoImplementationInfo{
+		Implementation: implementationInfo{
 			Implementation:   implAddr.String(),
 			Verifier:         verifierAddr.String(),
 			DepositVerifier:  depositVerifierAddr.String(),

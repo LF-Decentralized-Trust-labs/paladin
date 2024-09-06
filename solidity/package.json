@@ -24,6 +24,6 @@
     "ethers": "^6.13.1",
     "hardhat": "^2.19.4",
     "ts-node": "^10.9.2",
-    "zeto": "file:../zeto/solidity"
+    "zeto": "https://gitpkg.vercel.app/hyperledger-labs/zeto/solidity?main"
   }
 }

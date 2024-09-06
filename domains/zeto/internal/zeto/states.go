@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -124,7 +124,7 @@ func (z *Zeto) addHash(newCoin *types.ZetoCoin, ownerKey *babyjub.PublicKey) err
 func (z *Zeto) prepareOutputs(owner string, ownerKey *babyjub.PublicKey, amount *ethtypes.HexInteger) ([]*types.ZetoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
-	salt := utxo.NewSalt()
+	salt := crypto.NewSalt()
 	keyCompressed := ownerKey.Compress()
 	newCoin := &types.ZetoCoin{
 		Salt:     (*ethtypes.HexInteger)(salt),
