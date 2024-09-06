@@ -69,7 +69,7 @@ task protoc(type: ProtoCompile, dependsOn: [tasks.installTools]) {
     }
 }
 
-task lint(type: Exec, dependsOn:[tasks.protoc]) {
+task lint(type: Exec, dependsOn:[installTools, tasks.protoc]) {
     workingDir '.'
 
     inputs.files(goFiles);

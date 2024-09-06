@@ -49,7 +49,7 @@ task installTools(type: Exec) {
     args 'github.com/vektra/mockery/v2'
 }
 
-task lint(type: Exec) {
+task lint(type: Exec, dependsOn: installTools) {
     workingDir '.'
 
     inputs.files(goFiles);
