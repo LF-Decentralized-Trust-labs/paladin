@@ -17,46 +17,33 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/internal/engine/orchestrator"
 	"github.com/kaleido-io/paladin/core/internal/engine/sequencer"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/core/pkg/types"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
-
-// MOCK implementations of engine, plugins etc. Function signatures are just examples
-// no formal interface proposed intentionally in this file
-
-// Mock Plugin manager
-
-type MockPlugins struct {
-	installedPlugins  map[string]MockPlugin
-	contractInstances map[string]string
-}
-
-type MockPlugin interface {
-	Validate(ctx context.Context, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool
-}
-
-func (mpm *MockPlugins) Validate(ctx context.Context, contractAddress string, tsg transactionstore.TxStateGetters, ss statestore.StateStore) bool {
-	return mpm.installedPlugins[mpm.contractInstances[contractAddress]].Validate(ctx, tsg, ss)
-}
 
 type Engine interface {
 	components.Engine
 	HandleNewEvent(ctx context.Context, stageEvent *enginespi.StageEvent)
 	HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error)
+	HandleDeployTx(ctx context.Context, tx *components.PrivateContractDeploy) (txID string, contractAddress string, err error)
+
 	GetTxStatus(ctx context.Context, domainAddress string, txID string) (status enginespi.TxStatus, err error)
 	Subscribe(ctx context.Context, subscriber enginespi.EventSubscriber)
 }
@@ -101,26 +88,8 @@ func NewEngine(nodeID uuid.UUID) Engine {
 	}
 }
 
-// HandleNewTx implements Engine.
-func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error) { // TODO: this function currently assumes another layer initialize transactions and store them into DB
-	log.L(ctx).Debugf("Handling new transaction: %v", tx)
-	if tx.Inputs == nil || tx.Inputs.Domain == "" {
-		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
-	}
-	contractAddr, err := types.ParseEthAddress(tx.Inputs.Domain)
-	if err != nil {
-		return "", err
-	}
-	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, *contractAddr)
-	if err != nil {
-		return "", err
-	}
-	err = domainAPI.InitTransaction(ctx, tx)
-	if err != nil {
-		return "", err
-	}
-	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
-	// TODO how to measure fairness/ per From address / contract address / something else
+func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr *types.EthAddress, domainAPI components.DomainSmartContract) (oc *orchestrator.Orchestrator, err error) {
+
 	if e.orchestrators[contractAddr.String()] == nil {
 		publisher := NewPublisher(e)
 		delegator := NewDelegator()
@@ -131,6 +100,7 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 			delegator,
 			dispatcher,
 		)
+		endorsementGatherer := NewEndorsementGatherer(domainAPI, e.components.KeyManager())
 		e.orchestrators[contractAddr.String()] =
 			orchestrator.NewOrchestrator(
 				ctx, e.nodeID,
@@ -140,11 +110,12 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 				domainAPI,
 				publisher,
 				seq,
+				endorsementGatherer,
 			)
 		orchestratorDone, err := e.orchestrators[contractAddr.String()].Start(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to start orchestrator for contract %s: %s", contractAddr.String(), err)
-			return "", err
+			return nil, err
 		}
 
 		go func() {
@@ -152,12 +123,163 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 			log.L(ctx).Infof("Orchestrator for contract %s has stopped", contractAddr.String())
 		}()
 	}
-	oc := e.orchestrators[contractAddr.String()]
+	return e.orchestrators[contractAddr.String()], nil
+}
+
+// HandleNewTx implements Engine.
+func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransaction) (txID string, err error) { // TODO: this function currently assumes another layer initialize transactions and store them into DB
+	log.L(ctx).Debugf("Handling new transaction: %v", tx)
+	if tx.Inputs == nil || tx.Inputs.Domain == "" {
+		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
+	}
+
+	contractAddr := tx.Inputs.To
+	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, contractAddr)
+	if err != nil {
+		return "", err
+	}
+	err = domainAPI.InitTransaction(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+
+	//Resolve keys synchronously (rather than having an orchestrator stage for it) so that we can return an error if any key resolution fails
+	keyMgr := e.components.KeyManager()
+	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
+	for i, v := range tx.PreAssembly.RequiredVerifiers {
+		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+		if err != nil {
+			return "", i18n.WrapError(ctx, err, msgs.MsgKeyResolutionFailed, v.Lookup, v.Algorithm)
+		}
+		tx.PreAssembly.Verifiers[i] = &prototk.ResolvedVerifier{
+			Lookup:    v.Lookup,
+			Algorithm: v.Algorithm,
+			Verifier:  verifier,
+		}
+	}
+
+	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
+	// TODO how to measure fairness/ per From address / contract address / something else
+
+	oc, err := e.getOrchestratorForContract(ctx, &contractAddr, domainAPI)
+	if err != nil {
+		return "", err
+	}
 	queued := oc.ProcessNewTransaction(ctx, txInstance)
 	if queued {
 		log.L(ctx).Debugf("Transaction with ID %s queued in database", txInstance.GetTxID(ctx))
 	}
 	return txInstance.GetTxID(ctx), nil
+}
+
+// Synchronous function to deploy a domain smart contract
+// TODO should this be async?  How does this plug into the dispatch stages given that we don't have an orchestrator yet?
+func (e *engine) HandleDeployTx(ctx context.Context, tx *components.PrivateContractDeploy) (txID string, contractAddress string, err error) { // TODO: this function currently assumes another layer initialize transactions and store them into DB
+	log.L(ctx).Debugf("Handling new private contract deploy transaction: %v", tx)
+	if tx.Domain == "" {
+		return "", "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
+	}
+
+	domain, err := e.components.DomainManager().GetDomainByName(ctx, tx.Domain)
+	if err != nil {
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgDomainNotFound, tx.Domain)
+	}
+
+	err = domain.InitDeploy(ctx, tx)
+	if err != nil {
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgDeployInitFailed)
+	}
+
+	//Resolve keys synchronously (rather than having an orchestrator stage for it) so that we can return an error if any key resolution fails
+	keyMgr := e.components.KeyManager()
+	tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
+	for i, v := range tx.RequiredVerifiers {
+		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
+		if err != nil {
+			return "", "", i18n.WrapError(ctx, err, msgs.MsgKeyResolutionFailed, v.Lookup, v.Algorithm)
+		}
+		tx.Verifiers[i] = &prototk.ResolvedVerifier{
+			Lookup:    v.Lookup,
+			Algorithm: v.Algorithm,
+			Verifier:  verifier,
+		}
+	}
+
+	//TODO should the following be done asyncronously?
+
+	err = domain.PrepareDeploy(ctx, tx)
+	if err != nil {
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgDeployPrepareFailed)
+	}
+
+	//Placeholder for integration with baseledge transaction engine
+	if tx.DeployTransaction != nil && tx.InvokeTransaction == nil {
+		err = e.execBaseLedgerDeployTransaction(ctx, tx.Signer, tx.DeployTransaction)
+	} else if tx.InvokeTransaction != nil && tx.DeployTransaction == nil {
+		err = e.execBaseLedgerTransaction(ctx, tx.Signer, tx.InvokeTransaction)
+	} else {
+		return "", "", i18n.NewError(ctx, msgs.MsgDeployPrepareIncomplete)
+	}
+	if err != nil {
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgBaseLedgerTransactionFailed)
+	}
+
+	psc, err := e.components.DomainManager().WaitForDeploy(ctx, tx.ID)
+	if err != nil {
+		return "", "", i18n.WrapError(ctx, err, msgs.MsgBaseLedgerTransactionFailed)
+	}
+	addr := psc.Address()
+
+	return tx.ID.String(), addr.String(), nil
+
+}
+
+func (e *engine) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
+
+	var abiFunc ethclient.ABIFunctionClient
+	ec := e.components.EthClientFactory().HTTPClient()
+	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, types.HexBytes(txInstruction.Bytecode))
+	if err != nil {
+		return err
+	}
+
+	// Send the transaction
+	txHash, err := abiFunc.R(ctx).
+		Signer(signer).
+		Input(txInstruction.Inputs).
+		SignAndSend()
+	if err == nil {
+		_, err = e.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to send base deploy ledger transaction: %s", err)
+	}
+	return nil
+}
+
+func (e *engine) execBaseLedgerTransaction(ctx context.Context, signer string, txInstruction *components.EthTransaction) error {
+
+	var abiFunc ethclient.ABIFunctionClient
+	ec := e.components.EthClientFactory().HTTPClient()
+	abiFunc, err := ec.ABIFunction(ctx, txInstruction.FunctionABI)
+	if err != nil {
+		return err
+	}
+
+	// Send the transaction
+	addr := ethtypes.Address0xHex(txInstruction.To)
+	txHash, err := abiFunc.R(ctx).
+		Signer(signer).
+		To(&addr).
+		Input(txInstruction.Inputs).
+		SignAndSend()
+	if err == nil {
+		_, err = e.components.BlockIndexer().WaitForTransaction(ctx, *txHash)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to send base ledger transaction: %s", err)
+	}
+	return nil
 }
 
 func (e *engine) GetTxStatus(ctx context.Context, domainAddress string, txID string) (status enginespi.TxStatus, err error) {

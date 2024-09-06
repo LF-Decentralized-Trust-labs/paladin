@@ -39,7 +39,8 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
 	mockPublisher := enginemocks.NewPublisher(t)
 	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	mockEndorsementGatherer := enginemocks.NewEndorsementGatherer(t)
+	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer, mockEndorsementGatherer)
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -93,7 +94,8 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
 	mockPublisher := enginemocks.NewPublisher(t)
 	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	mockEndorsementGatherer := enginemocks.NewEndorsementGatherer(t)
+	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer, mockEndorsementGatherer)
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -173,7 +175,8 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 
 	mockPublisher := enginemocks.NewPublisher(t)
 	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	mockEndorsementGatherer := enginemocks.NewEndorsementGatherer(t)
+	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer, mockEndorsementGatherer)
 	ocDone, err := testOc.Start(ctx)
 	assert.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
@@ -191,7 +194,8 @@ func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
 	mockPublisher := enginemocks.NewPublisher(t)
 	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	mockEndorsementGatherer := enginemocks.NewEndorsementGatherer(t)
+	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer, mockEndorsementGatherer)
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
@@ -219,7 +223,8 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
 	mockPublisher := enginemocks.NewPublisher(t)
 	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	mockEndorsementGatherer := enginemocks.NewEndorsementGatherer(t)
+	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer, mockEndorsementGatherer)
 	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 

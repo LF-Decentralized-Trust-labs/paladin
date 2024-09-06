@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -488,7 +489,10 @@ func TestEngineMiniLoad(t *testing.T) {
 
 	numDispatched := 0
 	allDispatched := make(chan bool, 1)
+	nonceWriterLock := sync.Mutex{}
 	engine.Subscribe(ctx, func(event engineTypes.EngineEvent) {
+		nonceWriterLock.Lock()
+		defer nonceWriterLock.Unlock()
 		numDispatched++
 		switch event := event.(type) {
 		case *engineTypes.TransactionDispatchedEvent:
@@ -578,7 +582,7 @@ out:
 			for _, depTxID := range dependencies {
 				depNonce, ok := nonceByTransactionID[depTxID]
 				assert.True(t, ok)
-				assert.True(t, depNonce < nonce)
+				assert.True(t, depNonce < nonce, "Transaction %s (nonce %d) was dispatched before its dependency %s (nonce %d)", txId, nonce, depTxID, depNonce)
 			}
 		}
 	}
