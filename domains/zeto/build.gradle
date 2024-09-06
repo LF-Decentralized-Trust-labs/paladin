@@ -72,7 +72,6 @@ task downloadZetoProver {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
         f.setExecutable(true)
-        mkdir(zkpOut)
     }
     outputs.file(f)
 }
@@ -89,31 +88,18 @@ task downloadZetoTestProvingKeys {
     outputs.file(f)
 }
 
-task extractZetoProver(type: Exec, dependsOn: [downloadZetoProver]) {
-    executable 'tar'
-    args '-xzvf'
-    args "${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz"
-    workingDir zkpOut
+task extractZetoProverArtifacts(type: Copy, dependsOn: [downloadZetoProver, downloadZetoTestProvingKeys]) {
+    from tarTree("${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz")
+    from tarTree("${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz")
+    into zkpOut
 
-    environment "CIRCUITS_ROOT", zkpOut
-
-    inputs.dir(workingDir)
-    outputs.dir(zkpOut)
-}
-
-task extractZetoTestProvingKeys(type: Exec, dependsOn: [extractZetoProver, downloadZetoTestProvingKeys]) {
-    executable 'tar'
-    args '-xzvf'
-    args "${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz"
-    workingDir zkpOut
-
-    environment "PROVING_KEYS_ROOT", zkpOut
-
-    inputs.dir(workingDir)
     outputs.dir(zkpOut)
 }
 
 task test(type: Exec) {
+    environment "CIRCUITS_ROOT", zkpOut
+    environment "PROVING_KEYS_ROOT", zkpOut
+
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
@@ -130,8 +116,7 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn extractZetoProver
-    dependsOn extractZetoTestProvingKeys
+    dependsOn extractZetoProverArtifacts
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
