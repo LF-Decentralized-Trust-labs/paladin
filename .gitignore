@@ -55,3 +55,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Proto ###
+*.pb.go
