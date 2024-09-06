@@ -39,19 +39,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testCallbacks struct {
-	getTransportDetails func(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
-	receiveMessage      func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
-}
-
-func (tc *testCallbacks) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	return tc.getTransportDetails(ctx, req)
-}
-
-func (tc *testCallbacks) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	return tc.receiveMessage(ctx, req)
-}
-
 func getRSAKeyFromPEM(t *testing.T, pemBytes string) *rsa.PrivateKey {
 	block, _ := pem.Decode([]byte(pemBytes))
 	assert.NotNil(t, block)
@@ -139,11 +126,6 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 		transport.grpcServer.Stop()
 		<-transport.serverDone
 	}
-}
-
-func TestPluginLifecycle(t *testing.T) {
-	pb := NewPlugin(context.Background())
-	assert.NotNil(t, pb)
 }
 
 func mockRegistry(cb *testCallbacks, ptds map[string]*PublishedTransportDetails) {

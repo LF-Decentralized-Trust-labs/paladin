@@ -290,6 +290,7 @@ var (
 	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
 	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
+	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound = ffe("PD012100", "No entries found for node '%s'")

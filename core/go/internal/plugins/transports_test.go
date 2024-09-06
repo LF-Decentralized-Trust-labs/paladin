@@ -138,7 +138,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	}
 
 	ttm.resolveTarget = func(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-		assert.Equal(t, "node1", req.Destination)
+		assert.Equal(t, "node1", req.Node)
 		return &prototk.GetTransportDetailsResponse{
 			TransportDetails: "node1_details",
 		}, nil
@@ -171,7 +171,7 @@ func TestTransportRequestsOK(t *testing.T) {
 
 	callbacks := <-waitForCallbacks
 	rts, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-		Destination: "node1",
+		Node: "node1",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "node1_details", rts.TransportDetails)

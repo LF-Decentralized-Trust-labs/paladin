@@ -23,6 +23,7 @@ import (
 	"github.com/kaleido-io/paladin/registries/static/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Server interface {
@@ -56,5 +57,41 @@ func (r *staticRegistry) ConfigureRegistry(ctx context.Context, req *prototk.Con
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidRegistryConfig)
 	}
+
+	// We simply publish everything here and now with the static registry.
+	for nodeName, nodeRecord := range r.conf.Nodes {
+		for transportName, transportRecordUnparsed := range nodeRecord.Transports {
+			if err := r.registerNodeTransport(ctx, nodeName, transportName, transportRecordUnparsed); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &prototk.ConfigureRegistryResponse{}, nil
+}
+
+func (r *staticRegistry) registerNodeTransport(ctx context.Context, nodeName, transportName string, transportRecordUnparsed tktypes.RawJSON) error {
+	var untyped any
+	err := json.Unmarshal(transportRecordUnparsed, &untyped)
+	if err != nil {
+		return i18n.WrapError(ctx, err, msgs.MsgInvalidRegistryConfig, nodeName, transportName)
+	}
+
+	// We let the config contain structured JSON (well YAML in it's original form before it was passed as JSON to us)
+	// Or we let the config contain a string
+	var transportDetails string
+	switch v := untyped.(type) {
+	case string:
+		// it's already a string - so it's our details directly
+		transportDetails = v
+	default:
+		// otherwise we preserve the JSON
+		transportDetails = transportRecordUnparsed.String()
+	}
+	_, err = r.callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{
+		Node:             nodeName,
+		Transport:        transportName,
+		TransportDetails: transportDetails,
+	})
+	return err
 }

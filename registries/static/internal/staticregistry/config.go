@@ -15,5 +15,12 @@
 
 package staticregistry
 
+import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+
 type Config struct {
+	Nodes map[string]*NodeStaticEntry `json:"nodes"`
+}
+
+type NodeStaticEntry struct {
+	Transports map[string]tktypes.RawJSON `json:"transports"`
 }

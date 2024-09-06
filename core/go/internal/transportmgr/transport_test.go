@@ -18,6 +18,7 @@ package transportmgr
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -144,7 +145,7 @@ func TestSendMessage(t *testing.T) {
 
 		// ... if we didn't have a connection established we'd expect to come back to request the details
 		gtdr, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-			Destination: message.Destination.String(),
+			Node: strings.Split(message.Destination.String(), "@")[1],
 		})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, gtdr.TransportDetails)
@@ -234,14 +235,14 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 	assert.Regexp(t, "PD012003.*another", err)
 
 	_, err = tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-		Destination: message.Destination.String(),
+		Node: "node2",
 	})
 	assert.Regexp(t, "PD012004", err)
 
 	_, err = tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-		Destination: "no_node",
+		Node: "node1",
 	})
-	assert.Regexp(t, "PD012007", err)
+	assert.Regexp(t, "PD012009", err)
 
 }
 
