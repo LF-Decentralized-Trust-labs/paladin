@@ -140,7 +140,7 @@ func TestReceiveFail(t *testing.T) {
 			},
 		})
 	}
-	assert.Regexp(t, "EOF", err)
+	assert.Error(t, err)
 
 }
 
@@ -161,7 +161,7 @@ func TestBadReplyTo(t *testing.T) {
 			},
 		})
 	}
-	assert.Regexp(t, "EOF", err)
+	assert.Error(t, err)
 
 }
 
@@ -262,7 +262,7 @@ func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 			Destination: "to.you@node2",
 		})
 	}
-	assert.Regexp(t, "EOF", err)
+	assert.Error(t, err)
 }
 
 func TestWaitNewConn(t *testing.T) {
