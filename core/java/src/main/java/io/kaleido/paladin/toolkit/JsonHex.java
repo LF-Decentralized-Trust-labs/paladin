@@ -166,10 +166,6 @@ public abstract class JsonHex {
         return new JsonHex.Fixed(bytes, requiredByteLength);
     }
 
-    public static JsonHex bytes32From(String str) throws IllegalArgumentException {
-        return new JsonHex.Bytes32(str);
-    }
-
     public String toString() {
         return to0xHex();
     }
