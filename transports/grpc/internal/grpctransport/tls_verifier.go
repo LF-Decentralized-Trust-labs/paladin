@@ -46,44 +46,52 @@ type tlsVerifierStatic struct {
 
 type tlsVerifierAuthInfo struct {
 	credentials.CommonAuthInfo
+	authType         string
 	cert             *x509.Certificate
 	transportDetails *PublishedTransportDetails
 	remoteAddr       string
 	verifiedNodeName string
 }
 
-func (tv *tlsVerifier) ClientHandshake(ctx context.Context, s string, c net.Conn) (net.Conn, credentials.AuthInfo, error) {
-	authInfo, validator := tv.peerValidator()
-	c, tlsAuthInfo, err := validator.ClientHandshake(ctx, s, c)
-	ai := authInfo.Load()
+type hasCommonAuthInfo interface {
+	GetCommonAuthInfo() credentials.CommonAuthInfo
+}
+
+func (tv *tlsVerifier) returnAuthInfo(dir string, aip *atomic.Pointer[tlsVerifierAuthInfo], c net.Conn, tlsAuthInfo credentials.AuthInfo, err error) (net.Conn, credentials.AuthInfo, error) {
+	ai := aip.Load()
 	if err == nil && (ai == nil || ai.verifiedNodeName == "") {
 		err = i18n.NewError(tv.t.bgCtx, msgs.MsgTLSNegotiationFailed)
 	}
 	if err != nil {
+		log.L(tv.t.bgCtx).Errorf("%s TLS handshake failed: %s", dir, err)
 		return nil, nil, err
 	}
 	ai.remoteAddr = c.RemoteAddr().String()
-	log.L(tv.t.bgCtx).Infof("TLS client handshake completed. TLS authInfo=%s", tlsAuthInfo.AuthType())
-	return c, authInfo.Load(), nil
+	ai.authType = tlsAuthInfo.AuthType()
+	if ciai, ok := tlsAuthInfo.(hasCommonAuthInfo); ok {
+		// unclear the value of this experimental API, but we honor the recommendation to propagate it
+		ai.CommonAuthInfo = ciai.GetCommonAuthInfo()
+	}
+	log.L(tv.t.bgCtx).Infof("%s TLS handshake completed remote=%s authInfo=%s", dir, c.RemoteAddr(), tlsAuthInfo.AuthType())
+	return c, ai, nil
+}
+
+func (tv *tlsVerifier) ClientHandshake(ctx context.Context, s string, c net.Conn) (net.Conn, credentials.AuthInfo, error) {
+	log.L(tv.t.bgCtx).Debugf("Client TLS handshake initiated remote=%s", c.RemoteAddr())
+	authInfo, validator := tv.peerValidator()
+	c, tlsAuthInfo, err := validator.ClientHandshake(ctx, s, c)
+	return tv.returnAuthInfo("Client", authInfo, c, tlsAuthInfo, err)
 }
 
 func (tv *tlsVerifier) ServerHandshake(c net.Conn) (net.Conn, credentials.AuthInfo, error) {
+	log.L(tv.t.bgCtx).Debugf("Server TLS handshake initiated remote=%s", c.RemoteAddr())
 	authInfo, validator := tv.peerValidator()
 	c, tlsAuthInfo, err := validator.ServerHandshake(c)
-	ai := authInfo.Load()
-	if err == nil && (ai == nil || ai.verifiedNodeName == "") {
-		err = i18n.NewError(tv.t.bgCtx, msgs.MsgTLSNegotiationFailed)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	ai.remoteAddr = c.RemoteAddr().String()
-	log.L(tv.t.bgCtx).Infof("TLS server handshake completed. TLS authInfo=%s", tlsAuthInfo.AuthType())
-	return c, authInfo.Load(), nil
+	return tv.returnAuthInfo("Server", authInfo, c, tlsAuthInfo, err)
 }
 
 func (ai *tlsVerifierAuthInfo) AuthType() string {
-	return ai.verifiedNodeName
+	return ai.authType
 }
 
 func (tv *tlsVerifier) Info() credentials.ProtocolInfo {
@@ -109,7 +117,7 @@ func getCertFromPEM(ctx context.Context, pemBytes []byte) (cert *x509.Certificat
 	if block != nil {
 		cert, err = x509.ParseCertificate(block.Bytes)
 	}
-	if block == nil || err != nil || block.Type != "CERTIFICATE" {
+	if block == nil || err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPEMCertificateInvalid)
 	}
 	return cert, err
@@ -133,7 +141,9 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 		if tv.subjectMatchRegex != nil {
 			match := tv.subjectMatchRegex.FindStringSubmatch(ai.cert.Subject.String())
 			if len(match) != 2 /* we require one capture group */ {
-				return i18n.NewError(ctx, msgs.MsgSubjectRegexpMismatch, len(match))
+				log.L(ctx).Errorf("subject regexp '%s' mismatch on '%s' len=%d (0:fail,1:no-groups,2+:too-many-groups)",
+					tv.subjectMatchRegex, ai.cert.Subject, len(match))
+				return err
 			}
 			node = match[1]
 		} else {
@@ -142,12 +152,15 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 
 		// On the client side we connect expecting to find a particular node on the other side
 		if tv.expectedNode != "" && node != tv.expectedNode {
-			log.L(ctx).Errorf("Expected node '%s', received node '%s'", tv.expectedNode, node)
-			return i18n.NewError(ctx, msgs.MsgConnectionToWrongNode, node)
+			return i18n.NewError(ctx, msgs.MsgConnectionToWrongNode, node, tv.expectedNode)
 		}
 
 		// Ask the Paladin server/registry for details of the node we are peering with
 		ai.transportDetails, err = tv.t.getTransportDetails(ctx, node)
+		if err != nil {
+			log.L(ctx).Error(err.Error())
+			return err
+		}
 
 		// If we need to check the issuer, do that now
 		if tv.directCertVerification {
@@ -169,24 +182,13 @@ func (tv *tlsVerifier) peerValidator() (*atomic.Pointer[tlsVerifierAuthInfo], cr
 			}
 		}
 
-		// OK - we've verified
+		// OK - we've verified.
+		// We're not completely certain the handshake happens on a single go-routine, so we play safe
+		// and use an atomic pointer to pass it back to the waiting TransportCredentials
+		// ClientHandshake/ServerHandshake function.
 		ai.verifiedNodeName = node
 		authInfo.Store(ai)
 
-		// Grab the conn lock at this point
-		tv.t.connLock.L.Lock()
-		defer tv.t.connLock.L.Unlock()
-
-		// Ok - we know who we are talking to, and we are happy!
-		// Add this to the connection list - we close any existing connection
-		// existing := gc.t.connections[ai.verifiedNodeName]
-		// if existing != nil {
-		// 	log.L(ctx).Infof("Connection %s (%s) is replaced by connection %s (%s)",
-		// 		existing.netConn.RemoteAddr(), existing.direction, gc.netConn.RemoteAddr(), gc.direction)
-		// 	// Just close the connection
-		// 	_ = existing.netConn.Close()
-		// }
-		// gc.t.connections[gc.node] = gc
 		return nil
 	}
 	return authInfo, credentials.NewTLS(tlsConfig)

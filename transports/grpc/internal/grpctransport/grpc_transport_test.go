@@ -17,239 +17,260 @@ package grpctransport
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/json"
-	"encoding/pem"
-	"math/big"
+	"fmt"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
+	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type testCallbacks struct {
-	getTransportDetails func(context.Context, *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error)
-	receiveMessage      func(context.Context, *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error)
-}
+func TestBadConfigJSON(t *testing.T) {
 
-func (tc *testCallbacks) GetTransportDetails(ctx context.Context, req *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-	return tc.getTransportDetails(ctx, req)
-}
-
-func (tc *testCallbacks) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-	return tc.receiveMessage(ctx, req)
-}
-
-func getRSAKeyFromPEM(t *testing.T, pemBytes string) *rsa.PrivateKey {
-	block, _ := pem.Decode([]byte(pemBytes))
-	assert.NotNil(t, block)
-	assert.Equal(t, "RSA PRIVATE KEY", block.Type)
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	assert.NoError(t, err)
-	return privateKey
-}
-
-func buildTestCertificate(t *testing.T, subject pkix.Name, ca *x509.Certificate, caKey *rsa.PrivateKey) (string, string) {
-	// Create an X509 certificate pair
-	privatekey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publickey := &privatekey.PublicKey
-	var privateKeyBytes []byte = x509.MarshalPKCS1PrivateKey(privatekey)
-	privateKeyBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}
-	privateKeyPEM := &strings.Builder{}
-	err := pem.Encode(privateKeyPEM, privateKeyBlock)
-	require.NoError(t, err)
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	x509Template := &x509.Certificate{
-		SerialNumber:          serialNumber,
-		Subject:               subject,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(100 * time.Second),
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1)},
-		DNSNames:              []string{"127.0.0.1", "localhost"},
-	}
-	require.NoError(t, err)
-	if ca == nil {
-		ca = x509Template
-		caKey = privatekey
-		x509Template.IsCA = true
-		x509Template.KeyUsage |= x509.KeyUsageCertSign
-	}
-	derBytes, err := x509.CreateCertificate(rand.Reader, x509Template, ca, publickey, caKey)
-	require.NoError(t, err)
-	publicKeyPEM := &strings.Builder{}
-	err = pem.Encode(publicKeyPEM, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	require.NoError(t, err)
-	return publicKeyPEM.String(), privateKeyPEM.String()
-}
-
-func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) (*grpcTransport, *PublishedTransportDetails, *testCallbacks, func()) {
-	// Grab a localhost port to use and put that in config
-	portGrabber, err := net.Listen("tcp", "127.0.0.1:0")
-	assert.NoError(t, err)
-	port := portGrabber.Addr().(*net.TCPAddr).Port
-	err = portGrabber.Close()
-	assert.NoError(t, err)
-	conf.Port = &port
-	conf.Address = confutil.P("127.0.0.1")
-
-	// Put the certs in the config
-	conf.TLS.Cert = nodeCert
-	conf.TLS.Key = nodeKey
-
-	// Serialize the config
-	jsonConf, err := json.Marshal(conf)
-	assert.NoError(t, err)
-
-	//  construct the plugin
 	callbacks := &testCallbacks{}
 	transport := grpcTransportFactory(callbacks).(*grpcTransport)
-	res, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
-		ConfigJson: string(jsonConf),
+		ConfigJson: `{!!!!`,
 	})
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
+	assert.Regexp(t, "PD030001", err)
 
-	// Build the transport details for this plugin
-	transportDetails := &PublishedTransportDetails{
-		Endpoint: "dns:///" + transport.listener.Addr().String(),
-		Issuer:   nodeCert, // self-signed
-	}
-
-	return transport, transportDetails, callbacks, func() {
-		panicked := recover()
-		if panicked != nil {
-			panic(panicked)
-		}
-		transport.grpcServer.Stop()
-		<-transport.serverDone
-	}
 }
 
-func TestPluginLifecycle(t *testing.T) {
-	pb := NewPlugin(context.Background())
-	assert.NotNil(t, pb)
+func TestMissingListenerPort(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+		Name:       "grpc",
+		ConfigJson: `{}`,
+	})
+	assert.Regexp(t, "PD030000", err)
+
 }
 
-func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
+func TestBadCertSubjectMatcher(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+		Name:       "grpc",
+		ConfigJson: `{"address": "127.0.0.1", "port": 0, "certSubjectMatcher": "[[[[[[[badness"}`,
+	})
+	assert.Regexp(t, "PD030003", err)
+
+}
+
+func TestBadTLSConf(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+		Name:       "grpc",
+		ConfigJson: `{"address": "127.0.0.1", "port": 0, "tls": { "caFile": "` + t.TempDir() + `" }}`,
+	})
+	assert.Regexp(t, "PD020401", err)
+
+}
+
+func TestBadDirectCertVerificationConf(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+		Name:       "grpc",
+		ConfigJson: `{"address": "127.0.0.1", "port": 0, "tls": { "requiredDNAttributes": {"cn":"anything"} }}`,
+	})
+	assert.Regexp(t, "PD030002", err)
+
+}
+
+func TestBadListenerConf(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
+		Name:       "grpc",
+		ConfigJson: `{"address": "::::::::", "port": 0}`,
+	})
+	assert.Regexp(t, "listen", err)
+}
+
+func TestReceiveFail(t *testing.T) {
 
 	ctx := context.Background()
 
-	// the default config is direct cert verification
-	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
-	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{})
-	defer done1()
-
-	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, nil, nil)
-	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{})
-	defer done2()
-
-	received := make(chan *prototk.Message)
-	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-		received <- rmr.Message
-		return &prototk.ReceiveMessageResponse{}, nil
-	}
-
-	// Register nodes
-	fakeRegistry := func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-		reg := map[string]string{
-			"node1": tktypes.JSONString(transportDetails1).String(),
-			"node2": tktypes.JSONString(transportDetails2).String(),
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return nil, fmt.Errorf("pop")
 		}
-		assert.Contains(t, reg, gtdr.Node)
-		return &prototk.GetTransportDetailsResponse{
-			TransportDetails: reg[gtdr.Node],
-		}, nil
-	}
-	callbacks1.getTransportDetails = fakeRegistry
-	callbacks2.getTransportDetails = fakeRegistry
+	})
+	defer done()
 
-	// Connect plugin1 to plugin2
-	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+	// Send and we should get an error as the server fails
+	var err error
+	for err == nil {
+		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+			Message: &prototk.Message{
+				ReplyTo:     "to.me@node1",
+				Destination: "to.you@node2",
+			},
+		})
+	}
+	assert.Regexp(t, "EOF", err)
+
+}
+
+func TestBadReplyTo(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t)
+	defer done()
+
+	// Send and we should get an error as the server fails
+	var err error
+	for err == nil {
+		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+			Message: &prototk.Message{
+				ReplyTo:     "to.me@not.mine",
+				Destination: "to.you@node2",
+			},
+		})
+	}
+	assert.Regexp(t, "EOF", err)
+
+}
+
+func TestConnectFail(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, plugin2, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return &prototk.ReceiveMessageResponse{}, nil
+		}
+	})
+	defer done()
+
+	plugin2.grpcServer.Stop()
+
+	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
 			ReplyTo:     "to.me@node1",
 			Destination: "to.you@node2",
 		},
 	})
-	assert.NoError(t, err)
-	assert.NotNil(t, sendRes)
-
-	if err == nil {
-		<-received
-	}
+	assert.Regexp(t, "rpc error", err)
 
 }
 
-func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
+func TestConnectBadTransport(t *testing.T) {
 
 	ctx := context.Background()
 
-	caCert, caKeyPEM := buildTestCertificate(t, pkix.Name{CommonName: "ca"}, nil, nil)
-	ca, err := getCertFromPEM(ctx, []byte(caCert))
-	assert.NoError(t, err)
-	caKey := getRSAKeyFromPEM(t, caKeyPEM)
-
-	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, ca, caKey)
-	plugin1, transportDetails1, callbacks1, done1 := newTestGRPCTransport(t, node1Cert, node1Key, &Config{
-		TLS:                    tlsconf.Config{CA: caCert},
-		DirectCertVerification: confutil.P(false),
-	})
-	defer done1()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
-
-	node2Cert, node2Key := buildTestCertificate(t, pkix.Name{CommonName: "node2"}, ca, caKey)
-	_, transportDetails2, callbacks2, done2 := newTestGRPCTransport(t, node2Cert, node2Key, &Config{
-		TLS:                    tlsconf.Config{CA: caCert},
-		DirectCertVerification: confutil.P(false),
-	})
-	defer done2()
-	transportDetails1.Issuer = "" // to ensure we're not falling back to cert verification
-
-	received := make(chan *prototk.Message)
-	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-		received <- rmr.Message
-		return &prototk.ReceiveMessageResponse{}, nil
-	}
-
-	// Register nodes
-	fakeRegistry := func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-		reg := map[string]string{
-			"node1": tktypes.JSONString(transportDetails1).String(),
-			"node2": tktypes.JSONString(transportDetails2).String(),
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(callbacks1, _ *testCallbacks) {
+		callbacks1.getTransportDetails = func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
+			return &prototk.GetTransportDetailsResponse{
+				TransportDetails: `{"endpoint": "WRONG:::::::"}`,
+			}, nil
 		}
-		assert.Contains(t, reg, gtdr.Node)
-		return &prototk.GetTransportDetailsResponse{
-			TransportDetails: reg[gtdr.Node],
-		}, nil
-	}
-	callbacks1.getTransportDetails = fakeRegistry
-	callbacks2.getTransportDetails = fakeRegistry
+	})
+	defer done()
 
-	// Connect plugin1 to plugin2
-	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
 			ReplyTo:     "to.me@node1",
 			Destination: "to.you@node2",
 		},
 	})
-	assert.NoError(t, err)
-	assert.NotNil(t, sendRes)
+	assert.Regexp(t, "WRONG", err)
 
-	if err == nil {
-		<-received
+}
+
+func TestSendBadDest(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return &prototk.ReceiveMessageResponse{}, nil
+		}
+	})
+	defer done()
+
+	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+		Message: &prototk.Message{
+			ReplyTo:     "to.me@node1",
+			Destination: "!wrong",
+		},
+	})
+	assert.Regexp(t, "PD020006", err)
+
+}
+
+func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
+
+	plugin, _, _, done := newTestGRPCTransport(t, "", "", &Config{})
+	defer done()
+
+	// Create an unsecured server to the plugin using an unsecured server,
+	// and check that the stream loop closes rather than accepting messages.
+	unsecuredServer := grpc.NewServer()
+	proto.RegisterPaladinGRPCTransportServer(unsecuredServer, plugin)
+
+	serverDone := make(chan struct{})
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	go func() {
+		defer close(serverDone)
+		_ = unsecuredServer.Serve(l)
+	}()
+
+	conn, err := grpc.NewClient("dns:///"+l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NoError(t, err)
+	client := proto.NewPaladinGRPCTransportClient(conn)
+	s, err := client.ConnectSendStream(context.Background())
+	assert.NoError(t, err)
+
+	for err == nil {
+		err = s.Send(&proto.Message{
+			ReplyTo:     "to.me@not.mine",
+			Destination: "to.you@node2",
+		})
 	}
+	assert.Regexp(t, "EOF", err)
+}
+
+func TestWaitNewConn(t *testing.T) {
+
+	plugin, _, _, done := newTestGRPCTransport(t, "", "", &Config{})
+	defer done()
+
+	isNew, oc, err := plugin.waitExistingOrNewConn("node1")
+	assert.True(t, isNew)
+	assert.Nil(t, err)
+
+	bgError := make(chan error)
+	go func() {
+		_, _, err := plugin.waitExistingOrNewConn("node1")
+		bgError <- err
+	}()
+
+	for oc.waiting == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	plugin.connLock.L.Lock()
+	oc.connecting = false
+	oc.connError = fmt.Errorf("pop")
+	plugin.connLock.Broadcast()
+	plugin.connLock.L.Unlock()
+
+	assert.Regexp(t, "pop", <-bgError)
 
 }

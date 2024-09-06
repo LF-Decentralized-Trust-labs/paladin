@@ -60,7 +60,10 @@ type grpcTransport struct {
 }
 
 type outboundConn struct {
+	nodeName   string
 	connecting bool
+	sendLock   sync.Mutex
+	waiting    int
 	connError  error
 	stream     grpc.ClientStreamingClient[proto.Message, proto.Empty]
 }
@@ -113,7 +116,6 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	}
 
 	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
-	baseTLSConfig.InsecureSkipVerify = false
 	baseTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	if directCertVerification {
 		// Check the tls default settings haven't been set with conflicting config
@@ -171,13 +173,13 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 	if ok && peer.AuthInfo != nil {
 		ai, ok = peer.AuthInfo.(*tlsVerifierAuthInfo)
 	}
-	if !ok {
+	if !ok || ai == nil {
 		return i18n.NewError(ctx, msgs.MsgAuthContextNotAvailable)
 	}
 
 	// Go into the long-lived receive loop until the client disconnects
 	ctx = log.WithLogField(log.WithLogField(ctx, "remote", ai.remoteAddr), "node", ai.verifiedNodeName)
-	log.L(ctx).Infof("GRPC message stream established from node %s", ai.verifiedNodeName)
+	log.L(ctx).Infof("GRPC message stream established from node %s (authType=%s)", ai.verifiedNodeName, peer.AuthInfo.AuthType())
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
@@ -192,7 +194,7 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 			err = i18n.NewError(ctx, msgs.MsgInvalidReplyToNode)
 		}
 		if err != nil {
-			log.L(ctx).Errorf("Invalid replyTo: %s", tktypes.ProtoToJSON(msg))
+			log.L(ctx).Errorf("Invalid replyTo (err=%s): %s", err, tktypes.ProtoToJSON(msg))
 			return err
 		}
 
@@ -232,31 +234,60 @@ func (t *grpcTransport) getTransportDetails(ctx context.Context, node string) (t
 	return transportDetails, nil
 }
 
-func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (grpc.ClientStreamingClient[proto.Message, proto.Empty], error) {
+func (t *grpcTransport) waitExistingOrNewConn(nodeName string) (bool, *outboundConn, error) {
 	t.connLock.L.Lock()
+	defer t.connLock.L.Unlock()
 	existing := t.outboundConnections[nodeName]
 	if existing != nil {
 		// Multiple routines might try to connect concurrently, so we have a condition
-		defer t.connLock.L.Unlock() // unlock on return on this path
+		existing.waiting++
 		for existing.connecting {
 			t.connLock.Wait()
 		}
-		return existing.stream, existing.connError
+		return false, existing, existing.connError
 	}
 	// We need to create the connection - put the placeholder in the map
-	newConn := &outboundConn{connecting: true}
+	newConn := &outboundConn{nodeName: nodeName, connecting: true}
 	t.outboundConnections[nodeName] = newConn
-	t.connLock.L.Unlock()
+	return true, newConn, nil
+}
+
+func (t *grpcTransport) send(ctx context.Context, oc *outboundConn, message *proto.Message) (err error) {
+	oc.sendLock.Lock()
+	defer func() {
+		if err != nil {
+			// Close this stream and remove it before dropping the lock (unsafe to call concurrent to send)
+			log.L(ctx).Errorf("closing stream to %s due to send err: %s", oc.nodeName, err)
+			_ = oc.stream.CloseSend()
+			// Drop the send lock before taking conn lock to remove from the connections
+			oc.sendLock.Unlock()
+			t.connLock.L.Lock()
+			defer t.connLock.L.Unlock()
+			delete(t.outboundConnections, oc.nodeName)
+		} else {
+			// Just drop the lock and return
+			oc.sendLock.Unlock()
+		}
+	}()
+	err = oc.stream.Send(message)
+	return
+}
+
+func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (*outboundConn, error) {
+
+	isNew, oc, err := t.waitExistingOrNewConn(nodeName)
+	if !isNew || err != nil {
+		return oc, err
+	}
 
 	// We must ensure we complete the newConn (for good or bad)
 	// and notify everyone waiting to check status before we return
-	var err error
 	defer func() {
 		t.connLock.L.Lock()
-		newConn.connecting = false
+		oc.connecting = false
 		if err != nil {
 			// copy our error to anyone queuing - everybody fails
-			newConn.connError = err
+			oc.connError = err
 			// remove this entry, so the next one will try again
 			delete(t.outboundConnections, nodeName)
 		}
@@ -276,12 +307,11 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (grp
 	conn, err := grpc.NewClient(transportDetails.Endpoint,
 		grpc.WithTransportCredentials(individualNodeVerifier),
 	)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		client := proto.NewPaladinGRPCTransportClient(conn)
+		oc.stream, err = client.ConnectSendStream(ctx)
 	}
-	client := proto.NewPaladinGRPCTransportClient(conn)
-	newConn.stream, err = client.ConnectSendStream(ctx)
-	return newConn.stream, err
+	return oc, err
 }
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
@@ -289,9 +319,9 @@ func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessag
 	if err != nil {
 		return nil, err
 	}
-	stream, err := t.getConnection(ctx, node)
+	oc, err := t.getConnection(ctx, node)
 	if err == nil {
-		err = stream.Send(&proto.Message{
+		err = t.send(ctx, oc, &proto.Message{
 			MessageId:     req.Message.MessageId,
 			CorrelationId: req.Message.CorrelationId,
 			Destination:   req.Message.Destination,
