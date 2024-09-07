@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,7 +28,7 @@ public class JsonHexTest {
     @Test
     public void testDynamic() throws Exception {
         assertEquals("feedbeef", JsonHex.from("0xfEEdbEEf").toHex());
-        assertEquals("0xfeedbeef", JsonHex.from(JsonHex.from("fEEdbEEf").getBytes()).to0xHex());
+        assertEquals("0xfeedbeef", JsonHex.wrap(JsonHex.from("fEEdbEEf").getBytes()).to0xHex());
         assertEquals("0x", JsonHex.from("").toString());
         assertEquals("0x", JsonHex.from((String)(null)).toString());
 
@@ -44,7 +43,7 @@ public class JsonHexTest {
     @Test
     public void testFixed() throws Exception {
         assertEquals("0xfeedbeef", JsonHex.from("0xfEEdbEEf", 4).toString());
-        assertEquals("0xfeedbeef", JsonHex.from(JsonHex.from("0xfEEdbEEf").getBytes(), 4).toString());
+        assertEquals("0xfeedbeef", JsonHex.wrap(JsonHex.from("0xfEEdbEEf").getBytes(), 4).toString());
         assertThrows(IllegalArgumentException.class, () -> {
             JsonHex.from("0xfeedbeef", 10);
         });
@@ -56,7 +55,7 @@ public class JsonHexTest {
 
     private record TestRecord(
             @JsonProperty()
-            JsonHex.Dynamic bytes,
+            JsonHex.Bytes bytes,
             @JsonProperty()
             JsonHex.Bytes32 bytes32,
             @JsonProperty()
@@ -77,6 +76,9 @@ public class JsonHexTest {
         assertEquals("0x67e0aEcDbdA15B040978299B1dCFdff77c0C1dE8", tr.address().checksummed());
         assertEquals(20, tr.address().getRequiredByteLength());
 
+        // Check equals() works
+        assertEquals(tr.bytes32(), JsonHex.from("4783d50032169c868672a02ff005a7f222e9b0f9da1ac5f10814c5b03894cbff"));
+
         assertThrows(IOException.class, () -> {
             new ObjectMapper().readValue("""
                 {"bytes":{}}
@@ -86,5 +88,15 @@ public class JsonHexTest {
         assertNull(tr.bytes());
         assertNull(tr.bytes32());
         assertNull(tr.address());
+
+        tr = new TestRecord(
+                JsonHex.from("AAbbCCdd"),
+                new JsonHex.Bytes32("0x4783d50032169c868672a02ff005a7f222e9b0f9da1ac5f10814c5b03894cbff"),
+                JsonHex.addressFrom("0x67e0aEcDbdA15B040978299B1dCFdff77c0C1dE8")
+        );
+        String jsonRecord = new ObjectMapper().writeValueAsString(tr);
+        assertEquals("""
+                {"bytes":"0xaabbccdd","bytes32":"0x4783d50032169c868672a02ff005a7f222e9b0f9da1ac5f10814c5b03894cbff","address":"0x67e0aecdbda15b040978299b1dcfdff77c0c1de8"}
+                """.trim(), jsonRecord);
     }
 }

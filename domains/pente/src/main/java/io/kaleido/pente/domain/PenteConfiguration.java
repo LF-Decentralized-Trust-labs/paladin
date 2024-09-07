@@ -20,15 +20,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.JsonHex.Address;
+import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.web3j.abi.TypeEncoder;
+import org.web3j.abi.datatypes.DynamicArray;
+import org.web3j.abi.datatypes.DynamicStruct;
+import org.web3j.abi.datatypes.generated.Uint256;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.ByteBuffer;
+import java.util.*;
 
 /**
  * Provides thread safe access to the configuration of the domain from the functions that are called
@@ -66,9 +71,9 @@ public class PenteConfiguration {
     public static final String ENDORSEMENT_TYPE_GROUP_SCOPED_KEYS = "groupScopedKeys";
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static record GroupTupleJSON(
+    record GroupTupleJSON(
             @JsonProperty
-            String salt,
+            Bytes32 salt,
             @JsonProperty
             String[] members
     ) {}
@@ -81,7 +86,7 @@ public class PenteConfiguration {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static record PrivacyGroupConstructorParamsJSON(
+    record PrivacyGroupConstructorParamsJSON(
             @JsonProperty
             GroupTupleJSON group,
             @JsonProperty
@@ -124,11 +129,41 @@ public class PenteConfiguration {
         ));
     }
 
+    record NewPrivacyGroupFactoryParams(
+            @JsonProperty()
+            Bytes32 transactionId,
+            @JsonProperty()
+            JsonHex.Bytes config
+    ) {}
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record PenteYAMLConfig(
             @JsonProperty
             String address
     ) {}
+
+    public static byte[] fourByteSelector(int val) {
+        return ByteBuffer.allocate(4).putInt(val).array();
+    }
+
+    public static final byte[] PenteConfigID_Endorsement_V0 = fourByteSelector(0x00010000);;
+
+    record Endorsement_V0(
+            int threshold,
+            List<Address> addresses
+    ) {}
+
+     static byte[] abiEncoder_Endorsement_V0(Endorsement_V0 config) {
+        Uint256 w3Threshold = new Uint256(config.threshold());
+        List<org.web3j.abi.datatypes.Address> w3Addresses = new ArrayList<>(config.addresses().size());
+        for (Address addr : config.addresses()) {
+            org.web3j.abi.datatypes.Address w3Address = new org.web3j.abi.datatypes.Address(addr.to0xHex());
+            w3Addresses.add(w3Address);
+        }
+        DynamicArray<org.web3j.abi.datatypes.Address> w3AddressArray =
+                new DynamicArray<>(org.web3j.abi.datatypes.Address.class, w3Addresses);
+        return TypeEncoder.encode(new DynamicStruct(w3Threshold, w3AddressArray)).getBytes();
+    }
 
     synchronized JsonABI getFactoryContractABI() {
         return factoryContractABI;
@@ -153,9 +188,7 @@ public class PenteConfiguration {
     }
 
     List<String> allPenteSchemas() {
-        return Arrays.asList(new String[]{
-                abiTuple_AccountStateV20240902().toString(),
-        });
+        return Arrays.asList(abiTuple_AccountStateV20240902().toString());
     }
 
     synchronized void schemasInitialized(List<ToDomain.StateSchema> schemas) {

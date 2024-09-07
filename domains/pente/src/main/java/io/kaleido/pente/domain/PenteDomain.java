@@ -17,16 +17,22 @@ package io.kaleido.pente.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
+import io.kaleido.paladin.toolkit.Algorithms;
 import io.kaleido.paladin.toolkit.DomainInstance;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HexFormat;
-import java.util.concurrent.CompletableFuture;
-
+import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.JsonHex.Address;
+import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.web3j.abi.datatypes.Bytes;
+import org.web3j.abi.datatypes.DynamicStruct;
+
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public class PenteDomain extends DomainInstance {
     private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
@@ -66,6 +72,31 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.completedFuture(ToDomain.InitDomainResponse.getDefaultInstance());
     }
 
+    private List<String> buildGroupScopeIdentityLookups(Bytes32 salt, String [] members) throws IllegalArgumentException {
+        // Salt must be a 32byte hex string
+        if (salt == null || members == null) throw new IllegalArgumentException("salt and members are required for group");
+        String saltHex = salt.toHex();
+
+        // To deploy a new Privacy Group we need to collect unique endorsement addresses that
+        // mask the identities of all the participants.
+        // We use the salt of the privacy group to do this. This salt is basically a shared
+        // secret between all parties that is used to mask their identities.
+        List<String> lookups = new ArrayList<>(members.length);
+        for (String member : members) {
+            String[] locatorSplit = member.split("@");
+            switch (locatorSplit.length) {
+                case 1 -> {
+                    lookups.add(locatorSplit[0] + "." + saltHex);
+                }
+                case 2 -> {
+                    lookups.add(locatorSplit[0] + "." + saltHex + "@" + locatorSplit[1]);
+                }
+                default -> throw new IllegalArgumentException("invalid identity locator '%s'".formatted(member));
+            }
+        }
+        return lookups;
+    }
+
     @Override
     protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
         try {
@@ -90,44 +121,65 @@ public class PenteDomain extends DomainInstance {
                 throw new Exception("privacy group must have at least one member");
             }
 
-            // Salt must be a 32byte hex string
-            if (params.group().salt() == null || !params.group().salt().startsWith("0x") ||
-                params.group().salt().length() != 66) {
-                throw new Exception("salt must be an 0x hex encoded bytes32 value");
-            }
-            String salt = HexFormat.of().parseHex(params.group().salt().substring(2));
-
-            // To deploy a new Privacy Group we need to collect unique endorsement addresses that
-            // mask the identities of all the participants.
-            // We use the salt of the privacy group to do this. This salt is basically a shared
-            // secret between all parties that is used to mask their identities.
             ToDomain.InitDeployResponse.Builder response = ToDomain.InitDeployResponse.newBuilder();
-            for (String member : params.group().members()) {
-                String[] locatorSplit = member.split("@");
-                String identity;
-                String atNode;
-                switch (locatorSplit.length) {
-                    case 1 -> {
-                        identity = locatorSplit[0];
-                        atNode = "";
-                    }
-                    case 2 -> {
-                        identity = locatorSplit[0];
-                        atNode = "@" + locatorSplit[1];
-                    }
-                }
-
+            for (String lookup : buildGroupScopeIdentityLookups(params.group().salt(), params.group().members())) {
+                response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
+                        setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                        setLookup(lookup).
+                        build());
             }
-
             return CompletableFuture.completedFuture(response.build());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
+    private List<Address> getResolvedEndorsers(Bytes32 salt, String[] members, List<ToDomain.ResolvedVerifier> resolvedVerifiers) {
+        // Get the resolved address for each endorser we set the lookup for
+        List<String> lookups = buildGroupScopeIdentityLookups(salt, members);
+        List<Address> endorsementAddresses = new ArrayList<>(lookups.size());
+        for (String lookup : lookups) {
+            for (ToDomain.ResolvedVerifier verifier : resolvedVerifiers) {
+                if (verifier.getLookup().equals(lookup) && verifier.getAlgorithm().equals(Algorithms.ECDSA_SECP256K1_PLAINBYTES)) {
+                    // Check it's not in the list already
+                    Address addr = JsonHex.addressFrom(verifier.getVerifier());
+                    for (Address endorser : endorsementAddresses) {
+                        if (endorser.equals(addr)) {
+                            throw new IllegalArgumentException("Duplicate resolved endorser %s (lookup='%s')".formatted(addr, lookup));
+                        }
+                    }
+                    endorsementAddresses.add(addr);
+                }
+            }
+        }
+        return endorsementAddresses;
+    }
+
     @Override
     protected CompletableFuture<ToDomain.PrepareDeployResponse> prepareDeploy(ToDomain.PrepareDeployRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            PenteConfiguration.PrivacyGroupConstructorParamsJSON params =
+                    new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+                            PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
+
+            List<Address> resolvedVerifiers = getResolvedEndorsers(params.group().salt(), params.group().members(), request.getResolvedVerifiersList());
+            ByteArrayOutputStream onchainConfBuilder = new ByteArrayOutputStream();
+            onchainConfBuilder.write(PenteConfiguration.PenteConfigID_Endorsement_V0);
+            onchainConfBuilder.write(PenteConfiguration.abiEncoder_Endorsement_V0(new PenteConfiguration.Endorsement_V0(
+                    resolvedVerifiers.size(),
+                    resolvedVerifiers
+            )));
+            ToDomain.PrepareDeployResponse.Builder response = ToDomain.PrepareDeployResponse.newBuilder();
+            response.getTransactionBuilder().
+                    setFunctionName("newPrivacyGroup").
+                    setParamsJson(new ObjectMapper().writeValueAsString(new PenteConfiguration.NewPrivacyGroupFactoryParams(
+                            new Bytes32(request.getTransaction().getTransactionId()),
+                            new JsonHex.Bytes(onchainConfBuilder.toByteArray())
+                    )));
+            return CompletableFuture.completedFuture(response.build());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

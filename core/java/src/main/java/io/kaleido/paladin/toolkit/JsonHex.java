@@ -15,14 +15,19 @@
 
 package io.kaleido.paladin.toolkit;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HexFormat;
 
 /** helper utility for hex bytes */
@@ -44,23 +49,32 @@ public abstract class JsonHex {
     }
 
     @JsonDeserialize(using = JsonDeserializerDynamic.class)
-    public static class Dynamic extends JsonHex {
-        public Dynamic(String str) {
+    @JsonSerialize(using = JsonSerializerDynamic.class)
+    public static class Bytes extends JsonHex {
+        public Bytes(String str) {
             super(str, -1);
         }
-        public Dynamic(byte[] bytes) {
+        public Bytes(byte[] bytes) {
             super(bytes, -1);
         }
     }
 
-    public static class JsonDeserializerDynamic extends JsonDeserializer<Dynamic> {
+    public static class JsonDeserializerDynamic extends JsonDeserializer<Bytes> {
         @Override
-        public Dynamic deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
-            return new Dynamic(deserializeStr(jp));
+        public Bytes deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
+            return new Bytes(deserializeStr(jp));
+        }
+    }
+
+    public static class JsonSerializerDynamic extends JsonSerializer<Bytes> {
+        @Override
+        public void serialize(Bytes value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(value.to0xHex());
         }
     }
 
     @JsonDeserialize(using = JsonDeserializerBytes32.class)
+    @JsonSerialize(using = JsonSerializerBytes32.class)
     public static class Bytes32 extends JsonHex {
         public Bytes32(String str) {
             super(str, 32);
@@ -77,7 +91,15 @@ public abstract class JsonHex {
         }
     }
 
+    public static class JsonSerializerBytes32 extends JsonSerializer<Bytes32> {
+        @Override
+        public void serialize(Bytes32 value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(value.to0xHex());
+        }
+    }
+
     @JsonDeserialize(using = JsonDeserializerAddress.class)
+    @JsonSerialize(using = JsonSerializerAddress.class)
     public static class Address extends JsonHex {
         public Address(String str) {super(str, 20);}
         public Address(byte[] bytes) {
@@ -116,10 +138,17 @@ public abstract class JsonHex {
         }
     }
 
+    public static class JsonSerializerAddress extends JsonSerializer<Address> {
+        @Override
+        public void serialize(Address value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(value.to0xHex());
+        }
+    }
+
     /** only used in from(str, requiredByteLength) - do not use as a JSON type */
-    private static class Fixed extends JsonHex {
-        public Fixed(String str, int requiredByteLength) {super(str, requiredByteLength);}
-        public Fixed(byte[] bytes, int requiredByteLength) {super(bytes, requiredByteLength);}
+    public static class FixedLenBytes extends JsonHex {
+        private FixedLenBytes(String str, int requiredByteLength) {super(str, requiredByteLength);}
+        private FixedLenBytes(byte[] bytes, int requiredByteLength) {super(bytes, requiredByteLength);}
     }
 
 
@@ -150,20 +179,29 @@ public abstract class JsonHex {
         return s.substring(prefix.length());
     }
 
-    public static JsonHex from(String str) throws IllegalArgumentException {
-        return new JsonHex.Dynamic(str);
+    @Override
+    public boolean equals(final Object obj) {
+        return (obj instanceof JsonHex) && Arrays.equals(this.bytes, ((JsonHex)obj).bytes);
     }
 
-    public static JsonHex from(String str, int requiredByteLength) throws IllegalArgumentException {
-        return new JsonHex.Fixed(str, requiredByteLength);
+    public static Bytes from(String str) throws IllegalArgumentException {
+        return new Bytes(str);
     }
 
-    public static JsonHex from(byte[] bytes) throws IllegalArgumentException {
-        return new JsonHex.Dynamic(bytes);
+    public static FixedLenBytes from(String str, int requiredByteLength) throws IllegalArgumentException {
+        return new FixedLenBytes(str, requiredByteLength);
     }
 
-    public static JsonHex from(byte[] bytes, int requiredByteLength) throws IllegalArgumentException {
-        return new JsonHex.Fixed(bytes, requiredByteLength);
+    public static Bytes wrap(byte[] bytes) throws IllegalArgumentException {
+        return new Bytes(bytes);
+    }
+
+    public static FixedLenBytes wrap(byte[] bytes, int requiredByteLength) throws IllegalArgumentException {
+        return new FixedLenBytes(bytes, requiredByteLength);
+    }
+
+    public static Address addressFrom(String str) throws IllegalArgumentException {
+        return new JsonHex.Address(str);
     }
 
     public String toString() {
