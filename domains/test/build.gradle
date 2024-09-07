@@ -49,9 +49,9 @@ dependencies {
 task copySolidity(type: Copy,) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
-        include 'contracts/atom/Atom.sol/Atom.json'
-        include 'contracts/atom/Atom.sol/AtomFactory.json'
+        include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
+        include 'contracts/shared/atom/Atom.sol/Atom.json'
+        include 'contracts/shared/atom/Atom.sol/AtomFactory.json'
     }
     into 'abis'
 

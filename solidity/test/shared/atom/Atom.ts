@@ -2,7 +2,11 @@ import { expect } from "chai";
 import { ContractTransactionReceipt, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 import { Atom } from "../typechain-types";
-import { fakeTXO, newTransferHash, randomBytes32 } from "../noto/Noto";
+import {
+  fakeTXO,
+  newTransferHash,
+  randomBytes32,
+} from "../../domains/noto/Noto";
 
 describe("Atom", function () {
   it("atomic operation with 2 encoded calls", async function () {
