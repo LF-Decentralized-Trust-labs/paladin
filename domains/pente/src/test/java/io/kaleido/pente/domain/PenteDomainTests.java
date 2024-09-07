@@ -15,12 +15,15 @@
 
 package io.kaleido.pente.domain;
 
-import io.kaleido.paladin.toolkit.JsonABI;
-import io.kaleido.paladin.toolkit.JsonRpcClient;
-import io.kaleido.paladin.toolkit.ResourceLoader;
-import io.kaleido.paladin.toolkit.Testbed;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kaleido.paladin.toolkit.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class PenteDomainTests {
 
@@ -28,7 +31,6 @@ public class PenteDomainTests {
 
     String deployFactory() throws Exception {
         try (Testbed deployBed = new Testbed(testbedSetup)) {
-            deployBed.start();
             String factoryBytecode = ResourceLoader.jsonResourceEntryText(
                     this.getClass().getClassLoader(),
                     "contracts/pente/PenteFactory.sol/PenteFactory.json",
@@ -39,13 +41,11 @@ public class PenteDomainTests {
                     "contracts/pente/PenteFactory.sol/PenteFactory.json",
                     "abi"
             );
-            try (JsonRpcClient testbedClient = new JsonRpcClient(deployBed.getRPCUrl())) {
-                return testbedClient.request("testbed_deployBytecode",
-                        "deployer",
-                        factoryABI,
-                        factoryBytecode,
-                        "{}");
-            }
+            return deployBed.getRpcClient().request("testbed_deployBytecode",
+                    "deployer",
+                    factoryABI,
+                    factoryBytecode,
+                    "{}");
         }
     }
 
@@ -53,5 +53,23 @@ public class PenteDomainTests {
     void testSimpleStorage() throws Exception {
         String address = deployFactory();
         Assertions.assertNotEquals("", address);
+        Map<String, Object> config = new HashMap<>();
+        config.put("address", address);
+
+        JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
+        try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
+                "pente", new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), config
+        ))) {
+            String contractAddr = testbed.getRpcClient().request("testbed_deploy",
+                    "pente",
+                    new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
+                            new PenteConfiguration.GroupTupleJSON(
+                                    groupSalt,
+                                    new String[]{"member1", "member2"}
+                            ),
+                            PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES
+                    ));
+            assertFalse(contractAddr.isBlank());
+        }
     }
 }

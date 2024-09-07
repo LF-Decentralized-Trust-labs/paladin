@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Random;
 
 /** helper utility for hex bytes */
 public abstract class JsonHex {
@@ -202,6 +203,20 @@ public abstract class JsonHex {
 
     public static Address addressFrom(String str) throws IllegalArgumentException {
         return new JsonHex.Address(str);
+    }
+
+    public static Bytes32 randomBytes32() throws IllegalArgumentException {
+        Random rand = new Random();
+        byte[] bytes = new byte[32];
+        rand.nextBytes(bytes);
+        return new Bytes32(bytes);
+    }
+
+    public static Bytes randomBytes(int len) throws IllegalArgumentException {
+        Random rand = new Random();
+        byte[] bytes = new byte[len];
+        rand.nextBytes(bytes);
+        return new Bytes(bytes);
     }
 
     public String toString() {

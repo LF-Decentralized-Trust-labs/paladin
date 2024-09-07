@@ -168,7 +168,7 @@ public class PenteDomain extends DomainInstance {
             onchainConfBuilder.write(PenteConfiguration.abiEncoder_Endorsement_V0(new PenteConfiguration.Endorsement_V0(
                     resolvedVerifiers.size(),
                     resolvedVerifiers
-            )));
+            )).getBytes());
             ToDomain.PrepareDeployResponse.Builder response = ToDomain.PrepareDeployResponse.newBuilder();
             response.getTransactionBuilder().
                     setFunctionName("newPrivacyGroup").

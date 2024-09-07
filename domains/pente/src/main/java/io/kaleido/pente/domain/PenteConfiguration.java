@@ -153,7 +153,7 @@ public class PenteConfiguration {
             List<Address> addresses
     ) {}
 
-     static byte[] abiEncoder_Endorsement_V0(Endorsement_V0 config) {
+     static JsonHex.Bytes abiEncoder_Endorsement_V0(Endorsement_V0 config) {
         Uint256 w3Threshold = new Uint256(config.threshold());
         List<org.web3j.abi.datatypes.Address> w3Addresses = new ArrayList<>(config.addresses().size());
         for (Address addr : config.addresses()) {
@@ -162,7 +162,7 @@ public class PenteConfiguration {
         }
         DynamicArray<org.web3j.abi.datatypes.Address> w3AddressArray =
                 new DynamicArray<>(org.web3j.abi.datatypes.Address.class, w3Addresses);
-        return TypeEncoder.encode(new DynamicStruct(w3Threshold, w3AddressArray)).getBytes();
+        return new JsonHex.Bytes(TypeEncoder.encode(new DynamicStruct(w3Threshold, w3AddressArray)));
     }
 
     synchronized JsonABI getFactoryContractABI() {

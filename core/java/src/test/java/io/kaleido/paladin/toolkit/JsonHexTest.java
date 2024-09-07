@@ -99,4 +99,12 @@ public class JsonHexTest {
                 {"bytes":"0xaabbccdd","bytes32":"0x4783d50032169c868672a02ff005a7f222e9b0f9da1ac5f10814c5b03894cbff","address":"0x67e0aecdbda15b040978299b1dcfdff77c0c1de8"}
                 """.trim(), jsonRecord);
     }
+
+    @Test
+    public void testRandom() {
+        JsonHex.Bytes32 b32 = JsonHex.randomBytes32();
+        assertEquals(64, b32.toHex().length());
+        JsonHex.Bytes b16 = JsonHex.randomBytes(16);
+        assertEquals(32, b16.toHex().length());
+    }
 }

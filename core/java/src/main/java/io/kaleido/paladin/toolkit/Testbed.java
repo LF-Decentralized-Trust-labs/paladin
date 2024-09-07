@@ -46,12 +46,14 @@ public class Testbed implements Closeable {
 
     private final Setup testbedSetup;
 
+    private JsonRpcClient rpcClient;
+
     public record Setup(
             String dbMigrationsDir,
             long startTimeoutMS
     ) {}
 
-    public Testbed(Setup testbedSetup, ConfigDomain... domains) throws IOException {
+    public Testbed(Setup testbedSetup, ConfigDomain... domains) throws Exception {
         this.testbedSetup = testbedSetup;
         this.configuredDomains = domains;
         // Assign ourselves a free port
@@ -69,6 +71,12 @@ public class Testbed implements Closeable {
         }
         configMap.put("domains", domainMap);
         yamlConfigMerged = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(configMap);
+        try {
+            start();
+        } catch(Exception e) {
+            close();
+            throw e;
+        }
     }
 
     public record ConfigDomain(
@@ -132,11 +140,7 @@ public class Testbed implements Closeable {
                 """.formatted(new File(testbedSetup.dbMigrationsDir).getAbsolutePath(), availableRPCPort);
     }
 
-    public String getRPCUrl() {
-        return "http://127.0.0.1:%d".formatted(availableRPCPort);
-    }
-
-    public void start() throws Exception {
+    private void start() throws Exception {
         final File configFile = File.createTempFile("paladin-ut-", ".yaml");
         Files.writeString(configFile.toPath(), yamlConfigMerged);
 
@@ -150,7 +154,14 @@ public class Testbed implements Closeable {
         long startTime = System.currentTimeMillis();
         boolean connected = false;
         while (!connected) {
-            try (JsonRpcClient rpcClient = new JsonRpcClient(getRPCUrl())) {
+            long timeStarting = System.currentTimeMillis() - startTime;
+            if (timeStarting > testbedSetup.startTimeoutMS) {
+                throw new TimeoutException("timed out start after %dms".formatted(timeStarting));
+            }
+            Thread.sleep(250);
+
+            rpcClient = new JsonRpcClient("http://127.0.0.1:%d".formatted(availableRPCPort));
+            try {
                 List<String> domains = rpcClient.request("testbed_listDomains");
                 if (domains.size() != configuredDomains.length) {
                     throw new IllegalStateException("expected %d domains, found %d".formatted(configuredDomains.length, domains.size()));
@@ -158,12 +169,9 @@ public class Testbed implements Closeable {
                 connected = true;
             } catch (IOException e) {
                 System.err.printf("Waiting to connect: %s\n", e);
+                rpcClient.close();
+                rpcClient = null;
             }
-            long timeStarting = System.currentTimeMillis() - startTime;
-            if (timeStarting > testbedSetup.startTimeoutMS) {
-                throw new TimeoutException("timed out start after %dms".formatted(timeStarting));
-            }
-            Thread.sleep(250);
         }
     }
 
@@ -189,8 +197,15 @@ public class Testbed implements Closeable {
     public void close() {
         try {
             stop();
+            if (rpcClient != null) {
+                rpcClient.close();
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public JsonRpcClient getRpcClient() {
+        return rpcClient;
     }
 }
