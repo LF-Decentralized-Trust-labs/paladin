@@ -282,12 +282,36 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		invocation tktypes.PrivateContractInvoke,
-	) ([]byte, error) {
+	) (*tktypes.PrivateContractPreparedTransaction, error) {
 
 		tx, err := tb.prepareTransaction(ctx, invocation)
 		if err != nil {
 			return nil, err
 		}
-		return tx.PreparedTransaction.FunctionABI.EncodeCallDataCtx(ctx, tx.PreparedTransaction.Inputs)
+		encodedCall, err := tx.PreparedTransaction.FunctionABI.EncodeCallDataCtx(ctx, tx.PreparedTransaction.Inputs)
+		if err != nil {
+			return nil, err
+		}
+		inputStates := make([]*tktypes.FullState, len(tx.PostAssembly.InputStates))
+		for i, state := range tx.PostAssembly.InputStates {
+			inputStates[i] = &tktypes.FullState{
+				ID:     state.ID,
+				Schema: state.Schema,
+				Data:   []byte(state.Data),
+			}
+		}
+		outputStates := make([]*tktypes.FullState, len(tx.PostAssembly.OutputStates))
+		for i, state := range tx.PostAssembly.OutputStates {
+			outputStates[i] = &tktypes.FullState{
+				ID:     state.ID,
+				Schema: state.Schema,
+				Data:   []byte(state.Data),
+			}
+		}
+		return &tktypes.PrivateContractPreparedTransaction{
+			EncodedCall:  encodedCall,
+			InputStates:  inputStates,
+			OutputStates: outputStates,
+		}, nil
 	})
 }

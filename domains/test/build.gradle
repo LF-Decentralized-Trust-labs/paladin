@@ -46,12 +46,13 @@ dependencies {
     notoGo project(path: ":domains:noto", configuration: "goSource")
 }
 
-task copySolidity(type: Copy,) {
+task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/shared/atom/Atom.sol/Atom.json'
         include 'contracts/shared/atom/Atom.sol/AtomFactory.json'
+        include 'contracts/private/Swap.sol/Swap.json'
     }
     into 'abis'
 
@@ -65,6 +66,7 @@ task test(type: Exec) {
     inputs.files(configurations.coreGo)
     inputs.files(configurations.notoGo)
     inputs.files(goFiles)
+    inputs.files(copySolidity)
     outputs.dir('coverage')
 
     workingDir '.'
@@ -76,7 +78,6 @@ task test(type: Exec) {
     args '-timeout=30s'
     args "-test.gocoverdir=${projectDir}/coverage"
 
-    dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
