@@ -54,7 +54,7 @@ func (p *dispatcher) Dispatch(ctx context.Context, transactionIDs []uuid.UUID) e
 	p.sequencedTransactions = append(p.sequencedTransactions, transactionIDs...)
 	for _, transactionID := range transactionIDs {
 		err := p.publisher.PublishStageEvent(ctx, &enginespi.StageEvent{
-			Stage:           "attestation",
+			Stage:           "gather_endorsements",
 			ContractAddress: p.contractAddress,
 			TxID:            transactionID.String(),
 			Data:            &enginespi.TransactionDispatched{},

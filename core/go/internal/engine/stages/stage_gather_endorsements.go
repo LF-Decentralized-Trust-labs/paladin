@@ -31,24 +31,21 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
-type AttestationResult struct {
-}
-
-type AttestationStage struct {
+type GatherEndorsementsStage struct {
 	sequencer enginespi.Sequencer
 }
 
-func NewAttestationStage(sequencer enginespi.Sequencer) *AttestationStage {
-	return &AttestationStage{
+func NewGatherEndorsementsStage(sequencer enginespi.Sequencer) *GatherEndorsementsStage {
+	return &GatherEndorsementsStage{
 		sequencer: sequencer,
 	}
 }
 
-func (as *AttestationStage) Name() string {
-	return "attestation"
+func (as *GatherEndorsementsStage) Name() string {
+	return "gather_endorsements"
 }
 
-func (as *AttestationStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
+func (as *GatherEndorsementsStage) GetIncompletePreReqTxIDs(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) *enginespi.TxProcessPreReq {
 
 	return nil
 }
@@ -57,7 +54,7 @@ type endorsementResponse struct {
 	revertReason *string
 	endorsement  *prototk.AttestationResult
 }
-type attestationActionResult struct {
+type endorsementActionResult struct {
 	endorsementResponses []*endorsementResponse
 }
 
@@ -83,7 +80,7 @@ out:
 	return outstandingEndorsementRequests
 }
 
-func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
+func (as *GatherEndorsementsStage) ProcessEvents(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService, stageEvents []*enginespi.StageEvent) (unprocessedStageEvents []*enginespi.StageEvent, txUpdates *transactionstore.TransactionUpdate, nextStep enginespi.StageProcessNextStep) {
 	tx := tsg.HACKGetPrivateTx()
 
 	unprocessedStageEvents = []*enginespi.StageEvent{}
@@ -92,7 +89,7 @@ func (as *AttestationStage) ProcessEvents(ctx context.Context, tsg transactionst
 		if string(se.Stage) == as.Name() { // the current stage does not care about events from other stages yet (may need to be for interrupts)
 			if se.Data != nil {
 				switch v := se.Data.(type) {
-				case *attestationActionResult:
+				case *endorsementActionResult:
 					// process any enodrsements or signatures that have been gathered
 					log.L(ctx).Debugf("Processing %d endorsements for transaction %s", len(v.endorsementResponses), tx.ID.String())
 					for _, er := range v.endorsementResponses {
@@ -163,16 +160,15 @@ func isEndorsed(tx *components.PrivateTransaction) bool {
 		len(tx.PostAssembly.Endorsements) >= len(tx.PostAssembly.AttestationPlan)
 }
 
-func (as *AttestationStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
+func (as *GatherEndorsementsStage) MatchStage(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) bool {
 	tx := tsg.HACKGetPrivateTx()
 	// any asembled transactions are in this stage until they are dispatched
 	return isAssembled(tx) && !isDispatched(tx) && !hasOutstandingSignatureRequests(tx) && hasOutstandingEndorsementRequests(tx)
-
 }
 
-func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
+func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	tx := tsg.HACKGetPrivateTx()
-	log.L(ctx).Debugf("AttestationStage.PerformAction tx: %s", tx.ID.String())
+	log.L(ctx).Debugf("GatherEndorsementsStage.PerformAction tx: %s", tx.ID.String())
 
 	if tx.PostAssembly == nil {
 		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
@@ -184,7 +180,7 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		log.L(ctx).Errorf("Failed to assign transaction to sequencer: %s", err)
 		return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
 	}
-	attestationActionResult := &attestationActionResult{}
+	endorsementActionResult := &endorsementActionResult{}
 
 	attPlan := tx.PostAssembly.AttestationPlan
 	attResults := tx.PostAssembly.Endorsements
@@ -192,7 +188,6 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		switch attRequest.AttestationType {
 		case prototk.AttestationType_SIGN:
 			// no op. Signatures are gathered in the GatherSignaturesStage
-
 		case prototk.AttestationType_ENDORSE:
 			//TODO not sure this is the best way to check toBeComplete - take a closer look and think about this
 			toBeComplete := true
@@ -234,7 +229,7 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 							//TODO specific error message
 							return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
 						}
-						attestationActionResult.endorsementResponses = append(attestationActionResult.endorsementResponses, &endorsementResponse{
+						endorsementActionResult.endorsementResponses = append(endorsementActionResult.endorsementResponses, &endorsementResponse{
 							revertReason: revertReason,
 							endorsement:  endorsement,
 						})
@@ -253,7 +248,6 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 					}
 				}
 			}
-
 		case prototk.AttestationType_GENERATE_PROOF:
 			errorMessage := "AttestationType_GENERATE_PROOF is not implemented yet"
 			log.L(ctx).Error(errorMessage)
@@ -265,5 +259,5 @@ func (as *AttestationStage) PerformAction(ctx context.Context, tsg transactionst
 		}
 
 	}
-	return attestationActionResult, nil
+	return endorsementActionResult, nil
 }
