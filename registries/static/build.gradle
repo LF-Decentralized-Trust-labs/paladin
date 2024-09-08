@@ -52,6 +52,7 @@ task installTools(type: Exec) {
 task lint(type: Exec, dependsOn: installTools) {
     workingDir '.'
 
+    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles);
     environment 'GOGC', '20'
 

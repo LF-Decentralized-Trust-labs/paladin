@@ -72,6 +72,7 @@ task protoc(type: ProtoCompile, dependsOn: [tasks.installTools]) {
 task lint(type: Exec, dependsOn:[installTools, tasks.protoc]) {
     workingDir '.'
 
+    helpers.lockResource(it, "lint.lock")
     inputs.files(goFiles);
     environment 'GOGC', '20'
 
