@@ -28,8 +28,10 @@ import (
 	engineTypes "github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	coreProto "github.com/kaleido-io/paladin/core/pkg/proto"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -52,6 +54,7 @@ func TestEngineInit(t *testing.T) {
 }
 
 func TestEngineSimpleTransaction(t *testing.T) {
+	//Submit a transaction that gets assembled with an attestation plan for a local endorser to sign the transaction
 	ctx := context.Background()
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
@@ -61,8 +64,20 @@ func TestEngineSimpleTransaction(t *testing.T) {
 
 	initialised := make(chan struct{}, 1)
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+		tx.PreAssembly = &components.TransactionPreAssembly{
+			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+				{
+					Lookup:    "alice",
+					Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				},
+			},
+		}
 		initialised <- struct{}{}
 	}).Return(nil)
+
+	mocks.keyManager.On("ResolveKey", mock.Anything, "alice", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("aliceKeyHandle", "aliceVerifier", nil)
+	// TODO check that the transaction is signed with this key
 
 	assembled := make(chan struct{}, 1)
 	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
@@ -81,9 +96,106 @@ func TestEngineSimpleTransaction(t *testing.T) {
 				{
 					Name:            "notary",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					Parties: []string{
-						"domain1/contract1/notary",
+						"domain1.contract1.notary",
+					},
+				},
+			},
+		}
+		assembled <- struct{}{}
+
+	}).Return(nil)
+	mocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
+
+	//TODO match endorsement request and verifier args
+	mocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
+		Result:  prototk.EndorseTransactionResponse_SIGN,
+		Payload: []byte("some-endorsement-bytes"),
+		Endorser: &prototk.ResolvedVerifier{
+			Lookup:    "notaryKeyHandle",
+			Verifier:  "notaryVerifier",
+			Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		},
+	}, nil)
+
+	mocks.keyManager.On("Sign", mock.Anything, &coreProto.SignRequest{
+		KeyHandle: "notaryKeyHandle",
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   []byte("some-endorsement-bytes"),
+	}).Return(&coreProto.SignResponse{
+		Payload: []byte("some-signature-bytes"),
+	}, nil)
+
+	err := engine.Start()
+	assert.NoError(t, err)
+
+	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
+	// no input domain should err
+	assert.Regexp(t, "PD011800", err)
+	assert.Empty(t, txID)
+	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
+		ID: uuid.New(),
+		Inputs: &components.TransactionInputs{
+			Domain: "domain1",
+			To:     *domainAddress,
+		},
+	})
+	assert.NoError(t, err)
+	require.NotNil(t, txID)
+
+	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, txID, 2*time.Second)
+	assert.Equal(t, "dispatch", status)
+}
+
+func TestEngineLocalEndorserSubmits(t *testing.T) {
+}
+
+func TestEngineRevertFromLocalEndorsement(t *testing.T) {
+}
+
+func TestEngineRemoteEndorser(t *testing.T) {
+	ctx := context.Background()
+
+	engine, mocks, domainAddress := newEngineForTesting(t)
+	domainAddressString := domainAddress.String()
+
+	initialised := make(chan struct{}, 1)
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+		tx.PreAssembly = &components.TransactionPreAssembly{
+			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+				{
+					Lookup:    "alice",
+					Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				},
+			},
+		}
+		initialised <- struct{}{}
+	}).Return(nil)
+
+	mocks.keyManager.On("ResolveKey", mock.Anything, "alice", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("aliceKeyHandle", "aliceVerifier", nil)
+
+	assembled := make(chan struct{}, 1)
+	mocks.domainSmartContract.On("AssembleTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+
+		tx.PostAssembly = &components.TransactionPostAssembly{
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+			InputStates: []*components.FullState{
+				{
+					ID:     types.Bytes32(types.RandBytes(32)),
+					Schema: types.Bytes32(types.RandBytes(32)),
+					Data:   types.JSONString("foo"),
+				},
+			},
+			AttestationPlan: []*prototk.AttestationRequest{
+				{
+					Name:            "notary",
+					AttestationType: prototk.AttestationType_ENDORSE,
+					Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
+					Parties: []string{
+						"domain1.contract1.notary@othernode",
 					},
 				},
 			},
@@ -114,7 +226,8 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
-			Domain: domainAddressString,
+			Domain: "domain1",
+			To:     *domainAddress,
 		},
 	})
 	assert.NoError(t, err)
@@ -192,10 +305,12 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	}()
 
 	assert.Equal(t, "dispatch", status)
-
 }
 
-func TestEngineDependantTransaction(t *testing.T) {
+func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
+	//2 transactions, one dependant on the other
+	// we purposely endorse the first transaction late to ensure that the 2nd transaction
+	// is still sequenced behind the first
 	ctx := context.Background()
 
 	engine, mocks, domainAddress := newEngineForTesting(t)
@@ -241,7 +356,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 						AttestationType: prototk.AttestationType_ENDORSE,
 						//Algorithm:       api.SignerAlgorithm_ED25519,
 						Parties: []string{
-							"domain1/contract1/notary",
+							"domain1.contract1.notary",
 						},
 					},
 				},
@@ -256,7 +371,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 						AttestationType: prototk.AttestationType_ENDORSE,
 						//Algorithm:       api.SignerAlgorithm_ED25519,
 						Parties: []string{
-							"domain1/contract1/notary",
+							"domain1.contract1.notary",
 						},
 					},
 				},
@@ -618,6 +733,7 @@ type dependencyMocks struct {
 	domainMgr            *componentmocks.DomainManager
 	transportManager     *componentmocks.TransportManager
 	stateStore           *componentmocks.StateStore
+	keyManager           *componentmocks.KeyManager
 }
 
 func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddress) {
@@ -630,11 +746,19 @@ func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddr
 		domainMgr:            componentmocks.NewDomainManager(t),
 		transportManager:     componentmocks.NewTransportManager(t),
 		stateStore:           componentmocks.NewStateStore(t),
+		keyManager:           componentmocks.NewKeyManager(t),
 	}
 	mocks.allComponents.On("StateStore").Return(mocks.stateStore).Maybe()
 	mocks.allComponents.On("DomainManager").Return(mocks.domainMgr).Maybe()
 	mocks.allComponents.On("TransportManager").Return(mocks.transportManager).Maybe()
+	mocks.allComponents.On("KeyManager").Return(mocks.keyManager).Maybe()
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
+
+	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
+		fn := args.Get(1).(statestore.DomainContextFunction)
+		err := fn(context.Background(), mocks.domainStateInterface)
+		assert.NoError(t, err)
+	}).Maybe().Return(nil)
 
 	e := NewEngine(uuid.Must(uuid.NewUUID()))
 	r, err := e.Init(mocks.allComponents)
