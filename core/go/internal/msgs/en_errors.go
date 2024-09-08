@@ -263,7 +263,7 @@ var (
 
 	// Engine PD0118XX
 	MsgDomainNotProvided           = ffe("PD011800", "Domain not found in the transaction input")
-	MsgEngineInternalError         = ffe("PD011801", "Unexpected error in engine")
+	MsgEngineInternalError         = ffe("PD011801", "Unexpected error in engine %s")
 	MsgEngineAssembleError         = ffe("PD011802", "Error assembling transaction")
 	MsgEngineParseFailed           = ffe("PD011803", "Failed to parse message")
 	MsgEngineInvalidMessage        = ffe("PD011804", "Invalid message received from transport")
@@ -273,6 +273,7 @@ var (
 	MsgDeployPrepareFailed         = ffe("PD011808", "Failed to prepare a deploy transaction")
 	MsgDeployPrepareIncomplete     = ffe("PD011809", "Prepare step did not return a transaction to invoke, or a transaction to deploy")
 	MsgBaseLedgerTransactionFailed = ffe("PD011810", "Failed to submit base ledger transaction")
+	MsgContractAddressNotProvided  = ffe("PD011811", "Contract address (To) not found in the transaction input")
 
 	// Base Ledger engine PD0119XX
 	MsgInsufficientBalance             = ffe("PD011900", "Balance %s of fueling source address %s is below the required amount %s ")

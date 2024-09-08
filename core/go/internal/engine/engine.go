@@ -133,6 +133,11 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
 
+	emptyAddress := types.EthAddress{}
+	if tx.Inputs.To == emptyAddress {
+		return "", i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
+	}
+
 	contractAddr := tx.Inputs.To
 	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, contractAddr)
 	if err != nil {
@@ -145,6 +150,9 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 
 	//Resolve keys synchronously (rather than having an orchestrator stage for it) so that we can return an error if any key resolution fails
 	keyMgr := e.components.KeyManager()
+	if tx.PreAssembly == nil {
+		return "", i18n.NewError(ctx, msgs.MsgEngineInternalError, "PreAssembly is nil")
+	}
 	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
 	for i, v := range tx.PreAssembly.RequiredVerifiers {
 		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm)
