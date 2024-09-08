@@ -65,12 +65,14 @@ message InitTransactionRequest {
 
 message InitTransactionResponse {
   repeated ResolveVerifierRequest required_verifiers = 1; // the list of verifiers that need to be resolved in order to prepare the transaction (such as issuers/notaries that have privledge in the smart contract)
+  repeated ABIEncodingRequest abi_encoding_requests = 2; // domains can ask Paladin to perform JSON -> ABI encoding tasks (for consistent behavior for user-supplied JSON inputs)
 }
 
 // **ASSEMBLE** step happens after plan, once any verifiers specified as needing pre-emptive resolution by the owning Paladin nodes have been resolved successfully. At this step the state store should be queried to determine if sufficient states exist to execute
 message AssembleTransactionRequest {
   TransactionSpecification transaction = 1; // The transaction to assemble
   repeated ResolvedVerifier resolved_verifiers = 2; // A list of transaction signatures/proofs that have been resolved, so the transaction can be assembled
+  repeated ABIEncodedData abi_encoded_data = 3; // Completed ABI encoding requests
 }
 
 message AssembleTransactionResponse {
@@ -236,4 +238,20 @@ message BaseLedgerDeployTransaction {
 
 message DomainAPIError {
   string error_message = 1;
+}
+
+message ABIEncodingRequest {
+  enum ABIEncodingType {
+    TUPLE = 0;
+    FUNCTION_CALL_DATA = 1;
+  }
+  string name = 1;
+  ABIEncodingType abi_encoding_type = 2;
+  string abi_entry = 3;
+  string params_json = 4;
+}
+
+message ABIEncodedData {
+  string name = 1;
+  bytes data = 2;
 }

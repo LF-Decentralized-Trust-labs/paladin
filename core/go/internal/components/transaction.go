@@ -35,6 +35,7 @@ type TransactionPreAssembly struct {
 	TransactionSpecification *prototk.TransactionSpecification
 	RequiredVerifiers        []*prototk.ResolveVerifierRequest
 	Verifiers                []*prototk.ResolvedVerifier
+	ABIEncodedData           []*prototk.ABIEncodedData
 }
 
 type FullState struct {
