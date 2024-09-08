@@ -209,13 +209,6 @@ func TestEngineRemoteEndorser(t *testing.T) {
 		sentEndorsementRequest <- struct{}{}
 	}).Return(nil).Maybe()
 
-	//TODO do we need this?
-	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
-		fn := args.Get(1).(statestore.DomainContextFunction)
-		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
-	}).Maybe().Return(nil)
-
 	err := engine.Start()
 	assert.NoError(t, err)
 
@@ -264,14 +257,24 @@ func TestEngineRemoteEndorser(t *testing.T) {
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
+	endorsementResponse := pbEngine.EndorsementResponse{
+		Endorsement: attestationResultAny,
+	}
+
+	endorsementResponseAny, err := anypb.New(&endorsementResponse)
+	require.NoError(t, err)
 
 	//for now, while endorsement is a stage, we will send the endorsement back as a stage message
+	//TODO in this test, we shouldn't really be mocking or simulating anything internal to the engine so the following
+	// should really be achieved by running a 2nd engine and mocking/simulating the transport manager to pass messages
+	// between the 2 engines
 	engineMessage := pbEngine.StageMessage{
 		ContractAddress: domainAddressString,
 		TransactionId:   txID,
-		Data:            attestationResultAny,
-		Stage:           "attestation",
+		Data:            endorsementResponseAny,
+		Stage:           "gather_endorsements",
 	}
 
 	engineMessageBytes, err := proto.Marshal(&engineMessage)

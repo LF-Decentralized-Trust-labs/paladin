@@ -25,8 +25,10 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/engine/enginespi"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
+	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
@@ -93,38 +95,7 @@ func (as *GatherEndorsementsStage) ProcessEvents(ctx context.Context, tsg transa
 					// process any enodrsements or signatures that have been gathered
 					log.L(ctx).Debugf("Processing %d endorsements for transaction %s", len(v.endorsementResponses), tx.ID.String())
 					for _, er := range v.endorsementResponses {
-						if er.revertReason != nil {
-							log.L(ctx).Infof("Endorsement for transaction %s was rejected: %s", tx.ID.String(), *er.revertReason)
-							//TODO
-						} else {
-							log.L(ctx).Infof("Adding endorsement to transaction %s", tx.ID.String())
-							tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, er.endorsement)
-							if er.endorsement.Constraints != nil {
-								for _, constraint := range er.endorsement.Constraints {
-									switch constraint {
-									case prototk.AttestationResult_ENDORSER_MUST_SUBMIT:
-										//TODO endorser must submit?
-										//TODO other constraints
-
-									default:
-										log.L(ctx).Errorf("Unsupported constraint: %s", constraint)
-									}
-								}
-							}
-							if !hasOutstandingEndorsementRequests(tx) {
-								//TODO should really call out to the engine to publish this event because it needs
-								// to go to other nodes too?
-
-								//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
-								err := as.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
-									TransactionId: tx.ID.String(),
-								})
-								if err != nil {
-									//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
-									log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
-								}
-							}
-						}
+						as.processEndorsementResponse(ctx, tx, er)
 					}
 
 				case *enginespi.TransactionDispatched:
@@ -135,6 +106,24 @@ func (as *GatherEndorsementsStage) ProcessEvents(ctx context.Context, tsg transa
 						//TODO this is an error, we should never have gotten here without endorsements
 						log.L(ctx).Errorf("Transaction dispatched without endorsements")
 					}
+				case *engineProto.EndorsementResponse:
+					log.L(ctx).Debugf("Processing remote endorsement for transaction %s", tx.ID.String())
+					var revertReason *string
+					if v.GetRevertReason() != "" {
+						revertReason = confutil.P(v.GetRevertReason())
+					}
+					endorsement := &prototk.AttestationResult{}
+					err := v.GetEndorsement().UnmarshalTo(endorsement)
+					if err != nil {
+						// TODO this is only temproary until we stop using anypb in EndorsementResponse
+						log.L(ctx).Errorf("Wrong type received in EndorsementResponse")
+						break
+					}
+
+					as.processEndorsementResponse(ctx, tx, &endorsementResponse{
+						revertReason: revertReason,
+						endorsement:  endorsement,
+					})
 				}
 			}
 			//TODO: panic error, retry when data is nil?
@@ -144,6 +133,41 @@ func (as *GatherEndorsementsStage) ProcessEvents(ctx context.Context, tsg transa
 		}
 	}
 	return
+}
+
+func (as *GatherEndorsementsStage) processEndorsementResponse(ctx context.Context, tx *components.PrivateTransaction, er *endorsementResponse) {
+	if er.revertReason != nil {
+		log.L(ctx).Infof("Endorsement for transaction %s was rejected: %s", tx.ID.String(), *er.revertReason)
+		//TODO
+	} else {
+		log.L(ctx).Infof("Adding endorsement to transaction %s", tx.ID.String())
+		tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, er.endorsement)
+		if er.endorsement.Constraints != nil {
+			for _, constraint := range er.endorsement.Constraints {
+				switch constraint {
+				case prototk.AttestationResult_ENDORSER_MUST_SUBMIT:
+					//TODO endorser must submit?
+					//TODO other constraints
+
+				default:
+					log.L(ctx).Errorf("Unsupported constraint: %s", constraint)
+				}
+			}
+		}
+		if !hasOutstandingEndorsementRequests(tx) {
+			//TODO should really call out to the engine to publish this event because it needs
+			// to go to other nodes too?
+
+			//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
+			err := as.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
+				TransactionId: tx.ID.String(),
+			})
+			if err != nil {
+				//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
+				log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
+			}
+		}
+	}
 }
 
 func isAssembled(tx *components.PrivateTransaction) bool {
