@@ -21,6 +21,7 @@ import io.kaleido.paladin.toolkit.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -57,18 +58,54 @@ public class PenteDomainTests {
         Map<String, Object> config = new HashMap<>();
         config.put("address", address);
 
+        JsonABI.Entry simpleStorageDeployABI = JsonABI.newFunction(
+                "deploy",
+                JsonABI.newParameters(
+                        JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                JsonABI.newParameter("salt", "bytes32"),
+                                JsonABI.newParameter("members", "string[]")
+                        )),
+                        JsonABI.newParameter("bytecode", "bytes"),
+                        JsonABI.newTuple("inputs", "None", JsonABI.newParameters())
+                ),
+                JsonABI.newParameters()
+        );
+
         JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
         try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
                 "pente", new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), config
         ))) {
+            PenteConfiguration.GroupTupleJSON groupInfo = new PenteConfiguration.GroupTupleJSON(
+                    groupSalt,
+                    new String[]{"member1", "member2"}
+            );
+
+            // Create the privacy group
             String contractAddr = testbed.getRpcClient().request("testbed_deploy",
                     "pente",
                     new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
-                            new PenteConfiguration.GroupTupleJSON(
-                                    groupSalt,
-                                    new String[]{"member1", "member2"}
-                            ),
+                            groupInfo,
                             PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES
+                    ));
+            assertFalse(contractAddr.isBlank());
+
+            // Deploy Simple Storage to it
+            String simpleStorageBytecode = ResourceLoader.jsonResourceEntryText(
+                    this.getClass().getClassLoader(),
+                    "contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json",
+                    "bytecode"
+            );
+            Map<String, Object> deployValues = new HashMap<>() {{
+                put("group", groupInfo);
+                put("bytecode", simpleStorageBytecode);
+                put("inputs", Collections.emptyMap());
+            }};
+            testbed.getRpcClient().request("testbed_invoke",
+                    new PrivateContractInvoke(
+                            "simpleStorageDeployer",
+                            JsonHex.addressFrom(contractAddr),
+                            simpleStorageDeployABI,
+                            deployValues
                     ));
             assertFalse(contractAddr.isBlank());
         }

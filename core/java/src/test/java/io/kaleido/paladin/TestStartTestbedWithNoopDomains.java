@@ -42,7 +42,6 @@ public class TestStartTestbedWithNoopDomains {
                         new Testbed.ConfigPlugin("jar", "", TestDomainFactory.class.getName()),
                         new HashMap<>())
         );
-        testBed.start();
         testBed.close();
     }
 }

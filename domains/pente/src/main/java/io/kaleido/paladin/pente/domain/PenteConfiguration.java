@@ -17,7 +17,9 @@ package io.kaleido.paladin.pente.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
@@ -32,6 +34,7 @@ import org.web3j.abi.datatypes.generated.Uint256;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -103,16 +106,28 @@ public class PenteConfiguration {
         ));
     }
 
-    JsonABI.Entry abiEntry_privateTransactionInvoke() {
-        return JsonABI.newConstructor(JsonABI.newParameters(
-                abiTuple_group(),
-                JsonABI.newParameter("from", "string"),
-                JsonABI.newParameter("to", "string"),
-                JsonABI.newParameter("gas", "uint256"),
-                JsonABI.newParameter("value", "uint256"),
-                JsonABI.newParameter("data", "bytes")
-        ));
-    }
+    public static final String FUNCTION_NAME_INVOKE = "invoke";
+
+    public static final String FUNCTION_NAME_DEPLOY = "deploy";
+
+    record ParsedInvokeInputs(
+        @JsonProperty
+        GroupTupleJSON group,
+        @JsonProperty
+        String from,
+        @JsonProperty
+        String to,
+        @JsonProperty
+        BigInteger gas, // jackson supports the decimal string format we normalize to before passing to domain
+        @JsonProperty
+        BigInteger value,
+        @JsonProperty
+        JsonHex.Bytes data, // for FUNCTION_NAME_INVOKE only - where the data is passed directly
+        @JsonProperty
+        JsonHex.Bytes bytecode, // for FUNCTION_NAME_DEPLOY only - where the inputs are encoded after the bytecode
+        @JsonProperty
+        JsonNode inputs // leave this unparsed as we will push it back ot paladin to parse for us
+    ) {}
 
     JsonABI.Parameter abiTuple_AccountStateV20240902() {
         return JsonABI.newTuple("AccountStateV20240902", "AccountStateV20240902", JsonABI.newParameters(

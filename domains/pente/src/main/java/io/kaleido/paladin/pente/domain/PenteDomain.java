@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.Algorithms;
 import io.kaleido.paladin.toolkit.DomainInstance;
+import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
@@ -26,6 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -184,7 +186,19 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            PenteTransaction tx = new PenteTransaction(request.getTransaction());
+            ToDomain.InitTransactionResponse.Builder response = ToDomain.InitTransactionResponse.newBuilder();
+            response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
+                    setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                    setLookup(tx.getFrom()).
+                    build()
+            );
+            if (tx.requiresABIEncoding()) response.addAbiEncodingRequests(tx.getABIEncodingRequest());
+            return CompletableFuture.completedFuture(response.build());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

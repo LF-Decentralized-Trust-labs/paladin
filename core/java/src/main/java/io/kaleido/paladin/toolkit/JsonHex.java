@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HexFormat;
@@ -106,7 +107,6 @@ public abstract class JsonHex {
         public Address(byte[] bytes) {
             super(bytes, 20);
         }
-
         public String checksummed() {
 
             // EIP-55: Mixed-case checksum address encoding

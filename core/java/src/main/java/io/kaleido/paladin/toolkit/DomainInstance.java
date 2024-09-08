@@ -66,7 +66,7 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
     final CompletableFuture<Service.DomainMessage> handleRequest(Service.DomainMessage request) {
         Service.DomainMessage.Builder response = Service.DomainMessage.newBuilder();
         try {
-            switch (request.getRequestToDomainCase()) {
+            CompletableFuture<?> resultApplied = switch (request.getRequestToDomainCase()) {
                 case CONFIGURE_DOMAIN -> configureDomain(request.getConfigureDomain()).thenApply(response::setConfigureDomainRes);
                 case INIT_DOMAIN -> initDomain(request.getInitDomain()).thenApply(response::setInitDomainRes);
                 case INIT_DEPLOY -> initDeploy(request.getInitDeploy()).thenApply(response::setInitDeployRes);
@@ -78,8 +78,10 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
                         prepareTransaction(request.getPrepareTransaction()).thenApply(response::setPrepareTransactionRes);
                 default -> throw new IllegalArgumentException("unknown request: %s".formatted(request.getRequestToDomainCase()));
             };
-            response.setHeader(getReplyHeader(request));
-            return CompletableFuture.completedFuture(response.build());
+            return resultApplied.thenApply((ra) -> {
+                response.setHeader(getReplyHeader(request));
+                return response.build();
+            });
         } catch(Exception e) {
             LOGGER.error(new FormattedMessage("unable to process {} {}", request.getRequestToDomainCase(), request.getHeader().getMessageId()), e);
             return CompletableFuture.failedFuture(e);
