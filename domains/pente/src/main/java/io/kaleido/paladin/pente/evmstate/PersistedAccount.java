@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmstate;
+package io.kaleido.paladin.pente.evmstate;
 
 import kotlin.NotImplementedError;
 import kotlin.collections.ArrayDeque;
@@ -31,10 +31,7 @@ import org.hyperledger.besu.evm.account.AccountStorageEntry;
 import org.hyperledger.besu.evm.worldstate.UpdateTrackingAccount;
 import org.web3j.rlp.*;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.util.*;
-import java.util.function.Function;
 
 public class PersistedAccount implements Account {
 

@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente;
+package io.kaleido.paladin.pente;
 
 import org.apache.tuweni.bytes.DelegatingBytes;
 import org.apache.tuweni.units.bigints.UInt256;

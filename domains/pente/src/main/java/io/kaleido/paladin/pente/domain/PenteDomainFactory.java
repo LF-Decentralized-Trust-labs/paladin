@@ -13,16 +13,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmstate;
+package io.kaleido.paladin.pente.domain;
 
-import org.hyperledger.besu.datatypes.Address;
-import org.hyperledger.besu.evm.account.Account;
+import io.kaleido.paladin.toolkit.DomainBase;
+import io.kaleido.paladin.toolkit.DomainInstance;
 
-import java.io.IOException;
-import java.util.Optional;
-
-public interface AccountLoader {
-
-    public Optional<PersistedAccount> load(Address address) throws IOException;
-
+public class PenteDomainFactory extends DomainBase {
+    @Override
+    protected DomainInstance newDomainInstance(String grpcTarget, String instanceId) {
+        return new PenteDomain(grpcTarget, instanceId);
+    }
 }

@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.domain;
+package io.kaleido.paladin.pente.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
@@ -24,12 +24,9 @@ import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.web3j.abi.datatypes.DynamicStruct;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -122,7 +119,9 @@ public class PenteDomain extends DomainInstance {
             }
 
             ToDomain.InitDeployResponse.Builder response = ToDomain.InitDeployResponse.newBuilder();
-            for (String lookup : buildGroupScopeIdentityLookups(params.group().salt(), params.group().members())) {
+            List<String> lookups =  buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
+            LOGGER.info("endorsement group identity lookups: {}", lookups);
+            for (String lookup : lookups) {
                 response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
                         setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
                         setLookup(lookup).
@@ -176,6 +175,7 @@ public class PenteDomain extends DomainInstance {
                             new Bytes32(request.getTransaction().getTransactionId()),
                             new JsonHex.Bytes(onchainConfBuilder.toByteArray())
                     )));
+            LOGGER.info("endorsement group verifier addresses: {}", resolvedVerifiers);
             return CompletableFuture.completedFuture(response.build());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);

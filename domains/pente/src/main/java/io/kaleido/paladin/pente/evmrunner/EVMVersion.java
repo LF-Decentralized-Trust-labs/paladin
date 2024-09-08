@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmrunner;
+package io.kaleido.paladin.pente.evmrunner;
 
 import org.hyperledger.besu.evm.EVM;
 import org.hyperledger.besu.evm.MainnetEVMs;
