@@ -173,7 +173,7 @@ func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress stri
 		// for now, assume all orchestrators have same stages and register all the stages here
 		//we add them in reverse order to make sure the last stage is the first to be checked for a match
 		&stages.DispatchStage{},
-		stages.NewAttestationStage(sequencer),
+		stages.NewGatherEndorsementsStage(sequencer),
 		stages.NewGatherSignaturesStage(sequencer),
 		stages.NewAssembleStage(sequencer, nodeID.String()),
 	})
