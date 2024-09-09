@@ -56,7 +56,7 @@ var NotoABI = abi.ABI{
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{
 			{Name: "delegate", Type: "address"},
-			{Name: "call", Type: "bytes"},
+			{Name: "call", Type: "bytes"}, // assumed to be an encoded "approvedTransfer"
 		},
 	},
 }
