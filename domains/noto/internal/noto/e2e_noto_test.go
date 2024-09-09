@@ -70,22 +70,23 @@ func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]b
 	return deployed
 }
 
-func newTestDomain(t *testing.T, domainName string, config *types.Config) (context.CancelFunc, *Noto, rpcbackend.Backend) {
-	var domain *Noto
+func newNotoDomain(t *testing.T, config *types.Config) (*Noto, *testbed.TestbedDomain) {
+	var domain Noto
+	return &domain, &testbed.TestbedDomain{
+		Config: mapConfig(t, config),
+		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+			domain.Callbacks = callbacks
+			return &domain
+		}),
+	}
+}
+
+func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
 	tb := testbed.NewTestBed()
-	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		domain = &Noto{Callbacks: callbacks}
-		return domain
-	})
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
-		domainName: {
-			Config: mapConfig(t, config),
-			Plugin: plugin,
-		},
-	})
-	require.NoError(t, err)
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", domains)
+	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-	return done, domain, rpc
+	return done, tb, rpc
 }
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *domain.SolidityBuild) (string, error) {
@@ -113,8 +114,11 @@ func TestNoto(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	done, noto, rpc := newTestDomain(t, domainName, &types.Config{
+	noto, notoTestbed := newNotoDomain(t, &types.Config{
 		FactoryAddress: contracts["factory"],
+	})
+	done, _, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
+		domainName: notoTestbed,
 	})
 	defer done()
 
@@ -239,9 +243,12 @@ func TestNotoSelfSubmit(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	done, noto, rpc := newTestDomain(t, domainName, &types.Config{
+	noto, notoTestbed := newNotoDomain(t, &types.Config{
 		FactoryAddress: contracts["factory"],
 		Variant:        "NotoSelfSubmit",
+	})
+	done, _, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
+		domainName: notoTestbed,
 	})
 	defer done()
 
