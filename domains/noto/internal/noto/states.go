@@ -159,6 +159,15 @@ func (n *Noto) findAvailableStates(ctx context.Context, query string) ([]*pb.Sto
 	return res.States, nil
 }
 
+func (n *Noto) eip712Domain(contract *ethtypes.Address0xHex) map[string]interface{} {
+	return map[string]interface{}{
+		"name":              EIP712DomainName,
+		"version":           EIP712DomainVersion,
+		"chainId":           n.chainID,
+		"verifyingContract": contract,
+	}
+}
+
 func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	messageInputs := make([]interface{}, len(inputs))
 	for i, input := range inputs {
@@ -179,12 +188,7 @@ func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Ad
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferUnmaskedTypeSet,
 		PrimaryType: "Transfer",
-		Domain: map[string]interface{}{
-			"name":              EIP712DomainName,
-			"version":           EIP712DomainVersion,
-			"chainId":           n.chainID,
-			"verifyingContract": contract,
-		},
+		Domain:      n.eip712Domain(contract),
 		Message: map[string]interface{}{
 			"inputs":  messageInputs,
 			"outputs": messageOutputs,
@@ -196,12 +200,7 @@ func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Addr
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferMaskedTypeSet,
 		PrimaryType: "Transfer",
-		Domain: map[string]interface{}{
-			"name":              EIP712DomainName,
-			"version":           EIP712DomainVersion,
-			"chainId":           n.chainID,
-			"verifyingContract": contract,
-		},
+		Domain:      n.eip712Domain(contract),
 		Message: map[string]interface{}{
 			"inputs":  inputs,
 			"outputs": outputs,
