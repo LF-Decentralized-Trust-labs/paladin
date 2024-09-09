@@ -51,7 +51,8 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
 
         bytes4 configSelector = bytes4(config[0:4]);
         if (configSelector == PenteConfigID_Endorsement_V0) {
-            (uint threshold, address[] memory endorsmentSet) = abi.decode(config[4:], (uint, address[]));
+            ( /* string memory evmVersion */, uint threshold, address[] memory endorsmentSet) = 
+                abi.decode(config[4:], (string, uint, address[]));
             _endorsementConfig = EndorsementConfig({
                 threshold: threshold,
                 endorsmentSet: endorsmentSet

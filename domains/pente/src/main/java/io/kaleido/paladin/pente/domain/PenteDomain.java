@@ -16,10 +16,11 @@
 package io.kaleido.paladin.pente.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.com.kaleido_io.paladin.toolkit.FromDomain;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
+import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import io.kaleido.paladin.toolkit.Algorithms;
 import io.kaleido.paladin.toolkit.DomainInstance;
-import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
@@ -31,7 +32,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class PenteDomain extends DomainInstance {
     private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
@@ -46,9 +49,9 @@ public class PenteDomain extends DomainInstance {
     protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
         // The in-memory config is late initialized here (and does so in its lock so access from any thread
         // we get called on for this and subsequent gRPC calls is safe).
-        config.initFromJSON(request.getConfigJson());
+        config.initFromConfig(request);
 
-        ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
+        var domainConfig = ToDomain.DomainConfig.newBuilder()
                 .setConstructorAbiJson(config.abiEntry_privateConstructor().toString())
                 .setFactoryContractAddress(config.getAddress().toString())
                 .setFactoryContractAbiJson(config.getFactoryContractABI().toString())
@@ -74,7 +77,7 @@ public class PenteDomain extends DomainInstance {
     private List<String> buildGroupScopeIdentityLookups(Bytes32 salt, String [] members) throws IllegalArgumentException {
         // Salt must be a 32byte hex string
         if (salt == null || members == null) throw new IllegalArgumentException("salt and members are required for group");
-        String saltHex = salt.toHex();
+        var saltHex = salt.toHex();
 
         // To deploy a new Privacy Group we need to collect unique endorsement addresses that
         // mask the identities of all the participants.
@@ -99,8 +102,7 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
         try {
-            PenteConfiguration.PrivacyGroupConstructorParamsJSON params =
-                    new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+            var params = new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
                             PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
 
             // Only support one string right now for endorsement type.
@@ -120,8 +122,8 @@ public class PenteDomain extends DomainInstance {
                 throw new Exception("privacy group must have at least one member");
             }
 
-            ToDomain.InitDeployResponse.Builder response = ToDomain.InitDeployResponse.newBuilder();
-            List<String> lookups =  buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
+            var response = ToDomain.InitDeployResponse.newBuilder();
+            var lookups =  buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
             LOGGER.info("endorsement group identity lookups: {}", lookups);
             for (String lookup : lookups) {
                 response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
@@ -137,7 +139,7 @@ public class PenteDomain extends DomainInstance {
 
     private List<Address> getResolvedEndorsers(Bytes32 salt, String[] members, List<ToDomain.ResolvedVerifier> resolvedVerifiers) {
         // Get the resolved address for each endorser we set the lookup for
-        List<String> lookups = buildGroupScopeIdentityLookups(salt, members);
+        var lookups = buildGroupScopeIdentityLookups(salt, members);
         List<Address> endorsementAddresses = new ArrayList<>(lookups.size());
         for (String lookup : lookups) {
             for (ToDomain.ResolvedVerifier verifier : resolvedVerifiers) {
@@ -159,18 +161,18 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.PrepareDeployResponse> prepareDeploy(ToDomain.PrepareDeployRequest request) {
         try {
-            PenteConfiguration.PrivacyGroupConstructorParamsJSON params =
-                    new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
-                            PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
+            var params = new ObjectMapper().readValue(request.getTransaction().getConstructorParamsJson(),
+                PenteConfiguration.PrivacyGroupConstructorParamsJSON.class);
 
-            List<Address> resolvedVerifiers = getResolvedEndorsers(params.group().salt(), params.group().members(), request.getResolvedVerifiersList());
-            ByteArrayOutputStream onchainConfBuilder = new ByteArrayOutputStream();
-            onchainConfBuilder.write(PenteConfiguration.PenteConfigID_Endorsement_V0);
+            var resolvedVerifiers = getResolvedEndorsers(params.group().salt(), params.group().members(), request.getResolvedVerifiersList());
+            var onchainConfBuilder = new ByteArrayOutputStream();
+            onchainConfBuilder.write(PenteConfiguration.intToBytes4(PenteConfiguration.PenteConfigID_Endorsement_V0));
             onchainConfBuilder.write(PenteConfiguration.abiEncoder_Endorsement_V0(new PenteConfiguration.Endorsement_V0(
+                    params.evmVersion(),
                     resolvedVerifiers.size(),
                     resolvedVerifiers
             )).getBytes());
-            ToDomain.PrepareDeployResponse.Builder response = ToDomain.PrepareDeployResponse.newBuilder();
+            var response = ToDomain.PrepareDeployResponse.newBuilder();
             response.getTransactionBuilder().
                     setFunctionName("newPrivacyGroup").
                     setParamsJson(new ObjectMapper().writeValueAsString(new PenteConfiguration.NewPrivacyGroupFactoryParams(
@@ -187,8 +189,8 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request) {
         try {
-            PenteTransaction tx = new PenteTransaction(request.getTransaction());
-            ToDomain.InitTransactionResponse.Builder response = ToDomain.InitTransactionResponse.newBuilder();
+            var tx = new PenteTransaction(request.getTransaction());
+            var response = ToDomain.InitTransactionResponse.newBuilder();
             response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
                     setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
                     setLookup(tx.getFrom()).
@@ -203,7 +205,13 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            var tx = new PenteTransaction(request.getTransaction());
+            var evm = tx.getEVM(config.getChainId());
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
@@ -214,5 +222,13 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.PrepareTransactionResponse> prepareTransaction(ToDomain.PrepareTransactionRequest request) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    void loadAccountState(String address) throws InterruptedException, ExecutionException {
+        var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
+                setQueryJson("""
+                        {}
+                        """.formatted(address)).
+                build()).get();
     }
 }

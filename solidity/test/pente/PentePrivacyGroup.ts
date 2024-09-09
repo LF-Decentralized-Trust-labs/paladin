@@ -48,8 +48,8 @@ describe("PentePrivacyGroup", function () {
     const configType: PenteConfigID = PenteConfigID.Endorsement_V0;
     const configTypeBytes = '0x' + (configType).toString(16).padStart(8, '0');
     const config = abiCoder.encode(
-      ["uint", "address[]"],
-      [3, [endorser1.address, endorser2.address, endorser3.address]],
+      ["string", "uint", "address[]"],
+      ["shanghai", 3, [endorser1.address, endorser2.address, endorser3.address]],
     );
     const configBytes = concat([configTypeBytes, config]);
 

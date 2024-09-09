@@ -101,6 +101,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation project(path: ':toolkit:go', configuration: 'libstarter')
+    testImplementation 'org.skyscreamer:jsonassert:1.5.3'
 
 }
 

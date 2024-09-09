@@ -197,6 +197,10 @@ public abstract class JsonHex {
         return new Bytes(bytes);
     }
 
+    public static Bytes from(byte[] buffer, int offset, int len) throws IllegalArgumentException {
+        return new Bytes(Arrays.copyOfRange(buffer, offset, len));
+    }
+
     public static FixedLenBytes wrap(byte[] bytes, int requiredByteLength) throws IllegalArgumentException {
         return new FixedLenBytes(bytes, requiredByteLength);
     }

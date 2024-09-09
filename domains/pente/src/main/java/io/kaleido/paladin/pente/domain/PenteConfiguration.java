@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
@@ -27,13 +26,13 @@ import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeEncoder;
-import org.web3j.abi.datatypes.DynamicArray;
-import org.web3j.abi.datatypes.DynamicStruct;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.*;
 import org.web3j.abi.datatypes.generated.Uint256;
 
-import java.io.IOException;
-import java.io.StringReader;
+import java.io.*;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -48,6 +47,8 @@ public class PenteConfiguration {
     private final JsonABI factoryContractABI;
 
     private final JsonABI privacyGroupABI;
+
+    private long chainId;
 
     private Address address;
 
@@ -93,6 +94,8 @@ public class PenteConfiguration {
             @JsonProperty
             GroupTupleJSON group,
             @JsonProperty
+            String evmVersion,
+            @JsonProperty
             String endorsementType
     ) {}
 
@@ -102,6 +105,7 @@ public class PenteConfiguration {
     JsonABI.Entry abiEntry_privateConstructor() {
         return JsonABI.newConstructor(JsonABI.newParameters(
                 abiTuple_group(),
+                JsonABI.newParameter("evmVersion", "string"),
                 JsonABI.newParameter("endorsementType", "string")
         ));
     }
@@ -157,27 +161,69 @@ public class PenteConfiguration {
             String address
     ) {}
 
-    public static byte[] fourByteSelector(int val) {
+    public static byte[] intToBytes4(int val) {
         return ByteBuffer.allocate(4).putInt(val).array();
     }
 
-    public static final byte[] PenteConfigID_Endorsement_V0 = fourByteSelector(0x00010000);;
+    public static int bytes4ToInt(byte[] data, int offset, int len) {
+        return ByteBuffer.wrap(data, offset, len).getInt();
+    }
 
-    record Endorsement_V0(
+    public static final int PenteConfigID_Endorsement_V0 = 0x00010000;
+
+    interface OnChainConfig {
+        String evmVersion();
+    }
+
+    public record Endorsement_V0(
+            String evmVersion,
             int threshold,
             List<Address> addresses
-    ) {}
+    ) implements OnChainConfig {}
 
-     static JsonHex.Bytes abiEncoder_Endorsement_V0(Endorsement_V0 config) {
-        Uint256 w3Threshold = new Uint256(config.threshold());
-        List<org.web3j.abi.datatypes.Address> w3Addresses = new ArrayList<>(config.addresses().size());
-        for (Address addr : config.addresses()) {
+    public  static JsonHex.Bytes abiEncoder_Endorsement_V0(Endorsement_V0 config) {
+        var w3EVMVersion = new org.web3j.abi.datatypes.Utf8String(config.evmVersion());
+        var w3Threshold = new Uint256(config.threshold());
+        var w3Addresses = new ArrayList<org.web3j.abi.datatypes.Address>(config.addresses().size());
+        for (var addr : config.addresses()) {
             org.web3j.abi.datatypes.Address w3Address = new org.web3j.abi.datatypes.Address(addr.to0xHex());
             w3Addresses.add(w3Address);
         }
-        DynamicArray<org.web3j.abi.datatypes.Address> w3AddressArray =
-                new DynamicArray<>(org.web3j.abi.datatypes.Address.class, w3Addresses);
-        return new JsonHex.Bytes(TypeEncoder.encode(new DynamicStruct(w3Threshold, w3AddressArray)));
+        var w3AddressArray = new DynamicArray<>(org.web3j.abi.datatypes.Address.class, w3Addresses);
+        return new JsonHex.Bytes(TypeEncoder.encode(new DynamicStruct(w3EVMVersion, w3Threshold, w3AddressArray)));
+    }
+
+    public static Endorsement_V0 abiDecoder_Endorsement_V0(JsonHex data, int offset) throws ClassNotFoundException {
+        var struct = new DynamicStruct(
+                Utf8String.DEFAULT,
+                Uint256.DEFAULT,
+                new DynamicArray<>(org.web3j.abi.datatypes.Address.class)
+        );
+        var result = TypeDecoder.decodeDynamicStruct(data.to0xHex(), 2 + (2 * offset), TypeReference.create(struct.getClass()));
+        var fields = result.getValue();
+        var w3EVMVersion = (Utf8String)fields.getFirst();
+        var w3Threshold = (Uint256)fields.get(1);
+        //noinspection unchecked
+        var w3Addresses = ((DynamicArray<org.web3j.abi.datatypes.Address>) fields.get(2)).getValue();
+        var addresses = new ArrayList<Address>(w3Addresses.size());
+        for (var w3Address : w3Addresses) {
+            addresses.add(new Address(w3Address.getValue()));
+        }
+        return new Endorsement_V0(
+                w3EVMVersion.getValue(),
+                w3Threshold.getValue().intValue(),
+                addresses
+        );
+    }
+
+    static OnChainConfig decodeConfig(byte[] constructorConfig) throws IllegalArgumentException, ClassNotFoundException {
+        if (constructorConfig.length < 4) {
+            throw new IllegalArgumentException("on-chain configuration must be at least 4 bytes");
+        }
+        return switch (bytes4ToInt(constructorConfig, 0, 4)) {
+            case PenteConfigID_Endorsement_V0 -> abiDecoder_Endorsement_V0(JsonHex.wrap(constructorConfig), 4);
+            default -> throw new IllegalArgumentException("unknown config ID: %s".formatted(JsonHex.from(constructorConfig, 0, 4)));
+        };
     }
 
     synchronized JsonABI getFactoryContractABI() {
@@ -192,11 +238,16 @@ public class PenteConfiguration {
         return address;
     }
 
-    synchronized void initFromJSON(String yamlConfig) {
+    synchronized long getChainId() {
+        return chainId;
+    }
+
+    synchronized void initFromConfig(ToDomain.ConfigureDomainRequest configReq) {
         try {
-            final ObjectMapper mapper = new ObjectMapper();
-            PenteYAMLConfig config = mapper.readValue(new StringReader(yamlConfig), PenteYAMLConfig.class);
+            var mapper = new ObjectMapper();
+            var config = mapper.readValue(new StringReader(configReq.getConfigJson()), PenteYAMLConfig.class);
             this.address = new Address(config.address());
+            this.chainId = configReq.getChainId();
         } catch(IOException e) {
             throw new IllegalArgumentException(e);
         }
@@ -207,7 +258,7 @@ public class PenteConfiguration {
     }
 
     synchronized void schemasInitialized(List<ToDomain.StateSchema> schemas) {
-        List<String> schemaDefs = allPenteSchemas();
+        var schemaDefs = allPenteSchemas();
         if (schemas.size() != schemaDefs.size()) {
             throw new IllegalStateException("expected %d schemas, received %d".formatted(schemaDefs.size(), schemas.size()));
         }

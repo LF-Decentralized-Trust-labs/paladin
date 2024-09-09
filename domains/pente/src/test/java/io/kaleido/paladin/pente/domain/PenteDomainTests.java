@@ -85,6 +85,7 @@ public class PenteDomainTests {
                     "pente",
                     new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
                             groupInfo,
+                            "shanghai",
                             PenteConfiguration.ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES
                     ));
             assertFalse(contractAddr.isBlank());

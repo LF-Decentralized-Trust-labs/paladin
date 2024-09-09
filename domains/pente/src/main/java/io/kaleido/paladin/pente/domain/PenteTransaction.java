@@ -20,6 +20,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
+import io.kaleido.paladin.pente.evmrunner.EVMRunner;
+import io.kaleido.paladin.pente.evmrunner.EVMVersion;
 import io.kaleido.paladin.toolkit.Algorithms;
 import io.kaleido.paladin.toolkit.DomainInstance;
 import io.kaleido.paladin.toolkit.JsonABI;
@@ -28,6 +30,7 @@ import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hyperledger.besu.evm.internal.EvmConfiguration;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -106,12 +109,16 @@ class PenteTransaction {
 
     private final ABIDefinitions defs = new ABIDefinitions();
 
+    private final PenteDomain domain;
     private final JsonABI.Entry functionDef;
+    private final byte[] contractConfig;
     private final String from;
     private final String jsonParams;
     private Values values;
 
-    PenteTransaction(ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
+    PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
+        this.domain = domain;
+        contractConfig = tx.getContractConfig().toByteArray();
         from = tx.getFrom();
         // Check the ABI params we expect at the top level (we don't mind the order)
         functionDef = new ObjectMapper().readValue(tx.getFunctionAbiJson(), JsonABI.Entry.class);
@@ -195,6 +202,22 @@ class PenteTransaction {
             }
         }
         return values;
+    }
+
+    PenteConfiguration.OnChainConfig getConfig() throws ClassNotFoundException {
+        return PenteConfiguration.decodeConfig(this.contractConfig);
+    }
+
+    EVMRunner getEVM(long chainId, long blockNumber) throws ClassNotFoundException, IOException {
+        var evmConfig = EvmConfiguration.DEFAULT;
+        var evmVersionStr = getConfig().evmVersion();
+        EVMVersion evmVersion = switch (evmVersionStr) {
+            case "london" -> EVMVersion.London(chainId, evmConfig);
+            case "paris" -> EVMVersion.Paris(chainId, evmConfig);
+            case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
+            default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
+        };
+        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
     }
 
     boolean requiresABIEncoding() {
