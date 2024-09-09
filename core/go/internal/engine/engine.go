@@ -33,6 +33,7 @@ import (
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/core/pkg/types"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -49,13 +50,14 @@ type Engine interface {
 }
 
 type engine struct {
-	ctx             context.Context
-	ctxCancel       func()
-	orchestrators   map[string]*orchestrator.Orchestrator
-	components      components.PreInitComponentsAndManagers
-	nodeID          uuid.UUID
-	subscribers     []enginespi.EventSubscriber
-	subscribersLock sync.Mutex
+	ctx                  context.Context
+	ctxCancel            func()
+	orchestrators        map[string]*orchestrator.Orchestrator
+	endorsementGatherers map[string]enginespi.EndorsementGatherer
+	components           components.PreInitComponentsAndManagers
+	nodeID               uuid.UUID
+	subscribers          []enginespi.EventSubscriber
+	subscribersLock      sync.Mutex
 }
 
 // Init implements Engine.
@@ -82,13 +84,14 @@ func (e *engine) Stop() {
 
 func NewEngine(nodeID uuid.UUID) Engine {
 	return &engine{
-		orchestrators: make(map[string]*orchestrator.Orchestrator),
-		nodeID:        nodeID,
-		subscribers:   make([]enginespi.EventSubscriber, 0),
+		orchestrators:        make(map[string]*orchestrator.Orchestrator),
+		endorsementGatherers: make(map[string]enginespi.EndorsementGatherer),
+		nodeID:               nodeID,
+		subscribers:          make([]enginespi.EventSubscriber, 0),
 	}
 }
 
-func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr *types.EthAddress, domainAPI components.DomainSmartContract) (oc *orchestrator.Orchestrator, err error) {
+func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr types.EthAddress, domainAPI components.DomainSmartContract) (oc *orchestrator.Orchestrator, err error) {
 
 	if e.orchestrators[contractAddr.String()] == nil {
 		publisher := NewPublisher(e)
@@ -100,7 +103,12 @@ func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr *t
 			delegator,
 			dispatcher,
 		)
-		endorsementGatherer := NewEndorsementGatherer(domainAPI, e.components.KeyManager())
+		endorsementGatherer, err := e.getEndorsementGathererForContract(ctx, contractAddr)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to get endorsement gatherer for contract %s: %s", contractAddr.String(), err)
+			return nil, err
+		}
+
 		e.orchestrators[contractAddr.String()] =
 			orchestrator.NewOrchestrator(
 				ctx, e.nodeID,
@@ -124,6 +132,19 @@ func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr *t
 		}()
 	}
 	return e.orchestrators[contractAddr.String()], nil
+}
+
+func (e *engine) getEndorsementGathererForContract(ctx context.Context, contractAddr types.EthAddress) (enginespi.EndorsementGatherer, error) {
+
+	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, contractAddr)
+	if err != nil {
+		return nil, err
+	}
+	if e.endorsementGatherers[contractAddr.String()] == nil {
+		endorsementGatherer := NewEndorsementGatherer(domainAPI, e.components.KeyManager())
+		e.endorsementGatherers[contractAddr.String()] = endorsementGatherer
+	}
+	return e.endorsementGatherers[contractAddr.String()], nil
 }
 
 // HandleNewTx implements Engine.
@@ -169,7 +190,7 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 	txInstance := transactionstore.NewTransactionStageManager(ctx, tx)
 	// TODO how to measure fairness/ per From address / contract address / something else
 
-	oc, err := e.getOrchestratorForContract(ctx, &contractAddr, domainAPI)
+	oc, err := e.getOrchestratorForContract(ctx, contractAddr, domainAPI)
 	if err != nil {
 		return "", err
 	}
@@ -312,33 +333,185 @@ func (e *engine) HandleNewEvent(ctx context.Context, stageEvent *enginespi.Stage
 	}
 }
 
-func (e *engine) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
-	//Send the event to the orchestrator for the contract and any transaction manager for the signing key
-	messagePayload := message.Payload
-	stageMessage := &pbEngine.StageMessage{}
-
-	err := proto.Unmarshal(messagePayload, stageMessage)
+func (e *engine) handleEndorsementRequest(ctx context.Context, messagePayload []byte) {
+	endorsementRequest := &pbEngine.EndorsementRequest{}
+	err := proto.Unmarshal(messagePayload, endorsementRequest)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal message payload: %s", err)
+		log.L(ctx).Errorf("Failed to unmarshal endorsement request: %s", err)
 		return
 	}
-	if stageMessage.ContractAddress == "" {
-		log.L(ctx).Errorf("Invalid message: contract address is empty")
+	contractAddressString := endorsementRequest.ContractAddress
+	contractAddress, err := types.ParseEthAddress(contractAddressString)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to parse contract address %s: %s", contractAddressString, err)
 		return
 	}
 
-	dataProto, err := stageMessage.Data.UnmarshalNew()
+	endorsementGatherer, err := e.getEndorsementGathererForContract(ctx, *contractAddress)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal from any: %s", err)
+		log.L(ctx).Errorf("Failed to get endorsement gathere for contract address %s: %s", contractAddressString, err)
 		return
 	}
+
+	//TODO the following is temporary code to unmarshal the fields of the endorsement request
+	// what we really should be doing is importing the tkproto messages but need to figure out the build
+	// magic to make that work
+
+	transactionSpecificationAny := endorsementRequest.GetTransactionSpecification()
+	transactionSpecification := &prototk.TransactionSpecification{}
+	err = transactionSpecificationAny.UnmarshalTo(transactionSpecification)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal transaction specification: %s", err)
+		return
+	}
+
+	attestationRequestAny := endorsementRequest.GetAttestationRequest()
+	attestationRequest := &prototk.AttestationRequest{}
+	err = attestationRequestAny.UnmarshalTo(attestationRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal attestation request: %s", err)
+		return
+	}
+
+	verifiersAny := endorsementRequest.GetVerifiers()
+	verifiers := make([]*prototk.ResolvedVerifier, len(verifiersAny))
+	for i, v := range verifiersAny {
+		verifiers[i] = &prototk.ResolvedVerifier{}
+		err = v.UnmarshalTo(verifiers[i])
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal attestation request: %s", err)
+			return
+		}
+	}
+
+	signatures := make([]*prototk.AttestationResult, len(endorsementRequest.GetSignatures()))
+	for i, s := range endorsementRequest.GetSignatures() {
+		signatures[i] = &prototk.AttestationResult{}
+		err = s.UnmarshalTo(signatures[i])
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal attestation request: %s", err)
+			return
+		}
+	}
+
+	inputStates := make([]*prototk.EndorsableState, len(endorsementRequest.GetInputStates()))
+	for i, s := range endorsementRequest.GetInputStates() {
+		inputStates[i] = &prototk.EndorsableState{}
+		err = s.UnmarshalTo(inputStates[i])
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal attestation request: %s", err)
+			return
+		}
+	}
+
+	outputStates := make([]*prototk.EndorsableState, len(endorsementRequest.GetOutputStates()))
+	for i, s := range endorsementRequest.GetOutputStates() {
+		outputStates[i] = &prototk.EndorsableState{}
+		err = s.UnmarshalTo(outputStates[i])
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal attestation request: %s", err)
+			return
+		}
+	}
+
+	endorsement, revertReason, err := endorsementGatherer.GatherEndorsement(ctx,
+		transactionSpecification,
+		verifiers,
+		signatures,
+		inputStates,
+		outputStates,
+		endorsementRequest.GetParty(),
+		attestationRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to gather endorsement: %s", err)
+		return
+	}
+
+	endorsementAny, err := anypb.New(endorsement)
+	if err != nil {
+		log.L(ctx).Errorf("Failed marshal endorsement: %s", err)
+		return
+	}
+
+	endorsementResponse := &pbEngine.EndorsementResponse{
+		ContractAddress: contractAddressString,
+		TransactionId:   endorsementRequest.TransactionId,
+		Endorsement:     endorsementAny,
+		RevertReason:    revertReason,
+	}
+	endorsementResponseBytes, err := proto.Marshal(endorsementResponse)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to marshal endorsement response: %s", err)
+		return
+	}
+
+	err = e.components.TransportManager().Send(ctx, &components.TransportMessage{
+		MessageType: "EndorsementResponse",
+		Payload:     endorsementResponseBytes,
+	})
+	if err != nil {
+		log.L(ctx).Errorf("Failed to send endorsement response: %s", err)
+		return
+	}
+}
+
+func (e *engine) handleEndorsementResponse(ctx context.Context, messagePayload []byte) {
+	endorsementResponse := &pbEngine.EndorsementResponse{}
+	err := proto.Unmarshal(messagePayload, endorsementResponse)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to unmarshal endorsement request: %s", err)
+		return
+	}
+	contractAddressString := endorsementResponse.ContractAddress
 
 	e.HandleNewEvent(ctx, &enginespi.StageEvent{
-		ContractAddress: stageMessage.ContractAddress,
-		TxID:            stageMessage.TransactionId,
-		Stage:           stageMessage.Stage,
-		Data:            dataProto,
+		ContractAddress: contractAddressString,
+		TxID:            endorsementResponse.TransactionId,
+		Stage:           "gather_endorsements",
+		Data:            endorsementResponse,
 	})
+
+}
+
+func (e *engine) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
+	//TODO this is supposed to be a quick handover to another thread.
+
+	//Send the event to the orchestrator for the contract and any transaction manager for the signing key
+	messagePayload := message.Payload
+
+	switch message.MessageType {
+	case "EndorsementRequest":
+		go e.handleEndorsementRequest(ctx, messagePayload)
+	case "EndorsementResponse":
+		go e.handleEndorsementResponse(ctx, messagePayload)
+	case "StageMessage":
+
+		//TODO - this may be dead code.
+		stageMessage := &pbEngine.StageMessage{}
+
+		err := proto.Unmarshal(messagePayload, stageMessage)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal message payload: %s", err)
+			return
+		}
+		if stageMessage.ContractAddress == "" {
+			log.L(ctx).Errorf("Invalid message: contract address is empty")
+			return
+		}
+
+		dataProto, err := stageMessage.Data.UnmarshalNew()
+		if err != nil {
+			log.L(ctx).Errorf("Failed to unmarshal from any: %s", err)
+			return
+		}
+
+		e.HandleNewEvent(ctx, &enginespi.StageEvent{
+			ContractAddress: stageMessage.ContractAddress,
+			TxID:            stageMessage.TransactionId,
+			Stage:           stageMessage.Stage,
+			Data:            dataProto,
+		})
+	}
 }
 
 // For now, this is here to help with testing but it seems like it could be useful thing to have

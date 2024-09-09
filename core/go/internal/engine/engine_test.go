@@ -46,7 +46,7 @@ import (
 
 func TestEngineInit(t *testing.T) {
 
-	engine, mocks, _ := newEngineForTesting(t)
+	engine, mocks := newEngineForTesting(t, types.MustEthAddress(types.RandHex(20)))
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 	initResult, err := engine.Init(mocks.allComponents)
 	assert.NoError(t, err)
@@ -57,7 +57,8 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	//Submit a transaction that gets assembled with an attestation plan for a local endorser to sign the transaction
 	ctx := context.Background()
 
-	engine, mocks, domainAddress := newEngineForTesting(t)
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
@@ -109,7 +110,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	mocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
 
 	//TODO match endorsement request and verifier args
-	mocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
+	mocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
 		Result:  prototk.EndorseTransactionResponse_SIGN,
 		Payload: []byte("some-endorsement-bytes"),
 		Endorser: &prototk.ResolvedVerifier{
@@ -157,8 +158,11 @@ func TestEngineRevertFromLocalEndorsement(t *testing.T) {
 func TestEngineRemoteEndorser(t *testing.T) {
 	ctx := context.Background()
 
-	engine, mocks, domainAddress := newEngineForTesting(t)
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+	engine, mocks := newEngineForTesting(t, domainAddress)
 	domainAddressString := domainAddress.String()
+
+	remoteEngine, remoteEngineMocks := newEngineForTesting(t, domainAddress)
 
 	initialised := make(chan struct{}, 1)
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
@@ -204,19 +208,46 @@ func TestEngineRemoteEndorser(t *testing.T) {
 
 	}).Return(nil)
 
-	sentEndorsementRequest := make(chan struct{}, 1)
-	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		sentEndorsementRequest <- struct{}{}
+	mocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		go func() {
+			transportMessage := args.Get(1).(*components.TransportMessage)
+			remoteEngine.ReceiveTransportMessage(ctx, transportMessage)
+		}()
 	}).Return(nil).Maybe()
+
+	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		go func() {
+			transportMessage := args.Get(1).(*components.TransportMessage)
+			engine.ReceiveTransportMessage(ctx, transportMessage)
+		}()
+	}).Return(nil).Maybe()
+
+	remoteEngineMocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Return(remoteEngineMocks.domainSmartContract, nil)
+
+	remoteEngineMocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary@othernode", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
+
+	//TODO match endorsement request and verifier args
+	remoteEngineMocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
+		Result:  prototk.EndorseTransactionResponse_SIGN,
+		Payload: []byte("some-endorsement-bytes"),
+		Endorser: &prototk.ResolvedVerifier{
+			Lookup:    "notaryKeyHandle",
+			Verifier:  "notaryVerifier",
+			Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		},
+	}, nil)
+	remoteEngineMocks.keyManager.On("Sign", mock.Anything, &coreProto.SignRequest{
+		KeyHandle: "notaryKeyHandle",
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   []byte("some-endorsement-bytes"),
+	}).Return(&coreProto.SignResponse{
+		Payload: []byte("some-signature-bytes"),
+	}, nil)
 
 	err := engine.Start()
 	assert.NoError(t, err)
 
-	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
-	// no input domain should err
-	assert.Regexp(t, "PD011800", err)
-	assert.Empty(t, txID)
-	txID, err = engine.HandleNewTx(ctx, &components.PrivateTransaction{
+	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
 			Domain: "domain1",
@@ -226,88 +257,9 @@ func TestEngineRemoteEndorser(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, txID)
 
-	//poll until the transaction is initialised
-	select {
-	case <-time.After(1000 * time.Millisecond):
-		assert.Fail(t, "Timed out waiting for transaction to be initialised")
-	case <-initialised:
-		break
-	}
-
-	//poll until the transaction is assembled
-	select {
-	case <-time.After(1000 * time.Millisecond):
-		assert.Fail(t, "Timed out waiting for transaction to be assembled")
-	case <-assembled:
-		break
-	}
-
-	//poll until the endorsement request has been sent
-	select {
-	case <-time.After(1000 * time.Millisecond):
-		assert.Fail(t, "Timed out waiting for endorsement request to be sent")
-	case <-sentEndorsementRequest:
-		break
-	}
-
-	attestationResult := prototk.AttestationResult{
-		Name:            "notary",
-		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         types.RandBytes(32),
-	}
-
-	attestationResultAny, err := anypb.New(&attestationResult)
-	require.NoError(t, err)
-
-	endorsementResponse := pbEngine.EndorsementResponse{
-		Endorsement: attestationResultAny,
-	}
-
-	endorsementResponseAny, err := anypb.New(&endorsementResponse)
-	require.NoError(t, err)
-
-	//for now, while endorsement is a stage, we will send the endorsement back as a stage message
-	//TODO in this test, we shouldn't really be mocking or simulating anything internal to the engine so the following
-	// should really be achieved by running a 2nd engine and mocking/simulating the transport manager to pass messages
-	// between the 2 engines
-	engineMessage := pbEngine.StageMessage{
-		ContractAddress: domainAddressString,
-		TransactionId:   txID,
-		Data:            endorsementResponseAny,
-		Stage:           "gather_endorsements",
-	}
-
-	engineMessageBytes, err := proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
-
-	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
-		MessageType: "endorsement",
-		Payload:     engineMessageBytes,
-	})
-
-	timeout := time.After(2 * time.Second)
-	tick := time.Tick(100 * time.Millisecond)
-
-	status := func() string {
-		for {
-			select {
-			case <-timeout:
-				// Timeout reached, exit the loop
-				assert.Fail(t, "Timed out waiting for transaction to be endorsed")
-				s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
-				require.NoError(t, err)
-				return s.Status
-			case <-tick:
-				s, err := engine.GetTxStatus(ctx, domainAddressString, txID)
-				if s.Status == "dispatch" {
-					return s.Status
-				}
-				assert.NoError(t, err)
-			}
-		}
-	}()
-
+	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, txID, 200*time.Second)
 	assert.Equal(t, "dispatch", status)
+
 }
 
 func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
@@ -316,7 +268,8 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	// is still sequenced behind the first
 	ctx := context.Background()
 
-	engine, mocks, domainAddress := newEngineForTesting(t)
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
@@ -490,7 +443,8 @@ func TestEngineMiniLoad(t *testing.T) {
 
 	ctx := context.Background()
 
-	engine, mocks, domainAddress := newEngineForTesting(t)
+	domainAddress := types.MustEthAddress(types.RandHex(20))
+	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
@@ -739,8 +693,7 @@ type dependencyMocks struct {
 	keyManager           *componentmocks.KeyManager
 }
 
-func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddress) {
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+func newEngineForTesting(t *testing.T, domainAddress *types.EthAddress) (Engine, *dependencyMocks) {
 
 	mocks := &dependencyMocks{
 		allComponents:        componentmocks.NewAllComponents(t),
@@ -767,6 +720,6 @@ func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *types.EthAddr
 	r, err := e.Init(mocks.allComponents)
 	assert.NotNil(t, r)
 	assert.NoError(t, err)
-	return e, mocks, domainAddress
+	return e, mocks
 
 }

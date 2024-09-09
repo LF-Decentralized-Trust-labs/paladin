@@ -17,7 +17,6 @@ package stages
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -31,6 +30,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type GatherEndorsementsStage struct {
@@ -190,6 +191,18 @@ func (as *GatherEndorsementsStage) MatchStage(ctx context.Context, tsg transacti
 	return isAssembled(tx) && !isDispatched(tx) && !hasOutstandingSignatureRequests(tx) && hasOutstandingEndorsementRequests(tx)
 }
 
+func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
+	endorsableList := make([]*prototk.EndorsableState, len(states))
+	for i, input := range states {
+		endorsableList[i] = &prototk.EndorsableState{
+			Id:            input.ID.String(),
+			SchemaId:      input.Schema.String(),
+			StateDataJson: string(input.Data),
+		}
+	}
+	return endorsableList
+}
+
 func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transactionstore.TxStateGetters, sfs enginespi.StageFoundationService) (actionOutput interface{}, actionTriggerErr error) {
 	tx := tsg.HACKGetPrivateTx()
 	log.L(ctx).Debugf("GatherEndorsementsStage.PerformAction tx: %s", tx.ID.String())
@@ -225,19 +238,6 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 
 				for _, party := range attRequest.GetParties() {
 
-					message := enginespi.StageEvent{
-						Stage:           as.Name(),
-						Data:            attRequest.GetPayload(),
-						ContractAddress: tx.Inputs.Domain,
-						TxID:            tx.ID.String(),
-					}
-					messageBytes, err := json.Marshal(message)
-					if err != nil {
-						//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
-						log.L(ctx).Errorf("Failed to marshal message payload: %s", err)
-						return nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError)
-					}
-
 					partyLocator := types.PrivateIdentityLocator(party)
 					partyNode, err := partyLocator.Node(ctx, true)
 					if err != nil {
@@ -247,7 +247,12 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 
 					if sfs.IdentityResolver().IsCurrentNode(partyNode) || partyNode == "" {
 						// This is a local party, so we can endorse it directly
-						endorsement, revertReason, err := sfs.EndorsementGatherer().GatherEndorsement(ctx, tx, party, attRequest)
+						endorsement, revertReason, err := sfs.EndorsementGatherer().GatherEndorsement(ctx,
+							tx.PreAssembly.TransactionSpecification,
+							tx.PreAssembly.Verifiers,
+							tx.PostAssembly.Signatures,
+							toEndorsableList(tx.PostAssembly.InputStates),
+							toEndorsableList(tx.PostAssembly.OutputStates), party, attRequest)
 						if err != nil {
 							log.L(ctx).Errorf("Failed to gather endorsement for party %s: %s", party, err)
 							//TODO specific error message
@@ -259,10 +264,81 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 						})
 
 					} else {
+						// This is a remote party, so we need to send an endorsement request to the remote node
+
+						attRequstAny, err := anypb.New(attRequest)
+						if err != nil {
+							log.L(ctx).Error("Error marshalling attestation request", err)
+							return nil, err
+						}
+
+						transactionSpecificationAny, err := anypb.New(tx.PreAssembly.TransactionSpecification)
+						if err != nil {
+							log.L(ctx).Error("Error marshalling transaction specification", err)
+							return nil, err
+						}
+						verifiers := make([]*anypb.Any, len(tx.PreAssembly.Verifiers))
+						for i, verifier := range tx.PreAssembly.Verifiers {
+							verifierAny, err := anypb.New(verifier)
+							if err != nil {
+								log.L(ctx).Error("Error marshalling verifier", err)
+								return nil, err
+							}
+							verifiers[i] = verifierAny
+						}
+						signatures := make([]*anypb.Any, len(tx.PostAssembly.Signatures))
+						for i, signature := range tx.PostAssembly.Signatures {
+							signatureAny, err := anypb.New(signature)
+							if err != nil {
+								log.L(ctx).Error("Error marshalling signature", err)
+								return nil, err
+							}
+							signatures[i] = signatureAny
+						}
+
+						inputStates := make([]*anypb.Any, len(tx.PostAssembly.InputStates))
+						endorseableInputStates := toEndorsableList(tx.PostAssembly.InputStates)
+						for i, inputState := range endorseableInputStates {
+							inputStateAny, err := anypb.New(inputState)
+							if err != nil {
+								log.L(ctx).Error("Error marshalling input state", err)
+								return nil, err
+							}
+							inputStates[i] = inputStateAny
+						}
+
+						outputStates := make([]*anypb.Any, len(tx.PostAssembly.OutputStates))
+						endorseableOutputStates := toEndorsableList(tx.PostAssembly.OutputStates)
+						for i, outputState := range endorseableOutputStates {
+							outputStateAny, err := anypb.New(outputState)
+							if err != nil {
+								log.L(ctx).Error("Error marshalling output state", err)
+								return nil, err
+							}
+							outputStates[i] = outputStateAny
+						}
+
+						endorsementRequest := &engineProto.EndorsementRequest{
+							ContractAddress:          tx.Inputs.To.String(),
+							TransactionId:            tx.ID.String(),
+							AttestationRequest:       attRequstAny,
+							Party:                    party,
+							TransactionSpecification: transactionSpecificationAny,
+							Verifiers:                verifiers,
+							Signatures:               signatures,
+							InputStates:              inputStates,
+							OutputStates:             outputStates,
+						}
+
+						endorsementRequestBytes, err := proto.Marshal(endorsementRequest)
+						if err != nil {
+							log.L(ctx).Error("Error marshalling endorsement request", err)
+							return nil, err
+						}
 						err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
-							MessageType: "endorsementRequest",
+							MessageType: "EndorsementRequest",
 							Destination: types.PrivateIdentityLocator(party),
-							Payload:     messageBytes,
+							Payload:     endorsementRequestBytes,
 						})
 						if err != nil {
 							//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?

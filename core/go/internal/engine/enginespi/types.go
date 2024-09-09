@@ -269,5 +269,5 @@ type EventSubscriber func(event EngineEvent)
 type EndorsementGatherer interface {
 	//integrate with local signer and domain manager to satisfy the given endorsement request
 	// that may have came from a transaction assembled locally or from another node
-	GatherEndorsement(ctx context.Context, tx *components.PrivateTransaction, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error)
+	GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error)
 }

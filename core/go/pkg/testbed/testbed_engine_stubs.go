@@ -112,6 +112,18 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 	return nil
 }
 
+func toEndorsableList(states []*components.FullState) []*prototk.EndorsableState {
+	endorsableList := make([]*prototk.EndorsableState, len(states))
+	for i, input := range states {
+		endorsableList[i] = &prototk.EndorsableState{
+			Id:            input.ID.String(),
+			SchemaId:      input.Schema.String(),
+			StateDataJson: string(input.Data),
+		}
+	}
+	return endorsableList
+}
+
 func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) error {
 
 	keyMgr := tb.c.KeyManager()
@@ -125,11 +137,17 @@ func (tb *testbed) gatherEndorsements(ctx context.Context, psc components.Domain
 					return fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				// Invoke the domain
-				endorseRes, err := psc.EndorseTransaction(ctx, tx, ar, &prototk.ResolvedVerifier{
-					Lookup:    partyName,
-					Algorithm: ar.Algorithm,
-					Verifier:  verifier,
-				})
+				endorseRes, err := psc.EndorseTransaction(ctx,
+					tx.PreAssembly.TransactionSpecification,
+					tx.PreAssembly.Verifiers,
+					tx.PostAssembly.Signatures,
+					toEndorsableList(tx.PostAssembly.InputStates),
+					toEndorsableList(tx.PostAssembly.OutputStates),
+					ar, &prototk.ResolvedVerifier{
+						Lookup:    partyName,
+						Algorithm: ar.Algorithm,
+						Verifier:  verifier,
+					})
 				if err != nil {
 					return err
 				}
