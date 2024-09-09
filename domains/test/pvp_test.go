@@ -308,6 +308,14 @@ func TestPvP(t *testing.T) {
 	transferGold := notoPrepareTransfer(ctx, t, rpc, notoGoldAddress, recipient1Name, recipient2Name, 1)
 	transferSilver := notoPrepareTransfer(ctx, t, rpc, notoSilverAddress, recipient2Name, recipient1Name, 10)
 
+	// TODO: this should actually be a Pente state transition
+	log.L(ctx).Infof("Prepare the trade execute")
+	executeBuilder := functionBuilder(ctx, t, eth, swap.ABI, "execute").
+		Signer(recipient1Name).
+		To(&swapAddress)
+	err = executeBuilder.BuildCallData()
+	require.NoError(t, err)
+
 	log.L(ctx).Infof("Record the prepared transfers")
 	txHash1, err1 := functionBuilder(ctx, t, eth, swap.ABI, "prepare").
 		Signer(recipient1Name).
@@ -333,13 +341,6 @@ func TestPvP(t *testing.T) {
 		SignAndSend()
 	waitFor(ctx, t, tb, txHash1, err1)
 	waitFor(ctx, t, tb, txHash2, err2)
-
-	log.L(ctx).Infof("Prepare the trade execute")
-	executeBuilder := functionBuilder(ctx, t, eth, swap.ABI, "execute").
-		Signer(recipient1Name).
-		To(&swapAddress)
-	err = executeBuilder.BuildCallData()
-	require.NoError(t, err)
 
 	log.L(ctx).Infof("Create Atom instance")
 	txHash, err = functionBuilder(ctx, t, eth, atomFactory.ABI, "create").
@@ -368,21 +369,12 @@ func TestPvP(t *testing.T) {
 	findEvent(ctx, t, tb, *txHash, atomFactory.ABI, "AtomDeployed", &atomDeployed)
 	assert.NotEmpty(t, atomDeployed.Address)
 
+	// TODO: all parties should verify the Atom against the original proposed trade
+	// If any party found a discrepancy at this point, they could cancel the swap (last chance to back out)
+
 	log.L(ctx).Infof("Approve both Noto transactions")
 	notoApprove(ctx, t, rpc, notoGoldAddress, recipient1Name, atomDeployed.Address, transferGold.EncodedCall)
 	notoApprove(ctx, t, rpc, notoSilverAddress, recipient2Name, atomDeployed.Address, transferSilver.EncodedCall)
-
-	log.L(ctx).Infof("Accept the swap")
-	txHash1, err1 = functionBuilder(ctx, t, eth, swap.ABI, "accept").
-		Signer(recipient1Name).
-		To(&swapAddress).
-		SignAndSend()
-	txHash2, err2 = functionBuilder(ctx, t, eth, swap.ABI, "accept").
-		Signer(recipient2Name).
-		To(&swapAddress).
-		SignAndSend()
-	waitFor(ctx, t, tb, txHash1, err1)
-	waitFor(ctx, t, tb, txHash2, err2)
 
 	log.L(ctx).Infof("Execute the atomic operation")
 	txHash, err = functionBuilder(ctx, t, eth, atom.ABI, "execute").

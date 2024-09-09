@@ -19,7 +19,6 @@ contract Swap {
     );
 
     event TradePrepared(address indexed sender);
-    event TradeAccepted(address indexed sender);
     event TradeExecuted(address indexed sender);
     event TradeCancelled(address indexed sender);
 
@@ -28,7 +27,6 @@ contract Swap {
         uint256 tokenValue;
         StateData states;
         bool prepared;
-        bool accepted;
         string data;
     }
 
@@ -102,40 +100,8 @@ contract Swap {
         return trade.userTradeData1.prepared && trade.userTradeData2.prepared;
     }
 
-    function accept() external {
-        require(trade.state == State.Pending, "Trade is not pending");
-        require(
-            prepared(),
-            "Trade has not been prepared by all token holders yet"
-        );
-        if (msg.sender == trade.holder1) {
-            require(
-                !trade.userTradeData1.accepted,
-                "Trade has already been accepted"
-            );
-            trade.userTradeData1.accepted = true;
-        } else if (msg.sender == trade.holder2) {
-            require(
-                !trade.userTradeData2.accepted,
-                "Trade has already been accepted"
-            );
-            trade.userTradeData2.accepted = true;
-        } else {
-            revert("Invalid sender");
-        }
-        emit TradeAccepted(msg.sender);
-    }
-
-    function accepted() public view returns (bool) {
-        return trade.userTradeData1.accepted && trade.userTradeData2.accepted;
-    }
-
     function execute() external {
         require(trade.state == State.Pending, "Trade is not pending");
-        require(
-            accepted(),
-            "Trade has not been accepted by all token holders yet"
-        );
         trade.state = State.Executed;
         emit TradeExecuted(msg.sender);
     }
