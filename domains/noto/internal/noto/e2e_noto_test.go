@@ -42,15 +42,15 @@ var (
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return result
 }
 
 func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = json.Unmarshal(configJSON, &m)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return m
 }
 
@@ -83,7 +83,7 @@ func newTestDomain(t *testing.T, domainName string, config *types.Config) (conte
 			Plugin: plugin,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, domain, rpc
 }
@@ -187,7 +187,7 @@ func TestNoto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
@@ -216,7 +216,7 @@ func TestNoto(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
@@ -250,7 +250,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, &types.ConstructorParams{Notary: notaryName})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
@@ -266,12 +266,12 @@ func TestNotoSelfSubmit(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
 	coins, err := noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
 	assert.Equal(t, notaryName, coins[0].Owner)
@@ -287,11 +287,11 @@ func TestNotoSelfSubmit(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, coins, 3) // TODO: verify coins
 
 	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2")
@@ -305,10 +305,10 @@ func TestNotoSelfSubmit(t *testing.T) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 
 	coins, err = noto.FindCoins(ctx, "{}")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, coins, 4) // TODO: verify coins
 }

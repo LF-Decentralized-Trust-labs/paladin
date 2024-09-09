@@ -4,6 +4,8 @@ use (
 	./core/go
 	./domains/noto
 	./domains/zeto
+	./registries/static
 	./testinfra
 	./toolkit/go
+	./transports/grpc
 )

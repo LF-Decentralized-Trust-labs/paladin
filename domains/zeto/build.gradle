@@ -50,7 +50,7 @@ dependencies {
 
 task downloadZetoProver {
     def outname = "zeto-wasm-${zetoVersion}.tar.gz"
-    def url = "https://github.com/jimthematrix/zeto/releases/download/${zetoVersion}/${outname}"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
     doFirst {
         mkdir(f.parent)
@@ -62,7 +62,7 @@ task downloadZetoProver {
 
 task downloadZetoTestProvingKeys {
     def outname = "zeto-test-proving-keys-${zetoVersion}.tar.gz"
-    def url = "https://github.com/jimthematrix/zeto/releases/download/${zetoVersion}/${outname}"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
     doFirst {
         mkdir(f.parent)
@@ -74,7 +74,7 @@ task downloadZetoTestProvingKeys {
 
 task downloadZetoCompiledContracts {
     def outname = "zeto-contracts-${zetoVersion}.tar.gz"
-    def url = "https://github.com/jimthematrix/zeto/releases/download/${zetoVersion}/${outname}"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
     doFirst {
         mkdir(f.parent)
@@ -167,6 +167,7 @@ task test(type: Exec) {
 
 task build {
     dependsOn test
+    dependsOn testE2E
 }
 
 task clean(type: Delete) {

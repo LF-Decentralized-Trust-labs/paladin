@@ -23,6 +23,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testValuesResolved struct {
@@ -61,10 +62,10 @@ func TestValueSetSorter2D(t *testing.T) {
 
 	ctx := context.Background()
 	sorted, err := SortedValueSetCopy(ctx, fieldSet, values, "field1", "-field2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resJSON, err := json.MarshalIndent(sorted, "", "  ")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `[
 	  {"field1": "AAA", "field2": 300},
 	  {"field1": "EEE", "field2": 600},
@@ -77,10 +78,10 @@ func TestValueSetSorter2D(t *testing.T) {
 	assert.NotEqual(t, values, sorted)
 
 	err = SortValueSetInPlace(ctx, fieldSet, sorted, "field2", "field1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resJSON, err = json.MarshalIndent(sorted, "", "  ")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `[
 		{"field1": "EEE", "field2": 100},
 		{"field1": "AAA", "field2": 300},

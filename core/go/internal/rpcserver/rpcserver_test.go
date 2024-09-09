@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/httpserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestServerHTTP(t *testing.T, conf *Config) (string, *rpcServer, func()) {
@@ -34,9 +35,9 @@ func newTestServerHTTP(t *testing.T, conf *Config) (string, *rpcServer, func()) 
 	conf.HTTP.Port = confutil.P(0)
 	conf.WS.Disabled = true
 	s, err := NewRPCServer(context.Background(), conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = s.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rs := s.(*rpcServer)
 	return fmt.Sprintf("http://%s", rs.HTTPAddr()), rs, s.Stop
 
@@ -48,9 +49,9 @@ func newTestServerWebSockets(t *testing.T, conf *Config) (string, *rpcServer, fu
 	conf.WS.Port = confutil.P(0)
 	conf.HTTP.Disabled = true
 	s, err := NewRPCServer(context.Background(), conf)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = s.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rs := s.(*rpcServer)
 	return fmt.Sprintf("ws://%s", rs.WSAddr()), rs, s.Stop
 
@@ -100,7 +101,7 @@ func TestBadHTTPMethod(t *testing.T) {
 	defer done()
 
 	res, err := http.DefaultClient.Get(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 
 }
@@ -111,7 +112,7 @@ func TestBadWSUpgrade(t *testing.T) {
 	defer done()
 
 	res, err := http.DefaultClient.Get(fmt.Sprintf("http://%s", s.WSAddr()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 
 }

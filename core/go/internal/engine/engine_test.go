@@ -46,7 +46,7 @@ func TestEngineInit(t *testing.T) {
 	engine, mocks, _ := newEngineForTesting(t)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 	initResult, err := engine.Init(mocks.allComponents)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, initResult)
 }
 
@@ -100,11 +100,11 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
 		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}).Maybe().Return(nil)
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
 	// no input domain should err
@@ -116,7 +116,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 			Domain: domainAddressString,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, txID)
 
 	//poll until the transaction is initialised
@@ -150,7 +150,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//for now, while endorsement is a stage, we will send the endorsement back as a stage message
 	engineMessage := pbEngine.StageMessage{
@@ -161,7 +161,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	}
 
 	engineMessageBytes, err := proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
 		MessageType: "endorsement",
@@ -185,7 +185,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 				if s.Status == "dispatch" {
 					return s.Status
 				}
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		}
 	}()
@@ -274,18 +274,18 @@ func TestEngineDependantTransaction(t *testing.T) {
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
 		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}).Maybe().Return(nil)
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tx1ID, err := engine.HandleNewTx(ctx, tx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, tx1ID)
 
 	tx2ID, err := engine.HandleNewTx(ctx, tx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, tx2ID)
 
 	// Neither transaction should be dispatched yet
@@ -304,7 +304,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//wait for both transactions to send the endorsement request
 	<-sentEndorsementRequest
@@ -319,7 +319,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 	}
 
 	engineMessageBytes, err := proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//now send the endorsement back
 	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
@@ -348,7 +348,7 @@ func TestEngineDependantTransaction(t *testing.T) {
 	}
 
 	engineMessageBytes, err = proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//now send the endorsement back
 	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
@@ -469,7 +469,7 @@ func TestEngineMiniLoad(t *testing.T) {
 			payloadBytes := transportMessage.Payload
 			stageEvent := new(engineTypes.StageEvent)
 			err := json.Unmarshal(payloadBytes, stageEvent)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			endorsementRequests <- stageEvent.TxID
 		default:
@@ -481,7 +481,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
 		fn := args.Get(1).(statestore.DomainContextFunction)
 		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}).Maybe().Return(nil)
 
 	expectedNonce := uint64(0)
@@ -502,7 +502,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	})
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for i := 0; i < numTransactions; i++ {
 		tx := &components.PrivateTransaction{
@@ -513,7 +513,7 @@ func TestEngineMiniLoad(t *testing.T) {
 			},
 		}
 		txID, err := engine.HandleNewTx(ctx, tx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, txID)
 	}
 
@@ -530,7 +530,7 @@ func TestEngineMiniLoad(t *testing.T) {
 				}
 
 				attestationResultAny, err := anypb.New(&attestationResult)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				engineMessage := pbEngine.StageMessage{
 					ContractAddress: domainAddressString,
@@ -539,7 +539,7 @@ func TestEngineMiniLoad(t *testing.T) {
 					Stage:           "attestation",
 				}
 				engineMessageBytes, err := proto.Marshal(&engineMessage)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				//now send the endorsement back
 				engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
@@ -602,7 +602,7 @@ func pollForStatus(ctx context.Context, t *testing.T, expectedStatus string, eng
 			if s.Status == expectedStatus {
 				return s.Status
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -635,7 +635,7 @@ func newEngineForTesting(t *testing.T) (Engine, *dependencyMocks, *tktypes.EthAd
 	e := NewEngine(uuid.Must(uuid.NewUUID()))
 	r, err := e.Init(mocks.allComponents)
 	assert.NotNil(t, r)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return e, mocks, domainAddress
 
 }

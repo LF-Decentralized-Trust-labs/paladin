@@ -168,7 +168,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 			From: controllerName,
 		})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Zeto instance deployed to %s", zetoAddress)
 
@@ -184,7 +184,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
@@ -205,7 +205,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 	assert.True(t, boolResult)
 
@@ -242,6 +242,6 @@ func testZetoFungible(t *testing.T, tokenName string) {
 		}),
 	})
 	if rpcerr != nil {
-		assert.NoError(t, rpcerr.Error())
+		require.NoError(t, rpcerr.Error())
 	}
 }

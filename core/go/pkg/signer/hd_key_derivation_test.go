@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tyler-smith/go-bip39"
 )
 
@@ -52,14 +53,14 @@ func TestHDSigningStaticExample(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
 		Name:       "key1",
 		Index:      0,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "m/44'/60'/0'/0/0", res.KeyHandle)
 	assert.Equal(t, "0x6331ccb948aaf903a69d6054fd718062bd0d535c", res.Identifiers[0].Identifier)
 
@@ -68,7 +69,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, resSign.Payload)
 
 }
@@ -88,7 +89,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 			FileSystem: api.FileSystemConfig{Path: confutil.P(t.TempDir())},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
@@ -113,7 +114,7 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
 
 	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
@@ -144,10 +145,10 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	ctx := context.Background()
 	entropy, err := bip39.NewEntropy(256)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mnemonic, err := bip39.NewMnemonic(entropy)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sm, err := NewSigningModule(ctx, &api.Config{
 		KeyDerivation: api.KeyDerivationConfig{
@@ -172,7 +173,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
 		Algorithms: []string{algorithms.ECDSA_SECP256K1_PLAINBYTES},
@@ -189,26 +190,26 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "m/44'/60'/2147483647'/3/2147483647", res.KeyHandle)
 
 	seed, err := bip39.NewSeedWithErrorChecking(string(mnemonic), "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err = tk.Derive(0x80000000 + 44)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err = tk.Derive(0x80000000 + 60)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err = tk.Derive(0x80000000 + 0x7FFFFFFF)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err = tk.Derive(3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tk, err = tk.Derive(0x7FFFFFFF)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	expectedKey, err := tk.ECPrivKey()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	keyBytes := expectedKey.Key.Bytes()
 	testKeyPair := secp256k1.KeyPairFromBytes(keyBytes[:])
 	assert.Equal(t, testKeyPair.Address.String(), res.Identifiers[0].Identifier)
@@ -218,13 +219,13 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Payload:   ([]byte)("some data"),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testSign.CompactRSV(), resSign.Payload)
 	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testSign, sig)
 
 }
@@ -272,10 +273,10 @@ func TestHDInitBadSeed(t *testing.T) {
 
 	ctx := context.Background()
 	entropy, err := bip39.NewEntropy(256)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mnemonic, err := bip39.NewMnemonic(entropy)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = NewSigningModule(ctx, &api.Config{
 		KeyDerivation: api.KeyDerivationConfig{
@@ -319,10 +320,10 @@ func TestHDInitGenSeed(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	generatedSeed, err := sm.(*signingModule).keyStore.LoadKeyMaterial(ctx, "generate/seed")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, generatedSeed, 32)
 	assert.NotEqual(t, make([]byte, 32), generatedSeed) // not zero
 }

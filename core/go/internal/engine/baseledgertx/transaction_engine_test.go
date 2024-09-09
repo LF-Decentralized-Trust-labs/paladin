@@ -37,6 +37,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const testMainSigningAddress = testDestAddress
@@ -75,7 +76,7 @@ func TestNewEngineErrors(t *testing.T) {
 	orchestratorConf.Set(OrchestratorGasPriceIncreaseMaxBigIntString, "1")
 	h, err := NewTransactionEngine(ctx, conf)
 	ble := h.(*baseLedgerTxEngine)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(1), ble.gasPriceIncreaseMax)
 	orchestratorConf.Set(OrchestratorGasPriceIncreaseMaxBigIntString, "")
 }
@@ -219,7 +220,7 @@ func TestHandleNewTransactionForTransferOnly(t *testing.T) {
 		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mEC.AssertNotCalled(t, "GasEstimate")
 }
 
@@ -268,7 +269,7 @@ func TestHandleNewTransactionTransferOnlyWithProvideGas(t *testing.T) {
 		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mEC.AssertNotCalled(t, "GasEstimate")
 }
 
@@ -316,7 +317,7 @@ func TestHandleNewTransactionTransferAndInvalidType(t *testing.T) {
 		To:    *tktypes.MustEthAddress(testEthTxInput.To.String()),
 		Value: testEthTxInput.Value,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mEC.AssertNotCalled(t, "GasEstimate")
 
 	_, submissionRejected, err := ble.HandleNewTransaction(ctx, &baseTypes.RequestOptions{
@@ -469,7 +470,7 @@ func TestHandleNewTransaction(t *testing.T) {
 		FunctionABI: nil,
 		Inputs:      nil,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestHandleNewDeployment(t *testing.T) {
@@ -593,7 +594,7 @@ func TestHandleNewDeployment(t *testing.T) {
 		Bytecode:       tktypes.HexBytes(testTransactionData),
 		Inputs:         nil,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestEngineSuspend(t *testing.T) {
@@ -633,7 +634,7 @@ func TestEngineSuspend(t *testing.T) {
 		Status: &suspendedStatus,
 	}).Return(nil).Once()
 	tx, err := ble.HandleSuspendTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, suspendedStatus, tx.Status)
 
 	// orchestrator handler tests
@@ -666,7 +667,7 @@ func TestEngineSuspend(t *testing.T) {
 		Status: &suspendedStatus,
 	}).Return(nil).Once()
 	tx, err = ble.HandleSuspendTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, suspendedStatus, tx.Status)
 
 	// in flight tx test
@@ -681,14 +682,14 @@ func TestEngineSuspend(t *testing.T) {
 	mtx.Status = baseTypes.BaseTxStatusPending
 	mTS.On("GetTransactionByID", ctx, mtx.ID).Return(mtx, nil).Once()
 	tx, err = ble.HandleSuspendTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, baseTypes.BaseTxStatusPending, tx.Status)
 
 	// already on the target status
 	mtx.Status = baseTypes.BaseTxStatusSuspended
 	mTS.On("GetTransactionByID", ctx, mtx.ID).Return(mtx, nil).Once()
 	tx, err = ble.HandleSuspendTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, baseTypes.BaseTxStatusSuspended, tx.Status)
 
 	// error when try to update the status of a completed tx
@@ -736,7 +737,7 @@ func TestEngineResume(t *testing.T) {
 		Status: &pendingStatus,
 	}).Return(nil).Once()
 	tx, err := ble.HandleResumeTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, pendingStatus, tx.Status)
 
 	// orchestrator handler tests
@@ -769,7 +770,7 @@ func TestEngineResume(t *testing.T) {
 		Status: &pendingStatus,
 	}).Return(nil).Once()
 	tx, err = ble.HandleResumeTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, pendingStatus, tx.Status)
 
 	// in flight tx test
@@ -784,14 +785,14 @@ func TestEngineResume(t *testing.T) {
 	mtx.Status = baseTypes.BaseTxStatusSuspended
 	mTS.On("GetTransactionByID", ctx, mtx.ID).Return(mtx, nil).Once()
 	tx, err = ble.HandleResumeTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, baseTypes.BaseTxStatusSuspended, tx.Status)
 
 	// already on the target status
 	mtx.Status = baseTypes.BaseTxStatusPending
 	mTS.On("GetTransactionByID", ctx, mtx.ID).Return(mtx, nil).Once()
 	tx, err = ble.HandleResumeTransaction(ctx, mtx.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, baseTypes.BaseTxStatusPending, tx.Status)
 
 	// error when try to update the status of a completed tx

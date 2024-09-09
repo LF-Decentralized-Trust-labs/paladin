@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
@@ -31,7 +30,9 @@ import (
 )
 
 type Testbed interface {
-	StartForTest(t *testing.T, configFile string, domains map[string]*TestbedDomain) (url string, done func())
+	components.Engine
+	StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error)
+	Components() AllComponents
 }
 
 type TestbedDomain struct {
@@ -46,8 +47,8 @@ type testbed struct {
 	c         components.PreInitComponentsAndManagers
 }
 
-func NewTestBed() (tb *testbed) {
-	tb = &testbed{}
+func NewTestBed() Testbed {
+	tb := &testbed{}
 	tb.ctx, tb.cancelCtx = context.WithCancel(context.Background())
 	tb.initRPC()
 	return tb
@@ -69,6 +70,10 @@ func (tb *testbed) Init(c components.PreInitComponentsAndManagers) (*components.
 	return &components.ManagerInitResult{
 		RPCModules: []*rpcserver.RPCModule{tb.rpcModule},
 	}, nil
+}
+
+func (tb *testbed) Components() AllComponents {
+	return tb.c
 }
 
 // redeclare the AllComponents interface to allow unit test

@@ -1,7 +1,6 @@
 **/coverage*.txt
 **/debug.test
 **/__debug_*
-.vscode/*.log
 **/.DS_Store
 **/*.so
 **/*.dylib
@@ -51,7 +50,11 @@ bin/
 /.nb-gradle/
 
 ### VS Code ###
-.vscode/
+**/.vscode/**
+!.vscode/settings.json
 
 ### Mac OS ###
 .DS_Store
+
+### Proto ###
+*.pb.go

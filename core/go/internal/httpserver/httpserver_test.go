@@ -26,9 +26,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/kaleido-io/paladin/core/internal/tls"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestServer(t *testing.T, conf *Config, handler http.HandlerFunc) (string, *httpServer, func()) {
@@ -36,10 +37,10 @@ func newTestServer(t *testing.T, conf *Config, handler http.HandlerFunc) (string
 	conf.Address = confutil.P("127.0.0.1")
 	conf.Port = confutil.P(0)
 	s, err := NewServer(context.Background(), "unittest", conf, handler)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	hs := s.(*httpServer)
 	err = s.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return fmt.Sprintf("http://%s", s.Addr()), hs, s.Stop
 
@@ -53,12 +54,12 @@ func TestMissingPort(t *testing.T) {
 func TestBadTLSConfig(t *testing.T) {
 	_, err := NewServer(context.Background(), "unittest", &Config{
 		Port: confutil.P(0),
-		TLS: tls.Config{
+		TLS: tlsconf.Config{
 			Enabled: true,
 			CAFile:  "!!!!!badness",
 		},
 	}, nil)
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestBadAddress(t *testing.T) {
@@ -77,18 +78,18 @@ func TestServeOK(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, err := w.Write(([]byte)(`{"some":"data"}`))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 	defer done()
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, res.StatusCode)
 	assert.Equal(t, "application/json", res.Header.Get("Content-Type"))
 	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{"some":"data"}`, (string)(data))
 }
 
@@ -102,7 +103,7 @@ func TestForceShutdown(t *testing.T) {
 	})
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	returned := make(chan error)
 	go func() {
@@ -123,10 +124,10 @@ func TestServeCustomTimeout(t *testing.T) {
 	defer done()
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Request-Timeout", "1ns")
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusRequestTimeout, res.StatusCode)
 }
 
@@ -135,7 +136,7 @@ func TestParseCustomTimeout(t *testing.T) {
 	defer done()
 
 	req, err := http.NewRequest(http.MethodPut, url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	req.Header.Set("Request-Timeout", "1")
 	assert.Equal(t, 1*time.Second, s.calcRequestTimeout(req, 10*time.Second, 20*time.Second))
@@ -167,11 +168,11 @@ func TestWSUpgradeSupported(t *testing.T) {
 	url, _, done := newTestServer(t, &Config{}, func(w http.ResponseWriter, r *http.Request) {
 		wsUpgrader := websocket.Upgrader{}
 		_, err := wsUpgrader.Upgrade(w, r, r.Header)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 	defer done()
 
 	c, _, err := websocket.DefaultDialer.Dial(strings.Replace(url, "http", "ws", 1), http.Header{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = c.Close()
 }

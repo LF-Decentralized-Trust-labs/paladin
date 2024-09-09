@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const fakeCoinConstructorABI = `{
@@ -211,10 +212,10 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 func registerTestDomain(t *testing.T, dm *domainManager, tp *testPlugin) {
 	domainID := uuid.New()
 	_, err := dm.DomainRegistered("test1", domainID, tp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	da, err := dm.GetDomainByName(context.Background(), "test1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tp.d = da.(*domain)
 	tp.d.initRetry.UTSetMaxAttempts(1)
 	<-tp.d.initDone
@@ -251,7 +252,7 @@ func TestDomainInitStates(t *testing.T) {
 	assert.Nil(t, tp.d.initError.Load())
 	assert.True(t, tp.initialized.Load())
 	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, tp.d, byAddr)
 	assert.True(t, tp.d.Initialized())
 	assert.NotNil(t, tp.d.Configuration().BaseLedgerSubmitConfig)
@@ -275,13 +276,13 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 	// Check we get the second from all the maps
 	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Same(t, tp1.d, byAddr)
 	byName, err := dm.GetDomainByName(ctx, "test1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Same(t, tp1.d, byName)
 	byUUID := dm.domainsByID[tp1.d.id]
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Same(t, tp1.d, byUUID)
 
 }
@@ -435,10 +436,10 @@ func TestDomainConfigureFail(t *testing.T) {
 
 	domainID := uuid.New()
 	_, err := dm.DomainRegistered("test1", domainID, tp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	da, err := dm.GetDomainByName(ctx, "test1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	d := da.(*domain)
 	d.initRetry.UTSetMaxAttempts(1)
@@ -488,7 +489,7 @@ func storeState(t *testing.T, dm *domainManager, tp *testPlugin, txID uuid.UUID,
 		Amount: amount,
 	}
 	stateJSON, err := json.Marshal(state)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = dm.stateStore.RunInDomainContextFlush("test1", func(ctx context.Context, dsi statestore.DomainStateInterface) error {
 		newStates, err := dsi.UpsertStates(&txID, []*statestore.StateUpsert{
@@ -501,7 +502,7 @@ func storeState(t *testing.T, dm *domainManager, tp *testPlugin, txID uuid.UUID,
 		assert.Len(t, newStates, 1)
 		return err
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return state
 }
 
@@ -522,7 +523,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 		  ]
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, states.States, 1)
 
 	// Filter miss
@@ -534,7 +535,7 @@ func TestDomainFindAvailableStatesOK(t *testing.T) {
 		  ]
 		}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, states.States, 0)
 }
 
@@ -573,7 +574,7 @@ func TestDomainInitDeployOK(t *testing.T) {
 		}`),
 	}
 	err := domain.InitDeploy(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, tx.RequiredVerifiers, 1)
 
 }
@@ -675,7 +676,7 @@ func TestDomainPrepareDeployInvokeTX(t *testing.T) {
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, tx.DeployTransaction)
 	assert.Equal(t, "newInstance", tx.InvokeTransaction.FunctionABI.Name)
 	assert.Equal(t, abi.Function, tx.InvokeTransaction.FunctionABI.Type)
@@ -706,7 +707,7 @@ func TestDomainPrepareDeployDeployTXWithSigner(t *testing.T) {
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, tx.InvokeTransaction)
 	assert.Equal(t, abi.Constructor, tx.DeployTransaction.ConstructorABI.Type)
 	assert.NotNil(t, tx.DeployTransaction.Inputs)
@@ -818,7 +819,7 @@ func TestDomainPrepareDeployDefaultConstructor(t *testing.T) {
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestDomainPrepareInvokeBadParams(t *testing.T) {

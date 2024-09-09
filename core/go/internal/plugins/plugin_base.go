@@ -152,7 +152,7 @@ func (ph *pluginHandler[M]) serve() error {
 	for {
 		iMsg, err := ph.stream.Recv()
 		if err != nil {
-			log.L(serverCtx).Errorf("Stream for plugin ailed: %s", err)
+			log.L(serverCtx).Errorf("Stream for plugin failed: %s", err)
 			return err
 		}
 		msg := ph.wrapper.Wrap(iMsg)

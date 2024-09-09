@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRawJSON(t *testing.T) {
@@ -36,7 +38,7 @@ func TestRawJSON(t *testing.T) {
 		"f1": [ { "things": "and" }, "stuff" ],
 		"f2": null
 	}`), &s1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `[ { "things": "and" }, "stuff" ]`, s1.F1.String())
 	assert.Equal(t, `null`, s1.F2.String())
 	assert.Equal(t, `null`, s1.F3.String())
@@ -48,15 +50,15 @@ func TestRawJSON(t *testing.T) {
 	assert.Regexp(t, "PD020001", err)
 
 	err = (&s1.F1).Scan(nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, s1.F1)
 
 	err = (&s1.F1).Scan(`[ { "more": "things" } ]`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `[ { "more": "things" } ]`, s1.F1.String())
 
 	err = (&s1.F1).Scan(([]byte)(`[ { "yet": "more" }, "things" ]`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.String())
 	assert.JSONEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.Pretty())
 	assert.YAMLEq(t, `[ { "yet": "more" }, "things" ]`, s1.F1.YAML())
@@ -83,4 +85,11 @@ func TestRawJSON(t *testing.T) {
 	assert.JSONEq(t, `{"some":"thing"}`, RawJSON(`{"some":"thing"}`).StringValue())
 	assert.JSONEq(t, `[{"some":"thing"}]`, RawJSON(`[{"some":"thing"}]`).StringValue())
 
+}
+
+func TestProtoToJSON(t *testing.T) {
+	m := &prototk.Message{
+		MessageId: "3d472892-8c5c-4290-910d-beeec5858e47",
+	}
+	assert.JSONEq(t, `{"messageId":"3d472892-8c5c-4290-910d-beeec5858e47"}`, ProtoToJSON(m).String())
 }

@@ -32,6 +32,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func NewTestFixedPriceGasPriceClient(t *testing.T) GasPriceClient {
@@ -126,15 +127,15 @@ func TestGasPriceClient(t *testing.T) {
 	// fall back to connector when get call failed
 	mEC.On("GasPrice", ctx, mock.Anything).Return(ethtypes.NewHexInteger64(1000), nil).Once()
 	gasPriceJSON, err := hgc.getGasPriceJSON(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testNodeGasPrice, gasPriceJSON.String())
 
 	// gasPrice should be cached
 	gasPriceJSON, err = hgc.getGasPriceJSON(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testNodeGasPrice, gasPriceJSON.String())
 	fixedGpo, err := hgc.ParseGasPriceJSON(ctx, gasPriceJSON)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, big.NewInt(1000), fixedGpo.GasPrice)
 	assert.Nil(t, fixedGpo.MaxFeePerGas)
 	assert.Nil(t, fixedGpo.MaxPriorityFeePerGas)

@@ -22,6 +22,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRCPMissingID(t *testing.T) {
@@ -34,7 +35,7 @@ func TestRCPMissingID(t *testing.T) {
 		SetBody(`{}`).
 		SetError(&errResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
 	assert.Regexp(t, "PD011001", errResponse.Error.Message)
@@ -54,7 +55,7 @@ func TestRCPUnknownMethod(t *testing.T) {
 		}`).
 		SetError(&errResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), errResponse.Error.Code)
 	assert.Regexp(t, "PD011002", errResponse.Error.Message)

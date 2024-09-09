@@ -22,6 +22,7 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func mockWASMModule() []byte {
@@ -35,11 +36,11 @@ func mockWASMModule() []byte {
 func TestLoadCircuit(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), mockWASMModule(), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.WriteFile(path.Join(tmpDir, "test.zkey"), []byte("test"), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	config := api.SnarkProverConfig{}
 	config.CircuitsDir = tmpDir
@@ -54,9 +55,9 @@ func TestLoadCircuit(t *testing.T) {
 func TestLoadCircuitFail(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), mockWASMModule(), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	config := api.SnarkProverConfig{}
 	_, _, err = loadCircuit("test", config)
@@ -81,9 +82,9 @@ func TestLoadCircuitFailRead(t *testing.T) {
 func TestLoadCircuitFailReadZKey(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), mockWASMModule(), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	config := api.SnarkProverConfig{}
 	config.CircuitsDir = tmpDir

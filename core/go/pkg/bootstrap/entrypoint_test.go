@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestConfig(t *testing.T, mockers ...func(mockCM *componentmocks.ComponentManager, mockEngine *componentmocks.Engine)) (socketFile, loaderUUID, configFile string, done func()) {
@@ -51,7 +52,7 @@ func setupTestConfig(t *testing.T, mockers ...func(mockCM *componentmocks.Compon
 	err := os.WriteFile(configFile, []byte(`{
 	  "blockchain": { "http": { "url": "http://localhost:8545" } }
 	}`), 0664)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return path.Join(t.TempDir(), "socket.file"), id.String(), configFile, func() {
 		engineFactory = origEngineFactory
 		componentManagerFactory = origCMFactory
