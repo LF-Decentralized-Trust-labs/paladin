@@ -155,8 +155,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 
 // Happens only on the sequencing node
 func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *components.PrivateTransaction) error {
-	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
-		tx.PostAssembly == nil || tx.PostAssembly.OutputStatesPotential == nil {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil || tx.PostAssembly == nil {
 		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteWritePotentialStates)
 	}
 
@@ -188,13 +187,16 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 	}
 
 	var states []*statestore.State
-	err := dc.dm.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
-		states, err = dsi.UpsertStates(&tx.ID, newStatesToWrite)
-		return err
-	})
-	if err != nil {
-		return err
+	if len(newStatesToWrite) > 0 {
+		err := dc.dm.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+			states, err = dsi.UpsertStates(&tx.ID, newStatesToWrite)
+			return err
+		})
+		if err != nil {
+			return err
+		}
 	}
+
 	// Store the results on the TX
 	postAssembly.OutputStates = make([]*components.FullState, len(states))
 	for i, s := range states {
