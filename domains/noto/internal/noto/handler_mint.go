@@ -68,12 +68,12 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
 
-	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
-	to := domain.FindVerifier(params.To, req.ResolvedVerifiers)
+	to := domain.FindVerifier(params.To, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if to == nil {
 		return nil, fmt.Errorf("error verifying recipient address")
 	}

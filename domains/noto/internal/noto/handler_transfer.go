@@ -70,12 +70,12 @@ func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction,
 func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.TransferParams)
 
-	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
-	from := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if from == nil {
 		return nil, fmt.Errorf("error verifying recipient address")
 	}
@@ -83,7 +83,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, err
 	}
-	to := domain.FindVerifier(params.To, req.ResolvedVerifiers)
+	to := domain.FindVerifier(params.To, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if to == nil {
 		return nil, fmt.Errorf("error verifying recipient address")
 	}
@@ -190,7 +190,7 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types
 }
 
 func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
-	from := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if from == nil {
 		return fmt.Errorf("error verifying recipient address")
 	}

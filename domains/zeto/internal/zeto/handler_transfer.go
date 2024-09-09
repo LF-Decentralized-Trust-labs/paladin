@@ -123,11 +123,11 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.
 func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.TransferParams)
 
-	resolvedSender := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
+	resolvedSender := domain.FindVerifier(tx.Transaction.From, algorithms.ZKP_BABYJUBJUB_PLAINBYTES, req.ResolvedVerifiers)
 	if resolvedSender == nil {
 		return nil, fmt.Errorf("failed to resolve: %s", tx.Transaction.From)
 	}
-	resolvedRecipient := domain.FindVerifier(params.To, req.ResolvedVerifiers)
+	resolvedRecipient := domain.FindVerifier(params.To, algorithms.ZKP_BABYJUBJUB_PLAINBYTES, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
 		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}

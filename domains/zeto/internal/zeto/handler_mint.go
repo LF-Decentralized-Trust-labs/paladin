@@ -61,7 +61,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
 
-	resolvedRecipient := domain.FindVerifier(params.To, req.ResolvedVerifiers)
+	resolvedRecipient := domain.FindVerifier(params.To, algorithms.ZKP_BABYJUBJUB_PLAINBYTES, req.ResolvedVerifiers)
 	if resolvedRecipient == nil {
 		return nil, fmt.Errorf("failed to resolve: %s", params.To)
 	}
