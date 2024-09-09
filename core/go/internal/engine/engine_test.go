@@ -107,8 +107,8 @@ func TestEngineSimpleTransaction(t *testing.T) {
 		assembled <- struct{}{}
 
 	}).Return(nil)
-	mocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
 
+	mocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
 	//TODO match endorsement request and verifier args
 	mocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
 		Result:  prototk.EndorseTransactionResponse_SIGN,
@@ -257,7 +257,7 @@ func TestEngineRemoteEndorser(t *testing.T) {
 	assert.NoError(t, err)
 	require.NotNil(t, txID)
 
-	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, txID, 200*time.Second)
+	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, txID, 2*time.Second)
 	assert.Equal(t, "dispatch", status)
 
 }
@@ -273,8 +273,22 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
 	domainAddressString := domainAddress.String()
+	mocks.keyManager.On("ResolveKey", mock.Anything, "alice", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("aliceKeyHandle", "aliceVerifier", nil)
 
-	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+		tx.PreAssembly = &components.TransactionPreAssembly{
+			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+				{
+					Lookup:    "alice",
+					Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				},
+			},
+		}
+	}).Return(nil)
+
+	// TODO check that the transaction is signed with this key
+
 	states := []*components.FullState{
 		{
 			ID:     types.Bytes32(types.RandBytes(32)),
@@ -286,7 +300,8 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	tx1 := &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
-			Domain: domainAddressString,
+			Domain: "domain1",
+			To:     *domainAddress,
 			From:   "Alice",
 		},
 	}
@@ -294,7 +309,8 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	tx2 := &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
-			Domain: domainAddressString,
+			Domain: "domain1",
+			To:     *domainAddress,
 			From:   "Bob",
 		},
 	}
@@ -310,9 +326,9 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 					{
 						Name:            "notary",
 						AttestationType: prototk.AttestationType_ENDORSE,
-						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 						Parties: []string{
-							"domain1.contract1.notary",
+							"domain1.contract1.notary@othernode",
 						},
 					},
 				},
@@ -325,9 +341,9 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 					{
 						Name:            "notary",
 						AttestationType: prototk.AttestationType_ENDORSE,
-						//Algorithm:       api.SignerAlgorithm_ED25519,
+						Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 						Parties: []string{
-							"domain1.contract1.notary",
+							"domain1.contract1.notary@othernode",
 						},
 					},
 				},
@@ -341,13 +357,6 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		sentEndorsementRequest <- struct{}{}
 	}).Return(nil).Maybe()
-
-	//TODO do we need this?
-	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
-		fn := args.Get(1).(statestore.DomainContextFunction)
-		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
-	}).Maybe().Return(nil)
 
 	err := engine.Start()
 	assert.NoError(t, err)
@@ -383,20 +392,18 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	<-sentEndorsementRequest
 
 	// endorse transaction 2 before 1 and check that 2 is not dispatched before 1
-	engineMessage := pbEngine.StageMessage{
+	endorsementResponse2 := &pbEngine.EndorsementResponse{
 		ContractAddress: domainAddressString,
 		TransactionId:   tx2ID,
-		Data:            attestationResultAny,
-		Stage:           "attestation",
+		Endorsement:     attestationResultAny,
 	}
-
-	engineMessageBytes, err := proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
+	endorsementResponse2Bytes, err := proto.Marshal(endorsementResponse2)
+	require.NoError(t, err)
 
 	//now send the endorsement back
 	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
-		MessageType: "endorsement",
-		Payload:     engineMessageBytes,
+		MessageType: "EndorsementResponse",
+		Payload:     endorsementResponse2Bytes,
 	})
 
 	//unless the tests are running in short mode, wait a second to ensure that the transaction is not dispatched
@@ -412,20 +419,18 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	assert.NotEqual(t, "dispatch", s.Status)
 
 	// endorse transaction 1 and check that both it and 2 are dispatched
-	engineMessage = pbEngine.StageMessage{
+	endorsementResponse1 := &pbEngine.EndorsementResponse{
 		ContractAddress: domainAddressString,
 		TransactionId:   tx1ID,
-		Data:            attestationResultAny,
-		Stage:           "attestation",
+		Endorsement:     attestationResultAny,
 	}
-
-	engineMessageBytes, err = proto.Marshal(&engineMessage)
-	assert.NoError(t, err)
+	endorsementResponse1Bytes, err := proto.Marshal(endorsementResponse1)
+	require.NoError(t, err)
 
 	//now send the endorsement back
 	engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
-		MessageType: "endorsement",
-		Payload:     engineMessageBytes,
+		MessageType: "EndorsementResponse",
+		Payload:     endorsementResponse1Bytes,
 	})
 
 	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, tx1ID, 2*time.Second)
