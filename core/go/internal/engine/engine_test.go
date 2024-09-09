@@ -17,7 +17,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"math/rand"
 	"sync"
 	"testing"
@@ -452,7 +451,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
-	domainAddressString := domainAddress.String()
+	remoteEngine, remoteEngineMocks := newEngineForTesting(t, domainAddress)
 
 	//500 is the maximum we can do in this test for now until either
 	//a) implement config to allow us to define MaxConcurrentTransactions
@@ -464,7 +463,18 @@ func TestEngineMiniLoad(t *testing.T) {
 
 	unclaimedPendingStatesToMintingTransaction := make(map[types.Bytes32]string)
 
-	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Return(nil)
+	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		tx := args.Get(1).(*components.PrivateTransaction)
+		tx.PreAssembly = &components.TransactionPreAssembly{
+			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
+				{
+					Lookup:    "alice",
+					Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				},
+			},
+		}
+	}).Return(nil)
+	mocks.keyManager.On("ResolveKey", mock.Anything, "alice", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("aliceKeyHandle", "aliceVerifier", nil)
 
 	r := rand.New(rand.NewSource(42))
 	failEarly := make(chan string, 1)
@@ -528,39 +538,53 @@ func TestEngineMiniLoad(t *testing.T) {
 				{
 					Name:            "notary",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					//Algorithm:       api.SignerAlgorithm_ED25519,
+					Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
 					Parties: []string{
-						"domain1/contract1/notary",
+						"domain1.contract1.notary@othernode",
 					},
 				},
 			},
 		}
 	}).Return(nil)
 
-	endorsementRequests := make(chan string, 10)
-	//mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.AnythingOfType("github.com/kaleido-io/paladin/core/internal/components.TransportMessage")).Run(func(args mock.Arguments) {
-	mocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		transportMessage := args.Get(1)
-		switch transportMessage := transportMessage.(type) {
-		case components.TransportMessage:
-
-			payloadBytes := transportMessage.Payload
-			stageEvent := new(engineTypes.StageEvent)
-			err := json.Unmarshal(payloadBytes, stageEvent)
-			assert.NoError(t, err)
-
-			endorsementRequests <- stageEvent.TxID
-		default:
-			assert.Fail(t, "Unexpected message type")
-		}
+	mocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		go func() {
+			//inject random latency on the network
+			time.Sleep(time.Duration(r.Intn(100)) * time.Millisecond)
+			transportMessage := args.Get(1).(*components.TransportMessage)
+			remoteEngine.ReceiveTransportMessage(ctx, transportMessage)
+		}()
 	}).Return(nil).Maybe()
 
-	//TODO do we need this?
-	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {
-		fn := args.Get(1).(statestore.DomainContextFunction)
-		err := fn(ctx, mocks.domainStateInterface)
-		assert.NoError(t, err)
-	}).Maybe().Return(nil)
+	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		go func() {
+			//inject random latency on the network
+			time.Sleep(time.Duration(r.Intn(100)) * time.Millisecond)
+			transportMessage := args.Get(1).(*components.TransportMessage)
+			engine.ReceiveTransportMessage(ctx, transportMessage)
+		}()
+	}).Return(nil).Maybe()
+	remoteEngineMocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Return(remoteEngineMocks.domainSmartContract, nil)
+
+	remoteEngineMocks.keyManager.On("ResolveKey", mock.Anything, "domain1.contract1.notary@othernode", algorithms.ECDSA_SECP256K1_PLAINBYTES).Return("notaryKeyHandle", "notaryVerifier", nil)
+
+	//TODO match endorsement request and verifier args
+	remoteEngineMocks.domainSmartContract.On("EndorseTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&components.EndorsementResult{
+		Result:  prototk.EndorseTransactionResponse_SIGN,
+		Payload: []byte("some-endorsement-bytes"),
+		Endorser: &prototk.ResolvedVerifier{
+			Lookup:    "notaryKeyHandle",
+			Verifier:  "notaryVerifier",
+			Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		},
+	}, nil)
+	remoteEngineMocks.keyManager.On("Sign", mock.Anything, &coreProto.SignRequest{
+		KeyHandle: "notaryKeyHandle",
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   []byte("some-endorsement-bytes"),
+	}).Return(&coreProto.SignResponse{
+		Payload: []byte("some-signature-bytes"),
+	}, nil)
 
 	expectedNonce := uint64(0)
 
@@ -589,7 +613,8 @@ func TestEngineMiniLoad(t *testing.T) {
 		tx := &components.PrivateTransaction{
 			ID: uuid.New(),
 			Inputs: &components.TransactionInputs{
-				Domain: domainAddressString,
+				Domain: "domain1",
+				To:     *domainAddress,
 				From:   "Alice",
 			},
 		}
@@ -597,39 +622,6 @@ func TestEngineMiniLoad(t *testing.T) {
 		assert.NoError(t, err)
 		require.NotNil(t, txID)
 	}
-
-	// whenever a new endorsement request comes in, endorse it after a random delay
-	go func() {
-		for {
-			txID := <-endorsementRequests
-			go func() {
-				time.Sleep(time.Duration(r.Intn(1000)) * time.Millisecond)
-				attestationResult := prototk.AttestationResult{
-					Name:            "notary",
-					AttestationType: prototk.AttestationType_ENDORSE,
-					Payload:         types.RandBytes(32),
-				}
-
-				attestationResultAny, err := anypb.New(&attestationResult)
-				assert.NoError(t, err)
-
-				engineMessage := pbEngine.StageMessage{
-					ContractAddress: domainAddressString,
-					TransactionId:   txID,
-					Data:            attestationResultAny,
-					Stage:           "attestation",
-				}
-				engineMessageBytes, err := proto.Marshal(&engineMessage)
-				assert.NoError(t, err)
-
-				//now send the endorsement back
-				engine.ReceiveTransportMessage(ctx, &components.TransportMessage{
-					MessageType: "endorsement",
-					Payload:     engineMessageBytes,
-				})
-			}()
-		}
-	}()
 
 	deadline, ok := t.Deadline()
 	if !ok {
