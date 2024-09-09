@@ -14,27 +14,27 @@ contract Swap {
 
     event TradeRequested(
         address indexed operator,
-        string holder1,
-        string holder2
+        address indexed holder1,
+        address indexed holder2
     );
 
-    event TradePrepared(address indexed sender, string holder);
+    event TradePrepared(address indexed sender);
     event TradeAccepted(address indexed sender);
     event TradeExecuted(address indexed sender);
     event TradeCancelled(address indexed sender);
 
     struct UserTradeData {
-        address sender;
         address tokenAddress;
         uint256 tokenValue;
-        PreparedData prepared;
+        StateData states;
+        bool prepared;
         bool accepted;
         string data;
     }
 
     struct TradeRequestInput {
-        string holder1;
-        string holder2;
+        address holder1;
+        address holder2;
         address tokenAddress1;
         address tokenAddress2;
         uint256 tokenValue1;
@@ -49,14 +49,14 @@ contract Swap {
         bytes data;
     }
 
-    struct PreparedData {
+    struct StateData {
         FullState[] inputs;
         FullState[] outputs;
     }
 
     struct Trade {
-        string holder1;
-        string holder2;
+        address holder1;
+        address holder2;
         UserTradeData userTradeData1;
         UserTradeData userTradeData2;
         State state;
@@ -76,43 +76,30 @@ contract Swap {
         trade.state = State.Pending;
     }
 
-    function stringEqual(
-        string memory s1,
-        string memory s2
-    ) internal pure returns (bool) {
-        return
-            keccak256(abi.encodePacked(s1)) == keccak256(abi.encodePacked(s2));
-    }
-
-    function prepare(
-        string calldata holder,
-        PreparedData calldata prepared
-    ) external {
+    function prepare(StateData calldata states) external {
         require(trade.state == State.Pending, "Trade is not pending");
-        if (stringEqual(holder, trade.holder1)) {
+        if (msg.sender == trade.holder1) {
             require(
-                trade.userTradeData1.sender == address(0),
+                !trade.userTradeData1.prepared,
                 "Trade has already been prepared"
             );
-            trade.userTradeData1.sender = msg.sender;
-            trade.userTradeData1.prepared = prepared;
-        } else if (stringEqual(holder, trade.holder2)) {
+            trade.userTradeData1.prepared = true;
+            trade.userTradeData1.states = states;
+        } else if (msg.sender == trade.holder2) {
             require(
-                trade.userTradeData2.sender == address(0),
+                !trade.userTradeData2.prepared,
                 "Trade has already been prepared"
             );
-            trade.userTradeData2.sender = msg.sender;
-            trade.userTradeData2.prepared = prepared;
+            trade.userTradeData2.prepared = true;
+            trade.userTradeData2.states = states;
         } else {
             revert("Invalid holder");
         }
-        emit TradePrepared(msg.sender, holder);
+        emit TradePrepared(msg.sender);
     }
 
     function prepared() public view returns (bool) {
-        return
-            trade.userTradeData1.sender != address(0) &&
-            trade.userTradeData2.sender != address(0);
+        return trade.userTradeData1.prepared && trade.userTradeData2.prepared;
     }
 
     function accept() external {
@@ -121,13 +108,13 @@ contract Swap {
             prepared(),
             "Trade has not been prepared by all token holders yet"
         );
-        if (msg.sender == trade.userTradeData1.sender) {
+        if (msg.sender == trade.holder1) {
             require(
                 !trade.userTradeData1.accepted,
                 "Trade has already been accepted"
             );
             trade.userTradeData1.accepted = true;
-        } else if (msg.sender == trade.userTradeData2.sender) {
+        } else if (msg.sender == trade.holder2) {
             require(
                 !trade.userTradeData2.accepted,
                 "Trade has already been accepted"

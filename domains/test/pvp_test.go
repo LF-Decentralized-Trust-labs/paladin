@@ -32,6 +32,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -73,7 +74,7 @@ type TradeRequestInput struct {
 	TradeData2    ethtypes.HexBytes0xPrefix `json:"tradeData2"`
 }
 
-type PreparedData struct {
+type StateData struct {
 	Inputs  []*tktypes.FullState `json:"inputs"`
 	Outputs []*tktypes.FullState `json:"outputs"`
 }
@@ -263,6 +264,11 @@ func TestPvP(t *testing.T) {
 	atomAddress, err := ethtypes.NewAddress(contracts["atom"])
 	assert.NoError(t, err)
 
+	_, recipient1Key, err := tb.Components().KeyManager().ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	require.NoError(t, err)
+	_, recipient2Key, err := tb.Components().KeyManager().ResolveKey(ctx, recipient2Name, algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	require.NoError(t, err)
+
 	eth := tb.Components().EthClientFactory().HTTPClient()
 	atomFactory := domain.LoadBuild(atomFactoryJSON)
 	atom := domain.LoadBuild(atomJSON)
@@ -285,11 +291,11 @@ func TestPvP(t *testing.T) {
 		Signer(recipient1Name).
 		Input(toJSON(t, map[string]any{
 			"inputData": TradeRequestInput{
-				Holder1:       recipient1Name,
+				Holder1:       recipient1Key,
 				TokenAddress1: notoGoldAddress,
 				TokenValue1:   ethtypes.NewHexInteger64(1),
 
-				Holder2:       recipient2Name,
+				Holder2:       recipient2Key,
 				TokenAddress2: notoSilverAddress,
 				TokenValue2:   ethtypes.NewHexInteger64(10),
 			},
@@ -308,7 +314,7 @@ func TestPvP(t *testing.T) {
 		To(&swapAddress).
 		Input(toJSON(t, map[string]any{
 			"holder": recipient1Name,
-			"prepared": PreparedData{
+			"states": StateData{
 				Inputs:  transferGold.InputStates,
 				Outputs: transferGold.OutputStates,
 			},
@@ -319,7 +325,7 @@ func TestPvP(t *testing.T) {
 		To(&swapAddress).
 		Input(toJSON(t, map[string]any{
 			"holder": recipient2Name,
-			"prepared": &PreparedData{
+			"states": &StateData{
 				Inputs:  transferSilver.InputStates,
 				Outputs: transferSilver.OutputStates,
 			},
