@@ -174,6 +174,9 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types
 	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
 	}
+	if signature.Verifier.Lookup != tx.Transaction.From {
+		return fmt.Errorf("sender attestation does not match transaction sender")
+	}
 	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
 		return err
@@ -250,10 +253,12 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				Payload:           encodedTransfer,
 			}, nil
 		} else if req.EndorsementRequest.Name == "sender" {
-			// Sender submits the transaction
-			return &pb.EndorseTransactionResponse{
-				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-			}, nil
+			if req.EndorsementVerifier.Lookup == tx.Transaction.From {
+				// Sender submits the transaction
+				return &pb.EndorseTransactionResponse{
+					EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
+				}, nil
+			}
 		}
 	}
 
