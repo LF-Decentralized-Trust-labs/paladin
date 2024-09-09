@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -50,6 +51,7 @@ type BlockIndexer interface {
 	GetBlockTransactionsByNumber(ctx context.Context, blockNumber int64) ([]*IndexedTransaction, error)
 	GetTransactionEventsByHash(ctx context.Context, hash tktypes.Bytes32) ([]*IndexedEvent, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
+	DecodeTransactionEvents(ctx context.Context, hash tktypes.Bytes32, abi abi.ABI) ([]*EventWithData, error)
 	WaitForTransaction(ctx context.Context, hash tktypes.Bytes32) (*IndexedTransaction, error)
 	GetBlockListenerHeight(ctx context.Context) (highest uint64, err error)
 	GetConfirmedBlockHeight(ctx context.Context) (confirmed uint64, err error)
@@ -783,4 +785,69 @@ func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int
 	}
 	err := q.Find(&events).Error
 	return events, err
+}
+
+func (bi *blockIndexer) DecodeTransactionEvents(ctx context.Context, hash tktypes.Bytes32, abi abi.ABI) ([]*EventWithData, error) {
+	events, err := bi.GetTransactionEventsByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	decoded := make([]*EventWithData, len(events))
+	for i, event := range events {
+		decoded[i] = &EventWithData{IndexedEvent: event}
+	}
+	err = bi.queryTransactionEvents(ctx, abi, hash[:], decoded)
+	return decoded, err
+}
+
+func (bi *blockIndexer) queryTransactionEvents(ctx context.Context, abi abi.ABI, tx ethtypes.HexBytes0xPrefix, events []*EventWithData) error {
+	// Get the TX receipt with all the logs
+	var receipt *TXReceiptJSONRPC
+	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
+		log.L(ctx).Debugf("Fetching transaction receipt by hash %s", tx)
+		rpcErr := bi.wsConn.CallRPC(ctx, &receipt, "eth_getTransactionReceipt", tx)
+		if rpcErr != nil {
+			return true, rpcErr.Error()
+		}
+		if receipt == nil {
+			return true, i18n.NewError(ctx, msgs.MsgBlockIndexerConfirmedReceiptNotFound, tx)
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Spin through the logs to find the corresponding result entries
+	for _, l := range receipt.Logs {
+		for _, e := range events {
+			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
+				bi.matchLog(ctx, abi, l, e)
+			}
+		}
+	}
+	return nil
+}
+
+func (bi *blockIndexer) matchLog(ctx context.Context, abi abi.ABI, in *LogJSONRPC, out *EventWithData) {
+	// This is one that matches our signature, but we need to check it against our ABI list.
+	// We stop at the first entry that parses it, and it's perfectly fine and expected that
+	// none will (because Eth signatures are not precise enough to distinguish events -
+	// particularly the "indexed" settings on parameters)
+	for _, abiEntry := range abi {
+		cv, err := abiEntry.DecodeEventDataCtx(ctx, in.Topics, in.Data)
+		if err == nil {
+			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
+			out.Data, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, cv)
+		}
+		if err == nil {
+			log.L(ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
+			if in.Address != nil {
+				out.Address = tktypes.EthAddress(*in.Address)
+			}
+			return
+		} else {
+			log.L(ctx).Debugf("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
+		}
+	}
 }
