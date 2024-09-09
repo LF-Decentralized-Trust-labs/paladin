@@ -23,14 +23,14 @@ ext {
 
 configurations {
     // Resolvable configurations
-    toolkitProtoCompiled {
+    toolkitGo {
         canBeConsumed = false
         canBeResolved = true
     }
 }
 
 dependencies {
-    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
+    toolkitGo project(path: ":toolkit:go", configuration: "goSource")
 }
 
 task installTools(type: Exec) {
@@ -53,6 +53,7 @@ task lint(type: Exec, dependsOn: installTools) {
     workingDir '.'
 
     helpers.lockResource(it, "lint.lock")
+    inputs.files(configurations.toolkitGo)
     inputs.files(goFiles);
     environment 'GOGC', '20'
 
@@ -64,7 +65,7 @@ task lint(type: Exec, dependsOn: installTools) {
 }
 
 task test(type: Exec) {
-    inputs.files(configurations.toolkitProtoCompiled)
+    inputs.files(configurations.toolkitGo)
     inputs.files(goFiles)
     outputs.dir('coverage')
 

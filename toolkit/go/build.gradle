@@ -36,7 +36,7 @@ configurations {
     }
 
     // Consumable configurations
-    protoCompiled {
+    goSource {
         canBeConsumed = true
         canBeResolved = false
     }
@@ -227,5 +227,5 @@ task build {
 
 dependencies {
     libstarter files(buildStarterLibrary)
-    protoCompiled files(protoc)
+    goSource files(goFiles, protoc)
 }
