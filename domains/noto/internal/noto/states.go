@@ -39,7 +39,7 @@ var NotoTransferUnmaskedTypeSet = eip712.TypeSet{
 	},
 	"Coin": {
 		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "string"},
+		{Name: "owner", Type: "address"},
 		{Name: "amount", Type: "uint256"},
 	},
 	eip712.EIP712Domain: {
@@ -64,10 +64,10 @@ var NotoTransferMaskedTypeSet = eip712.TypeSet{
 	},
 }
 
-func (n *Noto) makeCoin(stateData string) (*types.NotoCoin, error) {
-	coin := &types.NotoCoin{}
+func (n *Noto) unmarshalCoin(stateData string) (*types.NotoCoin, error) {
+	var coin types.NotoCoin
 	err := json.Unmarshal([]byte(stateData), &coin)
-	return coin, err
+	return &coin, err
 }
 
 func (n *Noto) makeNewState(coin *types.NotoCoin) (*pb.NewState, error) {
@@ -81,7 +81,7 @@ func (n *Noto) makeNewState(coin *types.NotoCoin) (*pb.NewState, error) {
 	}, nil
 }
 
-func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.StateRef, *big.Int, error) {
+func (n *Noto) prepareInputs(ctx context.Context, owner ethtypes.Address0xHex, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*pb.StateRef{}
@@ -95,7 +95,7 @@ func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 			"sort":  []string{".created"},
 			"eq": []map[string]string{{
 				"field": "owner",
-				"value": owner,
+				"value": owner.String(),
 			}},
 		}
 		if lastStateTimestamp > 0 {
@@ -118,7 +118,7 @@ func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 		}
 		for _, state := range states {
 			lastStateTimestamp = state.StoredAt
-			coin, err := n.makeCoin(state.DataJson)
+			coin, err := n.unmarshalCoin(state.DataJson)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.Id, err)
 			}
@@ -135,7 +135,7 @@ func (n *Noto) prepareInputs(ctx context.Context, owner string, amount *ethtypes
 	}
 }
 
-func (n *Noto) prepareOutputs(owner string, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.NewState, error) {
+func (n *Noto) prepareOutputs(owner ethtypes.Address0xHex, amount *ethtypes.HexInteger) ([]*types.NotoCoin, []*pb.NewState, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoCoin{

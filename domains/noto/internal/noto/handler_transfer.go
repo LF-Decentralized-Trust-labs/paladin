@@ -47,13 +47,22 @@ func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
 }
 
 func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*types.TransferParams)
+
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    tx.DomainConfig.NotaryLookup,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
-			// TODO: should we also resolve "From"/"To" parties?
+			{
+				Lookup:    tx.Transaction.From,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
+			{
+				Lookup:    params.To,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
 		},
 	}, nil
 }
@@ -66,18 +75,34 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
-
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, tx.Transaction.From, params.Amount)
+	from := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
+	if from == nil {
+		return nil, fmt.Errorf("error verifying recipient address")
+	}
+	fromAddress, err := ethtypes.NewAddress(from.Verifier)
 	if err != nil {
 		return nil, err
 	}
-	outputCoins, outputStates, err := h.noto.prepareOutputs(params.To, params.Amount)
+	to := domain.FindVerifier(params.To, req.ResolvedVerifiers)
+	if to == nil {
+		return nil, fmt.Errorf("error verifying recipient address")
+	}
+	toAddress, err := ethtypes.NewAddress(to.Verifier)
+	if err != nil {
+		return nil, err
+	}
+
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, *fromAddress, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	outputCoins, outputStates, err := h.noto.prepareOutputs(*toAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(tx.Transaction.From, ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := h.noto.prepareOutputs(*fromAddress, ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
@@ -164,9 +189,18 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types
 	return nil
 }
 
-func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, coins *gatheredCoins) error {
+func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+	from := domain.FindVerifier(tx.Transaction.From, req.ResolvedVerifiers)
+	if from == nil {
+		return fmt.Errorf("error verifying recipient address")
+	}
+	fromAddress, err := ethtypes.NewAddress(from.Verifier)
+	if err != nil {
+		return err
+	}
+
 	for i, coin := range coins.inCoins {
-		if coin.Owner != tx.Transaction.From {
+		if coin.Owner != *fromAddress {
 			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.Transaction.From)
 		}
 	}
@@ -181,7 +215,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	if err := h.validateAmounts(coins); err != nil {
 		return nil, err
 	}
-	if err := h.validateOwners(tx, coins); err != nil {
+	if err := h.validateOwners(tx, req, coins); err != nil {
 		return nil, err
 	}
 

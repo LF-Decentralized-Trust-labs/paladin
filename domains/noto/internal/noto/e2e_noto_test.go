@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -117,10 +118,15 @@ func TestNoto(t *testing.T) {
 	noto, notoTestbed := newNotoDomain(t, &types.Config{
 		FactoryAddress: contracts["factory"],
 	})
-	done, _, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
+	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,
 	})
 	defer done()
+
+	_, notaryKey, err := tb.Components().KeyManager().ResolveKey(ctx, notaryName, algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	require.NoError(t, err)
+	_, recipient1Key, err := tb.Components().KeyManager().ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	require.NoError(t, err)
 
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
@@ -151,7 +157,7 @@ func TestNoto(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
-	assert.Equal(t, notaryName, coins[0].Owner)
+	assert.Equal(t, notaryKey, coins[0].Owner.String())
 
 	log.L(ctx).Infof("Attempt mint from non-notary (should fail)")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
@@ -201,13 +207,13 @@ func TestNoto(t *testing.T) {
 	// This should have been spent
 	// TODO: why does it still exist?
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
-	assert.Equal(t, notaryName, coins[0].Owner)
+	assert.Equal(t, notaryKey, coins[0].Owner.String())
 
 	// These are the expected coins after the transfer
 	assert.Equal(t, int64(50), coins[1].Amount.Int64())
-	assert.Equal(t, recipient1Name, coins[1].Owner)
+	assert.Equal(t, recipient1Key, coins[1].Owner.String())
 	assert.Equal(t, int64(50), coins[2].Amount.Int64())
-	assert.Equal(t, notaryName, coins[2].Owner)
+	assert.Equal(t, notaryKey, coins[2].Owner.String())
 
 	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
@@ -247,10 +253,13 @@ func TestNotoSelfSubmit(t *testing.T) {
 		FactoryAddress: contracts["factory"],
 		Variant:        "NotoSelfSubmit",
 	})
-	done, _, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
+	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,
 	})
 	defer done()
+
+	_, notaryKey, err := tb.Components().KeyManager().ResolveKey(ctx, notaryName, algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	require.NoError(t, err)
 
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
@@ -281,7 +290,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Amount.Int64())
-	assert.Equal(t, notaryName, coins[0].Owner)
+	assert.Equal(t, notaryKey, coins[0].Owner.String())
 
 	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
 	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{

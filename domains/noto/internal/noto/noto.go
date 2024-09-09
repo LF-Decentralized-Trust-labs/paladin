@@ -295,7 +295,7 @@ func (n *Noto) parseCoinList(label string, states []*pb.EndorsableState) ([]*typ
 		if input.SchemaId != n.coinSchema.Id {
 			return nil, nil, nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
 		}
-		if coins[i], err = n.makeCoin(input.StateDataJson); err != nil {
+		if coins[i], err = n.unmarshalCoin(input.StateDataJson); err != nil {
 			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.Id, err)
 		}
 		refs[i] = &pb.StateRef{
@@ -334,7 +334,7 @@ func (n *Noto) FindCoins(ctx context.Context, query string) ([]*types.NotoCoin, 
 
 	coins := make([]*types.NotoCoin, len(states))
 	for i, state := range states {
-		if coins[i], err = n.makeCoin(state.DataJson); err != nil {
+		if coins[i], err = n.unmarshalCoin(state.DataJson); err != nil {
 			return nil, err
 		}
 	}
