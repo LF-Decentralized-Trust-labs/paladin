@@ -121,7 +121,7 @@ public class JsonQuery {
         List<Op> isNull
     ) {}
 
-    static Builder newBuilder() {
+    public static Builder newBuilder() {
         return new Builder();
     }
 

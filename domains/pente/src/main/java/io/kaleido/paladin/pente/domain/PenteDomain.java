@@ -24,6 +24,7 @@ import io.kaleido.paladin.toolkit.DomainInstance;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
+import io.kaleido.paladin.toolkit.JsonQuery;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -189,7 +190,7 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.InitTransactionResponse> initTransaction(ToDomain.InitTransactionRequest request) {
         try {
-            var tx = new PenteTransaction(request.getTransaction());
+            var tx = new PenteTransaction(this, request.getTransaction());
             var response = ToDomain.InitTransactionResponse.newBuilder();
             response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
                     setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
@@ -206,8 +207,8 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
         try {
-            var tx = new PenteTransaction(request.getTransaction());
-            var evm = tx.getEVM(config.getChainId());
+//            var tx = new PenteTransaction(this, request.getTransaction());
+//            var evm = tx.getEVM(config.getChainId());
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);
@@ -224,11 +225,18 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
-    void loadAccountState(String address) throws InterruptedException, ExecutionException {
-        var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
-                setQueryJson("""
-                        {}
-                        """.formatted(address)).
-                build()).get();
+    class PenteAccountLoader {
+        public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) throws IOException, ExecutionException, InterruptedException {
+            var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
+                    setQueryJson(JsonQuery.newBuilder().
+                            limit(1).
+                            isEqual("address", address.toString()).
+                            json()).
+                    build()).get();
+            if (response.getStatesList().size() != 1) {
+                return Optional.empty();
+            }
+            throw new IOException("todo");
+        }
     }
 }

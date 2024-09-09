@@ -133,8 +133,8 @@ public class PenteConfiguration {
         JsonNode inputs // leave this unparsed as we will push it back ot paladin to parse for us
     ) {}
 
-    JsonABI.Parameter abiTuple_AccountStateV20240902() {
-        return JsonABI.newTuple("AccountStateV20240902", "AccountStateV20240902", JsonABI.newParameters(
+    JsonABI.Parameter abiTuple_AccountState_v24_9_0() {
+        return JsonABI.newTuple("AccountState_v24_9_0", "AccountState_v24_9_0", JsonABI.newParameters(
             JsonABI.newIndexedParameter("address", "address"),
             JsonABI.newParameter("nonce", "uint256"),
             JsonABI.newParameter("balance", "uint256"),
@@ -254,7 +254,7 @@ public class PenteConfiguration {
     }
 
     List<String> allPenteSchemas() {
-        return Arrays.asList(abiTuple_AccountStateV20240902().toString());
+        return Arrays.asList(abiTuple_AccountState_v24_9_0().toString());
     }
 
     synchronized void schemasInitialized(List<ToDomain.StateSchema> schemas) {
@@ -266,7 +266,7 @@ public class PenteConfiguration {
         schemasByID.put(schemaId_AccountStateV20240902, new Schema(
                 schemas.getFirst().getId(),
                 schemas.getFirst().getSignature(),
-                abiTuple_AccountStateV20240902()
+                abiTuple_AccountState_v24_9_0()
         ));
     }
 

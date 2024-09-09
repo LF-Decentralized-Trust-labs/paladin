@@ -15,6 +15,9 @@
 
 package io.kaleido.paladin.pente.evmstate;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kaleido.paladin.toolkit.JsonHex;
 import kotlin.NotImplementedError;
 import kotlin.collections.ArrayDeque;
 import org.apache.tuweni.bytes.Bytes;
@@ -31,6 +34,7 @@ import org.hyperledger.besu.evm.account.AccountStorageEntry;
 import org.hyperledger.besu.evm.worldstate.UpdateTrackingAccount;
 import org.web3j.rlp.*;
 
+import java.math.BigInteger;
 import java.util.*;
 
 public class PersistedAccount implements Account {
@@ -38,6 +42,8 @@ public class PersistedAccount implements Account {
     private final Address address;
 
     private long nonce;
+
+    private Wei balance = Wei.ZERO;
 
     private Bytes code;
 
@@ -72,7 +78,7 @@ public class PersistedAccount implements Account {
 
     @Override
     public Wei getBalance() {
-        return Wei.ZERO;
+        return balance;
     }
 
     @Override
@@ -130,12 +136,9 @@ public class PersistedAccount implements Account {
     }
 
     public void applyChanges(UpdateTrackingAccount<? extends Account> account)  {
-        if (!account.getBalance().isZero()) {
-            throw new UnsupportedOperationException("balance cannot be modified in private contracts");
-        }
         this.nonce = account.getNonce();
+        this.balance = account.getBalance();
         this.code = account.getCode();
-
         account.getUpdatedStorage()
                 .forEach(
                     (key, value) -> {
@@ -147,80 +150,85 @@ public class PersistedAccount implements Account {
                     });
     }
 
-    public byte[] serialize() {
-        // We use RLP for serialization. This isn't strictly necessary, but it is more efficient than
-        // JSON, and we're in a world of RLP serialization.
-        // TODO: Performance/readability/versioning comparison with Protobuf?
-        List<RlpType> values = new ArrayDeque<>();
-        values.add(RlpString.create(1L /* version */));
-        values.add(RlpString.create(this.address.toArray()));
-        values.add(RlpString.create(this.nonce));
-        Bytes codeHash = this.getCodeHash();
-        if (codeHash == null) {
-            values.add(RlpString.create((byte[])(null)));
-            values.add(RlpString.create((byte[])(null)));
-        } else {
-            values.add(RlpString.create(codeHash.toArray()));
-            values.add(RlpString.create(this.code.toArray()));
-        }
-        values.add(RlpString.create(this.storageTrie.getRootHash().toArray()));
-        List<RlpType> trieLeafs = new ArrayDeque<>();
-        this.storageTrie.visitLeafs((key, leafNode) -> {
-            if (leafNode.getValue().isPresent()) {
-                trieLeafs.add(new RlpList(
-                        RlpString.create(key.toArray()),
-                        RlpString.create(leafNode.getValue().get().toArray())
-                ));
-            }
-            return TrieIterator.State.CONTINUE;
-        });
-        values.add(new RlpList(trieLeafs));
-        return RlpEncoder.encode(new RlpList(values));
-    }
+    public record PersistedAccountJson(
+            @JsonProperty
+            String version,
+            @JsonProperty
+            JsonHex.Address address,
+            @JsonProperty
+            long nonce,
+            @JsonProperty
+            BigInteger balance,
+            @JsonProperty
+            JsonHex.Bytes32 codeHash,
+            @JsonProperty
+            JsonHex.Bytes code,
+            @JsonProperty
+            JsonHex.Bytes32 storageRoot,
+            @JsonProperty
+            List<JsonHex.Bytes[]> storage
+    ) {}
 
-    private static class RlpIterator {
-        private final Iterator<RlpType> iterator;
-        private RlpIterator(RlpList list) {
-            this.iterator = list.getValues().iterator();
-        }
-        private boolean hasNext() {
-            return this.iterator.hasNext();
-        }
-        private RlpString nextString() {
-            return (RlpString)(this.iterator.next());
-        }
-        private RlpList nextList() {
-            return (RlpList)(this.iterator.next());
+    public byte[] serialize() {
+        try {
+            JsonHex.Bytes32 jsonCodeHash = null;
+            JsonHex.Bytes jsonCode = null;
+            var codehash = this.getCodeHash();
+            if (codehash != null) {
+                jsonCodeHash = new JsonHex.Bytes32(this.getCodeHash().toArray());
+                jsonCode = new JsonHex.Bytes(this.code.toArray());
+            }
+            var storageTrieLeafs = new ArrayDeque<JsonHex.Bytes[]>();
+            var jsonAccount = new PersistedAccountJson(
+                    "v24.9.0",
+                    new JsonHex.Address(this.address.toArray()),
+                    this.nonce,
+                    this.balance.getAsBigInteger(),
+                    jsonCodeHash,
+                    jsonCode,
+                    new JsonHex.Bytes32(this.storageTrie.getRootHash().toArray()),
+                    storageTrieLeafs
+            );
+            this.storageTrie.visitLeafs((key, leafNode) -> {
+                if (leafNode.getValue().isPresent()) {
+                    storageTrieLeafs.add(new JsonHex.Bytes[]{
+                            new JsonHex.Bytes(key.toArray()),
+                            new JsonHex.Bytes(leafNode.getValue().get().toArray())
+                    });
+                }
+                return TrieIterator.State.CONTINUE;
+            });
+            return new ObjectMapper().writeValueAsBytes(jsonAccount);
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
         }
     }
 
     public static PersistedAccount deserialize(byte[] data)  {
-        RlpIterator rlp = new RlpIterator(new RlpIterator(RlpDecoder.decode(data)).nextList());
-        if (rlp.nextString().asPositiveBigInteger().longValue() != 1L) {
-            throw new IllegalArgumentException("only version 1 encoding is supported");
-        }
-        PersistedAccount account = new PersistedAccount(Address.wrap(Bytes.wrap(rlp.nextString().getBytes())));
-        account.nonce = rlp.nextString().asPositiveBigInteger().longValue();
-        byte[] codeHash = rlp.nextString().getBytes();
-        if (codeHash == null) {
-            rlp.nextString();
-        } else {
-            account.code = Bytes.wrap(rlp.nextString().getBytes());
-            if (!account.getCodeHash().equals(Bytes.wrap(codeHash))) {
-                throw new IllegalArgumentException("code bytes hash mismatch");
+        try {
+            var jsonAccount = new ObjectMapper().readValue(data, PersistedAccountJson.class);
+            if (!jsonAccount.version().equals("v24.9.0")) {
+                throw new IllegalArgumentException("unsupported version: %s".formatted(jsonAccount.version()));
             }
+            PersistedAccount account = new PersistedAccount(Address.wrap(Bytes.wrap(jsonAccount.address().getBytes())));
+            account.nonce = jsonAccount.nonce;
+            account.balance = Wei.of(jsonAccount.balance);
+            if (jsonAccount.codeHash != null) {
+                account.code = Bytes.wrap(jsonAccount.code.getBytes());
+                if (!account.getCodeHash().equals(Bytes.wrap(jsonAccount.codeHash.getBytes()))) {
+                    throw new IllegalArgumentException("code bytes hash mismatch");
+                }
+            }
+            Bytes storageRootHash = Bytes.wrap(jsonAccount.storageRoot().getBytes());
+            for (var leafKV : jsonAccount.storage) {
+                account.storageTrie.put(Bytes32.wrap(leafKV[0].getBytes()), Bytes.wrap(leafKV[1].getBytes()));
+            }
+            if (!account.storageTrie.getRootHash().equals(Bytes.wrap(storageRootHash))) {
+                throw new IllegalArgumentException("storage trie root hash mismatch");
+            }
+            return account;
+        } catch (Exception e) {
+            throw new IllegalArgumentException(e);
         }
-        Bytes storageRootHash = Bytes.wrap(rlp.nextString().getBytes());
-        RlpIterator trieLeafs = new RlpIterator(rlp.nextList());
-        while (trieLeafs.hasNext()) {
-            RlpIterator leafKV = new RlpIterator(trieLeafs.nextList());
-            account.storageTrie.put(
-                    Bytes32.wrap(leafKV.nextString().getBytes()),
-                    Bytes.wrap(leafKV.nextString().getBytes()));
-        }
-        if (!account.storageTrie.getRootHash().equals(Bytes.wrap(storageRootHash))) {
-            throw new IllegalArgumentException("storage trie root hash mismatch");
-        }
-        return account;
     }
 }

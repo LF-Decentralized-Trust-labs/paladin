@@ -209,15 +209,16 @@ class PenteTransaction {
     }
 
     EVMRunner getEVM(long chainId, long blockNumber) throws ClassNotFoundException, IOException {
-        var evmConfig = EvmConfiguration.DEFAULT;
-        var evmVersionStr = getConfig().evmVersion();
-        EVMVersion evmVersion = switch (evmVersionStr) {
-            case "london" -> EVMVersion.London(chainId, evmConfig);
-            case "paris" -> EVMVersion.Paris(chainId, evmConfig);
-            case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
-            default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
-        };
-        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
+//        var evmConfig = EvmConfiguration.DEFAULT;
+//        var evmVersionStr = getConfig().evmVersion();
+//        EVMVersion evmVersion = switch (evmVersionStr) {
+//            case "london" -> EVMVersion.London(chainId, evmConfig);
+//            case "paris" -> EVMVersion.Paris(chainId, evmConfig);
+//            case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
+//            default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
+//        };
+//        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
+        throw new IOException("todo");
     }
 
     boolean requiresABIEncoding() {
