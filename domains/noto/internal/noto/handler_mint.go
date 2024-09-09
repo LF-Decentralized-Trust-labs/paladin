@@ -70,7 +70,6 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
-		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
 	to := domain.FindVerifier(params.To, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
@@ -93,6 +92,8 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 			OutputStates: outputStates,
 		},
 		AttestationPlan: []*pb.AttestationRequest{
+			// Notary will endorse the assembled transaction (by submitting to the ledger)
+			// Note no  additional attestation using req.Transaction.From, because it is guaranteed to be the notary
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
@@ -135,7 +136,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 
 	params := map[string]interface{}{
 		"outputs":   outputs,
-		"signature": "0x",
+		"signature": "0x", // no signature, because requester AND submitter are always the notary
 		"data":      req.Transaction.TransactionId,
 	}
 	paramsJSON, err := json.Marshal(params)

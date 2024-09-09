@@ -72,7 +72,6 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 
 	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
-		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
 	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
@@ -274,7 +273,8 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	var signature *pb.AttestationResult
 	switch h.noto.config.Variant {
 	case "Noto":
-		// Include the signature from the sender (informational only)
+		// Include the signature from the sender
+		// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 		signature = domain.FindAttestation("sender", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'sender' attestation")
