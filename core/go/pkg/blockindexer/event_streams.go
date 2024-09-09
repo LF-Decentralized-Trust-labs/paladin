@@ -594,57 +594,9 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 }
 
 func (es *eventStream) queryTransactionEvents(tx ethtypes.HexBytes0xPrefix, events []*EventWithData, done chan error) {
-	var err error
-	defer func() {
-		done <- err
-	}()
-
-	// Get the TX receipt with all the logs
-	var receipt *TXReceiptJSONRPC
-	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		log.L(es.ctx).Debugf("Fetching transaction receipt by hash %s", tx)
-		rpcErr := es.bi.wsConn.CallRPC(es.ctx, &receipt, "eth_getTransactionReceipt", tx)
-		if rpcErr != nil {
-			return true, rpcErr.Error()
-		}
-		if receipt == nil {
-			return true, i18n.NewError(es.ctx, msgs.MsgBlockIndexerConfirmedReceiptNotFound, tx)
-		}
-		return false, nil
-	})
-	if err != nil {
-		return
-	}
-
-	// Spin through the logs to find the corresponding result entries
-	for _, l := range receipt.Logs {
-		for _, e := range events {
-			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
-				es.matchLog(l, e)
-			}
-		}
-	}
+	done <- es.bi.queryTransactionEvents(es.ctx, es.eventABIs, tx, events)
 }
 
 func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
-	// This is one that matches our signature, but we need to check it against our ABI list.
-	// We stop at the first entry that parses it, and it's perfectly fine and expected that
-	// none will (because Eth signatures are not precise enough to distinguish events -
-	// particularly the "indexed" settings on parameters)
-	for _, abiEntry := range es.eventABIs {
-		cv, err := abiEntry.DecodeEventDataCtx(es.ctx, in.Topics, in.Data)
-		if err == nil {
-			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
-			out.Data, err = tktypes.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
-		}
-		if err == nil {
-			log.L(es.ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
-			if in.Address != nil {
-				out.Address = tktypes.EthAddress(*in.Address)
-			}
-			return
-		} else {
-			log.L(es.ctx).Debugf("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
-		}
-	}
+	es.bi.matchLog(es.ctx, es.eventABIs, in, out)
 }
