@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
@@ -106,7 +107,7 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: "anon",
+		CircuitId: h.zeto.config.CircuitId,
 		Common: &corepb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
 			InputValues:      inputValueInts,
@@ -207,12 +208,12 @@ func (h *transferHandler) encodeProof(proof *corepb.SnarkProof) map[string]inter
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
-	var proof corepb.SnarkProof
+	var proofRes corepb.ProvingResponse
 	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
 		return nil, fmt.Errorf("did not find 'sender' attestation")
 	}
-	if err := proto.Unmarshal(result.Payload, &proof); err != nil {
+	if err := proto.Unmarshal(result.Payload, &proofRes); err != nil {
 		return nil, err
 	}
 
@@ -243,10 +244,14 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		}
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"inputs":  inputs,
 		"outputs": outputs,
-		"proof":   h.encodeProof(&proof),
+		"proof":   h.encodeProof(proofRes.Proof),
+	}
+	if h.zeto.config.TokenName == "Zeto_AnonEnc" {
+		params["encryptionNonce"] = proofRes.PublicInputs["encryptionNonce"]
+		params["encryptedValues"] = strings.Split(proofRes.PublicInputs["encryptedValues"], ",")
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

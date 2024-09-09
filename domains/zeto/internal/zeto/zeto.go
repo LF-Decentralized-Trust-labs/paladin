@@ -17,6 +17,7 @@ package zeto
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
@@ -24,25 +25,39 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+//go:embed abis/ZetoFactory.json
+var factoryJSONBytes []byte // From "gradle copySolidity"
+
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config      *types.Config
+	config      *types.DomainFactoryConfig
+	localConfig *LocalDomainConfig
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
-	tokenName   string
-	factoryAbi  abi.ABI
 	contractAbi abi.ABI
 }
 
+func New(callbacks plugintk.DomainCallbacks) (*Zeto, error) {
+	localConfig, err := loadLocalConfig()
+	if err != nil {
+		return nil, err
+	}
+	return &Zeto{
+		Callbacks:   callbacks,
+		localConfig: localConfig,
+	}, nil
+}
+
 func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
-	var config types.Config
+	var config types.DomainFactoryConfig
 	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
@@ -51,11 +66,27 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.config = &config
 	z.chainID = req.ChainId
 
-	factoryJSON, err := json.Marshal(z.factoryAbi)
+	factory := domain.LoadBuild(factoryJSONBytes)
+	factoryJSON, err := json.Marshal(factory.ABI)
 	if err != nil {
 		return nil, err
 	}
-	zetoJSON, err := json.Marshal(z.contractAbi)
+
+	var tokenContractAbi abi.ABI
+	for _, contract := range z.localConfig.DomainContracts.Implementations {
+		if contract.Name == config.TokenName {
+			contractAbi, err := z.localConfig.getContractAbi(contract.Name)
+			if err != nil {
+				return nil, err
+			}
+			tokenContractAbi = contractAbi
+			break
+		}
+	}
+	if tokenContractAbi == nil {
+		return nil, fmt.Errorf("token contract not found in local configuration: %s", config.TokenName)
+	}
+	zetoJSON, err := json.Marshal(tokenContractAbi)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +139,23 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
-	deployParams := &ZetoDeployParams{
+	config := &types.DomainInstanceConfig{
+		CircuitId: z.config.CircuitId,
+		TokenName: z.config.TokenName,
+	}
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	deployParams := &types.DeployParams{
 		TransactionID: req.Transaction.TransactionId,
-		Data:          ethtypes.HexBytes0xPrefix(""),
-		TokenName:     z.tokenName,
+		Data:          ethtypes.HexBytes0xPrefix(encoded),
+		TokenName:     z.config.TokenName,
 		InitialOwner:  req.ResolvedVerifiers[0].Verifier,
 	}
 	paramsJSON, err := json.Marshal(deployParams)
@@ -160,8 +204,8 @@ func (z *Zeto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactio
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainConfig, error) {
-	configValues, err := types.DomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
+func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainInstanceConfig, error) {
+	configValues, err := types.DomainInstanceConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +213,7 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	if err != nil {
 		return nil, err
 	}
-	var config types.DomainConfig
+	var config types.DomainInstanceConfig
 	err = json.Unmarshal(configJSON, &config)
 	return &config, err
 }

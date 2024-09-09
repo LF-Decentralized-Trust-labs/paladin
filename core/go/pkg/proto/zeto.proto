@@ -34,6 +34,15 @@ message ProvingRequestCommon {
   repeated string outputOwners = 7;
 }
 
+message ProvingRequestExtras_Encryption {
+  string encryptionNonce = 1;
+}
+
+message ProvingResponse {
+  SnarkProof proof = 1;
+  map<string, string> publicInputs = 2;
+}
+
 message SnarkProof {
  	repeated string  A = 1;
 	repeated B_Item B = 2;

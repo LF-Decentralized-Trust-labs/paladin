@@ -60,11 +60,11 @@ func TestLoadCircuitFail(t *testing.T) {
 
 	config := api.SnarkProverConfig{}
 	_, _, err = loadCircuit("test", config)
-	assert.EqualError(t, err, "CIRCUITS_ROOT not set")
+	assert.EqualError(t, err, "circuits root must be set via the configuration file")
 
 	config.CircuitsDir = tmpDir
 	_, _, err = loadCircuit("test", config)
-	assert.EqualError(t, err, "PROVING_KEYS_ROOT not set")
+	assert.EqualError(t, err, "proving keys root must be set via the configuration file")
 }
 
 func TestLoadCircuitFailRead(t *testing.T) {

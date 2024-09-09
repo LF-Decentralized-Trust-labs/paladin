@@ -17,18 +17,26 @@ package zeto
 
 import (
 	"context"
+	"encoding/json"
+	"testing"
 
-	internal "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/stretchr/testify/assert"
 )
 
-type Zeto interface {
-	plugintk.DomainAPI
-	GetHandler(method string) types.DomainHandler
-	FindCoins(ctx context.Context, query string) ([]*types.ZetoCoin, error)
-}
+func TestDecodeDomainConfig(t *testing.T) {
+	config := &types.DomainInstanceConfig{
+		CircuitId: "circuit-id",
+		TokenName: "token-name",
+	}
+	configJSON, err := json.Marshal(config)
+	assert.NoError(t, err)
 
-func New(callbacks plugintk.DomainCallbacks) (Zeto, error) {
-	return internal.New(callbacks)
+	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
+	assert.NoError(t, err)
+
+	z := &Zeto{}
+	decoded, err := z.decodeDomainConfig(context.Background(), encoded)
+	assert.NoError(t, err)
+	assert.Equal(t, config, decoded)
 }

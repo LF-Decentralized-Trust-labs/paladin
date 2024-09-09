@@ -4,7 +4,7 @@ db:
   sqlite:
     uri: ':memory:'
     autoMigrate: true
-    migrationsDir: '../../../../core/go/db/migrations/sqlite'
+    migrationsDir: '../../../core/go/db/migrations/sqlite'
 rpcServer:
   http:
     port: 0
@@ -20,12 +20,12 @@ blockchain:
     initialConnectAttempts: 25
 signer:
   keyDerivation:
-    type: "bip32"
+    type: 'bip32'
   keyStore:
-    type: "static"
+    type: 'static'
     snarkProver:
-      circuitsDir: ../../zkp
-      provingKeysDir: ../../zkp
+      circuitsDir: ../zkp
+      provingKeysDir: ../zkp
     static:
       keys:
         seed:

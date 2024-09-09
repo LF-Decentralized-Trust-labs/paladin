@@ -20,40 +20,31 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 )
 
-type Config struct {
+// DomainFactoryConfig is the configuration for a Zeto domain
+// to provision new domain instances based on a factory contract
+type DomainFactoryConfig struct {
 	FactoryAddress string            `json:"factoryAddress"`
 	Libraries      map[string]string `json:"libraries"`
+	TokenName      string            `json:"tokenName"`
+	CircuitId      string            `json:"circuitId"`
 }
 
-type DomainConfig struct {
-	DomainContracts DomainContracts `yaml:"contracts"`
+// DomainInstanceConfig is the domain instance config, which are
+// sent to the domain contract deployment request to be published
+// on-chain. This must include sufficient information for a Paladin
+// node to fully initialize the domain instance, based on only
+// on-chain information.
+type DomainInstanceConfig struct {
+	TokenName string `json:"tokenName"`
+	CircuitId string `json:"circuitId"`
 }
 
-type DomainContracts struct {
-	Factory         DomainContract   `yaml:"factory"`
-	Implementations []DomainContract `yaml:"implementations"`
+// DomainInstanceConfigABI is the ABI for the DomainInstanceConfig,
+// used to encode and decode the on-chain data for the domain config
+var DomainInstanceConfigABI = &abi.ParameterArray{
+	{Type: "string", Name: "tokenName"},
+	{Type: "string", Name: "circuitId"},
 }
 
-type DomainContract struct {
-	Name            string         `yaml:"name"`
-	CircuitId       string         `yaml:"circuitId"`
-	ContractAddress string         `yaml:"address"`
-	AbiAndBytecode  AbiAndBytecode `yaml:"abiAndBytecode"`
-	Libraries       []string       `yaml:"libraries"`
-	Cloneable       bool           `yaml:"cloneable"`
-}
-
-type AbiAndBytecode struct {
-	Path string             `yaml:"path"`
-	Json AbiAndBytecodeJSON `yaml:"json"`
-}
-
-type AbiAndBytecodeJSON struct {
-	Abi      map[string]interface{} `yaml:"abi"`
-	Bytecode string                 `yaml:"bytecode"`
-}
-
-var DomainConfigABI = &abi.ParameterArray{}
-
-type DomainHandler = domain.DomainHandler[DomainConfig]
-type ParsedTransaction = domain.ParsedTransaction[DomainConfig]
+type DomainHandler = domain.DomainHandler[DomainInstanceConfig]
+type ParsedTransaction = domain.ParsedTransaction[DomainInstanceConfig]

@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package integratino_test
+package integration_test
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
@@ -41,7 +40,11 @@ type zetoDomainContracts struct {
 	factoryAbi           abi.ABI
 	deployedContracts    map[string]*ethtypes.Address0xHex
 	deployedContractAbis map[string]abi.ABI
-	cloneableContracts   []string
+	cloneableContracts   map[string]cloneableContract
+}
+
+type cloneableContract struct {
+	circuitId string
 }
 
 func newZetoDomainContracts() *zetoDomainContracts {
@@ -52,7 +55,7 @@ func newZetoDomainContracts() *zetoDomainContracts {
 	}
 }
 
-func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *types.DomainConfig) (*zetoDomainContracts, error) {
+func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, config *domainConfig) (*zetoDomainContracts, error) {
 	if len(config.DomainContracts.Implementations) == 0 {
 		return nil, fmt.Errorf("no implementations specified for factory contract")
 	}
@@ -88,11 +91,13 @@ func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer
 	return ctrs, nil
 }
 
-func findCloneableContracts(config *types.DomainConfig) []string {
-	var cloneableContracts []string
+func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
+	cloneableContracts := make(map[string]cloneableContract)
 	for _, contract := range config.DomainContracts.Implementations {
 		if contract.Cloneable {
-			cloneableContracts = append(cloneableContracts, contract.Name)
+			cloneableContracts[contract.Name] = cloneableContract{
+				circuitId: contract.CircuitId,
+			}
 		}
 	}
 	return cloneableContracts
@@ -101,8 +106,8 @@ func findCloneableContracts(config *types.DomainConfig) []string {
 // when contracts include a `libraries` section, the libraries must be deployed first
 // we build a sorted list of contracts, with the dependencies first, and the depending
 // contracts later
-func sortContracts(config *types.DomainConfig) ([]types.DomainContract, error) {
-	var contracts []types.DomainContract
+func sortContracts(config *domainConfig) ([]domainContract, error) {
+	var contracts []domainContract
 	contracts = append(contracts, config.DomainContracts.Implementations...)
 
 	sort.Slice(contracts, func(i, j int) bool {
@@ -133,7 +138,7 @@ func sortContracts(config *types.DomainConfig) ([]types.DomainContract, error) {
 	return contracts, nil
 }
 
-func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []types.DomainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
+func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []domainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
 	deployedContracts := make(map[string]*ethtypes.Address0xHex)
 	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
@@ -149,7 +154,7 @@ func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer strin
 	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *types.DomainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *domainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
@@ -165,7 +170,7 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 	return addr, build.ABI, nil
 }
 
-func getContractSpec(contract *types.DomainContract) (*domain.SolidityBuild, error) {
+func getContractSpec(contract *domainContract) (*domain.SolidityBuild, error) {
 	var build domain.SolidityBuild
 	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
 		abiBytecode := make(map[string]interface{})
@@ -209,7 +214,7 @@ func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi bl
 
 	// Send the transaction
 	addr := ethtypes.Address0xHex(*domainContracts.factoryAddress)
-	for _, contractName := range domainContracts.cloneableContracts {
+	for contractName := range domainContracts.cloneableContracts {
 		err = registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, addr, bi)
 		if err != nil {
 			return err

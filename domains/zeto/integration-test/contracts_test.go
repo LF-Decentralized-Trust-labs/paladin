@@ -13,12 +13,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zeto
+package integration_test
 
 import (
 	"testing"
 
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -75,7 +74,7 @@ contracts:
 `
 
 func TestSortContracts(t *testing.T) {
-	var config types.DomainConfig
+	var config domainConfig
 	err := yaml.Unmarshal([]byte(testConfig), &config)
 	assert.NoError(t, err)
 

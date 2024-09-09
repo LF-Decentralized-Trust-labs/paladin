@@ -19,6 +19,9 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -28,7 +31,9 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	internalZeto "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -42,8 +47,11 @@ var (
 	deployedContracts *zetoDomainContracts
 )
 
-//go:embed zeto.config.yaml
+//go:embed config-for-deploy.yaml
 var testZetoConfigYaml []byte
+
+//go:embed config-local.yaml
+var testZetoLocalConfigYaml []byte
 
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
@@ -51,7 +59,7 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
+func mapConfig(t *testing.T, config *types.DomainFactoryConfig) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
 	require.NoError(t, err)
 	err = json.Unmarshal(configJSON, &m)
@@ -59,17 +67,40 @@ func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
 	return m
 }
 
-func newTestDomain(t *testing.T, domainName string, tokenName string, config *types.Config, domainContracts *zetoDomainContracts) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
-	var domain *Zeto
+func prepareLocalConfig(t *testing.T, domainContracts *zetoDomainContracts) {
+	// emulate preparing the local config based on Zeto contracts deploy,
+	// for the Paladin runtime's zeto domain
+	var localConfig internalZeto.LocalDomainConfig
+	err := yaml.Unmarshal(testZetoLocalConfigYaml, &localConfig)
+	assert.NoError(t, err)
+	localConfig.DomainContracts.Factory.ContractAddress = domainContracts.factoryAddress.String()
+	for _, implContract := range localConfig.DomainContracts.Implementations {
+		implContract.ContractAddress = domainContracts.deployedContracts[implContract.Name].String()
+		abiJSON, err := json.Marshal(domainContracts.deployedContractAbis[implContract.Name])
+		require.NoError(t, err)
+		implContract.Abi = tktypes.RawJSON(abiJSON)
+	}
+	configFile := path.Join(t.TempDir(), "config-local.yaml")
+	configTestBytes, err := yaml.Marshal(localConfig)
+	require.NoError(t, err)
+	fmt.Printf("Local config written to file %s\n", configFile)
+	err = os.WriteFile(configFile, configTestBytes, 0644)
+	require.NoError(t, err)
+	os.Setenv("LOCAL_CONFIG", configFile)
+}
+
+func newTestDomain(t *testing.T, domainName string, config *types.DomainFactoryConfig, domainContracts *zetoDomainContracts) (context.CancelFunc, zeto.Zeto, rpcbackend.Backend) {
+	prepareLocalConfig(t, domainContracts)
+
+	var domain zeto.Zeto
+	var err error
 	tb := testbed.NewTestBed()
 	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		domain = &Zeto{Callbacks: callbacks}
-		domain.tokenName = tokenName
-		domain.factoryAbi = domainContracts.factoryAbi
-		domain.contractAbi = domainContracts.deployedContractAbis[tokenName]
+		domain, err = zeto.New(callbacks)
+		require.NoError(t, err)
 		return domain
 	})
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
+	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{
 		domainName: {
 			Config: mapConfig(t, config),
 			Plugin: plugin,
@@ -88,7 +119,7 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 	var ec ethclient.EthClient
 	var bi blockindexer.BlockIndexer
 	url, done, err := tb.StartForTest(
-		"../../testbed.config.yaml",
+		"./testbed.config.yaml",
 		map[string]*testbed.TestbedDomain{},
 		&testbed.UTInitFunction{PreManagerStart: func(c testbed.AllComponents) error {
 			ec = c.EthClientFactory().HTTPClient()
@@ -100,7 +131,7 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 
-	var config types.DomainConfig
+	var config domainConfig
 	err = yaml.Unmarshal(testZetoConfigYaml, &config)
 	assert.NoError(t, err)
 
@@ -123,15 +154,17 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	ctx := context.Background()
 	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	done, zeto, rpc := newTestDomain(t, domainName, tokenName, &types.Config{
+	done, zeto, rpc := newTestDomain(t, domainName, &types.DomainFactoryConfig{
 		FactoryAddress: deployedContracts.factoryAddress.String(),
+		TokenName:      tokenName,
+		CircuitId:      deployedContracts.cloneableContracts[tokenName].circuitId,
 	}, deployedContracts)
 	defer done()
 
 	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
 	var zetoAddress ethtypes.Address0xHex
 	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
-		domainName, &ZetoConstructorParams{
+		domainName, &types.ConstructorParams{
 			From: controllerName,
 		})
 	if rpcerr != nil {
