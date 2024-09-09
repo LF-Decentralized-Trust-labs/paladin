@@ -26,16 +26,13 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/domainmgr"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/internal/rpcserver"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 )
 
 type Testbed interface {
 	components.Engine
 	StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error)
-	EthClientFactory() ethclient.EthClientFactory
-	BlockIndexer() blockindexer.BlockIndexer
+	Components() AllComponents
 }
 
 type TestbedDomain struct {
@@ -75,12 +72,8 @@ func (tb *testbed) Init(c components.PreInitComponentsAndManagers) (*components.
 	}, nil
 }
 
-func (tb *testbed) EthClientFactory() ethclient.EthClientFactory {
-	return tb.c.EthClientFactory()
-}
-
-func (tb *testbed) BlockIndexer() blockindexer.BlockIndexer {
-	return tb.c.BlockIndexer()
+func (tb *testbed) Components() AllComponents {
+	return tb.c
 }
 
 // redeclare the AllComponents interface to allow unit test
