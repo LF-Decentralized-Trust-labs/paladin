@@ -90,13 +90,12 @@ public class JsonQueryTest {
     @Test
     public void testQueryOr() throws Exception {
 
-        var query = JsonQuery.newBuilder();
-        query.
-            or(query.nested()
+        var query = JsonQuery.newBuilder().
+            or(nested -> nested
                     .isEqual("field1", "value1")
                     .isNotEqual("field2", "value2")
             ).
-            or(query.nested()
+            or(nested -> nested
                     .isNotEqual("field1", "value1")
                     .isEqual("field3", "value3")
             );

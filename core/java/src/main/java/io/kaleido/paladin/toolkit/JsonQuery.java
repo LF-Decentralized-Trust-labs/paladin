@@ -145,18 +145,9 @@ public class JsonQuery {
             return this;
         }
 
-        public StatementsBuilder nested() {
-            return new SubStatementsBuilder(this);
-        }
-
         @Override
-        public Query build() {
-            return query;
-        }
-
-        @Override
-        public String json() throws IOException  {
-            return new ObjectMapper().writeValueAsString(query);
+        Builder root() {
+            return this;
         }
 
     }
@@ -184,13 +175,13 @@ public class JsonQuery {
             this.root = root;
         }
         @Override
-        public Query build() {
-            return root.build();
+        Builder root() {
+            return root;
         }
-        @Override
-        public String json() throws IOException {
-            return root.json();
-        }
+    }
+
+    public interface NestedBuilder {
+        public StatementsBuilder nested(StatementsBuilder s);
     }
 
     public abstract static class StatementsBuilder {
@@ -216,14 +207,10 @@ public class JsonQuery {
                 )
         );
 
-        abstract public Query build();
+        abstract Builder root();
 
-        abstract public String json() throws IOException;
-
-        public StatementsBuilder or(StatementsBuilder ...subStatements) {
-            for (var s : subStatements) {
-                this.statements.or.add(s.statements);
-            }
+        public StatementsBuilder or(NestedBuilder builder) {
+            this.statements.or.add(builder.nested(new SubStatementsBuilder(root())).statements);
             return this;
         }
 
@@ -275,6 +262,14 @@ public class JsonQuery {
         public StatementsBuilder isNull(String field, Modifier ...modifiers) {
             this.statements.ops.isNull.add(newOp(field, modifiers));
             return this;
+        }
+
+        public final Query build() {
+            return root().build();
+
+        }
+        public final String json() throws IOException {
+            return root().json();
         }
 
     }
