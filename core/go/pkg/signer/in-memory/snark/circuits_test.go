@@ -16,6 +16,7 @@
 package snark
 
 import (
+	_ "embed"
 	"os"
 	"path"
 	"testing"
@@ -24,6 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//go:embed test-resources/test.wasm
+var testWasm []byte
 
 func mockWASMModule() []byte {
 	return []byte(`(module
@@ -50,6 +54,13 @@ func TestLoadCircuit(t *testing.T) {
 	assert.EqualError(t, err, "Export `getFieldNumLen32` does not exist")
 	assert.Nil(t, circuit)
 	assert.Equal(t, []byte{}, provingKey)
+
+	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), testWasm, 0644)
+	assert.NoError(t, err)
+	circuit, provingKey, err = loadCircuit("test", config)
+	assert.NoError(t, err)
+	assert.NotNil(t, circuit)
+	assert.Equal(t, []byte("test"), provingKey)
 }
 
 func TestLoadCircuitFail(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 func TestDecodeProvingRequest(t *testing.T) {
 	common := pb.ProvingRequestCommon{}
 	req := &pb.ProvingRequest{
-		CircuitId: "Zeto_AnonEnc",
+		CircuitId: "anon_enc",
 		Common:    &common,
 	}
 	bytes, err := proto.Marshal(req)
@@ -37,7 +37,7 @@ func TestDecodeProvingRequest(t *testing.T) {
 	}
 	_, extras, err := decodeProvingRequest(signReq)
 	assert.NoError(t, err)
-	assert.Empty(t, extras.(*pb.ProvingRequestExtras_Encryption).EncryptionNonce)
+	assert.Empty(t, extras)
 
 	encExtras := &pb.ProvingRequestExtras_Encryption{
 		EncryptionNonce: "123456",
@@ -51,4 +51,21 @@ func TestDecodeProvingRequest(t *testing.T) {
 	_, extras, err = decodeProvingRequest(signReq)
 	assert.NoError(t, err)
 	assert.Equal(t, "123456", extras.(*pb.ProvingRequestExtras_Encryption).EncryptionNonce)
+}
+
+func TestDecodeProvingRequest_Fail(t *testing.T) {
+	common := pb.ProvingRequestCommon{}
+	req := &pb.ProvingRequest{
+		CircuitId: "anon_enc",
+		Common:    &common,
+		Extras:    []byte("invalid"),
+	}
+	bytes, err := proto.Marshal(req)
+	assert.NoError(t, err)
+
+	signReq := &pb.SignRequest{
+		Payload: bytes,
+	}
+	_, _, err = decodeProvingRequest(signReq)
+	assert.ErrorContains(t, err, "cannot parse invalid wire-format data")
 }
