@@ -19,6 +19,8 @@ ext {
     goFiles = fileTree(".") {
         include "internal/**/*.go"
         include "pkg/**/*.go"
+    }
+    goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
     zetoVersion = "v0.0.3"
@@ -122,6 +124,7 @@ task testE2E(type: Exec) {
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
+    inputs.files(goFilesE2E)
     inputs.file('./integration-test/config-for-deploy.yaml')
     outputs.dir('coverage')
 
@@ -146,7 +149,6 @@ task test(type: Exec) {
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
-    inputs.file('./internal/zeto/config-test.yaml')
     outputs.dir('coverage')
 
     workingDir '.'
