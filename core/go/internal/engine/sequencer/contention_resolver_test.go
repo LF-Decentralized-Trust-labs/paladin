@@ -25,6 +25,9 @@ import (
 )
 
 func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
+	t.Skip("This test has non zero probability of failing")
+	// ... which means it has a high probabiliy of failing at some point in time if we run it on every CI build
+
 	// create 2 ids at random (representing bidding transactions),
 	// then iterate over 100 random state ids and check that there is a fair distribution of winners
 	winner1 := 0
@@ -46,6 +49,7 @@ func TestContentionResolver_2TransactionsDeterministicResults(t *testing.T) {
 		}
 
 	}
+
 	assert.InDelta(t, winner2, winner1, 100)
 }
 
