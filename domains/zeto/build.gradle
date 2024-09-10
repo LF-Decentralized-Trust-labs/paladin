@@ -34,11 +34,11 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    toolkitProtoCompiled {
+    toolkitGo {
         canBeConsumed = false
         canBeResolved = true
     }
-    coreProtoCompiled {
+    coreGo {
         canBeConsumed = false
         canBeResolved = true
     }
@@ -46,8 +46,8 @@ configurations {
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
-    coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
+    toolkitGo project(path: ":toolkit:go", configuration: "goSource")
+    coreGo project(path: ":core:go", configuration: "goSource")
 }
 
 task downloadZetoProver {
@@ -149,8 +149,8 @@ task testE2E(type: Exec) {
 
 task test(type: Exec) {
 
-    inputs.files(configurations.toolkitProtoCompiled)
-    inputs.files(configurations.coreProtoCompiled)
+    inputs.files(configurations.toolkitGo)
+    inputs.files(configurations.coreGo)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
