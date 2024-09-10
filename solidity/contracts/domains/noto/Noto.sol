@@ -190,7 +190,7 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
         bytes memory data
     ) external virtual onlyNotary {
         bytes32[] memory inputs;
-        _transfer(inputs, outputs, "", data);
+        _transfer(inputs, outputs, signature, data);
     }
 
     function transfer(
