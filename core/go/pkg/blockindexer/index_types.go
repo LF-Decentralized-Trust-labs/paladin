@@ -49,6 +49,7 @@ type IndexedTransaction struct {
 	TransactionIndex int64                              `json:"transactionIndex"`
 	From             *tktypes.EthAddress                `json:"from"`
 	To               *tktypes.EthAddress                `json:"to,omitempty"`
+	Nonce            uint64                             `json:"nonce"`
 	ContractAddress  *tktypes.EthAddress                `json:"contractAddress,omitempty"`
 	Result           tktypes.Enum[EthTransactionResult] `json:"result,omitempty"`
 }

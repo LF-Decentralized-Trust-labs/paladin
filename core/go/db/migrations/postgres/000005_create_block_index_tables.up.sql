@@ -12,6 +12,7 @@ CREATE TABLE indexed_transactions (
     "transaction_index" BIGINT    NOT NULL,
     "from"              CHAR(40)  NOT NULL,
     "to"                CHAR(40),
+    "nonce"             BIGINT    NOT NULL,
     "contract_address"  CHAR(40),
     "result"            TEXT,
     PRIMARY KEY ("block_number", "transaction_index"),
