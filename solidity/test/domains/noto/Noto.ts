@@ -1,9 +1,14 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { randomBytes } from "crypto";
-import { ContractTransactionReceipt, Signer, TypedDataEncoder } from "ethers";
+import {
+  ContractTransactionReceipt,
+  Interface,
+  Signer,
+  TypedDataEncoder,
+} from "ethers";
 import hre, { ethers } from "hardhat";
-import { Noto } from "../../typechain-types";
+import { NotoFactory, Noto } from "../../../typechain-types";
 
 export async function newTransferHash(
   noto: Noto,
@@ -38,19 +43,32 @@ export function fakeTXO() {
   return randomBytes32();
 }
 
+export async function deployNotoInstance(
+  notoFactory: NotoFactory,
+  notoInterface: Interface,
+  notary: string
+) {
+  const deployTx = await notoFactory.deploy(randomBytes32(), notary, "0x");
+  const deployReceipt = await deployTx.wait();
+  const deployEvent = deployReceipt?.logs.find(
+    (l) => notoInterface.parseLog(l)?.name === "PaladinNewSmartContract_V0"
+  );
+  expect(deployEvent).to.exist;
+  return deployEvent?.address ?? "";
+}
+
 describe("Noto", function () {
   async function deployNotoFixture() {
     const [notary, other] = await ethers.getSigners();
 
+    const NotoFactory = await ethers.getContractFactory("NotoFactory");
+    const notoFactory = await NotoFactory.deploy();
     const Noto = await ethers.getContractFactory("Noto");
-    const noto = await Noto.deploy(
-      randomBytes32(),
-      "0xab5a1b758fdabfa31542bf50de1e1689ab64db6e",
-      notary.address,
-      "0x"
+    const noto = Noto.attach(
+      await deployNotoInstance(notoFactory, Noto.interface, notary.address)
     );
 
-    return { noto, notary, other };
+    return { noto: noto as Noto, notary, other };
   }
 
   async function doTransfer(

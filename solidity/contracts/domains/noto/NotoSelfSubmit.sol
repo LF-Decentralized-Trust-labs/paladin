@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import {Noto} from "./Noto.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Noto} from "./Noto.sol";
 
 /**
  * Noto variant which allows _any_ address to submit a transfer, as long as
@@ -10,13 +10,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * signature is recovered and verified.
  */
 contract NotoSelfSubmit is Noto {
-    constructor(
-        bytes32 transactionId,
-        address domain,
-        address notary,
-        bytes memory data
-    ) Noto(transactionId, domain, notary, data) {}
-
     function transfer(
         bytes32[] memory inputs,
         bytes32[] memory outputs,

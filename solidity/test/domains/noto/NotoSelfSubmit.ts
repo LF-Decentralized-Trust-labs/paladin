@@ -33,13 +33,22 @@ describe("NotoSelfSubmit", function () {
   async function deployNotoFixture() {
     const [notary, other] = await ethers.getSigners();
 
+    const NotoFactory = await ethers.getContractFactory(
+      "NotoSelfSubmitFactory"
+    );
+    const notoFactory = await NotoFactory.deploy();
     const Noto = await ethers.getContractFactory("NotoSelfSubmit");
-    const noto = await Noto.deploy(
+    const deployTx = await notoFactory.deploy(
       randomBytes32(),
-      "0xab5a1b758fdabfa31542bf50de1e1689ab64db6e",
       notary.address,
       "0x"
     );
+    const deployReceipt = await deployTx.wait();
+    const deployEvent = deployReceipt?.logs.find(
+      (l) => Noto.interface.parseLog(l)?.name === "PaladinNewSmartContract_V0"
+    );
+    expect(deployEvent).to.exist;
+    const noto = Noto.attach(deployEvent?.address ?? "");
 
     return { noto, notary, other };
   }
