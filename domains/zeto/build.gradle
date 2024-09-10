@@ -109,6 +109,9 @@ task copySolidity(type: Copy, dependsOn: [":solidity:compile"]) {
 
 task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts]) {
     inputs.files(fileTree("${zkpOut}/artifacts/contracts"))
+    from fileTree("${rootDir}/solidity/artifacts") {
+        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
+    }
     from fileTree("${zkpOut}/artifacts/contracts") {
         include '**/*.json'
         exclude '**/*.dbg.json'
