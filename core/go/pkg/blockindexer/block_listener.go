@@ -238,7 +238,7 @@ func (bl *blockListener) listenLoop() {
 			default:
 				candidate := bl.reconcileCanonicalChain(bi)
 				// Check this is the lowest position to notify from
-				if candidate != nil && (notifyPos == nil || candidate.Value.(*BlockInfoJSONRPC).Number < notifyPos.Value.(*BlockInfoJSONRPC).Number) {
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*BlockInfoJSONRPC).Number <= notifyPos.Value.(*BlockInfoJSONRPC).Number) {
 					notifyPos = candidate
 				}
 			}
