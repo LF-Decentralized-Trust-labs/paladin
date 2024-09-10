@@ -27,3 +27,15 @@ type PrivateContractInvoke struct {
 	Function abi.Entry  `json:"function,omitempty"` // ABI definition of the function to invoke
 	Inputs   RawJSON    `json:"inputs,omitempty"`   // JSON encoded inputs - which will be validated against the function spec
 }
+
+type PrivateContractPreparedTransaction struct {
+	EncodedCall  []byte       `json:"encodedCall"`
+	InputStates  []*FullState `json:"inputStates"`
+	OutputStates []*FullState `json:"outputStates"`
+}
+
+type FullState struct {
+	ID     Bytes32  `json:"id"`
+	Schema Bytes32  `json:"schema"`
+	Data   HexBytes `json:"data"`
+}

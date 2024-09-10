@@ -31,7 +31,7 @@ type mintHandler struct {
 	zeto *Zeto
 }
 
-func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
+func (h *mintHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
 	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err

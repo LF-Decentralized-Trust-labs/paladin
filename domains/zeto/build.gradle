@@ -50,8 +50,8 @@ dependencies {
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/zeto/ZetoSample.sol/ZetoSample.json'
-        include 'contracts/zeto/ZetoSampleFactory.sol/ZetoSampleFactory.json'
+        include 'contracts/domains/zeto/ZetoSample.sol/ZetoSample.json'
+        include 'contracts/domains/zeto/ZetoSampleFactory.sol/ZetoSampleFactory.json'
         include 'zeto/contracts/lib/common.sol/Commonlib.json'
         include 'zeto/contracts/lib/verifier_anon.sol/Groth16Verifier_Anon.json'
         include 'zeto/contracts/lib/verifier_check_hashes_value.sol/Groth16Verifier_CheckHashesValue.json'
