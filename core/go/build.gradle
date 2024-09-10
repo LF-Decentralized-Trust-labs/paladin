@@ -52,7 +52,7 @@ configurations {
         canBeConsumed = true
         canBeResolved = false
     }
-    protoCompiled {
+    goSource {
         canBeConsumed = true
         canBeResolved = false
     }
@@ -466,6 +466,6 @@ task build {
 
 dependencies {
     libcore files(buildSharedLibrary)
-    protoCompiled files(protoc)
+    goSource files(goFiles, protoc, makeMocks)
 }
 
