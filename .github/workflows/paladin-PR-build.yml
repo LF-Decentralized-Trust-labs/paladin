@@ -33,7 +33,59 @@ jobs:
           curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
           unzip protoc-25.1-linux-x86_64.zip -d protoc
           echo "${PWD}/protoc/bin" >> $GITHUB_PATH
+      
+      # Set up Docker Buildx for caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # Cache Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+    
+      # Load cached images (if available)
+      - name: Load cached images
+        continue-on-error: true
+        run: |
+          docker load -i /tmp/.buildx-cache/postgres.tar || echo "No cached postgres image found"
+          docker load -i /tmp/.buildx-cache/besu.tar || echo "No cached besu image found"
+          docker load -i /tmp/.buildx-cache/golang.tar || echo "No cached golang image found"
 
+      # Pull the required images only if not cached and store them in cache
+      - name: Pull and cache images
+        run: |
+          mkdir -p /tmp/.buildx-cache  # Create the cache directory if it doesn't exist
+          
+          if [[ "$(docker images -q postgres:15-alpine 2> /dev/null)" == "" ]]; then
+            docker pull postgres:15-alpine
+            docker save -o /tmp/.buildx-cache/postgres.tar postgres:15-alpine
+          fi
+
+          if [[ "$(docker images -q hyperledger/besu:24.8.0 2> /dev/null)" == "" ]]; then
+            docker pull hyperledger/besu:24.8.0
+            docker save -o /tmp/.buildx-cache/besu.tar hyperledger/besu:24.8.0
+          fi
+
+          if [[ "$(docker images -q golang:1.22 2> /dev/null)" == "" ]]; then
+            docker pull golang:1.22
+            docker save -o /tmp/.buildx-cache/golang.tar golang:1.22
+          fi
+
+      - name: Go Build Cache for Docker
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache
+          key: ${{ runner.os }}-go-build-cache-${{ hashFiles('**/go.sum') }}
+
+      - name: inject go-build-cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@4b2444fec0c0fb9dbf175a96c094720a692ef810 # v2.1.4
+        with:
+          cache-source: go-build-cache
+     
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -51,7 +103,10 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew -PcomposeLogs=true --parallel build
-
+        env:
+          DOCKER_BUILDKIT: 1  # Enable Docker BuildKit for caching
+          COMPOSE_DOCKER_CLI_BUILD: 1  # Enable Docker Compose BuildKit support
+ 
         # env:
         #   CREATE_TEST_DB: 0 # github action setup a PSQL db service, so no need to create a test db again
         #   POSTGRES_HOSTNAME: postgres

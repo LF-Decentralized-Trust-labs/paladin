@@ -1,20 +1,20 @@
 services:
   postgres:
-    image: postgres
+    image: postgres:15-alpine
     ports:
       - 5432:5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: my-secret
   besu_bootstrap:
-    image: paladin/besu_bootstrap
+    image: paladin/besu_bootstrap:local
     user: 0:0
     volumes:
       - besu_data:/var/besu:rw
     command:
       - /var/besu
   besu:
-    image: hyperledger/besu:latest
+    image: hyperledger/besu:24.8.0
     user: 0:0
     volumes:
       - besu_data:/var/besu:rw

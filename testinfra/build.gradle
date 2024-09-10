@@ -16,7 +16,7 @@
 task besuBootstrapTool(type: Exec) {
     executable "docker"
     args "build"
-    args "-t", "paladin/besu_bootstrap"
+    args "-t", "paladin/besu_bootstrap:local"
     args "-f", "besu_bootstrap/Dockerfile"
     args "."
 }
@@ -35,7 +35,7 @@ task stopTestInfra(type: DockerCompose) {
 
 task removeBesuBootstrapTool(type: Exec, dependsOn: stopTestInfra) {
     executable "docker"
-    args "rmi", "-f", "paladin/besu_bootstrap"
+    args "rmi", "-f", "paladin/besu_bootstrap:local"
     errorOutput OutputStream.nullOutputStream()
     ignoreExitValue true
 }
