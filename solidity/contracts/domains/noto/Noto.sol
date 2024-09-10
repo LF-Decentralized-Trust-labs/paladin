@@ -52,13 +52,14 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
         _;
     }
 
-    constructor(bytes32 transactionId, address domain, address notary, bytes memory data) EIP712("noto", "0.0.1") {
+    constructor(
+        bytes32 transactionId,
+        address domain,
+        address notary,
+        bytes memory data
+    ) EIP712("noto", "0.0.1") {
         _notary = notary;
-        emit PaladinNewSmartContract_V0(
-            transactionId,
-            domain,
-            data
-        );
+        emit PaladinNewSmartContract_V0(transactionId, domain, data);
     }
 
     /// @dev query whether a TXO is currently in the unspent list
@@ -92,9 +93,13 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
      *
      * Emits a {UTXOApproved} event.
      */
-    function _approve(address delegate, bytes32 txhash) internal {
+    function _approve(
+        address delegate,
+        bytes32 txhash,
+        bytes memory signature
+    ) internal {
         _approvals[txhash].delegate = delegate;
-        emit UTXOApproved(delegate, txhash);
+        emit UTXOApproved(delegate, txhash, signature);
     }
 
     /**
@@ -109,6 +114,7 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
     function approvedTransfer(
         bytes32[] memory inputs,
         bytes32[] memory outputs,
+        bytes memory signature,
         bytes memory data
     ) public {
         bytes32 txhash = _buildTXHash(inputs, outputs, data);
@@ -120,7 +126,7 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
             );
         }
 
-        _transfer(inputs, outputs, data);
+        _transfer(inputs, outputs, signature, data);
 
         delete _approvals[txhash];
     }
@@ -156,6 +162,7 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
     function _transfer(
         bytes32[] memory inputs,
         bytes32[] memory outputs,
+        bytes memory signature,
         bytes memory data
     ) internal {
         // Check the inputs are all existing unspent ids
@@ -174,15 +181,16 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
             _unspent[outputs[i]] = true;
         }
 
-        emit UTXOTransfer(inputs, outputs, data);
+        emit UTXOTransfer(inputs, outputs, signature, data);
     }
 
     function mint(
         bytes32[] memory outputs,
+        bytes memory signature,
         bytes memory data
     ) external virtual onlyNotary {
         bytes32[] memory inputs;
-        _transfer(inputs, outputs, data);
+        _transfer(inputs, outputs, "", data);
     }
 
     function transfer(
@@ -191,7 +199,7 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
         bytes memory signature,
         bytes memory data
     ) external virtual onlyNotary {
-        _transfer(inputs, outputs, data);
+        _transfer(inputs, outputs, signature, data);
     }
 
     function approve(
@@ -199,6 +207,6 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
         bytes32 txhash,
         bytes memory signature
     ) external virtual onlyNotary {
-        _approve(delegate, txhash);
+        _approve(delegate, txhash, signature);
     }
 }

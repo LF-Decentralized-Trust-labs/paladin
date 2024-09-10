@@ -32,7 +32,7 @@ type transferHandler struct {
 	noto *Noto
 }
 
-func (h *transferHandler) ValidateParams(params string) (interface{}, error) {
+func (h *transferHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
 	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
@@ -266,7 +266,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "transfer",
+			FunctionName: tx.FunctionABI.Name,
 			ParamsJson:   string(paramsJSON),
 		},
 	}, nil
