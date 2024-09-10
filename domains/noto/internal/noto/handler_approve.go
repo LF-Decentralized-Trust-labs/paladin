@@ -44,7 +44,7 @@ func (h *approveHandler) ValidateParams(ctx context.Context, params string) (int
 	if err := json.Unmarshal([]byte(params), &approveParams); err != nil {
 		return nil, err
 	}
-	_, err := h.decodeTransfer(context.Background(), approveParams.Call)
+	_, err := h.decodeTransferCall(context.Background(), approveParams.Call)
 	if err != nil {
 		return nil, err
 	}
@@ -62,17 +62,35 @@ func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.(*types.ApproveParams)
-	transferParams, err := h.decodeTransfer(ctx, params.Call)
+func (h *approveHandler) decodeTransferCall(ctx context.Context, encodedCall []byte) (*ApprovedTransferParams, error) {
+	approvedTransfer := h.noto.contract.ABI.Functions()["approvedTransfer"]
+	if approvedTransfer == nil {
+		return nil, fmt.Errorf("could not find approvedTransfer method")
+	}
+	paramsJSON, err := decodeParams(ctx, approvedTransfer, encodedCall)
 	if err != nil {
 		return nil, err
 	}
-	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
+	var params ApprovedTransferParams
+	err = json.Unmarshal(paramsJSON, &params)
+	return &params, err
+}
+
+func (h *approveHandler) encodeTransfer(ctx context.Context, tx *types.ParsedTransaction, params *types.ApproveParams) (ethtypes.HexBytes0xPrefix, error) {
+	transferParams, err := h.decodeTransferCall(ctx, params.Call)
+	if err != nil {
+		return nil, err
+	}
+	return h.noto.encodeTransferMasked(ctx,
 		tx.ContractAddress,
 		transferParams.Inputs,
 		transferParams.Outputs,
 		transferParams.Data)
+}
+
+func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.ApproveParams)
+	encodedTransfer, err := h.encodeTransfer(ctx, tx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -105,21 +123,13 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 
 func (h *approveHandler) validateSenderSignature(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) error {
 	params := tx.Params.(*types.ApproveParams)
-	transferParams, err := h.decodeTransfer(ctx, params.Call)
+	encodedTransfer, err := h.encodeTransfer(ctx, tx, params)
 	if err != nil {
 		return err
 	}
 	signature := domain.FindAttestation("sender", req.Signatures)
 	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
-	}
-	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
-		tx.ContractAddress,
-		transferParams.Inputs,
-		transferParams.Outputs,
-		transferParams.Data)
-	if err != nil {
-		return err
 	}
 	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, signature.Payload)
 	if err != nil {
@@ -148,31 +158,9 @@ func decodeParams(ctx context.Context, abi *abi.Entry, encodedCall []byte) ([]by
 	return tktypes.StandardABISerializer().SerializeJSON(callData)
 }
 
-func (h *approveHandler) decodeTransfer(ctx context.Context, encodedCall []byte) (*ApprovedTransferParams, error) {
-	approvedTransfer := h.noto.contract.ABI.Functions()["approvedTransfer"]
-	if approvedTransfer == nil {
-		return nil, fmt.Errorf("could not find approvedTransfer method")
-	}
-	paramsJSON, err := decodeParams(ctx, approvedTransfer, encodedCall)
-	if err != nil {
-		return nil, err
-	}
-	var params ApprovedTransferParams
-	err = json.Unmarshal(paramsJSON, &params)
-	return &params, err
-}
-
 func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	params := tx.Params.(*types.ApproveParams)
-	transferParams, err := h.decodeTransfer(ctx, params.Call)
-	if err != nil {
-		return nil, err
-	}
-	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
-		tx.ContractAddress,
-		transferParams.Inputs,
-		transferParams.Outputs,
-		transferParams.Data)
+	encodedTransfer, err := h.encodeTransfer(ctx, tx, params)
 	if err != nil {
 		return nil, err
 	}
