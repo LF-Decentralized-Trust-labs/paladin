@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -109,7 +110,7 @@ func TestPluginRunBadMessages(t *testing.T) {
 			MessageType: prototk.Header_REQUEST_FROM_PLUGIN,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// 2... missing a correlation id
 	err = stream.Send(&prototk.DomainMessage{
 		Header: &prototk.Header{
@@ -117,7 +118,7 @@ func TestPluginRunBadMessages(t *testing.T) {
 			MessageType: prototk.Header_RESPONSE_TO_PLUGIN,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// 3... an unknown correlation id
 	anotherID := uuid.NewString()
 	err = stream.Send(&prototk.DomainMessage{
@@ -127,7 +128,7 @@ func TestPluginRunBadMessages(t *testing.T) {
 			CorrelationId: &anotherID,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// 4... the one we want!
 	correctID := reqID.String()
 	err = stream.Send(&prototk.DomainMessage{
@@ -137,10 +138,10 @@ func TestPluginRunBadMessages(t *testing.T) {
 			CorrelationId: &correctID,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check we are completed
 	msg, err := req.Wait()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, correctID, *msg.Header().CorrelationId)
 }

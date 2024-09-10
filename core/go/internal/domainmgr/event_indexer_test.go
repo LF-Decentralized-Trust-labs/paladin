@@ -21,9 +21,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -43,13 +44,13 @@ func TestEventIndexingWithDB(t *testing.T) {
 	defer done()
 
 	deployTX := uuid.New()
-	contractAddr := types.EthAddress(types.RandBytes(20))
+	contractAddr := tktypes.EthAddress(tktypes.RandBytes(20))
 
 	txNotified := make(chan struct{})
 	go func() {
 		defer close(txNotified)
 		sc, err := dm.WaitForDeploy(ctx, deployTX)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, contractAddr, sc.Address())
 	}()
 
@@ -68,11 +69,11 @@ func TestEventIndexingWithDB(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
-					Data: types.RawJSON(`{
-						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+					Data: tktypes.RawJSON(`{
+						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
 						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"data": "0xfeedbeef"
 					}`),
@@ -81,13 +82,13 @@ func TestEventIndexingWithDB(t *testing.T) {
 		})
 		return err
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, pc)
 	pc()
 
 	// Lookup the instance against the domain
 	psc, err := dm.GetSmartContractByAddress(ctx, contractAddr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	dc := psc.(*domainContract)
 	assert.Equal(t, &PrivateSmartContract{
 		DeployTX:      deployTX,
@@ -102,7 +103,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 
 	// Get cached
 	psc2, err := dm.GetSmartContractByAddress(ctx, contractAddr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, psc, psc2)
 
 	<-txNotified
@@ -125,7 +126,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 			Events: []*blockindexer.EventWithData{
 				{
 					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
-					Data: types.RawJSON(`{
+					Data: tktypes.RawJSON(`{
 						 "data": "cannot parse this"
 					 }`),
 				},
@@ -133,7 +134,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 		})
 		return err
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -147,7 +148,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 	})
 	defer done()
 
-	contractAddr := types.EthAddress(types.RandBytes(20))
+	contractAddr := tktypes.EthAddress(tktypes.RandBytes(20))
 	deployTX := uuid.New()
 	err := dm.persistence.DB().Transaction(func(tx *gorm.DB) error {
 		_, err := dm.eventIndexer(ctx, tx, &blockindexer.EventDeliveryBatch{
@@ -162,11 +163,11 @@ func TestEventIndexingInsertError(t *testing.T) {
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
-						TransactionHash:  types.NewBytes32FromSlice(types.RandBytes(32)),
+						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
 						Signature:        eventSig_PaladinNewSmartContract_V0,
 					},
-					Data: types.RawJSON(`{
-						"txId": "` + types.Bytes32UUIDFirst16(deployTX).String() + `",
+					Data: tktypes.RawJSON(`{
+						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
 						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"data": "0xfeedbeef"
 					}`),

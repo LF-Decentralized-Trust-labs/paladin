@@ -21,12 +21,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -49,7 +50,7 @@ type mockPlugin[T any] struct {
 func (tp *mockPlugin[T]) Conf() *components.PluginConfig {
 	if tp.conf == nil {
 		tp.conf = &components.PluginConfig{
-			Type:    types.Enum[components.LibraryType](components.LibraryTypeCShared),
+			Type:    tktypes.Enum[components.LibraryType](components.LibraryTypeCShared),
 			Library: "/any/where",
 		}
 	}
@@ -62,17 +63,17 @@ func (tp *mockPlugin[T]) Run(grpcTarget, pluginId string) {
 	t := tp.t
 
 	conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
 	client := prototk.NewPluginControllerClient(conn)
 
 	stream, err := tp.connectFactory(context.Background(), client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if tp.preRegister != nil {
 		err = stream.Send(tp.preRegister(pluginId))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	regMsg := new(T)
 	header := tp.headerAccessor(regMsg)
@@ -80,7 +81,7 @@ func (tp *mockPlugin[T]) Run(grpcTarget, pluginId string) {
 	header.MessageId = uuid.New().String()
 	header.MessageType = prototk.Header_REGISTER
 	err = stream.Send(regMsg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Switch to stream conect
 	ctx := stream.Context()
@@ -88,7 +89,7 @@ func (tp *mockPlugin[T]) Run(grpcTarget, pluginId string) {
 		if tp.sendRequest != nil {
 			req := tp.sendRequest(pluginId)
 			err := stream.Send(req)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			tp.sendRequest = nil
 		}
 
@@ -119,7 +120,7 @@ func (tp *mockPlugin[T]) Run(grpcTarget, pluginId string) {
 			replyHeader.MessageType = prototk.Header_RESPONSE_FROM_PLUGIN
 			replyHeader.CorrelationId = &tp.headerAccessor(msg).MessageId
 			err := stream.Send(reply)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		case prototk.Header_RESPONSE_TO_PLUGIN, prototk.Header_ERROR_RESPONSE:
 			tp.handleResponse(msg)
 		}
@@ -139,6 +140,7 @@ func TestPluginRequestsError(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				sendRequest: func(domainID string) *prototk.DomainMessage {
@@ -186,6 +188,7 @@ func TestSenderErrorHandling(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 			},
@@ -229,6 +232,7 @@ func TestDomainRequestsBadResponse(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
@@ -274,6 +278,7 @@ func TestDomainRequestsErrorWithMessage(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
@@ -315,6 +320,7 @@ func TestDomainRequestsErrorNoMessage(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
@@ -357,6 +363,7 @@ func TestReceiveAfterTimeout(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {
@@ -399,6 +406,7 @@ func TestDomainSendBeforeRegister(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				preRegister: func(string) *prototk.DomainMessage {
@@ -431,6 +439,7 @@ func TestDomainSendDoubleRegister(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
@@ -466,6 +475,7 @@ func TestDomainRegisterWrongID(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				preRegister: func(domainID string) *prototk.DomainMessage {
@@ -502,6 +512,7 @@ func TestDomainSendResponseWrongID(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				customResponses: func(req *prototk.DomainMessage) []*prototk.DomainMessage {

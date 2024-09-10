@@ -25,7 +25,8 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type ABIFunctionClient interface {
@@ -45,8 +46,8 @@ type ABIClient interface {
 	ABI() abi.ABI
 	Function(ctx context.Context, nameOrFullSig string) (_ ABIFunctionClient, err error)
 	MustFunction(nameOrFullSig string) ABIFunctionClient
-	Constructor(ctx context.Context, bytecode types.HexBytes) (_ ABIFunctionClient, err error)
-	MustConstructor(bytecode types.HexBytes) ABIFunctionClient
+	Constructor(ctx context.Context, bytecode tktypes.HexBytes) (_ ABIFunctionClient, err error)
+	MustConstructor(bytecode tktypes.HexBytes) ABIFunctionClient
 }
 
 type ABIFunctionRequestBuilder interface {
@@ -67,8 +68,8 @@ type ABIFunctionRequestBuilder interface {
 	BuildCallData() (err error)
 	Call() (err error)
 	CallJSON() (jsonData []byte, err error)
-	RawTransaction() (rawTX types.HexBytes, err error)
-	SignAndSend() (txHash *types.Bytes32, err error)
+	RawTransaction() (rawTX tktypes.HexBytes, err error)
+	SignAndSend() (txHash *tktypes.Bytes32, err error)
 }
 
 type BlockRef string
@@ -89,7 +90,7 @@ type abiClient struct {
 
 type abiFunctionClient struct {
 	ec          *ethClient
-	bytecode    types.HexBytes
+	bytecode    tktypes.HexBytes
 	signature   string
 	selector    []byte
 	abiEntry    *abi.Entry
@@ -174,7 +175,7 @@ func (ec *ethClient) ABIFunction(ctx context.Context, functionABI *abi.Entry) (f
 	return fc, err
 }
 
-func (abic *abiClient) Constructor(ctx context.Context, bytecode types.HexBytes) (ABIFunctionClient, error) {
+func (abic *abiClient) Constructor(ctx context.Context, bytecode tktypes.HexBytes) (ABIFunctionClient, error) {
 	ac := &abiFunctionClient{ec: abic.ec, bytecode: bytecode}
 	functionABI := abic.abi.Constructor()
 	if functionABI == nil {
@@ -188,7 +189,7 @@ func (abic *abiClient) Constructor(ctx context.Context, bytecode types.HexBytes)
 	return ac.functionCommon(ctx, functionABI)
 }
 
-func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode types.HexBytes) (fc ABIFunctionClient, err error) {
+func (ec *ethClient) ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode tktypes.HexBytes) (fc ABIFunctionClient, err error) {
 	a, err := ec.ABI(ctx, abi.ABI{constructorABI})
 	if err == nil {
 		fc, err = a.Constructor(ctx, bytecode)
@@ -221,7 +222,7 @@ func (abic *abiClient) MustFunction(nameOrFullSig string) ABIFunctionClient {
 	return ac
 }
 
-func (abic *abiClient) MustConstructor(bytecode types.HexBytes) ABIFunctionClient {
+func (abic *abiClient) MustConstructor(bytecode tktypes.HexBytes) ABIFunctionClient {
 	ac, err := abic.Constructor(context.Background(), bytecode)
 	if err != nil {
 		panic(err)
@@ -311,7 +312,7 @@ func (ac *abiFunctionRequestBuilder) BuildCallData() (err error) {
 			err = json.Unmarshal([]byte(input), &inputMap)
 		case []byte:
 			err = json.Unmarshal(input, &inputMap)
-		case types.RawJSON:
+		case tktypes.RawJSON:
 			err = json.Unmarshal(input, &inputMap)
 		case *abi.ComponentValue:
 			cv = input
@@ -372,12 +373,12 @@ func (ac *abiFunctionRequestBuilder) CallJSON() (jsonData []byte, err error) {
 	}
 	cv, err := ac.outputs.DecodeABIDataCtx(ac.ctx, resData, 0)
 	if err == nil {
-		jsonData, err = types.StandardABISerializer().SerializeJSONCtx(ac.ctx, cv)
+		jsonData, err = tktypes.StandardABISerializer().SerializeJSONCtx(ac.ctx, cv)
 	}
 	return jsonData, err
 }
 
-func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX types.HexBytes, err error) {
+func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX tktypes.HexBytes, err error) {
 	if ac.tx.Data == nil {
 		if err := ac.BuildCallData(); err != nil {
 			return nil, err
@@ -389,7 +390,7 @@ func (ac *abiFunctionRequestBuilder) RawTransaction() (rawTX types.HexBytes, err
 	return ac.ec.BuildRawTransaction(ac.ctx, ac.txVersion, *ac.fromStr, &ac.tx)
 }
 
-func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash *types.Bytes32, err error) {
+func (ac *abiFunctionRequestBuilder) SignAndSend() (txHash *tktypes.Bytes32, err error) {
 	rawTX, err := ac.RawTransaction()
 	if err != nil {
 		return nil, err

@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTransportTests(t *testing.T) (context.Context, *pluginExerciser[prototk.TransportMessage], *TransportAPIFunctions, TransportCallbacks, map[string]func(*prototk.TransportMessage), func()) {
@@ -71,7 +72,7 @@ func TestTransportCallback_GetTransportDetails(t *testing.T) {
 		}
 	}
 	_, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestTransportCallback_ReceiveMessage(t *testing.T) {
@@ -84,7 +85,7 @@ func TestTransportCallback_ReceiveMessage(t *testing.T) {
 		}
 	}
 	_, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestTransportFunction_ConfigureTransport(t *testing.T) {

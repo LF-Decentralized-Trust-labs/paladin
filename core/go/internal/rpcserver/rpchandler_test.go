@@ -25,8 +25,9 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRPCMessageBatch(t *testing.T) {
@@ -45,7 +46,7 @@ func TestRPCMessageBatch(t *testing.T) {
 		return "resultB", nil
 	}))
 
-	var jsonResponse types.RawJSON
+	var jsonResponse tktypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -64,7 +65,7 @@ func TestRPCMessageBatch(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `[
 		{
@@ -97,7 +98,7 @@ func TestRPCMessageBatchOneFails200WithError(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse types.RawJSON
+	var jsonResponse tktypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -116,7 +117,7 @@ func TestRPCMessageBatchOneFails200WithError(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `[
 		{
@@ -156,7 +157,7 @@ func TestRPCMessageBatchAllFail(t *testing.T) {
 		return "", fmt.Errorf("pop")
 	}))
 
-	var jsonResponse types.RawJSON
+	var jsonResponse tktypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`[
 			{
@@ -181,7 +182,7 @@ func TestRPCMessageBatchAllFail(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.JSONEq(t, `[
 		{
@@ -223,7 +224,7 @@ func TestRPCHandleBadDataEmptySpace(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, res.IsSuccess())
 	assert.Equal(t, int64(rpcbackend.RPCCodeInvalidRequest), jsonResponse.Error.Code)
 	assert.Regexp(t, "PD011000", jsonResponse.Error.Message)

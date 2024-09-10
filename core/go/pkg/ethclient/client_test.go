@@ -25,9 +25,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/pkg/proto"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolveKeyFail(t *testing.T) {
@@ -52,7 +53,7 @@ func TestResolveKeyFail(t *testing.T) {
 
 func TestCallFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -86,7 +87,7 @@ func TestGetBalance(t *testing.T) {
 	defer done()
 
 	balance, err := ec.HTTPClient().GetBalance(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754", "latest")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, balanceHexInt, balance)
 
 }
@@ -114,7 +115,7 @@ func TestGasPrice(t *testing.T) {
 	defer done()
 
 	gasPrice, err := ec.HTTPClient().GasPrice(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, gasPriceHexInt, gasPrice)
 
 }
@@ -142,7 +143,7 @@ func TestGasEstimate(t *testing.T) {
 	defer done()
 
 	gasLimit, err := ec.HTTPClient().GasEstimate(ctx, &ethsigner.Transaction{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, gasEstimateHexInt, gasLimit)
 
 }
@@ -169,7 +170,7 @@ func TestGetTransactionCount(t *testing.T) {
 	defer done()
 
 	txCount, err := ec.HTTPClient().GetTransactionCount(ctx, "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txCountHexUint, *txCount)
 
 }
@@ -238,7 +239,7 @@ func TestSignFail(t *testing.T) {
 
 func TestSendRawFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_sendRawTransaction: func(ctx context.Context, hbp types.HexBytes) (types.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, hbp tktypes.HexBytes) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -248,7 +249,7 @@ func TestSendRawFail(t *testing.T) {
 		Nonce:    ethtypes.NewHexInteger64(0),
 		GasLimit: ethtypes.NewHexInteger64(100000),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = ec.HTTPClient().SendRawTransaction(ctx, rawTx)
 	assert.Regexp(t, "pop", err)
@@ -275,7 +276,7 @@ func TestGetReceiptOkSuccess(t *testing.T) {
 	defer done()
 
 	receipt, err := ec.HTTPClient().GetTransactionReceipt(ctx, testTxHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, receipt.Success)
 	assert.Equal(t, int64(1988), receipt.BlockNumber.Int64())
@@ -299,7 +300,7 @@ func TestGetReceiptOkFailed(t *testing.T) {
 	defer done()
 
 	receipt, err := ec.HTTPClient().GetTransactionReceipt(ctx, testTxHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.False(t, receipt.Success)
 	assert.Contains(t, receipt.ExtraInfo.String(), "The stored value is too small")
@@ -320,7 +321,7 @@ func TestGetReceiptOkFailedMissingReason(t *testing.T) {
 	defer done()
 
 	receipt, err := ec.HTTPClient().GetTransactionReceipt(ctx, testTxHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.False(t, receipt.Success)
 	assert.Contains(t, receipt.ExtraInfo.String(), "PD011913")
@@ -344,7 +345,7 @@ func TestGetReceiptOkFailedCustomReason(t *testing.T) {
 	defer done()
 
 	receipt, err := ec.HTTPClient().GetTransactionReceipt(ctx, testTxHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.False(t, receipt.Success)
 	assert.Contains(t, receipt.ExtraInfo.String(), revertCustomHex.String())

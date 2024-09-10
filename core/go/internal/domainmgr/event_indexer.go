@@ -22,8 +22,8 @@ import (
 	_ "embed"
 
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -40,7 +40,7 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 			var parsedEvent event_PaladinNewSmartContract_V0
 			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
 			if parseErr != nil {
-				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, types.JSONString(ev))
+				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{

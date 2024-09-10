@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/utxo"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/types"
@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/signer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -60,7 +61,7 @@ func TestRegister(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	err := Register(context.Background(), config, registry)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(registry))
 }
 
@@ -70,7 +71,7 @@ func TestNewProver(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, prover.circuitsCache)
 	assert.NotNil(t, prover.provingKeysCache)
 }
@@ -93,7 +94,7 @@ func TestSnarkProve(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -118,9 +119,9 @@ func TestSnarkProve(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -139,19 +140,19 @@ func TestSnarkProve(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err := prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 34, len(res.Payload))
 }
 
@@ -161,7 +162,7 @@ func TestSnarkProveError(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -175,7 +176,7 @@ func TestSnarkProveError(t *testing.T) {
 		OutputOwners:     []string{"bob", "alice"},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -191,7 +192,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -208,7 +209,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -224,7 +225,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -233,7 +234,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		Common:    &pb.ProvingRequestCommon{},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -248,7 +249,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -264,7 +265,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -281,7 +282,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -299,7 +300,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -318,7 +319,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -333,7 +334,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return nil, nil, fmt.Errorf("bang!")
@@ -346,9 +347,9 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -371,7 +372,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -387,7 +388,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -399,9 +400,9 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -421,7 +422,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -437,7 +438,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -450,9 +451,9 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
 
-	salt1 := utxo.NewSalt()
+	salt1 := crypto.NewSalt()
 	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
-	salt2 := utxo.NewSalt()
+	salt2 := crypto.NewSalt()
 	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
 	inputCommitments := []string{input1.Text(16), input2.Text(16)}
 
@@ -471,12 +472,12 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       inputSalts,
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -492,12 +493,12 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 			InputSalts:       []string{"salt1", "salt2"},
 			InputOwner:       "alice/key0",
 			OutputValues:     outputValueInts,
-			OutputSalts:      []string{utxo.NewSalt().Text(16), utxo.NewSalt().Text(16)},
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
 			OutputOwners:     []string{bobPubKey, alicePubKey},
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,

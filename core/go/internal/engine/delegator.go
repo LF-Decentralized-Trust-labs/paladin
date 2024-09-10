@@ -28,7 +28,7 @@ func NewDelegator() enginespi.Delegator {
 type delegator struct {
 }
 
-// Delegate implements types.Delegator.
+// Delegate implements Delegator.
 func (p *delegator) Delegate(ctx context.Context, transactionId string, delegateNodeId string) error {
 	panic("unimplemented")
 }

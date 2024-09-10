@@ -19,16 +19,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type TransactionInputs struct {
 	Domain   string
 	From     string
-	To       types.EthAddress
+	To       tktypes.EthAddress
 	Function *abi.Entry
-	Inputs   types.RawJSON
+	Inputs   tktypes.RawJSON
 }
 
 type TransactionPreAssembly struct {
@@ -38,25 +38,25 @@ type TransactionPreAssembly struct {
 }
 
 type FullState struct {
-	ID     types.Bytes32
-	Schema types.Bytes32
-	Data   types.RawJSON
+	ID     tktypes.Bytes32
+	Schema tktypes.Bytes32
+	Data   tktypes.RawJSON
 }
 
 type EthTransfer struct {
-	To    types.EthAddress
+	To    tktypes.EthAddress
 	Value *ethtypes.HexInteger
 }
 
 type EthTransaction struct {
 	FunctionABI *abi.Entry
-	To          types.EthAddress
+	To          tktypes.EthAddress
 	Inputs      *abi.ComponentValue
 }
 
 type EthDeployTransaction struct {
 	ConstructorABI *abi.Entry
-	Bytecode       types.HexBytes
+	Bytecode       tktypes.HexBytes
 	Inputs         *abi.ComponentValue
 }
 
@@ -98,7 +98,7 @@ type PrivateContractDeploy struct {
 	// INPUTS: Items that come in from the submitter of the transaction to send to the constructor
 	ID     uuid.UUID // TODO: == idempotency key?
 	Domain string
-	Inputs types.RawJSON
+	Inputs tktypes.RawJSON
 
 	// ASSEMBLY PHASE
 	TransactionSpecification *prototk.DeployTransactionSpecification

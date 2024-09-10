@@ -24,7 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type ValueSet interface {
@@ -34,7 +34,7 @@ type ValueSet interface {
 	GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error)
 }
 
-type ResolvingValueSet map[string]types.RawJSON
+type ResolvingValueSet map[string]tktypes.RawJSON
 
 func (vs ResolvingValueSet) GetValue(ctx context.Context, fieldName string, resolver FieldResolver) (driver.Value, error) {
 	val, err := resolver.SQLValue(ctx, vs[fieldName])

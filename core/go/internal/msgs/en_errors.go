@@ -65,7 +65,6 @@ var (
 	MsgComponentRegistryStartError     = ffe("PD010022", "Error starting registry manager")
 
 	// States PD0101XX
-	MsgStateInvalidHex                = ffe("PD010100", "Invalid hex: %s")
 	MsgStateInvalidLength             = ffe("PD010101", "Invalid hash len expected=%d actual=%d")
 	MsgStateInvalidABIParam           = ffe("PD010102", "Invalid ABI parameter")
 	MsgStateInvalidSchemaType         = ffe("PD010103", "Invalid state schema type: %s")
@@ -139,15 +138,6 @@ var (
 	MsgHTTPServerMissingPort        = ffe("PD010801", "HTTP server port must be specified for '%s'")
 	MsgHTTPServerNoWSUpgradeSupport = ffe("PD010802", "HTTP server does not support WebSocket upgrade (%T)")
 
-	// TLS PD0198XX
-	MsgTLSInvalidCAFile             = ffe("PD010900", "Invalid CA certificates file")
-	MsgTLSConfigFailed              = ffe("PD010901", "Failed to initialize TLS configuration")
-	MsgTLSInvalidKeyPairFiles       = ffe("PD010902", "Invalid certificate and key pair files")
-	MsgTLSInvalidTLSDnMatcherAttr   = ffe("PD010903", "Unknown DN attribute '%s'")
-	MsgTLSInvalidTLSDnMatcherRegexp = ffe("PD010904", "Invalid regexp '%s' for requiredDNAttributes[%s]: %s")
-	MsgTLSInvalidTLSDnChain         = ffe("PD010905", "Cannot match subject distinguished name as cert chain is not verified")
-	MsgTLSInvalidTLSDnMismatch      = ffe("PD010906", "Certificate subject does not meet requirements")
-
 	// JSON/RPC PD0110XX
 	MsgJSONRPCInvalidRequest      = ffe("PD011000", "Invalid JSON/RPC request data")
 	MsgJSONRPCMissingRequestID    = ffe("PD011001", "Invalid JSON/RPC request. Must set request ID")
@@ -155,14 +145,6 @@ var (
 	MsgJSONRPCIncorrectParamCount = ffe("PD011003", "method %s requires %d params (supplied=%d)")
 	MsgJSONRPCInvalidParam        = ffe("PD011004", "method %s parameter %d invalid: %s")
 	MsgJSONRPCResultSerialization = ffe("PD011005", "method %s result serialization failed: %s")
-
-	// Types PD0111XX
-	MsgTypesUnmarshalNil                  = ffe("PD011100", "UnmarshalJSON on nil pointer")
-	MsgTypesScanFail                      = ffe("PD011101", "Unable to scan type %T into type %T")
-	MsgTypesEnumValueInvalid              = ffe("PD011102", "Value must be one of %s")
-	MsgTypesABIDefNotInBothStructs        = ffe("PD011103", "ABI is not equal due to mismatch on: %s")
-	MsgTypesInvalidNameSafeCharAlphaBoxed = ffe("PD011106", "Field '%s' must be 1-%d characters, including alphanumerics (a-zA-Z0-9), dot (.), dash (-) and underscore (_), and must start/end in an alphanumeric: %q")
-	MsgTypesPrivateIdentityLocatorInvalid = ffe("PD011107", "Locator string %s is invalid")
 
 	// Plugin controller PD0112XX
 	MsgPluginLoaderUUIDError   = ffe("PD011200", "Plugin loader UUID incorrect")
@@ -314,6 +296,7 @@ var (
 	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
 	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
+	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound = ffe("PD012100", "No entries found for node '%s'")

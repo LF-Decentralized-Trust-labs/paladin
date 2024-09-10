@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSQLMockProvider(t *testing.T) {
 	m, err := NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, m.P.DB())
 	assert.Equal(t, "sqlmock", (&SQLMockProvider{}).DBName())
 	_, err = (&SQLMockProvider{}).GetMigrationDriver(nil)

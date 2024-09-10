@@ -29,15 +29,16 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/rpcclient"
-	"github.com/kaleido-io/paladin/core/internal/tls"
 	"github.com/kaleido-io/paladin/core/mocks/rpcbackendmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tlsconf"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var testEventABIJSON = ([]byte)(`[
@@ -103,7 +104,7 @@ func testParseABI(abiJSON []byte) abi.ABI {
 func newTestBlockIndexer(t *testing.T) (context.Context, *blockIndexer, *rpcbackendmocks.WebSocketRPCClient, func()) {
 	return newTestBlockIndexerConf(t, &Config{
 		CommitBatchSize: confutil.P(1), // makes testing simpler
-		FromBlock:       types.RawJSON(`0`),
+		FromBlock:       tktypes.RawJSON(`0`),
 	})
 }
 
@@ -113,11 +114,11 @@ func newTestBlockIndexerConf(t *testing.T, config *Config) (context.Context, *bl
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	p, pDone, err := persistence.NewUnitTestPersistence(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	blockListener, mRPC := newTestBlockListenerConf(t, ctx, config)
 	bi, err := newBlockIndexer(ctx, config, p, blockListener)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	bi.utBatchNotify = make(chan *blockWriterBatch)
 	return ctx, bi, mRPC, func() {
 		r := recover()
@@ -134,12 +135,12 @@ func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockI
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 
 	bi, err := newBlockIndexer(ctx, config, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return ctx, bi, mRPC, p, done
 
@@ -151,45 +152,45 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 	for i := 0; i < l; i++ {
 		var contractAddress, to *ethtypes.Address0xHex
 		if i == 0 {
-			contractAddress = ethtypes.MustNewAddress(types.RandHex(20))
+			contractAddress = ethtypes.MustNewAddress(tktypes.RandHex(20))
 		} else {
-			to = ethtypes.MustNewAddress(types.RandHex(20))
+			to = ethtypes.MustNewAddress(tktypes.RandHex(20))
 		}
 		blocks[i] = &BlockInfoJSONRPC{
 			Number: ethtypes.HexUint64(i),
-			Hash:   ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+			Hash:   ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
 		}
-		txHash := ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+		txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 		eventBData, err := testABI[1].Inputs.EncodeABIDataValues(map[string]interface{}{
 			"intParam1": i + 1000000,
 			"strParam2": fmt.Sprintf("event_b_in_block_%d", i),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		eventCData, err := testABI[2].Inputs.EncodeABIDataValues(map[string]interface{}{
 			"structParam1": map[string]interface{}{
 				"strField":      fmt.Sprintf("event_c_in_block_%d", i),
 				"intArrayField": []int{i + 1000, i + 2000, i + 3000, i + 4000, i + 5000},
 			},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		receipts[blocks[i].Hash.String()] = []*TXReceiptJSONRPC{
 			{
 				TransactionHash: txHash,
-				From:            ethtypes.MustNewAddress(types.RandHex(20)),
+				From:            ethtypes.MustNewAddress(tktypes.RandHex(20)),
 				To:              to,
 				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
 				BlockHash:       blocks[i].Hash,
 				Status:          ethtypes.NewHexInteger64(1),
 				Logs: []*LogJSONRPC{
-					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}},
-					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventBData},
-					{Address: ethtypes.MustNewAddress(types.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))}, Data: eventCData},
+					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}},
+					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}, Data: eventBData},
+					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}, Data: eventCData},
 				},
 			},
 		}
 		if i == 0 {
-			blocks[i].ParentHash = ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32))
+			blocks[i].ParentHash = ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 		} else {
 			blocks[i].ParentHash = blocks[i-1].Hash
 		}
@@ -255,17 +256,17 @@ func TestNewBlockIndexerBadTLS(t *testing.T) {
 	_, err := NewBlockIndexer(context.Background(), &Config{}, &rpcclient.WSConfig{
 		HTTPConfig: rpcclient.HTTPConfig{
 			URL: "wss://localhost:8546",
-			TLS: tls.Config{
+			TLS: tlsconf.Config{
 				CAFile: t.TempDir(),
 			},
 		},
 	}, nil)
-	assert.Regexp(t, "PD010901", err)
+	assert.Regexp(t, "PD020401", err)
 }
 
 func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 
@@ -273,15 +274,15 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 
 	cancelledCtx, cancelCtx := context.WithCancel(context.Background())
 	bi, err := NewBlockIndexer(cancelledCtx, &Config{}, wsConf, p.P)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cancelCtx()
 
 	// Start will get error, but return due to cancelled context
 	err = bi.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bi.(*blockIndexer).processorDone)
 
-	assert.NoError(t, p.Mock.ExpectationsWereMet())
+	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
 func TestBlockIndexerCatchUpToHeadFromZeroNoConfirmations(t *testing.T) {
@@ -338,18 +339,18 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 
 		// Get the block
 		indexedBlock, err := bi.GetIndexedBlockByNumber(ctx, blocks[i].Number.Uint64())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, blocks[i].Hash.String(), indexedBlock.Hash.String())
 
 		// Get the transaction
-		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, types.Bytes32(receipts[blocks[i].Hash.String()][0].TransactionHash))
-		assert.NoError(t, err)
+		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(receipts[blocks[i].Hash.String()][0].TransactionHash))
+		require.NoError(t, err)
 		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTX.Hash.String())
 
 		// Get the events
 		tx0 := receipts[blocks[i].Hash.String()][0]
-		txEvents, err := bi.GetTransactionEventsByHash(ctx, types.Bytes32(tx0.TransactionHash))
-		assert.NoError(t, err)
+		txEvents, err := bi.GetTransactionEventsByHash(ctx, tktypes.Bytes32(tx0.TransactionHash))
+		require.NoError(t, err)
 		assert.Len(t, txEvents, 3)
 		assert.Equal(t, topicA.String(), txEvents[0].Signature.String())
 		assert.Equal(t, topicB.String(), txEvents[1].Signature.String())
@@ -357,25 +358,25 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		if i == 0 {
 			assert.Nil(t, tx0.To)
 			assert.NotNil(t, tx0.ContractAddress)
-			assert.NotEqual(t, types.EthAddress{}, *tx0.ContractAddress)
+			assert.NotEqual(t, tktypes.EthAddress{}, *tx0.ContractAddress)
 		} else {
 			assert.Nil(t, tx0.ContractAddress)
 			assert.NotNil(t, tx0.To)
-			assert.NotEqual(t, types.EthAddress{}, *tx0.To)
+			assert.NotEqual(t, tktypes.EthAddress{}, *tx0.To)
 		}
 		assert.NotNil(t, tx0.From)
-		assert.NotEqual(t, types.EthAddress{}, *tx0.From)
+		assert.NotEqual(t, tktypes.EthAddress{}, *tx0.From)
 
 		// Get the transactions per block
 		indexedTXs, err := bi.GetBlockTransactionsByNumber(ctx, int64(blocks[i].Number))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, indexedTXs, 1)
 		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTXs[0].Hash.String())
 	}
 
 	// Get the first unconfirmed block
 	indexedBlock, err := bi.GetIndexedBlockByNumber(ctx, blocks[len(blocks)-bi.requiredConfirmations+1].Number.Uint64())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, indexedBlock)
 
 	// Use small pages to list all the events
@@ -383,7 +384,7 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 	lastIndex := -1
 	for i := 0; i < 15; i += 5 {
 		page, err := bi.ListTransactionEvents(ctx, lastBlock, lastIndex, 5, true, true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, page, 5)
 		for i2 := 0; i2 < 5; i2++ {
 			// There's one transaction per block, and 3 events per transaction
@@ -423,7 +424,7 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	bi.startOrReset()
 
 	bh, err := bi.GetBlockListenerHeight(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, uint64(5), bh)
 
 	// Notify starting at block 5
@@ -441,7 +442,7 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	}
 
 	ch, err := bi.GetConfirmedBlockHeight(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, uint64(9), ch)
 }
 
@@ -500,7 +501,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 
 	bi.persistence.DB().Table("indexed_blocks").Create(&IndexedBlock{
 		Number: 12345,
-		Hash:   types.MustParseBytes32(types.RandHex(32)),
+		Hash:   tktypes.MustParseBytes32(tktypes.RandHex(32)),
 	})
 
 	bi.startOrReset() // do not start block listener
@@ -647,8 +648,8 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 
 	randBlock := &BlockInfoJSONRPC{
 		Number:     3,
-		Hash:       ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
-		ParentHash: ethtypes.MustNewHexBytes0xPrefix(types.RandHex(32)),
+		Hash:       ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
+		ParentHash: ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
 	}
 
 	sentRandom := false
@@ -736,56 +737,56 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 	defer done()
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`"pending"`),
+		FromBlock: tktypes.RawJSON(`"pending"`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300.*pending", err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err := newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`"latest"`),
+		FromBlock: tktypes.RawJSON(`"latest"`),
 	}, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`null`),
+		FromBlock: tktypes.RawJSON(`null`),
 	}, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{}, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`123`),
+		FromBlock: tktypes.RawJSON(`123`),
 	}, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ethtypes.HexUint64(123), *bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`"0x7b"`),
+		FromBlock: tktypes.RawJSON(`"0x7b"`),
 	}, p.P, bl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ethtypes.HexUint64(123), *bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`!!! bad JSON`),
+		FromBlock: tktypes.RawJSON(`!!! bad JSON`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300", err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	_, err = newBlockIndexer(ctx, &Config{
-		FromBlock: types.RawJSON(`false`),
+		FromBlock: tktypes.RawJSON(`false`),
 	}, p.P, bl)
 	assert.Regexp(t, "PD011300", err)
 }
@@ -795,7 +796,7 @@ func TestBlockIndexerBadStream(t *testing.T) {
 	defer done()
 
 	p, err := mockpersistence.NewSQLMockProvider()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{
 		"id", "abi",
@@ -813,13 +814,13 @@ func TestGetIndexedTransactionByHashErrors(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	res, err := bi.GetIndexedTransactionByHash(ctx, types.Bytes32(types.RandBytes(32)))
-	assert.NoError(t, err)
+	res, err := bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
+	require.NoError(t, err)
 	assert.Nil(t, res)
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err = bi.GetIndexedTransactionByHash(ctx, types.Bytes32(types.RandBytes(32)))
+	_, err = bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
 	assert.Regexp(t, "pop", err)
 
 }
@@ -831,12 +832,12 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	blocks, receipts := testBlockArray(t, 5)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
-	txHash := types.Bytes32(receipts[blocks[2].Hash.String()][0].TransactionHash)
+	txHash := tktypes.Bytes32(receipts[blocks[2].Hash.String()][0].TransactionHash)
 	gotTX := make(chan struct{})
 	go func() {
 		defer close(gotTX)
 		tx, err := bi.WaitForTransaction(ctx, txHash)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 		assert.Equal(t, txHash, tx.Hash)
 	}()
@@ -857,7 +858,7 @@ func TestBlockIndexerWaitForTransaction(t *testing.T) {
 	<-gotTX
 
 	tx, err := bi.WaitForTransaction(ctx, txHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, TXResult_SUCCESS, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 	assert.Equal(t, txHash, tx.Hash)
@@ -872,12 +873,12 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 
 	receipt := receipts[blocks[2].Hash.String()][0]
 	receipt.Status = ethtypes.NewHexInteger64(0) // reverted
-	txHash := types.Bytes32(receipt.TransactionHash)
+	txHash := tktypes.Bytes32(receipt.TransactionHash)
 	gotTX := make(chan struct{})
 	go func() {
 		defer close(gotTX)
 		tx, err := bi.WaitForTransaction(ctx, txHash)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 		assert.Equal(t, txHash, tx.Hash)
 	}()
@@ -898,7 +899,7 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 	<-gotTX
 
 	tx, err := bi.WaitForTransaction(ctx, txHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, TXResult_FAILURE, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 	assert.Equal(t, txHash, tx.Hash)
@@ -911,7 +912,7 @@ func TestWaitForTransactionErrorCases(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := bi.WaitForTransaction(ctx, types.Bytes32(types.RandBytes(32)))
+	_, err := bi.WaitForTransaction(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
 	assert.Regexp(t, "pop", err)
 
 }

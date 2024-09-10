@@ -26,9 +26,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -39,7 +40,7 @@ type eventStream struct {
 	bi             *blockIndexer
 	definition     *EventStream
 	signatures     map[string]bool
-	signatureList  []types.Bytes32
+	signatureList  []tktypes.Bytes32
 	eventABIs      []*abi.Entry
 	batchSize      int
 	batchTimeout   time.Duration
@@ -105,7 +106,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	def.Type = EventStreamTypeInternal.Enum()
 
 	// Validate the name
-	if err := types.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, types.DefaultNameMaxLen, "name"); err != nil {
+	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, def.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +126,7 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 	if len(existing) > 0 {
 		// The event definitions in both events must be identical
 		// We do not support changing the ABI after creation
-		if err := types.ABIsMustMatch(ctx, existing[0].ABI, def.ABI); err != nil {
+		if err := tktypes.ABIsMustMatch(ctx, existing[0].ABI, def.ABI); err != nil {
 			return nil, err
 		}
 		def.ID = existing[0].ID
@@ -202,7 +203,7 @@ func (bi *blockIndexer) initEventStream(definition *EventStream) *eventStream {
 	// Calculate all the signatures we require
 	for _, abiEntry := range definition.ABI {
 		if abiEntry.Type == abi.Event {
-			sig := types.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
+			sig := tktypes.NewBytes32FromSlice(abiEntry.SignatureHashBytes())
 			sigStr := sig.String()
 			es.eventABIs = append(es.eventABIs, abiEntry)
 			if _, dup := es.signatures[sigStr]; !dup {
@@ -593,57 +594,9 @@ func (es *eventStream) processCatchupEventPage(checkpointBlock int64, catchUpToB
 }
 
 func (es *eventStream) queryTransactionEvents(tx ethtypes.HexBytes0xPrefix, events []*EventWithData, done chan error) {
-	var err error
-	defer func() {
-		done <- err
-	}()
-
-	// Get the TX receipt with all the logs
-	var receipt *TXReceiptJSONRPC
-	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
-		log.L(es.ctx).Debugf("Fetching transaction receipt by hash %s", tx)
-		rpcErr := es.bi.wsConn.CallRPC(es.ctx, &receipt, "eth_getTransactionReceipt", tx)
-		if rpcErr != nil {
-			return true, rpcErr.Error()
-		}
-		if receipt == nil {
-			return true, i18n.NewError(es.ctx, msgs.MsgBlockIndexerConfirmedReceiptNotFound, tx)
-		}
-		return false, nil
-	})
-	if err != nil {
-		return
-	}
-
-	// Spin through the logs to find the corresponding result entries
-	for _, l := range receipt.Logs {
-		for _, e := range events {
-			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
-				es.matchLog(l, e)
-			}
-		}
-	}
+	done <- es.bi.queryTransactionEvents(es.ctx, es.eventABIs, tx, events)
 }
 
 func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
-	// This is one that matches our signature, but we need to check it against our ABI list.
-	// We stop at the first entry that parses it, and it's perfectly fine and expected that
-	// none will (because Eth signatures are not precise enough to distinguish events -
-	// particularly the "indexed" settings on parameters)
-	for _, abiEntry := range es.eventABIs {
-		cv, err := abiEntry.DecodeEventDataCtx(es.ctx, in.Topics, in.Data)
-		if err == nil {
-			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
-			out.Data, err = types.StandardABISerializer().SerializeJSONCtx(es.ctx, cv)
-		}
-		if err == nil {
-			log.L(es.ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
-			if in.Address != nil {
-				out.Address = types.EthAddress(*in.Address)
-			}
-			return
-		} else {
-			log.L(es.ctx).Debugf("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
-		}
-	}
+	es.bi.matchLog(es.ctx, es.eventABIs, in, out)
 }

@@ -20,22 +20,23 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimestampField(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := TimestampField("test").SQLValue(ctx, (types.RawJSON)(`!json`))
+	_, err := TimestampField("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = TimestampField("test").SQLValue(ctx, (types.RawJSON)(`"not a valid timestamp"`))
+	_, err = TimestampField("test").SQLValue(ctx, (tktypes.RawJSON)(`"not a valid timestamp"`))
 	assert.Regexp(t, "FF00136", err)
 
-	nv, err := TimestampField("test").SQLValue(ctx, (types.RawJSON)(`null`))
-	assert.NoError(t, err)
+	nv, err := TimestampField("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, TimestampField("test").SupportsLIKE())

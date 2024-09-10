@@ -22,7 +22,7 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Uint256Field string
@@ -35,7 +35,7 @@ func (sf Uint256Field) SupportsLIKE() bool {
 	return false
 }
 
-func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue types.RawJSON) (driver.Value, error) {
+func (sf Uint256Field) SQLValue(ctx context.Context, jsonValue tktypes.RawJSON) (driver.Value, error) {
 	if jsonValue.IsNil() {
 		return nil, nil
 	}

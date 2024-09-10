@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +34,7 @@ func TestPersistStateMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.PersistState(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), nil)
+	_, err := ss.PersistState(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), nil)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -42,7 +42,7 @@ func TestPersistStateInvalidState(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	schemaID := tktypes.Bytes32Keccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
@@ -58,7 +58,7 @@ func TestGetStateMissing(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.GetState(ctx, "domain1", types.Bytes32Keccak(([]byte)("state1")).String(), true, false)
+	_, err := ss.GetState(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("state1")).String(), true, false)
 	assert.Regexp(t, "PD010112", err)
 }
 
@@ -67,7 +67,7 @@ func TestGetStateBadID(t *testing.T) {
 	defer done()
 
 	_, err := ss.GetState(ctx, "domain1", "bad id", true, false)
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 }
 
 func TestMarkConfirmedBadID(t *testing.T) {
@@ -75,7 +75,7 @@ func TestMarkConfirmedBadID(t *testing.T) {
 	defer done()
 
 	err := ss.MarkConfirmed(ctx, "domain1", "bad id", uuid.New())
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 }
 
 func TestMarkSpentBadID(t *testing.T) {
@@ -83,7 +83,7 @@ func TestMarkSpentBadID(t *testing.T) {
 	defer done()
 
 	err := ss.MarkSpent(ctx, "domain1", "bad id", uuid.New())
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 }
 
 func TestMarkLockedBadID(t *testing.T) {
@@ -91,7 +91,7 @@ func TestMarkLockedBadID(t *testing.T) {
 	defer done()
 
 	err := ss.MarkLocked(ctx, "domain1", "bad id", uuid.New(), false, false)
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 }
 
 func TestFindStatesMissingSchema(t *testing.T) {
@@ -100,7 +100,7 @@ func TestFindStatesMissingSchema(t *testing.T) {
 
 	db.ExpectQuery("SELECT").WillReturnRows(db.NewRows([]string{}))
 
-	_, err := ss.FindStates(ctx, "domain1", types.Bytes32Keccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
+	_, err := ss.FindStates(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("schema1")).String(), &filters.QueryJSON{}, "all")
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -108,7 +108,7 @@ func TestFindStatesBadQuery(t *testing.T) {
 	ctx, ss, _, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	schemaID := tktypes.Bytes32Keccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		definition: &abi.Parameter{},
@@ -131,7 +131,7 @@ func TestFindStatesFail(t *testing.T) {
 	ctx, ss, db, done := newDBMockStateStore(t)
 	defer done()
 
-	schemaID := types.Bytes32Keccak(([]byte)("schema1"))
+	schemaID := tktypes.Bytes32Keccak(([]byte)("schema1"))
 	cacheKey := schemaCacheKey("domain1", schemaID)
 	ss.abiSchemaCache.Set(cacheKey, &abiSchema{
 		SchemaPersisted: &SchemaPersisted{ID: schemaID},
@@ -146,7 +146,7 @@ func TestFindStatesFail(t *testing.T) {
 				GreaterThan: []*filters.OpSingleVal{
 					{Op: filters.Op{
 						Field: ".created",
-					}, Value: types.RawJSON(fmt.Sprintf("%d", time.Now().UnixNano()))},
+					}, Value: tktypes.RawJSON(fmt.Sprintf("%d", time.Now().UnixNano()))},
 				},
 			},
 		},

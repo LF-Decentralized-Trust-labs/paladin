@@ -26,9 +26,10 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type orchestratorDepencyMocks struct {
@@ -44,9 +45,9 @@ type orchestratorDepencyMocks struct {
 	endorsementGatherer  *enginemocks.EndorsementGatherer
 }
 
-func newOrchestratorForTesting(t *testing.T, ctx context.Context, domainAddress *types.EthAddress) (*Orchestrator, *orchestratorDepencyMocks) {
+func newOrchestratorForTesting(t *testing.T, ctx context.Context, domainAddress *tktypes.EthAddress) (*Orchestrator, *orchestratorDepencyMocks) {
 	if domainAddress == nil {
-		domainAddress = types.MustEthAddress(types.RandHex(20))
+		domainAddress = tktypes.MustEthAddress(tktypes.RandHex(20))
 	}
 
 	mocks := &orchestratorDepencyMocks{
@@ -197,7 +198,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 	defer cancel()
 	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
 	testOc.Stop()
 	<-ocDone
@@ -210,7 +211,7 @@ func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	<-ocDone
 }
 
@@ -233,7 +234,7 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 	testOc.StageController = &mSC
 
 	ocDone, err := testOc.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	waitForAction := make(chan bool, 1)
 	mSC.On("GetAllStages").Maybe().Return([]string{"test"})
 	mSC.On("CalculateStage", ctx, testTx).Once().Return("remove")

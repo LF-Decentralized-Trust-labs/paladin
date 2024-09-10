@@ -28,16 +28,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/rpcclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -45,11 +47,12 @@ type BlockIndexer interface {
 	Start(internalStreams ...*InternalEventStream) error
 	Stop()
 	GetIndexedBlockByNumber(ctx context.Context, number uint64) (*IndexedBlock, error)
-	GetIndexedTransactionByHash(ctx context.Context, hash types.Bytes32) (*IndexedTransaction, error)
+	GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*IndexedTransaction, error)
 	GetBlockTransactionsByNumber(ctx context.Context, blockNumber int64) ([]*IndexedTransaction, error)
-	GetTransactionEventsByHash(ctx context.Context, hash types.Bytes32) ([]*IndexedEvent, error)
+	GetTransactionEventsByHash(ctx context.Context, hash tktypes.Bytes32) ([]*IndexedEvent, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
-	WaitForTransaction(ctx context.Context, hash types.Bytes32) (*IndexedTransaction, error)
+	DecodeTransactionEvents(ctx context.Context, hash tktypes.Bytes32, abi abi.ABI) ([]*EventWithData, error)
+	WaitForTransaction(ctx context.Context, hash tktypes.Bytes32) (*IndexedTransaction, error)
 	GetBlockListenerHeight(ctx context.Context) (highest uint64, err error)
 	GetConfirmedBlockHeight(ctx context.Context) (confirmed uint64, err error)
 }
@@ -79,7 +82,7 @@ type blockIndexer struct {
 	retry                      *retry.Retry
 	batchSize                  int
 	batchTimeout               time.Duration
-	txWaiters                  *inflight.InflightManager[types.Bytes32, *IndexedTransaction]
+	txWaiters                  *inflight.InflightManager[tktypes.Bytes32, *IndexedTransaction]
 	eventStreams               map[uuid.UUID]*eventStream
 	eventStreamsHeadSet        map[uuid.UUID]*eventStream
 	eventStreamsLock           sync.Mutex
@@ -111,7 +114,7 @@ func newBlockIndexer(ctx context.Context, config *Config, persistence persistenc
 		retry:                      blockListener.retry,
 		batchSize:                  confutil.IntMin(config.CommitBatchSize, 1, *DefaultConfig.CommitBatchSize),
 		batchTimeout:               confutil.DurationMin(config.CommitBatchTimeout, 0, *DefaultConfig.CommitBatchTimeout),
-		txWaiters:                  inflight.NewInflightManager[types.Bytes32, *IndexedTransaction](types.ParseBytes32),
+		txWaiters:                  inflight.NewInflightManager[tktypes.Bytes32, *IndexedTransaction](tktypes.ParseBytes32),
 		eventStreams:               make(map[uuid.UUID]*eventStream),
 		eventStreamsHeadSet:        make(map[uuid.UUID]*eventStream),
 		esBlockDispatchQueueLength: confutil.IntMin(config.EventStreams.BlockDispatchQueueLength, 0, *DefaultEventStreamsConfig.BlockDispatchQueueLength),
@@ -474,13 +477,13 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 }
 
 func (bi *blockIndexer) logToIndexedEvent(l *LogJSONRPC) *IndexedEvent {
-	var topic0 types.Bytes32
+	var topic0 tktypes.Bytes32
 	if len(l.Topics) > 0 {
-		topic0 = types.NewBytes32FromSlice(l.Topics[0])
+		topic0 = tktypes.NewBytes32FromSlice(l.Topics[0])
 	}
 	return &IndexedEvent{
 		Signature:        topic0,
-		TransactionHash:  types.NewBytes32FromSlice(l.TransactionHash),
+		TransactionHash:  tktypes.NewBytes32FromSlice(l.TransactionHash),
 		BlockNumber:      int64(l.BlockNumber),
 		TransactionIndex: int64(l.TransactionIndex),
 		LogIndex:         int64(l.LogIndex),
@@ -498,7 +501,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 		newHighestBlock = int64(block.Number)
 		blocks = append(blocks, &IndexedBlock{
 			Number: int64(block.Number),
-			Hash:   types.NewBytes32FromSlice(block.Hash),
+			Hash:   tktypes.NewBytes32FromSlice(block.Hash),
 		})
 		for txIndex, r := range batch.receipts[i] {
 			result := TXResult_FAILURE.Enum()
@@ -506,12 +509,12 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 				result = TXResult_SUCCESS.Enum()
 			}
 			transactions = append(transactions, &IndexedTransaction{
-				Hash:             types.NewBytes32FromSlice(r.TransactionHash),
+				Hash:             tktypes.NewBytes32FromSlice(r.TransactionHash),
 				BlockNumber:      int64(r.BlockNumber),
 				TransactionIndex: int64(txIndex),
-				From:             (*types.EthAddress)(r.From),
-				To:               (*types.EthAddress)(r.To),
-				ContractAddress:  (*types.EthAddress)(r.ContractAddress),
+				From:             (*tktypes.EthAddress)(r.From),
+				To:               (*tktypes.EthAddress)(r.To),
+				ContractAddress:  (*tktypes.EthAddress)(r.ContractAddress),
 				Result:           result,
 			})
 			for _, l := range r.Logs {
@@ -685,7 +688,7 @@ func (bi *blockIndexer) getNextConfirmed() (toDispatch *BlockInfoJSONRPC) {
 	return toDispatch
 }
 
-func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash types.Bytes32) (*IndexedTransaction, error) {
+func (bi *blockIndexer) WaitForTransaction(ctx context.Context, hash tktypes.Bytes32) (*IndexedTransaction, error) {
 
 	inflight := bi.txWaiters.AddInflight(ctx, hash)
 	defer inflight.Cancel()
@@ -716,11 +719,11 @@ func (bi *blockIndexer) GetIndexedBlockByNumber(ctx context.Context, number uint
 	return blocks[0], nil
 }
 
-func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash types.Bytes32) (*IndexedTransaction, error) {
+func (bi *blockIndexer) GetIndexedTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*IndexedTransaction, error) {
 	return bi.getIndexedTransactionByHash(ctx, hash)
 }
 
-func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID types.Bytes32) (*IndexedTransaction, error) {
+func (bi *blockIndexer) getIndexedTransactionByHash(ctx context.Context, hashID tktypes.Bytes32) (*IndexedTransaction, error) {
 	var txns []*IndexedTransaction
 	db := bi.persistence.DB()
 	err := db.
@@ -749,7 +752,7 @@ func (bi *blockIndexer) GetBlockTransactionsByNumber(ctx context.Context, blockN
 	return txns, err
 }
 
-func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash types.Bytes32) ([]*IndexedEvent, error) {
+func (bi *blockIndexer) GetTransactionEventsByHash(ctx context.Context, hash tktypes.Bytes32) ([]*IndexedEvent, error) {
 	var events []*IndexedEvent
 	db := bi.persistence.DB()
 	err := db.
@@ -782,4 +785,69 @@ func (bi *blockIndexer) ListTransactionEvents(ctx context.Context, lastBlock int
 	}
 	err := q.Find(&events).Error
 	return events, err
+}
+
+func (bi *blockIndexer) DecodeTransactionEvents(ctx context.Context, hash tktypes.Bytes32, abi abi.ABI) ([]*EventWithData, error) {
+	events, err := bi.GetTransactionEventsByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	decoded := make([]*EventWithData, len(events))
+	for i, event := range events {
+		decoded[i] = &EventWithData{IndexedEvent: event}
+	}
+	err = bi.queryTransactionEvents(ctx, abi, hash[:], decoded)
+	return decoded, err
+}
+
+func (bi *blockIndexer) queryTransactionEvents(ctx context.Context, abi abi.ABI, tx ethtypes.HexBytes0xPrefix, events []*EventWithData) error {
+	// Get the TX receipt with all the logs
+	var receipt *TXReceiptJSONRPC
+	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
+		log.L(ctx).Debugf("Fetching transaction receipt by hash %s", tx)
+		rpcErr := bi.wsConn.CallRPC(ctx, &receipt, "eth_getTransactionReceipt", tx)
+		if rpcErr != nil {
+			return true, rpcErr.Error()
+		}
+		if receipt == nil {
+			return true, i18n.NewError(ctx, msgs.MsgBlockIndexerConfirmedReceiptNotFound, tx)
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Spin through the logs to find the corresponding result entries
+	for _, l := range receipt.Logs {
+		for _, e := range events {
+			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
+				bi.matchLog(ctx, abi, l, e)
+			}
+		}
+	}
+	return nil
+}
+
+func (bi *blockIndexer) matchLog(ctx context.Context, abi abi.ABI, in *LogJSONRPC, out *EventWithData) {
+	// This is one that matches our signature, but we need to check it against our ABI list.
+	// We stop at the first entry that parses it, and it's perfectly fine and expected that
+	// none will (because Eth signatures are not precise enough to distinguish events -
+	// particularly the "indexed" settings on parameters)
+	for _, abiEntry := range abi {
+		cv, err := abiEntry.DecodeEventDataCtx(ctx, in.Topics, in.Data)
+		if err == nil {
+			out.SoliditySignature = abiEntry.SolString() // uniquely identifies this ABI entry for the event stream consumer
+			out.Data, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, cv)
+		}
+		if err == nil {
+			log.L(ctx).Debugf("Event %d/%d/%d matches ABI event %s (tx=%s,address=%s)", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address)
+			if in.Address != nil {
+				out.Address = tktypes.EthAddress(*in.Address)
+			}
+			return
+		} else {
+			log.L(ctx).Debugf("Event %d/%d/%d does not match ABI event %s (tx=%s,address=%s): %s", in.BlockNumber, in.TransactionIndex, in.LogIndex, abiEntry, in.TransactionHash, in.Address, err)
+		}
+	}
 }

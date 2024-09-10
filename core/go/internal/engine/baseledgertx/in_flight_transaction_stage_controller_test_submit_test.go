@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
@@ -416,7 +417,7 @@ func TestProduceLatestInFlightStageContextTriggerSubmit(t *testing.T) {
 		close(called)
 	}).Once()
 	err := it.TriggerSubmitTx(ctx, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	<-called
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	for len(inFlightStageMananger.bufferedStageOutputs) == 0 {

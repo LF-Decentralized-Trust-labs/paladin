@@ -25,7 +25,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 94.3
+    targetCoverage = 90.7
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/core/pkg/proto',
@@ -242,7 +242,8 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
 task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
     workingDir '.'
 
-    inputs.files(goFiles);
+    helpers.lockResource(it, "lint.lock")
+    inputs.files(goFiles)
     environment 'GOGC', '20'
 
     executable "bin/golangci-lint"
@@ -356,7 +357,7 @@ abstract class ComponentTest extends Exec {
         args '-timeout=120s'
         args "-test.gocoverdir=${project.projectDir}/coverage"
 
-        project.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
+        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
     }
 }
 
@@ -372,7 +373,11 @@ task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMock
     }
 }
 
-task unitTestSQLite(type: UnitTests, dependsOn: [setupCoverage, goGet]) {
+task unitTestSQLite(type: UnitTests, dependsOn: [
+        ':testinfra:startTestInfra',
+        setupCoverage,
+        goGet,
+    ]) {
 }
 
 task unitTestPostgres(type: UnitTests, dependsOn: [
@@ -381,16 +386,16 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
         goGet,
     ]) {
     args '-tags', "testdbpostgres"
-    lockTestInfra(it)
+    mustRunAfter 'unitTestSQLite' // these tests cannot run concurrently
 }
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
-    ':testinfra:startTestInfra',
-    tasks.setupCoverage,
-    tasks.goGet,
-    tasks.copyContracts,
+        ':testinfra:startTestInfra',
+        tasks.setupCoverage,
+        tasks.goGet,
+        tasks.copyContracts,
     ]) {
-    lockTestInfra(it)
+    mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [

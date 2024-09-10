@@ -20,7 +20,7 @@ ext {
         include "internal/**/*.go"
         include "pkg/**/*.go"
     }
-    jsCircuits = "${rootDir}/zeto/zkp/circuits"
+    zetoVersion = "v0.0.2"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"
 }
@@ -64,32 +64,9 @@ task copySolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-// TODO: should circuits logic move to a separate project?
-task circuitsInstall(type: Exec) {
-    executable 'npm'
-    args 'install'
-    workingDir "${rootDir}/zeto/zkp/circuits"
-
-    inputs.files("package.json", "package-lock.json")
-    outputs.files("package-lock.json")
-    outputs.dir("node_modules")
-}
-
-task installCircom {
-    def filename
-    def outname
-    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-        filename = "circom-windows-amd64.exe"
-        outname = "circom.exe"
-    } else if (Os.isFamily(Os.FAMILY_MAC)) {
-        filename = "circom-macos-amd64"
-        outname = "circom"
-    } else {
-        filename = "circom-linux-amd64"
-        outname = "circom"
-    }
-
-    def url = "https://github.com/iden3/circom/releases/download/v2.1.9/${filename}"
+task downloadZetoProver {
+    def outname = "zeto-wasm-${zetoVersion}.tar.gz"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
     doFirst {
         mkdir(f.parent)
@@ -99,25 +76,30 @@ task installCircom {
     outputs.file(f)
 }
 
-task circuitsGen(type: Exec, dependsOn: [circuitsInstall, installCircom]) {
-    executable 'npm'
-    args 'run', 'gen'
-    args '--', '-c', 'anon'
-    workingDir "${rootDir}/zeto/zkp/circuits"
-
-    environment 'PATH', "${toolsOut}${File.pathSeparator}${environment.PATH}"
-    environment "CIRCUITS_ROOT", zkpOut
-    environment "PROVING_KEYS_ROOT", zkpOut
-    environment "PTAU_DOWNLOAD_PATH", zkpOut
+task downloadZetoTestProvingKeys {
+    def outname = "zeto-test-proving-keys-${zetoVersion}.tar.gz"
+    def url = "https://github.com/hyperledger-labs/zeto/releases/download/${zetoVersion}/${outname}"
+    def f = new File(toolsOut, outname)
     doFirst {
-        mkdir(zkpOut)
+        mkdir(f.parent)
+        new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
+        f.setExecutable(true)
     }
+    outputs.file(f)
+}
 
-    inputs.dir(workingDir)
+task extractZetoProverArtifacts(type: Copy, dependsOn: [downloadZetoProver, downloadZetoTestProvingKeys]) {
+    from tarTree("${toolsOut}/zeto-wasm-${zetoVersion}.tar.gz")
+    from tarTree("${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz")
+    into zkpOut
+
     outputs.dir(zkpOut)
 }
 
 task test(type: Exec) {
+    environment "CIRCUITS_ROOT", zkpOut
+    environment "PROVING_KEYS_ROOT", zkpOut
+
     inputs.files(configurations.toolkitProtoCompiled)
     inputs.files(configurations.coreProtoCompiled)
     inputs.files(goFiles)
@@ -134,10 +116,9 @@ task test(type: Exec) {
     args "-test.gocoverdir=${projectDir}/coverage"
 
     dependsOn copySolidity
-    dependsOn circuitsGen
+    dependsOn extractZetoProverArtifacts
     dependsOn ':testinfra:startTestInfra'
-    lockTestInfra(it)
-    dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task build {

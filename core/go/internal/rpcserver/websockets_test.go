@@ -23,8 +23,9 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWebSocketRPCRequestResponse(t *testing.T) {
@@ -37,7 +38,7 @@ func TestWebSocketRPCRequestResponse(t *testing.T) {
 	client := rpcbackend.NewWSRPCClient(&wsclient.WSConfig{WebSocketURL: url, DisableReconnect: true})
 	defer client.Close()
 	err := client.Connect(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	regTestRPC(s, "stringy_method", RPCMethod2(func(ctx context.Context, p0, p1 string) (string, error) {
 		assert.Equal(t, "v0", p0)
@@ -59,7 +60,7 @@ func TestWebSocketConnectionFailureHandling(t *testing.T) {
 	client := rpcbackend.NewWSRPCClient(&wsclient.WSConfig{WebSocketURL: url, DisableReconnect: true})
 	defer client.Close()
 	err := client.Connect(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var wsConn *webSocketConnection
 	before := time.Now()
@@ -100,7 +101,7 @@ func TestWebSocketEthSubscribeUnsubscribe(t *testing.T) {
 	client := rpcbackend.NewWSRPCClient(&wsclient.WSConfig{WebSocketURL: url, DisableReconnect: true})
 	defer client.Close()
 	err := client.Connect(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var wsConn *webSocketConnection
 	before := time.Now()
@@ -113,9 +114,9 @@ func TestWebSocketEthSubscribeUnsubscribe(t *testing.T) {
 		}
 	}
 
-	rpcErr := client.CallRPC(context.Background(), &types.RawJSON{}, "eth_subscribe")
+	rpcErr := client.CallRPC(context.Background(), &tktypes.RawJSON{}, "eth_subscribe")
 	assert.Regexp(t, "PD011004", rpcErr.Message)
-	rpcErr = client.CallRPC(context.Background(), &types.RawJSON{}, "eth_unsubscribe")
+	rpcErr = client.CallRPC(context.Background(), &tktypes.RawJSON{}, "eth_unsubscribe")
 	assert.Regexp(t, "PD011004", rpcErr.Message)
 
 	sub1, rpcErr := client.Subscribe(context.Background(), "myEvents", map[string]interface{}{"extra": "params"})

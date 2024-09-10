@@ -23,9 +23,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -131,9 +132,9 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 			assert.False(t, gasLimit)
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
 			assert.Equal(t, int64(10), tx.Nonce.Int64())
 			if gasLimit {
@@ -143,9 +144,9 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 			}
 
 			cv, err := testABI.ABI().Functions()["newWidget"].DecodeCallData(tx.Data)
-			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
-			assert.NoError(t, err)
+			require.NoError(t, err)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"widget": {
 					"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
@@ -169,7 +170,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 	}
 
 	_, key1, err := ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
 
@@ -186,7 +187,7 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 	}
 	txHash, err := req.SignAndSend()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, txHash)
 
 }
@@ -209,7 +210,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var key1 string
 	var err error
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
 			} else if withBlockRef {
@@ -218,15 +219,15 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 				assert.Equal(t, "latest", s)
 			}
 			if withFrom {
-				assert.Equal(t, types.JSONString(key1), types.RawJSON(tx.From))
+				assert.Equal(t, tktypes.JSONString(key1), tktypes.RawJSON(tx.From))
 			} else {
 				assert.Nil(t, tx.From)
 			}
 			cv, err := testABI.ABI().Functions()["getWidgets"].DecodeCallData(tx.Data)
-			assert.NoError(t, err)
-			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
-			assert.NoError(t, err)
+			require.NoError(t, err)
+			require.NoError(t, err)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"sku":      "1122334455"
 			}`, string(jsonData))
@@ -248,7 +249,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 
 	if withFrom {
 		_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
@@ -267,7 +268,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 		getWidgetsReq.BlockRef(PENDING)
 	}
 	jsonRes, err := getWidgetsReq.CallJSON()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{
 		"0": [
 			{
@@ -283,7 +284,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 		Output(&getWidgetsRes).
 		Call()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, getWidgetsRes.Zero, 1)
 	assert.Equal(t, uint64(1122334455), getWidgetsRes.Zero[0].SKU.Uint64())
 
@@ -382,7 +383,7 @@ func TestABIFunctionShortcutsOK(t *testing.T) {
 		Inputs:  abi.ParameterArray{},
 		Outputs: abi.ParameterArray{},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, fc)
 
 	cc, err := ec.HTTPClient().ABIConstructor(ctx, &abi.Entry{
@@ -390,13 +391,13 @@ func TestABIFunctionShortcutsOK(t *testing.T) {
 		Inputs:  abi.ParameterArray{},
 		Outputs: abi.ParameterArray{},
 	}, []byte{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cc)
 }
 
 func TestCallFunctionFail(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -411,7 +412,7 @@ func TestCallFunctionFail(t *testing.T) {
 
 func TestSignAndSendMissingFrom(t *testing.T) {
 	ctx, ec, done := newTestClientAndServer(t, &mockEth{
-		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (types.HexBytes, error) {
+		eth_call: func(ctx context.Context, t ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	})
@@ -474,14 +475,14 @@ func TestBuildCallData(t *testing.T) {
 
 	req := newWidget.R(ctx).To(to)
 
-	err = req.Input(types.RawJSON(`{
+	err = req.Input(tktypes.RawJSON(`{
 		"widget": {
 			"id":       "0xfd33700f0511abb60ff31a8a533854db90b0a32a",
 			"sku":      "1122334455",
 			"features": ["shiny", "spinny"]
 		}
 	}`)).BuildCallData()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 
 	err = req.Input(&newWidgetInput{
@@ -491,7 +492,7 @@ func TestBuildCallData(t *testing.T) {
 			Features: []string{},
 		},
 	}).BuildCallData()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 
 	inMap := map[string]any{
@@ -502,13 +503,13 @@ func TestBuildCallData(t *testing.T) {
 		},
 	}
 	err = req.Input(inMap).BuildCallData()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 
 	cv, err := newWidget.ABIEntry().Inputs.ParseExternalData(inMap)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = req.Input(cv).BuildCallData()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, req.TX().Data)
 }
 
@@ -527,17 +528,17 @@ func TestInvokeConstructor(t *testing.T) {
 		eth_estimateGas: func(ctx context.Context, tx ethsigner.Transaction) (ethtypes.HexInteger, error) {
 			return *ethtypes.NewHexInteger64(100000), nil
 		},
-		eth_sendRawTransaction: func(ctx context.Context, rawTX types.HexBytes) (types.HexBytes, error) {
+		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
 			addr, tx, err := ethsigner.RecoverRawTransaction(ctx, ethtypes.HexBytes0xPrefix(rawTX), 12345)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, key1, addr.String())
 			assert.Equal(t, int64(10), tx.Nonce.Int64())
 			assert.Equal(t, int64(200000 /* 2x estimate */), tx.GasLimit.Int64())
 
 			cv, err := testABI.ABI().Constructor().Inputs.DecodeABIData(tx.Data, len(fakeBytecode))
-			assert.NoError(t, err)
-			jsonData, err := types.StandardABISerializer().SerializeJSON(cv)
-			assert.NoError(t, err)
+			require.NoError(t, err)
+			jsonData, err := tktypes.StandardABISerializer().SerializeJSON(cv)
+			require.NoError(t, err)
 			assert.JSONEq(t, `{
 				"supplier": "0xfb75836dc4130a9462fafd8fe96c8ee376e2f32e"
 			}`, string(jsonData))
@@ -550,7 +551,7 @@ func TestInvokeConstructor(t *testing.T) {
 	defer done()
 
 	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1_PLAINBYTES)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)
 	req := testABI.MustConstructor(fakeBytecode).R(ctx).
@@ -558,7 +559,7 @@ func TestInvokeConstructor(t *testing.T) {
 		Input(`{"supplier": "0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e"}`)
 	txHash, err := req.SignAndSend()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, txHash)
 
 }

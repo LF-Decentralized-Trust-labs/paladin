@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	prototk "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -34,11 +35,11 @@ import (
 func tempUDS(t *testing.T) string {
 	// Not safe to use t.TempDir() as it generates too long paths including the test name
 	f, err := os.CreateTemp("", "ut_*.sock")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = f.Close()
 	allocatedUDSName := f.Name()
 	err = os.Remove(allocatedUDSName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		err := os.Remove(allocatedUDSName)
 		assert.True(t, err == nil || os.IsNotExist(err))
@@ -94,11 +95,11 @@ func newTestPluginManager(t *testing.T, setup *testManagers) *pluginManager {
 	mc := setup.componentMocks(t)
 	ir, err := pc.PreInit(mc)
 	assert.NotNil(t, ir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = pc.PostInit(mc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = pc.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return pc.(*pluginManager)
 }
@@ -110,11 +111,11 @@ func TestControllerStartGracefulShutdownNoConns(t *testing.T) {
 
 func TestInitPluginManagerBadPlugin(t *testing.T) {
 	tdm := &testDomainManager{domains: map[string]plugintk.Plugin{
-		"!badname": &mockPlugin[prototk.DomainMessage]{},
+		"!badname": &mockPlugin[prototk.DomainMessage]{t: t},
 	}}
 	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &PluginManagerConfig{})
 	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentMocks(t))
-	assert.Regexp(t, "PD011106", err)
+	assert.Regexp(t, "PD020005", err)
 }
 
 func TestInitPluginManagerBadSocket(t *testing.T) {
@@ -123,7 +124,7 @@ func TestInitPluginManagerBadSocket(t *testing.T) {
 		uuid.New(), &PluginManagerConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentMocks(t))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.Start()
 	assert.Regexp(t, "bind", err)
@@ -155,10 +156,10 @@ func TestInitPluginManagerTCP4(t *testing.T) {
 		uuid.New(), &PluginManagerConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentMocks(t))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
 
@@ -173,25 +174,25 @@ func TestInitPluginManagerTCP6(t *testing.T) {
 		uuid.New(), &PluginManagerConfig{},
 	)
 	err := pc.PostInit((&testManagers{}).componentMocks(t))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(pc.GRPCTargetURL(), "dns:///"))
 }
 
 func TestNotifyPluginUpdateNotStarted(t *testing.T) {
 	pc := NewPluginManager(context.Background(), tempUDS(t), uuid.New(), &PluginManagerConfig{})
 	err := pc.PostInit((&testManagers{}).componentMocks(t))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.WaitForInit(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.ReloadPluginList()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = pc.ReloadPluginList()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestLoaderErrors(t *testing.T) {
@@ -199,6 +200,7 @@ func TestLoaderErrors(t *testing.T) {
 	tdm := &testDomainManager{
 		domains: map[string]plugintk.Plugin{
 			"domain1": &mockPlugin[prototk.DomainMessage]{
+				t:              t,
 				connectFactory: domainConnectFactory,
 				headerAccessor: domainHeaderAccessor,
 				conf: &components.PluginConfig{
@@ -217,13 +219,13 @@ func TestLoaderErrors(t *testing.T) {
 			},
 		})
 	err := pc.PostInit((&testManagers{testDomainManager: tdm}).componentMocks(t))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = pc.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	conn, err := grpc.NewClient(pc.GRPCTargetURL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer conn.Close() // will close all the child conns too
 
 	client := prototk.NewPluginControllerClient(conn)
@@ -232,7 +234,7 @@ func TestLoaderErrors(t *testing.T) {
 	wrongLoader, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: uuid.NewString(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = wrongLoader.Recv()
 	assert.Regexp(t, "PD011200", err)
 
@@ -240,16 +242,16 @@ func TestLoaderErrors(t *testing.T) {
 	loaderStream, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: pc.LoaderID().String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	loadReq, err := loaderStream.Recv()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = client.LoadFailed(ctx, &prototk.PluginLoadFailed{
 		Plugin:       loadReq.Plugin,
 		ErrorMessage: "pop",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We should be notified of the error if we were waiting
 	err = pc.WaitForInit(ctx)
@@ -259,7 +261,7 @@ func TestLoaderErrors(t *testing.T) {
 	dupLoader, err := client.InitLoader(ctx, &prototk.PluginLoaderInit{
 		Id: pc.LoaderID().String(),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = dupLoader.Recv()
 	assert.Regexp(t, "PD011201", err)
 
@@ -271,11 +273,12 @@ func TestLoaderErrors(t *testing.T) {
 	assert.Regexp(t, "PD010301", err)
 
 	err = loaderStream.CloseSend()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Notify of a plugin after closed stream
 	tdm.domains = map[string]plugintk.Plugin{
 		"domain2": &mockPlugin[prototk.DomainMessage]{
+			t:              t,
 			connectFactory: domainConnectFactory,
 			headerAccessor: domainHeaderAccessor,
 			conf: &components.PluginConfig{
@@ -285,7 +288,7 @@ func TestLoaderErrors(t *testing.T) {
 		},
 	}
 	err = pc.ReloadPluginList()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	pc.Stop()
 

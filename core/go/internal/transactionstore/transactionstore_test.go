@@ -31,7 +31,7 @@ import (
 func newTestTransactionStore(t *testing.T) (context.Context, *transactionStore, func()) {
 	ctx := context.Background()
 	p, done, err := persistence.NewUnitTestPersistence(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	ts := NewTransactionStore(ctx, &Config{}, p)
 	return ctx, ts.(*transactionStore), done
 }
@@ -48,7 +48,7 @@ func createSomeRandomTransactions(t *testing.T, ctx context.Context, ts *transac
 		}
 
 		createdTransaction, err := ts.InsertTransaction(ctx, txn)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, createdTransaction)
 	}
 }
@@ -61,7 +61,7 @@ func TestRetrieveAllTransactionOK(t *testing.T) {
 	createSomeRandomTransactions(t, ctx, ts, 10)
 
 	retreivedTxns, err := ts.GetAllTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, retreivedTxns, 10)
 }
 
@@ -82,7 +82,7 @@ func TestStoreRetrieveTransaction(t *testing.T) {
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, createdTransaction)
 	assert.NotEqual(t, uuid.Nil, createdTransaction.ID)
 	txnID := createdTransaction.ID
@@ -90,7 +90,7 @@ func TestStoreRetrieveTransaction(t *testing.T) {
 	createSomeRandomTransactions(t, ctx, ts, 10)
 
 	retreivedTxn, err := ts.GetTransactionByID(ctx, txnID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
 	assert.Equal(t, from, retreivedTxn.From)
 	assert.Equal(t, contract, retreivedTxn.Contract)
@@ -113,7 +113,7 @@ func TestStoreDeleteTransaction(t *testing.T) {
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, createdTransaction)
 	assert.NotEqual(t, uuid.Nil, createdTransaction.ID)
 
@@ -121,12 +121,12 @@ func TestStoreDeleteTransaction(t *testing.T) {
 
 	txnID := createdTransaction.ID
 	retreivedTxn, err := ts.GetTransactionByID(ctx, txnID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
 
 	err = ts.DeleteTransaction(ctx, *retreivedTxn)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	retreivedTxn, err = ts.GetTransactionByID(ctx, txnID)
 	assert.Error(t, err)
@@ -150,7 +150,7 @@ func TestStoreUpdateTransaction(t *testing.T) {
 	}
 
 	createdTransaction, err := ts.InsertTransaction(ctx, txn)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, createdTransaction)
 	assert.NotEqual(t, uuid.Nil, createdTransaction.ID)
 
@@ -158,7 +158,7 @@ func TestStoreUpdateTransaction(t *testing.T) {
 
 	txnID := createdTransaction.ID
 	retreivedTxn, err := ts.GetTransactionByID(ctx, txnID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
 
 	sequenceID := uuid.New()
@@ -171,11 +171,11 @@ func TestStoreUpdateTransaction(t *testing.T) {
 	}
 	updatedTxn, err := ts.UpdateTransaction(ctx, txnUpdate)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedTxn)
 
 	retreivedTxn, err = ts.GetTransactionByID(ctx, txnID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, txnID, retreivedTxn.ID)
 	assert.Equal(t, from, retreivedTxn.From)
 	assert.Equal(t, contract, retreivedTxn.Contract)

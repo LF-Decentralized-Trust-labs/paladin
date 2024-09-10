@@ -65,7 +65,7 @@ func TestRemoveTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testGraph.RemoveTransactions(ctx, []string{"tx1", "tx2"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, testGraph.IncludesTransaction("tx0"))
 	assert.False(t, testGraph.IncludesTransaction("tx1"))
 	assert.False(t, testGraph.IncludesTransaction("tx2"))
@@ -118,7 +118,7 @@ func TestGetDispatchableTransactions(t *testing.T) {
 	}
 
 	dispatchableTransactions, err := testGraph.GetDispatchableTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Len(t, dispatchableTransactions, 3)
 
 	//make sure they come out in the expected order
@@ -173,7 +173,7 @@ func TestScenario1(t *testing.T) {
 	require.NoError(t, err)
 
 	dispatchableTransactions, err := testGraph.GetDispatchableTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Len(t, dispatchableTransactions, 3)
 
 	//make sure they come out in the expected order
@@ -187,7 +187,7 @@ func TestScenario1(t *testing.T) {
 
 	// GetDispatchableTransactions is a read only operation so we can call it again and get the same result
 	dispatchableTransactions, err = testGraph.GetDispatchableTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Len(t, dispatchableTransactions, 3)
 
 	//make sure they come out in the expected order
@@ -198,10 +198,10 @@ func TestScenario1(t *testing.T) {
 	assert.Equal(t, "tx3", dispatchableTransactions[2])
 
 	err = testGraph.RemoveTransactions(ctx, dispatchableTransactions)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dispatchableTransactions, err = testGraph.GetDispatchableTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, dispatchableTransactions, 0)
 
 }
@@ -256,7 +256,7 @@ func TestScenario2(t *testing.T) {
 	require.NoError(t, err)
 
 	dispatchableTransactions, err := testGraph.GetDispatchableTransactions(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Len(t, dispatchableTransactions, 6)
 
 	//make sure they come out in the expected order

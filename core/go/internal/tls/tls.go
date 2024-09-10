@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tls
+package tlsconf
 
 import (
 	"context"
@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
 type TLSType string
@@ -66,21 +66,21 @@ func BuildTLSConfig(ctx context.Context, config *Config, tlsType TLSType) (*tls.
 		if err == nil {
 			ok := rootCAs.AppendCertsFromPEM(caBytes)
 			if !ok {
-				err = i18n.NewError(ctx, msgs.MsgTLSInvalidCAFile)
+				err = i18n.NewError(ctx, tkmsgs.MsgTLSInvalidCAFile)
 			}
 		}
 	case config.CA != "":
 		rootCAs = x509.NewCertPool()
 		ok := rootCAs.AppendCertsFromPEM([]byte(config.CA))
 		if !ok {
-			err = i18n.NewError(ctx, msgs.MsgTLSInvalidCAFile)
+			err = i18n.NewError(ctx, tkmsgs.MsgTLSInvalidCAFile)
 		}
 	default:
 		rootCAs, err = x509.SystemCertPool()
 	}
 
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgTLSConfigFailed)
+		return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSConfigFailed)
 	}
 
 	tlsConfig.RootCAs = rootCAs
@@ -90,13 +90,13 @@ func BuildTLSConfig(ctx context.Context, config *Config, tlsType TLSType) (*tls.
 		// Read the key pair to create certificate
 		cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgTLSInvalidKeyPairFiles)
+			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	} else if config.Cert != "" && config.Key != "" {
 		cert, err := tls.X509KeyPair([]byte(config.Cert), []byte(config.Key))
 		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgTLSInvalidKeyPairFiles)
+			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
@@ -168,25 +168,25 @@ func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]strin
 	for attr, validatorString := range requiredDNAttributes {
 		attr = strings.ToUpper(attr)
 		if _, knownAttr := SubjectDNKnownAttributes[attr]; !knownAttr {
-			return nil, i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnMatcherAttr, attr)
+			return nil, i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMatcherAttr, attr)
 		}
 		// Ensure full string match with all regexp
 		validatorString = "^" + strings.TrimSuffix(strings.TrimPrefix(validatorString, "^"), "$") + "$"
 		validator, err := regexp.Compile(validatorString)
 		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnMatcherRegexp, validatorString, attr, err)
+			return nil, i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMatcherRegexp, validatorString, attr, err)
 		}
 		validators[attr] = validator
 	}
 	return func(_ [][]byte, verifiedChains [][]*x509.Certificate) error {
 		if len(verifiedChains) == 0 {
 			log.L(ctx).Errorf("Failed TLS DN check: Nil cert chain")
-			return i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnChain)
+			return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnChain)
 		}
 		for iChain, chain := range verifiedChains {
 			if len(chain) == 0 {
 				log.L(ctx).Errorf("Failed TLS DN check: Empty cert chain %d", iChain)
-				return i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnChain)
+				return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnChain)
 			}
 			// We get a chain of one or more certificates, leaf first.
 			// Only check the leaf.
@@ -200,7 +200,7 @@ func buildDNValidator(ctx context.Context, requiredDNAttributes map[string]strin
 				}
 				if !matched {
 					log.L(ctx).Errorf("Failed TLS DN check: Does not match %s =~ /%s/", attr, validator.String())
-					return i18n.NewError(ctx, msgs.MsgTLSInvalidTLSDnMismatch)
+					return i18n.NewError(ctx, tkmsgs.MsgTLSInvalidTLSDnMismatch)
 				}
 			}
 		}

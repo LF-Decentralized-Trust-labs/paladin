@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func newDispatchPrepStageTx(ctx context.Context) *transactionstore.TransactionWrapper {
@@ -111,7 +112,7 @@ func TestDispatchPrepStageReturnsPreparedTx(t *testing.T) {
 	}).Return(nil)
 	mSFS.On("DomainAPI").Return(mDomainAPI)
 	output, err := dps.PerformAction(ctx, testTx, mSFS)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testEthTx, output)
 }
 

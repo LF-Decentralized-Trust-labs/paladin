@@ -26,10 +26,10 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -238,7 +238,7 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 
 				for _, party := range attRequest.GetParties() {
 
-					partyLocator := types.PrivateIdentityLocator(party)
+					partyLocator := tktypes.PrivateIdentityLocator(party)
 					partyNode, err := partyLocator.Node(ctx, true)
 					if err != nil {
 						log.L(ctx).Errorf("Failed to get node name from locator %s: %s", party, err)
@@ -337,7 +337,7 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 						}
 						err = sfs.TransportManager().Send(ctx, &components.TransportMessage{
 							MessageType: "EndorsementRequest",
-							Destination: types.PrivateIdentityLocator(party),
+							Destination: tktypes.PrivateIdentityLocator(party),
 							Payload:     endorsementRequestBytes,
 						})
 						if err != nil {

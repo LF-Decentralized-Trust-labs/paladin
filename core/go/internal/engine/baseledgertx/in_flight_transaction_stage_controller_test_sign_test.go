@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProduceLatestInFlightStageContextSigning(t *testing.T) {
@@ -202,7 +203,7 @@ func TestProduceLatestInFlightStageContextTriggerSign(t *testing.T) {
 		close(called)
 	}).Once()
 	err := it.TriggerSignTx(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	<-called
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 	for len(inFlightStageMananger.bufferedStageOutputs) == 0 {

@@ -25,8 +25,9 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type User struct {
@@ -60,13 +61,13 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 			{Name: "blue"},
 		},
 	}, func() ([]byte, error) { return key0[:], nil })
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, keyBytes, key0[:])
 	assert.Equal(t, "bob/blue/42", keyHandle)
 
 	keyBytes, err = fs.LoadKeyMaterial(ctx, keyHandle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keyBytes, key0[:])
 
 	privKeyBytes := [32]byte{}
@@ -78,10 +79,10 @@ func TestFileSystemStoreCreateBJJ(t *testing.T) {
 }
 
 func TestStaticStoreFileFileWithTrimForBJJ(t *testing.T) {
-	keyData := types.RandHex(32)
+	keyData := tktypes.RandHex(32)
 	keyFile := path.Join(t.TempDir(), "my.key")
 	err := os.WriteFile(keyFile, []byte(keyData+"\n"), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx, store := newTestStaticStore(t, map[string]api.StaticKeyEntryConfig{
 		"myKey": {
@@ -92,7 +93,7 @@ func TestStaticStoreFileFileWithTrimForBJJ(t *testing.T) {
 	})
 
 	loadedKey, err := store.LoadKeyMaterial(ctx, "myKey")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ([]byte)(keyData), loadedKey)
 
 	var keyBytes [32]byte

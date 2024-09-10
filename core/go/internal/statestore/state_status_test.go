@@ -24,8 +24,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/filters"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const widgetABI = `{
@@ -58,12 +59,12 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, sc
 	for i, w := range withoutSalt {
 		var ij map[string]interface{}
 		err := json.Unmarshal([]byte(w), &ij)
-		assert.NoError(t, err)
-		ij["salt"] = types.RandHex(32)
+		require.NoError(t, err)
+		ij["salt"] = tktypes.RandHex(32)
 		withSalt, err := json.Marshal(ij)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		states[i], err = ss.PersistState(ctx, domainID, schemaID, withSalt)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		fmt.Printf("widget[%d]: %s\n", i, states[i].Data)
 	}
 	return states
@@ -72,7 +73,7 @@ func makeWidgets(t *testing.T, ctx context.Context, ss *stateStore, domainID, sc
 func toQuery(t *testing.T, queryString string) *filters.QueryJSON {
 	var q filters.QueryJSON
 	err := json.Unmarshal([]byte(queryString), &q)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return &q
 }
 
@@ -82,9 +83,9 @@ func TestStateLockingQuery(t *testing.T) {
 	defer done()
 
 	schema, err := newABISchema(ctx, "domain1", testABIParam(t, widgetABI))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = ss.PersistSchema(ctx, schema)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	schemaID := schema.IDString()
 
 	widgets := makeWidgets(t, ctx, ss, "domain1", schemaID, []string{
@@ -97,7 +98,7 @@ func TestStateLockingQuery(t *testing.T) {
 
 	checkQuery := func(query string, status StateStatusQualifier, expected ...int) {
 		states, err := ss.FindStates(ctx, "domain1", schemaID, toQuery(t, query), status)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, states, len(expected))
 		for _, wIndex := range expected {
 			found := false
@@ -127,7 +128,7 @@ func TestStateLockingQuery(t *testing.T) {
 	for i, w := range widgets {
 		if i != 3 {
 			err = ss.MarkConfirmed(ctx, "domain1", w.ID.String(), uuid.New())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 
@@ -141,7 +142,7 @@ func TestStateLockingQuery(t *testing.T) {
 
 	// Mark one spent
 	err = ss.MarkSpent(ctx, "domain1", widgets[0].ID.String(), uuid.New())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
 	checkQuery(`{}`, StateStatusAvailable, 1, 2, 4) // removed 0
@@ -153,7 +154,7 @@ func TestStateLockingQuery(t *testing.T) {
 
 	// lock a confirmed one for spending
 	err = ss.MarkLocked(ctx, "domain1", widgets[1].ID.String(), seqID, false, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
 	checkQuery(`{}`, StateStatusAvailable, 2, 4)    // removed 1
@@ -165,7 +166,7 @@ func TestStateLockingQuery(t *testing.T) {
 
 	// lock the unconfirmed one for spending
 	err = ss.MarkLocked(ctx, "domain1", widgets[3].ID.String(), seqID, false, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
 	checkQuery(`{}`, StateStatusAvailable, 2, 4)    // unchanged
@@ -181,7 +182,7 @@ func TestStateLockingQuery(t *testing.T) {
 
 	// clear the transaction locks
 	err = ss.ResetTransaction(ctx, "domain1", seqID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	checkQuery(`{}`, StateStatusAll, 0, 1, 2, 3, 4) // unchanged
 	checkQuery(`{}`, StateStatusAvailable, 1, 2, 4) // added 1
@@ -198,7 +199,7 @@ func TestStateStatusQualifierJSON(t *testing.T) {
 	assert.Regexp(t, "PD010117", err)
 
 	u := uuid.New().String()
-	err = json.Unmarshal(types.JSONString(u), &q)
-	assert.NoError(t, err)
+	err = json.Unmarshal(tktypes.JSONString(u), &q)
+	require.NoError(t, err)
 	assert.Equal(t, u, (string)(q))
 }

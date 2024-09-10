@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCorsWrapperDisabled(t *testing.T) {
@@ -32,12 +33,12 @@ func TestCorsWrapperDisabled(t *testing.T) {
 	s := httptest.NewServer(WrapCorsIfEnabled(context.Background(), hf, &CORSConfig{}))
 
 	req, err := http.NewRequest(http.MethodOptions, s.URL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Origin", "https://some.example")
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	req.Header.Set("Access-Control-Request-Headers", "header1")
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "true", res.Header.Get("CalledServer"))
 }
@@ -52,12 +53,12 @@ func TestCorsWrapperEnabledWildcardPreflight(t *testing.T) {
 	}))
 
 	req, err := http.NewRequest(http.MethodOptions, s.URL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Origin", "https://some.example")
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	req.Header.Set("Access-Control-Request-Headers", "header1")
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusNoContent, res.StatusCode)
 	assert.Empty(t, "", res.Header.Get("CalledServer"))
 	assert.Equal(t, "", res.Header.Get("Access-Control-Allow-Origin"))
@@ -75,10 +76,10 @@ func TestCorsWrapperEnabledHostOk(t *testing.T) {
 	}))
 
 	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Origin", "https://some.example")
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "true", res.Header.Get("CalledServer"))
 	assert.Equal(t, "https://some.example", res.Header.Get("Access-Control-Allow-Origin"))
@@ -95,10 +96,10 @@ func TestCorsWrapperEnabledHostFail(t *testing.T) {
 	}))
 
 	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Origin", "https://another.example")
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	// The server still gets called
 	assert.Equal(t, "true", res.Header.Get("CalledServer"))

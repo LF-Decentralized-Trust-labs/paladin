@@ -25,9 +25,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInFlightTxSign(t *testing.T) {
@@ -63,8 +64,8 @@ func TestInFlightTxSign(t *testing.T) {
 
 		assert.Equal(t, "0x4e598f6e918321dd47c86e7a077b4ab0e7414846", from)
 		assert.Equal(t, ethtypes.MustNewHexBytes0xPrefix(testTransactionData), txObj.Data)
-	}).Return(types.MustParseHexBytes(testHashedSignedMessage), nil).Once()
+	}).Return(tktypes.MustParseHexBytes(testHashedSignedMessage), nil).Once()
 	_, txHash, err = it.signTx(ctx, mtx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testTxHash, txHash)
 }

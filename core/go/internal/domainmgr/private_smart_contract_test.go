@@ -28,12 +28,13 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPrivateSmartContractQueryFail(t *testing.T) {
@@ -44,7 +45,7 @@ func TestPrivateSmartContractQueryFail(t *testing.T) {
 	})
 	defer done()
 
-	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	_, err := dm.GetSmartContractByAddress(ctx, tktypes.EthAddress(tktypes.RandBytes(20)))
 	assert.Regexp(t, "pop", err)
 
 }
@@ -57,7 +58,7 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 	})
 	defer done()
 
-	_, err := dm.GetSmartContractByAddress(ctx, types.EthAddress(types.RandBytes(20)))
+	_, err := dm.GetSmartContractByAddress(ctx, tktypes.EthAddress(tktypes.RandBytes(20)))
 	assert.Regexp(t, "PD011609", err)
 
 }
@@ -66,7 +67,7 @@ func goodPSC(d *domain) *domainContract {
 	return d.newSmartContract(&PrivateSmartContract{
 		DeployTX:      uuid.New(),
 		DomainAddress: *d.Address(),
-		Address:       types.EthAddress(types.RandBytes(20)),
+		Address:       tktypes.EthAddress(tktypes.RandBytes(20)),
 		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
 	})
 }
@@ -85,7 +86,7 @@ func goodPrivateTXWithInputs(psc *domainContract) *components.PrivateTransaction
 					{Name: "amount", Type: "uint256"},
 				},
 			},
-			Inputs: types.RawJSON(`{
+			Inputs: tktypes.RawJSON(`{
 			   "from": "sender",
 			   "to": "receiver",
 			   "amount": "123000000000000000000"
@@ -101,7 +102,7 @@ func doDomainInitTransactionOK(t *testing.T, ctx context.Context, tp *testPlugin
 		TransactionSpecification: &prototk.TransactionSpecification{},
 	}
 	tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-		assert.Equal(t, types.Bytes32UUIDFirst16(tx.ID).String(), itr.Transaction.TransactionId)
+		assert.Equal(t, tktypes.Bytes32UUIDFirst16(tx.ID).String(), itr.Transaction.TransactionId)
 		assert.Equal(t, int64(12345), itr.Transaction.BaseBlock)
 		return &prototk.InitTransactionResponse{
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
@@ -114,7 +115,7 @@ func doDomainInitTransactionOK(t *testing.T, ctx context.Context, tp *testPlugin
 	}
 
 	err := psc.InitTransaction(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, tx.PreAssembly.RequiredVerifiers, 1)
 	return psc, tx
 }
@@ -136,7 +137,7 @@ func doDomainInitAssembleTransactionOK(t *testing.T, ctx context.Context, tp *te
 		}, nil
 	}
 	err := psc.AssembleTransaction(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return psc, tx
 }
 
@@ -207,7 +208,7 @@ func TestDomainInitTransactionBadInputs(t *testing.T) {
 
 	psc := goodPSC(tp.d)
 	tx := goodPrivateTXWithInputs(psc)
-	tx.Inputs.Inputs = types.RawJSON(`{"missing": "parameters}`)
+	tx.Inputs.Inputs = tktypes.RawJSON(`{"missing": "parameters}`)
 
 	err := psc.InitTransaction(ctx, tx)
 	assert.Regexp(t, "PD011612", err)
@@ -228,8 +229,8 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	state4 := storeState(t, dm, tp, tx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
-		Salt:   types.Bytes32(types.RandBytes(32)),
-		Owner:  types.EthAddress(types.RandBytes(20)),
+		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(5555555),
 	}
 	tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
@@ -251,11 +252,11 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 				]
 			  }`,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, stateRes.States, 3)
 
 		newStateData, err := json.Marshal(state5)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
@@ -277,7 +278,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		}, nil
 	}
 	err := psc.AssembleTransaction(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, tx.PostAssembly.InputStates, 2)
 	assert.Len(t, tx.PostAssembly.ReadStates, 1)
@@ -287,7 +288,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// Write the output states
 	err = psc.WritePotentialStates(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	stateRes, err := domain.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: tx.PostAssembly.OutputStatesPotential[0].SchemaId,
@@ -299,18 +300,18 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 			]
 		  }`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, stateRes.States, 1)
 
 	// Lock all the states
 	err = psc.LockStates(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	stillAvailable, err := domain.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId:  tx.PostAssembly.OutputStatesPotential[0].SchemaId,
 		QueryJson: `{}`,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, stillAvailable.States, 3)
 	// state1 & state3 are now locked for spending (state4 was just read, and state2 untouched)
 	// state2 & state4 still exist
@@ -339,7 +340,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// Run an endorsement
 	endorsementRequest := tx.PostAssembly.AttestationPlan[0]
-	endorserAddr := types.EthAddress(types.RandBytes(20))
+	endorserAddr := tktypes.EthAddress(tktypes.RandBytes(20))
 	endorser := &prototk.ResolvedVerifier{
 		Lookup:    "endorser1",
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
@@ -353,7 +354,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		psc.toEndorsableList(tx.PostAssembly.OutputStates),
 		endorsementRequest,
 		endorser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorsement.Result)
 
 	// Processing of endorsement faked up here
@@ -367,7 +368,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// Resolve who should sign it - we should find it's the endorser due to the endorser submit above
 	err = psc.ResolveDispatch(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "endorser1", tx.Signer)
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
@@ -393,7 +394,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 			onChain.Outputs = append(onChain.Outputs, inState.ID)
 		}
 		params, err := json.Marshal(onChain)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
 				FunctionName: "execute",
@@ -404,7 +405,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// And now prepare
 	err = psc.PrepareTransaction(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, tx.PreparedTransaction.FunctionABI)
 	assert.NotNil(t, tx.PreparedTransaction.Inputs)
 }
@@ -550,7 +551,7 @@ func TestResolveDispatchSignerOneTimeUse(t *testing.T) {
 	tx.PostAssembly.Endorsements = []*prototk.AttestationResult{}
 
 	err := psc.ResolveDispatch(ctx, tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "one/time/keys/"+tx.ID.String(), tx.Signer)
 }
 
@@ -642,7 +643,7 @@ func TestLoadStatesError(t *testing.T) {
 	tx.Signer = "signer1"
 
 	_, err := psc.loadStates(ctx, []*prototk.StateRef{
-		{Id: types.RandHex(32)},
+		{Id: tktypes.RandHex(32)},
 	})
 	assert.Regexp(t, "pop", err)
 }
@@ -657,7 +658,7 @@ func TestLoadStatesNotFound(t *testing.T) {
 	tx.Signer = "signer1"
 
 	_, err := psc.loadStates(ctx, []*prototk.StateRef{
-		{Id: types.RandHex(32)},
+		{Id: tktypes.RandHex(32)},
 	})
 	assert.Regexp(t, "PD011615", err)
 }

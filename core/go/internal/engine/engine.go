@@ -31,7 +31,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -91,7 +92,7 @@ func NewEngine(nodeID uuid.UUID) Engine {
 	}
 }
 
-func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr types.EthAddress, domainAPI components.DomainSmartContract) (oc *orchestrator.Orchestrator, err error) {
+func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr tktypes.EthAddress, domainAPI components.DomainSmartContract) (oc *orchestrator.Orchestrator, err error) {
 
 	if e.orchestrators[contractAddr.String()] == nil {
 		publisher := NewPublisher(e)
@@ -134,7 +135,7 @@ func (e *engine) getOrchestratorForContract(ctx context.Context, contractAddr ty
 	return e.orchestrators[contractAddr.String()], nil
 }
 
-func (e *engine) getEndorsementGathererForContract(ctx context.Context, contractAddr types.EthAddress) (enginespi.EndorsementGatherer, error) {
+func (e *engine) getEndorsementGathererForContract(ctx context.Context, contractAddr tktypes.EthAddress) (enginespi.EndorsementGatherer, error) {
 
 	domainAPI, err := e.components.DomainManager().GetSmartContractByAddress(ctx, contractAddr)
 	if err != nil {
@@ -154,7 +155,7 @@ func (e *engine) HandleNewTx(ctx context.Context, tx *components.PrivateTransact
 		return "", i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
 
-	emptyAddress := types.EthAddress{}
+	emptyAddress := tktypes.EthAddress{}
 	if tx.Inputs.To == emptyAddress {
 		return "", i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
 	}
@@ -267,7 +268,7 @@ func (e *engine) execBaseLedgerDeployTransaction(ctx context.Context, signer str
 
 	var abiFunc ethclient.ABIFunctionClient
 	ec := e.components.EthClientFactory().HTTPClient()
-	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, types.HexBytes(txInstruction.Bytecode))
+	abiFunc, err := ec.ABIConstructor(ctx, txInstruction.ConstructorABI, tktypes.HexBytes(txInstruction.Bytecode))
 	if err != nil {
 		return err
 	}
@@ -341,7 +342,7 @@ func (e *engine) handleEndorsementRequest(ctx context.Context, messagePayload []
 		return
 	}
 	contractAddressString := endorsementRequest.ContractAddress
-	contractAddress, err := types.ParseEthAddress(contractAddressString)
+	contractAddress, err := tktypes.ParseEthAddress(contractAddressString)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to parse contract address %s: %s", contractAddressString, err)
 		return

@@ -31,8 +31,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/proto"
 	"github.com/kaleido-io/paladin/core/pkg/signer/api"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type filesystemStore struct {
@@ -104,7 +104,7 @@ func (fss *filesystemStore) createWalletFile(ctx context.Context, keyFilePath, p
 	if err != nil {
 		return nil, err
 	}
-	password := types.RandHex(32)
+	password := tktypes.RandHex(32)
 	wf := keystorev3.NewWalletFileCustomBytesStandard(password, privateKey)
 
 	// Address is not part of the V3 standard, per

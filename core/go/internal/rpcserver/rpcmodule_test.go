@@ -21,8 +21,9 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRCPModule(t *testing.T) {
@@ -36,7 +37,7 @@ func TestRCPModule(t *testing.T) {
 		})),
 	)
 
-	var jsonResponse types.RawJSON
+	var jsonResponse tktypes.RawJSON
 	res, err := resty.New().R().
 		SetBody(`{
 		  "jsonrpc": "2.0",
@@ -47,7 +48,7 @@ func TestRCPModule(t *testing.T) {
 		SetResult(&jsonResponse).
 		SetError(&jsonResponse).
 		Post(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, res.IsSuccess())
 	assert.JSONEq(t, `{
 		"jsonrpc": "2.0",

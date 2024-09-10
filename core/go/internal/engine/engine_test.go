@@ -29,10 +29,10 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	coreProto "github.com/kaleido-io/paladin/core/pkg/proto"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	"github.com/kaleido-io/paladin/core/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,10 +45,10 @@ import (
 
 func TestEngineInit(t *testing.T) {
 
-	engine, mocks := newEngineForTesting(t, types.MustEthAddress(types.RandHex(20)))
+	engine, mocks := newEngineForTesting(t, tktypes.MustEthAddress(tktypes.RandHex(20)))
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 	initResult, err := engine.Init(mocks.allComponents)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, initResult)
 }
 
@@ -56,7 +56,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	//Submit a transaction that gets assembled with an attestation plan for a local endorser to sign the transaction
 	ctx := context.Background()
 
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
 	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
@@ -87,9 +87,9 @@ func TestEngineSimpleTransaction(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     types.Bytes32(types.RandBytes(32)),
-					Schema: types.Bytes32(types.RandBytes(32)),
-					Data:   types.JSONString("foo"),
+					ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+					Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+					Data:   tktypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -128,7 +128,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 	}, nil)
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	txID, err := engine.HandleNewTx(ctx, &components.PrivateTransaction{})
 	// no input domain should err
@@ -141,7 +141,7 @@ func TestEngineSimpleTransaction(t *testing.T) {
 			To:     *domainAddress,
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, txID)
 
 	status := pollForStatus(ctx, t, "dispatch", engine, domainAddressString, txID, 2*time.Second)
@@ -157,7 +157,7 @@ func TestEngineRevertFromLocalEndorsement(t *testing.T) {
 func TestEngineRemoteEndorser(t *testing.T) {
 	ctx := context.Background()
 
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
 	engine, mocks := newEngineForTesting(t, domainAddress)
 	domainAddressString := domainAddress.String()
 
@@ -187,9 +187,9 @@ func TestEngineRemoteEndorser(t *testing.T) {
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
 			InputStates: []*components.FullState{
 				{
-					ID:     types.Bytes32(types.RandBytes(32)),
-					Schema: types.Bytes32(types.RandBytes(32)),
-					Data:   types.JSONString("foo"),
+					ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+					Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+					Data:   tktypes.JSONString("foo"),
 				},
 			},
 			AttestationPlan: []*prototk.AttestationRequest{
@@ -267,7 +267,7 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	// is still sequenced behind the first
 	ctx := context.Background()
 
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
 	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
@@ -290,9 +290,9 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 
 	states := []*components.FullState{
 		{
-			ID:     types.Bytes32(types.RandBytes(32)),
-			Schema: types.Bytes32(types.RandBytes(32)),
-			Data:   types.JSONString("foo"),
+			ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+			Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
+			Data:   tktypes.JSONString("foo"),
 		},
 	}
 
@@ -358,14 +358,14 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	}).Return(nil).Maybe()
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tx1ID, err := engine.HandleNewTx(ctx, tx1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, tx1ID)
 
 	tx2ID, err := engine.HandleNewTx(ctx, tx2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, tx2ID)
 
 	// Neither transaction should be dispatched yet
@@ -380,11 +380,11 @@ func TestEngineDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	attestationResult := prototk.AttestationResult{
 		Name:            "notary",
 		AttestationType: prototk.AttestationType_ENDORSE,
-		Payload:         types.RandBytes(32),
+		Payload:         tktypes.RandBytes(32),
 	}
 
 	attestationResultAny, err := anypb.New(&attestationResult)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//wait for both transactions to send the endorsement request
 	<-sentEndorsementRequest
@@ -447,7 +447,7 @@ func TestEngineMiniLoad(t *testing.T) {
 
 	ctx := context.Background()
 
-	domainAddress := types.MustEthAddress(types.RandHex(20))
+	domainAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
 	engine, mocks := newEngineForTesting(t, domainAddress)
 	assert.Equal(t, "Kata Engine", engine.EngineName())
 
@@ -461,7 +461,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	dependenciesByTransactionID := make(map[string][]string) // populated during assembly stage
 	nonceByTransactionID := make(map[string]uint64)          // populated when dispatch event recieved and used later to check that the nonce order matchs the dependency order
 
-	unclaimedPendingStatesToMintingTransaction := make(map[types.Bytes32]string)
+	unclaimedPendingStatesToMintingTransaction := make(map[tktypes.Bytes32]string)
 
 	mocks.domainSmartContract.On("InitTransaction", ctx, mock.Anything).Run(func(args mock.Arguments) {
 		tx := args.Get(1).(*components.PrivateTransaction)
@@ -501,7 +501,7 @@ func TestEngineMiniLoad(t *testing.T) {
 			// chose a random unclaimed pending state to spend
 			stateIndex := r.Intn(len(unclaimedPendingStatesToMintingTransaction))
 
-			keys := make([]types.Bytes32, len(unclaimedPendingStatesToMintingTransaction))
+			keys := make([]tktypes.Bytes32, len(unclaimedPendingStatesToMintingTransaction))
 			keyIndex := 0
 			for keyName := range unclaimedPendingStatesToMintingTransaction {
 
@@ -522,7 +522,7 @@ func TestEngineMiniLoad(t *testing.T) {
 		numOutputStates := r.Intn(4)
 		outputStates := make([]*components.FullState, numOutputStates)
 		for i := 0; i < numOutputStates; i++ {
-			stateID := types.Bytes32(types.RandBytes(32))
+			stateID := tktypes.Bytes32(tktypes.RandBytes(32))
 			outputStates[i] = &components.FullState{
 				ID: stateID,
 			}
@@ -607,7 +607,7 @@ func TestEngineMiniLoad(t *testing.T) {
 	})
 
 	err := engine.Start()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for i := 0; i < numTransactions; i++ {
 		tx := &components.PrivateTransaction{
@@ -619,7 +619,7 @@ func TestEngineMiniLoad(t *testing.T) {
 			},
 		}
 		txID, err := engine.HandleNewTx(ctx, tx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, txID)
 	}
 
@@ -675,7 +675,7 @@ func pollForStatus(ctx context.Context, t *testing.T, expectedStatus string, eng
 			if s.Status == expectedStatus {
 				return s.Status
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -690,7 +690,7 @@ type dependencyMocks struct {
 	keyManager           *componentmocks.KeyManager
 }
 
-func newEngineForTesting(t *testing.T, domainAddress *types.EthAddress) (Engine, *dependencyMocks) {
+func newEngineForTesting(t *testing.T, domainAddress *tktypes.EthAddress) (Engine, *dependencyMocks) {
 
 	mocks := &dependencyMocks{
 		allComponents:        componentmocks.NewAllComponents(t),

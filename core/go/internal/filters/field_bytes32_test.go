@@ -20,33 +20,34 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBytes32Field(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err := Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`!json`))
+	_, err := Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`!json`))
 	assert.Error(t, err)
 
-	_, err = Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`[]`))
+	_, err = Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`[]`))
 	assert.Regexp(t, "PD010705", err)
 
-	_, err = Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`"not hex"`))
+	_, err = Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"not hex"`))
 	assert.Regexp(t, "PD010719", err)
 
-	_, err = Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`"0xAAbbCCdd"`))
+	_, err = Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0xAAbbCCdd"`))
 	assert.Regexp(t, "PD010719.*4", err)
 
-	v, err := Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`"0x0001020304050607080910111213141516171819202122232425262728293031"`))
-	assert.NoError(t, err)
+	v, err := Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`"0x0001020304050607080910111213141516171819202122232425262728293031"`))
+	require.NoError(t, err)
 	assert.Equal(t, "0001020304050607080910111213141516171819202122232425262728293031", v)
 	assert.Equal(t, "test", Bytes32Field("test").SQLColumn())
 
-	nv, err := Bytes32Field("test").SQLValue(ctx, (types.RawJSON)(`null`))
-	assert.NoError(t, err)
+	nv, err := Bytes32Field("test").SQLValue(ctx, (tktypes.RawJSON)(`null`))
+	require.NoError(t, err)
 	assert.Nil(t, nv)
 
 	assert.False(t, Bytes32Field("test").SupportsLIKE())

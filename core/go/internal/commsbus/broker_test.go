@@ -142,7 +142,7 @@ func TestBroker_SendMessageOK(t *testing.T) {
 
 	// Read the response from the channel
 	response := <-completionChan
-	assert.NoError(t, response)
+	require.NoError(t, response)
 
 }
 
@@ -170,7 +170,7 @@ func TestBroker_SendMessageHandlerTimeout(t *testing.T) {
 
 	// Call the SendMessage method twice to fill up the buffer
 	err = testBroker.SendMessage(ctx, message)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = testBroker.SendMessage(ctx, message)
 	require.Error(t, err)
@@ -295,7 +295,7 @@ func TestBroker_SubscribeToTopicsOK(t *testing.T) {
 
 	// Read the response from the channel
 	response := <-completionChan
-	assert.NoError(t, response)
+	require.NoError(t, response)
 }
 
 func TestBroker_PublishEventsNoSubscribers(t *testing.T) {

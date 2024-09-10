@@ -21,8 +21,9 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/kaleido-io/paladin/core/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetSchemaNotFoundNil(t *testing.T) {
@@ -31,8 +32,8 @@ func TestGetSchemaNotFoundNil(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	s, err := ss.GetSchema(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), false)
-	assert.NoError(t, err)
+	s, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), false)
+	require.NoError(t, err)
 	assert.Nil(t, s)
 }
 
@@ -42,7 +43,7 @@ func TestGetSchemaNotFoundError(t *testing.T) {
 
 	mdb.ExpectQuery("SELECT.*schemas").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	_, err := ss.GetSchema(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), true)
+	_, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), true)
 	assert.Regexp(t, "PD010106", err)
 }
 
@@ -54,7 +55,7 @@ func TestGetSchemaInvalidType(t *testing.T) {
 		[]string{"type"},
 	).AddRow("wrong"))
 
-	_, err := ss.GetSchema(ctx, "domain1", types.Bytes32Keccak(([]byte)("test")).String(), true)
+	_, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")).String(), true)
 	assert.Regexp(t, "PD010103.*wrong", err)
 }
 
@@ -63,7 +64,7 @@ func TestGetSchemaInvalidID(t *testing.T) {
 	defer done()
 
 	_, err := ss.GetSchema(ctx, "domain1", "wrong", true)
-	assert.Regexp(t, "PD010100", err)
+	assert.Regexp(t, "PD020007", err)
 }
 
 func TestListSchemasListIDsFail(t *testing.T) {
@@ -80,7 +81,7 @@ func TestListSchemasGetFullSchemaFail(t *testing.T) {
 	ctx, ss, mdb, done := newDBMockStateStore(t)
 	defer done()
 
-	id := types.Bytes32Keccak(([]byte)("test"))
+	id := tktypes.Bytes32Keccak(([]byte)("test"))
 	mdb.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(
 		id.String(),
 	))

@@ -5,7 +5,6 @@ go 1.22.5
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/aidarkhanov/nanoid v1.0.8
 	github.com/btcsuite/btcd v0.23.5-0.20231215221805-96c9fd8078fd
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/go-resty/resty/v2 v2.14.0
@@ -13,12 +12,12 @@ require (
 	github.com/golangci/golangci-lint v1.60.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240812164533-f19c3b9c5915
+	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240905213624-43a614759076
 	github.com/hyperledger/firefly-common v1.4.8
 	github.com/hyperledger/firefly-signer v1.1.14
 	github.com/iden3/go-iden3-crypto v0.0.16
 	github.com/iden3/go-rapidsnark/witness/v2 v2.0.0
-	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20230524142950-0986cf057d4e
+	github.com/iden3/go-rapidsnark/witness/wasmer v0.0.0-20240621085734-9323fbec34a3
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/rs/cors v1.11.0
 	github.com/serialx/hashring v0.0.0-20200727003509-22c0c7ab6b1b
@@ -26,8 +25,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/vektra/mockery/v2 v2.44.2
-	golang.org/x/crypto v0.26.0
-	golang.org/x/text v0.17.0
+	golang.org/x/crypto v0.27.0
+	golang.org/x/text v0.18.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
 	google.golang.org/protobuf v1.34.2
@@ -41,6 +40,7 @@ require (
 
 require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
+	github.com/aidarkhanov/nanoid v1.0.8 // indirect
 	github.com/karlseguin/ccache v2.0.3+incompatible // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -253,8 +253,8 @@ require (
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988 // indirect
@@ -267,3 +267,5 @@ require (
 )
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
+
+replace github.com/iden3/go-iden3-crypto => github.com/kaleido-io/go-iden3-crypto v0.0.0-20240905154504-333f60687c26

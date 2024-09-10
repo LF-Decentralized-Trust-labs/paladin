@@ -48,7 +48,7 @@ func (p *dispatcher) NextNonce() uint64 {
 	return nextNonce
 }
 
-// Dispatch implements types.Dispatcher.
+// Dispatch implements Dispatcher.
 func (p *dispatcher) Dispatch(ctx context.Context, transactionIDs []uuid.UUID) error {
 	//Placeholder for actual interface to hand over to dispatcher
 	p.sequencedTransactions = append(p.sequencedTransactions, transactionIDs...)
