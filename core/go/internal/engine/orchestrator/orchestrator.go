@@ -144,7 +144,7 @@ var orchestratorConfigDefault = OrchestratorConfig{
 	StaleTimeout:            confutil.P("10m"),
 }
 
-func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract, publisher enginespi.Publisher, sequencer enginespi.Sequencer) *Orchestrator {
+func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress string, oc *OrchestratorConfig, allComponents components.PreInitComponentsAndManagers, domainAPI components.DomainSmartContract, publisher enginespi.Publisher, sequencer enginespi.Sequencer, endorsementGatherer enginespi.EndorsementGatherer) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("orchestrator-%s", contractAddress)),
@@ -169,10 +169,12 @@ func NewOrchestrator(ctx context.Context, nodeID uuid.UUID, contractAddress stri
 
 	newOrchestrator.sequencer = sequencer
 
-	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, enginespi.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &enginespi.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher), []controller.TxStageProcessor{
+	newOrchestrator.StageController = controller.NewPaladinStageController(ctx, enginespi.NewPaladinStageFoundationService(newOrchestrator, allComponents.StateStore(), &enginespi.MockIdentityResolver{}, allComponents.TransportManager(), domainAPI, publisher, allComponents.KeyManager(), endorsementGatherer), []controller.TxStageProcessor{
 		// for now, assume all orchestrators have same stages and register all the stages here
+		//we add them in reverse order to make sure the last stage is the first to be checked for a match
 		&stages.DispatchStage{},
-		stages.NewAttestationStage(sequencer),
+		stages.NewGatherEndorsementsStage(sequencer),
+		stages.NewGatherSignaturesStage(sequencer),
 		stages.NewAssembleStage(sequencer, nodeID.String()),
 	})
 

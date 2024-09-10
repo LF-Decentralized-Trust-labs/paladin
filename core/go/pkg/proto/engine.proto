@@ -48,3 +48,25 @@ message TransactionDispatched {
     string contract_address = 2;
     string transaction_id = 3;
 }
+
+message EndorsementRequest {
+    // TODO we are using google.protobuf.Any here for a few fields that should be more specific
+    // need to figure out the build magic to import these from toolkit protos
+    google.protobuf.Any attestation_request = 1;
+    string transaction_id = 2;
+    string contract_address = 3;
+    string party = 4;
+    google.protobuf.Any transaction_specification = 5;
+    repeated google.protobuf.Any verifiers = 6;
+    repeated google.protobuf.Any signatures = 7;
+    repeated google.protobuf.Any inputStates = 8;
+    repeated google.protobuf.Any outputStates = 9;
+
+}
+
+message EndorsementResponse {
+    string transaction_id = 1;
+    string contract_address = 2;
+    google.protobuf.Any endorsement = 3;
+    optional string revert_reason = 4;
+}
