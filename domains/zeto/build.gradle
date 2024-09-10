@@ -93,7 +93,7 @@ task extractZetoArtifacts(type: Copy, dependsOn: [downloadZetoProver, downloadZe
 task copySolidity(type: Copy, dependsOn: [":solidity:compile"]) {
     inputs.files(fileTree("${rootDir}/solidity/artifacts"))
     from fileTree("${rootDir}/solidity/artifacts") {
-        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
+        include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
     }
     into 'internal/zeto/abis'
 
@@ -105,7 +105,7 @@ task copySolidity(type: Copy, dependsOn: [":solidity:compile"]) {
 task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, ":solidity:compile"]) {
     inputs.files(fileTree("${zkpOut}/artifacts/contracts"))
     from fileTree("${rootDir}/solidity/artifacts") {
-        include 'contracts/zeto/ZetoFactory.sol/ZetoFactory.json'
+        include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
     }
     from fileTree("${zkpOut}/artifacts/contracts") {
         include '**/*.json'
