@@ -188,6 +188,13 @@ abstract class PluginInstance<MSG> {
                         inflightRequests.completeRequest(cid, msg);
                     }
                 }
+                case Service.Header.MessageType.ERROR_RESPONSE -> {
+                    UUID cid = getCorrelationUUID(header);
+                    if (cid != null) {
+                        LOGGER.debug("Received reply {} to {} type {}", header.getMessageId(), cid, header.getMessageType());
+                        inflightRequests.failRequest(cid, new Exception(header.getErrorMessage()));
+                    }
+                }
                 case Service.Header.MessageType.REQUEST_TO_PLUGIN -> {
                     // Dispatch for async handling of the request (do not block this thread at all)
                     CompletableFuture.runAsync(() -> handleRequest(msg)

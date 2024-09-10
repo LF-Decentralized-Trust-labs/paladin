@@ -114,12 +114,16 @@ class PenteTransaction {
     private final byte[] contractConfig;
     private final String from;
     private final String jsonParams;
+    private final long baseBlock;
+    private final Address contract;
     private Values values;
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
+        contract = new Address(tx.getContractAddress());
         contractConfig = tx.getContractConfig().toByteArray();
         from = tx.getFrom();
+        baseBlock = tx.getBaseBlock();
         // Check the ABI params we expect at the top level (we don't mind the order)
         functionDef = new ObjectMapper().readValue(tx.getFunctionAbiJson(), JsonABI.Entry.class);
         for (JsonABI.Parameter param : functionDef.inputs()) {
@@ -209,38 +213,46 @@ class PenteTransaction {
     }
 
     EVMRunner getEVM(long chainId, long blockNumber) throws ClassNotFoundException, IOException {
-//        var evmConfig = EvmConfiguration.DEFAULT;
-//        var evmVersionStr = getConfig().evmVersion();
-//        EVMVersion evmVersion = switch (evmVersionStr) {
-//            case "london" -> EVMVersion.London(chainId, evmConfig);
-//            case "paris" -> EVMVersion.Paris(chainId, evmConfig);
-//            case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
-//            default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
-//        };
-//        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
-        throw new IOException("todo");
+        var evmConfig = EvmConfiguration.DEFAULT;
+        var evmVersionStr = getConfig().evmVersion();
+        EVMVersion evmVersion = switch (evmVersionStr) {
+            case "london" -> EVMVersion.London(chainId, evmConfig);
+            case "paris" -> EVMVersion.Paris(chainId, evmConfig);
+            case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
+            default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
+        };
+        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
     }
 
     boolean requiresABIEncoding() {
         return (abiEntryType == ABIEntryType.DEPLOY || abiEntryType == ABIEntryType.CUSTOM_FUNCTION);
     }
 
+    enum ABIEncodingRequestType {
+        CONSTRUCTOR_PARAMS("constructorParams"),
+        FUNCTION_PARAMS("functionParams")
+        ;
+        private final String text;
+        @Override
+        public String toString() { return text; }
+        ABIEncodingRequestType(final String text) { this.text = text; }
+    }
+
     ToDomain.ABIEncodingRequest getABIEncodingRequest() throws IOException, IllegalStateException {
         String paramsJSON = new ObjectMapper().writeValueAsString(getValues().inputs);
         switch (abiEntryType) {
         case ABIEntryType.DEPLOY -> {
-            JsonABI.Entry constructorEntry = JsonABI.newConstructor(defs.inputs.components());
             return ToDomain.ABIEncodingRequest.newBuilder().
-                    setName("constructorParams").
+                    setName(ABIEncodingRequestType.CONSTRUCTOR_PARAMS.text).
                     setAbiEncodingType(ToDomain.ABIEncodingRequest.ABIEncodingType.TUPLE).
-                    setAbiEntry(constructorEntry.toJSON(false)).
+                    setAbiEntry(defs.inputs.toJSON(false)).
                     setParamsJson(paramsJSON).
                     build();
         }
         case ABIEntryType.CUSTOM_FUNCTION -> {
             JsonABI.Entry functionEntry = JsonABI.newFunction(functionDef.name(), defs.inputs.components(), JsonABI.newParameters());
             return ToDomain.ABIEncodingRequest.newBuilder().
-                    setName("constructorParams").
+                    setName(ABIEncodingRequestType.FUNCTION_PARAMS.text).
                     setAbiEncodingType(ToDomain.ABIEncodingRequest.ABIEncodingType.TUPLE).
                     setAbiEntry(functionEntry.toJSON(false)).
                     setParamsJson(paramsJSON).
@@ -248,6 +260,15 @@ class PenteTransaction {
         }
         default -> throw new IllegalStateException("no ABI encoding required for %s".formatted(abiEntryType));
         }
+    }
+
+    byte[] getABIEncodedData(List<ToDomain.ABIEncodedData> abiEncodedData, ABIEncodingRequestType type) {
+        for (var data : abiEncodedData) {
+            if (data.getName().equals(type.text)) {
+                return data.getData().toByteArray();
+            }
+        }
+        throw new IllegalArgumentException("missing ABI encoded data '%s'".formatted(type.text));
     }
 
     private JsonABI.Parameter checkABIMatch(JsonABI.Parameter param, String ...expectedTypes) throws IllegalArgumentException {
@@ -276,6 +297,17 @@ class PenteTransaction {
         return defs;
     }
 
+    Address getFromVerifier(List<ToDomain.ResolvedVerifier> verifiers) {
+        for (var verifier : verifiers) {
+            if (verifier.getAlgorithm().equals(Algorithms.ECDSA_SECP256K1_PLAINBYTES) && verifier.getLookup().equals(from)) {
+                return new Address(verifier.getVerifier());
+            }
+        }
+        throw new IllegalArgumentException("missing resolved %s verifier for '%s'".formatted(Algorithms.ECDSA_SECP256K1_PLAINBYTES, from));
+    }
+
     String getFrom() { return from; }
+
+    long getBaseBlock() { return baseBlock; }
 
 }

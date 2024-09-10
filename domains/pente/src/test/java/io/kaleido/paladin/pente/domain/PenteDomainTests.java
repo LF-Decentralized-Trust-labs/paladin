@@ -66,7 +66,9 @@ public class PenteDomainTests {
                                 JsonABI.newParameter("members", "string[]")
                         )),
                         JsonABI.newParameter("bytecode", "bytes"),
-                        JsonABI.newTuple("inputs", "None", JsonABI.newParameters())
+                        JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                JsonABI.newParameter("x", "uint256")
+                        ))
                 ),
                 JsonABI.newParameters()
         );
@@ -99,7 +101,9 @@ public class PenteDomainTests {
             Map<String, Object> deployValues = new HashMap<>() {{
                 put("group", groupInfo);
                 put("bytecode", simpleStorageBytecode);
-                put("inputs", Collections.emptyMap());
+                put("inputs", new HashMap<>() {{
+                    put("x", "1122334455");
+                }});
             }};
             testbed.getRpcClient().request("testbed_invoke",
                     new PrivateContractInvoke(

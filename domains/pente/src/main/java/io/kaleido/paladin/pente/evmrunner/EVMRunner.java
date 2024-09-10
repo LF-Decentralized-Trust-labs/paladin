@@ -20,10 +20,12 @@ import io.kaleido.paladin.pente.evmstate.DebugEVMTracer;
 import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
 import io.kaleido.paladin.pente.evmstate.VirtualBlockchain;
 import org.apache.tuweni.bytes.Bytes;
+import org.bouncycastle.jcajce.provider.digest.Keccak;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.evm.Code;
+import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.precompile.PrecompileContractRegistry;
 import org.hyperledger.besu.evm.processor.ContractCreationProcessor;
@@ -37,8 +39,12 @@ import org.web3j.abi.TypeReference;
 import org.web3j.abi.Utils;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
+import org.web3j.rlp.RlpEncoder;
+import org.web3j.rlp.RlpList;
+import org.web3j.rlp.RlpString;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -73,15 +79,39 @@ public class EVMRunner {
             Bytes codeBytes,
             Type ...parameters
     ) {
-
         // Use web3j to encode the input data
+        Bytes constructorParamsBytes = null;
         if (parameters.length > 0) {
             String constructorParamsHex = FunctionEncoder.encodeConstructor(List.of(parameters));
-            Bytes constructorParamsBytes = Bytes.fromHexString(constructorParamsHex);
+            constructorParamsBytes = Bytes.fromHexString(constructorParamsHex);
+        }
+        return runContractDeploymentBytes(sender, smartContractAddress, codeBytes, constructorParamsBytes);
+    }
+
+    public static Address nonceSmartContractAddress(Address address, long nonce) {
+        var rlpBytes = RlpEncoder.encode(new RlpList(
+                RlpString.create(address.toArray()),
+                RlpString.create(nonce)
+        ));
+        var hash = new Keccak.Digest256().digest(rlpBytes);
+        return Address.wrap(Bytes.wrap(Arrays.copyOfRange(hash, 12, hash.length)));
+    }
+
+    public MessageFrame runContractDeploymentBytes(
+            Address sender,
+            Address smartContractAddress,
+            Bytes codeBytes,
+            Bytes constructorParamsBytes
+    ) {
+        if (constructorParamsBytes != null) {
             codeBytes = Bytes.wrap(codeBytes, constructorParamsBytes);
         }
+
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
-        this.world.getUpdater().getOrCreate(sender);
+        var senderAccount = this.world.getUpdater().getOrCreate(sender);
+        if (smartContractAddress == null) {
+            smartContractAddress = nonceSmartContractAddress(senderAccount.getAddress(), senderAccount.getNonce());
+        }
 
         // Build the message frame
         final MessageFrame frame =
@@ -131,6 +161,15 @@ public class EVMRunner {
         // Use web3j to encode the call data
         Function function = new Function(methodName, List.of(parameters), List.of());
         String callDataHex = FunctionEncoder.encode(function);
+        logger.debug("Invoking {} from {} to contract address {}", methodSignature(function), sender, smartContractAddress);
+        return runContractInvokeBytes(sender, smartContractAddress, Bytes.fromHexString(callDataHex));
+    }
+
+    public MessageFrame runContractInvokeBytes(
+            Address sender,
+            Address smartContractAddress,
+            Bytes callData
+    ) {
         this.world.getUpdater().getOrCreate(sender);
 
         // Build the message frame
@@ -146,7 +185,7 @@ public class EVMRunner {
                         .address(smartContractAddress)
                         .contract(smartContractAddress)
                         .code(code)
-                        .inputData(Bytes.fromHexString(callDataHex))
+                        .inputData(callData)
                         .gasPrice(Wei.ZERO)
                         .value(Wei.ZERO)
                         .apparentValue(Wei.ZERO)
@@ -157,7 +196,6 @@ public class EVMRunner {
                         .maxStackSize(Integer.MAX_VALUE)
                         .completer(__ -> {})
                         .build();
-        logger.debug("Invoking {} from {} to contract address {}", methodSignature(function), sender, smartContractAddress);
         this.runFrame(frame);
         return frame;
     }

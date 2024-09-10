@@ -133,6 +133,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	res, err := dc.api.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
 		ResolvedVerifiers: preAssembly.Verifiers,
+		AbiEncodedData:    preAssembly.ABIEncodedData,
 	})
 	if err != nil {
 		return err

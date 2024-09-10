@@ -43,7 +43,10 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
     }
 
     protected CompletableFuture<FromDomain.FindAvailableStatesResponse> findAvailableStates(FromDomain.FindAvailableStatesRequest request) {
-        Service.DomainMessage message = Service.DomainMessage.newBuilder().setHeader(newRequestHeader()).build();
+        Service.DomainMessage message = Service.DomainMessage.newBuilder().
+                setHeader(newRequestHeader()).
+                setFindAvailableStates(request).
+                build();
         return requestReply(message).thenApply(Service.DomainMessage::getFindAvailableStatesRes);
     }
 

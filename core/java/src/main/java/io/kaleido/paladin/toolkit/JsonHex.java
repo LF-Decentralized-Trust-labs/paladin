@@ -78,6 +78,7 @@ public abstract class JsonHex {
     @JsonDeserialize(using = JsonDeserializerBytes32.class)
     @JsonSerialize(using = JsonSerializerBytes32.class)
     public static class Bytes32 extends JsonHex {
+        public static Bytes32 ZERO = new Bytes32(new byte[32]);
         public Bytes32(String str) {
             super(str, 32);
         }

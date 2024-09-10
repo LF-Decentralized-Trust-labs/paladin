@@ -150,6 +150,11 @@ public class JsonQuery {
             return this;
         }
 
+        @Override
+        public final String json() throws IOException {
+            return new ObjectMapper().writeValueAsString(this.query);
+        }
+
     }
 
     public static enum Modifier {
@@ -268,7 +273,7 @@ public class JsonQuery {
             return root().build();
 
         }
-        public final String json() throws IOException {
+        public String json() throws IOException {
             return root().json();
         }
 

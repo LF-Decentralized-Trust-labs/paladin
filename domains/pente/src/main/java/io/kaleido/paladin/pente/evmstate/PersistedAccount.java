@@ -171,8 +171,8 @@ public class PersistedAccount implements Account {
 
     public byte[] serialize() {
         try {
-            JsonHex.Bytes32 jsonCodeHash = null;
-            JsonHex.Bytes jsonCode = null;
+            JsonHex.Bytes32 jsonCodeHash = JsonHex.Bytes32.ZERO;
+            JsonHex.Bytes jsonCode = new JsonHex.Bytes(new byte[0]);
             var codehash = this.getCodeHash();
             if (codehash != null) {
                 jsonCodeHash = new JsonHex.Bytes32(this.getCodeHash().toArray());
@@ -213,7 +213,7 @@ public class PersistedAccount implements Account {
             PersistedAccount account = new PersistedAccount(Address.wrap(Bytes.wrap(jsonAccount.address().getBytes())));
             account.nonce = jsonAccount.nonce;
             account.balance = Wei.of(jsonAccount.balance);
-            if (jsonAccount.codeHash != null) {
+            if (!jsonAccount.codeHash.equals(JsonHex.Bytes32.ZERO)) {
                 account.code = Bytes.wrap(jsonAccount.code.getBytes());
                 if (!account.getCodeHash().equals(Bytes.wrap(jsonAccount.codeHash.getBytes()))) {
                     throw new IllegalArgumentException("code bytes hash mismatch");

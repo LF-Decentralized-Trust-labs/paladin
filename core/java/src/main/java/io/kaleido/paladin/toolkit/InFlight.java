@@ -17,6 +17,7 @@ package io.kaleido.paladin.toolkit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -63,6 +64,14 @@ public class InFlight<K, V> {
             req.complete(value);
         }
      }
+
+    public synchronized void failRequest(K id, Throwable e) {
+        CompletableFuture<V> req = requests.remove(id);
+        LOGGER.error(new FormattedMessage("failed request {}", id), e);
+        if (req != null) {
+            req.completeExceptionally(e);
+        }
+    }
 
     private synchronized void cancelRequest(K id) {
         CompletableFuture<V> req = requests.remove(id);

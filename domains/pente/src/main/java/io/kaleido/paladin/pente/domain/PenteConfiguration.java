@@ -31,6 +31,7 @@ import org.web3j.abi.TypeEncoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.*;
 import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.reflection.Parameterized;
 
 import java.io.*;
 import java.math.BigInteger;
@@ -52,7 +53,7 @@ public class PenteConfiguration {
 
     private Address address;
 
-    private String schemaId_AccountStateV20240902;
+    private String schemaId_AccountState_v24_9_0;
 
     record Schema(String id, String signature, JsonABI.Parameter def) {}
 
@@ -175,45 +176,42 @@ public class PenteConfiguration {
         String evmVersion();
     }
 
-    public record Endorsement_V0(
-            String evmVersion,
-            int threshold,
-            List<Address> addresses
-    ) implements OnChainConfig {}
+    public static class Endorsement_V0 extends DynamicStruct implements OnChainConfig {
+        public Utf8String evmVersion;
+        public Uint256 threshold;
+        public DynamicArray<org.web3j.abi.datatypes.Address> addresses;
+        public Endorsement_V0(
+                Utf8String evmVersion,
+                Uint256 threshold,
+                @Parameterized(type = org.web3j.abi.datatypes.Address.class)
+                DynamicArray<org.web3j.abi.datatypes.Address> addresses) {
+            super(evmVersion, threshold, addresses);
+            this.evmVersion = evmVersion;
+            this.threshold = threshold;
+            this.addresses = addresses;
+        }
 
-    public  static JsonHex.Bytes abiEncoder_Endorsement_V0(Endorsement_V0 config) {
-        var w3EVMVersion = new org.web3j.abi.datatypes.Utf8String(config.evmVersion());
-        var w3Threshold = new Uint256(config.threshold());
-        var w3Addresses = new ArrayList<org.web3j.abi.datatypes.Address>(config.addresses().size());
-        for (var addr : config.addresses()) {
+        public String evmVersion() {
+            return evmVersion.getValue();
+        }
+    }
+
+    public static JsonHex.Bytes abiEncoder_Endorsement_V0(String evmVersion, int threshold, List<JsonHex.Address> endorsers) {
+        var w3Addresses = new ArrayList<org.web3j.abi.datatypes.Address>(endorsers.size());
+        for (var addr : endorsers) {
             org.web3j.abi.datatypes.Address w3Address = new org.web3j.abi.datatypes.Address(addr.to0xHex());
             w3Addresses.add(w3Address);
         }
         var w3AddressArray = new DynamicArray<>(org.web3j.abi.datatypes.Address.class, w3Addresses);
-        return new JsonHex.Bytes(TypeEncoder.encode(new DynamicStruct(w3EVMVersion, w3Threshold, w3AddressArray)));
+        return new JsonHex.Bytes(TypeEncoder.encode(new Endorsement_V0(
+                new org.web3j.abi.datatypes.Utf8String(evmVersion),
+                new Uint256(threshold),
+                w3AddressArray
+        )));
     }
 
     public static Endorsement_V0 abiDecoder_Endorsement_V0(JsonHex data, int offset) throws ClassNotFoundException {
-        var struct = new DynamicStruct(
-                Utf8String.DEFAULT,
-                Uint256.DEFAULT,
-                new DynamicArray<>(org.web3j.abi.datatypes.Address.class)
-        );
-        var result = TypeDecoder.decodeDynamicStruct(data.to0xHex(), 2 + (2 * offset), TypeReference.create(struct.getClass()));
-        var fields = result.getValue();
-        var w3EVMVersion = (Utf8String)fields.getFirst();
-        var w3Threshold = (Uint256)fields.get(1);
-        //noinspection unchecked
-        var w3Addresses = ((DynamicArray<org.web3j.abi.datatypes.Address>) fields.get(2)).getValue();
-        var addresses = new ArrayList<Address>(w3Addresses.size());
-        for (var w3Address : w3Addresses) {
-            addresses.add(new Address(w3Address.getValue()));
-        }
-        return new Endorsement_V0(
-                w3EVMVersion.getValue(),
-                w3Threshold.getValue().intValue(),
-                addresses
-        );
+        return TypeDecoder.decodeDynamicStruct(data.to0xHex(), 2 + (2 * offset), TypeReference.create(Endorsement_V0.class));
     }
 
     static OnChainConfig decodeConfig(byte[] constructorConfig) throws IllegalArgumentException, ClassNotFoundException {
@@ -262,20 +260,20 @@ public class PenteConfiguration {
         if (schemas.size() != schemaDefs.size()) {
             throw new IllegalStateException("expected %d schemas, received %d".formatted(schemaDefs.size(), schemas.size()));
         }
-        schemaId_AccountStateV20240902 = schemas.getFirst().getId();
-        schemasByID.put(schemaId_AccountStateV20240902, new Schema(
+        schemaId_AccountState_v24_9_0 = schemas.getFirst().getId();
+        schemasByID.put(schemaId_AccountState_v24_9_0, new Schema(
                 schemas.getFirst().getId(),
                 schemas.getFirst().getSignature(),
                 abiTuple_AccountState_v24_9_0()
         ));
     }
 
-    synchronized Schema schema_AccountStateV20240902() {
-        return schemasByID.get(schemaId_AccountStateV20240902);
+    synchronized Schema schema_AccountState_v24_9_0() {
+        return schemasByID.get(schemaId_AccountState_v24_9_0);
     }
 
     synchronized Schema schema_AccountStateLatest() {
-        return schema_AccountStateV20240902();
+        return schema_AccountState_v24_9_0();
     }
 
 }

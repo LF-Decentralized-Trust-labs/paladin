@@ -18,6 +18,7 @@ package io.kaleido.paladin.pente.domain;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.FromDomain;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
+import io.kaleido.paladin.pente.evmstate.AccountLoader;
 import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import io.kaleido.paladin.toolkit.Algorithms;
 import io.kaleido.paladin.toolkit.DomainInstance;
@@ -27,6 +28,8 @@ import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import io.kaleido.paladin.toolkit.JsonQuery;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.tuweni.bytes.Bytes;
+import org.hyperledger.besu.evm.frame.MessageFrame;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,7 +38,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public class PenteDomain extends DomainInstance {
     private static final Logger LOGGER = LogManager.getLogger(PenteDomain.class);
@@ -168,11 +170,11 @@ public class PenteDomain extends DomainInstance {
             var resolvedVerifiers = getResolvedEndorsers(params.group().salt(), params.group().members(), request.getResolvedVerifiersList());
             var onchainConfBuilder = new ByteArrayOutputStream();
             onchainConfBuilder.write(PenteConfiguration.intToBytes4(PenteConfiguration.PenteConfigID_Endorsement_V0));
-            onchainConfBuilder.write(PenteConfiguration.abiEncoder_Endorsement_V0(new PenteConfiguration.Endorsement_V0(
+            onchainConfBuilder.write(PenteConfiguration.abiEncoder_Endorsement_V0(
                     params.evmVersion(),
                     resolvedVerifiers.size(),
                     resolvedVerifiers
-            )).getBytes());
+            ).getBytes());
             var response = ToDomain.PrepareDeployResponse.newBuilder();
             response.getTransactionBuilder().
                     setFunctionName("newPrivacyGroup").
@@ -207,9 +209,32 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
         try {
-//            var tx = new PenteTransaction(this, request.getTransaction());
-//            var evm = tx.getEVM(config.getChainId());
-            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+            var tx = new PenteTransaction(this, request.getTransaction());
+            var evm = tx.getEVM(config.getChainId(), tx.getBaseBlock());
+            var values = tx.getValues();
+            var besuSender = org.hyperledger.besu.datatypes.Address.wrap(Bytes.wrap(tx.getFromVerifier(request.getResolvedVerifiersList()).getBytes()));
+            MessageFrame execResult;
+            if (values.to() == null) {
+                execResult = evm.runContractDeploymentBytes(
+                    besuSender,
+                    null,
+                    Bytes.wrap(tx.getValues().bytecode().getBytes()),
+                    Bytes.wrap(tx.getABIEncodedData(request.getAbiEncodedDataList(), PenteTransaction.ABIEncodingRequestType.CONSTRUCTOR_PARAMS))
+                );
+            } else {
+                execResult = evm.runContractInvokeBytes(
+                    besuSender,
+                    org.hyperledger.besu.datatypes.Address.fromHexString(values.to()),
+                    Bytes.wrap(tx.getABIEncodedData(request.getAbiEncodedDataList(), PenteTransaction.ABIEncodingRequestType.FUNCTION_PARAMS))
+                );
+            }
+            var result = ToDomain.AssembleTransactionResponse.newBuilder();
+            if (execResult.getState() != MessageFrame.State.COMPLETED_SUCCESS) {
+                result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.REVERT);
+            } else {
+                result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
+            }
+            return CompletableFuture.completedFuture(result.build());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -225,18 +250,41 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
-    class PenteAccountLoader {
-        public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) throws IOException, ExecutionException, InterruptedException {
-            var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
-                    setQueryJson(JsonQuery.newBuilder().
-                            limit(1).
-                            isEqual("address", address.toString()).
-                            json()).
-                    build()).get();
-            if (response.getStatesList().size() != 1) {
-                return Optional.empty();
+    PenteAccountLoader accountLoader() {
+        return new PenteAccountLoader();
+    }
+
+    class PenteAccountLoader implements AccountLoader {
+        public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) throws IOException {
+            return withIOException(() -> {
+                var queryJson = JsonQuery.newBuilder().
+                        limit(1).
+                        isEqual("address", address.toString()).
+                        json();
+                var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
+                        setSchemaId(config.schema_AccountState_v24_9_0().id()).
+                        setQueryJson(queryJson).
+                        build()).get();
+                if (response.getStatesCount() != 1) {
+                    return Optional.empty();
+                }
+                return Optional.of(PersistedAccount.deserialize(response.getStates(0).getDataJsonBytes().toByteArray()));
+            });
+        }
+    }
+
+    @FunctionalInterface
+    public interface SupplierEx<T> { T get() throws Exception; }
+    static <ReturnType> ReturnType withIOException(SupplierEx<ReturnType> fn) throws IOException {
+        try {
+            return fn.get();
+        } catch(IOException e) {
+            throw e;
+        } catch (Exception e) {
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException)(e);
             }
-            throw new IOException("todo");
+            throw new RuntimeException(e);
         }
     }
 }
