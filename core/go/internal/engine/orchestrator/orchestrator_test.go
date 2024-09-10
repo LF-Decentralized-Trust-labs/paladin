@@ -26,21 +26,58 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/enginemocks"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
+type orchestratorDepencyMocks struct {
+	allComponents        *componentmocks.AllComponents
+	domainStateInterface *componentmocks.DomainStateInterface
+	domainSmartContract  *componentmocks.DomainSmartContract
+	domainMgr            *componentmocks.DomainManager
+	transportManager     *componentmocks.TransportManager
+	stateStore           *componentmocks.StateStore
+	keyManager           *componentmocks.KeyManager
+	publisher            *enginemocks.Publisher
+	sequencer            *enginemocks.Sequencer
+	endorsementGatherer  *enginemocks.EndorsementGatherer
+}
+
+func newOrchestratorForTesting(t *testing.T, ctx context.Context, domainAddress *tktypes.EthAddress) (*Orchestrator, *orchestratorDepencyMocks) {
+	if domainAddress == nil {
+		domainAddress = tktypes.MustEthAddress(tktypes.RandHex(20))
+	}
+
+	mocks := &orchestratorDepencyMocks{
+		allComponents:        componentmocks.NewAllComponents(t),
+		domainStateInterface: componentmocks.NewDomainStateInterface(t),
+		domainSmartContract:  componentmocks.NewDomainSmartContract(t),
+		domainMgr:            componentmocks.NewDomainManager(t),
+		transportManager:     componentmocks.NewTransportManager(t),
+		stateStore:           componentmocks.NewStateStore(t),
+		keyManager:           componentmocks.NewKeyManager(t),
+		publisher:            enginemocks.NewPublisher(t),
+		sequencer:            enginemocks.NewSequencer(t),
+		endorsementGatherer:  enginemocks.NewEndorsementGatherer(t),
+	}
+	mocks.allComponents.On("StateStore").Return(mocks.stateStore).Maybe()
+	mocks.allComponents.On("DomainManager").Return(mocks.domainMgr).Maybe()
+	mocks.allComponents.On("TransportManager").Return(mocks.transportManager).Maybe()
+	mocks.allComponents.On("KeyManager").Return(mocks.keyManager).Maybe()
+	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
+
+	o := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), domainAddress.String(), &OrchestratorConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.publisher, mocks.sequencer, mocks.endorsementGatherer)
+
+	return o, mocks
+
+}
+
 func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	ctx := context.Background()
-	mockAllComponents := componentmocks.NewAllComponents(t)
-	mockStateStore := componentmocks.NewStateStore(t)
-	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
-	mockTransportManger := componentmocks.NewTransportManager(t)
-	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
-	mockPublisher := enginemocks.NewPublisher(t)
-	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+
+	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -87,14 +124,7 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 
 func TestOrchestratorHandleEvents(t *testing.T) {
 	ctx := context.Background()
-	mockAllComponents := componentmocks.NewAllComponents(t)
-	mockStateStore := componentmocks.NewStateStore(t)
-	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
-	mockTransportManger := componentmocks.NewTransportManager(t)
-	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
-	mockPublisher := enginemocks.NewPublisher(t)
-	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
 	newTxID := uuid.New()
 	testTx := &transactionstore.TransactionWrapper{
 		Transaction: transactionstore.Transaction{
@@ -166,15 +196,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mockAllComponents := componentmocks.NewAllComponents(t)
-	mockStateStore := componentmocks.NewStateStore(t)
-	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
-	mockTransportManger := componentmocks.NewTransportManager(t)
-	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
-
-	mockPublisher := enginemocks.NewPublisher(t)
-	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
 	ocDone, err := testOc.Start(ctx)
 	require.NoError(t, err)
 	testOc.TriggerOrchestratorEvaluation()
@@ -185,14 +207,7 @@ func TestOrchestratorPollingLoopStop(t *testing.T) {
 func TestOrchestratorPollingLoopCancelContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
-	mockAllComponents := componentmocks.NewAllComponents(t)
-	mockStateStore := componentmocks.NewStateStore(t)
-	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
-	mockTransportManger := componentmocks.NewTransportManager(t)
-	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
-	mockPublisher := enginemocks.NewPublisher(t)
-	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
 
 	cancel()
 	ocDone, err := testOc.Start(ctx)
@@ -213,14 +228,8 @@ func TestOrchestratorPollingLoopRemoveCompletedTx(t *testing.T) {
 			ID: newTxID,
 		},
 	}
-	mockAllComponents := componentmocks.NewAllComponents(t)
-	mockStateStore := componentmocks.NewStateStore(t)
-	mockAllComponents.On("StateStore").Return(mockStateStore).Maybe()
-	mockTransportManger := componentmocks.NewTransportManager(t)
-	mockAllComponents.On("TransportManager").Return(mockTransportManger).Maybe()
-	mockPublisher := enginemocks.NewPublisher(t)
-	mockSequencer := enginemocks.NewSequencer(t)
-	testOc := NewOrchestrator(ctx, uuid.Must(uuid.NewUUID()), "test_contract_address", &OrchestratorConfig{}, mockAllComponents, &componentmocks.DomainSmartContract{}, mockPublisher, mockSequencer)
+	testOc, _ := newOrchestratorForTesting(t, ctx, nil)
+
 	mSC := enginemocks.StageController{}
 	testOc.StageController = &mSC
 
