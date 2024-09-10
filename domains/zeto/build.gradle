@@ -57,7 +57,6 @@ task downloadZetoProver {
     doFirst {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-        f.setExecutable(true)
     }
     outputs.file(f)
 }
@@ -69,7 +68,6 @@ task downloadZetoTestProvingKeys {
     doFirst {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-        f.setExecutable(true)
     }
     outputs.file(f)
 }
@@ -81,7 +79,6 @@ task downloadZetoCompiledContracts {
     doFirst {
         mkdir(f.parent)
         new URL(url).withInputStream{ i -> f.withOutputStream{ it << i }}
-        f.setExecutable(true)
     }
     outputs.file(f)
 }
@@ -91,8 +88,6 @@ task extractZetoArtifacts(type: Copy, dependsOn: [downloadZetoProver, downloadZe
     from tarTree("${toolsOut}/zeto-test-proving-keys-${zetoVersion}.tar.gz")
     from tarTree("${toolsOut}/zeto-contracts-${zetoVersion}.tar.gz")
     into zkpOut
-
-    outputs.dir(zkpOut)
 }
 
 task copySolidity(type: Copy, dependsOn: [":solidity:compile"]) {
@@ -129,6 +124,7 @@ task testE2E(type: Exec) {
     inputs.files(goFiles)
     inputs.files(goFilesE2E)
     inputs.file('./integration-test/config-for-deploy.yaml')
+    inputs.file('./integration-test/config-local.yaml')
     outputs.dir('coverage')
 
     workingDir '.'

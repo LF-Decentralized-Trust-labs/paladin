@@ -249,7 +249,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		"outputs": outputs,
 		"proof":   h.encodeProof(proofRes.Proof),
 	}
-	if h.zeto.config.TokenName == "Zeto_AnonEnc" {
+	if tx.DomainConfig.TokenName == "Zeto_AnonEnc" {
 		params["encryptionNonce"] = proofRes.PublicInputs["encryptionNonce"]
 		params["encryptedValues"] = strings.Split(proofRes.PublicInputs["encryptedValues"], ",")
 	}

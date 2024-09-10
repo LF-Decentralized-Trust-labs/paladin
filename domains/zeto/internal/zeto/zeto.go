@@ -42,7 +42,6 @@ type Zeto struct {
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
-	contractAbi abi.ABI
 }
 
 func New(callbacks plugintk.DomainCallbacks) (*Zeto, error) {
