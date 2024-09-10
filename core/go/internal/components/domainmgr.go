@@ -60,7 +60,7 @@ type DomainSmartContract interface {
 	AssembleTransaction(ctx context.Context, tx *PrivateTransaction) error
 	WritePotentialStates(ctx context.Context, tx *PrivateTransaction) error
 	LockStates(ctx context.Context, tx *PrivateTransaction) error
-	EndorseTransaction(ctx context.Context, tx *PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
+	EndorseTransaction(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*EndorsementResult, error)
 	ResolveDispatch(ctx context.Context, tx *PrivateTransaction) error
 	PrepareTransaction(ctx context.Context, tx *PrivateTransaction) error
 }
