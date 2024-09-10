@@ -99,10 +99,9 @@ task copyTestContracts(type: Copy) {
 task copyTestbedContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
     from fileTree(configurations.compiledContracts.asPath) {
-        include 'contracts/testbed_sim/SIMDomain.sol/SIMDomain.json'
-        include 'contracts/testbed_sim/SIMToken.sol/SIMToken.json'
-        include 'contracts/interfaces/IPaladinDomain.sol/IPaladinDomain_V0.json'
-        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+        include 'contracts/domains/testbed_sim/SIMDomain.sol/SIMDomain.json'
+        include 'contracts/domains/testbed_sim/SIMToken.sol/SIMToken.json'
+        include 'contracts/domains/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
     }
     into 'pkg/testbed/abis'
 
@@ -114,7 +113,7 @@ task copyTestbedContracts(type: Copy) {
 task copyDomainManagerContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
     from fileTree(configurations.compiledContracts.asPath) {
-        include 'contracts/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+        include 'contracts/domains/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
     }
     into 'internal/domainmgr/abis'
 
@@ -466,6 +465,5 @@ task build {
 
 dependencies {
     libcore files(buildSharedLibrary)
-    goSource files(goFiles, protoc, makeMocks)
+    goSource files(goFiles, protoc, makeMocks, copyContracts)
 }
-

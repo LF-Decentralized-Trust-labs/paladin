@@ -43,6 +43,22 @@ var NotoABI = abi.ABI{
 			{Name: "amount", Type: "uint256"},
 		},
 	},
+	{
+		Name: "approvedTransfer",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "to", Type: "string"},
+			{Name: "amount", Type: "uint256"},
+		},
+	},
+	{
+		Name: "approve",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "delegate", Type: "address"},
+			{Name: "call", Type: "bytes"}, // assumed to be an encoded "approvedTransfer"
+		},
+	},
 }
 
 type ConstructorParams struct {
@@ -57,4 +73,9 @@ type MintParams struct {
 type TransferParams struct {
 	To     string               `json:"to"`
 	Amount *ethtypes.HexInteger `json:"amount"`
+}
+
+type ApproveParams struct {
+	Delegate ethtypes.Address0xHex     `json:"delegate"`
+	Call     ethtypes.HexBytes0xPrefix `json:"call"`
 }
