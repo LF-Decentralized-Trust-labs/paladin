@@ -19,6 +19,7 @@ CREATE TABLE indexed_transactions (
     FOREIGN KEY ("block_number") REFERENCES indexed_blocks ("number") ON DELETE CASCADE
 );
 CREATE INDEX indexed_transaction_id ON indexed_transactions("hash");
+CREATE UNIQUE INDEX indexed_transaction_from_nonce ON indexed_transactions("from","nonce");
 
 CREATE TABLE indexed_events (
     "transaction_hash"  TEXT    NOT NULL,
