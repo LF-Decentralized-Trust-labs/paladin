@@ -46,6 +46,7 @@ describe("Atom", function () {
     const encoded1 = noto.interface.encodeFunctionData("approvedTransfer", [
       [f1txo1, f1txo2],
       [f1txo3, f1txo4],
+      randomBytes32(),
       f1TxData,
     ]);
     const encoded2 = erc20.interface.encodeFunctionData("transferFrom", [
@@ -127,6 +128,7 @@ describe("Atom", function () {
     const encoded1 = noto.interface.encodeFunctionData("approvedTransfer", [
       [f1txo1, f1txo2],
       [f1txo3, f1txo4],
+      randomBytes32(),
       f1TxData,
     ]);
 
