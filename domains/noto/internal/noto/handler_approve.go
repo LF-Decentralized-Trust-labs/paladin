@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -52,11 +53,30 @@ func (h *approveHandler) ValidateParams(ctx context.Context, params string) (int
 
 func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	return &pb.InitTransactionResponse{
-		RequiredVerifiers: []*pb.ResolveVerifierRequest{},
+		RequiredVerifiers: []*pb.ResolveVerifierRequest{
+			{
+				Lookup:    tx.Transaction.From,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
+		},
 	}, nil
 }
 
 func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.ApproveParams)
+	transferParams, err := h.decodeTransfer(ctx, params.Call)
+	if err != nil {
+		return nil, err
+	}
+	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
+		tx.ContractAddress,
+		transferParams.Inputs,
+		transferParams.Outputs,
+		transferParams.Data)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.AssembleTransactionResponse{
 		AssemblyResult: pb.AssembleTransactionResponse_OK,
 		AssembledTransaction: &pb.AssembledTransaction{
@@ -64,6 +84,15 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 			OutputStates: []*pb.NewState{},
 		},
 		AttestationPlan: []*pb.AttestationRequest{
+			// Sender confirms the initial request with a signature
+			{
+				Name:            "sender",
+				AttestationType: pb.AttestationType_SIGN,
+				Algorithm:       algorithms.ECDSA_SECP256K1_PLAINBYTES,
+				Payload:         encodedTransfer,
+				Parties:         []string{req.Transaction.From},
+			},
+			// Notary will endorse the assembled transaction (by submitting to the ledger)
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
@@ -74,7 +103,38 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
+func (h *approveHandler) validateSenderSignature(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) error {
+	params := tx.Params.(*types.ApproveParams)
+	transferParams, err := h.decodeTransfer(ctx, params.Call)
+	if err != nil {
+		return err
+	}
+	signature := domain.FindAttestation("sender", req.Signatures)
+	if signature == nil {
+		return fmt.Errorf("did not find 'sender' attestation")
+	}
+	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
+		tx.ContractAddress,
+		transferParams.Inputs,
+		transferParams.Outputs,
+		transferParams.Data)
+	if err != nil {
+		return err
+	}
+	signingAddress, err := h.noto.recoverSignature(ctx, encodedTransfer, signature.Payload)
+	if err != nil {
+		return err
+	}
+	if signingAddress.String() != signature.Verifier.Verifier {
+		return fmt.Errorf("sender signature does not match")
+	}
+	return nil
+}
+
 func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+	if err := h.validateSenderSignature(ctx, tx, req); err != nil {
+		return nil, err
+	}
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
@@ -108,7 +168,7 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	txhash, err := h.noto.encodeTransferMasked(ctx,
+	encodedTransfer, err := h.noto.encodeTransferMasked(ctx,
 		tx.ContractAddress,
 		transferParams.Inputs,
 		transferParams.Outputs,
@@ -116,11 +176,15 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
+	signature := domain.FindAttestation("sender", req.AttestationResult)
+	if signature == nil {
+		return nil, fmt.Errorf("did not find 'sender' attestation")
+	}
 
 	approveParams := map[string]interface{}{
 		"delegate":  params.Delegate,
-		"txhash":    txhash,
-		"signature": "0x",
+		"txhash":    encodedTransfer,
+		"signature": ethtypes.HexBytes0xPrefix(signature.Payload),
 	}
 	paramsJSON, err := json.Marshal(approveParams)
 	if err != nil {
