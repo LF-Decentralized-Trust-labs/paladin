@@ -1,76 +1,40 @@
 contracts:
   factory:
-    # if the address is set, it takes precendece over
-    # the rest of the properties for deploying a factory
-    address: '0x0'
-    # if the address is not set, the factory will be deployed
-    # with the following properties
     abiAndBytecode:
-      # if the path is set, the target must be a JSON file
-      # containing the "abi" and "bytecode" properties
       path: ./abis/ZetoFactory.json
-      json:
-        abi:
-        bytecode:
   # the Zeto factory is a CloneFactory, which needs implementation
   # contracts to be set
   implementations:
-    - name: Zeto_Anon
-      circuitId: anon
-      cloneable: true
-      address:
-      abiAndBytecode:
-        path: ./abis/Zeto_Anon.json
-        json:
-          abi:
-          bytecode:
-      libraries:
-        - Groth16Verifier_Anon
-        - Groth16Verifier_CheckHashesValue
-        - Groth16Verifier_CheckInputsOutputsValue
-    - name: Zeto_AnonEnc
-      circuitId: anon_enc
-      cloneable: true
-      address:
-      abiAndBytecode:
-        path: ./abis/Zeto_AnonEnc.json
-        json:
-          abi:
-          bytecode:
-      libraries:
-        - Groth16Verifier_AnonEnc
-        - Groth16Verifier_CheckHashesValue
-        - Groth16Verifier_CheckInputsOutputsValue
-    - name: Zeto_NfAnon
-      circuitId: nf_anon
-      cloneable: true
-      address:
-      abiAndBytecode:
-        path: ./abis/Zeto_NfAnon.json
-        json:
-          abi:
-          bytecode:
-      libraries:
-        - Groth16Verifier_NfAnon
-        - Groth16Verifier_CheckHashesValue
-        - Groth16Verifier_CheckInputsOutputsValue
     - name: Groth16Verifier_Anon
-      address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_Anon.json
     - name: Groth16Verifier_AnonEnc
-      address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_AnonEnc.json
     - name: Groth16Verifier_NfAnon
-      address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_NfAnon.json
     - name: Groth16Verifier_CheckHashesValue
-      address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_CheckHashesValue.json
     - name: Groth16Verifier_CheckInputsOutputsValue
-      address:
       abiAndBytecode:
         path: ./abis/Groth16Verifier_CheckInputsOutputsValue.json
+    - name: Zeto_Anon
+      verifier: Groth16Verifier_Anon
+      circuitId: anon
+      cloneable: true
+      abiAndBytecode:
+        path: ./abis/Zeto_Anon.json
+    - name: Zeto_AnonEnc
+      verifier: Groth16Verifier_AnonEnc
+      circuitId: anon_enc
+      cloneable: true
+      abiAndBytecode:
+        path: ./abis/Zeto_AnonEnc.json
+    - name: Zeto_NfAnon
+      verifier: Groth16Verifier_NfAnon
+      circuitId: nf_anon
+      cloneable: true
+      abiAndBytecode:
+        path: ./abis/Zeto_NfAnon.json

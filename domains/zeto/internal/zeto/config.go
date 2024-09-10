@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gopkg.in/yaml.v2"
 )
 
@@ -36,17 +35,17 @@ type LocalDomainConfigContracts struct {
 }
 
 type LocalDomainContract struct {
-	Name            string          `yaml:"name"`
-	CircuitId       string          `yaml:"circuitId"`
-	ContractAddress string          `yaml:"address"`
-	Abi             tktypes.RawJSON `yaml:"abi"`
+	Name            string `yaml:"name"`
+	CircuitId       string `yaml:"circuitId"`
+	ContractAddress string `yaml:"address"`
+	Abi             string `yaml:"abi"`
 }
 
 func (d *LocalDomainConfig) getContractAbi(name string) (abi.ABI, error) {
 	for _, contract := range d.DomainContracts.Implementations {
 		if contract.Name == name {
 			var contractAbi abi.ABI
-			err := json.Unmarshal(contract.Abi, &contractAbi)
+			err := json.Unmarshal([]byte(contract.Abi), &contractAbi)
 			if err != nil {
 				return nil, err
 			}

@@ -28,8 +28,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	internalZeto "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -78,7 +76,7 @@ func prepareLocalConfig(t *testing.T, domainContracts *zetoDomainContracts) {
 		implContract.ContractAddress = domainContracts.deployedContracts[implContract.Name].String()
 		abiJSON, err := json.Marshal(domainContracts.deployedContractAbis[implContract.Name])
 		require.NoError(t, err)
-		implContract.Abi = tktypes.RawJSON(abiJSON)
+		implContract.Abi = tktypes.RawJSON(abiJSON).String()
 	}
 	configFile := path.Join(t.TempDir(), "config-local.yaml")
 	configTestBytes, err := yaml.Marshal(localConfig)
@@ -116,17 +114,9 @@ func TestZeto_DeployZetoContracts(t *testing.T) {
 	log.L(ctx).Infof("Deploy Zeto Contracts")
 
 	tb := testbed.NewTestBed()
-	var ec ethclient.EthClient
-	var bi blockindexer.BlockIndexer
-	url, done, err := tb.StartForTest(
-		"./testbed.config.yaml",
-		map[string]*testbed.TestbedDomain{},
-		&testbed.UTInitFunction{PreManagerStart: func(c testbed.AllComponents) error {
-			ec = c.EthClientFactory().HTTPClient()
-			bi = c.BlockIndexer()
-			return nil
-		},
-		})
+	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	bi := tb.Components().BlockIndexer()
+	ec := tb.Components().EthClientFactory().HTTPClient()
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))

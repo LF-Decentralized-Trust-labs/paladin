@@ -25,22 +25,16 @@ type domainContracts struct {
 }
 
 type domainContract struct {
-	Name            string         `yaml:"name"`
-	CircuitId       string         `yaml:"circuitId"`
-	ContractAddress string         `yaml:"address"`
-	AbiAndBytecode  abiAndBytecode `yaml:"abiAndBytecode"`
-	Libraries       []string       `yaml:"libraries"`
-	Cloneable       bool           `yaml:"cloneable"`
+	Name           string         `yaml:"name"`
+	Verifier       string         `yaml:"verifier"`
+	CircuitId      string         `yaml:"circuitId"`
+	AbiAndBytecode abiAndBytecode `yaml:"abiAndBytecode"`
+	Libraries      []string       `yaml:"libraries"`
+	Cloneable      bool           `yaml:"cloneable"`
 }
 
 type abiAndBytecode struct {
-	Path string             `yaml:"path"`
-	Json abiAndBytecodeJSON `yaml:"json"`
-}
-
-type abiAndBytecodeJSON struct {
-	Abi      map[string]interface{} `yaml:"abi"`
-	Bytecode string                 `yaml:"bytecode"`
+	Path string `yaml:"path"`
 }
 
 type setImplementationParams struct {

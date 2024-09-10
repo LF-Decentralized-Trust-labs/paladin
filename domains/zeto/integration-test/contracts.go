@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -45,6 +44,7 @@ type zetoDomainContracts struct {
 
 type cloneableContract struct {
 	circuitId string
+	verifier  string
 }
 
 func newZetoDomainContracts() *zetoDomainContracts {
@@ -64,14 +64,8 @@ func deployDomainContracts(ctx context.Context, rpc rpcbackend.Backend, deployer
 	// these are the top level Zeto token contracts
 	cloneableContracts := findCloneableContracts(config)
 
-	// sort contracts so that the dependencies are deployed first
-	sortedContractList, err := sortContracts(config)
-	if err != nil {
-		return nil, err
-	}
-
 	// deploy the implementation contracts
-	deployedContracts, deployedContractAbis, err := deployContracts(ctx, rpc, deployer, sortedContractList)
+	deployedContracts, deployedContractAbis, err := deployContracts(ctx, rpc, deployer, config.DomainContracts.Implementations)
 	if err != nil {
 		return nil, err
 	}
@@ -97,45 +91,11 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 		if contract.Cloneable {
 			cloneableContracts[contract.Name] = cloneableContract{
 				circuitId: contract.CircuitId,
+				verifier:  contract.Verifier,
 			}
 		}
 	}
 	return cloneableContracts
-}
-
-// when contracts include a `libraries` section, the libraries must be deployed first
-// we build a sorted list of contracts, with the dependencies first, and the depending
-// contracts later
-func sortContracts(config *domainConfig) ([]domainContract, error) {
-	var contracts []domainContract
-	contracts = append(contracts, config.DomainContracts.Implementations...)
-
-	sort.Slice(contracts, func(i, j int) bool {
-		if len(contracts[i].Libraries) == 0 && len(contracts[j].Libraries) == 0 {
-			// order doesn't matter
-			return false
-		}
-		if len(contracts[i].Libraries) > 0 && len(contracts[j].Libraries) > 0 {
-			// the order is determined by the dependencies
-			for _, lib := range contracts[i].Libraries {
-				if lib == contracts[j].Name {
-					// i depends on j
-					return false
-				}
-			}
-			for _, lib := range contracts[j].Libraries {
-				if lib == contracts[i].Name {
-					// j depends on i
-					return true
-				}
-			}
-			// no dependency relationship
-			return false
-		}
-		return len(contracts[i].Libraries) < len(contracts[j].Libraries)
-	})
-
-	return contracts, nil
 }
 
 func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []domainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
@@ -155,7 +115,7 @@ func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer strin
 }
 
 func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *domainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
-	if contract.AbiAndBytecode.Path == "" && (contract.AbiAndBytecode.Json.Bytecode == "" || contract.AbiAndBytecode.Json.Abi == nil) {
+	if contract.AbiAndBytecode.Path == "" {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
 	// deploy the contract
@@ -172,27 +132,13 @@ func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string
 
 func getContractSpec(contract *domainContract) (*domain.SolidityBuild, error) {
 	var build domain.SolidityBuild
-	if contract.AbiAndBytecode.Json.Bytecode != "" && contract.AbiAndBytecode.Json.Abi != nil {
-		abiBytecode := make(map[string]interface{})
-		abiBytecode["abi"] = contract.AbiAndBytecode.Json.Abi
-		abiBytecode["bytecode"] = contract.AbiAndBytecode.Json.Bytecode
-		bytes, err := json.Marshal(abiBytecode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal abi and bytecode content in the Domain configuration. %s", err)
-		}
-		err = json.Unmarshal(bytes, &build)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
-		}
-	} else {
-		bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
-		}
-		err = json.Unmarshal(bytes, &build)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
-		}
+	bytes, err := os.ReadFile(contract.AbiAndBytecode.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read abi+bytecode file %s. %s", contract.AbiAndBytecode.Path, err)
+	}
+	err = json.Unmarshal(bytes, &build)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse abi and bytecode content in the Domain configuration. %s", err)
 	}
 	return &build, nil
 }
@@ -226,10 +172,7 @@ func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi bl
 
 func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc ethclient.ABIFunctionClient, deployer string, addr ethtypes.Address0xHex, bi blockindexer.BlockIndexer) error {
 	log.L(ctx).Infof("Registering implementation %s", name)
-	// work out the verifier contract name, by taking the suffix from the implementation name
-	// such as Zeto_Anon -> Groth16Verifier_Anon
-	// TODO: think about more robust ways than relying on the naming convention
-	verifierName := "Groth16Verifier_" + name[len("Zeto_"):]
+	verifierName := domainContracts.cloneableContracts[name].verifier
 	implAddr, ok := domainContracts.deployedContracts[name]
 	if !ok {
 		return fmt.Errorf("implementation contract %s not found among the deployed contracts", name)

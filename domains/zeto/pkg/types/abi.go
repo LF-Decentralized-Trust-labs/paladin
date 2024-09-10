@@ -25,9 +25,7 @@ var ZetoABI = abi.ABI{
 		Type: abi.Constructor,
 		Inputs: abi.ParameterArray{
 			{Name: "from", Type: "string"},
-			{Name: "depositVerifier", Type: "address"},
-			{Name: "withdrawVerifier", Type: "address"},
-			{Name: "verifier", Type: "address"},
+			{Name: "initialOwner", Type: "address"},
 		},
 	},
 	&abi.Entry{
@@ -49,11 +47,8 @@ var ZetoABI = abi.ABI{
 }
 
 type ConstructorParams struct {
-	From             string `json:"from"`
-	InitialOwner     string `json:"initialOwner"`
-	Verifier         string `json:"verifier"`
-	DepositVerifier  string `json:"depositVerifier"`
-	WithdrawVerifier string `json:"withdrawVerifier"`
+	From         string `json:"from"`
+	InitialOwner string `json:"initialOwner"`
 }
 
 type DeployParams struct {

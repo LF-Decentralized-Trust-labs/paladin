@@ -18,11 +18,28 @@ package zeto
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestNew(t *testing.T) {
+	_, err := New(nil)
+	assert.ErrorContains(t, err, "")
+
+	configFile := path.Join(t.TempDir(), "test.yaml")
+	os.Setenv("LOCAL_CONFIG", configFile)
+	defer os.Unsetenv("LOCAL_CONFIG")
+	err = os.WriteFile(configFile, []byte(testConfig), 0644)
+	assert.NoError(t, err)
+
+	z, err := New(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, z)
+}
 
 func TestDecodeDomainConfig(t *testing.T) {
 	config := &types.DomainInstanceConfig{
