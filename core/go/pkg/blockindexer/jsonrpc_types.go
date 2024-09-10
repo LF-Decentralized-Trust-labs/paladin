@@ -28,6 +28,7 @@ type BlockInfoJSONRPC struct {
 	Transactions []*PartialTransactionInfo `json:"transactions"`
 }
 
+// For memory efficiency we only retain in memory some of the fields returned in the JSON from the node
 type PartialTransactionInfo struct {
 	Hash  ethtypes.HexBytes0xPrefix `json:"hash"`
 	Nonce ethtypes.HexUint64        `json:"nonce"`
