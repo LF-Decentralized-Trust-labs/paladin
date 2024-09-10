@@ -63,8 +63,13 @@ func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][
 	for _, entry := range contracts {
 		for name, contract := range entry {
 			build := domain.LoadBuildLinked(contract, deployed)
-			deployed[name], err = deployBytecode(ctx, rpc, build)
-			require.NoError(t, err)
+			var addr string
+			rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
+				controllerName, build.ABI, build.Bytecode.String(), `{}`)
+			if rpcerr != nil {
+				assert.NoError(t, rpcerr.Error())
+			}
+			deployed[name] = addr
 		}
 	}
 	return deployed
@@ -87,16 +92,6 @@ func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (contex
 	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, tb, rpc
-}
-
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, build *domain.SolidityBuild) (string, error) {
-	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-		controllerName, build.ABI, build.Bytecode.String(), `{}`)
-	if rpcerr != nil {
-		return "", rpcerr.Error()
-	}
-	return addr, nil
 }
 
 func TestZeto(t *testing.T) {

@@ -165,7 +165,7 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		err = cm.transportManager.PostInit(cm)
+		err = cm.registryManager.PostInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentRegistryInitError)
 	}
 

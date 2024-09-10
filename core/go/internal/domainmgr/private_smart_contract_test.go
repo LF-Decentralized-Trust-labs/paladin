@@ -346,7 +346,14 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Verifier:  endorserAddr.String(),
 	}
-	endorsement, err := psc.EndorseTransaction(ctx, tx, endorsementRequest, endorser)
+	endorsement, err := psc.EndorseTransaction(ctx,
+		tx.PreAssembly.TransactionSpecification,
+		tx.PreAssembly.Verifiers,
+		tx.PostAssembly.Signatures,
+		psc.toEndorsableList(tx.PostAssembly.InputStates),
+		psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		endorsementRequest,
+		endorser)
 	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorsement.Result)
 
@@ -505,7 +512,14 @@ func TestEndorseTransactionFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := psc.EndorseTransaction(ctx, tx, &prototk.AttestationRequest{}, &prototk.ResolvedVerifier{})
+	_, err := psc.EndorseTransaction(ctx,
+		tx.PreAssembly.TransactionSpecification,
+		tx.PreAssembly.Verifiers,
+		tx.PostAssembly.Signatures,
+		psc.toEndorsableList(tx.PostAssembly.InputStates),
+		psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		&prototk.AttestationRequest{},
+		&prototk.ResolvedVerifier{})
 	assert.Regexp(t, "pop", err)
 }
 
@@ -668,7 +682,7 @@ func TestIncompleteStages(t *testing.T) {
 	err = psc.LockStates(ctx, tx)
 	assert.Regexp(t, "PD011629", err)
 
-	_, err = psc.EndorseTransaction(ctx, tx, nil, nil)
+	_, err = psc.EndorseTransaction(ctx, nil, nil, nil, nil, nil, nil, nil)
 	assert.Regexp(t, "PD011630", err)
 
 	err = psc.ResolveDispatch(ctx, tx)
