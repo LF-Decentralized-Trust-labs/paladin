@@ -29,6 +29,6 @@ type Zeto interface {
 	FindCoins(ctx context.Context, query string) ([]*types.ZetoCoin, error)
 }
 
-func New(callbacks plugintk.DomainCallbacks) (Zeto, error) {
+func New(callbacks plugintk.DomainCallbacks) Zeto {
 	return internal.New(callbacks)
 }

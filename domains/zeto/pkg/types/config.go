@@ -16,17 +16,50 @@
 package types
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 )
 
 // DomainFactoryConfig is the configuration for a Zeto domain
 // to provision new domain instances based on a factory contract
+// and avalable implementation contracts
 type DomainFactoryConfig struct {
-	FactoryAddress string            `json:"factoryAddress"`
-	Libraries      map[string]string `json:"libraries"`
-	TokenName      string            `json:"tokenName"`
-	CircuitId      string            `json:"circuitId"`
+	FactoryAddress  string                `json:"factoryAddress"`
+	Libraries       map[string]string     `json:"libraries"`
+	DomainContracts DomainConfigContracts `json:"domainContracts"`
+	// TODO: one token type per domain until core has been enhanced
+	// to not require a single private contract ABI
+	TokenName string `yaml:"name"`
+	CircuitId string `yaml:"circuitId"`
+}
+
+type DomainConfigContracts struct {
+	Factory         *DomainContract   `yaml:"factory"`
+	Implementations []*DomainContract `yaml:"implementations"`
+}
+
+type DomainContract struct {
+	Name            string `yaml:"name"`
+	CircuitId       string `yaml:"circuitId"`
+	ContractAddress string `yaml:"address"`
+	Abi             string `yaml:"abi"`
+}
+
+func (d *DomainFactoryConfig) GetContractAbi(name string) (abi.ABI, error) {
+	for _, contract := range d.DomainContracts.Implementations {
+		if contract.Name == name {
+			var contractAbi abi.ABI
+			err := json.Unmarshal([]byte(contract.Abi), &contractAbi)
+			if err != nil {
+				return nil, err
+			}
+			return contractAbi, nil
+		}
+	}
+	return nil, fmt.Errorf("contract %s not found", name)
 }
 
 // DomainInstanceConfig is the domain instance config, which are

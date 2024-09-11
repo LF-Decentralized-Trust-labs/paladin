@@ -37,22 +37,16 @@ var factoryJSONBytes []byte // From "gradle copySolidity"
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config      *types.DomainFactoryConfig
-	localConfig *LocalDomainConfig
-	chainID     int64
-	domainID    string
-	coinSchema  *pb.StateSchema
+	config     *types.DomainFactoryConfig
+	chainID    int64
+	domainID   string
+	coinSchema *pb.StateSchema
 }
 
-func New(callbacks plugintk.DomainCallbacks) (*Zeto, error) {
-	localConfig, err := loadLocalConfig()
-	if err != nil {
-		return nil, err
-	}
+func New(callbacks plugintk.DomainCallbacks) *Zeto {
 	return &Zeto{
-		Callbacks:   callbacks,
-		localConfig: localConfig,
-	}, nil
+		Callbacks: callbacks,
+	}
 }
 
 func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
@@ -72,9 +66,9 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	}
 
 	var tokenContractAbi abi.ABI
-	for _, contract := range z.localConfig.DomainContracts.Implementations {
+	for _, contract := range z.config.DomainContracts.Implementations {
 		if contract.Name == config.TokenName {
-			contractAbi, err := z.localConfig.getContractAbi(contract.Name)
+			contractAbi, err := z.config.GetContractAbi(contract.Name)
 			if err != nil {
 				return nil, err
 			}

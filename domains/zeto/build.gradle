@@ -124,7 +124,6 @@ task testE2E(type: Exec) {
     inputs.files(goFiles)
     inputs.files(goFilesE2E)
     inputs.file('./integration-test/config-for-deploy.yaml')
-    inputs.file('./integration-test/config-local.yaml')
     outputs.dir('coverage')
 
     workingDir '.'
