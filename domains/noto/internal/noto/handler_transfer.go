@@ -263,15 +263,14 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	if err != nil {
 		return nil, err
 	}
-	notoJSON, err := json.Marshal(h.noto.contractABI)
+	functionJSON, err := json.Marshal(h.noto.contractABI.Functions()[tx.FunctionABI.Name])
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			ContractAbiJson: string(notoJSON),
-			FunctionName:    tx.FunctionABI.Name,
+			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 	}, nil

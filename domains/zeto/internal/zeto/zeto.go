@@ -137,15 +137,14 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
-	factoryJSON, err := json.Marshal(z.factoryABI)
+	functionJSON, err := json.Marshal(z.factoryABI.Functions()["deploy"])
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			ContractAbiJson: string(factoryJSON),
-			FunctionName:    "deploy",
+			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &params.From,

@@ -223,13 +223,12 @@ message AttestationResult {
 }
 
 message BaseLedgerTransaction {
-  string contract_abi_json = 1; // The ABI of the smart contract
-  string function_name = 2; // The name of the function to invoke on the base smart contract, based on processing the user's constructor parameters in the private smart contract layer
-  string params_json = 3; // The parameters to pass to the base smart contract function, in JSON format. Paladin will submit this transaction to the base blockchain
+  string function_abi_json = 1; // The ABI of the function to invoke on the base smart contract, based on processing the user's parameters in the private smart contract layer
+  string params_json = 2; // The parameters to pass to the base smart contract function, in JSON format. Paladin will submit this transaction to the base blockchain
 }
 
 message BaseLedgerDeployTransaction {
-  string contract_abi_json = 1; // The ABI of the smart contract
+  string constructor_abi_json = 1; // The ABI of the smart contract constructor
   bytes bytecode = 2; // The contract bytecode
   string params_json = 3; // The parameters to pass to the base smart contract constructor, in JSON format. Paladin will submit this transaction to the base blockchain
 }

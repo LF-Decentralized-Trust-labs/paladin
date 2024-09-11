@@ -77,77 +77,56 @@ const fakeCoinStateSchema = `{
 	]
 }`
 
-const fakeCoinPrivateABI = `[
-	{
-		"type": "constructor",
-		"inputs": [
-			{
-				"name": "notary",
-				"type": "address"
-			},
-			{
-				"name": "name",
-				"type": "string"
-			},
-			{
-				"name": "symbol",
-				"type": "string"
-			}
-		],
-		"outputs": null
-	},
-	{
-		"type": "function",
-		"name": "execute",
-		"inputs": [
-			{
-				"name": "inputs",
-				"type": "bytes32[]"
-			},
-			{
-				"name": "outputs",
-				"type": "bytes32[]"
-			},
-			{
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"outputs": null
-	}
-]`
+const fakeCoinExecuteABI = `{
+	"type": "function",
+	"name": "execute",
+	"inputs": [
+		{
+			"name": "inputs",
+			"type": "bytes32[]"
+		},
+		{
+			"name": "outputs",
+			"type": "bytes32[]"
+		},
+		{
+			"name": "data",
+			"type": "bytes"
+		}
+	],
+	"outputs": null
+}`
 
-const fakeCoinFactoryABI = `[
-	{
-		"type": "constructor",
-		"inputs": [
-			{
-				"name": "notary",
-				"type": "address"
-			},
-			{
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"outputs": null
-	},
-	{
-		"type": "function",
-		"name": "newInstance",
-		"inputs": [
-			{
-				"name": "notary",
-				"type": "address"
-			},
-			{
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"outputs": null
-	}
-]`
+const fakeCoinFactoryConstructorABI = `{
+	"type": "constructor",
+	"inputs": [
+		{
+			"name": "notary",
+			"type": "address"
+		},
+		{
+			"name": "data",
+			"type": "bytes"
+		}
+	],
+	"outputs": null
+}`
+
+const fakeCoinFactoryNewInstanceABI = `{
+	"type": "function",
+	"name": "newInstance",
+	"inputs": [
+		{
+			"name": "notary",
+			"type": "address"
+		},
+		{
+			"name": "data",
+			"type": "bytes"
+		}
+	],
+	"outputs": null
+}`
 
 type fakeState struct {
 	Salt   tktypes.Bytes32      `json:"salt"`
@@ -618,8 +597,7 @@ func TestDomainPrepareDeployInvokeTX(t *testing.T) {
 		assert.Same(t, tx.TransactionSpecification, pdr.Transaction)
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinFactoryABI,
-				FunctionName:    "newInstance",
+				FunctionAbiJson: fakeCoinFactoryNewInstanceABI,
 				ParamsJson: `{
 				  "notary": "` + pdr.ResolvedVerifiers[0].Verifier + `",
 				  "data": "0xfeedbeef"
@@ -650,7 +628,7 @@ func TestDomainPrepareDeployDeployTXWithSigner(t *testing.T) {
 		assert.Same(t, tx.TransactionSpecification, pdr.Transaction)
 		return &prototk.PrepareDeployResponse{
 			Deploy: &prototk.BaseLedgerDeployTransaction{
-				ContractAbiJson: fakeCoinFactoryABI,
+				ConstructorAbiJson: fakeCoinFactoryConstructorABI,
 				ParamsJson: `{
 				  "notary": "` + pdr.ResolvedVerifiers[0].Verifier + `",
 				  "data": "0xfeedbeef"
@@ -697,28 +675,6 @@ func TestDomainPrepareDeployError(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 }
 
-func TestDomainPrepareDeployInvokeInvalidFunction(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
-	defer done()
-	assert.Nil(t, tp.d.initError.Load())
-
-	domain := tp.d
-	tx := goodTXForDeploy()
-
-	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
-		return &prototk.PrepareDeployResponse{
-			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinFactoryABI,
-				FunctionName:    "wrong",
-				ParamsJson:      `{}`,
-			},
-		}, nil
-	}
-
-	err := domain.PrepareDeploy(ctx, tx)
-	assert.Regexp(t, "PD011618", err)
-}
-
 func TestDomainPrepareDeployMissingSigner(t *testing.T) {
 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
@@ -749,14 +705,32 @@ func TestDomainPrepareDeployBadParams(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Deploy: &prototk.BaseLedgerDeployTransaction{
-				ContractAbiJson: fakeCoinFactoryABI,
-				ParamsJson:      `{"missing":"expected things"}`,
+				ConstructorAbiJson: fakeCoinFactoryConstructorABI,
+				ParamsJson:         `{"missing":"expected things"}`,
 			},
 		}, nil
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
 	assert.Regexp(t, "FF22040", err)
+}
+
+func TestDomainPrepareDeployDefaultConstructor(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	domain := tp.d
+	tx := goodTXForDeploy()
+
+	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+		return &prototk.PrepareDeployResponse{
+			Deploy: &prototk.BaseLedgerDeployTransaction{},
+		}, nil
+	}
+
+	err := domain.PrepareDeploy(ctx, tx)
+	require.NoError(t, err)
 }
 
 func TestDomainPrepareInvokeBadParams(t *testing.T) {
@@ -770,8 +744,7 @@ func TestDomainPrepareInvokeBadParams(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinFactoryABI,
-				FunctionName:    "newInstance",
+				FunctionAbiJson: fakeCoinFactoryNewInstanceABI,
 				ParamsJson:      `{"missing":"expected things"}`,
 			},
 		}, nil
@@ -792,7 +765,7 @@ func TestDomainPrepareDeployABIInvalid(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Deploy: &prototk.BaseLedgerDeployTransaction{
-				ContractAbiJson: `!!!wrong`,
+				ConstructorAbiJson: `!!!wrong`,
 			},
 		}, nil
 	}
@@ -812,7 +785,7 @@ func TestDomainPrepareInvokeABIInvalid(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: `!!!wrong`,
+				FunctionAbiJson: `!!!wrong`,
 			},
 		}, nil
 	}
@@ -832,8 +805,8 @@ func TestDomainPrepareInvokeAndDeploy(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "newInstance",
-				ParamsJson:   `{}`,
+				FunctionAbiJson: fakeCoinFactoryNewInstanceABI,
+				ParamsJson:      `{}`,
 			},
 			Deploy: &prototk.BaseLedgerDeployTransaction{
 				ParamsJson: `{}`,

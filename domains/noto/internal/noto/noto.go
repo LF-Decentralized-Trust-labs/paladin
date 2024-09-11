@@ -162,15 +162,14 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
-	factoryJSON, err := json.Marshal(n.factoryABI)
+	functionJSON, err := json.Marshal(n.factoryABI.Functions()["deploy"])
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			ContractAbiJson: string(factoryJSON),
-			FunctionName:    "deploy",
+			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &config.NotaryLookup,

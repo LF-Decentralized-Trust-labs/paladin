@@ -119,15 +119,14 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	zetoJSON, err := json.Marshal(h.zeto.contractABI)
+	functionJSON, err := json.Marshal(h.zeto.contractABI.Functions()["mint"])
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			ContractAbiJson: string(zetoJSON),
-			FunctionName:    "mint",
+			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 	}, nil

@@ -366,21 +366,17 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		return err
 	}
 
-	var privateContractABI abi.ABI
-	if err := json.Unmarshal(([]byte)(res.Transaction.ContractAbiJson), &privateContractABI); err != nil {
+	var functionABI abi.Entry
+	if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
-	functionABI := privateContractABI.Functions()[res.Transaction.FunctionName]
-	if functionABI == nil {
-		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
-	}
 	inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
 	if err != nil {
 		return err
 	}
 	tx.PreparedTransaction = &components.EthTransaction{
-		FunctionABI: functionABI,
+		FunctionABI: &functionABI,
 		To:          dc.Address(),
 		Inputs:      inputs,
 	}

@@ -397,8 +397,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinPrivateABI,
-				FunctionName:    "execute",
+				FunctionAbiJson: fakeCoinExecuteABI,
 				ParamsJson:      string(params),
 			},
 		}, nil
@@ -605,34 +604,13 @@ func TestPrepareTransactionABIInvalid(t *testing.T) {
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: `!!!wrong`,
-				FunctionName:    "wrong",
+				FunctionAbiJson: `!!!wrong`,
 			},
 		}, nil
 	}
 
 	err := psc.PrepareTransaction(ctx, tx)
 	assert.Regexp(t, "PD011607", err)
-}
-
-func TestPrepareTransactionBadFunction(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
-	defer done()
-
-	psc, tx := doDomainInitAssembleTransactionOK(t, ctx, tp)
-	tx.Signer = "signer1"
-
-	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-		return &prototk.PrepareTransactionResponse{
-			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinPrivateABI,
-				FunctionName:    "wrong",
-			},
-		}, nil
-	}
-
-	err := psc.PrepareTransaction(ctx, tx)
-	assert.Regexp(t, "PD011618", err)
 }
 
 func TestPrepareTransactionBadData(t *testing.T) {
@@ -645,8 +623,7 @@ func TestPrepareTransactionBadData(t *testing.T) {
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				ContractAbiJson: fakeCoinPrivateABI,
-				FunctionName:    "execute",
+				FunctionAbiJson: fakeCoinExecuteABI,
 				ParamsJson:      `{"missing": "expected"}`,
 			},
 		}, nil

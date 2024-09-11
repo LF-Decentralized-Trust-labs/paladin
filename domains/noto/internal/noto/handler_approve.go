@@ -178,15 +178,14 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	notoJSON, err := json.Marshal(h.noto.contractABI)
+	functionJSON, err := json.Marshal(h.noto.contractABI.Functions()["approve"])
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			ContractAbiJson: string(notoJSON),
-			FunctionName:    "approve",
+			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
 	}, nil

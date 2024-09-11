@@ -304,13 +304,9 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 	}
 	if res.Transaction != nil && res.Deploy == nil {
-		var contractABI abi.ABI
-		if err := json.Unmarshal(([]byte)(res.Transaction.ContractAbiJson), &contractABI); err != nil {
+		var functionABI abi.Entry
+		if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
 			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
-		}
-		functionABI := contractABI.Functions()[res.Transaction.FunctionName]
-		if functionABI == nil {
-			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
 		if err != nil {
@@ -318,26 +314,27 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
-			FunctionABI: functionABI,
+			FunctionABI: &functionABI,
 			To:          *d.Address(),
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {
-		var contractABI abi.ABI
-		if err := json.Unmarshal(([]byte)(res.Deploy.ContractAbiJson), &contractABI); err != nil {
-			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
-		}
-		functionABI := contractABI.Constructor()
-		if functionABI == nil {
+		var functionABI abi.Entry
+		if res.Deploy.ConstructorAbiJson == "" {
 			// default constructor
-			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
+			functionABI.Type = abi.Constructor
+			functionABI.Inputs = abi.ParameterArray{}
+		} else {
+			if err := json.Unmarshal(([]byte)(res.Deploy.ConstructorAbiJson), &functionABI); err != nil {
+				return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+			}
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Deploy.ParamsJson))
 		if err != nil {
 			return err
 		}
 		tx.DeployTransaction = &components.EthDeployTransaction{
-			ConstructorABI: functionABI,
+			ConstructorABI: &functionABI,
 			Bytecode:       res.Deploy.Bytecode,
 			Inputs:         inputs,
 		}
