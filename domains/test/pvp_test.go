@@ -89,7 +89,7 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
+func mapConfig(t *testing.T, config *types.DomainConfig) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
 	assert.NoError(t, err)
 	err = json.Unmarshal(configJSON, &m)
@@ -118,7 +118,7 @@ func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]b
 	return deployed
 }
 
-func newNotoDomain(t *testing.T, config *types.Config) (*noto.Noto, *testbed.TestbedDomain) {
+func newNotoDomain(t *testing.T, config *types.DomainConfig) (*noto.Noto, *testbed.TestbedDomain) {
 	var domain noto.Noto
 	return &domain, &testbed.TestbedDomain{
 		Config: mapConfig(t, config),
@@ -253,7 +253,7 @@ func TestPvP(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	_, notoTestbed := newNotoDomain(t, &types.Config{
+	_, notoTestbed := newNotoDomain(t, &types.DomainConfig{
 		FactoryAddress: contracts["noto"],
 	})
 	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{

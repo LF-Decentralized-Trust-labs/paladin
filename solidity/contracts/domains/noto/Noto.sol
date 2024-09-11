@@ -38,6 +38,19 @@ contract Noto is
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
+    error NotoUnsupportedConfigType(bytes4 configSelector);
+
+    // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
+    bytes4 public constant NotoConfigID_V0 = 0x00010000;
+
+    struct NotoConfig_V0 {
+        string notaryLookup;
+        address notaryAddress;
+        bytes32 variant;
+    }
+
+    bytes32 public constant NotoVariantDefault =
+        0x0000000000000000000000000000000000000000000000000000000000000000;
 
     bytes32 private constant TRANSFER_TYPEHASH =
         keccak256("Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)");
@@ -66,11 +79,43 @@ contract Noto is
         bytes32 transactionId,
         address domain,
         address notary,
-        bytes memory data
-    ) public initializer {
+        bytes calldata config
+    ) public virtual initializer {
         __EIP712_init("noto", "0.0.1");
         _notary = notary;
-        emit PaladinNewSmartContract_V0(transactionId, domain, data);
+
+        NotoConfig_V0 memory configOut = _decodeConfig(config);
+        configOut.notaryAddress = notary;
+        configOut.variant = NotoVariantDefault;
+
+        emit PaladinNewSmartContract_V0(
+            transactionId,
+            domain,
+            _encodeConfig(configOut)
+        );
+    }
+
+    function _decodeConfig(
+        bytes calldata config
+    ) internal pure returns (NotoConfig_V0 memory) {
+        bytes4 configSelector = bytes4(config[0:4]);
+        if (configSelector == NotoConfigID_V0) {
+            NotoConfig_V0 memory configOut;
+            (configOut.notaryLookup) = abi.decode(config[4:], (string));
+            return configOut;
+        }
+        revert NotoUnsupportedConfigType(configSelector);
+    }
+
+    function _encodeConfig(
+        NotoConfig_V0 memory config
+    ) internal pure returns (bytes memory) {
+        bytes memory configOut = abi.encode(
+            config.notaryLookup,
+            config.notaryAddress,
+            config.variant
+        );
+        return bytes.concat(NotoConfigID_V0, configOut);
     }
 
     function _authorizeUpgrade(address) internal override onlyNotary {}
@@ -109,7 +154,7 @@ contract Noto is
     function _approve(
         address delegate,
         bytes32 txhash,
-        bytes memory signature
+        bytes calldata signature
     ) internal {
         _approvals[txhash].delegate = delegate;
         emit UTXOApproved(delegate, txhash, signature);
@@ -125,10 +170,10 @@ contract Noto is
      * Emits a {UTXOTransfer} event.
      */
     function approvedTransfer(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) public {
         bytes32 txhash = _buildTXHash(inputs, outputs, data);
         if (_approvals[txhash].delegate != msg.sender) {
@@ -145,9 +190,9 @@ contract Noto is
     }
 
     function _buildTXHash(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory data
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes calldata data
     ) internal view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
@@ -198,19 +243,19 @@ contract Noto is
     }
 
     function mint(
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) external virtual onlyNotary {
         bytes32[] memory inputs;
         _transfer(inputs, outputs, signature, data);
     }
 
     function transfer(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) external virtual onlyNotary {
         _transfer(inputs, outputs, signature, data);
     }
@@ -218,7 +263,7 @@ contract Noto is
     function approve(
         address delegate,
         bytes32 txhash,
-        bytes memory signature
+        bytes calldata signature
     ) external virtual onlyNotary {
         _approve(delegate, txhash, signature);
     }

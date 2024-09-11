@@ -50,7 +50,7 @@ func toJSON(t *testing.T, v any) []byte {
 	return result
 }
 
-func mapConfig(t *testing.T, config *types.Config) (m map[string]any) {
+func mapConfig(t *testing.T, config *types.DomainConfig) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
 	require.NoError(t, err)
 	err = json.Unmarshal(configJSON, &m)
@@ -79,7 +79,7 @@ func deployContracts(ctx context.Context, t *testing.T, contracts map[string][]b
 	return deployed
 }
 
-func newNotoDomain(t *testing.T, config *types.Config) (*Noto, *testbed.TestbedDomain) {
+func newNotoDomain(t *testing.T, config *types.DomainConfig) (*Noto, *testbed.TestbedDomain) {
 	var domain Noto
 	return &domain, &testbed.TestbedDomain{
 		Config: mapConfig(t, config),
@@ -128,7 +128,7 @@ func TestNoto(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	noto, notoTestbed := newNotoDomain(t, &types.Config{
+	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
 		FactoryAddress: contracts["factory"],
 	})
 	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
@@ -144,7 +144,9 @@ func TestNoto(t *testing.T) {
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
-		domainName, &types.ConstructorParams{Notary: notaryName})
+		domainName, &types.ConstructorParams{
+			Notary: notaryName,
+		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
@@ -266,9 +268,8 @@ func TestNotoSelfSubmit(t *testing.T) {
 	factoryAddress, err := ethtypes.NewAddress(contracts["factory"])
 	require.NoError(t, err)
 
-	noto, notoTestbed := newNotoDomain(t, &types.Config{
+	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
 		FactoryAddress: factoryAddress.String(),
-		Variant:        "NotoSelfSubmit",
 	})
 	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,

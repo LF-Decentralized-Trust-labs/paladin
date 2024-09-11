@@ -2,6 +2,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { randomBytes } from "crypto";
 import {
+  AbiCoder,
   ContractTransactionReceipt,
   Interface,
   Signer,
@@ -9,6 +10,8 @@ import {
 } from "ethers";
 import hre, { ethers } from "hardhat";
 import { NotoFactory, Noto } from "../../../typechain-types";
+
+export const NotoConfigID_V0 = "0x00010000";
 
 export async function newTransferHash(
   noto: Noto,
@@ -48,7 +51,12 @@ export async function deployNotoInstance(
   notoInterface: Interface,
   notary: string
 ) {
-  const deployTx = await notoFactory.deploy(randomBytes32(), notary, "0x");
+  const abi = AbiCoder.defaultAbiCoder();
+  const deployTx = await notoFactory.deploy(
+    randomBytes32(),
+    notary,
+    NotoConfigID_V0 + abi.encode(["string"], [""]).substring(2)
+  );
   const deployReceipt = await deployTx.wait();
   const deployEvent = deployReceipt?.logs.find(
     (l) => notoInterface.parseLog(l)?.name === "PaladinNewSmartContract_V0"

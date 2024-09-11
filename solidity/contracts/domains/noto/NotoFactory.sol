@@ -20,16 +20,16 @@ contract NotoFactory is Ownable {
     function deploy(
         bytes32 transactionId,
         address notary,
-        bytes memory data
+        bytes calldata config
     ) external {
-        _deploy(implementations["default"], transactionId, notary, data);
+        _deploy(implementations["default"], transactionId, notary, config);
     }
 
     /**
      * Register an additional implementation of Noto.
      */
     function registerImplementation(
-        string memory name,
+        string calldata name,
         address implementation
     ) public onlyOwner {
         implementations[name] = implementation;
@@ -42,23 +42,23 @@ contract NotoFactory is Ownable {
         string calldata name,
         bytes32 transactionId,
         address notary,
-        bytes memory data
+        bytes calldata config
     ) external {
-        _deploy(implementations[name], transactionId, notary, data);
+        _deploy(implementations[name], transactionId, notary, config);
     }
 
     function _deploy(
         address implementation,
         bytes32 transactionId,
         address notary,
-        bytes memory data
+        bytes calldata config
     ) internal {
         address instance = Clones.clone(implementation);
         INoto(instance).initialize(
             transactionId,
             address(this),
             notary,
-            data
+            config
         );
     }
 }

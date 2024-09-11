@@ -15,7 +15,7 @@ interface INoto {
         bytes32 transactionId,
         address domain,
         address notary,
-        bytes memory data
+        bytes memory config
     ) external;
 
     function transfer(

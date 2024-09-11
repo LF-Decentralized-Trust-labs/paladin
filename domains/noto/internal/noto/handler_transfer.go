@@ -110,8 +110,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 
 	var attestation []*pb.AttestationRequest
-	switch h.noto.config.Variant {
-	case "Noto":
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
 		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
 		if err != nil {
 			return nil, err
@@ -133,7 +133,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Parties:         []string{tx.DomainConfig.NotaryLookup},
 			},
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		attestation = []*pb.AttestationRequest{
 			// Notary will endorse the assembled transaction (by providing a signature)
 			{
@@ -150,6 +150,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Parties:         []string{req.Transaction.From},
 			},
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	return &pb.AssembleTransactionResponse{
@@ -221,8 +223,8 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 		return nil, err
 	}
 
-	switch h.noto.config.Variant {
-	case "Noto":
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
 			if err := h.validateSenderSignature(ctx, tx, req, coins); err != nil {
@@ -232,7 +234,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 			}, nil
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary provides a signature for the assembled payload (to be verified on base ledger)
 			inputIDs := make([]interface{}, len(req.Inputs))
@@ -260,6 +262,8 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				}, nil
 			}
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.EndorsementRequest.Name)
@@ -276,20 +280,22 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	var signature *pb.AttestationResult
-	switch h.noto.config.Variant {
-	case "Noto":
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
 		// Include the signature from the sender
 		// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 		signature = domain.FindAttestation("sender", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'sender' attestation")
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		// Include the signature from the notary (will be verified on base ledger)
 		signature = domain.FindAttestation("notary", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'notary' attestation")
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	params := map[string]interface{}{
