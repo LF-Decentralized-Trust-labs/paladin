@@ -39,9 +39,6 @@ var notoFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/Noto.json
 var notoJSON []byte // From "gradle copySolidity"
 
-//go:embed abis/NotoSelfSubmitFactory.json
-var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
-
 //go:embed abis/NotoSelfSubmit.json
 var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 
@@ -57,6 +54,7 @@ type Noto struct {
 }
 
 type NotoDeployParams struct {
+	Name          string                    `json:"name,omitempty"`
 	TransactionID string                    `json:"transactionId"`
 	Notary        string                    `json:"notary"`
 	Data          ethtypes.HexBytes0xPrefix `json:"data"`
@@ -80,14 +78,13 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 
 	n.config = &config
 	n.chainID = req.ChainId
+	n.factory = domain.LoadBuild(notoFactoryJSON)
 
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		n.factory = domain.LoadBuild(notoFactoryJSON)
 		n.contract = domain.LoadBuild(notoJSON)
 	case "NotoSelfSubmit":
-		n.factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
 		n.contract = domain.LoadBuild(notoSelfSubmitJSON)
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
@@ -146,7 +143,7 @@ func (n *Noto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.I
 }
 
 func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
-	_, err := n.validateDeploy(req.Transaction)
+	params, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
 	}
@@ -163,19 +160,25 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 		return nil, err
 	}
 
-	params := &NotoDeployParams{
+	deployParams := &NotoDeployParams{
+		Name:          params.Implementation,
 		TransactionID: req.Transaction.TransactionId,
 		Notary:        config.NotaryAddress,
 		Data:          data,
 	}
-	paramsJSON, err := json.Marshal(params)
+	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {
 		return nil, err
 	}
 
+	functionName := "deploy"
+	if deployParams.Name != "" {
+		functionName = "deployImplementation"
+	}
+
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
+			FunctionName: functionName,
 			ParamsJson:   string(paramsJSON),
 		},
 		Signer: &config.NotaryLookup,

@@ -33,12 +33,13 @@ describe("NotoSelfSubmit", function () {
   async function deployNotoFixture() {
     const [notary, other] = await ethers.getSigners();
 
-    const NotoFactory = await ethers.getContractFactory(
-      "NotoSelfSubmitFactory"
-    );
+    const NotoFactory = await ethers.getContractFactory("NotoFactory");
     const notoFactory = await NotoFactory.deploy();
     const Noto = await ethers.getContractFactory("NotoSelfSubmit");
-    const deployTx = await notoFactory.deploy(
+    const notoImpl = await Noto.deploy();
+    await notoFactory.registerImplementation("selfsubmit", notoImpl);
+    const deployTx = await notoFactory.deployImplementation(
+      "selfsubmit",
       randomBytes32(),
       notary.address,
       "0x"

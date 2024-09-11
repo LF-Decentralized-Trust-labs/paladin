@@ -22,8 +22,11 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -93,6 +96,21 @@ func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (contex
 	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, tb, rpc
+}
+
+func functionBuilder(ctx context.Context, t *testing.T, eth ethclient.EthClient, abi abi.ABI, functionName string) ethclient.ABIFunctionRequestBuilder {
+	abiClient, err := eth.ABI(ctx, abi)
+	assert.NoError(t, err)
+	fn, err := abiClient.Function(ctx, functionName)
+	assert.NoError(t, err)
+	return fn.R(ctx)
+}
+
+func waitFor(ctx context.Context, t *testing.T, tb testbed.Testbed, txHash *tktypes.Bytes32, err error) *blockindexer.IndexedTransaction {
+	require.NoError(t, err)
+	tx, err := tb.Components().BlockIndexer().WaitForTransaction(ctx, *txHash)
+	assert.NoError(t, err)
+	return tx
 }
 
 func TestNoto(t *testing.T) {
@@ -237,15 +255,19 @@ func TestNotoSelfSubmit(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying Noto factory")
 	contractSource := map[string][]byte{
-		"factory": notoSelfSubmitFactoryJSON,
+		"factory": notoFactoryJSON,
+		"noto":    notoSelfSubmitJSON,
 	}
 	contracts := deployContracts(ctx, t, contractSource)
 	for name, address := range contracts {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
+	factoryAddress, err := ethtypes.NewAddress(contracts["factory"])
+	require.NoError(t, err)
+
 	noto, notoTestbed := newNotoDomain(t, &types.Config{
-		FactoryAddress: contracts["factory"],
+		FactoryAddress: factoryAddress.String(),
 		Variant:        "NotoSelfSubmit",
 	})
 	done, tb, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
@@ -256,10 +278,27 @@ func TestNotoSelfSubmit(t *testing.T) {
 	_, notaryKey, err := tb.Components().KeyManager().ResolveKey(ctx, notaryName, algorithms.ECDSA_SECP256K1_PLAINBYTES)
 	require.NoError(t, err)
 
+	eth := tb.Components().EthClientFactory().HTTPClient()
+	notoFactory := domain.LoadBuild(notoFactoryJSON)
+	txHash, err := functionBuilder(ctx, t, eth, notoFactory.ABI, "registerImplementation").
+		Signer(notaryName).
+		To(factoryAddress).
+		Input(map[string]any{
+			"name":           "selfsubmit",
+			"implementation": contracts["noto"],
+		}).
+		SignAndSend()
+	require.NoError(t, err)
+	waitFor(ctx, t, tb, txHash, err)
+
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress ethtypes.Address0xHex
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
-		domainName, &types.ConstructorParams{Notary: notaryName})
+		domainName, &types.ConstructorParams{
+			Notary:         notaryName,
+			Implementation: "selfsubmit",
+		},
+	)
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
