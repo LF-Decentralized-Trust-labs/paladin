@@ -26,6 +26,7 @@ import github.com.kaleido_io.paladin.toolkit.FromDomain;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.pente.evmrunner.EVMVersion;
+import io.kaleido.paladin.pente.evmstate.AccountLoader;
 import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
 import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import io.kaleido.paladin.toolkit.Algorithms;
@@ -36,15 +37,11 @@ import io.kaleido.paladin.toolkit.Keccak;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
-import org.hyperledger.besu.datatypes.Transaction;
-import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
@@ -124,7 +121,7 @@ class PenteTransaction {
     private final long baseBlock;
     private final Address contract;
     private Values values;
-    private PenteDomain.PenteAccountLoader accountLoader;
+    private PenteDomain.AssemblyAccountLoader accountLoader;
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
@@ -220,7 +217,7 @@ class PenteTransaction {
         return PenteConfiguration.decodeConfig(this.contractConfig);
     }
 
-    EVMRunner getEVM(long chainId, long blockNumber, PenteDomain.PenteAccountLoader accountLoader) throws ClassNotFoundException {
+    EVMRunner getEVM(long chainId, long blockNumber, AccountLoader accountLoader) throws ClassNotFoundException {
         var evmConfig = EvmConfiguration.DEFAULT;
         var evmVersionStr = getConfig().evmVersion();
         EVMVersion evmVersion = switch (evmVersionStr) {
@@ -338,7 +335,7 @@ class PenteTransaction {
             ToDomain.AssembledTransaction assembledTransaction
     ) {}
 
-    EVMStateResult buildAssembledTransaction(EVMRunner evm, PenteDomain.PenteAccountLoader accountLoader) throws IOException {
+    ToDomain.AssembledTransaction buildAssembledTransaction(EVMRunner evm, PenteDomain.AssemblyAccountLoader accountLoader) throws IOException {
         var latestSchemaId = domain.getConfig().schemaId_AccountStateLatest();
         var result = ToDomain.AssembledTransaction.newBuilder();
         var committedUpdates = evm.getWorld().getCommittedAccountUpdates();
@@ -347,7 +344,6 @@ class PenteTransaction {
         var inputStates = new ArrayDeque<ToDomain.StateRef>();
         var readStates = new ArrayDeque<ToDomain.StateRef>();
         var outputStates = new ArrayDeque<ToDomain.NewState>();
-        List<PersistedAccount> newAccountStates = new kotlin.collections.ArrayDeque<>();
         for (var loadedAccount : loadedAccountStates.keySet()) {
             var inputState = loadedAccountStates.get(loadedAccount);
             var lastOp = committedUpdates.get(loadedAccount);
@@ -361,7 +357,6 @@ class PenteTransaction {
                 if (lastOp == DynamicLoadWorldState.LastOpType.UPDATED) {
                     LOGGER.info("Writing new state for account {} (existing={})", loadedAccount, inputState);
                     var updatedAccount = evm.getWorld().get(loadedAccount);
-                    newAccountStates.add(updatedAccount);
                     outputStates.add(ToDomain.NewState.newBuilder().
                             setSchemaId(latestSchemaId).
                             setStateDataJsonBytes(ByteString.copyFrom(updatedAccount.serialize())).
@@ -382,10 +377,7 @@ class PenteTransaction {
         result.addAllInputStates(inputStates);
         result.addAllReadStates(readStates);
         result.addAllOutputStates(outputStates);
-        return new EVMStateResult(
-                newAccountStates,
-                result.build()
-        );
+        return result.build();
     }
 
     String getFrom() { return from; }
@@ -418,14 +410,14 @@ class PenteTransaction {
     }
 
     record EVMExecutionResult(
-            EVMStateResult state,
+            EVMRunner evm,
             byte[] txPayload,
             JsonHex.Bytes32 txPayloadHash
     ) {}
 
     class EVMExecutionException extends Exception { EVMExecutionException(String message) { super(message); } }
 
-    EVMExecutionResult executeEVM(long chainId, Address fromAddr, PenteDomain.PenteAccountLoader accountLoader) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException, EVMExecutionException {
+    EVMExecutionResult executeEVM(long chainId, Address fromAddr, AccountLoader accountLoader) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException, EVMExecutionException {
         var evm = getEVM(chainId, getBaseBlock(), accountLoader);
         var senderAddress = org.hyperledger.besu.datatypes.Address.wrap(Bytes.wrap(fromAddr.getBytes()));
         var calldata = getEncodedCallData();
@@ -452,7 +444,7 @@ class PenteTransaction {
         }
         var txPayload = getEncodedTransaction(nonce, calldata);
         return new EVMExecutionResult(
-                buildAssembledTransaction(evm, accountLoader),
+                evm,
                 txPayload,
                 Keccak.Hash(txPayload)
         );

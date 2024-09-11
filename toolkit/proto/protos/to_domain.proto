@@ -92,8 +92,9 @@ message EndorseTransactionRequest {
   TransactionSpecification transaction = 3; // The transaction specified by the user
   repeated ResolvedVerifier resolved_verifiers = 4; // The list of resovled verifiers
   repeated EndorsableState inputs = 5; // Input states for the transaction
-  repeated EndorsableState outputs = 6; // Output states for the transaction
-  repeated AttestationResult signatures = 7; // All SIGN attestation results (required from submitting node before endorsement)
+  repeated EndorsableState reads = 6; // States relied upon by the transaction, that are not actually consumed
+  repeated EndorsableState outputs = 7; // Output states for the transaction
+  repeated AttestationResult signatures = 8; // All SIGN attestation results (required from submitting node before endorsement)
 }
 
 message EndorseTransactionResponse {

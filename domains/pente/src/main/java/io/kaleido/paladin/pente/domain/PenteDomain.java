@@ -20,6 +20,7 @@ import com.google.protobuf.ByteString;
 import github.com.kaleido_io.paladin.toolkit.FromDomain;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.pente.evmstate.AccountLoader;
+import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
 import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import io.kaleido.paladin.toolkit.*;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
@@ -27,8 +28,6 @@ import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
-import org.apache.tuweni.bytes.Bytes;
-import org.hyperledger.besu.evm.frame.MessageFrame;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -183,10 +182,11 @@ public class PenteDomain extends DomainInstance {
             var tx = new PenteTransaction(this, request.getTransaction());
 
             // Execution throws an EVMExecutionException if fails
-            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), new PenteAccountLoader());
+            var accountLoader = new AssemblyAccountLoader();
+            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), accountLoader);
             var result = ToDomain.AssembleTransactionResponse.newBuilder();
             result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
-            result.setAssembledTransaction(execResult.state().assembledTransaction());
+            result.setAssembledTransaction(tx.buildAssembledTransaction(execResult.evm(), accountLoader));
 
             // Just like a base Eth transaction, we sign the encoded transaction.
             // However, we do not package the signature back up in any RLP encoded way
@@ -229,36 +229,59 @@ public class PenteDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.EndorseTransactionResponse> endorseTransaction(ToDomain.EndorseTransactionRequest request) {
         try {
+            // Parse all the inputs/reads supplied into inputs
+            var inputAccounts = new ArrayList<PersistedAccount>(request.getInputsCount());
+            for (var input : request.getInputsList()) {
+                inputAccounts.add(PersistedAccount.deserialize(input.getStateDataJson().getBytes(StandardCharsets.UTF_8)));
+            }
+            var readAccounts = new ArrayList<PersistedAccount>(request.getReadsCount());
+            for (var read : request.getReadsList()) {
+                readAccounts.add(PersistedAccount.deserialize(read.getStateDataJson().getBytes(StandardCharsets.UTF_8)));
+            }
+
             // Do the execution of the transaction again ourselves
             var tx = new PenteTransaction(this, request.getTransaction());
-            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), new PenteAccountLoader());
+            var endorsementLoader = new EndorsementAccountLoader(inputAccounts, readAccounts);
+            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), endorsementLoader);
 
-            // Compare the exact execution result
-            var assertedInputs = new ArrayList<String>(request.getInputsCount());
-            for (var input : request.getInputsList()) {
-                assertedInputs.add(input.getId());
-            }
-            var expectedInputs = new ArrayList<String>(execResult.state().assembledTransaction().getInputStatesCount());
-            for (var input : execResult.state().assembledTransaction().getInputStatesList()) {
-                expectedInputs.add(input.getId());
-            }
-            var assertedOutputs = new ArrayList<PersistedAccount>(request.getOutputsCount());
+            // For the inputs, the endorsementLoader checks we loaded everything from the right set
+            var inputsMatch = endorsementLoader.checkEmpty();
+
+            // Build the expected outputs
+            var expectedOutputs = new ArrayList<PersistedAccount>(request.getOutputsCount());
             for (var output : request.getOutputsList()) {
-                assertedOutputs.add(PersistedAccount.deserialize(output.getStateDataJson().getBytes(StandardCharsets.UTF_8)));
+                expectedOutputs.add(PersistedAccount.deserialize(output.getStateDataJson().getBytes(StandardCharsets.UTF_8)));
             }
-            var expectedOutputs = execResult.state().newAccountStates();
-            var inputsMatch = assertedInputs.size() == expectedInputs.size();
-            for (int i = 0; inputsMatch && i < assertedInputs.size(); i++) {
-                inputsMatch = assertedInputs.get(i).equals(expectedInputs.get(i));
+            // Go round the actual outputs and confirm they match
+            var newWorld = execResult.evm().getWorld();
+            var committedUpdates = newWorld.getCommittedAccountUpdates();
+            var outputsMatch = (committedUpdates.size() == expectedOutputs.size());
+            for (var update : committedUpdates.entrySet()) {
+                boolean matchFound = false;
+                if (update.getValue() != DynamicLoadWorldState.LastOpType.DELETED) {
+                    var resultingState = newWorld.get(update.getKey());
+                    for (var expectedOutput : expectedOutputs) {
+                        if (expectedOutput.getAddress().equals(update.getKey())) {
+                            if (expectedOutput.equals(resultingState)) {
+                                matchFound = true;
+                            } else {
+                                LOGGER.error("Address {} expected={} actual={}", update.getKey(), expectedOutput, resultingState);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!matchFound) {
+                    LOGGER.error("Address update result unmatched {}", update.getKey());
+                }
+                outputsMatch = outputsMatch && matchFound;
             }
-            var outputsMatch = assertedOutputs.size() == expectedOutputs.size();
-            for (int i = 0; outputsMatch && i < expectedOutputs.size(); i++) {
-                outputsMatch = assertedOutputs.get(i).equals(expectedOutputs.get(i));
-            }
+
+
             if (!inputsMatch || !outputsMatch) {
-                LOGGER.error("Endorsement failed. ASSERTED inputs={} outputs={} EXPECTED inputs={} outputs={}",
-                        assertedInputs, assertedOutputs,
-                        expectedInputs, expectedOutputs);
+                LOGGER.error("Endorsement failed inputsMatch={} outputsMatch={}. EXPECTED inputs={} reads={} outputs={}",
+                        inputsMatch, outputsMatch,
+                        inputAccounts, readAccounts, expectedOutputs);
                 throw new IllegalStateException("Execution state mismatch detected in endorsement");
             }
 
@@ -284,7 +307,8 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
-    class PenteAccountLoader implements AccountLoader {
+    /** during assembly we load available states from the Paladin state store */
+    class AssemblyAccountLoader implements AccountLoader {
         private final HashMap<org.hyperledger.besu.datatypes.Address, FromDomain.StoredState> loadedAccountStates = new HashMap<>();
         public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) throws IOException {
             return withIOException(() -> {
@@ -305,8 +329,36 @@ public class PenteDomain extends DomainInstance {
                 return Optional.of(PersistedAccount.deserialize(state.getDataJsonBytes().toByteArray()));
             });
         }
-        public Map<org.hyperledger.besu.datatypes.Address, FromDomain.StoredState> getLoadedAccountStates() {
+        final Map<org.hyperledger.besu.datatypes.Address, FromDomain.StoredState> getLoadedAccountStates() {
             return loadedAccountStates;
+        }
+    }
+
+    /** During endorsement, only the accounts in the "inputs" and "reads" list are available to execute. */
+    class EndorsementAccountLoader implements AccountLoader {
+        private final Map<org.hyperledger.besu.datatypes.Address, PersistedAccount> inputAccounts = new HashMap<>();
+        private final Map<org.hyperledger.besu.datatypes.Address, PersistedAccount> readAccounts = new HashMap<>();
+        EndorsementAccountLoader(List<PersistedAccount> inputAccounts, List<PersistedAccount> readAccounts) {
+            for (var account : inputAccounts) {
+                this.inputAccounts.put(account.getAddress(), account);
+            }
+            for (var account : readAccounts) {
+                this.readAccounts.put(account.getAddress(), account);
+            }
+        }
+        public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) {
+            var account = inputAccounts.remove(address);
+            if (account != null) {
+                return Optional.of(account);
+            }
+            account = readAccounts.remove(address);
+            if (account != null) {
+                return Optional.of(account);
+            }
+            return Optional.empty();
+        }
+        boolean checkEmpty() {
+            return readAccounts.isEmpty() && inputAccounts.isEmpty();
         }
     }
 
