@@ -42,12 +42,20 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
         super(grpcTarget, instanceId);
     }
 
-    protected CompletableFuture<FromDomain.FindAvailableStatesResponse> findAvailableStates(FromDomain.FindAvailableStatesRequest request) {
+    public CompletableFuture<FromDomain.FindAvailableStatesResponse> findAvailableStates(FromDomain.FindAvailableStatesRequest request) {
         Service.DomainMessage message = Service.DomainMessage.newBuilder().
                 setHeader(newRequestHeader()).
                 setFindAvailableStates(request).
                 build();
         return requestReply(message).thenApply(Service.DomainMessage::getFindAvailableStatesRes);
+    }
+
+    public CompletableFuture<FromDomain.EncodeDataResponse> encodeData(FromDomain.EncodeDataRequest request) {
+        Service.DomainMessage message = Service.DomainMessage.newBuilder().
+                setHeader(newRequestHeader()).
+                setEncodeData(request).
+                build();
+        return requestReply(message).thenApply(Service.DomainMessage::getEncodeDataRes);
     }
 
     @Override

@@ -94,10 +94,17 @@ public class PersistedAccount implements Account {
         return Hash.hash(this.code);
     }
 
+    public Hash getCodeHashOrZero() {
+        if (this.code == null) {
+            return Hash.ZERO;
+        }
+        return Hash.hash(this.code);
+    }
+
     @Override
     public UInt256 getStorageValue(UInt256 k) {
         Optional<Bytes> v = this.storageTrie.get(Hash.hash(k));
-        return v.map(PersistedAccount::convertRLPBytesToUInt256).orElse(null);
+        return v.map(PersistedAccount::convertBytes32ToUInt256).orElse(null);
     }
 
     @Override
@@ -106,14 +113,12 @@ public class PersistedAccount implements Account {
         return this.getStorageValue(k);
     }
 
-    private static UInt256 convertRLPBytesToUInt256(final Bytes value) {
-        // TODO: Optimize function for simple scalar UInt256 conversion?
-        return UInt256.valueOf(((RlpString)RlpDecoder.decode(value.toArray()).getValues().getFirst()).asPositiveBigInteger());
+    private static UInt256 convertBytes32ToUInt256(final Bytes value) {
+        return UInt256.fromBytes(value);
     }
 
-    private static Bytes convertToRLPBytes(final UInt256 value) {
-        // TODO: Optimize function for simple scalar UInt256 conversion?
-        return Bytes.wrap(RlpEncoder.encode(RlpString.create(value.toMinimalBytes().toArray())));
+    private static Bytes convertToBytes32(final UInt256 value) {
+        return Bytes.wrap(value.toBytes());
     }
 
     @Override
@@ -122,17 +127,19 @@ public class PersistedAccount implements Account {
         // TODO: This function would require a reverse lookup table from storage key pre-images
         //       to the hashed 32b storage keys.
         throw new NotImplementedError("storage traversal not implemented");
-//        final NavigableMap<Bytes32, AccountStorageEntry> storageEntries = new TreeMap<>();
-//        this.storageTrie
-//                .entriesFrom(startKeyHash, limit)
-//                .forEach(
-//                        (key, value) -> {
-//                            final AccountStorageEntry entry =
-//                                    AccountStorageEntry.create(
-//                                            convertToUInt256(value), key, storageKeys.get(key));
-//                            storageEntries.put(key, entry);
-//                        });
-//        return storageEntries;
+    }
+
+    @Override
+    public boolean equals(Object otherObj) {
+        if (!(otherObj instanceof PersistedAccount)) {
+            return false;
+        }
+        var other = (PersistedAccount)(otherObj);
+        return this.getAddress().equals(other.getAddress()) &&
+                this.getNonce() == other.getNonce() &&
+                this.getBalance().equals(other.getBalance()) &&
+                this.getCodeHashOrZero().equals(other.getCodeHashOrZero()) &&
+                this.storageTrie.getRootHash().equals(other.storageTrie.getRootHash());
     }
 
     public void applyChanges(UpdateTrackingAccount<? extends Account> account)  {
@@ -145,9 +152,23 @@ public class PersistedAccount implements Account {
                         if (value.isZero()) {
                             this.storageTrie.remove(Hash.hash(key));
                         } else {
-                            this.storageTrie.put(Hash.hash(key), convertToRLPBytes(value));
+                            this.storageTrie.put(Hash.hash(key), convertToBytes32(value));
                         }
                     });
+    }
+
+    public String toString() {
+        return this.getAddress().toString() +
+                '[' +
+                "nonce=" +
+                this.getNonce() +
+                "balance=" +
+                this.getBalance() +
+                "codehash=" +
+                this.getCodeHashOrZero().toString() +
+                "storagehash=" +
+                this.storageTrie.getRootHash().toString() +
+                ']';
     }
 
     public record PersistedAccountJson(
@@ -166,7 +187,7 @@ public class PersistedAccount implements Account {
             @JsonProperty
             JsonHex.Bytes32 storageRoot,
             @JsonProperty
-            List<JsonHex.Bytes[]> storage
+            List<JsonHex.Bytes32[]> storage
     ) {}
 
     public byte[] serialize() {
@@ -178,7 +199,7 @@ public class PersistedAccount implements Account {
                 jsonCodeHash = new JsonHex.Bytes32(this.getCodeHash().toArray());
                 jsonCode = new JsonHex.Bytes(this.code.toArray());
             }
-            var storageTrieLeafs = new ArrayDeque<JsonHex.Bytes[]>();
+            var storageTrieLeafs = new ArrayDeque<JsonHex.Bytes32[]>();
             var jsonAccount = new PersistedAccountJson(
                     "v24.9.0",
                     new JsonHex.Address(this.address.toArray()),
@@ -191,9 +212,9 @@ public class PersistedAccount implements Account {
             );
             this.storageTrie.visitLeafs((key, leafNode) -> {
                 if (leafNode.getValue().isPresent()) {
-                    storageTrieLeafs.add(new JsonHex.Bytes[]{
-                            new JsonHex.Bytes(key.toArray()),
-                            new JsonHex.Bytes(leafNode.getValue().get().toArray())
+                    storageTrieLeafs.add(new JsonHex.Bytes32[]{
+                            new JsonHex.Bytes32(key.toArray()),
+                            new JsonHex.Bytes32(leafNode.getValue().get().toArray())
                     });
                 }
                 return TrieIterator.State.CONTINUE;

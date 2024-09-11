@@ -71,6 +71,15 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 				}
 			},
 		)
+	case *prototk.DomainMessage_EncodeData:
+		return callManagerImpl(ctx, req.EncodeData,
+			br.manager.EncodeData,
+			func(resMsg *prototk.DomainMessage, res *prototk.EncodeDataResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_EncodeDataRes{
+					EncodeDataRes: res,
+				}
+			},
+		)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
 	}

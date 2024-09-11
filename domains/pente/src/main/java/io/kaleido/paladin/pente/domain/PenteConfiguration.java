@@ -136,16 +136,14 @@ public class PenteConfiguration {
 
     JsonABI.Parameter abiTuple_AccountState_v24_9_0() {
         return JsonABI.newTuple("AccountState_v24_9_0", "AccountState_v24_9_0", JsonABI.newParameters(
+            JsonABI.newIndexedParameter("version", "string"),
             JsonABI.newIndexedParameter("address", "address"),
             JsonABI.newParameter("nonce", "uint256"),
             JsonABI.newParameter("balance", "uint256"),
             JsonABI.newParameter("codeHash", "bytes32"),
             JsonABI.newParameter("code", "bytes"),
             JsonABI.newParameter("storageRoot", "bytes32"),
-            JsonABI.newTupleArray("storage", "StorageTrie", JsonABI.newParameters(
-                JsonABI.newParameter("key", "bytes32"),
-                JsonABI.newParameter("value", "bytes32")
-            ))
+            JsonABI.newParameter("storage", "bytes32[2][]")
         ));
     }
 

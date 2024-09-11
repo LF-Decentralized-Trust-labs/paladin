@@ -71,6 +71,10 @@ tasks.named('clean') {
     dependsOn tasks.cleanProto
 }
 
+tasks.register("protoc") {
+    dependsOn tasks.generateProto
+}
+
 def grpcVersion = '1.65+'
 def protobufVersion = '3.25+'
 def protocVersion = protobufVersion

@@ -16,23 +16,23 @@
 package io.kaleido.paladin.pente.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.ByteString;
 import github.com.kaleido_io.paladin.toolkit.FromDomain;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.pente.evmstate.AccountLoader;
 import io.kaleido.paladin.pente.evmstate.PersistedAccount;
-import io.kaleido.paladin.toolkit.Algorithms;
-import io.kaleido.paladin.toolkit.DomainInstance;
-import io.kaleido.paladin.toolkit.JsonHex;
+import io.kaleido.paladin.toolkit.*;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
-import io.kaleido.paladin.toolkit.JsonQuery;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.FormattedMessage;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -171,7 +171,6 @@ public class PenteDomain extends DomainInstance {
                     setLookup(tx.getFrom()).
                     build()
             );
-            if (tx.requiresABIEncoding()) response.addAbiEncodingRequests(tx.getABIEncodingRequest());
             return CompletableFuture.completedFuture(response.build());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);
@@ -182,44 +181,46 @@ public class PenteDomain extends DomainInstance {
     protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
         try {
             var tx = new PenteTransaction(this, request.getTransaction());
-            var accoutLoader = new PenteAccountLoader();
-            var evm = tx.getEVM(config.getChainId(), tx.getBaseBlock(), accoutLoader);
-            var values = tx.getValues();
-            var besuSender = org.hyperledger.besu.datatypes.Address.wrap(Bytes.wrap(tx.getFromVerifier(request.getResolvedVerifiersList()).getBytes()));
-            MessageFrame execResult;
-            if (values.to() == null) {
-                execResult = evm.runContractDeploymentBytes(
-                    besuSender,
-                    null,
-                    Bytes.wrap(tx.getValues().bytecode().getBytes()),
-                    Bytes.wrap(tx.getABIEncodedData(request.getAbiEncodedDataList(), PenteTransaction.ABIEncodingRequestType.CONSTRUCTOR_PARAMS))
-                );
-            } else {
-                execResult = evm.runContractInvokeBytes(
-                    besuSender,
-                    org.hyperledger.besu.datatypes.Address.fromHexString(values.to()),
-                    Bytes.wrap(tx.getABIEncodedData(request.getAbiEncodedDataList(), PenteTransaction.ABIEncodingRequestType.FUNCTION_PARAMS))
-                );
-            }
+
+            // Execution throws an EVMExecutionException if fails
+            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), new PenteAccountLoader());
             var result = ToDomain.AssembleTransactionResponse.newBuilder();
-            if (execResult.getState() != MessageFrame.State.COMPLETED_SUCCESS) {
-                result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.REVERT);
-            } else {
-                result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
-                result.setAssembledTransaction(tx.buildAssembledTransaction(evm, accoutLoader));
-                result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
-                        setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
-                        setAttestationType(ToDomain.AttestationType.SIGN).
-                        addParties(tx.getFrom()).
-                        build()
-                );
-                result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
-                        setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
-                        setAttestationType(ToDomain.AttestationType.ENDORSE).
-                        build()
-                );
-            }
+            result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
+            result.setAssembledTransaction(execResult.state().assembledTransaction());
+
+            // Just like a base Eth transaction, we sign the encoded transaction.
+            // However, we do not package the signature back up in any RLP encoded way
+            // back again into a full transaction RLP bytestring.
+            result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
+                    setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                    setAttestationType(ToDomain.AttestationType.SIGN).
+                    setPayload(ByteString.copyFrom(execResult.txPayloadHash().getBytes())).
+                    addParties(tx.getFrom()).
+                    build()
+            );
+
+            // In addition to the signing address of the sender of this transaction (which can be any eth address)
+            // we need to get endorsements from all endorsers in the list associated with the privacy group.
+            // This includes this node, but not the same signing address, so there's no special optimization for "us"
+            // to avoid the re-execution of the EVM transaction on this local node at endorsement phase.
+            var params = tx.getValues();
+            var endorsers = PenteTransaction.buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
+            result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
+                    setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                    setAttestationType(ToDomain.AttestationType.ENDORSE).
+                    addAllParties(endorsers).
+                    build()
+            );
             return CompletableFuture.completedFuture(result.build());
+        } catch(PenteTransaction.EVMExecutionException e) {
+            // Note unlike a base ledger, we do not write a nonce update to the sender's account
+            // (which would be a UTXO spend + mint) for a revert during assembly of a transaction,
+            // as endorsing and submitting that would be lots of work.
+            LOGGER.error(new FormattedMessage("EVM execution failed during assemble for TX {}", request.getTransaction().getTransactionId()), e);
+            return CompletableFuture.completedFuture(ToDomain.AssembleTransactionResponse.newBuilder().
+                    setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.REVERT).
+                    setRevertReason(e.getMessage()).
+                    build());
         } catch(Exception e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -227,7 +228,55 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.EndorseTransactionResponse> endorseTransaction(ToDomain.EndorseTransactionRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            // Do the execution of the transaction again ourselves
+            var tx = new PenteTransaction(this, request.getTransaction());
+            var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), new PenteAccountLoader());
+
+            // Compare the exact execution result
+            var assertedInputs = new ArrayList<String>(request.getInputsCount());
+            for (var input : request.getInputsList()) {
+                assertedInputs.add(input.getId());
+            }
+            var expectedInputs = new ArrayList<String>(execResult.state().assembledTransaction().getInputStatesCount());
+            for (var input : execResult.state().assembledTransaction().getInputStatesList()) {
+                expectedInputs.add(input.getId());
+            }
+            var assertedOutputs = new ArrayList<PersistedAccount>(request.getOutputsCount());
+            for (var output : request.getOutputsList()) {
+                assertedOutputs.add(PersistedAccount.deserialize(output.getStateDataJson().getBytes(StandardCharsets.UTF_8)));
+            }
+            var expectedOutputs = execResult.state().newAccountStates();
+            var inputsMatch = assertedInputs.size() == expectedInputs.size();
+            for (int i = 0; inputsMatch && i < assertedInputs.size(); i++) {
+                inputsMatch = assertedInputs.get(i).equals(expectedInputs.get(i));
+            }
+            var outputsMatch = assertedOutputs.size() == expectedOutputs.size();
+            for (int i = 0; outputsMatch && i < expectedOutputs.size(); i++) {
+                outputsMatch = assertedOutputs.get(i).equals(expectedOutputs.get(i));
+            }
+            if (!inputsMatch || !outputsMatch) {
+                LOGGER.error("Endorsement failed. ASSERTED inputs={} outputs={} EXPECTED inputs={} outputs={}",
+                        assertedInputs, assertedOutputs,
+                        expectedInputs, expectedOutputs);
+                throw new IllegalStateException("Execution state mismatch detected in endorsement");
+            }
+
+//            var result = ToDomain.EndorseTransactionResponse.newBuilder();
+            throw new UnsupportedOperationException();
+
+        } catch(PenteTransaction.EVMExecutionException e) {
+            // Note unlike a base ledger, we do not write a nonce update to the sender's account
+            // (which would be a UTXO spend + mint) for a revert during assembly of a transaction,
+            // as endorsing and submitting that would be lots of work.
+            LOGGER.error(new FormattedMessage("EVM execution failed during endorsement TX {}", request.getTransaction().getTransactionId()), e);
+            return CompletableFuture.completedFuture(ToDomain.EndorseTransactionResponse.newBuilder().
+                    setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.REVERT).
+                    setRevertReason(e.getMessage()).
+                    build());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
@@ -248,6 +297,7 @@ public class PenteDomain extends DomainInstance {
                         setQueryJson(queryJson).
                         build()).get();
                 if (response.getStatesCount() != 1) {
+                    loadedAccountStates.put(address, null);
                     return Optional.empty();
                 }
                 var state = response.getStates(0);

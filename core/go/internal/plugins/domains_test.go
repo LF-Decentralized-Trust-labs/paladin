@@ -37,6 +37,15 @@ type testDomainManager struct {
 	domains             map[string]plugintk.Plugin
 	domainRegistered    func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
+	encodeData          func(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
+}
+
+func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
+	return tp.findAvailableStates(ctx, req)
+}
+
+func (tp *testDomainManager) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	return tp.encodeData(ctx, req)
 }
 
 func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
@@ -66,10 +75,6 @@ func (tp *testDomainManager) mock(t *testing.T) *componentmocks.DomainManager {
 		mdr.Return(m2p, err)
 	})
 	return mdm
-}
-
-func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-	return tp.findAvailableStates(ctx, req)
 }
 
 func newTestDomainPluginManager(t *testing.T, setup *testManagers) (context.Context, *pluginManager, func()) {
@@ -185,6 +190,13 @@ func TestDomainRequestsOK(t *testing.T) {
 		}, nil
 	}
 
+	tdm.encodeData = func(ctx context.Context, edr *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+		assert.Equal(t, edr.Body, "some input data")
+		return &prototk.EncodeDataResponse{
+			Data: []byte("some output data"),
+		}, nil
+	}
+
 	ctx, pc, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
@@ -257,11 +269,18 @@ func TestDomainRequestsOK(t *testing.T) {
 	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
 
 	callbacks := <-waitForCallbacks
+
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: "schema1",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "12345", fas.States[0].Id)
+
+	edr, err := callbacks.EncodeData(ctx, &prototk.EncodeDataRequest{
+		Body: "some input data",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some output data", string(edr.Data))
 }
 
 func TestDomainRegisterFail(t *testing.T) {
