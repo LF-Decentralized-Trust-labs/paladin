@@ -23,21 +23,21 @@ import (
 	"os"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 //go:embed abis/ZetoFactory.json
 var zetoFactoryJSON []byte // From "gradle copySolidity"
 
 type zetoDomainContracts struct {
-	factoryAddress       *ethtypes.Address0xHex
+	factoryAddress       *tktypes.EthAddress
 	factoryAbi           abi.ABI
-	deployedContracts    map[string]*ethtypes.Address0xHex
+	deployedContracts    map[string]*tktypes.EthAddress
 	deployedContractAbis map[string]abi.ABI
 	cloneableContracts   map[string]cloneableContract
 }
@@ -98,8 +98,8 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 	return cloneableContracts
 }
 
-func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []domainContract) (map[string]*ethtypes.Address0xHex, map[string]abi.ABI, error) {
-	deployedContracts := make(map[string]*ethtypes.Address0xHex)
+func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []domainContract) (map[string]*tktypes.EthAddress, map[string]abi.ABI, error) {
+	deployedContracts := make(map[string]*tktypes.EthAddress)
 	deployedContractAbis := make(map[string]abi.ABI)
 	for _, contract := range contracts {
 		addr, abi, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
@@ -114,7 +114,7 @@ func deployContracts(ctx context.Context, rpc rpcbackend.Backend, deployer strin
 	return deployedContracts, deployedContractAbis, nil
 }
 
-func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *domainContract, deployedContracts map[string]*ethtypes.Address0xHex) (*ethtypes.Address0xHex, abi.ABI, error) {
+func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *domainContract, deployedContracts map[string]*tktypes.EthAddress) (*tktypes.EthAddress, abi.ABI, error) {
 	if contract.AbiAndBytecode.Path == "" {
 		return nil, nil, fmt.Errorf("no path or JSON specified for the abi and bytecode for contract %s", contract.Name)
 	}
@@ -143,13 +143,13 @@ func getContractSpec(contract *domainContract) (*domain.SolidityBuild, error) {
 	return &build, nil
 }
 
-func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*ethtypes.Address0xHex, error) {
+func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*tktypes.EthAddress, error) {
 	var addr string
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
 	}
-	return ethtypes.MustNewAddress(addr), nil
+	return tktypes.MustEthAddress(addr), nil
 }
 
 func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi blockindexer.BlockIndexer, deployer string, domainContracts *zetoDomainContracts) error {
@@ -159,9 +159,8 @@ func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi bl
 	}
 
 	// Send the transaction
-	addr := ethtypes.Address0xHex(*domainContracts.factoryAddress)
 	for contractName := range domainContracts.cloneableContracts {
-		err = registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, addr, bi)
+		err = registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, domainContracts.factoryAddress, bi)
 		if err != nil {
 			return err
 		}
@@ -170,7 +169,7 @@ func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi bl
 	return nil
 }
 
-func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc ethclient.ABIFunctionClient, deployer string, addr ethtypes.Address0xHex, bi blockindexer.BlockIndexer) error {
+func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc ethclient.ABIFunctionClient, deployer string, addr *tktypes.EthAddress, bi blockindexer.BlockIndexer) error {
 	log.L(ctx).Infof("Registering implementation %s", name)
 	verifierName := domainContracts.cloneableContracts[name].verifier
 	implAddr, ok := domainContracts.deployedContracts[name]
@@ -200,7 +199,7 @@ func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainC
 	}
 	txHash, err := abiFunc.R(ctx).
 		Signer(deployer).
-		To(&addr).
+		To(addr.Address0xHex()).
 		Input(params).
 		SignAndSend()
 	if err != nil {
