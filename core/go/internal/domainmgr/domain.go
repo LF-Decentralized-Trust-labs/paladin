@@ -53,8 +53,6 @@ type domain struct {
 	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry
 	factoryContractAddress *tktypes.EthAddress
-	factoryContractABI     abi.ABI
-	privateContractABI     abi.ABI
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -100,14 +98,6 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	}
 	if d.constructorABI.Type != abi.Constructor {
 		return nil, i18n.NewError(d.ctx, msgs.MsgDomainConstructorABITypeWrong, d.constructorABI.Type)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.FactoryContractAbiJson), &d.factoryContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.PrivateContractAbiJson), &d.privateContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
 	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
@@ -314,9 +304,9 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 	}
 	if res.Transaction != nil && res.Deploy == nil {
-		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
-		if functionABI == nil {
-			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+		var functionABI abi.Entry
+		if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
+			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
 		if err != nil {
@@ -324,22 +314,27 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
-			FunctionABI: functionABI,
+			FunctionABI: &functionABI,
 			To:          *d.Address(),
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {
-		functionABI := d.factoryContractABI.Constructor()
-		if functionABI == nil {
+		var functionABI abi.Entry
+		if res.Deploy.ConstructorAbiJson == "" {
 			// default constructor
-			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
+			functionABI.Type = abi.Constructor
+			functionABI.Inputs = abi.ParameterArray{}
+		} else {
+			if err := json.Unmarshal(([]byte)(res.Deploy.ConstructorAbiJson), &functionABI); err != nil {
+				return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+			}
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Deploy.ParamsJson))
 		if err != nil {
 			return err
 		}
 		tx.DeployTransaction = &components.EthDeployTransaction{
-			ConstructorABI: functionABI,
+			ConstructorABI: &functionABI,
 			Bytecode:       res.Deploy.Bytecode,
 			Inputs:         inputs,
 		}

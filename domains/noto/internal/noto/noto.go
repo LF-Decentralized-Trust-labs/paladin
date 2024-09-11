@@ -48,12 +48,12 @@ var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config     *types.Config
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
-	factory    *domain.SolidityBuild
-	contract   *domain.SolidityBuild
+	config      *types.Config
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	factoryABI  abi.ABI
+	contractABI abi.ABI
 }
 
 type NotoDeployParams struct {
@@ -84,23 +84,15 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		n.factory = domain.LoadBuild(notoFactoryJSON)
-		n.contract = domain.LoadBuild(notoJSON)
+		n.factoryABI = domain.LoadBuild(notoFactoryJSON).ABI
+		n.contractABI = domain.LoadBuild(notoJSON).ABI
 	case "NotoSelfSubmit":
-		n.factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
-		n.contract = domain.LoadBuild(notoSelfSubmitJSON)
+		n.factoryABI = domain.LoadBuild(notoSelfSubmitFactoryJSON).ABI
+		n.contractABI = domain.LoadBuild(notoSelfSubmitJSON).ABI
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	factoryJSON, err := json.Marshal(n.factory.ABI)
-	if err != nil {
-		return nil, err
-	}
-	notoJSON, err := json.Marshal(n.contract.ABI)
-	if err != nil {
-		return nil, err
-	}
 	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -113,8 +105,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(notoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -172,11 +162,15 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	functionJSON, err := json.Marshal(n.factoryABI.Functions()["deploy"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &config.NotaryLookup,
 	}, nil

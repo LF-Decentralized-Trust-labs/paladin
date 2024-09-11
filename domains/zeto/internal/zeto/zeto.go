@@ -51,10 +51,12 @@ var zetoJSON []byte // From "gradle copySolidity"
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config     *types.Config
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
+	config      *types.Config
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	factoryABI  abi.ABI
+	contractABI abi.ABI
 }
 
 type ZetoDeployParams struct {
@@ -72,20 +74,14 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 		return nil, err
 	}
 
-	z.config = &config
-	z.chainID = req.ChainId
-
 	factory := domain.LoadBuildLinked(zetoFactoryJSON, config.Libraries)
 	contract := domain.LoadBuildLinked(zetoJSON, config.Libraries)
 
-	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
-	zetoJSON, err := json.Marshal(contract.ABI)
-	if err != nil {
-		return nil, err
-	}
+	z.config = &config
+	z.chainID = req.ChainId
+	z.factoryABI = factory.ABI
+	z.contractABI = contract.ABI
+
 	constructorJSON, err := json.Marshal(types.ZetoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -98,8 +94,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(zetoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -143,11 +137,15 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	functionJSON, err := json.Marshal(z.factoryABI.Functions()["deploy"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &params.From,
 	}, nil
