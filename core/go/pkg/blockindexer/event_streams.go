@@ -131,6 +131,8 @@ func (bi *blockIndexer) upsertInternalEventStream(ctx context.Context, ies *Inte
 		}
 		def.ID = existing[0].ID
 		// Update in the DB so we store the latest config
+		// only the config can be updated. In particular the
+		// "Source" is immutable after creation
 		err := bi.persistence.DB().
 			Table("event_streams").
 			Where("type = ?", def.Type).
@@ -598,5 +600,5 @@ func (es *eventStream) queryTransactionEvents(tx ethtypes.HexBytes0xPrefix, even
 }
 
 func (es *eventStream) matchLog(in *LogJSONRPC, out *EventWithData) {
-	es.bi.matchLog(es.ctx, es.eventABIs, in, out)
+	es.bi.matchLog(es.ctx, es.eventABIs, in, out, es.definition.Source)
 }

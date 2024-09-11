@@ -138,7 +138,11 @@ func TestConfiguredDomains(t *testing.T) {
 
 func TestDomainRegisteredNotFound(t *testing.T) {
 	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-		Domains: map[string]*DomainConfig{},
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+			},
+		},
 	})
 	defer done()
 
@@ -148,7 +152,11 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 
 func TestGetDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-		Domains: map[string]*DomainConfig{},
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+			},
+		},
 	})
 	defer done()
 
@@ -184,7 +192,11 @@ func TestMustParseLoaders(t *testing.T) {
 
 func TestWaitForDeployQueryError(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-		Domains: map[string]*DomainConfig{},
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+			},
+		},
 	}, func(mc *mockComponents) {
 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
 	})
@@ -196,7 +208,11 @@ func TestWaitForDeployQueryError(t *testing.T) {
 
 func TestWaitForDeployDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-		Domains: map[string]*DomainConfig{},
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+			},
+		},
 	}, func(mc *mockComponents) {
 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
 	})
@@ -222,7 +238,11 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 
 func TestWaitForDeployTimeout(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
-		Domains: map[string]*DomainConfig{},
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+			},
+		},
 	})
 	defer done()
 

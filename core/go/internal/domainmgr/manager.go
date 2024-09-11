@@ -103,13 +103,17 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
 	dm.blockIndexer = pic.BlockIndexer()
+
+	var eventStreams []*components.ManagerEventStream
+	for _, d := range dm.conf.Domains {
+		eventStreams = append(eventStreams, &components.ManagerEventStream{
+			ABI:     iPaladinContractABI,
+			Handler: dm.eventIndexer,
+			Source:  &d.FactoryAddress,
+		})
+	}
 	return &components.ManagerInitResult{
-		EventStreams: []*components.ManagerEventStream{
-			{
-				ABI:     iPaladinContractABI,
-				Handler: dm.eventIndexer,
-			},
-		},
+		EventStreams: eventStreams,
 	}, nil
 }
 
