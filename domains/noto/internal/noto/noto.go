@@ -52,6 +52,7 @@ type Noto struct {
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
+	factoryABI  abi.ABI
 	contractABI abi.ABI
 }
 
@@ -80,24 +81,18 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
-	var factory *domain.SolidityBuild
-
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		factory = domain.LoadBuild(notoFactoryJSON)
+		n.factoryABI = domain.LoadBuild(notoFactoryJSON).ABI
 		n.contractABI = domain.LoadBuild(notoJSON).ABI
 	case "NotoSelfSubmit":
-		factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
+		n.factoryABI = domain.LoadBuild(notoSelfSubmitFactoryJSON).ABI
 		n.contractABI = domain.LoadBuild(notoSelfSubmitJSON).ABI
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
 	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -110,7 +105,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -168,11 +162,16 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	factoryJSON, err := json.Marshal(n.factoryABI)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			ContractAbiJson: string(factoryJSON),
+			FunctionName:    "deploy",
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &config.NotaryLookup,
 	}, nil

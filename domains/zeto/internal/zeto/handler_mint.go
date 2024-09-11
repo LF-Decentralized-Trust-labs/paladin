@@ -125,10 +125,10 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	}
 
 	return &pb.PrepareTransactionResponse{
-		PrivateContractAbiJson: string(zetoJSON),
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "mint",
-			ParamsJson:   string(paramsJSON),
+			ContractAbiJson: string(zetoJSON),
+			FunctionName:    "mint",
+			ParamsJson:      string(paramsJSON),
 		},
 	}, nil
 }

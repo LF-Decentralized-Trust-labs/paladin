@@ -269,10 +269,10 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	return &pb.PrepareTransactionResponse{
-		PrivateContractAbiJson: string(notoJSON),
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: tx.FunctionABI.Name,
-			ParamsJson:   string(paramsJSON),
+			ContractAbiJson: string(notoJSON),
+			FunctionName:    tx.FunctionABI.Name,
+			ParamsJson:      string(paramsJSON),
 		},
 	}, nil
 }

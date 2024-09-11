@@ -55,6 +55,7 @@ type Zeto struct {
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
+	factoryABI  abi.ABI
 	contractABI abi.ABI
 }
 
@@ -78,12 +79,9 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 
 	z.config = &config
 	z.chainID = req.ChainId
+	z.factoryABI = factory.ABI
 	z.contractABI = contract.ABI
 
-	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
 	constructorJSON, err := json.Marshal(types.ZetoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -96,7 +94,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -140,11 +137,16 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	factoryJSON, err := json.Marshal(z.factoryABI)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			ContractAbiJson: string(factoryJSON),
+			FunctionName:    "deploy",
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &params.From,
 	}, nil

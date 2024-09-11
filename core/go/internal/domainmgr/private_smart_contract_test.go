@@ -396,10 +396,10 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		params, err := json.Marshal(onChain)
 		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
-			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "execute",
-				ParamsJson:   string(params),
+				ContractAbiJson: fakeCoinPrivateABI,
+				FunctionName:    "execute",
+				ParamsJson:      string(params),
 			},
 		}, nil
 	}
@@ -604,9 +604,9 @@ func TestPrepareTransactionABIInvalid(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
-			PrivateContractAbiJson: `!!!wrong`,
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "wrong",
+				ContractAbiJson: `!!!wrong`,
+				FunctionName:    "wrong",
 			},
 		}, nil
 	}
@@ -624,9 +624,9 @@ func TestPrepareTransactionBadFunction(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
-			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "wrong",
+				ContractAbiJson: fakeCoinPrivateABI,
+				FunctionName:    "wrong",
 			},
 		}, nil
 	}
@@ -644,10 +644,10 @@ func TestPrepareTransactionBadData(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
-			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "execute",
-				ParamsJson:   `{"missing": "expected"}`,
+				ContractAbiJson: fakeCoinPrivateABI,
+				FunctionName:    "execute",
+				ParamsJson:      `{"missing": "expected"}`,
 			},
 		}, nil
 	}

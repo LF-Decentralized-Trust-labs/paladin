@@ -367,7 +367,7 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	}
 
 	var privateContractABI abi.ABI
-	if err := json.Unmarshal(([]byte)(res.PrivateContractAbiJson), &privateContractABI); err != nil {
+	if err := json.Unmarshal(([]byte)(res.Transaction.ContractAbiJson), &privateContractABI); err != nil {
 		return i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 

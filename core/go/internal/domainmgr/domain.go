@@ -53,7 +53,6 @@ type domain struct {
 	schemasByID            map[string]statestore.Schema
 	constructorABI         *abi.Entry
 	factoryContractAddress *tktypes.EthAddress
-	factoryContractABI     abi.ABI
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -99,10 +98,6 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	}
 	if d.constructorABI.Type != abi.Constructor {
 		return nil, i18n.NewError(d.ctx, msgs.MsgDomainConstructorABITypeWrong, d.constructorABI.Type)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.FactoryContractAbiJson), &d.factoryContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
 	}
 
 	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
@@ -309,7 +304,11 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 	}
 	if res.Transaction != nil && res.Deploy == nil {
-		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
+		var contractABI abi.ABI
+		if err := json.Unmarshal(([]byte)(res.Transaction.ContractAbiJson), &contractABI); err != nil {
+			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+		}
+		functionABI := contractABI.Functions()[res.Transaction.FunctionName]
 		if functionABI == nil {
 			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 		}
@@ -324,7 +323,11 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {
-		functionABI := d.factoryContractABI.Constructor()
+		var contractABI abi.ABI
+		if err := json.Unmarshal(([]byte)(res.Deploy.ContractAbiJson), &contractABI); err != nil {
+			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+		}
+		functionABI := contractABI.Constructor()
 		if functionABI == nil {
 			// default constructor
 			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}

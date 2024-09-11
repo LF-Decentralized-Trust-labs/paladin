@@ -229,7 +229,6 @@ func goodDomainConf() *prototk.DomainConfig {
 		},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: fakeCoinFactoryABI,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -291,7 +290,6 @@ func TestDomainInitBadSchemas(t *testing.T) {
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: fakeCoinFactoryABI,
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
@@ -306,7 +304,6 @@ func TestDomainInitBadConstructor(t *testing.T) {
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `!!!wrong`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -321,7 +318,6 @@ func TestDomainInitBadConstructorType(t *testing.T) {
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -336,7 +332,6 @@ func TestDomainInitSchemaStoreFail(t *testing.T) {
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -351,7 +346,6 @@ func TestDomainInitBadAddress(t *testing.T) {
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: `!wrong`,
-		FactoryContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -361,27 +355,11 @@ func TestDomainInitBadAddress(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestDomainInitFactoryABIInvalid(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `!!!wrong`,
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011605", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -424,9 +402,7 @@ func TestDomainConfigureFail(t *testing.T) {
 }
 
 func TestDomainFindAvailableStatesNotInit(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		FactoryContractAbiJson: `!!!WRONG`,
-	})
+	ctx, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{})
 	defer done()
 	assert.NotNil(t, *tp.d.initError.Load())
 	_, err := tp.d.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{SchemaId: "12345"})
@@ -642,7 +618,8 @@ func TestDomainPrepareDeployInvokeTX(t *testing.T) {
 		assert.Same(t, tx.TransactionSpecification, pdr.Transaction)
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "newInstance",
+				ContractAbiJson: fakeCoinFactoryABI,
+				FunctionName:    "newInstance",
 				ParamsJson: `{
 				  "notary": "` + pdr.ResolvedVerifiers[0].Verifier + `",
 				  "data": "0xfeedbeef"
@@ -673,6 +650,7 @@ func TestDomainPrepareDeployDeployTXWithSigner(t *testing.T) {
 		assert.Same(t, tx.TransactionSpecification, pdr.Transaction)
 		return &prototk.PrepareDeployResponse{
 			Deploy: &prototk.BaseLedgerDeployTransaction{
+				ContractAbiJson: fakeCoinFactoryABI,
 				ParamsJson: `{
 				  "notary": "` + pdr.ResolvedVerifiers[0].Verifier + `",
 				  "data": "0xfeedbeef"
@@ -730,8 +708,9 @@ func TestDomainPrepareDeployInvokeInvalidFunction(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "wrong",
-				ParamsJson:   `{}`,
+				ContractAbiJson: fakeCoinFactoryABI,
+				FunctionName:    "wrong",
+				ParamsJson:      `{}`,
 			},
 		}, nil
 	}
@@ -770,32 +749,14 @@ func TestDomainPrepareDeployBadParams(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Deploy: &prototk.BaseLedgerDeployTransaction{
-				ParamsJson: `{"missing":"expected things"}`,
+				ContractAbiJson: fakeCoinFactoryABI,
+				ParamsJson:      `{"missing":"expected things"}`,
 			},
 		}, nil
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
 	assert.Regexp(t, "FF22040", err)
-}
-
-func TestDomainPrepareDeployDefaultConstructor(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
-	defer done()
-	assert.Nil(t, tp.d.initError.Load())
-
-	domain := tp.d
-	domain.factoryContractABI = abi.ABI{}
-	tx := goodTXForDeploy()
-
-	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
-		return &prototk.PrepareDeployResponse{
-			Deploy: &prototk.BaseLedgerDeployTransaction{},
-		}, nil
-	}
-
-	err := domain.PrepareDeploy(ctx, tx)
-	require.NoError(t, err)
 }
 
 func TestDomainPrepareInvokeBadParams(t *testing.T) {
@@ -809,14 +770,55 @@ func TestDomainPrepareInvokeBadParams(t *testing.T) {
 	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 		return &prototk.PrepareDeployResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "newInstance",
-				ParamsJson:   `{"missing":"expected things"}`,
+				ContractAbiJson: fakeCoinFactoryABI,
+				FunctionName:    "newInstance",
+				ParamsJson:      `{"missing":"expected things"}`,
 			},
 		}, nil
 	}
 
 	err := domain.PrepareDeploy(ctx, tx)
 	assert.Regexp(t, "FF22040", err)
+}
+
+func TestDomainPrepareDeployABIInvalid(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	domain := tp.d
+	tx := goodTXForDeploy()
+
+	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+		return &prototk.PrepareDeployResponse{
+			Deploy: &prototk.BaseLedgerDeployTransaction{
+				ContractAbiJson: `!!!wrong`,
+			},
+		}, nil
+	}
+
+	err := domain.PrepareDeploy(ctx, tx)
+	assert.Regexp(t, "PD011605", err)
+}
+
+func TestDomainPrepareInvokeABIInvalid(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	domain := tp.d
+	tx := goodTXForDeploy()
+
+	tp.Functions.PrepareDeploy = func(ctx context.Context, pdr *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
+		return &prototk.PrepareDeployResponse{
+			Transaction: &prototk.BaseLedgerTransaction{
+				ContractAbiJson: `!!!wrong`,
+			},
+		}, nil
+	}
+
+	err := domain.PrepareDeploy(ctx, tx)
+	assert.Regexp(t, "PD011605", err)
 }
 
 func TestDomainPrepareInvokeAndDeploy(t *testing.T) {

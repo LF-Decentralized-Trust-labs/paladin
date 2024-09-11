@@ -184,10 +184,10 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	}
 
 	return &pb.PrepareTransactionResponse{
-		PrivateContractAbiJson: string(notoJSON),
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "approve",
-			ParamsJson:   string(paramsJSON),
+			ContractAbiJson: string(notoJSON),
+			FunctionName:    "approve",
+			ParamsJson:      string(paramsJSON),
 		},
 	}, nil
 }
