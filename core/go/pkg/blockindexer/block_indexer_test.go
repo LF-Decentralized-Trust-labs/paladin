@@ -156,11 +156,17 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 		} else {
 			to = ethtypes.MustNewAddress(tktypes.RandHex(20))
 		}
+		txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 		blocks[i] = &BlockInfoJSONRPC{
 			Number: ethtypes.HexUint64(i),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
+			Transactions: []*PartialTransactionInfo{
+				{
+					Hash:  txHash,
+					Nonce: ethtypes.HexUint64(i),
+				},
+			},
 		}
-		txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 		eventBData, err := testABI[1].Inputs.EncodeABIDataValues(map[string]interface{}{
 			"intParam1": i + 1000000,
 			"strParam2": fmt.Sprintf("event_b_in_block_%d", i),
@@ -205,7 +211,7 @@ func mockBlocksRPCCalls(mRPC *rpcbackendmocks.WebSocketRPCClient, blocks []*Bloc
 }
 
 func mockBlocksRPCCallsDynamic(mRPC *rpcbackendmocks.WebSocketRPCClient, dynamic func(args mock.Arguments) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC)) {
-	byBlock := mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).Maybe()
+	byBlock := mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, true).Maybe()
 	byBlock.Run(func(args mock.Arguments) {
 		blocks, _ := dynamic(args)
 		blockReturn := args[1].(**BlockInfoJSONRPC)

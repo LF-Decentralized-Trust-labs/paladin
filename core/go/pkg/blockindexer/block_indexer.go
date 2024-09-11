@@ -514,6 +514,7 @@ func (bi *blockIndexer) writeBatch(ctx context.Context, batch *blockWriterBatch)
 				TransactionIndex: int64(txIndex),
 				From:             (*tktypes.EthAddress)(r.From),
 				To:               (*tktypes.EthAddress)(r.To),
+				Nonce:            uint64(block.Transactions[txIndex].Nonce),
 				ContractAddress:  (*tktypes.EthAddress)(r.ContractAddress),
 				Result:           result,
 			})

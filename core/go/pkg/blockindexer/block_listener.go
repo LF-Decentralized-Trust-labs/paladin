@@ -153,7 +153,7 @@ func isNotFound(err *rpcbackend.RPCError) bool {
 func (bl *blockListener) getBlockInfoByHash(ctx context.Context, blockHash string) (*BlockInfoJSONRPC, error) {
 	var info *BlockInfoJSONRPC
 	log.L(ctx).Debugf("Fetching block by hash %s", blockHash)
-	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByHash", blockHash, false)
+	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByHash", blockHash, true)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
@@ -166,7 +166,7 @@ func (bl *blockListener) getBlockInfoByHash(ctx context.Context, blockHash strin
 func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber ethtypes.HexUint64) (*BlockInfoJSONRPC, error) {
 	var info *BlockInfoJSONRPC
 	log.L(ctx).Debugf("Fetching block by number %d", blockNumber)
-	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByNumber", blockNumber, false)
+	err := bl.wsConn.CallRPC(ctx, &info, "eth_getBlockByNumber", blockNumber, true)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
@@ -238,7 +238,7 @@ func (bl *blockListener) listenLoop() {
 			default:
 				candidate := bl.reconcileCanonicalChain(bi)
 				// Check this is the lowest position to notify from
-				if candidate != nil && (notifyPos == nil || candidate.Value.(*BlockInfoJSONRPC).Number < notifyPos.Value.(*BlockInfoJSONRPC).Number) {
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*BlockInfoJSONRPC).Number <= notifyPos.Value.(*BlockInfoJSONRPC).Number) {
 					notifyPos = candidate
 				}
 			}
