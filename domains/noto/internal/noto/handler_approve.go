@@ -63,7 +63,7 @@ func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 }
 
 func (h *approveHandler) decodeTransferCall(ctx context.Context, encodedCall []byte) (*ApprovedTransferParams, error) {
-	approvedTransfer := h.noto.contract.ABI.Functions()["approvedTransfer"]
+	approvedTransfer := h.noto.contractABI.Functions()["approvedTransfer"]
 	if approvedTransfer == nil {
 		return nil, fmt.Errorf("could not find approvedTransfer method")
 	}
@@ -178,8 +178,13 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
+	notoJSON, err := json.Marshal(h.noto.contractABI)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareTransactionResponse{
+		PrivateContractAbiJson: string(notoJSON),
 		Transaction: &pb.BaseLedgerTransaction{
 			FunctionName: "approve",
 			ParamsJson:   string(paramsJSON),

@@ -396,6 +396,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		params, err := json.Marshal(onChain)
 		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
+			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
 				FunctionName: "execute",
 				ParamsJson:   string(params),
@@ -594,6 +595,26 @@ func TestPrepareTransactionFail(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 }
 
+func TestPrepareTransactionABIInvalid(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
+	defer done()
+
+	psc, tx := doDomainInitAssembleTransactionOK(t, ctx, tp)
+	tx.Signer = "signer1"
+
+	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+		return &prototk.PrepareTransactionResponse{
+			PrivateContractAbiJson: `!!!wrong`,
+			Transaction: &prototk.BaseLedgerTransaction{
+				FunctionName: "wrong",
+			},
+		}, nil
+	}
+
+	err := psc.PrepareTransaction(ctx, tx)
+	assert.Regexp(t, "PD011607", err)
+}
+
 func TestPrepareTransactionBadFunction(t *testing.T) {
 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
@@ -603,6 +624,7 @@ func TestPrepareTransactionBadFunction(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
+			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
 				FunctionName: "wrong",
 			},
@@ -622,6 +644,7 @@ func TestPrepareTransactionBadData(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
+			PrivateContractAbiJson: fakeCoinPrivateABI,
 			Transaction: &prototk.BaseLedgerTransaction{
 				FunctionName: "execute",
 				ParamsJson:   `{"missing": "expected"}`,

@@ -54,7 +54,6 @@ type domain struct {
 	constructorABI         *abi.Entry
 	factoryContractAddress *tktypes.EthAddress
 	factoryContractABI     abi.ABI
-	privateContractABI     abi.ABI
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -104,10 +103,6 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 
 	if err := json.Unmarshal(([]byte)(d.config.FactoryContractAbiJson), &d.factoryContractABI); err != nil {
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.PrivateContractAbiJson), &d.privateContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
 
 	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)

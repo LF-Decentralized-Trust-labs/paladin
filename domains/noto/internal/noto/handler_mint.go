@@ -128,8 +128,13 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
+	notoJSON, err := json.Marshal(h.noto.contractABI)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareTransactionResponse{
+		PrivateContractAbiJson: string(notoJSON),
 		Transaction: &pb.BaseLedgerTransaction{
 			FunctionName: "mint",
 			ParamsJson:   string(paramsJSON),

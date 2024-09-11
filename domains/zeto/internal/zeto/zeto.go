@@ -51,10 +51,11 @@ var zetoJSON []byte // From "gradle copySolidity"
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config     *types.Config
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
+	config      *types.Config
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	contractABI abi.ABI
 }
 
 type ZetoDeployParams struct {
@@ -72,17 +73,14 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 		return nil, err
 	}
 
-	z.config = &config
-	z.chainID = req.ChainId
-
 	factory := domain.LoadBuildLinked(zetoFactoryJSON, config.Libraries)
 	contract := domain.LoadBuildLinked(zetoJSON, config.Libraries)
 
+	z.config = &config
+	z.chainID = req.ChainId
+	z.contractABI = contract.ABI
+
 	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
-	zetoJSON, err := json.Marshal(contract.ABI)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +97,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
 			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(zetoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{

@@ -45,7 +45,6 @@ func (s *starter) configureDomain(ctx context.Context, cdr *prototk.ConfigureDom
 			ConstructorAbiJson:     `{"type":"constructor","inputs":[]}`,
 			FactoryContractAddress: `0x1000000000000000000000000000000000000001`,
 			FactoryContractAbiJson: `[]`,
-			PrivateContractAbiJson: `[]`,
 			AbiStateSchemasJson:    []string{},
 			BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
 				SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,

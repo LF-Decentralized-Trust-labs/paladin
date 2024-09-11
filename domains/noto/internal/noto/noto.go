@@ -48,12 +48,11 @@ var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config     *types.Config
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
-	factory    *domain.SolidityBuild
-	contract   *domain.SolidityBuild
+	config      *types.Config
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	contractABI abi.ABI
 }
 
 type NotoDeployParams struct {
@@ -81,23 +80,21 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
+	var factory *domain.SolidityBuild
+
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		n.factory = domain.LoadBuild(notoFactoryJSON)
-		n.contract = domain.LoadBuild(notoJSON)
+		factory = domain.LoadBuild(notoFactoryJSON)
+		n.contractABI = domain.LoadBuild(notoJSON).ABI
 	case "NotoSelfSubmit":
-		n.factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
-		n.contract = domain.LoadBuild(notoSelfSubmitJSON)
+		factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
+		n.contractABI = domain.LoadBuild(notoSelfSubmitJSON).ABI
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	factoryJSON, err := json.Marshal(n.factory.ABI)
-	if err != nil {
-		return nil, err
-	}
-	notoJSON, err := json.Marshal(n.contract.ABI)
+	factoryJSON, err := json.Marshal(factory.ABI)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +111,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
 			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(notoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{

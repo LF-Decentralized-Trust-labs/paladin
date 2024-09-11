@@ -41,7 +41,6 @@ public class PenteDomain extends DomainInstance {
                 .setConstructorAbiJson(config.abiEntry_privateConstructor().toString())
                 .setFactoryContractAddress(config.getAddress().toString())
                 .setFactoryContractAbiJson(config.getFactoryContractABI().toString())
-                .setPrivateContractAbiJson(config.getPrivacyGroupABI().toString())
                 .addAllAbiStateSchemasJson(config.allPenteSchemas())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)

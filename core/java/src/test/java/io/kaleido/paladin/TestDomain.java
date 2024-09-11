@@ -34,7 +34,6 @@ public class TestDomain extends DomainInstance {
                 """)
                 .setFactoryContractAddress("0x1000000000000000000000000000000000000001")
                 .setFactoryContractAbiJson("[]")
-                .setPrivateContractAbiJson("[]")
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())

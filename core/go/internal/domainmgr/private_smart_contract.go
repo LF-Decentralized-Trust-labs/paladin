@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -365,7 +366,12 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		return err
 	}
 
-	functionABI := dc.d.privateContractABI.Functions()[res.Transaction.FunctionName]
+	var privateContractABI abi.ABI
+	if err := json.Unmarshal(([]byte)(res.PrivateContractAbiJson), &privateContractABI); err != nil {
+		return i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
+	}
+
+	functionABI := privateContractABI.Functions()[res.Transaction.FunctionName]
 	if functionABI == nil {
 		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
 	}

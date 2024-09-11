@@ -230,7 +230,6 @@ func goodDomainConf() *prototk.DomainConfig {
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: fakeCoinFactoryABI,
-		PrivateContractAbiJson: fakeCoinPrivateABI,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -293,7 +292,6 @@ func TestDomainInitBadSchemas(t *testing.T) {
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: fakeCoinFactoryABI,
-		PrivateContractAbiJson: fakeCoinPrivateABI,
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
@@ -309,7 +307,6 @@ func TestDomainInitBadConstructor(t *testing.T) {
 		ConstructorAbiJson:     `!!!wrong`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -325,7 +322,6 @@ func TestDomainInitBadConstructorType(t *testing.T) {
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -341,7 +337,6 @@ func TestDomainInitSchemaStoreFail(t *testing.T) {
 		ConstructorAbiJson:     `{"type":"event"}`,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -357,7 +352,6 @@ func TestDomainInitBadAddress(t *testing.T) {
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: `!wrong`,
 		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -373,7 +367,6 @@ func TestDomainInitFactoryABIInvalid(t *testing.T) {
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `!!!wrong`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -383,29 +376,12 @@ func TestDomainInitFactoryABIInvalid(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestDomainInitPrivateABIInvalid(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `!!!wrong`,
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011607", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		FactoryContractAbiJson: `[]`,
-		PrivateContractAbiJson: `[]`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
