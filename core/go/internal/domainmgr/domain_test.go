@@ -37,25 +37,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fakeCoinConstructorABI = `{
-	 "type": "constructor",
-	 "inputs": [
-	   {
-		 "name": "notary",
-		 "type": "string"
-	   },
-	   {
-		 "name": "name",
-		 "type": "string"
-	   },
-	   {
-		 "name": "symbol",
-		 "type": "string"
-	   }
-	 ],
-	 "outputs": null
- }`
-
 const fakeCoinStateSchema = `{
 	"type": "tuple",
 	"internalType": "struct FakeCoin",
@@ -206,7 +187,6 @@ func goodDomainConf() *prototk.DomainConfig {
 			SubmitMode:       prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
 			OneTimeUsePrefix: "one/time/keys/",
 		},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
@@ -267,7 +247,6 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
@@ -278,52 +257,9 @@ func TestDomainInitBadSchemas(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestDomainInitBadConstructor(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     `!!!wrong`,
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011603", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
-func TestDomainInitBadConstructorType(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     `{"type":"event"}`,
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
-func TestDomainInitSchemaStoreFail(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     `{"type":"event"}`,
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011604", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
 func TestDomainInitBadAddress(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: `!wrong`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
@@ -337,7 +273,6 @@ func TestDomainInitBadAddress(t *testing.T) {
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
 		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		ConstructorAbiJson:     fakeCoinConstructorABI,
 		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
@@ -479,7 +414,6 @@ func TestDomainInitDeployOK(t *testing.T) {
 	tp.Functions.InitDeploy = func(ctx context.Context, idr *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
 		defer done()
 		assert.Equal(t, "0x53ba5dd6b708444da2fa50578b974fb700000000000000000000000000000000", idr.Transaction.TransactionId)
-		assert.JSONEq(t, fakeCoinConstructorABI, idr.Transaction.ConstructorAbi)
 		assert.JSONEq(t, `{
 		  "notary": "notary1",
 		  "name": "token1",
@@ -522,26 +456,6 @@ func TestDomainInitDeployMissingInput(t *testing.T) {
 	}
 	err := domain.InitDeploy(ctx, tx)
 	assert.Regexp(t, "PD011620", err)
-	assert.Nil(t, tx.RequiredVerifiers)
-}
-
-func TestDomainInitDeployBadConstructorParams(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
-	defer done()
-	assert.Nil(t, tp.d.initError.Load())
-
-	txID := uuid.MustParse("53BA5DD6-B708-444D-A2FA-50578B974FB7")
-	domain := tp.d
-	tx := &components.PrivateContractDeploy{
-		ID: txID,
-		Inputs: tktypes.RawJSON(`{
-		  "notary": "notary1",
-		  "name": 12345,
-		  "symbol": "TKN1"
-		}`),
-	}
-	err := domain.InitDeploy(ctx, tx)
-	assert.Regexp(t, "PD011610", err)
 	assert.Nil(t, tx.RequiredVerifiers)
 }
 
