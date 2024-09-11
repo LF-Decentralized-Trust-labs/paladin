@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -246,6 +247,52 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 		States: pbStates,
 	}, nil
 
+}
+
+func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	var abiData []byte
+	switch encRequest.EncodingType {
+	case prototk.EncodeDataRequest_FUNCTION_CALL_DATA:
+		var entry *abi.Entry
+		err := json.Unmarshal([]byte(encRequest.Definition), &entry)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		abiData, err = entry.EncodeCallDataJSONCtx(ctx, []byte(encRequest.Body))
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+		}
+	case prototk.EncodeDataRequest_TUPLE:
+		var param *abi.Parameter
+		err := json.Unmarshal([]byte(encRequest.Definition), &param)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		abiData, err = param.Components.EncodeABIDataJSONCtx(ctx, []byte(encRequest.Body))
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+		}
+	case prototk.EncodeDataRequest_ETH_TRANSACTION:
+		var tx *ethsigner.Transaction
+		err := json.Unmarshal([]byte(encRequest.Body), &tx)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		// We only support EIP-155 and EIP-1559 as they include the ChainID in the payload
+		switch encRequest.Definition {
+		case "", "eip1559", "eip-1559": // default
+			abiData = tx.SignaturePayloadEIP1559(d.dm.ethClientFactory.ChainID()).Bytes()
+		case "eip155", "eip-155":
+			abiData = tx.SignaturePayloadLegacyEIP155(d.dm.ethClientFactory.ChainID()).Bytes()
+		default:
+			return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition)
+		}
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType)
+	}
+	return &prototk.EncodeDataResponse{
+		Data: abiData,
+	}, nil
 }
 
 func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {

@@ -36,6 +36,7 @@ type DomainAPI interface {
 }
 
 type DomainCallbacks interface {
+	EncodeData(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
 	FindAvailableStates(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
 }
 
@@ -166,6 +167,17 @@ func (dp *domainHandler) FindAvailableStates(ctx context.Context, req *prototk.F
 	}))
 	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_FindAvailableStatesRes) *prototk.FindAvailableStatesResponse {
 		return msg.FindAvailableStatesRes
+	})
+}
+
+func (dp *domainHandler) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_EncodeData{
+			EncodeData: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_EncodeDataRes) *prototk.EncodeDataResponse {
+		return msg.EncodeDataRes
 	})
 }
 

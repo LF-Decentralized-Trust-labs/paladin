@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -101,19 +100,10 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		return err
 	}
 
-	// Perform any ABI encodings that are requested
-	abiEncodedData := make([]*prototk.ABIEncodedData, len(res.AbiEncodingRequests))
-	for i, encRequest := range res.AbiEncodingRequests {
-		if abiEncodedData[i], err = dc.encodeABIData(ctx, encRequest); err != nil {
-			return err
-		}
-	}
-
 	// Store the response back on the TX
 	preAssembly := &components.TransactionPreAssembly{
 		TransactionSpecification: txSpec,
 		RequiredVerifiers:        res.RequiredVerifiers,
-		ABIEncodedData:           abiEncodedData,
 	}
 	tx.PreAssembly = preAssembly
 	return nil
@@ -133,7 +123,6 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 	res, err := dc.api.AssembleTransaction(ctx, &prototk.AssembleTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
 		ResolvedVerifiers: preAssembly.Verifiers,
-		AbiEncodedData:    preAssembly.ABIEncodedData,
 	})
 	if err != nil {
 		return err
@@ -467,36 +456,4 @@ func (dc *domainContract) toEndorsableList(states []*components.FullState) []*pr
 		}
 	}
 	return endorsableList
-}
-
-func (dc *domainContract) encodeABIData(ctx context.Context, encRequest *prototk.ABIEncodingRequest) (*prototk.ABIEncodedData, error) {
-	var abiData []byte
-	switch encRequest.AbiEncodingType {
-	case prototk.ABIEncodingRequest_FUNCTION_CALL_DATA:
-		var entry *abi.Entry
-		err := json.Unmarshal([]byte(encRequest.AbiEntry), &entry)
-		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid, encRequest.Name)
-		}
-		abiData, err = entry.EncodeCallDataJSONCtx(ctx, []byte(encRequest.ParamsJson))
-		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail, encRequest.Name)
-		}
-	case prototk.ABIEncodingRequest_TUPLE:
-		var param *abi.Parameter
-		err := json.Unmarshal([]byte(encRequest.AbiEntry), &param)
-		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid, encRequest.Name)
-		}
-		abiData, err = param.Components.EncodeABIDataJSONCtx(ctx, []byte(encRequest.ParamsJson))
-		if err != nil {
-			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail, encRequest.Name)
-		}
-	default:
-		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Name, encRequest.AbiEncodingType)
-	}
-	return &prototk.ABIEncodedData{
-		Name: encRequest.Name,
-		Data: abiData,
-	}, nil
 }

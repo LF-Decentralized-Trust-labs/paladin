@@ -19,27 +19,28 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.ByteString;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.pente.evmrunner.EVMVersion;
+import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
+import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import io.kaleido.paladin.toolkit.Algorithms;
-import io.kaleido.paladin.toolkit.DomainInstance;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
-import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hyperledger.besu.datatypes.Transaction;
+import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The most important part of the external interface of Pente is the way you construct transactions.
@@ -117,6 +118,7 @@ class PenteTransaction {
     private final long baseBlock;
     private final Address contract;
     private Values values;
+    private PenteDomain.PenteAccountLoader accountLoader;
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
@@ -212,7 +214,7 @@ class PenteTransaction {
         return PenteConfiguration.decodeConfig(this.contractConfig);
     }
 
-    EVMRunner getEVM(long chainId, long blockNumber) throws ClassNotFoundException, IOException {
+    EVMRunner getEVM(long chainId, long blockNumber, PenteDomain.PenteAccountLoader accountLoader) throws ClassNotFoundException {
         var evmConfig = EvmConfiguration.DEFAULT;
         var evmVersionStr = getConfig().evmVersion();
         EVMVersion evmVersion = switch (evmVersionStr) {
@@ -221,7 +223,7 @@ class PenteTransaction {
             case "shanghai" -> EVMVersion.Shanghai(chainId, evmConfig);
             default -> throw new IllegalArgumentException("unknown EVM version '%s'".formatted(evmVersionStr));
         };
-        return new EVMRunner(evmVersion, domain.accountLoader(), blockNumber);
+        return new EVMRunner(evmVersion, accountLoader, blockNumber);
     }
 
     boolean requiresABIEncoding() {
@@ -306,8 +308,66 @@ class PenteTransaction {
         throw new IllegalArgumentException("missing resolved %s verifier for '%s'".formatted(Algorithms.ECDSA_SECP256K1_PLAINBYTES, from));
     }
 
+    ToDomain.AssembledTransaction buildAssembledTransaction(EVMRunner evm, PenteDomain.PenteAccountLoader accountLoader) throws IOException {
+        var latestSchemaId = domain.getConfig().schemaId_AccountStateLatest();
+        var result = ToDomain.AssembledTransaction.newBuilder();
+        var committedUpdates = evm.getWorld().getCommittedAccountUpdates();
+        var loadedAccountStates = accountLoader.getLoadedAccountStates();
+        var lookups = buildGroupScopeIdentityLookups(getValues().group().salt(), getValues().group().members());
+        for (var loadedAccount : loadedAccountStates.keySet()) {
+            var inputState = loadedAccountStates.get(loadedAccount);
+            var lastOp = committedUpdates.get(loadedAccount);
+            if (lastOp == DynamicLoadWorldState.LastOpType.DELETED || lastOp == DynamicLoadWorldState.LastOpType.UPDATED) {
+                result.addInputStates(ToDomain.StateRef.newBuilder().
+                        setSchemaId(inputState.getSchemaId()).
+                        setId(inputState.getId()).
+                        build());
+                if (lastOp == DynamicLoadWorldState.LastOpType.UPDATED) {
+                    var updatedAccount = evm.getWorld().get(loadedAccount);
+                    result.addOutputStates(ToDomain.NewState.newBuilder().
+                            setSchemaId(latestSchemaId).
+                            setStateDataJsonBytes(ByteString.copyFrom(updatedAccount.serialize())).
+                            addAllDistibutionList(lookups));
+                }
+            } else {
+                result.addReadStates(ToDomain.StateRef.newBuilder().
+                        setSchemaId(inputState.getSchemaId()).
+                        setId(inputState.getId()).
+                        build());
+            }
+        }
+        return result.build();
+    }
+
+    public EIP1559 getTransaction
+
     String getFrom() { return from; }
 
     long getBaseBlock() { return baseBlock; }
+
+    static List<String> buildGroupScopeIdentityLookups(JsonHex.Bytes32 salt, String [] members) throws IllegalArgumentException {
+        // Salt must be a 32byte hex string
+        if (salt == null || members == null) throw new IllegalArgumentException("salt and members are required for group");
+        var saltHex = salt.toHex();
+
+        // To deploy a new Privacy Group we need to collect unique endorsement addresses that
+        // mask the identities of all the participants.
+        // We use the salt of the privacy group to do this. This salt is basically a shared
+        // secret between all parties that is used to mask their identities.
+        List<String> lookups = new ArrayList<>(members.length);
+        for (String member : members) {
+            String[] locatorSplit = member.split("@");
+            switch (locatorSplit.length) {
+                case 1 -> {
+                    lookups.add(locatorSplit[0] + "." + saltHex);
+                }
+                case 2 -> {
+                    lookups.add(locatorSplit[0] + "." + saltHex + "@" + locatorSplit[1]);
+                }
+                default -> throw new IllegalArgumentException("invalid identity locator '%s'".formatted(member));
+            }
+        }
+        return lookups;
+    }
 
 }

@@ -866,3 +866,47 @@ func TestDomainPrepareInvokeAndDeploy(t *testing.T) {
 	err := domain.PrepareDeploy(ctx, tx)
 	assert.Regexp(t, "PD011611", err)
 }
+
+func TestEncodeABIDataFailCases(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	d := tp.d
+
+	_, err := d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_EncodingType(42),
+	})
+	assert.Regexp(t, "PD011635", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_FUNCTION_CALL_DATA,
+		Body:         `{!!!`,
+	})
+	assert.Regexp(t, "PD011633", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TUPLE,
+		Body:         `{!!!`,
+	})
+	assert.Regexp(t, "PD011633", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_FUNCTION_CALL_DATA,
+		Definition:   `{"inputs":[{"name":"int1","type":"uint256"}]}`,
+		Body:         `{}`,
+	})
+	assert.Regexp(t, "PD011634.*int1", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TUPLE,
+		Definition:   `{"components":[{"name":"int1","type":"uint256"}]}`,
+		Body:         `{}`,
+	})
+	assert.Regexp(t, "PD011634.*int1", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   `wrong`,
+		Body:         `{"to":"0x92CB9e0086a774525469bbEde564729F277d2549"}`,
+	})
+	assert.Regexp(t, "PD011635", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Body:         `{!!!bad`,
+	})
+	assert.Regexp(t, "PD011633", err)
+}

@@ -268,12 +268,8 @@ public class PenteConfiguration {
         ));
     }
 
-    synchronized Schema schema_AccountState_v24_9_0() {
-        return schemasByID.get(schemaId_AccountState_v24_9_0);
-    }
-
-    synchronized Schema schema_AccountStateLatest() {
-        return schema_AccountState_v24_9_0();
+    synchronized String schemaId_AccountStateLatest() {
+        return schemaId_AccountState_v24_9_0;
     }
 
 }

@@ -75,6 +75,19 @@ func TestDomainCallback_FindAvailableStates(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDomainCallback_EncodeData(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_EncodeData{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_EncodeDataRes{
+			EncodeDataRes: &prototk.EncodeDataResponse{},
+		}
+	}
+	_, err := callbacks.EncodeData(ctx, &prototk.EncodeDataRequest{})
+	require.NoError(t, err)
+}
+
 func TestDomainFunction_ConfigureDomain(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupDomainTests(t)
 	defer done()

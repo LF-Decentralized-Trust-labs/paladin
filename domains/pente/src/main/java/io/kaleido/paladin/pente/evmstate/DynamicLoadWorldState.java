@@ -47,6 +47,12 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
 
     private final Set<Address> queriedAccounts = new HashSet<>();
 
+    public enum LastOpType {
+        UPDATED, DELETED
+    }
+
+    private final Map<Address, LastOpType> committedAccountUpdates = new HashMap<>();
+
     @Override
     public Hash rootHash() {
         return null;
@@ -86,6 +92,10 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
 
     public Collection<Address> getQueriedAccounts() {
         return Collections.unmodifiableSet(queriedAccounts);
+    }
+
+    public Map<Address, LastOpType> getCommittedAccountUpdates() {
+        return Collections.unmodifiableMap(committedAccountUpdates);
     }
 
     private void setAccount(PersistedAccount account) {
@@ -140,10 +150,12 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
                 // TODO: Consider persisting the change list
                 baseAccount.applyChanges(account);
                 DynamicLoadWorldState.this.setAccount(baseAccount);
+                committedAccountUpdates.put(account.getAddress(), LastOpType.UPDATED);
             }
             for (Address account : getDeletedAccounts()) {
                 logger.debug("deleted account: {}", account);
                 DynamicLoadWorldState.this.deleteAccount(account);
+                committedAccountUpdates.put(account, LastOpType.DELETED);
             }
         }
     }

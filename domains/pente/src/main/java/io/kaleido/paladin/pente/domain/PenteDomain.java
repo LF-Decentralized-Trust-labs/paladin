@@ -33,10 +33,7 @@ import org.hyperledger.besu.evm.frame.MessageFrame;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class PenteDomain extends DomainInstance {
@@ -77,31 +74,6 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.completedFuture(ToDomain.InitDomainResponse.getDefaultInstance());
     }
 
-    private List<String> buildGroupScopeIdentityLookups(Bytes32 salt, String [] members) throws IllegalArgumentException {
-        // Salt must be a 32byte hex string
-        if (salt == null || members == null) throw new IllegalArgumentException("salt and members are required for group");
-        var saltHex = salt.toHex();
-
-        // To deploy a new Privacy Group we need to collect unique endorsement addresses that
-        // mask the identities of all the participants.
-        // We use the salt of the privacy group to do this. This salt is basically a shared
-        // secret between all parties that is used to mask their identities.
-        List<String> lookups = new ArrayList<>(members.length);
-        for (String member : members) {
-            String[] locatorSplit = member.split("@");
-            switch (locatorSplit.length) {
-                case 1 -> {
-                    lookups.add(locatorSplit[0] + "." + saltHex);
-                }
-                case 2 -> {
-                    lookups.add(locatorSplit[0] + "." + saltHex + "@" + locatorSplit[1]);
-                }
-                default -> throw new IllegalArgumentException("invalid identity locator '%s'".formatted(member));
-            }
-        }
-        return lookups;
-    }
-
     @Override
     protected CompletableFuture<ToDomain.InitDeployResponse> initDeploy(ToDomain.InitDeployRequest request) {
         try {
@@ -126,7 +98,7 @@ public class PenteDomain extends DomainInstance {
             }
 
             var response = ToDomain.InitDeployResponse.newBuilder();
-            var lookups =  buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
+            var lookups = PenteTransaction.buildGroupScopeIdentityLookups(params.group().salt(), params.group().members());
             LOGGER.info("endorsement group identity lookups: {}", lookups);
             for (String lookup : lookups) {
                 response.addRequiredVerifiers(ToDomain.ResolveVerifierRequest.newBuilder().
@@ -142,7 +114,7 @@ public class PenteDomain extends DomainInstance {
 
     private List<Address> getResolvedEndorsers(Bytes32 salt, String[] members, List<ToDomain.ResolvedVerifier> resolvedVerifiers) {
         // Get the resolved address for each endorser we set the lookup for
-        var lookups = buildGroupScopeIdentityLookups(salt, members);
+        var lookups = PenteTransaction.buildGroupScopeIdentityLookups(salt, members);
         List<Address> endorsementAddresses = new ArrayList<>(lookups.size());
         for (String lookup : lookups) {
             for (ToDomain.ResolvedVerifier verifier : resolvedVerifiers) {
@@ -210,7 +182,8 @@ public class PenteDomain extends DomainInstance {
     protected CompletableFuture<ToDomain.AssembleTransactionResponse> assembleTransaction(ToDomain.AssembleTransactionRequest request) {
         try {
             var tx = new PenteTransaction(this, request.getTransaction());
-            var evm = tx.getEVM(config.getChainId(), tx.getBaseBlock());
+            var accoutLoader = new PenteAccountLoader();
+            var evm = tx.getEVM(config.getChainId(), tx.getBaseBlock(), accoutLoader);
             var values = tx.getValues();
             var besuSender = org.hyperledger.besu.datatypes.Address.wrap(Bytes.wrap(tx.getFromVerifier(request.getResolvedVerifiersList()).getBytes()));
             MessageFrame execResult;
@@ -233,6 +206,18 @@ public class PenteDomain extends DomainInstance {
                 result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.REVERT);
             } else {
                 result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
+                result.setAssembledTransaction(tx.buildAssembledTransaction(evm, accoutLoader));
+                result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
+                        setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                        setAttestationType(ToDomain.AttestationType.SIGN).
+                        addParties(tx.getFrom()).
+                        build()
+                );
+                result.addAttestationPlan(ToDomain.AttestationRequest.newBuilder().
+                        setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                        setAttestationType(ToDomain.AttestationType.ENDORSE).
+                        build()
+                );
             }
             return CompletableFuture.completedFuture(result.build());
         } catch(Exception e) {
@@ -250,11 +235,8 @@ public class PenteDomain extends DomainInstance {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
-    PenteAccountLoader accountLoader() {
-        return new PenteAccountLoader();
-    }
-
     class PenteAccountLoader implements AccountLoader {
+        private final HashMap<org.hyperledger.besu.datatypes.Address, FromDomain.StoredState> loadedAccountStates = new HashMap<>();
         public Optional<PersistedAccount> load(org.hyperledger.besu.datatypes.Address address) throws IOException {
             return withIOException(() -> {
                 var queryJson = JsonQuery.newBuilder().
@@ -262,15 +244,24 @@ public class PenteDomain extends DomainInstance {
                         isEqual("address", address.toString()).
                         json();
                 var response = findAvailableStates(FromDomain.FindAvailableStatesRequest.newBuilder().
-                        setSchemaId(config.schema_AccountState_v24_9_0().id()).
+                        setSchemaId(config.schemaId_AccountStateLatest()).
                         setQueryJson(queryJson).
                         build()).get();
                 if (response.getStatesCount() != 1) {
                     return Optional.empty();
                 }
-                return Optional.of(PersistedAccount.deserialize(response.getStates(0).getDataJsonBytes().toByteArray()));
+                var state = response.getStates(0);
+                loadedAccountStates.put(address, state);
+                return Optional.of(PersistedAccount.deserialize(state.getDataJsonBytes().toByteArray()));
             });
         }
+        public Map<org.hyperledger.besu.datatypes.Address, FromDomain.StoredState> getLoadedAccountStates() {
+            return loadedAccountStates;
+        }
+    }
+
+    PenteConfiguration getConfig() {
+        return config;
     }
 
     @FunctionalInterface

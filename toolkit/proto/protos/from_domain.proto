@@ -26,6 +26,21 @@ message FindAvailableStatesResponse {
   repeated StoredState states = 1;
 }
 
+message EncodeDataRequest {
+  enum EncodingType {
+    TUPLE = 0;
+    FUNCTION_CALL_DATA = 1;
+    ETH_TRANSACTION = 2;
+  }
+  EncodingType encoding_type = 1;
+  string body = 2;
+  string definition = 3;
+}
+
+message EncodeDataResponse {
+  bytes data = 1;
+}
+
 message StoredState {
   string id = 1;
   string schema_id = 2;

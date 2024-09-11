@@ -157,66 +157,64 @@ func TestDomainInitTransactionOK(t *testing.T) {
 	_, _ = doDomainInitTransactionOK(t, ctx, tp)
 }
 
-func TestDomainInitTransactionOKWithEncodeEntry(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
+func TestEncodeABIData(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
 	defer done()
 	assert.Nil(t, tp.d.initError.Load())
 
-	_, tx := doDomainInitTransactionOK(t, ctx, tp, func(res *prototk.InitTransactionResponse) {
-		res.AbiEncodingRequests = []*prototk.ABIEncodingRequest{
-			{
-				Name:            "fnEncode",
-				AbiEncodingType: prototk.ABIEncodingRequest_FUNCTION_CALL_DATA,
-				AbiEntry: `{
-				  "type": "function",
-				  "name": "doStuff",
-				  "inputs": [
-				     { "name": "intVal", "type": "uint256" }
-				  ]
-				}`,
-				ParamsJson: `{ "intVal": 42 }`,
-			},
-			{
-				Name:            "tupleEncode",
-				AbiEncodingType: prototk.ABIEncodingRequest_TUPLE,
-				AbiEntry: `{
-				  "type": "tuple",
-				  "components": [
-				     { "name": "intVal", "type": "uint256" }
-				  ]
-				}`,
-				ParamsJson: `{ "intVal": 42 }`,
-			},
-		}
+	_, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_FUNCTION_CALL_DATA,
+		Definition: `{
+			  "type": "function",
+			  "name": "doStuff",
+			  "inputs": [
+				 { "name": "intVal", "type": "uint256" }
+			  ]
+			}`,
+		Body: `{ "intVal": 42 }`,
 	})
-	assert.Len(t, tx.PreAssembly.ABIEncodedData, 2)
+	assert.NoError(t, err)
 
-	fnEncode := tx.PreAssembly.ABIEncodedData[0]
-	assert.Equal(t, "fnEncode", fnEncode.Name)
-	assert.Equal(t, "0x23bad5cd000000000000000000000000000000000000000000000000000000000000002a", tktypes.HexBytes(fnEncode.Data).String())
+	_, err = tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TUPLE,
+		Definition: `{
+		  "type": "tuple",
+		  "components": [
+			 { "name": "intVal", "type": "uint256" }
+		  ]
+		}`,
+		Body: `{ "intVal": 42 }`,
+	})
+	assert.NoError(t, err)
 
-	tupleEncode := tx.PreAssembly.ABIEncodedData[1]
-	assert.Equal(t, "tupleEncode", tupleEncode.Name)
-	assert.Equal(t, "0x000000000000000000000000000000000000000000000000000000000000002a", tktypes.HexBytes(tupleEncode.Data).String())
-}
+	txEIP1559_a, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
 
-func TestDomainInitTransactionWithEncodeEntryFail(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
-	defer done()
-	assert.Nil(t, tp.d.initError.Load())
+	txEIP1559_b, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "eip1559",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, txEIP1559_a, txEIP1559_b)
 
-	psc := goodPSC(tp.d)
-	tx := goodPrivateTXWithInputs(psc)
-	tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-		return &prototk.InitTransactionResponse{
-			AbiEncodingRequests: []*prototk.ABIEncodingRequest{
-				{Name: "wrong", AbiEncodingType: prototk.ABIEncodingRequest_ABIEncodingType(99)},
-			},
-		}, nil
-	}
-	err := psc.InitTransaction(ctx, tx)
-	assert.Regexp(t, "PD011635", err)
-	assert.Nil(t, tx.PreAssembly)
+	txEIP155, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "eip155",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
+	assert.NotEqual(t, txEIP155, txEIP1559_a)
 
 }
 
@@ -714,40 +712,6 @@ func TestLoadStatesNotFound(t *testing.T) {
 		{Id: tktypes.RandHex(32)},
 	})
 	assert.Regexp(t, "PD011615", err)
-}
-
-func TestEncodeABIDataFailCases(t *testing.T) {
-	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
-	defer done()
-
-	psc := goodPSC(tp.d)
-
-	_, err := psc.encodeABIData(ctx, &prototk.ABIEncodingRequest{
-		Name:            "badFuncDef",
-		AbiEncodingType: prototk.ABIEncodingRequest_FUNCTION_CALL_DATA,
-		AbiEntry:        `{!!!`,
-	})
-	assert.Regexp(t, "PD011633", err)
-	_, err = psc.encodeABIData(ctx, &prototk.ABIEncodingRequest{
-		Name:            "badTupleDef",
-		AbiEncodingType: prototk.ABIEncodingRequest_TUPLE,
-		AbiEntry:        `{!!!`,
-	})
-	assert.Regexp(t, "PD011633", err)
-	_, err = psc.encodeABIData(ctx, &prototk.ABIEncodingRequest{
-		Name:            "badFuncInput",
-		AbiEncodingType: prototk.ABIEncodingRequest_FUNCTION_CALL_DATA,
-		AbiEntry:        `{"inputs":[{"name":"int1","type":"uint256"}]}`,
-		ParamsJson:      `{}`,
-	})
-	assert.Regexp(t, "PD011634.*int1", err)
-	_, err = psc.encodeABIData(ctx, &prototk.ABIEncodingRequest{
-		Name:            "badTupleInput",
-		AbiEncodingType: prototk.ABIEncodingRequest_TUPLE,
-		AbiEntry:        `{"components":[{"name":"int1","type":"uint256"}]}`,
-		ParamsJson:      `{}`,
-	})
-	assert.Regexp(t, "PD011634.*int1", err)
 }
 
 func TestIncompleteStages(t *testing.T) {

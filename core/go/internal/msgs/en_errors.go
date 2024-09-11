@@ -239,9 +239,10 @@ var (
 	MsgDomainTXIncompleteEndorseTransaction   = ffe("PD011630", "Transaction is incomplete for phase EndorseTransaction")
 	MsgDomainTXIncompleteResolveDispatch      = ffe("PD011631", "Transaction is incomplete for phase ResolveDispatch")
 	MsgDomainTXIncompletePrepareTransaction   = ffe("PD011632", "Transaction is incomplete for phase PrepareTransaction")
-	MsgDomainABIEncodingRequestEntryInvalid   = ffe("PD011633", "ABI encoding request '%s' could not be completed as ABI entry is invalid")
-	MsgDomainABIEncodingRequestEncodingFail   = ffe("PD011634", "ABI encoding request '%s' failed")
-	MsgDomainABIEncodingRequestInvalidType    = ffe("PD011635", "ABI encoding request '%s' is of invalid type '%s'")
+	MsgDomainABIEncodingRequestEntryInvalid   = ffe("PD011633", "ABI encoding request could not be completed as ABI entry is invalid")
+	MsgDomainABIEncodingRequestEncodingFail   = ffe("PD011634", "ABI encoding request failed")
+	MsgDomainABIEncodingRequestInvalidType    = ffe("PD011635", "ABI encoding request is of invalid type '%s'")
+	MsgDomainABIEncodingRequestInvalidTX      = ffe("PD011636", "Transaction encoding request is invalid")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")
