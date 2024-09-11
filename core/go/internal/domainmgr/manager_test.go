@@ -103,7 +103,13 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *DomainManagerConfig, 
 	require.NoError(t, err)
 	err = dm.PostInit(componentMocks)
 	require.NoError(t, err)
-	assert.Len(t, initInstructions.EventStreams, 1)
+	expectedNum := 1
+	for _, d := range conf.Domains {
+		if d.FactoryAddress != nil {
+			expectedNum++
+		}
+	}
+	assert.Len(t, initInstructions.EventStreams, expectedNum)
 
 	err = dm.Start()
 	require.NoError(t, err)
@@ -140,7 +146,7 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})
@@ -154,7 +160,7 @@ func TestGetDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})
@@ -194,7 +200,7 @@ func TestWaitForDeployQueryError(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	}, func(mc *mockComponents) {
@@ -210,7 +216,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	}, func(mc *mockComponents) {
@@ -240,7 +246,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				FactoryAddress: *tktypes.MustEthAddress(tktypes.RandHex(20)),
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})

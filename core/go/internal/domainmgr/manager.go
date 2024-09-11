@@ -41,12 +41,17 @@ import (
 
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
+
+//go:embed abis/IPaladinContractFactory_V0.json
+var iPaladinContractFactoryBuildJSON []byte
+
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
+var iPaladinContractFactoryABI = mustParseEmbeddedBuildABI(iPaladinContractFactoryBuildJSON)
 
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
-var eventSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContractByFactory_V0")
-var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContractByFactory_V0")
+var eventSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSignatureHash(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
+var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
@@ -105,13 +110,21 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 	dm.blockIndexer = pic.BlockIndexer()
 
 	var eventStreams []*components.ManagerEventStream
-	for _, d := range dm.conf.Domains {
+	for name, d := range dm.conf.Domains {
+		if d.FactoryAddress == nil {
+			log.L(dm.bgCtx).Warnf("Domain %s has no factory address configured, skip listening to factory deploy events", name)
+			continue
+		}
 		eventStreams = append(eventStreams, &components.ManagerEventStream{
-			ABI:     iPaladinContractABI,
+			ABI:     iPaladinContractFactoryABI,
 			Handler: dm.eventIndexer,
-			Source:  &d.FactoryAddress,
+			Source:  d.FactoryAddress,
 		})
 	}
+	eventStreams = append(eventStreams, &components.ManagerEventStream{
+		ABI:     iPaladinContractABI,
+		Handler: dm.eventIndexer,
+	})
 	return &components.ManagerInitResult{
 		EventStreams: eventStreams,
 	}, nil

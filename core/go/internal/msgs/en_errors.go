@@ -158,6 +158,7 @@ var (
 
 	// BlockIndexer PD0113XX
 	MsgBlockIndexerInvalidFromBlock         = ffe("PD011300", "Invalid from block '%s' (must be 'latest' or number)")
+	MsgBlockIndexerESSourceError            = ffe("PD011302", "Event stream source must not be changed after creation")
 	MsgBlockIndexerESInitFail               = ffe("PD011303", "Event stream initialization failed")
 	MsgBlockIndexerESAlreadyInit            = ffe("PD011304", "Event stream already initialized")
 	MsgBlockIndexerConfirmedReceiptNotFound = ffe("PD011305", "Expected received for confirmed transaction %s not found")

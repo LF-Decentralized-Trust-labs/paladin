@@ -37,7 +37,7 @@ type DomainConfig struct {
 	Init           DomainInitConfig        `yaml:"init"`
 	Plugin         components.PluginConfig `yaml:"plugin"`
 	Config         map[string]any          `yaml:"config"`
-	FactoryAddress tktypes.EthAddress      `yaml:"factoryAddress"`
+	FactoryAddress *tktypes.EthAddress     `yaml:"factoryAddress"`
 }
 
 var ContractCacheDefaults = &cache.Config{
