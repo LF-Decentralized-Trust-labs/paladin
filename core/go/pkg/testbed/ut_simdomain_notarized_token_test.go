@@ -65,24 +65,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	var blockIndexer atomic.Pointer[blockindexer.BlockIndexer]
 	var ec ethclient.EthClient
-	fakeCoinConstructorABI := `{
-		"type": "constructor",
-		"inputs": [
-		  {
-		    "name": "notary",
-			"type": "string"
-		  },
-		  {
-		    "name": "name",
-			"type": "string"
-		  },
-		  {
-		    "name": "symbol",
-			"type": "string"
-		  }
-		],
-		"outputs": null
-	}`
 
 	fakeCoinStateSchema := `{
 		"type": "tuple",
@@ -336,7 +318,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
 							SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
 						},
-						ConstructorAbiJson:     fakeCoinConstructorABI,
 						FactoryContractAddress: deployTx.ContractAddress.String(),
 						AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 					},
@@ -351,7 +332,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			},
 
 			InitDeploy: func(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
-				assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 				assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
 				return &prototk.InitDeployResponse{
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
@@ -364,7 +344,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 			},
 
 			PrepareDeploy: func(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
-				assert.JSONEq(t, fakeCoinConstructorABI, req.Transaction.ConstructorAbi)
 				assert.JSONEq(t, `{
 					"notary": "domain1/contract1/notary",
 					"name": "FakeToken1",

@@ -38,7 +38,6 @@ public class PenteDomain extends DomainInstance {
         config.initFromJSON(request.getConfigJson());
 
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setConstructorAbiJson(config.abiEntry_privateConstructor().toString())
                 .setFactoryContractAddress(config.getAddress().toString())
                 .addAllAbiStateSchemasJson(config.allPenteSchemas())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
