@@ -115,6 +115,7 @@ class PenteTransaction {
 
     private final PenteDomain domain;
     private final JsonABI.Entry functionDef;
+    private final Address contractAddress;
     private final byte[] contractConfig;
     private final String from;
     private final String jsonParams;
@@ -124,6 +125,7 @@ class PenteTransaction {
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
+        contractAddress = new Address(tx.getContractAddress());
         contractConfig = tx.getContractConfig().toByteArray();
         from = tx.getFrom();
         baseBlock = tx.getBaseBlock();
@@ -470,7 +472,7 @@ class PenteTransaction {
                 put("name", "pente");
                 put("version", "0.0.1");
                 put("chainId", domain.getConfig().getChainId());
-                put("verifyingContract", domain.getConfig().getAddress());
+                put("verifyingContract", contractAddress);
             }});
             put("message", new HashMap<>(){{
                 put("inputs", inputs);
