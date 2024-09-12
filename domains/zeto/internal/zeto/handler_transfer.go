@@ -257,11 +257,19 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	if err != nil {
 		return nil, err
 	}
+	contractAbi, err := h.zeto.config.GetContractAbi(tx.DomainConfig.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	functionJSON, err := json.Marshal(contractAbi.Functions()["transfer"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "transfer",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 	}, nil
 }

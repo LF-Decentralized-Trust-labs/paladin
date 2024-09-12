@@ -225,7 +225,6 @@ var (
 	MsgDomainInputStateNotFound               = ffe("PD011615", "Input state %d [%s] not found")
 	MsgDomainMissingStates                    = ffe("PD011616", "Missing in-memory states")
 	MsgDomainEndorsementReverted              = ffe("PD011617", "Endorsement from '%s' reverted: %s")
-	MsgDomainFunctionNotFound                 = ffe("PD011618", "Function with name '%s' not found on ABI")
 	MsgDomainBaseLedgerSubmitInvalid          = ffe("PD011619", "Base ledger submission config is invalid")
 	MsgDomainTXIncompleteInitDeploy           = ffe("PD011620", "Transaction is incomplete for phase InitDeploy")
 	MsgDomainTXIncompletePrepareDeploy        = ffe("PD011621", "Transaction is incomplete for phase PrepareDeploy")

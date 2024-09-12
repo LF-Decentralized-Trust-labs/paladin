@@ -338,8 +338,6 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						},
 						ConstructorAbiJson:     fakeCoinConstructorABI,
 						FactoryContractAddress: deployTx.ContractAddress.String(),
-						FactoryContractAbiJson: toJSONString(t, simDomainABI),
-						PrivateContractAbiJson: toJSONString(t, simTokenABI),
 						AbiStateSchemasJson:    []string{fakeCoinStateSchema},
 					},
 				}, nil
@@ -379,7 +377,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				return &prototk.PrepareDeployResponse{
 					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
 					Transaction: &prototk.BaseLedgerTransaction{
-						FunctionName: "newSIMTokenNotarized",
+						FunctionAbiJson: toJSONString(t, simDomainABI.Functions()["newSIMTokenNotarized"]),
 						ParamsJson: fmt.Sprintf(`{
 							"txId": "%s",
 							"notary": "%s",
@@ -579,7 +577,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				}
 				return &prototk.PrepareTransactionResponse{
 					Transaction: &prototk.BaseLedgerTransaction{
-						FunctionName: "executeNotarized",
+						FunctionAbiJson: toJSONString(t, simTokenABI.Functions()["executeNotarized"]),
 						ParamsJson: toJSONString(t, map[string]interface{}{
 							"txId":      req.Transaction.TransactionId,
 							"inputs":    spentStateIds,

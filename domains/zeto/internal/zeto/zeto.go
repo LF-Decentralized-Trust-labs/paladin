@@ -41,6 +41,7 @@ type Zeto struct {
 	chainID    int64
 	domainID   string
 	coinSchema *pb.StateSchema
+	factoryABI abi.ABI
 }
 
 func New(callbacks plugintk.DomainCallbacks) *Zeto {
@@ -59,30 +60,9 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.config = &config
 	z.chainID = req.ChainId
 
-	factory := domain.LoadBuild(factoryJSONBytes)
-	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
+	factory := domain.LoadBuildLinked(factoryJSONBytes, config.Libraries)
+	z.factoryABI = factory.ABI
 
-	var tokenContractAbi abi.ABI
-	for _, contract := range z.config.DomainContracts.Implementations {
-		if contract.Name == config.TokenName {
-			contractAbi, err := z.config.GetContractAbi(contract.Name)
-			if err != nil {
-				return nil, err
-			}
-			tokenContractAbi = contractAbi
-			break
-		}
-	}
-	if tokenContractAbi == nil {
-		return nil, fmt.Errorf("token contract not found in local configuration: %s", config.TokenName)
-	}
-	zetoJSON, err := json.Marshal(tokenContractAbi)
-	if err != nil {
-		return nil, err
-	}
 	constructorJSON, err := json.Marshal(types.ZetoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -95,8 +75,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(zetoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -155,11 +133,15 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	functionJSON, err := json.Marshal(z.factoryABI.Functions()["deploy"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &params.From,
 	}, nil

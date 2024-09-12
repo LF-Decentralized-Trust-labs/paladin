@@ -155,7 +155,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			assert.Equal(t, "tx2_prepare", ptr.Transaction.TransactionId)
 			return &prototk.PrepareTransactionResponse{
 				Transaction: &prototk.BaseLedgerTransaction{
-					FunctionName: "func1",
+					ParamsJson: `{"test": "value"}`,
 				},
 			}, nil
 		},
@@ -254,7 +254,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "func1", ptr.Transaction.FunctionName)
+	assert.Equal(t, `{"test": "value"}`, ptr.Transaction.ParamsJson)
 
 	callbacks := <-waitForCallbacks
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
