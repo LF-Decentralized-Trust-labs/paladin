@@ -58,6 +58,14 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
         return requestReply(message).thenApply(Service.DomainMessage::getEncodeDataRes);
     }
 
+    public CompletableFuture<FromDomain.RecoverSignerResponse> recoverSigner(FromDomain.RecoverSignerRequest request) {
+        Service.DomainMessage message = Service.DomainMessage.newBuilder().
+                setHeader(newRequestHeader()).
+                setRecoverSigner(request).
+                build();
+        return requestReply(message).thenApply(Service.DomainMessage::getRecoverSignerRes);
+    }
+
     @Override
     final StreamObserver<Service.DomainMessage> connect(StreamObserver<Service.DomainMessage> observer) {
         return stub.connectDomain(observer);

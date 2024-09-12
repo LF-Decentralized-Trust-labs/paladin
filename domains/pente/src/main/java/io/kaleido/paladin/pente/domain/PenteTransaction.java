@@ -411,6 +411,7 @@ class PenteTransaction {
 
     record EVMExecutionResult(
             EVMRunner evm,
+            org.hyperledger.besu.datatypes.Address senderAddress,
             byte[] txPayload,
             JsonHex.Bytes32 txPayloadHash
     ) {}
@@ -445,6 +446,7 @@ class PenteTransaction {
         var txPayload = getEncodedTransaction(nonce, calldata);
         return new EVMExecutionResult(
                 evm,
+                senderAddress,
                 txPayload,
                 Keccak.Hash(txPayload)
         );

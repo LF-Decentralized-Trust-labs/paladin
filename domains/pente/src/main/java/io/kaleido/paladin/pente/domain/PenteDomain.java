@@ -277,7 +277,6 @@ public class PenteDomain extends DomainInstance {
                 outputsMatch = outputsMatch && matchFound;
             }
 
-
             if (!inputsMatch || !outputsMatch) {
                 LOGGER.error("Endorsement failed inputsMatch={} outputsMatch={}. EXPECTED inputs={} reads={} outputs={}",
                         inputsMatch, outputsMatch,
@@ -285,13 +284,31 @@ public class PenteDomain extends DomainInstance {
                 throw new IllegalStateException("Execution state mismatch detected in endorsement");
             }
 
-//            var result = ToDomain.EndorseTransactionResponse.newBuilder();
-            throw new UnsupportedOperationException();
+            // Recover the signer against the payload as we processed it
+            ByteString signature = null;
+            for (var sign : request.getSignaturesList()) {
+                if (sign.getVerifier().getAlgorithm().equals(Algorithms.ECDSA_SECP256K1_PLAINBYTES) &&
+                   sign.getVerifier().getVerifier().equals(execResult.senderAddress().toString())) {
+                    signature = sign.getPayload();
+                }
+            }
+            if (signature == null) {
+                throw new IllegalArgumentException("missing signature for %s".formatted(execResult.senderAddress()));
+            }
+            var recovered = recoverSigner(FromDomain.RecoverSignerRequest.newBuilder().
+                    setAlgorithm(Algorithms.ECDSA_SECP256K1_PLAINBYTES).
+                    setPayload(ByteString.copyFrom(execResult.txPayloadHash().getBytes())).
+                    setSignature(signature).
+                    build()).get();
+            if (!recovered.getVerifier().equals(execResult.senderAddress().toString())) {
+                throw new IllegalArgumentException("invalid signature for %s (recovered=%s)".formatted(execResult.senderAddress(), recovered.getVerifier()));
+            }
 
+            // Ok - we are happy to add our endorsement signature
+            return CompletableFuture.completedFuture(ToDomain.EndorseTransactionResponse.newBuilder().
+                    setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.SIGN).
+                    build());
         } catch(PenteTransaction.EVMExecutionException e) {
-            // Note unlike a base ledger, we do not write a nonce update to the sender's account
-            // (which would be a UTXO spend + mint) for a revert during assembly of a transaction,
-            // as endorsing and submitting that would be lots of work.
             LOGGER.error(new FormattedMessage("EVM execution failed during endorsement TX {}", request.getTransaction().getTransactionId()), e);
             return CompletableFuture.completedFuture(ToDomain.EndorseTransactionResponse.newBuilder().
                     setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.REVERT).
