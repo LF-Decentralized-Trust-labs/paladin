@@ -21,7 +21,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.kaleido.paladin.Main;
-import org.hyperledger.besu.datatypes.Address;
 
 import java.io.Closeable;
 import java.io.File;
@@ -77,9 +76,7 @@ public class Testbed implements Closeable {
             @JsonProperty
             ConfigPlugin plugin,
             @JsonProperty
-            Map<String, Object> config,
-            @JsonProperty
-            Address factoryAddress
+            Map<String, Object> config
     ) {
     }
 
