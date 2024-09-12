@@ -424,7 +424,6 @@ class PenteTransaction {
         var calldata = getEncodedCallData();
         var sender = evm.getWorld().getUpdater().getOrCreate(senderAddress);
         var nonce = sender.getNonce();
-        sender.setNonce(nonce+1);
         MessageFrame execResult;
         if (getValues().to() == null) {
             execResult = evm.runContractDeploymentBytes(
@@ -443,6 +442,8 @@ class PenteTransaction {
         if (execResult.getState() != MessageFrame.State.COMPLETED_SUCCESS) {
             throw new EVMExecutionException("transaction reverted: %s".formatted(execResult.getRevertReason()));
         }
+        // Note we only increment the nonce after successful executions
+        sender.setNonce(nonce+1);
         var txPayload = getEncodedTransaction(nonce, calldata);
         return new EVMExecutionResult(
                 evm,

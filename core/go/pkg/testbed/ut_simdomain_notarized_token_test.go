@@ -112,7 +112,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`
 
 	fakeDeployPayload := `{
-		"notary": "domain1/contract1/notary",
+		"notary": "domain1.contract1.notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"
 	}`
@@ -336,7 +336,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				return &prototk.InitDeployResponse{
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 						{
-							Lookup:    "domain1/contract1/notary",
+							Lookup:    "domain1.contract1.notary",
 							Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 						},
 					},
@@ -345,13 +345,13 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 			PrepareDeploy: func(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
 				assert.JSONEq(t, `{
-					"notary": "domain1/contract1/notary",
+					"notary": "domain1.contract1.notary",
 					"name": "FakeToken1",
 					"symbol": "FT1"
 				}`, req.Transaction.ConstructorParamsJson)
 				assert.Len(t, req.ResolvedVerifiers, 1)
 				assert.Equal(t, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers[0].Algorithm)
-				assert.Equal(t, "domain1/contract1/notary", req.ResolvedVerifiers[0].Lookup)
+				assert.Equal(t, "domain1.contract1.notary", req.ResolvedVerifiers[0].Lookup)
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
 					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
@@ -360,7 +360,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						ParamsJson: fmt.Sprintf(`{
 							"txId": "%s",
 							"notary": "%s",
-							"notaryLocator": "domain1/contract1/notary"
+							"notaryLocator": "domain1.contract1.notary"
 						}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier),
 					},
 				}, nil
@@ -589,34 +589,40 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	var contractAddr ethtypes.Address0xHex
 	rpcErr := tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", tktypes.RawJSON(`{
-		"notary": "domain1/contract1/notary",
+		"notary": "domain1.contract1.notary",
 		"name": "FakeToken1",
 		"symbol": "FT1"
 	}`))
 	assert.Nil(t, rpcErr)
 
 	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &tktypes.PrivateContractInvoke{
-		From:     "wallets/org1/aaaaaa",
+		From:     "wallets.org1.aaaaaa",
 		To:       tktypes.EthAddress(contractAddr),
 		Function: *mustParseABIEntry(fakeCoinTransferABI),
 		Inputs: tktypes.RawJSON(`{
 			"from": "",
-			"to": "wallets/org1/aaaaaa",
+			"to": "wallets.org1.aaaaaa",
 			"amount": "123000000000000000000"
 		}`),
 	})
 	assert.Nil(t, rpcErr)
 
 	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &tktypes.PrivateContractInvoke{
-		From:     "wallets/org1/aaaaaa",
+		From:     "wallets.org1.aaaaaa",
 		To:       tktypes.EthAddress(contractAddr),
 		Function: *mustParseABIEntry(fakeCoinTransferABI),
 		Inputs: tktypes.RawJSON(`{
-			"from": "wallets/org1/aaaaaa",
-			"to": "wallets/org2/bbbbbb",
+			"from": "wallets.org1.aaaaaa",
+			"to": "wallets.org2.bbbbbb",
 			"amount": "23000000000000000000"
 		}`),
 	})
 	assert.Nil(t, rpcErr)
+
+	// Check we can also use the utility function externally to resolve verifiers
+	var address tktypes.EthAddress
+	rpcErr = tbRPC.CallRPC(ctx, &address, "testbed_resolveVerifier", "wallets.org2.bbbbbb", algorithms.ECDSA_SECP256K1_PLAINBYTES)
+	assert.Nil(t, rpcErr)
+	assert.Equal(t, "0x128db14adcbfa4c7375dd82841df766818a7a5a0", address.String())
 
 }

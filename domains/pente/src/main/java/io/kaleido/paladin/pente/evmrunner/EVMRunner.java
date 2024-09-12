@@ -98,7 +98,7 @@ public class EVMRunner {
     }
 
     public MessageFrame runContractDeploymentBytes(
-            Address sender,
+            Address senderAddress,
             Address smartContractAddress,
             Bytes codeBytes,
             Bytes constructorParamsBytes
@@ -108,19 +108,20 @@ public class EVMRunner {
         }
 
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
-        var senderAccount = this.world.getUpdater().getOrCreate(sender);
+        var sender = this.world.getUpdater().getOrCreate(senderAddress);
         if (smartContractAddress == null) {
-            smartContractAddress = nonceSmartContractAddress(senderAccount.getAddress(), senderAccount.getNonce());
+            smartContractAddress = nonceSmartContractAddress(senderAddress, sender.getNonce());
         }
 
         // Build the message frame
+        logger.debug("Deploying to={} from={} nonce={}", smartContractAddress, senderAddress, sender.getNonce());
         final MessageFrame frame =
                 MessageFrame.builder()
                         .type(MessageFrame.Type.CONTRACT_CREATION)
                         .worldUpdater(this.world.getUpdater())
                         .initialGas(Long.MAX_VALUE)
-                        .originator(sender)
-                        .sender(sender)
+                        .originator(senderAddress)
+                        .sender(senderAddress)
                         .address(smartContractAddress)
                         .contract(smartContractAddress)
                         .code(code)
@@ -134,7 +135,6 @@ public class EVMRunner {
                         .blockHashLookup(virtualBlockchain)
                         .maxStackSize(Integer.MAX_VALUE)
                         .build();
-        logger.debug("Running contract deployment from {} to contract address {}", sender, smartContractAddress);
         this.runFrame(frame);
         return frame;
     }
@@ -161,27 +161,31 @@ public class EVMRunner {
         // Use web3j to encode the call data
         Function function = new Function(methodName, List.of(parameters), List.of());
         String callDataHex = FunctionEncoder.encode(function);
-        logger.debug("Invoking {} from {} to contract address {}", methodSignature(function), sender, smartContractAddress);
         return runContractInvokeBytes(sender, smartContractAddress, Bytes.fromHexString(callDataHex));
     }
 
     public MessageFrame runContractInvokeBytes(
-            Address sender,
+            Address senderAddress,
             Address smartContractAddress,
             Bytes callData
     ) {
-        this.world.getUpdater().getOrCreate(sender);
+        var sender = this.world.getUpdater().getOrCreate(senderAddress);
+        logger.debug("Deploying to={} from={} nonce={}", smartContractAddress, senderAddress, sender.getNonce());
 
         // Build the message frame
-        Bytes codeBytes = this.world.getUpdater().get(smartContractAddress).getCode();
+        var contractAccount = this.world.getUpdater().get(smartContractAddress);
+        if (contractAccount == null) {
+            throw new IllegalArgumentException("no contract deployed at %s".formatted(smartContractAddress));
+        }
+        Bytes codeBytes = contractAccount.getCode();
         Code code = this.evmVersion.evm().getCode(Hash.hash(codeBytes), codeBytes);
         final MessageFrame frame =
                 MessageFrame.builder()
                         .type(MessageFrame.Type.MESSAGE_CALL)
                         .worldUpdater(this.world.getUpdater())
                         .initialGas(Long.MAX_VALUE)
-                        .originator(sender)
-                        .sender(sender)
+                        .originator(senderAddress)
+                        .sender(senderAddress)
                         .address(smartContractAddress)
                         .contract(smartContractAddress)
                         .code(code)

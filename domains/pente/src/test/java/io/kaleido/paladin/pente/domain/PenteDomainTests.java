@@ -17,7 +17,9 @@ package io.kaleido.paladin.pente.domain;
 
 import io.kaleido.paladin.pente.domain.PenteConfiguration;
 import io.kaleido.paladin.pente.domain.PenteDomainFactory;
+import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.toolkit.*;
+import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,27 +53,43 @@ public class PenteDomainTests {
         }
     }
 
+    static final JsonABI.Entry simpleStorageDeployABI = JsonABI.newFunction(
+            "deploy",
+            JsonABI.newParameters(
+                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                            JsonABI.newParameter("salt", "bytes32"),
+                            JsonABI.newParameter("members", "string[]")
+                    )),
+                    JsonABI.newParameter("bytecode", "bytes"),
+                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                            JsonABI.newParameter("x", "uint256")
+                    ))
+            ),
+            JsonABI.newParameters()
+    );
+
+    static final JsonABI.Entry simpleStorageSetABI = JsonABI.newFunction(
+            "set",
+            JsonABI.newParameters(
+                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                            JsonABI.newParameter("salt", "bytes32"),
+                            JsonABI.newParameter("members", "string[]")
+                    )),
+                    JsonABI.newParameter("to", "address"),
+                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                            JsonABI.newParameter("x", "uint256")
+                    ))
+            ),
+            JsonABI.newParameters()
+    );
+
+
     @Test
     void testSimpleStorage() throws Exception {
         String address = deployFactory();
         Assertions.assertNotEquals("", address);
         Map<String, Object> config = new HashMap<>();
         config.put("address", address);
-
-        JsonABI.Entry simpleStorageDeployABI = JsonABI.newFunction(
-                "deploy",
-                JsonABI.newParameters(
-                        JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                                JsonABI.newParameter("salt", "bytes32"),
-                                JsonABI.newParameter("members", "string[]")
-                        )),
-                        JsonABI.newParameter("bytecode", "bytes"),
-                        JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                                JsonABI.newParameter("x", "uint256")
-                        ))
-                ),
-                JsonABI.newParameters()
-        );
 
         JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
         try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
@@ -113,6 +131,33 @@ public class PenteDomainTests {
                             deployValues
                     ));
             assertFalse(contractAddr.isBlank());
+
+            // TODO: This is a hack because we need to define a way for domain transactions to
+            // return information specific to them about the confirmation of a transaction
+            // on chain - by decoding the data field that's emitted from that event.
+            // There will be new event/transaction commit domain functions needed to do that processing
+            // (Pente will then implement those).
+            String simpleStorageDeployer = testbed.getRpcClient().
+                    request("testbed_resolveVerifier", "simpleStorageDeployer", Algorithms.ECDSA_SECP256K1_PLAINBYTES);
+            var expectedContractAddress = EVMRunner.nonceSmartContractAddress(Address.fromHexString(simpleStorageDeployer), 0);
+
+            // Invoke set on Simple Storage
+            Map<String, Object> setValues = new HashMap<>() {{
+                put("group", groupInfo);
+                put("to", expectedContractAddress.toString());
+                put("inputs", new HashMap<>() {{
+                    put("x", "2233445566");
+                }});
+            }};
+            testbed.getRpcClient().request("testbed_invoke",
+                    new PrivateContractInvoke(
+                            "simpleStorageDeployer",
+                            JsonHex.addressFrom(contractAddr),
+                            simpleStorageSetABI,
+                            setValues
+                    ));
+            assertFalse(contractAddr.isBlank());
+
         }
     }
 }
