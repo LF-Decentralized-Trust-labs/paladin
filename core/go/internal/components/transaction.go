@@ -110,3 +110,14 @@ type PrivateContractDeploy struct {
 	InvokeTransaction *EthTransaction
 	DeployTransaction *EthDeployTransaction
 }
+
+type PrivateTransactionEndorseRequest struct {
+	TransactionSpecification *prototk.TransactionSpecification
+	Verifiers                []*prototk.ResolvedVerifier
+	Signatures               []*prototk.AttestationResult
+	InputStates              []*prototk.EndorsableState
+	ReadStates               []*prototk.EndorsableState
+	OutputStates             []*prototk.EndorsableState
+	Endorsement              *prototk.AttestationRequest
+	Endorser                 *prototk.ResolvedVerifier
+}

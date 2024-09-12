@@ -62,10 +62,10 @@ public class PenteConfiguration {
     PenteConfiguration() {
         try {
             factoryContractABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
-                    "contracts/pente/PenteFactory.sol/PenteFactory.json",
+                    "contracts/domains/pente/PenteFactory.sol/PenteFactory.json",
                     "abi");
             privacyGroupABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
-                    "contracts/pente/PentePrivacyGroup.sol/PentePrivacyGroup.json",
+                    "contracts/domains/pente/PentePrivacyGroup.sol/PentePrivacyGroup.json",
                     "abi");
         } catch (Exception t) {
             LOGGER.error("failed to initialize configuration", t);

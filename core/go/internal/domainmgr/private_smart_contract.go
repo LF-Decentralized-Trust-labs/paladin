@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -155,8 +156,7 @@ func (dc *domainContract) AssembleTransaction(ctx context.Context, tx *component
 
 // Happens only on the sequencing node
 func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *components.PrivateTransaction) error {
-	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
-		tx.PostAssembly == nil || tx.PostAssembly.OutputStatesPotential == nil {
+	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil || tx.PostAssembly == nil {
 		return i18n.NewError(ctx, msgs.MsgDomainTXIncompleteWritePotentialStates)
 	}
 
@@ -188,13 +188,16 @@ func (dc *domainContract) WritePotentialStates(ctx context.Context, tx *componen
 	}
 
 	var states []*statestore.State
-	err := dc.dm.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
-		states, err = dsi.UpsertStates(&tx.ID, newStatesToWrite)
-		return err
-	})
-	if err != nil {
-		return err
+	if len(newStatesToWrite) > 0 {
+		err := dc.dm.stateStore.RunInDomainContext(domain.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+			states, err = dsi.UpsertStates(&tx.ID, newStatesToWrite)
+			return err
+		})
+		if err != nil {
+			return err
+		}
 	}
+
 	// Store the results on the TX
 	postAssembly.OutputStates = make([]*components.FullState, len(states))
 	for i, s := range states {
@@ -263,10 +266,18 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 }
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
-func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components.PrivateTransaction, endorsement *prototk.AttestationRequest, endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
-	if tx.Inputs == nil || tx.PreAssembly == nil || tx.PreAssembly.TransactionSpecification == nil ||
-		tx.PostAssembly == nil || tx.PostAssembly.InputStates == nil || tx.PostAssembly.ReadStates == nil || tx.PostAssembly.OutputStates == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainTXIncompleteEndorseTransaction)
+func (dc *domainContract) EndorseTransaction(ctx context.Context, req *components.PrivateTransactionEndorseRequest) (*components.EndorsementResult, error) {
+
+	if req == nil ||
+		req.TransactionSpecification == nil ||
+		req.Verifiers == nil ||
+		req.Signatures == nil ||
+		req.InputStates == nil ||
+		req.ReadStates == nil ||
+		req.OutputStates == nil ||
+		req.Endorsement == nil ||
+		req.Endorser == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgDomainReqIncompleteEndorseTransaction)
 	}
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
@@ -277,19 +288,16 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 	// but for efficiency we can and should start the runtime exercise of endorsement + signing before
 	// waiting for the DB TX to commit.
 
-	preAssembly := tx.PreAssembly
-	postAssembly := tx.PostAssembly
-
 	// Run the endorsement
 	res, err := dc.api.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
-		Transaction:         preAssembly.TransactionSpecification,
-		ResolvedVerifiers:   preAssembly.Verifiers,
-		Inputs:              dc.toEndorsableList(postAssembly.InputStates),
-		Reads:               dc.toEndorsableList(postAssembly.ReadStates),
-		Outputs:             dc.toEndorsableList(postAssembly.OutputStates),
-		Signatures:          postAssembly.Signatures,
-		EndorsementRequest:  endorsement,
-		EndorsementVerifier: endorser,
+		Transaction:         req.TransactionSpecification,
+		ResolvedVerifiers:   req.Verifiers,
+		Inputs:              req.InputStates,
+		Reads:               req.ReadStates,
+		Outputs:             req.OutputStates,
+		Signatures:          req.Signatures,
+		EndorsementRequest:  req.Endorsement,
+		EndorsementVerifier: req.Endorser,
 	})
 	// We don't do any processing - as the result is not directly processable by us.
 	// It is an instruction to the engine - such as an authority to sign an endorsement,
@@ -298,7 +306,7 @@ func (dc *domainContract) EndorseTransaction(ctx context.Context, tx *components
 		return nil, err
 	}
 	return &components.EndorsementResult{
-		Endorser:     endorser,
+		Endorser:     req.Endorser,
 		Result:       res.EndorsementResult,
 		Payload:      res.Payload,
 		RevertReason: res.RevertReason,
@@ -360,16 +368,17 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		return err
 	}
 
-	functionABI := dc.d.privateContractABI.Functions()[res.Transaction.FunctionName]
-	if functionABI == nil {
-		return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+	var functionABI abi.Entry
+	if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
+		return i18n.WrapError(ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
 	}
+
 	inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
 	if err != nil {
 		return err
 	}
 	tx.PreparedTransaction = &components.EthTransaction{
-		FunctionABI: functionABI,
+		FunctionABI: &functionABI,
 		To:          dc.Address(),
 		Inputs:      inputs,
 	}

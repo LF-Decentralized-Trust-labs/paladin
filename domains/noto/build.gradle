@@ -26,29 +26,35 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
-    toolkitProtoCompiled {
+    toolkitGo {
         canBeConsumed = false
         canBeResolved = true
     }
-    coreProtoCompiled {
+    coreGo {
         canBeConsumed = false
         canBeResolved = true
+    }
+
+    // Consumable configurations
+    goSource {
+        canBeConsumed = true
+        canBeResolved = false
     }
 }
 
 dependencies {
     contractCompile project(path: ":solidity", configuration: "compiledContracts")
-    toolkitProtoCompiled project(path: ":toolkit:go", configuration: "protoCompiled")
-    coreProtoCompiled project(path: ":core:go", configuration: "protoCompiled")
+    toolkitGo project(path: ":toolkit:go", configuration: "goSource")
+    coreGo project(path: ":core:go", configuration: "goSource")
 }
 
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
-        include 'contracts/noto/NotoFactory.sol/NotoFactory.json'
-        include 'contracts/noto/Noto.sol/Noto.json'
-        include 'contracts/noto/NotoSelfSubmitFactory.sol/NotoSelfSubmitFactory.json'
-        include 'contracts/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
+        include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
+        include 'contracts/domains/noto/Noto.sol/Noto.json'
+        include 'contracts/domains/noto/NotoSelfSubmitFactory.sol/NotoSelfSubmitFactory.json'
+        include 'contracts/domains/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
     }
     into 'internal/noto/abis'
 
@@ -58,8 +64,8 @@ task copySolidity(type: Copy) {
 }
 
 task test(type: Exec) {
-    inputs.files(configurations.toolkitProtoCompiled)
-    inputs.files(configurations.coreProtoCompiled)
+    inputs.files(configurations.toolkitGo)
+    inputs.files(configurations.coreGo)
     inputs.files(goFiles)
     outputs.dir('coverage')
 
@@ -85,4 +91,8 @@ task build {
 task clean(type: Delete) {
     delete 'coverage'
     delete 'internal/noto/abis'
+}
+
+dependencies {
+    goSource files(goFiles, copySolidity)
 }

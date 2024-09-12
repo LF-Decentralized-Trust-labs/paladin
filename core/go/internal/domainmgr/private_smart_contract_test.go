@@ -371,6 +371,10 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Equal(t, prototk.AssembleTransactionResponse_OK, tx.PostAssembly.AssemblyResult)
 	assert.Len(t, tx.PostAssembly.AttestationPlan, 1)
 
+	// This would be the engine's job
+	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0)
+	tx.PostAssembly.Signatures = make([]*prototk.AttestationResult, 0)
+
 	// Write the output states
 	err = psc.WritePotentialStates(ctx, tx)
 	require.NoError(t, err)
@@ -431,7 +435,16 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Verifier:  endorserAddr.String(),
 	}
-	endorsement, err := psc.EndorseTransaction(ctx, tx, endorsementRequest, endorser)
+	endorsement, err := psc.EndorseTransaction(ctx, &components.PrivateTransactionEndorseRequest{
+		TransactionSpecification: tx.PreAssembly.TransactionSpecification,
+		Verifiers:                tx.PreAssembly.Verifiers,
+		Signatures:               tx.PostAssembly.Signatures,
+		InputStates:              psc.toEndorsableList(tx.PostAssembly.InputStates),
+		ReadStates:               psc.toEndorsableList(tx.PostAssembly.ReadStates),
+		OutputStates:             psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		Endorsement:              endorsementRequest,
+		Endorser:                 endorser,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorsement.Result)
 
@@ -475,8 +488,8 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "execute",
-				ParamsJson:   string(params),
+				FunctionAbiJson: fakeCoinExecuteABI,
+				ParamsJson:      string(params),
 			},
 		}, nil
 	}
@@ -590,7 +603,16 @@ func TestEndorseTransactionFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := psc.EndorseTransaction(ctx, tx, &prototk.AttestationRequest{}, &prototk.ResolvedVerifier{})
+	_, err := psc.EndorseTransaction(ctx, &components.PrivateTransactionEndorseRequest{
+		TransactionSpecification: tx.PreAssembly.TransactionSpecification,
+		Verifiers:                tx.PreAssembly.Verifiers,
+		Signatures:               tx.PostAssembly.Signatures,
+		InputStates:              psc.toEndorsableList(tx.PostAssembly.InputStates),
+		ReadStates:               psc.toEndorsableList(tx.PostAssembly.ReadStates),
+		OutputStates:             psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		Endorsement:              &prototk.AttestationRequest{},
+		Endorser:                 &prototk.ResolvedVerifier{},
+	})
 	assert.Regexp(t, "pop", err)
 }
 
@@ -665,7 +687,7 @@ func TestPrepareTransactionFail(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 }
 
-func TestPrepareTransactionBadFunction(t *testing.T) {
+func TestPrepareTransactionABIInvalid(t *testing.T) {
 	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
 
@@ -675,13 +697,13 @@ func TestPrepareTransactionBadFunction(t *testing.T) {
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "wrong",
+				FunctionAbiJson: `!!!wrong`,
 			},
 		}, nil
 	}
 
 	err := psc.PrepareTransaction(ctx, tx)
-	assert.Regexp(t, "PD011618", err)
+	assert.Regexp(t, "PD011607", err)
 }
 
 func TestPrepareTransactionBadData(t *testing.T) {
@@ -694,8 +716,8 @@ func TestPrepareTransactionBadData(t *testing.T) {
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
 			Transaction: &prototk.BaseLedgerTransaction{
-				FunctionName: "execute",
-				ParamsJson:   `{"missing": "expected"}`,
+				FunctionAbiJson: fakeCoinExecuteABI,
+				ParamsJson:      `{"missing": "expected"}`,
 			},
 		}, nil
 	}
@@ -753,7 +775,7 @@ func TestIncompleteStages(t *testing.T) {
 	err = psc.LockStates(ctx, tx)
 	assert.Regexp(t, "PD011629", err)
 
-	_, err = psc.EndorseTransaction(ctx, tx, nil, nil)
+	_, err = psc.EndorseTransaction(ctx, nil)
 	assert.Regexp(t, "PD011630", err)
 
 	err = psc.ResolveDispatch(ctx, tx)

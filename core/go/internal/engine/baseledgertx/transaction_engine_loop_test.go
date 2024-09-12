@@ -116,15 +116,25 @@ func TestNewEnginePollingReAddStoppedOrchestrator(t *testing.T) {
 	ble.maxInFlightOrchestrators = 1
 	ble.enginePollingInterval = 1 * time.Hour
 
+	zeroTransactionListedForIdle := make(chan struct{})
+
 	// already has a running orchestrator for the address so no new orchestrator should be started
-	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter).Once()
+	mTS.On("NewTransactionFilter", mock.Anything).Return(mockTransactionFilter)
 	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{mockManagedTx1, mockManagedTx2}, nil, nil).Once()
+	mTS.On("ListTransactions", mock.Anything, mock.Anything).Return([]*baseTypes.ManagedTX{}, nil, nil).Run(func(args mock.Arguments) {
+		close(zeroTransactionListedForIdle)
+	})
 	ble.InFlightOrchestrators = map[string]*orchestrator{
 		testMainSigningAddress: {state: OrchestratorStateStopped, stateEntryTime: time.Now()}, // already has an orchestrator for 0x1
 	}
 	ble.ctx = ctx
 	ble.poll(ctx)
-	assert.Equal(t, OrchestratorStateNew, ble.InFlightOrchestrators[testMainSigningAddress].state)
+	to := ble.InFlightOrchestrators[testMainSigningAddress]
+	assert.NotNil(t, to)
+	to.maxInFlightTxs = 1
+	to.poll(ctx)
+	<-zeroTransactionListedForIdle
+	assert.Equal(t, OrchestratorStateIdle, to.state)
 }
 
 func TestNewEnginePollingStoppingAnOrchestratorAndSelf(t *testing.T) {

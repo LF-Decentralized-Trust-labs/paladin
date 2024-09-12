@@ -48,10 +48,12 @@ var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config     *types.Config
-	chainID    int64
-	domainID   string
-	coinSchema *pb.StateSchema
+	config      *types.Config
+	chainID     int64
+	domainID    string
+	coinSchema  *pb.StateSchema
+	factoryABI  abi.ABI
+	contractABI abi.ABI
 }
 
 type NotoDeployParams struct {
@@ -79,28 +81,18 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	n.config = &config
 	n.chainID = req.ChainId
 
-	var factory *domain.SolidityBuild
-	var contract *domain.SolidityBuild
 	switch config.Variant {
 	case "", "Noto":
 		config.Variant = "Noto"
-		factory = domain.LoadBuild(notoFactoryJSON)
-		contract = domain.LoadBuild(notoJSON)
+		n.factoryABI = domain.LoadBuild(notoFactoryJSON).ABI
+		n.contractABI = domain.LoadBuild(notoJSON).ABI
 	case "NotoSelfSubmit":
-		factory = domain.LoadBuild(notoSelfSubmitFactoryJSON)
-		contract = domain.LoadBuild(notoSelfSubmitJSON)
+		n.factoryABI = domain.LoadBuild(notoSelfSubmitFactoryJSON).ABI
+		n.contractABI = domain.LoadBuild(notoSelfSubmitJSON).ABI
 	default:
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	factoryJSON, err := json.Marshal(factory.ABI)
-	if err != nil {
-		return nil, err
-	}
-	notoJSON, err := json.Marshal(contract.ABI)
-	if err != nil {
-		return nil, err
-	}
 	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
 	if err != nil {
 		return nil, err
@@ -113,8 +105,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			FactoryContractAbiJson: string(factoryJSON),
-			PrivateContractAbiJson: string(notoJSON),
 			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
@@ -172,11 +162,15 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	if err != nil {
 		return nil, err
 	}
+	functionJSON, err := json.Marshal(n.factoryABI.Functions()["deploy"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareDeployResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "deploy",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 		Signer: &config.NotaryLookup,
 	}, nil
@@ -246,7 +240,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := handler.ValidateParams(tx.FunctionParamsJson)
+	params, err := handler.ValidateParams(ctx, tx.FunctionParamsJson)
 	if err != nil {
 		return nil, nil, err
 	}

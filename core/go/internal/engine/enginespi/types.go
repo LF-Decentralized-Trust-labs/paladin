@@ -23,7 +23,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/internal/transactionstore"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
 
 type StageProcessNextStep int
@@ -111,6 +113,8 @@ type StageFoundationService interface {
 	DomainAPI() components.DomainSmartContract
 	StateStore() statestore.StateStore // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
 	Publisher() Publisher
+	KeyManager() ethclient.KeyManager
+	EndorsementGatherer() EndorsementGatherer
 }
 
 type Sequencer interface {
@@ -164,6 +168,8 @@ type PaladinStageFoundationService struct {
 	domainAPI           components.DomainSmartContract
 	transport           components.TransportManager
 	publisher           Publisher
+	keyManager          ethclient.KeyManager
+	endorsementGatherer EndorsementGatherer
 }
 
 type TransactionDispatched struct {
@@ -197,9 +203,22 @@ func (psfs *PaladinStageFoundationService) Publisher() Publisher {
 	return psfs.publisher
 }
 
+func (psfs *PaladinStageFoundationService) KeyManager() ethclient.KeyManager {
+	return psfs.keyManager
+}
+
+func (psfs *PaladinStageFoundationService) EndorsementGatherer() EndorsementGatherer {
+	return psfs.endorsementGatherer
+}
 func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 	stateStore statestore.StateStore,
-	nodeAndWalletLookUp IdentityResolver, transport components.TransportManager, domainAPI components.DomainSmartContract, publisher Publisher) StageFoundationService {
+	nodeAndWalletLookUp IdentityResolver,
+	transport components.TransportManager,
+	domainAPI components.DomainSmartContract,
+	publisher Publisher,
+	keyManager ethclient.KeyManager,
+	endorsementGatherer EndorsementGatherer,
+) StageFoundationService {
 	return &PaladinStageFoundationService{
 		dependencyChecker:   dependencyChecker,
 		stateStore:          stateStore,
@@ -207,6 +226,8 @@ func NewPaladinStageFoundationService(dependencyChecker DependencyChecker,
 		transport:           transport,
 		domainAPI:           domainAPI,
 		publisher:           publisher,
+		keyManager:          keyManager,
+		endorsementGatherer: endorsementGatherer,
 	}
 }
 
@@ -244,3 +265,18 @@ type EngineEvent interface {
 }
 
 type EventSubscriber func(event EngineEvent)
+
+type EndorsementGatherer interface {
+	//integrate with local signer and domain manager to satisfy the given endorsement request
+	// that may have came from a transaction assembled locally or from another node
+	GatherEndorsement(
+		ctx context.Context,
+		transactionSpecification *prototk.TransactionSpecification,
+		verifiers []*prototk.ResolvedVerifier,
+		signatures []*prototk.AttestationResult,
+		inputStates []*prototk.EndorsableState,
+		readStates []*prototk.EndorsableState,
+		outputStates []*prototk.EndorsableState,
+		partyName string,
+		endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error)
+}

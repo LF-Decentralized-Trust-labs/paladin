@@ -53,8 +53,6 @@ public class PenteDomain extends DomainInstance {
         var domainConfig = ToDomain.DomainConfig.newBuilder()
                 .setConstructorAbiJson(config.abiEntry_privateConstructor().toString())
                 .setFactoryContractAddress(config.getAddress().toString())
-                .setFactoryContractAbiJson(config.getFactoryContractABI().toString())
-                .setPrivateContractAbiJson(config.getPrivacyGroupABI().toString())
                 .addAllAbiStateSchemasJson(config.allPenteSchemas())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
@@ -147,8 +145,9 @@ public class PenteDomain extends DomainInstance {
                     resolvedVerifiers
             ).getBytes());
             var response = ToDomain.PrepareDeployResponse.newBuilder();
+            var newPrivacyGroupABIJson = config.getFactoryContractABI().getABIEntry("function", "newPrivacyGroup").toJSON(false);
             response.getTransactionBuilder().
-                    setFunctionName("newPrivacyGroup").
+                    setFunctionAbiJson(newPrivacyGroupABIJson).
                     setParamsJson(new ObjectMapper().writeValueAsString(new PenteConfiguration.NewPrivacyGroupFactoryParams(
                             new Bytes32(request.getTransaction().getTransactionId()),
                             new JsonHex.Bytes(onchainConfBuilder.toByteArray())

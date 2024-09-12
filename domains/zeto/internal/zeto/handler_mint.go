@@ -31,7 +31,7 @@ type mintHandler struct {
 	zeto *Zeto
 }
 
-func (h *mintHandler) ValidateParams(params string) (interface{}, error) {
+func (h *mintHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
 	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
@@ -119,11 +119,15 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
+	functionJSON, err := json.Marshal(h.zeto.contractABI.Functions()["mint"])
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.PrepareTransactionResponse{
 		Transaction: &pb.BaseLedgerTransaction{
-			FunctionName: "mint",
-			ParamsJson:   string(paramsJSON),
+			FunctionAbiJson: string(functionJSON),
+			ParamsJson:      string(paramsJSON),
 		},
 	}, nil
 }
