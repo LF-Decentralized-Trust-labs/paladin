@@ -329,7 +329,31 @@ public class PenteDomain extends DomainInstance {
 
     @Override
     protected CompletableFuture<ToDomain.PrepareTransactionResponse> prepareTransaction(ToDomain.PrepareTransactionRequest request) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        try {
+            var inputIds = request.getInputStatesList().stream().map(ToDomain.EndorsableState::getId).toList();
+            var readIds = request.getReadStatesList().stream().map(ToDomain.EndorsableState::getId).toList();
+            var outputIds = request.getOutputStatesList().stream().map(ToDomain.EndorsableState::getId).toList();
+
+            var params = new HashMap<String, Object>(){{
+                put("txId", request.getTransaction().getTransactionId());
+                put("inputs", request.getInputStatesList().stream().map(ToDomain.EndorsableState::getId).toList());
+                put("reads", request.getReadStatesList().stream().map(ToDomain.EndorsableState::getId).toList());
+                put("outputs", request.getOutputStatesList().stream().map(ToDomain.EndorsableState::getId).toList());
+                put("signatures", request.getAttestationResultList().stream().
+                        filter(r -> r.getAttestationType() == ToDomain.AttestationType.ENDORSE).
+                        map(r -> JsonHex.wrap(r.getPayload().toByteArray())).
+                        toList()
+                );
+            }};
+            var transitionFunctionABI = config.getPrivacyGroupABI().getABIEntry("function", "transition").toJSON(false);
+            var preparedTx = ToDomain.BaseLedgerTransaction.newBuilder().
+                    setFunctionAbiJson(transitionFunctionABI).
+                    setParamsJson(new ObjectMapper().writeValueAsString(params));
+            var result = ToDomain.PrepareTransactionResponse.newBuilder().setTransaction(preparedTx);
+            return CompletableFuture.completedFuture(result.build());
+        } catch(Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     /** during assembly we load available states from the Paladin state store */

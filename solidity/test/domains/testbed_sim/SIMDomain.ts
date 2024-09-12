@@ -42,15 +42,15 @@ describe("SIMDomain", function () {
 
       // Invoke against it an expect an event
       const SINGLE_FUNCTION_SELECTOR = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("SIMToken()"));
-      const txID = randBytes32();
+      const txId = randBytes32();
       const signature = randBytes32();
       const inputs = [randBytes32(), randBytes32()];
       const outputs = [randBytes32(), randBytes32()];
       const payload = abiCoder.encode(['bytes32', 'bytes32[]', 'bytes32[]'], [signature, inputs, outputs]);
-      await expect(simToken.paladinExecute_V0(txID, SINGLE_FUNCTION_SELECTOR, payload)).to.
+      await expect(simToken.paladinExecute_V0(txId, SINGLE_FUNCTION_SELECTOR, payload)).to.
         emit(simToken, "PaladinPrivateTransaction_V0")
         .withArgs(
-          txID,
+          txId,
           inputs,
           outputs,
           signature

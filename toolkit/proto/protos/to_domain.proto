@@ -112,8 +112,9 @@ message EndorseTransactionResponse {
 message PrepareTransactionRequest {
   TransactionSpecification transaction = 1; // The transaction specified by the user
   repeated EndorsableState input_states = 2; // The list of input states
-  repeated EndorsableState output_states = 3; // The list of output states
-  repeated AttestationResult attestation_result = 4; // The results of any proofs/attestations that came out of the endorsement phase
+  repeated EndorsableState read_states = 3; // The list of read states
+  repeated EndorsableState output_states = 4; // The list of output states
+  repeated AttestationResult attestation_result = 5; // The results of any proofs/attestations that came out of the endorsement phase
 }
 
 message PrepareTransactionResponse {

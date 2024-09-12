@@ -88,7 +88,7 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
     }
 
     function transition(
-        bytes32            txID,
+        bytes32            txId,
         bytes32[] calldata inputs,
         bytes32[] calldata reads,
         bytes32[] calldata outputs,
@@ -117,7 +117,7 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         }
 
         // Emmit the state transition event
-        emit PaladinPrivateTransaction_V0(txID, inputs, outputs, new bytes(0));
+        emit PaladinPrivateTransaction_V0(txId, inputs, outputs, new bytes(0));
     }
 
     function _buildTransitionHash(

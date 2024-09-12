@@ -361,6 +361,7 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	res, err := dc.api.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
 		InputStates:       dc.toEndorsableList(postAssembly.InputStates),
+		ReadStates:        dc.toEndorsableList(postAssembly.ReadStates),
 		OutputStates:      dc.toEndorsableList(postAssembly.OutputStates),
 		AttestationResult: dc.allAttestations(tx),
 	})
