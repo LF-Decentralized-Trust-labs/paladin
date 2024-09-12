@@ -247,6 +247,7 @@ func (z *Zeto) FindCoins(ctx context.Context, query string) ([]*types.ZetoCoin, 
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("states: %+v\n", states)
 
 	coins := make([]*types.ZetoCoin, len(states))
 	for i, state := range states {

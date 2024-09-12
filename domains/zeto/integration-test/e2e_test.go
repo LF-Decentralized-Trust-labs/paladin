@@ -32,13 +32,13 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v3"
 )
 
 var (
-	controllerName    = "controller"
-	recipient1Name    = "recipient1"
-	deployedContracts *zetoDomainContracts
+	controllerName = "controller"
+	recipient1Name = "recipient1"
 )
 
 //go:embed config-for-deploy.yaml
@@ -58,7 +58,7 @@ func mapConfig(t *testing.T, config *types.DomainFactoryConfig) (m map[string]an
 	return m
 }
 
-func prepareLocalConfig(t *testing.T, domainContracts *zetoDomainContracts) *types.DomainFactoryConfig {
+func prepareDomainConfig(t *testing.T, domainContracts *zetoDomainContracts) *types.DomainFactoryConfig {
 	config := types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
 			Factory: &types.DomainContract{
@@ -88,8 +88,33 @@ func prepareLocalConfig(t *testing.T, domainContracts *zetoDomainContracts) *typ
 	return &config
 }
 
-func newTestDomain(t *testing.T, domainName, tokenName string, domainContracts *zetoDomainContracts) (context.CancelFunc, zeto.Zeto, rpcbackend.Backend) {
-	config := prepareLocalConfig(t, domainContracts)
+func deployZetoContracts(t *testing.T) *zetoDomainContracts {
+	ctx := context.Background()
+	log.L(ctx).Infof("Deploy Zeto Contracts")
+
+	tb := testbed.NewTestBed()
+	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{})
+	bi := tb.Components().BlockIndexer()
+	ec := tb.Components().EthClientFactory().HTTPClient()
+	assert.NoError(t, err)
+	defer done()
+	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
+
+	var config domainConfig
+	err = yaml.Unmarshal(testZetoConfigYaml, &config)
+	assert.NoError(t, err)
+
+	deployedContracts, err := deployDomainContracts(ctx, rpc, controllerName, &config)
+	assert.NoError(t, err)
+
+	err = configureFactoryContract(ctx, ec, bi, controllerName, deployedContracts)
+	assert.NoError(t, err)
+
+	return deployedContracts
+}
+
+func newTestDomain(t *testing.T, domainName string, domainContracts *zetoDomainContracts) (context.CancelFunc, zeto.Zeto, rpcbackend.Backend) {
+	config := prepareDomainConfig(t, domainContracts)
 
 	var domain zeto.Zeto
 	var err error
@@ -110,48 +135,49 @@ func newTestDomain(t *testing.T, domainName, tokenName string, domainContracts *
 	return done, domain, rpc
 }
 
-func TestZeto_DeployZetoContracts(t *testing.T) {
-	ctx := context.Background()
-	log.L(ctx).Infof("Deploy Zeto Contracts")
-
-	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{})
-	bi := tb.Components().BlockIndexer()
-	ec := tb.Components().EthClientFactory().HTTPClient()
-	assert.NoError(t, err)
-	defer done()
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-
-	var config domainConfig
-	err = yaml.Unmarshal(testZetoConfigYaml, &config)
-	assert.NoError(t, err)
-
-	deployedContracts, err = deployDomainContracts(ctx, rpc, controllerName, &config)
-	assert.NoError(t, err)
-
-	err = configureFactoryContract(ctx, ec, bi, controllerName, deployedContracts)
-	assert.NoError(t, err)
+type zetoDomainTestSuite struct {
+	suite.Suite
+	deployedContracts *zetoDomainContracts
+	domainName        string
+	domain            zeto.Zeto
+	rpc               rpcbackend.Backend
+	done              context.CancelFunc
 }
 
-func TestZeto_Anon(t *testing.T) {
-	testZetoFungible(t, "Zeto_Anon")
+func (s *zetoDomainTestSuite) SetupSuite() {
+	domainContracts := deployZetoContracts(s.T())
+	s.deployedContracts = domainContracts
 }
 
-func TestZeto_AnonEnc(t *testing.T) {
-	testZetoFungible(t, "Zeto_AnonEnc")
-}
-
-func testZetoFungible(t *testing.T, tokenName string) {
+func (s *zetoDomainTestSuite) SetupTest() {
 	ctx := context.Background()
 	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	done, zeto, rpc := newTestDomain(t, domainName, tokenName, deployedContracts)
-	defer done()
+	done, zeto, rpc := newTestDomain(s.T(), domainName, s.deployedContracts)
+	s.domainName = domainName
+	s.domain = zeto
+	s.rpc = rpc
+	s.done = done
+}
 
+func (s *zetoDomainTestSuite) TearDownSuite() {
+	s.done()
+}
+
+func (s *zetoDomainTestSuite) TestZeto_Anon() {
+	s.testZetoFungible(s.T(), "Zeto_Anon")
+}
+
+func (s *zetoDomainTestSuite) TestZeto_AnonEnc() {
+	s.testZetoFungible(s.T(), "Zeto_AnonEnc")
+}
+
+func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
+	ctx := context.Background()
 	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
 	var zetoAddress ethtypes.Address0xHex
-	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
-		domainName, &types.InitializerParams{
+	rpcerr := s.rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
+		s.domainName, &types.InitializerParams{
 			From:      controllerName,
 			TokenName: tokenName,
 		})
@@ -162,7 +188,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 
 	log.L(ctx).Infof("Mint 10 from controller to controller")
 	var boolResult bool
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
+	rpcerr = s.rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
 		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
@@ -176,14 +202,14 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	}
 	assert.True(t, boolResult)
 
-	coins, err := zeto.FindCoins(ctx, "{}")
+	coins, err := s.domain.FindCoins(ctx, "{}")
 	require.NoError(t, err)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
 	assert.Equal(t, controllerName, coins[0].Owner)
 
 	log.L(ctx).Infof("Mint 20 from controller to controller")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
+	rpcerr = s.rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
 		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
@@ -197,7 +223,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	}
 	assert.True(t, boolResult)
 
-	coins, err = zeto.FindCoins(ctx, "{}")
+	coins, err = s.domain.FindCoins(ctx, "{}")
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Amount.Int64())
@@ -206,7 +232,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	assert.Equal(t, controllerName, coins[1].Owner)
 
 	log.L(ctx).Infof("Attempt mint from non-controller (should fail)")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
+	rpcerr = s.rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     recipient1Name,
 		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["mint"],
@@ -220,7 +246,7 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	assert.True(t, boolResult)
 
 	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
-	rpcerr = rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
+	rpcerr = s.rpc.CallRPC(ctx, &boolResult, "testbed_invoke", &tktypes.PrivateContractInvoke{
 		From:     controllerName,
 		To:       tktypes.EthAddress(zetoAddress),
 		Function: *types.ZetoABI.Functions()["transfer"],
@@ -232,4 +258,8 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
+}
+
+func TestZetoDomainTestSuite(t *testing.T) {
+	suite.Run(t, new(zetoDomainTestSuite))
 }
