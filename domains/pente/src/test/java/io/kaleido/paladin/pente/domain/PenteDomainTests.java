@@ -40,7 +40,7 @@ public class PenteDomainTests {
             );
             JsonABI factoryABI = JsonABI.fromJSONResourceEntry(
                     this.getClass().getClassLoader(),
-                    "contracts/domains/ente/PenteFactory.sol/PenteFactory.json",
+                    "contracts/domains/pente/PenteFactory.sol/PenteFactory.json",
                     "abi"
             );
             return deployBed.getRpcClient().request("testbed_deployBytecode",

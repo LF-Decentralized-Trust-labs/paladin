@@ -143,6 +143,8 @@ func doDomainInitAssembleTransactionOK(t *testing.T, ctx context.Context, tp *te
 	}
 	err := psc.AssembleTransaction(ctx, tx)
 	require.NoError(t, err)
+	tx.PreAssembly.Verifiers = []*prototk.ResolvedVerifier{}
+	tx.PostAssembly.Signatures = []*prototk.AttestationResult{}
 	return psc, tx
 }
 
