@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // PreInitComponents are ones that are initialized before managers.
@@ -68,6 +69,7 @@ type ManagerLifecycle interface {
 type ManagerEventStream struct {
 	ABI     abi.ABI
 	Handler blockindexer.InternalStreamCallback
+	Source  *tktypes.EthAddress
 }
 
 // Managers can instruct the init of some of the PostInitComponents in a generic way

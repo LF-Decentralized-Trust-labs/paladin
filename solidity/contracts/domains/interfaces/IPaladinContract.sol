@@ -8,13 +8,6 @@ interface IPaladinContract_V0 {
         bytes data
     );
 
-    event PaladinNewSmartContractByFactory_V0(
-        bytes32 indexed txId,
-        address indexed instance,
-        address indexed domain,
-        bytes data
-    );
-
     event PaladinPrivateTransaction_V0(
         bytes32 indexed id,
         bytes32[] inputs,

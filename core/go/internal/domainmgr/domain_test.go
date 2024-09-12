@@ -164,7 +164,8 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	ctx, dm, _, done := newTestDomainManager(t, realDB, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config: map[string]any{"some": "conf"},
+				Config:         map[string]any{"some": "conf"},
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	}, extraSetup...)
@@ -355,7 +356,8 @@ func TestDomainConfigureFail(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config: map[string]any{"some": "config"},
+				Config:         map[string]any{"some": "config"},
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})
