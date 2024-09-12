@@ -129,6 +129,7 @@ func TestConfiguredDomains(t *testing.T) {
 					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
+				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})
@@ -154,6 +155,39 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 
 	_, err := dm.DomainRegistered("unknown", uuid.New(), nil)
 	assert.Regexp(t, "PD011600", err)
+}
+
+func TestDomainMissingFactoryAddress(t *testing.T) {
+	config := &DomainManagerConfig{
+		Domains: map[string]*DomainConfig{
+			"domain1": {
+				Plugin: components.PluginConfig{
+					Type:    components.LibraryTypeCShared.Enum(),
+					Library: "some/where",
+				},
+			},
+		},
+	}
+
+	mc := &mockComponents{
+		blockIndexer:     componentmocks.NewBlockIndexer(t),
+		stateStore:       componentmocks.NewStateStore(t),
+		ethClientFactory: componentmocks.NewEthClientFactory(t),
+	}
+	componentMocks := componentmocks.NewAllComponents(t)
+	componentMocks.On("EthClientFactory").Return(mc.ethClientFactory)
+	mc.ethClientFactory.On("ChainID").Return(int64(12345)).Maybe()
+	mc.ethClientFactory.On("HTTPClient").Return(mc.ethClient).Maybe()
+	mc.ethClientFactory.On("WSClient").Return(mc.ethClient).Maybe()
+	componentMocks.On("BlockIndexer").Return(mc.blockIndexer)
+
+	mp, err := mockpersistence.NewSQLMockProvider()
+	require.NoError(t, err)
+	componentMocks.On("StateStore").Return(mc.stateStore)
+	componentMocks.On("Persistence").Return(mp.P)
+	dm := NewDomainManager(context.Background(), config)
+	_, err = dm.PreInit(componentMocks)
+	assert.Regexp(t, "PD011633", err)
 }
 
 func TestGetDomainNotFound(t *testing.T) {

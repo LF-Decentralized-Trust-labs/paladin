@@ -112,8 +112,7 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 	var eventStreams []*components.ManagerEventStream
 	for name, d := range dm.conf.Domains {
 		if d.FactoryAddress == nil {
-			log.L(dm.bgCtx).Warnf("Domain %s has no factory address configured, skip listening to factory deploy events", name)
-			continue
+			return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainFactoryAddressMissing, name)
 		}
 		eventStreams = append(eventStreams, &components.ManagerEventStream{
 			ABI:     iPaladinContractFactoryABI,
