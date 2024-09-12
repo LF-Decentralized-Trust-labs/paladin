@@ -75,7 +75,7 @@ func (h *transferHandler) loadBabyJubKey(payload []byte) (*babyjub.PublicKey, er
 	return keyCompressed.Decompress()
 }
 
-func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.ZetoCoin) ([]byte, error) {
+func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.ZetoCoin, circuitId string) ([]byte, error) {
 	inputCommitments := make([]string, INPUT_COUNT)
 	inputValueInts := make([]uint64, INPUT_COUNT)
 	inputSalts := make([]string, INPUT_COUNT)
@@ -107,7 +107,7 @@ func (h *transferHandler) formatProvingRequest(inputCoins, outputCoins []*types.
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: h.zeto.config.CircuitId,
+		CircuitId: circuitId,
 		Common: &corepb.ProvingRequestCommon{
 			InputCommitments: inputCommitments,
 			InputValues:      inputValueInts,
@@ -160,7 +160,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	payloadBytes, err := h.formatProvingRequest(inputCoins, outputCoins)
+	payloadBytes, err := h.formatProvingRequest(inputCoins, outputCoins, tx.DomainConfig.CircuitId)
 	if err != nil {
 		return nil, err
 	}
