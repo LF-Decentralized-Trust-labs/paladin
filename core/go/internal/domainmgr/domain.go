@@ -51,10 +51,7 @@ type domain struct {
 	config                 *prototk.DomainConfig
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
-	constructorABI         *abi.Entry
 	factoryContractAddress *tktypes.EthAddress
-	factoryContractABI     abi.ABI
-	privateContractABI     abi.ABI
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -94,22 +91,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		}
 	}
 
-	err := json.Unmarshal(([]byte)(d.config.ConstructorAbiJson), &d.constructorABI)
-	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainConstructorAbiJsonInvalid)
-	}
-	if d.constructorABI.Type != abi.Constructor {
-		return nil, i18n.NewError(d.ctx, msgs.MsgDomainConstructorABITypeWrong, d.constructorABI.Type)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.FactoryContractAbiJson), &d.factoryContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
-	}
-
-	if err := json.Unmarshal(([]byte)(d.config.PrivateContractAbiJson), &d.privateContractABI); err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainPrivateAbiJsonInvalid)
-	}
-
+	var err error
 	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
 	if err != nil {
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
@@ -254,25 +236,10 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 	}
 
 	// Build the init request
-	var abiJSON []byte
-	var paramsJSON []byte
-	constructorValues, err := d.constructorABI.Inputs.ParseJSONCtx(ctx, tx.Inputs)
-	if err == nil {
-		abiJSON, err = json.Marshal(d.constructorABI)
-	}
-	if err == nil {
-		// Serialize to standardized JSON before passing to domain
-		paramsJSON, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, constructorValues)
-	}
-	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidConstructorParams, d.constructorABI.SolString())
-	}
-
 	txSpec := &prototk.DeployTransactionSpecification{}
 	tx.TransactionSpecification = txSpec
 	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
-	txSpec.ConstructorAbi = string(abiJSON)
-	txSpec.ConstructorParamsJson = string(paramsJSON)
+	txSpec.ConstructorParamsJson = tx.Inputs.String()
 
 	// Do the request with the domain
 	res, err := d.api.InitDeploy(ctx, &prototk.InitDeployRequest{
@@ -314,9 +281,9 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 	}
 	if res.Transaction != nil && res.Deploy == nil {
-		functionABI := d.factoryContractABI.Functions()[res.Transaction.FunctionName]
-		if functionABI == nil {
-			return i18n.NewError(ctx, msgs.MsgDomainFunctionNotFound, res.Transaction.FunctionName)
+		var functionABI abi.Entry
+		if err := json.Unmarshal(([]byte)(res.Transaction.FunctionAbiJson), &functionABI); err != nil {
+			return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Transaction.ParamsJson))
 		if err != nil {
@@ -324,22 +291,27 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		}
 		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
-			FunctionABI: functionABI,
+			FunctionABI: &functionABI,
 			To:          *d.Address(),
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {
-		functionABI := d.factoryContractABI.Constructor()
-		if functionABI == nil {
+		var functionABI abi.Entry
+		if res.Deploy.ConstructorAbiJson == "" {
 			// default constructor
-			functionABI = &abi.Entry{Type: abi.Constructor, Inputs: abi.ParameterArray{}}
+			functionABI.Type = abi.Constructor
+			functionABI.Inputs = abi.ParameterArray{}
+		} else {
+			if err := json.Unmarshal(([]byte)(res.Deploy.ConstructorAbiJson), &functionABI); err != nil {
+				return i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAbiJsonInvalid)
+			}
 		}
 		inputs, err := functionABI.Inputs.ParseJSONCtx(ctx, emptyJSONIfBlank(res.Deploy.ParamsJson))
 		if err != nil {
 			return err
 		}
 		tx.DeployTransaction = &components.EthDeployTransaction{
-			ConstructorABI: functionABI,
+			ConstructorABI: &functionABI,
 			Bytecode:       res.Deploy.Bytecode,
 			Inputs:         inputs,
 		}

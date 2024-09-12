@@ -29,12 +29,7 @@ public class TestDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setConstructorAbiJson("""
-                    {"type":"constructor","inputs":[]}
-                """)
                 .setFactoryContractAddress("0x1000000000000000000000000000000000000001")
-                .setFactoryContractAbiJson("[]")
-                .setPrivateContractAbiJson("[]")
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())

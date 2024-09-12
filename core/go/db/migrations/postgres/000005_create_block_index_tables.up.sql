@@ -12,12 +12,14 @@ CREATE TABLE indexed_transactions (
     "transaction_index" BIGINT    NOT NULL,
     "from"              CHAR(40)  NOT NULL,
     "to"                CHAR(40),
+    "nonce"             BIGINT    NOT NULL,
     "contract_address"  CHAR(40),
     "result"            TEXT,
     PRIMARY KEY ("block_number", "transaction_index"),
     FOREIGN KEY ("block_number") REFERENCES indexed_blocks ("number") ON DELETE CASCADE
 );
 CREATE INDEX indexed_transaction_id ON indexed_transactions("hash");
+CREATE UNIQUE INDEX indexed_transaction_from_nonce ON indexed_transactions("from","nonce");
 
 CREATE TABLE indexed_events (
     "transaction_hash"  TEXT    NOT NULL,

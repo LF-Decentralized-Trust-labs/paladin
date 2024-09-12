@@ -74,13 +74,6 @@ public class PenteConfiguration {
         ));
     }
 
-    JsonABI.Entry abiEntry_privateConstructor() {
-        return JsonABI.newConstructor(JsonABI.newParameters(
-                abiTuple_group(),
-                JsonABI.newParameter("endorsementType", "string")
-        ));
-    }
-
     JsonABI.Entry abiEntry_privateTransactionInvoke() {
         return JsonABI.newConstructor(JsonABI.newParameters(
                 abiTuple_group(),
