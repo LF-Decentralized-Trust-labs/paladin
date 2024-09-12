@@ -90,8 +90,6 @@ func prepareLocalConfig(t *testing.T, domainContracts *zetoDomainContracts) *typ
 
 func newTestDomain(t *testing.T, domainName, tokenName string, domainContracts *zetoDomainContracts) (context.CancelFunc, zeto.Zeto, rpcbackend.Backend) {
 	config := prepareLocalConfig(t, domainContracts)
-	config.TokenName = tokenName
-	config.CircuitId = domainContracts.cloneableContracts[tokenName].circuitId
 
 	var domain zeto.Zeto
 	var err error
@@ -153,8 +151,9 @@ func testZetoFungible(t *testing.T, tokenName string) {
 	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
 	var zetoAddress ethtypes.Address0xHex
 	rpcerr := rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
-		domainName, &types.ConstructorParams{
-			From: controllerName,
+		domainName, &types.InitializerParams{
+			From:      controllerName,
+			TokenName: tokenName,
 		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())

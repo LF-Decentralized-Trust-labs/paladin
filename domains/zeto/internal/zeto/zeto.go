@@ -86,14 +86,14 @@ func (z *Zeto) InitDomain(ctx context.Context, req *pb.InitDomainRequest) (*pb.I
 }
 
 func (z *Zeto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.InitDeployResponse, error) {
-	_, err := z.validateDeploy(req.Transaction)
+	initParams, err := z.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.InitDeployResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
-				Lookup:    "controller",
+				Lookup:    initParams.From,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
 		},
@@ -101,13 +101,17 @@ func (z *Zeto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.I
 }
 
 func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
-	params, err := z.validateDeploy(req.Transaction)
+	initParams, err := z.validateDeploy(req.Transaction)
+	if err != nil {
+		return nil, err
+	}
+	circuitId, err := z.config.GetCircuitId(initParams.TokenName)
 	if err != nil {
 		return nil, err
 	}
 	config := &types.DomainInstanceConfig{
-		CircuitId: z.config.CircuitId,
-		TokenName: z.config.TokenName,
+		CircuitId: circuitId,
+		TokenName: initParams.TokenName,
 	}
 	configJSON, err := json.Marshal(config)
 	if err != nil {
@@ -121,8 +125,8 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 	deployParams := &types.DeployParams{
 		TransactionID: req.Transaction.TransactionId,
 		Data:          ethtypes.HexBytes0xPrefix(encoded),
-		TokenName:     z.config.TokenName,
-		InitialOwner:  req.ResolvedVerifiers[0].Verifier,
+		TokenName:     initParams.TokenName,
+		InitialOwner:  req.ResolvedVerifiers[0].Verifier, // TODO: allow the initial owner to be specified by the deploy request
 	}
 	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {
@@ -138,7 +142,7 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
-		Signer: &params.From,
+		Signer: &initParams.From,
 	}, nil
 }
 
@@ -188,8 +192,8 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	return &config, err
 }
 
-func (z *Zeto) validateDeploy(tx *pb.DeployTransactionSpecification) (*types.ConstructorParams, error) {
-	var params types.ConstructorParams
+func (z *Zeto) validateDeploy(tx *pb.DeployTransactionSpecification) (*types.InitializerParams, error) {
+	var params types.InitializerParams
 	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }

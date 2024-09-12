@@ -30,10 +30,6 @@ type DomainFactoryConfig struct {
 	FactoryAddress  string                `json:"factoryAddress"`
 	Libraries       map[string]string     `json:"libraries"`
 	DomainContracts DomainConfigContracts `json:"domainContracts"`
-	// TODO: one token type per domain until core has been enhanced
-	// to not require a single private contract ABI
-	TokenName string `yaml:"name"`
-	CircuitId string `yaml:"circuitId"`
 }
 
 type DomainConfigContracts struct {
@@ -48,9 +44,9 @@ type DomainContract struct {
 	Abi             string `yaml:"abi"`
 }
 
-func (d *DomainFactoryConfig) GetContractAbi(name string) (abi.ABI, error) {
+func (d *DomainFactoryConfig) GetContractAbi(tokenName string) (abi.ABI, error) {
 	for _, contract := range d.DomainContracts.Implementations {
-		if contract.Name == name {
+		if contract.Name == tokenName {
 			var contractAbi abi.ABI
 			err := json.Unmarshal([]byte(contract.Abi), &contractAbi)
 			if err != nil {
@@ -59,7 +55,16 @@ func (d *DomainFactoryConfig) GetContractAbi(name string) (abi.ABI, error) {
 			return contractAbi, nil
 		}
 	}
-	return nil, fmt.Errorf("contract %s not found", name)
+	return nil, fmt.Errorf("contract %s not found", tokenName)
+}
+
+func (d *DomainFactoryConfig) GetCircuitId(tokenName string) (string, error) {
+	for _, contract := range d.DomainContracts.Implementations {
+		if contract.Name == tokenName {
+			return contract.CircuitId, nil
+		}
+	}
+	return "", fmt.Errorf("contract %s not found", tokenName)
 }
 
 // DomainInstanceConfig is the domain instance config, which are
