@@ -69,11 +69,13 @@ message DomainMessage {
   oneof request_from_domain {
     FindAvailableStatesRequest  find_available_states =     2010;
     EncodeDataRequest           encode_data =               2020;
+    RecoverSignerRequest        recover_signer =            2030;
   }
 
   oneof response_to_domain {
     FindAvailableStatesResponse find_available_states_res = 2011;
     EncodeDataResponse          encode_data_res =           2021;
+    RecoverSignerResponse       recover_signer_res =        2031;
   }
     
 }

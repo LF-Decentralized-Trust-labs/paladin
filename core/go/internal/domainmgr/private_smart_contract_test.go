@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
@@ -216,6 +217,25 @@ func TestEncodeABIData(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, txEIP155, txEIP1559_a)
 
+}
+
+func TestRecoverSignature(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	kp, err := secp256k1.GenerateSecp256k1KeyPair()
+	require.NoError(t, err)
+	s, err := kp.SignDirect(([]byte)("some data"))
+	require.NoError(t, err)
+
+	res, err := tp.d.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   ([]byte)("some data"),
+		Signature: s.CompactRSV(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, kp.Address.String(), res.Verifier)
 }
 
 func TestDomainInitTransactionMissingInput(t *testing.T) {

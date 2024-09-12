@@ -41,6 +41,18 @@ message EncodeDataResponse {
   bytes data = 1;
 }
 
+
+message RecoverSignerRequest {
+  string algorithm = 1;
+  bytes payload = 2;
+  bytes signature = 3;
+}
+
+message RecoverSignerResponse {
+  string verifier = 1;
+}
+
+
 message StoredState {
   string id = 1;
   string schema_id = 2;

@@ -88,6 +88,19 @@ func TestDomainCallback_EncodeData(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDomainCallback_RecoverSigner(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_RecoverSigner{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_RecoverSignerRes{
+			RecoverSignerRes: &prototk.RecoverSignerResponse{},
+		}
+	}
+	_, err := callbacks.RecoverSigner(ctx, &prototk.RecoverSignerRequest{})
+	require.NoError(t, err)
+}
+
 func TestDomainFunction_ConfigureDomain(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupDomainTests(t)
 	defer done()

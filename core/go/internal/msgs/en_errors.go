@@ -243,6 +243,8 @@ var (
 	MsgDomainABIEncodingRequestEncodingFail   = ffe("PD011634", "ABI encoding request failed")
 	MsgDomainABIEncodingRequestInvalidType    = ffe("PD011635", "ABI encoding request is of invalid type '%s'")
 	MsgDomainABIEncodingRequestInvalidTX      = ffe("PD011636", "Transaction encoding request is invalid")
+	MsgDomainABIRecoverRequestAlgorithm       = ffe("PD011637", "Algorithm not supported for recover signer '%s'")
+	MsgDomainABIRecoverRequestSignature       = ffe("PD011638", "Invalid signature")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")

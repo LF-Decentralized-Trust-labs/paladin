@@ -25,11 +25,14 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -293,6 +296,26 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 	return &prototk.EncodeDataResponse{
 		Data: abiData,
 	}, nil
+}
+
+func (d *domain) RecoverSigner(ctx context.Context, recoverRequest *prototk.RecoverSignerRequest) (_ *prototk.RecoverSignerResponse, err error) {
+	switch recoverRequest.Algorithm {
+	// If we add more signer algorithms to this utility in the future, we should make it an interface on the signer.
+	case algorithms.ECDSA_SECP256K1_PLAINBYTES:
+		var addr *ethtypes.Address0xHex
+		signature, err := secp256k1.DecodeCompactRSV(ctx, recoverRequest.Signature)
+		if err == nil {
+			addr, err = signature.RecoverDirect(recoverRequest.Payload, d.dm.ethClientFactory.ChainID())
+		}
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIRecoverRequestSignature)
+		}
+		return &prototk.RecoverSignerResponse{
+			Verifier: addr.String(),
+		}, nil
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgDomainABIRecoverRequestAlgorithm, recoverRequest.Algorithm)
+	}
 }
 
 func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {

@@ -38,6 +38,7 @@ type testDomainManager struct {
 	domainRegistered    func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
 	encodeData          func(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
+	recoverSigner       func(context.Context, *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
 }
 
 func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -46,6 +47,10 @@ func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *proto
 
 func (tp *testDomainManager) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
 	return tp.encodeData(ctx, req)
+}
+
+func (tp *testDomainManager) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
+	return tp.recoverSigner(ctx, req)
 }
 
 func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
@@ -197,6 +202,13 @@ func TestDomainRequestsOK(t *testing.T) {
 		}, nil
 	}
 
+	tdm.recoverSigner = func(ctx context.Context, edr *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
+		assert.Equal(t, edr.Algorithm, "some algo")
+		return &prototk.RecoverSignerResponse{
+			Verifier: "some verifier",
+		}, nil
+	}
+
 	ctx, pc, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
@@ -281,6 +293,12 @@ func TestDomainRequestsOK(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "some output data", string(edr.Data))
+
+	rsr, err := callbacks.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: "some algo",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some verifier", string(rsr.Verifier))
 }
 
 func TestDomainRegisterFail(t *testing.T) {

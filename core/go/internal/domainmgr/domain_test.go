@@ -910,3 +910,19 @@ func TestEncodeABIDataFailCases(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011633", err)
 }
+
+func TestRecoverSignerFailCases(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	d := tp.d
+
+	_, err := d.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: "not supported",
+	})
+	assert.Regexp(t, "PD011637", err)
+	_, err = d.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Signature: ([]byte)("not a signature RSV"),
+	})
+	assert.Regexp(t, "PD011638", err)
+}
