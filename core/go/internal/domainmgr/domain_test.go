@@ -909,6 +909,16 @@ func TestEncodeABIDataFailCases(t *testing.T) {
 		Body:         `{!!!bad`,
 	})
 	assert.Regexp(t, "PD011633", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TYPED_DATA_V4,
+		Body:         `{}`,
+	})
+	assert.Regexp(t, "PD011640", err)
+	_, err = d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TYPED_DATA_V4,
+		Body:         `{!!!bad`,
+	})
+	assert.Regexp(t, "PD011639", err)
 }
 
 func TestRecoverSignerFailCases(t *testing.T) {

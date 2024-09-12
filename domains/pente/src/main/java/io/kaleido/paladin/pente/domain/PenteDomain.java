@@ -185,8 +185,9 @@ public class PenteDomain extends DomainInstance {
             var accountLoader = new AssemblyAccountLoader();
             var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), accountLoader);
             var result = ToDomain.AssembleTransactionResponse.newBuilder();
+            var assembledTransaction = tx.buildAssembledTransaction(execResult.evm(), accountLoader);
             result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
-            result.setAssembledTransaction(tx.buildAssembledTransaction(execResult.evm(), accountLoader));
+            result.setAssembledTransaction(assembledTransaction);
 
             // Just like a base Eth transaction, we sign the encoded transaction.
             // However, we do not package the signature back up in any RLP encoded way
@@ -304,14 +305,22 @@ public class PenteDomain extends DomainInstance {
                 throw new IllegalArgumentException("invalid signature for %s (recovered=%s)".formatted(execResult.senderAddress(), recovered.getVerifier()));
             }
 
+            // Check we agree with the typed data we will sign
+            var endorsementPayload = tx.eip712TypedDataEndorsementPayload(
+                request.getInputsList().stream().map(ToDomain.EndorsableState::getId).toList(),
+                request.getReadsList().stream().map(ToDomain.EndorsableState::getId).toList(),
+                request.getOutputsList().stream().map(ToDomain.EndorsableState::getId).toList()
+            );
+
             // Ok - we are happy to add our endorsement signature
             return CompletableFuture.completedFuture(ToDomain.EndorseTransactionResponse.newBuilder().
                     setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.SIGN).
+                    setPayload(ByteString.copyFrom(endorsementPayload)).
                     build());
         } catch(PenteTransaction.EVMExecutionException e) {
             LOGGER.error(new FormattedMessage("EVM execution failed during endorsement TX {}", request.getTransaction().getTransactionId()), e);
             return CompletableFuture.completedFuture(ToDomain.EndorseTransactionResponse.newBuilder().
-                    setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.REVERT).
+                    setEndorsementResult(ToDomain.EndorseTransactionResponse.Result.SIGN).
                     setRevertReason(e.getMessage()).
                     build());
         } catch(Exception e) {

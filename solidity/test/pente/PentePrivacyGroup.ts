@@ -1,10 +1,7 @@
-import {
-  loadFixture
-} from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
+import { AbiCoder, concat, Signer, TypedDataEncoder } from "ethers";
 import hre from "hardhat";
 import { PentePrivacyGroup } from "../../typechain-types";
-import { AbiCoder, concat, Signer, TypedDataEncoder, ZeroHash } from "ethers";
 const abiCoder = AbiCoder.defaultAbiCoder();
 
 enum PenteConfigID {

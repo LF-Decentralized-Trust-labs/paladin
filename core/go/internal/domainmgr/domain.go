@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
@@ -289,6 +290,16 @@ func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataR
 			abiData = tx.SignaturePayloadLegacyEIP155(d.dm.ethClientFactory.ChainID()).Bytes()
 		default:
 			return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition)
+		}
+	case prototk.EncodeDataRequest_TYPED_DATA_V4:
+		var tdv4 *eip712.TypedData
+		err := json.Unmarshal([]byte(encRequest.Body), &tdv4)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid)
+		}
+		abiData, err = eip712.EncodeTypedDataV4(ctx, tdv4)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail)
 		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType)

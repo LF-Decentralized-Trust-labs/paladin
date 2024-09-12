@@ -119,13 +119,11 @@ class PenteTransaction {
     private final String from;
     private final String jsonParams;
     private final long baseBlock;
-    private final Address contract;
     private Values values;
     private PenteDomain.AssemblyAccountLoader accountLoader;
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
-        contract = new Address(tx.getContractAddress());
         contractConfig = tx.getContractConfig().toByteArray();
         from = tx.getFrom();
         baseBlock = tx.getBaseBlock();
@@ -416,7 +414,7 @@ class PenteTransaction {
             JsonHex.Bytes32 txPayloadHash
     ) {}
 
-    class EVMExecutionException extends Exception { EVMExecutionException(String message) { super(message); } }
+    static class EVMExecutionException extends Exception { EVMExecutionException(String message) { super(message); } }
 
     EVMExecutionResult executeEVM(long chainId, Address fromAddr, AccountLoader accountLoader) throws IOException, ExecutionException, InterruptedException, ClassNotFoundException, EVMExecutionException {
         var evm = getEVM(chainId, getBaseBlock(), accountLoader);
@@ -450,6 +448,41 @@ class PenteTransaction {
                 txPayload,
                 Keccak.Hash(txPayload)
         );
+    }
+
+    byte[] eip712TypedDataEndorsementPayload(List<String> inputs, List<String> reads, List<String> outputs) throws IOException, ExecutionException, InterruptedException {
+        var typedDataRequest = new HashMap<String, Object>(){{
+            put("types", new HashMap<String, Object>(){{
+                put("Transition", new ArrayDeque<Map<String, Object>>(){{
+                    add(new HashMap<>(){{put("name", "inputs"); put("type", "bytes32[]");}});
+                    add(new HashMap<>(){{put("name", "reads"); put("type", "bytes32[]");}});
+                    add(new HashMap<>(){{put("name", "outputs"); put("type", "bytes32[]");}});
+                }});
+                put("EIP712Domain", new ArrayDeque<Map<String, Object>>(){{
+                    add(new HashMap<>(){{put("name", "name"); put("type", "string");}});
+                    add(new HashMap<>(){{put("name", "version"); put("type", "string");}});
+                    add(new HashMap<>(){{put("name", "chainId"); put("type", "uint256");}});
+                    add(new HashMap<>(){{put("name", "verifyingContract"); put("type", "address");}});
+                }});
+            }});
+            put("primaryType", "Transition");
+            put("domain", new HashMap<>(){{
+                put("name", "pente");
+                put("version", "0.0.1");
+                put("chainId", domain.getConfig().getChainId());
+                put("verifyingContract", domain.getConfig().getAddress());
+            }});
+            put("message", new HashMap<>(){{
+                put("inputs", inputs);
+                put("reads", reads);
+                put("outputs", outputs);
+            }});
+        }};
+        var encoded = domain.encodeData(FromDomain.EncodeDataRequest.newBuilder().
+                setEncodingType(FromDomain.EncodeDataRequest.EncodingType.TYPED_DATA_V4).
+                setBody(new ObjectMapper().writeValueAsString(typedDataRequest)).
+                build()).get();
+        return encoded.getData().toByteArray();
     }
 
 }
