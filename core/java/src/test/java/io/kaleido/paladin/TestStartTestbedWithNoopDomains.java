@@ -16,7 +16,6 @@
 package io.kaleido.paladin;
 
 import io.kaleido.paladin.toolkit.Testbed;
-import io.kaleido.pente.evmrunner.EVMRunner;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -37,13 +36,11 @@ public class TestStartTestbedWithNoopDomains {
                 new Testbed.ConfigDomain(
                         "domain1",
                         new Testbed.ConfigPlugin("c-shared", "starter", ""),
-                        new HashMap<>(),
-                        EVMRunner.randomAddress()),
+                        new HashMap<>()),
                 new Testbed.ConfigDomain(
                         "domain2",
                         new Testbed.ConfigPlugin("jar", "", TestDomainFactory.class.getName()),
-                        new HashMap<>(),
-                        EVMRunner.randomAddress())
+                        new HashMap<>())
         );
         testBed.start();
         testBed.close();

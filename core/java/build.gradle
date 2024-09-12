@@ -19,10 +19,6 @@ application {
 
 repositories {
     mavenCentral()
-    maven {
-        url 'https://hyperledger.jfrog.io/hyperledger/besu-maven'
-        content { includeGroupByRegex('org\\.hyperledger\\..*') }
-    }
 }
 
 test {
@@ -89,7 +85,6 @@ dependencies {
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
 
     implementation 'org.apache.logging.log4j:log4j-core:2.23+'
-    implementation 'org.hyperledger.besu:besu-datatypes:24.5.4'
 
     toolkitProtoDefinitions project(path: ":toolkit:proto", configuration: "protoDefinitions")
 
