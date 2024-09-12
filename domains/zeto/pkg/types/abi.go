@@ -21,14 +21,7 @@ import (
 )
 
 var ZetoABI = abi.ABI{
-	&abi.Entry{
-		Type: abi.Constructor,
-		Inputs: abi.ParameterArray{
-			{Name: "from", Type: "string"},
-			{Name: "initialOwner", Type: "address"},
-		},
-	},
-	&abi.Entry{
+	{
 		Name: "mint",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{
@@ -36,7 +29,7 @@ var ZetoABI = abi.ABI{
 			{Name: "amount", Type: "uint256"},
 		},
 	},
-	&abi.Entry{
+	{
 		Name: "transfer",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{

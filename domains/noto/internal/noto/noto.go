@@ -93,10 +93,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
 	}
 
-	constructorJSON, err := json.Marshal(types.NotoABI.Constructor())
-	if err != nil {
-		return nil, err
-	}
 	schemaJSON, err := json.Marshal(types.NotoCoinABI)
 	if err != nil {
 		return nil, err
@@ -105,7 +101,6 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
 				SubmitMode: pb.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
