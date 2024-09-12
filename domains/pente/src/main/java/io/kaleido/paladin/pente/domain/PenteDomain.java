@@ -352,7 +352,7 @@ public class PenteDomain extends DomainInstance {
     }
 
     /** During endorsement, only the accounts in the "inputs" and "reads" list are available to execute. */
-    class EndorsementAccountLoader implements AccountLoader {
+    static class EndorsementAccountLoader implements AccountLoader {
         private final Map<org.hyperledger.besu.datatypes.Address, PersistedAccount> inputAccounts = new HashMap<>();
         private final Map<org.hyperledger.besu.datatypes.Address, PersistedAccount> readAccounts = new HashMap<>();
         EndorsementAccountLoader(List<PersistedAccount> inputAccounts, List<PersistedAccount> readAccounts) {

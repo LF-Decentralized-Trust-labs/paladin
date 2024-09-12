@@ -16,11 +16,11 @@ import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 ///
 contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContract_V0 {
     bytes32 private constant TRANSITION_TYPEHASH =
-        keccak256("Transitions(bytes32[] accounts,bytes32[] oldStates,bytes32[] newStates)");
+        keccak256("Transition(bytes32[] inputs,bytes32[] reads,bytes32[] outputs)");
     bytes32 private constant UPGRADE_TYPEHASH =
         keccak256("Upgrade(address address)");
 
-    mapping(bytes32 => bytes32) _accountStates; // accounts are referenced by a salted hash
+    mapping(bytes32 => bool) private _unspent;
     address _nextImplementation;
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
@@ -31,7 +31,9 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
     error PenteInvalidEndorser(address signer);
     error PenteEndorsementThreshold(uint obtained, uint required);
     error PenteUpgradeNotPreauthorized();
-    error PenteAccountStateMismatch(bytes32 asserted, bytes32 actual);
+    error PenteInputNotAvailable(bytes32 input);
+    error PenteReadNotAvailable(bytes32 read);
+    error PenteOutputAlreadyUnspent(bytes32 output);
 
     struct EndorsementConfig {
         uint      threshold;
@@ -87,47 +89,48 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
 
     function transition(
         bytes32            txID,
-        bytes32[] calldata accounts,
-        bytes32[] calldata oldStates,
-        bytes32[] calldata newStates,
+        bytes32[] calldata inputs,
+        bytes32[] calldata reads,
+        bytes32[] calldata outputs,
         bytes[]   calldata signatures
     ) public {
-        bytes32 transitionHash = _buildTransitionHash(accounts, oldStates, newStates);
+        bytes32 transitionHash = _buildTransitionHash(inputs, reads, outputs);
         validateEndorsements(transitionHash, signatures);
 
         // Perform the state transitions
-        uint nonZeroInputCount = 0;
-        bytes32[] memory nonZeroInputs = new bytes32[](oldStates.length);
-        for (uint i = 0; i < accounts.length; i++) {
-            if (oldStates[i] != _accountStates[accounts[i]]) {
-                revert PenteAccountStateMismatch(oldStates[i], _accountStates[accounts[i]]);
+        for (uint i = 0; i < inputs.length; i++) {
+            if (!_unspent[inputs[i]]) {
+                revert PenteInputNotAvailable(inputs[i]);
             }
-            if (oldStates[i] != bytes32(0)) {
-                nonZeroInputs[nonZeroInputCount] = oldStates[i];
-                nonZeroInputCount++;
-            }
-            _accountStates[accounts[i]] = newStates[i];
+            delete(_unspent[inputs[i]]);
         }
-        bytes32[] memory nonZeroInputsFinal = new bytes32[](nonZeroInputCount);
-        for (uint i = 0; i < nonZeroInputCount; i++) {
-            nonZeroInputsFinal[i] = nonZeroInputs[i];
+        for (uint i = 0; i < reads.length; i++) {
+            if (!_unspent[reads[i]]) {
+                revert PenteReadNotAvailable(reads[i]);
+            }
+        }
+        for (uint i = 0; i < outputs.length; i++) {
+            if (_unspent[outputs[i]]) {
+                revert PenteOutputAlreadyUnspent(outputs[i]);
+            }
+            _unspent[outputs[i]] = true;
         }
 
         // Emmit the state transition event
-        emit PaladinPrivateTransaction_V0(txID, nonZeroInputsFinal, newStates, new bytes(0));
+        emit PaladinPrivateTransaction_V0(txID, inputs, outputs, new bytes(0));
     }
 
     function _buildTransitionHash(
-        bytes32[] calldata accounts,
-        bytes32[] calldata oldStates,
-        bytes32[] calldata newStates
+        bytes32[] calldata inputs,
+        bytes32[] calldata reads,
+        bytes32[] calldata outputs
     ) internal view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
                 TRANSITION_TYPEHASH,
-                keccak256(abi.encodePacked(accounts)),
-                keccak256(abi.encodePacked(oldStates)),
-                keccak256(abi.encodePacked(newStates))
+                keccak256(abi.encodePacked(inputs)),
+                keccak256(abi.encodePacked(reads)),
+                keccak256(abi.encodePacked(outputs))
             )
         );
         return _hashTypedDataV4(structHash);

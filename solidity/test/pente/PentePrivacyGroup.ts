@@ -13,9 +13,9 @@ enum PenteConfigID {
 
 export async function newTransitionEIP712(
   privacyGroup: PentePrivacyGroup,
-  accounts: string[],
-  oldStates: string[],
-  newStates: string[],
+  inputs: string[],
+  reads: string[],
+  outputs: string[],
   signers: Signer[]
 ) {
   const domain = {
@@ -25,13 +25,13 @@ export async function newTransitionEIP712(
     verifyingContract: await privacyGroup.getAddress(),
   };
   const types = {
-    Transitions: [
-      { name: "accounts", type: "bytes32[]" },
-      { name: "oldStates", type: "bytes32[]" },
-      { name: "newStates", type: "bytes32[]" },
+    Transition: [
+      { name: "inputs",  type: "bytes32[]" },
+      { name: "reads",   type: "bytes32[]" },
+      { name: "outputs", type: "bytes32[]" },
     ],
   };
-  const value = { accounts, oldStates, newStates };
+  const value = { inputs, reads, outputs };
   const hash = TypedDataEncoder.hash(domain, types, value);
   const signatures: string[] = [];
   for (const signer of signers) {
@@ -80,16 +80,14 @@ describe("PentePrivacyGroup", function () {
 
     const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
 
-    const accountHashes       = [randBytes32(),randBytes32(),randBytes32()];
-    const uninitializedStates = [zeroBytes32(),zeroBytes32(),zeroBytes32()];
-    const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
+    const stateSet1    = [randBytes32(),randBytes32(),randBytes32()];
 
     // Build an en
     const { signatures: endorsements1 } =
-      await newTransitionEIP712(privacyGroup, accountHashes, uninitializedStates, stateSet1, endorsers)
+      await newTransitionEIP712(privacyGroup, [], [], stateSet1, endorsers)
     const tx1ID = randBytes32();
 
-    await expect(privacyGroup.transition(tx1ID, accountHashes, uninitializedStates, stateSet1, endorsements1)).to.
+    await expect(privacyGroup.transition(tx1ID, [], [], stateSet1, endorsements1)).to.
       emit(privacyGroup, "PaladinPrivateTransaction_V0")
       .withArgs(
         tx1ID,
@@ -99,18 +97,20 @@ describe("PentePrivacyGroup", function () {
       );
 
     const stateSet2           = [randBytes32(),randBytes32(),randBytes32()];
+    const inputs2             = [stateSet1[1]]
+    const reads2              = [stateSet1[0], stateSet1[2]]
     const { signatures: endorsements2 } =
-      await newTransitionEIP712(privacyGroup, accountHashes, stateSet1, stateSet2,
+      await newTransitionEIP712(privacyGroup, inputs2, reads2, stateSet2,
         /* mix up the endorser order */
         [ endorsers[1], endorsers[0], endorsers[2] ]
       )
     const tx2ID = randBytes32();
 
-    await expect(privacyGroup.transition(tx2ID, accountHashes, stateSet1, stateSet2, endorsements2)).to.
+    await expect(privacyGroup.transition(tx2ID, inputs2, reads2, stateSet2, endorsements2)).to.
       emit(privacyGroup, "PaladinPrivateTransaction_V0")
       .withArgs(
         tx2ID,
-        stateSet1,
+        inputs2,
         stateSet2,
         "0x"
       );      
@@ -121,16 +121,14 @@ describe("PentePrivacyGroup", function () {
 
     const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
 
-    const accountHashes       = [randBytes32(),randBytes32(),randBytes32()];
-    const uninitializedStates = [zeroBytes32(),zeroBytes32(),zeroBytes32()];
     const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
 
     // Build an en
     const { signatures: endorsements1 } =
-      await newTransitionEIP712(privacyGroup, accountHashes, uninitializedStates, stateSet1, [endorsers[0],endorsers[1]])
+      await newTransitionEIP712(privacyGroup, [], [], stateSet1, [endorsers[0],endorsers[1]])
     const tx1ID = randBytes32();
 
-    await expect(privacyGroup.transition(tx1ID, accountHashes, uninitializedStates, stateSet1, endorsements1)).to.
+    await expect(privacyGroup.transition(tx1ID, [], [], stateSet1, endorsements1)).to.
       revertedWithCustomError(privacyGroup, "PenteEndorsementThreshold").withArgs(2, 3);
 
   });
@@ -139,35 +137,69 @@ describe("PentePrivacyGroup", function () {
 
     const { privacyGroup, deployer } = await pentePrivacyGroupSetup();
 
-    const accountHashes       = [randBytes32(),randBytes32(),randBytes32()];
-    const uninitializedStates = [zeroBytes32(),zeroBytes32(),zeroBytes32()];
     const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
 
-    // Build an en
     const { signatures: endorsements1 } =
-      await newTransitionEIP712(privacyGroup, accountHashes, uninitializedStates, stateSet1, [deployer])
+      await newTransitionEIP712(privacyGroup, [], [], stateSet1, [deployer])
     const tx1ID = randBytes32();
 
-    await expect(privacyGroup.transition(tx1ID, accountHashes, uninitializedStates, stateSet1, endorsements1)).to.
+    await expect(privacyGroup.transition(tx1ID, [], [], stateSet1, endorsements1)).to.
       revertedWithCustomError(privacyGroup, "PenteInvalidEndorser").withArgs(deployer.address);
 
   });
 
-  it("invalid previous state", async function () {
+  it("invalid input state", async function () {
 
     const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
 
-    const accountHashes       = [randBytes32(),randBytes32(),randBytes32()];
     const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
     const stateSet2           = [randBytes32(),randBytes32(),randBytes32()];
 
-    // Build an en
     const { signatures: endorsements1 } =
-      await newTransitionEIP712(privacyGroup, accountHashes, stateSet1, stateSet2, endorsers)
+      await newTransitionEIP712(privacyGroup, stateSet1, [], stateSet2, endorsers)
     const tx1ID = randBytes32();
 
-    await expect(privacyGroup.transition(tx1ID, accountHashes, stateSet1, stateSet2, endorsements1)).to.
-      revertedWithCustomError(privacyGroup, "PenteAccountStateMismatch").withArgs(stateSet1[0], zeroBytes32());
+    await expect(privacyGroup.transition(tx1ID, stateSet1, [], stateSet2, endorsements1)).to.
+      revertedWithCustomError(privacyGroup, "PenteInputNotAvailable").withArgs(stateSet1[0]);
+
+  });
+
+  it("invalid read state", async function () {
+
+    const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
+
+    const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
+    const stateSet2           = [randBytes32(),randBytes32(),randBytes32()];
+
+    const { signatures: endorsements1 } =
+      await newTransitionEIP712(privacyGroup, [], stateSet1, stateSet2, endorsers)
+    const tx1ID = randBytes32();
+
+    await expect(privacyGroup.transition(tx1ID, [], stateSet1, stateSet2, endorsements1)).to.
+      revertedWithCustomError(privacyGroup, "PenteReadNotAvailable").withArgs(stateSet1[0]);
+
+  });
+
+  it("invalid double output", async function () {
+
+    const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
+
+    const stateSet1           = [randBytes32(),randBytes32(),randBytes32()];
+    const stateSet2           = [randBytes32(),randBytes32(),randBytes32(), stateSet1[0]];
+    const inputs2             = [stateSet1[1], stateSet1[2]];
+
+    const { signatures: endorsements1 } =
+      await newTransitionEIP712(privacyGroup, [], [], stateSet1, endorsers)
+    const tx1ID = randBytes32();
+
+    await expect(privacyGroup.transition(tx1ID, [], [], stateSet1, endorsements1)).to.be.ok;
+
+    const { signatures: endorsements2 } =
+      await newTransitionEIP712(privacyGroup, inputs2, [], stateSet2, endorsers)
+    const tx2ID = randBytes32();
+
+    await expect(privacyGroup.transition(tx2ID, inputs2, [], stateSet2, endorsements2)).to.
+      revertedWithCustomError(privacyGroup, "PenteOutputAlreadyUnspent").withArgs(stateSet1[0]);
 
   });
 
