@@ -22,12 +22,6 @@ import (
 
 var NotoABI = abi.ABI{
 	{
-		Type: abi.Constructor,
-		Inputs: abi.ParameterArray{
-			{Name: "notary", Type: "string"},
-		},
-	},
-	{
 		Name: "mint",
 		Type: abi.Function,
 		Inputs: abi.ParameterArray{

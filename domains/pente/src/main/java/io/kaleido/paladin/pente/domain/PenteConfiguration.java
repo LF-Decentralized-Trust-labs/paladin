@@ -103,14 +103,6 @@ public class PenteConfiguration {
     public static String ENDORSEMENT_TYPE__GROUP_SCOPED_IDENTITIES =
             "group_scoped_identities";
 
-    JsonABI.Entry abiEntry_privateConstructor() {
-        return JsonABI.newConstructor(JsonABI.newParameters(
-                abiTuple_group(),
-                JsonABI.newParameter("evmVersion", "string"),
-                JsonABI.newParameter("endorsementType", "string")
-        ));
-    }
-
     public static final String FUNCTION_NAME_INVOKE = "invoke";
 
     public static final String FUNCTION_NAME_DEPLOY = "deploy";

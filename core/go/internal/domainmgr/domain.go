@@ -56,7 +56,6 @@ type domain struct {
 	config                 *prototk.DomainConfig
 	schemasBySignature     map[string]statestore.Schema
 	schemasByID            map[string]statestore.Schema
-	constructorABI         *abi.Entry
 	factoryContractAddress *tktypes.EthAddress
 
 	initError atomic.Pointer[error]
@@ -97,14 +96,7 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		}
 	}
 
-	err := json.Unmarshal(([]byte)(d.config.ConstructorAbiJson), &d.constructorABI)
-	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainConstructorAbiJsonInvalid)
-	}
-	if d.constructorABI.Type != abi.Constructor {
-		return nil, i18n.NewError(d.ctx, msgs.MsgDomainConstructorABITypeWrong, d.constructorABI.Type)
-	}
-
+	var err error
 	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
 	if err != nil {
 		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
@@ -325,25 +317,10 @@ func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractD
 	}
 
 	// Build the init request
-	var abiJSON []byte
-	var paramsJSON []byte
-	constructorValues, err := d.constructorABI.Inputs.ParseJSONCtx(ctx, tx.Inputs)
-	if err == nil {
-		abiJSON, err = json.Marshal(d.constructorABI)
-	}
-	if err == nil {
-		// Serialize to standardized JSON before passing to domain
-		paramsJSON, err = tktypes.StandardABISerializer().SerializeJSONCtx(ctx, constructorValues)
-	}
-	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgDomainInvalidConstructorParams, d.constructorABI.SolString())
-	}
-
 	txSpec := &prototk.DeployTransactionSpecification{}
 	tx.TransactionSpecification = txSpec
 	txSpec.TransactionId = tktypes.Bytes32UUIDFirst16(tx.ID).String()
-	txSpec.ConstructorAbi = string(abiJSON)
-	txSpec.ConstructorParamsJson = string(paramsJSON)
+	txSpec.ConstructorParamsJson = tx.Inputs.String()
 
 	// Do the request with the domain
 	res, err := d.api.InitDeploy(ctx, &prototk.InitDeployRequest{

@@ -82,10 +82,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	z.factoryABI = factory.ABI
 	z.contractABI = contract.ABI
 
-	constructorJSON, err := json.Marshal(types.ZetoABI.Constructor())
-	if err != nil {
-		return nil, err
-	}
 	schemaJSON, err := json.Marshal(types.ZetoCoinABI)
 	if err != nil {
 		return nil, err
@@ -94,7 +90,6 @@ func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
 			FactoryContractAddress: config.FactoryAddress,
-			ConstructorAbiJson:     string(constructorJSON),
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
 				SubmitMode: pb.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
