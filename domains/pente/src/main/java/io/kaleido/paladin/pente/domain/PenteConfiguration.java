@@ -51,7 +51,7 @@ public class PenteConfiguration {
 
     private long chainId;
 
-    private Address address;
+    private Address registryAddress;
 
     private String schemaId_AccountState_v24_9_0;
 
@@ -222,23 +222,13 @@ public class PenteConfiguration {
         return privacyGroupABI;
     }
 
-    synchronized Address getAddress() {
-        return address;
-    }
-
     synchronized long getChainId() {
         return chainId;
     }
 
     synchronized void initFromConfig(ToDomain.ConfigureDomainRequest configReq) {
-        try {
-            var mapper = new ObjectMapper();
-            var config = mapper.readValue(new StringReader(configReq.getConfigJson()), PenteYAMLConfig.class);
-            this.address = new Address(config.address());
-            this.chainId = configReq.getChainId();
-        } catch(IOException e) {
-            throw new IllegalArgumentException(e);
-        }
+        this.chainId = configReq.getChainId();
+        this.registryAddress = new Address(configReq.getRegistryContractAddress());
     }
 
     List<String> allPenteSchemas() {
