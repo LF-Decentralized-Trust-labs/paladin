@@ -146,7 +146,7 @@ func newMockBlockIndexer(t *testing.T, config *Config) (context.Context, *blockI
 
 }
 
-func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
+func testBlockArray(t *testing.T, l int, knownAddress ...*ethtypes.Address0xHex) ([]*BlockInfoJSONRPC, map[string][]*TXReceiptJSONRPC) {
 	blocks := make([]*BlockInfoJSONRPC, l)
 	receipts := make(map[string][]*TXReceiptJSONRPC, l)
 	for i := 0; i < l; i++ {
@@ -154,7 +154,11 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 		if i == 0 {
 			contractAddress = ethtypes.MustNewAddress(tktypes.RandHex(20))
 		} else {
-			to = ethtypes.MustNewAddress(tktypes.RandHex(20))
+			if knownAddress != nil {
+				to = knownAddress[0]
+			} else {
+				to = ethtypes.MustNewAddress(tktypes.RandHex(20))
+			}
 		}
 		txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
 		blocks[i] = &BlockInfoJSONRPC{
@@ -189,8 +193,9 @@ func testBlockArray(t *testing.T, l int) ([]*BlockInfoJSONRPC, map[string][]*TXR
 				BlockHash:       blocks[i].Hash,
 				Status:          ethtypes.NewHexInteger64(1),
 				Logs: []*LogJSONRPC{
-					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}},
-					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}, Data: eventBData},
+					{Address: to, BlockNumber: blocks[i].Number, LogIndex: 0, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicA, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}},
+					{Address: to, BlockNumber: blocks[i].Number, LogIndex: 1, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicB, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}, Data: eventBData},
+					// the last event is set to a different address, to test the filtering in matchLog()
 					{Address: ethtypes.MustNewAddress(tktypes.RandHex(20)), BlockNumber: blocks[i].Number, LogIndex: 2, TransactionHash: txHash, Topics: []ethtypes.HexBytes0xPrefix{topicC, ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))}, Data: eventCData},
 				},
 			},

@@ -24,63 +24,44 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-//go:embed abis/Commonlib.json
-var commonLibJSON []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_Anon.json
-var Groth16Verifier_Anon []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_CheckHashesValue.json
-var Groth16Verifier_CheckHashesValue []byte // From "gradle copySolidity"
-
-//go:embed abis/Groth16Verifier_CheckInputsOutputsValue.json
-var Groth16Verifier_CheckInputsOutputsValue []byte // From "gradle copySolidity"
-
-//go:embed abis/ZetoSampleFactory.json
-var zetoFactoryJSON []byte // From "gradle copySolidity"
-
-//go:embed abis/ZetoSample.json
-var zetoJSON []byte // From "gradle copySolidity"
+//go:embed abis/ZetoFactory.json
+var factoryJSONBytes []byte // From "gradle copySolidity"
 
 type Zeto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config      *types.Config
-	chainID     int64
-	domainID    string
-	coinSchema  *pb.StateSchema
-	factoryABI  abi.ABI
-	contractABI abi.ABI
+	config     *types.DomainFactoryConfig
+	chainID    int64
+	domainID   string
+	coinSchema *pb.StateSchema
+	factoryABI abi.ABI
 }
 
-type ZetoDeployParams struct {
-	TransactionID    string                    `json:"transactionId"`
-	Data             ethtypes.HexBytes0xPrefix `json:"data"`
-	Verifier         string                    `json:"_verifier"`
-	DepositVerifier  string                    `json:"_depositVerifier"`
-	WithdrawVerifier string                    `json:"_withdrawVerifier"`
+func New(callbacks plugintk.DomainCallbacks) *Zeto {
+	return &Zeto{
+		Callbacks: callbacks,
+	}
 }
 
 func (z *Zeto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
-	var config types.Config
+	var config types.DomainFactoryConfig
 	err := json.Unmarshal([]byte(req.ConfigJson), &config)
 	if err != nil {
 		return nil, err
 	}
 
-	factory := domain.LoadBuildLinked(zetoFactoryJSON, config.Libraries)
-	contract := domain.LoadBuildLinked(zetoJSON, config.Libraries)
-
 	z.config = &config
 	z.chainID = req.ChainId
+
+	factory := domain.LoadBuildLinked(factoryJSONBytes, config.Libraries)
 	z.factoryABI = factory.ABI
-	z.contractABI = contract.ABI
 
 	schemaJSON, err := json.Marshal(types.ZetoCoinABI)
 	if err != nil {
@@ -105,28 +86,47 @@ func (z *Zeto) InitDomain(ctx context.Context, req *pb.InitDomainRequest) (*pb.I
 }
 
 func (z *Zeto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.InitDeployResponse, error) {
-	_, err := z.validateDeploy(req.Transaction)
+	initParams, err := z.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.InitDeployResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
-			// TODO: should we resolve anything?
+			{
+				Lookup:    initParams.From,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
 		},
 	}, nil
 }
 
 func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
-	params, err := z.validateDeploy(req.Transaction)
+	initParams, err := z.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	deployParams := &ZetoDeployParams{
-		TransactionID:    req.Transaction.TransactionId,
-		Data:             ethtypes.HexBytes0xPrefix(""),
-		DepositVerifier:  params.DepositVerifier,
-		WithdrawVerifier: params.WithdrawVerifier,
-		Verifier:         params.Verifier,
+	circuitId, err := z.config.GetCircuitId(initParams.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	config := &types.DomainInstanceConfig{
+		CircuitId: circuitId,
+		TokenName: initParams.TokenName,
+	}
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	deployParams := &types.DeployParams{
+		TransactionID: req.Transaction.TransactionId,
+		Data:          ethtypes.HexBytes0xPrefix(encoded),
+		TokenName:     initParams.TokenName,
+		InitialOwner:  req.ResolvedVerifiers[0].Verifier, // TODO: allow the initial owner to be specified by the deploy request
 	}
 	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {
@@ -142,7 +142,7 @@ func (z *Zeto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) 
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
-		Signer: &params.From,
+		Signer: &initParams.From,
 	}, nil
 }
 
@@ -178,8 +178,8 @@ func (z *Zeto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactio
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainConfig, error) {
-	configValues, err := types.DomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
+func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainInstanceConfig, error) {
+	configValues, err := types.DomainInstanceConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -187,13 +187,13 @@ func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	if err != nil {
 		return nil, err
 	}
-	var config types.DomainConfig
+	var config types.DomainInstanceConfig
 	err = json.Unmarshal(configJSON, &config)
 	return &config, err
 }
 
-func (z *Zeto) validateDeploy(tx *pb.DeployTransactionSpecification) (*types.ConstructorParams, error) {
-	var params types.ConstructorParams
+func (z *Zeto) validateDeploy(tx *pb.DeployTransactionSpecification) (*types.InitializerParams, error) {
+	var params types.InitializerParams
 	err := json.Unmarshal([]byte(tx.ConstructorParamsJson), &params)
 	return &params, err
 }
@@ -247,6 +247,7 @@ func (z *Zeto) FindCoins(ctx context.Context, query string) ([]*types.ZetoCoin, 
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("states: %+v\n", states)
 
 	coins := make([]*types.ZetoCoin, len(states))
 	for i, state := range states {

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +41,17 @@ func TestEthAddress(t *testing.T) {
 
 	a = MustEthAddress("0xacA6D8Ba6BFf0fa5c8a06A58368CB6097285d5c5")
 	assert.Equal(t, "0xaca6d8ba6bff0fa5c8a06a58368cb6097285d5c5", (*a).String())
+
+	assert.True(t, (*EthAddress)(nil).Equals(nil))
+	assert.False(t, a.Equals(nil))
+	assert.False(t, (*EthAddress)(nil).Equals(a))
+	b := MustEthAddress("0xaca6d8ba6bff0fa5c8a06a58368cb6097285d5c5")
+	assert.True(t, a.Equals(b))
+	c := MustEthAddress("0x0000000000000000000000000000000000000000")
+	assert.True(t, c.IsZero())
+	assert.False(t, a.IsZero())
+	d := ethtypes.MustNewAddress("0xaca6d8ba6bff0fa5c8a06a58368cb6097285d5c5")
+	assert.True(t, a.Equals((*EthAddress)(d)))
 
 	var a1 *EthAddress
 	err = a1.Scan(nil)

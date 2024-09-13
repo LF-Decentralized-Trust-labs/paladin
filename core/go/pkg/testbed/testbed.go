@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/internal/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Testbed interface {
@@ -36,8 +37,9 @@ type Testbed interface {
 }
 
 type TestbedDomain struct {
-	Config map[string]any
-	Plugin plugintk.Plugin
+	Config         map[string]any
+	Plugin         plugintk.Plugin
+	FactoryAddress *tktypes.EthAddress
 }
 
 type testbed struct {
@@ -147,7 +149,8 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 				Type:    components.LibraryTypeCShared.Enum(),
 				Library: "loaded/via/unit/test/loader",
 			},
-			Config: domain.Config,
+			Config:         domain.Config,
+			FactoryAddress: domain.FactoryAddress,
 		}
 	}
 

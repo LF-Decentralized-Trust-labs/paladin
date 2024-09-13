@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zkp
+package snark
 
 import (
 	"context"
@@ -31,7 +31,6 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/signer/common"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -61,7 +60,7 @@ func TestRegister(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	err := Register(context.Background(), config, registry)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(registry))
 }
 
@@ -71,7 +70,7 @@ func TestNewProver(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, prover.circuitsCache)
 	assert.NotNil(t, prover.provingKeysCache)
 }
@@ -94,7 +93,7 @@ func TestSnarkProve(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -145,15 +144,15 @@ func TestSnarkProve(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	res, err := prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
-	require.NoError(t, err)
-	assert.Equal(t, 34, len(res.Payload))
+	assert.NoError(t, err)
+	assert.Equal(t, 36, len(res.Payload))
 }
 
 func TestSnarkProveError(t *testing.T) {
@@ -162,7 +161,7 @@ func TestSnarkProveError(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -176,7 +175,7 @@ func TestSnarkProveError(t *testing.T) {
 		OutputOwners:     []string{"bob", "alice"},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -192,7 +191,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -209,7 +208,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -225,7 +224,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	alice := NewKeypair()
 
@@ -234,7 +233,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		Common:    &pb.ProvingRequestCommon{},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -249,7 +248,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -265,7 +264,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -282,7 +281,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -300,7 +299,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -319,7 +318,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -334,7 +333,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return nil, nil, fmt.Errorf("bang!")
@@ -372,7 +371,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -388,7 +387,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -422,7 +421,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
@@ -438,7 +437,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 		ProvingKeysDir: "test",
 	}
 	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	testCircuitLoader := func(circuitID string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 		return &testWitnessCalculator{}, []byte("proving key"), nil
@@ -477,7 +476,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 		},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
@@ -498,11 +497,59 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 		},
 	}
 	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	_, err = prover.Sign(context.Background(), alice.PrivateKey[:], &pb.SignRequest{
 		KeyHandle: "key1",
 		Algorithm: algorithms.ZKP_BABYJUBJUB_PLAINBYTES,
 		Payload:   payload,
 	})
 	assert.ErrorContains(t, err, "failed to parse input salt")
+}
+
+func TestValidateInputs(t *testing.T) {
+	inputs1 := &pb.ProvingRequestCommon{
+		InputCommitments: []string{"input1", "input2"},
+		InputValues:      []uint64{30},
+		InputSalts:       []string{"salt1", "salt2"},
+	}
+	err := validateInputs(inputs1)
+	assert.ErrorContains(t, err, "input commitments, values, and salts must have the same length")
+
+	inputs2 := &pb.ProvingRequestCommon{
+		InputCommitments: []string{"input1", "input2"},
+		InputValues:      []uint64{30, 40},
+		InputSalts:       []string{"salt1"},
+	}
+	err = validateInputs(inputs2)
+	assert.ErrorContains(t, err, "input commitments, values, and salts must have the same length")
+
+	inputs3 := &pb.ProvingRequestCommon{
+		InputCommitments: []string{"input1", "input2"},
+		InputValues:      []uint64{30, 40},
+		InputSalts:       []string{"salt1", "salt2"},
+		OutputValues:     []uint64{32, 38},
+		OutputOwners:     []string{"bob"},
+	}
+	err = validateInputs(inputs3)
+	assert.ErrorContains(t, err, "output values and owner keys must have the same length")
+}
+
+func TestSerializeProofResponse(t *testing.T) {
+	snark := types.ZKProof{
+		Proof: &types.ProofData{
+			A: []string{"a"},
+			B: [][]string{
+				{"b1.1", "b1.2"},
+				{"b2.1", "b2.2"},
+			},
+			C: []string{"c"},
+		},
+		PubSignals: []string{"1", "2", "3", "4"},
+	}
+	publicInputs := map[string]string{
+		"encryptedValues": "1,2,3,4",
+	}
+	bytes, err := serializeProofResponse("anon_enc", &snark, publicInputs)
+	assert.NoError(t, err)
+	assert.Equal(t, 64, len(bytes))
 }

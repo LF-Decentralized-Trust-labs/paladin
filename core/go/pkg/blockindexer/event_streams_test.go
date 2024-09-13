@@ -125,6 +125,73 @@ func TestInternalEventStreamDeliveryAtHead(t *testing.T) {
 
 }
 
+func TestInternalEventStreamDeliveryAtHeadWithSourceAddress(t *testing.T) {
+
+	// This test uses a real DB, includes the full block indexer, but simulates the blockchain.
+	_, bi, mRPC, blDone := newTestBlockIndexer(t)
+	defer blDone()
+	bi.utBatchNotify = nil // we only care about the blocks
+
+	sourceContractAddress := tktypes.MustEthAddress(tktypes.RandHex(20))
+
+	// Mock up the block calls to the blockchain for 15 blocks
+	blocks, receipts := testBlockArray(t, 15, sourceContractAddress.Address0xHex())
+	mockBlocksRPCCalls(mRPC, blocks, receipts)
+	mockBlockListenerNil(mRPC)
+
+	eventCollector := make(chan *EventWithData)
+
+	// Do a full start now with an internal event listener
+	var esID string
+	calledPostCommit := false
+	err := bi.Start(&InternalEventStream{
+		Handler: func(ctx context.Context, tx *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error) {
+			if esID == "" {
+				esID = batch.StreamID.String()
+			} else {
+				assert.Equal(t, esID, batch.StreamID.String())
+			}
+			assert.Equal(t, "unit_test", batch.StreamName)
+			assert.Greater(t, len(batch.Events), 0)
+			assert.LessOrEqual(t, len(batch.Events), 3)
+			for _, e := range batch.Events {
+				select {
+				case eventCollector <- e:
+				case <-ctx.Done():
+				}
+			}
+			return func() { calledPostCommit = true }, nil
+		},
+		Definition: &EventStream{
+			Name: "unit_test",
+			Config: EventStreamConfig{
+				BatchSize:    confutil.P(3),
+				BatchTimeout: confutil.P("5ms"),
+			},
+			// Listen to two out of three event types
+			ABI: abi.ABI{
+				testABI[1],
+				testABI[2],
+			},
+			Source: sourceContractAddress,
+		},
+	})
+	require.NoError(t, err)
+
+	// Expect to get 15 events. 1 TX x 3 Events per block, but we only have
+	// one event matching the expected source address
+	for i := 0; i < len(blocks); i++ {
+		e := <-eventCollector
+		blockNumber := i
+		assert.JSONEq(t, fmt.Sprintf(`{
+			"intParam1": "%d",
+			"strParam2": "event_b_in_block_%d"
+		}`, 1000000+blockNumber, blockNumber), string(e.Data))
+	}
+	assert.True(t, calledPostCommit)
+
+}
+
 func TestInternalEventStreamDeliveryCatchUp(t *testing.T) {
 
 	// This test uses a real DB, includes the full block indexer, but simulates the blockchain.
