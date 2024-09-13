@@ -42,7 +42,7 @@ type endorsementGatherer struct {
 	keyMgr ethclient.KeyManager
 }
 
-func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error) {
+func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error) {
 	keyHandle, verifier, err := e.keyMgr.ResolveKey(ctx, partyName, endorsementRequest.Algorithm)
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to resolve key for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, endorsementRequest.Algorithm, err)
@@ -50,18 +50,20 @@ func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transaction
 		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgEngineInternalError, errorMessage)
 	}
 	// Invoke the domain
-	endorseRes, err := e.psc.EndorseTransaction(ctx,
-		transactionSpecification,
-		verifiers,
-		signatures,
-		inputStates,
-		outputStates,
-		endorsementRequest,
-		&prototk.ResolvedVerifier{
+	endorseRes, err := e.psc.EndorseTransaction(ctx, &components.PrivateTransactionEndorseRequest{
+		TransactionSpecification: transactionSpecification,
+		Verifiers:                verifiers,
+		Signatures:               signatures,
+		InputStates:              inputStates,
+		ReadStates:               readStates,
+		OutputStates:             outputStates,
+		Endorsement:              endorsementRequest,
+		Endorser: &prototk.ResolvedVerifier{
 			Lookup:    partyName,
 			Algorithm: endorsementRequest.Algorithm,
 			Verifier:  verifier,
-		})
+		},
+	})
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, endorsementRequest.Algorithm, err)
 		log.L(ctx).Error(errorMessage)

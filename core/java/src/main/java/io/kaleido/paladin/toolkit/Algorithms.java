@@ -13,14 +13,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.domain;
+package io.kaleido.paladin.toolkit;
 
-import io.kaleido.paladin.toolkit.DomainBase;
-import io.kaleido.paladin.toolkit.DomainInstance;
-
-public class PenteDomainFactory extends DomainBase {
-    @Override
-    protected DomainInstance newDomainInstance(String grpcTarget, String instanceId) {
-        return new PenteDomain(grpcTarget, instanceId);
-    }
+public class Algorithms {
+    public static final String ECDSA_SECP256K1_PLAINBYTES = "ecdsa_secp256k1_plainbytes";
 }

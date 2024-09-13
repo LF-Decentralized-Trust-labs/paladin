@@ -252,6 +252,7 @@ func (as *GatherEndorsementsStage) PerformAction(ctx context.Context, tsg transa
 							tx.PreAssembly.Verifiers,
 							tx.PostAssembly.Signatures,
 							toEndorsableList(tx.PostAssembly.InputStates),
+							toEndorsableList(tx.PostAssembly.ReadStates),
 							toEndorsableList(tx.PostAssembly.OutputStates), party, attRequest)
 						if err != nil {
 							log.L(ctx).Errorf("Failed to gather endorsement for party %s: %s", party, err)

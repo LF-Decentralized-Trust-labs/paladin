@@ -26,6 +26,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 /** Serialization and de-serialization for ABIs */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -91,6 +92,11 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
                 }
                 public String toJSON(boolean pretty) {
                         return JsonABI.toJSONString(this, pretty);
+                }
+
+                public JsonABI.Parameters componentsOrEmpty() {
+                       if (components == null) return new JsonABI.Parameters();
+                       return components;
                 }
         }
 

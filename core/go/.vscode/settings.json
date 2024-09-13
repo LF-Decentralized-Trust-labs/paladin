@@ -1,3 +1,4 @@
 {
-    "window.title": "${activeEditorShort}${separator}Paladin Core (${rootName})${separator}${profileName}"
+    "window.title": "${activeEditorShort}${separator}Paladin Core (${rootName})${separator}${profileName}",
+    "go.testTimeout": "30s"
 }

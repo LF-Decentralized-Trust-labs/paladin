@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmstate;
+package io.kaleido.paladin.pente.evmstate;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 
 public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstate.WorldState {
 
-    private final Logger logger = LoggerFactory.getLogger(io.kaleido.pente.evmstate.DynamicLoadWorldState.class);
+    private final Logger logger = LoggerFactory.getLogger(DynamicLoadWorldState.class);
 
     private final AccountLoader accountLoader;
 
@@ -46,6 +46,12 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
     final Map<Address, PersistedAccount> accounts = new HashMap<>();
 
     private final Set<Address> queriedAccounts = new HashSet<>();
+
+    public enum LastOpType {
+        UPDATED, DELETED
+    }
+
+    private final Map<Address, LastOpType> committedAccountUpdates = new HashMap<>();
 
     @Override
     public Hash rootHash() {
@@ -86,6 +92,10 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
 
     public Collection<Address> getQueriedAccounts() {
         return Collections.unmodifiableSet(queriedAccounts);
+    }
+
+    public Map<Address, LastOpType> getCommittedAccountUpdates() {
+        return Collections.unmodifiableMap(committedAccountUpdates);
     }
 
     private void setAccount(PersistedAccount account) {
@@ -140,10 +150,12 @@ public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstat
                 // TODO: Consider persisting the change list
                 baseAccount.applyChanges(account);
                 DynamicLoadWorldState.this.setAccount(baseAccount);
+                committedAccountUpdates.put(account.getAddress(), LastOpType.UPDATED);
             }
             for (Address account : getDeletedAccounts()) {
                 logger.debug("deleted account: {}", account);
                 DynamicLoadWorldState.this.deleteAccount(account);
+                committedAccountUpdates.put(account, LastOpType.DELETED);
             }
         }
     }

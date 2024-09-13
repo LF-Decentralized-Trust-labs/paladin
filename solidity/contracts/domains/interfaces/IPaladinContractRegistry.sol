@@ -6,11 +6,10 @@ pragma solidity ^0.8.20;
 // The IPaladinContract_V0 events can be indexed from the whole ledger
 // because the contract address is parsed from the protocol-generated data
 // which can be trusted to be correct.
-interface IPaladinContractFactory_V0 {
-    event PaladinNewSmartContractByFactory_V0(
+interface IPaladinContractRegistry_V0 {
+    event PaladinRegisterSmartContract_V0(
         bytes32 indexed txId,
         address indexed instance,
-        address indexed domain,
         bytes data
     );
 }

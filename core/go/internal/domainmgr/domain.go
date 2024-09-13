@@ -24,11 +24,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/eip712"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -39,19 +44,19 @@ type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf *DomainConfig
-	dm   *domainManager
-	id   uuid.UUID
-	name string
-	api  components.DomainManagerToDomain
+	conf            *DomainConfig
+	dm              *domainManager
+	id              uuid.UUID
+	name            string
+	api             components.DomainManagerToDomain
+	registryAddress *tktypes.EthAddress
 
-	stateLock              sync.Mutex
-	initialized            atomic.Bool
-	initRetry              *retry.Retry
-	config                 *prototk.DomainConfig
-	schemasBySignature     map[string]statestore.Schema
-	schemasByID            map[string]statestore.Schema
-	factoryContractAddress *tktypes.EthAddress
+	stateLock          sync.Mutex
+	initialized        atomic.Bool
+	initRetry          *retry.Retry
+	config             *prototk.DomainConfig
+	schemasBySignature map[string]statestore.Schema
+	schemasByID        map[string]statestore.Schema
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -59,13 +64,14 @@ type domain struct {
 
 func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:        dm,
-		conf:      conf,
-		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:      name,
-		id:        id,
-		api:       toDomain,
-		initDone:  make(chan struct{}),
+		dm:              dm,
+		conf:            conf,
+		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:            name,
+		id:              id,
+		api:             toDomain,
+		initDone:        make(chan struct{}),
+		registryAddress: tktypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
 
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
@@ -91,16 +97,10 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		}
 	}
 
-	var err error
-	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
-	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
-	}
-
 	// Ensure all the schemas are recorded to the DB
 	// This is a special case where we need a synchronous flush to ensure they're all established
 	var schemas []statestore.Schema
-	err = d.dm.stateStore.RunInDomainContextFlush(d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+	err := d.dm.stateStore.RunInDomainContextFlush(d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
 		schemas, err = dsi.EnsureABISchemas(abiSchemas)
 		return err
 	})
@@ -134,9 +134,10 @@ func (d *domain) init() {
 
 		// Send the configuration to the domain for processing
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
-			Name:       d.name,
-			ChainId:    d.dm.ethClientFactory.ChainID(),
-			ConfigJson: tktypes.JSONString(d.conf.Config).String(),
+			Name:                    d.name,
+			RegistryContractAddress: d.RegistryAddress().String(),
+			ChainId:                 d.dm.ethClientFactory.ChainID(),
+			ConfigJson:              tktypes.JSONString(d.conf.Config).String(),
 		})
 		if err != nil {
 			return true, err
@@ -179,8 +180,8 @@ func (d *domain) Name() string {
 	return d.name
 }
 
-func (d *domain) Address() *tktypes.EthAddress {
-	return d.factoryContractAddress
+func (d *domain) RegistryAddress() *tktypes.EthAddress {
+	return d.registryAddress
 }
 
 func (d *domain) Configuration() *prototk.DomainConfig {
@@ -228,6 +229,82 @@ func (d *domain) FindAvailableStates(ctx context.Context, req *prototk.FindAvail
 		States: pbStates,
 	}, nil
 
+}
+
+func (d *domain) EncodeData(ctx context.Context, encRequest *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	var abiData []byte
+	switch encRequest.EncodingType {
+	case prototk.EncodeDataRequest_FUNCTION_CALL_DATA:
+		var entry *abi.Entry
+		err := json.Unmarshal([]byte(encRequest.Definition), &entry)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		abiData, err = entry.EncodeCallDataJSONCtx(ctx, []byte(encRequest.Body))
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+		}
+	case prototk.EncodeDataRequest_TUPLE:
+		var param *abi.Parameter
+		err := json.Unmarshal([]byte(encRequest.Definition), &param)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		abiData, err = param.Components.EncodeABIDataJSONCtx(ctx, []byte(encRequest.Body))
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEncodingFail)
+		}
+	case prototk.EncodeDataRequest_ETH_TRANSACTION:
+		var tx *ethsigner.Transaction
+		err := json.Unmarshal([]byte(encRequest.Body), &tx)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingRequestEntryInvalid)
+		}
+		// We only support EIP-155 and EIP-1559 as they include the ChainID in the payload
+		switch encRequest.Definition {
+		case "", "eip1559", "eip-1559": // default
+			abiData = tx.SignaturePayloadEIP1559(d.dm.ethClientFactory.ChainID()).Bytes()
+		case "eip155", "eip-155":
+			abiData = tx.SignaturePayloadLegacyEIP155(d.dm.ethClientFactory.ChainID()).Bytes()
+		default:
+			return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.Definition)
+		}
+	case prototk.EncodeDataRequest_TYPED_DATA_V4:
+		var tdv4 *eip712.TypedData
+		err := json.Unmarshal([]byte(encRequest.Body), &tdv4)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataInvalid)
+		}
+		abiData, err = eip712.EncodeTypedDataV4(ctx, tdv4)
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIEncodingTypedDataFail)
+		}
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgDomainABIEncodingRequestInvalidType, encRequest.EncodingType)
+	}
+	return &prototk.EncodeDataResponse{
+		Data: abiData,
+	}, nil
+}
+
+func (d *domain) RecoverSigner(ctx context.Context, recoverRequest *prototk.RecoverSignerRequest) (_ *prototk.RecoverSignerResponse, err error) {
+	switch recoverRequest.Algorithm {
+	// If we add more signer algorithms to this utility in the future, we should make it an interface on the signer.
+	case algorithms.ECDSA_SECP256K1_PLAINBYTES:
+		var addr *ethtypes.Address0xHex
+		signature, err := secp256k1.DecodeCompactRSV(ctx, recoverRequest.Signature)
+		if err == nil {
+			addr, err = signature.RecoverDirect(recoverRequest.Payload, d.dm.ethClientFactory.ChainID())
+		}
+		if err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgDomainABIRecoverRequestSignature)
+		}
+		return &prototk.RecoverSignerResponse{
+			Verifier: addr.String(),
+		}, nil
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgDomainABIRecoverRequestAlgorithm, recoverRequest.Algorithm)
+	}
 }
 
 func (d *domain) InitDeploy(ctx context.Context, tx *components.PrivateContractDeploy) error {
@@ -292,7 +369,7 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
 			FunctionABI: &functionABI,
-			To:          *d.Address(),
+			To:          *d.RegistryAddress(),
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {

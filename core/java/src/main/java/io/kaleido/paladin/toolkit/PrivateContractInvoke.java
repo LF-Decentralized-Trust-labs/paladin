@@ -13,16 +13,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmstate;
+package io.kaleido.paladin.toolkit;
 
-import org.hyperledger.besu.datatypes.Address;
-import org.hyperledger.besu.evm.account.Account;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.io.IOException;
-import java.util.Optional;
-
-public interface AccountLoader {
-
-    public Optional<PersistedAccount> load(Address address) throws IOException;
-
-}
+public record PrivateContractInvoke(
+    @JsonProperty
+    String from,
+    @JsonProperty
+    JsonHex.Address to,
+    @JsonProperty
+    JsonABI.Entry function,
+    @JsonProperty
+    Object inputs
+) {}

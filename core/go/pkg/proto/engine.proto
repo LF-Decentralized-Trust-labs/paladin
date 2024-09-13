@@ -60,7 +60,8 @@ message EndorsementRequest {
     repeated google.protobuf.Any verifiers = 6;
     repeated google.protobuf.Any signatures = 7;
     repeated google.protobuf.Any inputStates = 8;
-    repeated google.protobuf.Any outputStates = 9;
+    repeated google.protobuf.Any readStates = 9;
+    repeated google.protobuf.Any outputStates = 10;
 
 }
 

@@ -13,15 +13,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente;
+package io.kaleido.paladin.pente;
 
-import io.kaleido.pente.evmrunner.EVMRunner;
-import io.kaleido.pente.evmrunner.EVMVersion;
-import io.kaleido.pente.evmstate.PersistedAccount;
+import io.kaleido.paladin.pente.evmrunner.EVMRunner;
+import io.kaleido.paladin.pente.evmrunner.EVMVersion;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Type;
@@ -32,70 +32,64 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
 
-import static io.kaleido.pente.TestUtils.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class SimpleStorageWrappedStoreRetreiveTest {
+public class SimpleStorageGetSetTest {
 
     @Test
     void runAnEVM() throws IOException {
 
         // Generate a shiny new EVM
         EVMVersion evmVersion = EVMVersion.Shanghai(new Random().nextLong(), EvmConfiguration.DEFAULT);
-        EVMRunner evmRunnerFresh = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
+        EVMRunner evmRunner = new EVMRunner(evmVersion, address -> Optional.empty(), 0);
 
         // Load some bytecode for our first contract deploy
-        String resourcePath = "contracts/testcontracts/SimpleStorageWrapped.sol/SimpleStorageWrapped.json";
+        String resourcePath = "contracts/testcontracts/SimpleStorage.sol/SimpleStorage.json";
         String hexByteCode;
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
             assertNotNull(is);
             JsonNode node = new ObjectMapper().readTree(is);
             hexByteCode = node.get("bytecode").asText();
         }
         final Address smartContractAddress = EVMRunner.randomAddress();
         final Address sender = EVMRunner.randomAddress();
-        MessageFrame deployFrame = evmRunnerFresh.runContractDeployment(
+        MessageFrame deployFrame = evmRunner.runContractDeployment(
                 sender,
                 smartContractAddress,
                 Bytes.fromHexString(hexByteCode),
                 new Uint256(12345)
         );
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, deployFrame.getState());
-        MessageFrame setFrame = evmRunnerFresh.runContractInvoke(
+        MessageFrame setFrame = evmRunner.runContractInvoke(
                 sender,
                 smartContractAddress,
                 "set",
                 new Uint256(23456)
         );
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, setFrame.getState());
-
-        // Persist the world we've just built into bytes
-        final Map<Address, byte[]> accountBytes = new HashMap<>();
-        evmRunnerFresh.getWorld().getQueriedAccounts().forEach(address -> {
-            accountBytes.put(address, evmRunnerFresh.getWorld().get(address).serialize());
-        });
-
-        // Create a new world that dynamically loads those bytes
-        EVMRunner evmRunnerWithLoad = new EVMRunner(evmVersion, address ->
-            accountBytes.containsKey(address) ? Optional.of(PersistedAccount.deserialize(accountBytes.get(address))) : Optional.empty()
-        , 0);
-
-        // Run the get against that world
-        MessageFrame getFrame = evmRunnerWithLoad.runContractInvoke(
+        MessageFrame getFrame = evmRunner.runContractInvoke(
                 sender,
                 smartContractAddress,
                 "get"
         );
         assertEquals(MessageFrame.State.COMPLETED_SUCCESS, getFrame.getState());
-        List<Type<?>> returns = evmRunnerWithLoad.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
+        List<Type<?>> returns = evmRunner.decodeReturn(getFrame, List.of(new TypeReference<Uint256>() {}));
         assertEquals(23456, ((Uint256)(returns.getFirst())).getValue().intValue());
 
-        // We should see query against all three accounts that were in the storage
-        assertEquals(
-                sortedAddressList(evmRunnerWithLoad.getWorld().getQueriedAccounts()),
-                sortedAddressList(accountBytes.keySet())
+        // Should only have the two accounts involved
+        Assertions.assertEquals(
+                TestUtils.sortedAddressList(List.of(sender, smartContractAddress)),
+                TestUtils.sortedAddressList(evmRunner.getWorld().getQueriedAccounts())
         );
+
+        // The nonce of the first contract should still be zero (contrast from the SimpleStorageWrapped test)
+        assertEquals(0L, evmRunner.getWorld().get(smartContractAddress).getNonce());
+
     }
+
 }

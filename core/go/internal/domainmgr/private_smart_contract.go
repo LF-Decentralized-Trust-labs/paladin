@@ -32,10 +32,10 @@ import (
 )
 
 type PrivateSmartContract struct {
-	DeployTX      uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	DomainAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
-	Address       tktypes.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes   tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+	DeployTX        uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	RegistryAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
+	Address         tktypes.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes     tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
 }
 
 type domainContract struct {
@@ -266,17 +266,18 @@ func (dc *domainContract) LockStates(ctx context.Context, tx *components.Private
 }
 
 // Endorse is a little special, because it returns a payload rather than updating the transaction.
-func (dc *domainContract) EndorseTransaction(
-	ctx context.Context,
-	transactionSpecification *prototk.TransactionSpecification,
-	verifiers []*prototk.ResolvedVerifier,
-	signatures []*prototk.AttestationResult,
-	inputStates []*prototk.EndorsableState,
-	outputStates []*prototk.EndorsableState,
-	endorsement *prototk.AttestationRequest,
-	endorser *prototk.ResolvedVerifier) (*components.EndorsementResult, error) {
-	if transactionSpecification == nil {
-		return nil, i18n.NewError(ctx, msgs.MsgDomainTXIncompleteEndorseTransaction)
+func (dc *domainContract) EndorseTransaction(ctx context.Context, req *components.PrivateTransactionEndorseRequest) (*components.EndorsementResult, error) {
+
+	if req == nil ||
+		req.TransactionSpecification == nil ||
+		req.Verifiers == nil ||
+		req.Signatures == nil ||
+		req.InputStates == nil ||
+		req.ReadStates == nil ||
+		req.OutputStates == nil ||
+		req.Endorsement == nil ||
+		req.Endorser == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgDomainReqIncompleteEndorseTransaction)
 	}
 
 	// This function does NOT FLUSH before or after doing endorse. The assumption is that this
@@ -289,13 +290,14 @@ func (dc *domainContract) EndorseTransaction(
 
 	// Run the endorsement
 	res, err := dc.api.EndorseTransaction(ctx, &prototk.EndorseTransactionRequest{
-		Transaction:         transactionSpecification,
-		ResolvedVerifiers:   verifiers,
-		Inputs:              inputStates,
-		Outputs:             outputStates,
-		Signatures:          signatures,
-		EndorsementRequest:  endorsement,
-		EndorsementVerifier: endorser,
+		Transaction:         req.TransactionSpecification,
+		ResolvedVerifiers:   req.Verifiers,
+		Inputs:              req.InputStates,
+		Reads:               req.ReadStates,
+		Outputs:             req.OutputStates,
+		Signatures:          req.Signatures,
+		EndorsementRequest:  req.Endorsement,
+		EndorsementVerifier: req.Endorser,
 	})
 	// We don't do any processing - as the result is not directly processable by us.
 	// It is an instruction to the engine - such as an authority to sign an endorsement,
@@ -304,7 +306,7 @@ func (dc *domainContract) EndorseTransaction(
 		return nil, err
 	}
 	return &components.EndorsementResult{
-		Endorser:     endorser,
+		Endorser:     req.Endorser,
 		Result:       res.EndorsementResult,
 		Payload:      res.Payload,
 		RevertReason: res.RevertReason,
@@ -359,6 +361,7 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 	res, err := dc.api.PrepareTransaction(ctx, &prototk.PrepareTransactionRequest{
 		Transaction:       preAssembly.TransactionSpecification,
 		InputStates:       dc.toEndorsableList(postAssembly.InputStates),
+		ReadStates:        dc.toEndorsableList(postAssembly.ReadStates),
 		OutputStates:      dc.toEndorsableList(postAssembly.OutputStates),
 		AttestationResult: dc.allAttestations(tx),
 	})

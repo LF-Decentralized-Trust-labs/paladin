@@ -21,7 +21,8 @@ package github.com.kaleido_io.paladin.toolkit;
 message ConfigureDomainRequest {
   string name = 1; // The name
   string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for domain)
-  int64 chain_id = 3; // The chain_id of the underlying base ledger on which all smart contracts are deployed
+  string registry_contract_address = 3;  // The address of the registry smart contract
+  int64 chain_id = 4; // The chain_id of the underlying base ledger on which all smart contracts are deployed
 }
 
 message ConfigureDomainResponse {
@@ -92,8 +93,9 @@ message EndorseTransactionRequest {
   TransactionSpecification transaction = 3; // The transaction specified by the user
   repeated ResolvedVerifier resolved_verifiers = 4; // The list of resovled verifiers
   repeated EndorsableState inputs = 5; // Input states for the transaction
-  repeated EndorsableState outputs = 6; // Output states for the transaction
-  repeated AttestationResult signatures = 7; // All SIGN attestation results (required from submitting node before endorsement)
+  repeated EndorsableState reads = 6; // States relied upon by the transaction, that are not actually consumed
+  repeated EndorsableState outputs = 7; // Output states for the transaction
+  repeated AttestationResult signatures = 8; // All SIGN attestation results (required from submitting node before endorsement)
 }
 
 message EndorseTransactionResponse {
@@ -111,8 +113,9 @@ message EndorseTransactionResponse {
 message PrepareTransactionRequest {
   TransactionSpecification transaction = 1; // The transaction specified by the user
   repeated EndorsableState input_states = 2; // The list of input states
-  repeated EndorsableState output_states = 3; // The list of output states
-  repeated AttestationResult attestation_result = 4; // The results of any proofs/attestations that came out of the endorsement phase
+  repeated EndorsableState read_states = 3; // The list of read states
+  repeated EndorsableState output_states = 4; // The list of output states
+  repeated AttestationResult attestation_result = 5; // The results of any proofs/attestations that came out of the endorsement phase
 }
 
 message PrepareTransactionResponse {
@@ -120,9 +123,8 @@ message PrepareTransactionResponse {
 }
 
 message DomainConfig {
-  string factory_contract_address = 1;  // The address of the factory smart contract to invoke when the user requests deployment of a new private smart contract in this domain
-  repeated string abi_state_schemas_json = 2; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
-  BaseLedgerSubmitConfig base_ledger_submit_config = 3; // Describe the requirements of this domain for how submission happens
+  repeated string abi_state_schemas_json = 1; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
+  BaseLedgerSubmitConfig base_ledger_submit_config = 2; // Describe the requirements of this domain for how submission happens
 }
 
 message BaseLedgerSubmitConfig {

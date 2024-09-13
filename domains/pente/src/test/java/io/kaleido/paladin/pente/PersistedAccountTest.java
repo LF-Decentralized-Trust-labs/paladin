@@ -13,10 +13,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente;
+package io.kaleido.paladin.pente;
 
-import io.kaleido.pente.evmrunner.EVMRunner;
-import io.kaleido.pente.evmstate.PersistedAccount;
+import io.kaleido.paladin.pente.evmrunner.EVMRunner;
+import io.kaleido.paladin.pente.evmstate.PersistedAccount;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.account.Account;
@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-import static io.kaleido.pente.TestUtils.randomUInt256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -42,7 +41,7 @@ public class PersistedAccountTest {
         updater.setNonce(12345L);
         updater.setCode(Bytes.fromHexString("0xFeeDBeeF"));
         for (int i = 0; i < 1000; i++) {
-            updater.setStorageValue(randomUInt256(), randomUInt256());
+            updater.setStorageValue(TestUtils.randomUInt256(), TestUtils.randomUInt256());
         }
         account.applyChanges(updater);
 
