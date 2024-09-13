@@ -43,7 +43,7 @@ type DomainManager interface {
 type Domain interface {
 	Initialized() bool
 	Name() string
-	Address() *tktypes.EthAddress
+	RegistryAddress() *tktypes.EthAddress
 	Configuration() *prototk.DomainConfig
 
 	InitDeploy(ctx context.Context, tx *PrivateContractDeploy) error

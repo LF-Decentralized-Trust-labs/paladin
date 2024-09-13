@@ -121,7 +121,9 @@ func TestDomainRequestsOK(t *testing.T) {
 			assert.Equal(t, int64(12345), cdr.ChainId)
 			return &prototk.ConfigureDomainResponse{
 				DomainConfig: &prototk.DomainConfig{
-					RegistryContractAddress: "address1",
+					BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+						SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
+					},
 				},
 			}, nil
 		},
@@ -220,7 +222,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		ChainId: int64(12345),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "address1", cdr.DomainConfig.RegistryContractAddress)
+	assert.Equal(t, prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION, cdr.DomainConfig.BaseLedgerSubmitConfig.SubmitMode)
 
 	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
 		DomainUuid: domainID,

@@ -188,7 +188,6 @@ func goodDomainConf() *prototk.DomainConfig {
 			SubmitMode:       prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
 			OneTimeUsePrefix: "one/time/keys/",
 		},
-		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -209,7 +208,7 @@ func TestDomainInitStates(t *testing.T) {
 
 	assert.Nil(t, tp.d.initError.Load())
 	assert.True(t, tp.initialized.Load())
-	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.RegistryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tp.d.RegistryAddress())
 	require.NoError(t, err)
 	assert.Equal(t, tp.d, byAddr)
 	assert.True(t, tp.d.Initialized())
@@ -233,7 +232,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 	assert.True(t, tp1.initialized.Load())
 
 	// Check we get the second from all the maps
-	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.RegistryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tp0.d.RegistryAddress())
 	require.NoError(t, err)
 	assert.Same(t, tp1.d, byAddr)
 	byName, err := dm.GetDomainByName(ctx, "test1")
@@ -247,8 +246,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
-		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
@@ -258,23 +256,9 @@ func TestDomainInitBadSchemas(t *testing.T) {
 	assert.False(t, tp.initialized.Load())
 }
 
-func TestDomainInitBadAddress(t *testing.T) {
-	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
-		RegistryContractAddress: `!wrong`,
-		AbiStateSchemasJson: []string{
-			fakeCoinStateSchema,
-		},
-	})
-	defer done()
-	assert.Regexp(t, "PD011606", *tp.d.initError.Load())
-	assert.False(t, tp.initialized.Load())
-}
-
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
-		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
+		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -527,7 +511,6 @@ func TestDomainPrepareDeployInvokeTX(t *testing.T) {
 	assert.Nil(t, tx.DeployTransaction)
 	assert.Equal(t, "newInstance", tx.InvokeTransaction.FunctionABI.Name)
 	assert.Equal(t, abi.Function, tx.InvokeTransaction.FunctionABI.Type)
-	assert.Equal(t, *domain.registryContractAddress, tx.InvokeTransaction.To)
 	assert.NotNil(t, tx.InvokeTransaction.Inputs)
 	assert.Equal(t, "one/time/keys/"+tx.ID.String(), tx.Signer)
 }
