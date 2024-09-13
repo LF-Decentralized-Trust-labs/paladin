@@ -119,7 +119,11 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	functionJSON, err := json.Marshal(h.zeto.contractABI.Functions()["mint"])
+	contractAbi, err := h.zeto.config.GetContractAbi(tx.DomainConfig.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	functionJSON, err := json.Marshal(contractAbi.Functions()["mint"])
 	if err != nil {
 		return nil, err
 	}

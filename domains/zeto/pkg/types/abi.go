@@ -39,11 +39,17 @@ var ZetoABI = abi.ABI{
 	},
 }
 
-type ConstructorParams struct {
-	From             string `json:"from"`
-	Verifier         string `json:"verifier"`
-	DepositVerifier  string `json:"depositVerifier"`
-	WithdrawVerifier string `json:"withdrawVerifier"`
+type InitializerParams struct {
+	From         string `json:"from"`
+	TokenName    string `json:"tokenName"`
+	InitialOwner string `json:"initialOwner"`
+}
+
+type DeployParams struct {
+	TransactionID string                    `json:"transactionId"`
+	Data          ethtypes.HexBytes0xPrefix `json:"data"`
+	TokenName     string                    `json:"tokenName"`
+	InitialOwner  string                    `json:"initialOwner"`
 }
 
 type MintParams struct {

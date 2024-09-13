@@ -56,6 +56,20 @@ func (a *EthAddress) Checksummed() string {
 	return (*ethtypes.AddressWithChecksum)(a).String()
 }
 
+func (a *EthAddress) Equals(b *EthAddress) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func (a *EthAddress) IsZero() bool {
+	return a == nil || a.String() == "0x0000000000000000000000000000000000000000"
+}
+
 func (a EthAddress) String() string {
 	return a.Address0xHex().String()
 }

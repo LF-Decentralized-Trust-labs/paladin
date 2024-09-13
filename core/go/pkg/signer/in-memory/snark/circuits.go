@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package zkp
+package snark
 
 import (
 	"fmt"
@@ -27,10 +27,10 @@ import (
 
 func loadCircuit(circuitName string, config api.SnarkProverConfig) (witness.Calculator, []byte, error) {
 	if config.CircuitsDir == "" {
-		return nil, []byte{}, fmt.Errorf("CIRCUITS_ROOT not set")
+		return nil, []byte{}, fmt.Errorf("circuits root must be set via the configuration file")
 	}
 	if config.ProvingKeysDir == "" {
-		return nil, []byte{}, fmt.Errorf("PROVING_KEYS_ROOT not set")
+		return nil, []byte{}, fmt.Errorf("proving keys root must be set via the configuration file")
 	}
 
 	// load the wasm file for the circuit

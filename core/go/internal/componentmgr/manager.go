@@ -292,9 +292,10 @@ func (cm *componentManager) buildInternalEventStreams() ([]*blockindexer.Interna
 			streamName := fmt.Sprintf("i_%s_%s", shortName, streamHash)
 			streams = append(streams, &blockindexer.InternalEventStream{
 				Definition: &blockindexer.EventStream{
-					Name: streamName,
-					Type: blockindexer.EventStreamTypeInternal.Enum(),
-					ABI:  initStream.ABI,
+					Name:   streamName,
+					Type:   blockindexer.EventStreamTypeInternal.Enum(),
+					ABI:    initStream.ABI,
+					Source: initStream.Source,
 				},
 				Handler: initStream.Handler,
 			})

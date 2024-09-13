@@ -823,14 +823,17 @@ func (bi *blockIndexer) queryTransactionEvents(ctx context.Context, abi abi.ABI,
 	for _, l := range receipt.Logs {
 		for _, e := range events {
 			if ethtypes.HexUint64(e.LogIndex) == l.LogIndex {
-				bi.matchLog(ctx, abi, l, e)
+				bi.matchLog(ctx, abi, l, e, nil)
 			}
 		}
 	}
 	return nil
 }
 
-func (bi *blockIndexer) matchLog(ctx context.Context, abi abi.ABI, in *LogJSONRPC, out *EventWithData) {
+func (bi *blockIndexer) matchLog(ctx context.Context, abi abi.ABI, in *LogJSONRPC, out *EventWithData, source *tktypes.EthAddress) {
+	if in.Address != nil && !source.IsZero() && !source.Equals((*tktypes.EthAddress)(in.Address)) {
+		return
+	}
 	// This is one that matches our signature, but we need to check it against our ABI list.
 	// We stop at the first entry that parses it, and it's perfectly fine and expected that
 	// none will (because Eth signatures are not precise enough to distinguish events -

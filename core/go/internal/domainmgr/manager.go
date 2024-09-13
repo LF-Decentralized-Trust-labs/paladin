@@ -41,10 +41,17 @@ import (
 
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
+
+//go:embed abis/IPaladinContractFactory_V0.json
+var iPaladinContractFactoryBuildJSON []byte
+
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
+var iPaladinContractFactoryABI = mustParseEmbeddedBuildABI(iPaladinContractFactoryBuildJSON)
 
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
+var eventSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSignatureHash(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
+var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
@@ -89,18 +96,36 @@ type event_PaladinNewSmartContract_V0 struct {
 	Data   tktypes.HexBytes   `json:"data"`
 }
 
+type event_PaladinNewSmartContractByFactory_V0 struct {
+	TXId     tktypes.Bytes32    `json:"txId"`
+	Domain   tktypes.EthAddress `json:"domain"`
+	Instance tktypes.EthAddress `json:"instance"`
+	Data     tktypes.HexBytes   `json:"data"`
+}
+
 func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
 	dm.persistence = pic.Persistence()
 	dm.stateStore = pic.StateStore()
 	dm.ethClientFactory = pic.EthClientFactory()
 	dm.blockIndexer = pic.BlockIndexer()
+
+	var eventStreams []*components.ManagerEventStream
+	for name, d := range dm.conf.Domains {
+		if d.FactoryAddress == nil {
+			return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainFactoryAddressMissing, name)
+		}
+		eventStreams = append(eventStreams, &components.ManagerEventStream{
+			ABI:     iPaladinContractFactoryABI,
+			Handler: dm.eventIndexer,
+			Source:  d.FactoryAddress,
+		})
+	}
+	eventStreams = append(eventStreams, &components.ManagerEventStream{
+		ABI:     iPaladinContractABI,
+		Handler: dm.eventIndexer,
+	})
 	return &components.ManagerInitResult{
-		EventStreams: []*components.ManagerEventStream{
-			{
-				ABI:     iPaladinContractABI,
-				Handler: dm.eventIndexer,
-			},
-		},
+		EventStreams: eventStreams,
 	}, nil
 }
 

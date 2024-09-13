@@ -102,6 +102,7 @@ task copyTestbedContracts(type: Copy) {
         include 'contracts/domains/testbed_sim/SIMDomain.sol/SIMDomain.json'
         include 'contracts/domains/testbed_sim/SIMToken.sol/SIMToken.json'
         include 'contracts/domains/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+        include 'contracts/domains/interfaces/IPaladinContractFactory.sol/IPaladinContractFactory_V0.json'
     }
     into 'pkg/testbed/abis'
 
@@ -114,6 +115,7 @@ task copyDomainManagerContracts(type: Copy) {
     inputs.files(configurations.compiledContracts)
     from fileTree(configurations.compiledContracts.asPath) {
         include 'contracts/domains/interfaces/IPaladinContract.sol/IPaladinContract_V0.json'
+        include 'contracts/domains/interfaces/IPaladinContractFactory.sol/IPaladinContractFactory_V0.json'
     }
     into 'internal/domainmgr/abis'
 
