@@ -99,13 +99,14 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 
 	var eventStreams []*components.ManagerEventStream
 	for name, d := range dm.conf.Domains {
-		if d.RegistryAddress == nil {
-			return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainRegistryAddressMissing, name)
+		registryAddr, err := tktypes.ParseEthAddress(d.RegistryAddress)
+		if err != nil {
+			return nil, i18n.WrapError(dm.bgCtx, err, msgs.MsgDomainRegistryAddressInvalid, d.RegistryAddress, name)
 		}
 		eventStreams = append(eventStreams, &components.ManagerEventStream{
 			ABI:     iPaladinContractRegistryABI,
 			Handler: dm.eventIndexer,
-			Source:  d.RegistryAddress,
+			Source:  registryAddr,
 		})
 	}
 	return &components.ManagerInitResult{

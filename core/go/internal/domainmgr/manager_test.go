@@ -123,7 +123,7 @@ func TestConfiguredDomains(t *testing.T) {
 					Type:    components.LibraryTypeCShared.Enum(),
 					Library: "some/where",
 				},
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	})
@@ -141,7 +141,7 @@ func TestDomainRegisteredNotFound(t *testing.T) {
 	_, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	})
@@ -181,14 +181,14 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 	componentMocks.On("Persistence").Return(mp.P)
 	dm := NewDomainManager(context.Background(), config)
 	_, err = dm.PreInit(componentMocks)
-	assert.Regexp(t, "PD011641", err)
+	assert.Regexp(t, "PD011606", err)
 }
 
 func TestGetDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	})
@@ -228,7 +228,7 @@ func TestWaitForDeployQueryError(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	}, func(mc *mockComponents) {
@@ -244,7 +244,7 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	}, func(mc *mockComponents) {
@@ -274,7 +274,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"domain1": {
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	})

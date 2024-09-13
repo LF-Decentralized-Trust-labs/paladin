@@ -20,7 +20,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // Intended to be embedded at root level of paladin config
@@ -37,7 +36,7 @@ type DomainConfig struct {
 	Init            DomainInitConfig        `yaml:"init"`
 	Plugin          components.PluginConfig `yaml:"plugin"`
 	Config          map[string]any          `yaml:"config"`
-	RegistryAddress *tktypes.EthAddress     `yaml:"registryAddress"`
+	RegistryAddress string                  `yaml:"registryAddress"`
 }
 
 var ContractCacheDefaults = &cache.Config{

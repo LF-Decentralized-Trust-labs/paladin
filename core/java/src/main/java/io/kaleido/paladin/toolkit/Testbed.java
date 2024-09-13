@@ -82,6 +82,8 @@ public class Testbed implements Closeable {
     public record ConfigDomain(
             String name,
             @JsonProperty
+            JsonHex.Address registryAddress,
+            @JsonProperty
             ConfigPlugin plugin,
             @JsonProperty
             Map<String, Object> config

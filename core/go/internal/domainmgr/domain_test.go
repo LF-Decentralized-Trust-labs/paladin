@@ -146,7 +146,7 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "conf"},
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	}, extraSetup...)
@@ -276,7 +276,7 @@ func TestDomainConfigureFail(t *testing.T) {
 		Domains: map[string]*DomainConfig{
 			"test1": {
 				Config:          map[string]any{"some": "config"},
-				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
 	})
