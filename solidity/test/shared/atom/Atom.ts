@@ -20,7 +20,6 @@ describe("Atom", function () {
     // Deploy two contracts
     const noto = await Noto.connect(notary1).deploy(
       randomBytes32(),
-      anybody1.address,
       notary1.address,
       "0x"
     );
@@ -109,7 +108,6 @@ describe("Atom", function () {
     // Deploy noto contract
     const noto = await Noto.connect(notary1).deploy(
       randomBytes32(),
-      anybody1.address,
       notary1.address,
       "0x"
     );

@@ -9,6 +9,6 @@ contract NotoSelfSubmitFactory {
         address notary,
         bytes memory data
     ) external {
-        new NotoSelfSubmit(transactionId, address(this), notary, data);
+        new NotoSelfSubmit(transactionId, notary, data);
     }
 }
