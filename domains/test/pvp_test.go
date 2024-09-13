@@ -126,7 +126,7 @@ func newNotoDomain(t *testing.T, config *types.DomainConfig) (*noto.Noto, *testb
 			domain = noto.New(callbacks)
 			return domain
 		}),
-		FactoryAddress: tktypes.MustEthAddress(config.FactoryAddress),
+		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
 	}
 }
 

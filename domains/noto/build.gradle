@@ -71,6 +71,7 @@ task test(type: Exec) {
     workingDir '.'
     executable 'go'
     args 'test'
+    args '-v'
     args './internal/...'
     args './pkg/...'
     args '-cover'

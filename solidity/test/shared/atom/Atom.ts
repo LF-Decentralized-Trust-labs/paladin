@@ -111,15 +111,8 @@ describe("Atom", function () {
     const Atom = await ethers.getContractFactory("Atom");
 
     // Deploy noto contract
-<<<<<<< HEAD
-    const noto = await Noto.connect(notary1).deploy(
-      randomBytes32(),
-      notary1.address,
-      "0x"
-=======
     const noto: Noto = Noto.attach(
       await deployNotoInstance(notoFactory, Noto.interface, notary1.address)
->>>>>>> main
     );
 
     // Fake up a delegation

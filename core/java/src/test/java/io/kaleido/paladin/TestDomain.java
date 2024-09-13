@@ -29,7 +29,6 @@ public class TestDomain extends DomainInstance {
     @Override
     protected CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request) {
         ToDomain.DomainConfig domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setFactoryContractAddress("0x1000000000000000000000000000000000000001")
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
                         .build())

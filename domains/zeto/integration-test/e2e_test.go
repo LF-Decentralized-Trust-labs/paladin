@@ -122,12 +122,13 @@ func newZetoDomain(t *testing.T, config *types.DomainFactoryConfig) (zeto.Zeto, 
 			domain.Callbacks = callbacks
 			return &domain
 		}),
+		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
 	}
 }
 
 func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
 	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", domains)
+	url, done, err := tb.StartForTest("./testbed.config.yaml", domains)
 	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, tb, rpc

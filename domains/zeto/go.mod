@@ -3,6 +3,7 @@ module github.com/kaleido-io/paladin/domains/zeto
 go 1.22.5
 
 require (
+	github.com/go-resty/resty/v2 v2.14.0
 	github.com/hyperledger-labs/zeto/go-sdk v0.0.0-20240905213624-43a614759076
 	github.com/hyperledger/firefly-signer v1.1.14
 	github.com/iden3/go-iden3-crypto v0.0.16
@@ -10,6 +11,7 @@ require (
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/protobuf v1.34.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -30,7 +32,6 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.7 // indirect
-	github.com/go-resty/resty/v2 v2.14.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.17.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -102,7 +103,6 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlite v1.5.6 // indirect
 	gorm.io/gorm v1.25.11 // indirect
