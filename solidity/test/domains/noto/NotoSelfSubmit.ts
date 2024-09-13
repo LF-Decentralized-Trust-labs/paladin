@@ -2,7 +2,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ContractTransactionReceipt, Signer } from "ethers";
 import hre, { ethers } from "hardhat";
-import { NotoSelfSubmit } from "../../typechain-types";
+import { NotoSelfSubmit } from "../../../typechain-types";
 import { fakeTXO, randomBytes32 } from "./Noto";
 
 export async function prepareSignature(
@@ -35,9 +35,7 @@ describe("NotoSelfSubmit", function () {
 
     const Noto = await ethers.getContractFactory("NotoSelfSubmit");
     const noto = await Noto.deploy(
-      randomBytes32(),
       notary.address,
-      "0x"
     );
 
     return { noto, notary, other };

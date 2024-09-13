@@ -15,15 +15,11 @@
 
 package io.kaleido.paladin.pente.domain;
 
-import io.kaleido.paladin.pente.domain.PenteConfiguration;
-import io.kaleido.paladin.pente.domain.PenteDomainFactory;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.toolkit.*;
 import org.hyperledger.besu.datatypes.Address;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 

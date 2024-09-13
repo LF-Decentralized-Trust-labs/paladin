@@ -607,19 +607,14 @@ func deploySmartContract(t *testing.T, confFile string) *tktypes.EthAddress {
 
 	tb := NewTestBed()
 
-	getComponents := make(chan AllComponents, 1)
-	_, done, err := tb.StartForTest(confFile, nil, &UTInitFunction{PreManagerStart: func(c AllComponents) error {
-		getComponents <- c
-		return nil
-	}})
+	_, done, err := tb.StartForTest(confFile, nil)
 	require.NoError(t, err)
 	defer done()
 
-	c := <-getComponents
-	bi := c.BlockIndexer()
+	bi := tb.Components().BlockIndexer()
 
 	// In this test we deploy the factory in-line
-	ec, err := c.EthClientFactory().HTTPClient().ABI(ctx, simDomainABI)
+	ec, err := tb.Components().EthClientFactory().HTTPClient().ABI(ctx, simDomainABI)
 	require.NoError(t, err)
 
 	cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simDomainBuild))

@@ -47,7 +47,7 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 				DeployTX:        parsedEvent.TXId.UUIDFirst16(),
 				RegistryAddress: ev.Address,
 				Address:         parsedEvent.Instance,
-				ConfigBytes:     parsedEvent.Data,
+				ConfigBytes:     parsedEvent.Config,
 			})
 		}
 	}

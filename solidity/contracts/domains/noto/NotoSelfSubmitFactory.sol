@@ -2,13 +2,20 @@
 pragma solidity ^0.8.20;
 
 import {NotoSelfSubmit} from "./NotoSelfSubmit.sol";
+import {IPaladinContractRegistry_V0} from "../interfaces/IPaladinContractRegistry.sol";
 
-contract NotoSelfSubmitFactory {
+contract NotoSelfSubmitFactory is IPaladinContractRegistry_V0 {
     function deploy(
         bytes32 transactionId,
         address notary,
         bytes memory data
     ) external {
-        new NotoSelfSubmit(transactionId, notary, data);
+        NotoSelfSubmit instance = new NotoSelfSubmit(notary);
+
+        emit PaladinRegisterSmartContract_V0(
+            transactionId,
+            address(instance),
+            data
+        );
     }
 }

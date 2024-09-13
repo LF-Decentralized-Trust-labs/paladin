@@ -52,9 +52,7 @@ contract Noto is EIP712, INoto {
     }
 
     constructor(
-        bytes32 transactionId,
-        address notary,
-        bytes memory data
+        address notary
     ) EIP712("noto", "0.0.1") {
         _notary = notary;
     }

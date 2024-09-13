@@ -19,9 +19,7 @@ describe("Atom", function () {
 
     // Deploy two contracts
     const noto = await Noto.connect(notary1).deploy(
-      randomBytes32(),
       notary1.address,
-      "0x"
     );
     const erc20 = await ERC20Simple.connect(notary2).deploy("Token", "TOK");
 
@@ -107,9 +105,7 @@ describe("Atom", function () {
 
     // Deploy noto contract
     const noto = await Noto.connect(notary1).deploy(
-      randomBytes32(),
       notary1.address,
-      "0x"
     );
 
     // Fake up a delegation

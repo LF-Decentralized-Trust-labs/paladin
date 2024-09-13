@@ -144,12 +144,6 @@ public class PenteConfiguration {
             JsonHex.Bytes data
     ) {}
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record PenteYAMLConfig(
-            @JsonProperty
-            String address
-    ) {}
-
     public static byte[] intToBytes4(int val) {
         return ByteBuffer.allocate(4).putInt(val).array();
     }

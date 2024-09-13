@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { randomBytes } from "crypto";
 import { ContractTransactionReceipt, Signer, TypedDataEncoder } from "ethers";
 import hre, { ethers } from "hardhat";
-import { Noto } from "../../typechain-types";
+import { Noto } from "../../../typechain-types";
 
 export async function newTransferHash(
   noto: Noto,
@@ -44,9 +44,7 @@ describe("Noto", function () {
 
     const Noto = await ethers.getContractFactory("Noto");
     const noto = await Noto.deploy(
-      randomBytes32(),
       notary.address,
-      "0x"
     );
 
     return { noto, notary, other };

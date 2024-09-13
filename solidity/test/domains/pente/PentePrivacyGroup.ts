@@ -63,7 +63,7 @@ describe("PentePrivacyGroup", function () {
     expect(factoryTX!.logs[1].address).to.equal(await penteFactory.getAddress());
     expect(deployEvent?.name).to.equal('PaladinRegisterSmartContract_V0');
     expect(deployEvent?.args.toObject()["txId"]).to.equal(deployTxId);
-    expect(deployEvent?.args.toObject()["data"]).to.equal(configBytes);
+    expect(deployEvent?.args.toObject()["config"]).to.equal(configBytes);
     const privacyGroupAddress = deployEvent?.args.toObject()["instance"];
     const privacyGroup = await hre.ethers.getContractAt("PentePrivacyGroup", privacyGroupAddress);
 

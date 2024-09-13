@@ -88,7 +88,7 @@ type event_PaladinRegisterSmartContract_V0 struct {
 	TXId     tktypes.Bytes32    `json:"txId"`
 	Domain   tktypes.EthAddress `json:"domain"`
 	Instance tktypes.EthAddress `json:"instance"`
-	Data     tktypes.HexBytes   `json:"data"`
+	Config   tktypes.HexBytes   `json:"config"`
 }
 
 func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {

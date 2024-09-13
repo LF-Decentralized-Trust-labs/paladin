@@ -33,7 +33,7 @@ describe("SIMDomain", function () {
       const deployEvent = SIMDomain.interface.parseLog(factoryTX!.logs[0])
       expect(deployEvent?.name).to.equal('PaladinRegisterSmartContract_V0');
       expect(deployEvent?.args.toObject()["txId"]).to.equal(deployTxId);
-      expect(deployEvent?.args.toObject()["data"]).to.equal(abiCoder.encode(['string'], ['my/notary']));
+      expect(deployEvent?.args.toObject()["config"]).to.equal(abiCoder.encode(['string'], ['my/notary']));
       const deployedAddr = deployEvent?.args.toObject()["instance"];
       
       // Now we have the token - create a client for it using the notary address

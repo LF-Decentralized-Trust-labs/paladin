@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-// This is kept separate from the IPaladinContract_V0 interface to allow
-// for separate event streams attached to specific trusted factory addresses.
-// The IPaladinContract_V0 events can be indexed from the whole ledger
-// because the contract address is parsed from the protocol-generated data
-// which can be trusted to be correct.
+/// A contract registry is a trusted smart contract that announces the existence of
+/// new smart contracts instances of that are part of a single domain.
+/// @author https://github.com/kaleido-io/paladin
+/// @title Paladin contract registry
 interface IPaladinContractRegistry_V0 {
+
+    /// The event emitted when a new smart contract is deployed, provides the public
+    /// configuration information that is needed to configure the off-chain components
+    /// of the domain to correctly function against the new instance.
+    /// @param txId the submitter-determined transaction id is used to correlate the event to the submitting business transaction
+    /// @param instance the address of the instance smart contract that has been deployed
+    /// @param config encoded parameters that all nodes functioning against this smart contact instance need to know
     event PaladinRegisterSmartContract_V0(
         bytes32 indexed txId,
         address indexed instance,
-        bytes data
+        bytes config
     );
+
 }

@@ -10,7 +10,7 @@ contract NotoFactory is IPaladinContractRegistry_V0 {
         address notary,
         bytes memory data
     ) external {
-        Noto instance = new Noto(transactionId, notary, data);
+        Noto instance = new Noto(notary);
 
         emit PaladinRegisterSmartContract_V0(
             transactionId,

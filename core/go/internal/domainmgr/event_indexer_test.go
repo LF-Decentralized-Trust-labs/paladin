@@ -35,7 +35,7 @@ func TestSolidityEventSignatures(t *testing.T) {
 	// We don't store it as a constant because we're reliant on us and blockindexer calculating it identically (we use the same lib).
 	//
 	// The standard solidity signature is insufficient, as it doesn't include variable names, or the indexed-ness of fields
-	assert.Equal(t, "event PaladinRegisterSmartContract_V0(bytes32 indexed txId, address indexed instance, bytes data)", eventSolSig_PaladinRegisterSmartContract_V0)
+	assert.Equal(t, "event PaladinRegisterSmartContract_V0(bytes32 indexed txId, address indexed instance, bytes config)", eventSolSig_PaladinRegisterSmartContract_V0)
 }
 
 func TestEventIndexingWithDB(t *testing.T) {
@@ -75,7 +75,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 					Data: tktypes.RawJSON(`{
 						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
 						"instance": "` + contractAddr.String() + `",
-						"data": "0xfeedbeef"
+						"config": "0xfeedbeef"
 					}`),
 				},
 			},
@@ -126,7 +126,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 				{
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Data: tktypes.RawJSON(`{
-						 "data": "cannot parse this"
+						 "config": "cannot parse this"
 					 }`),
 				},
 			},
