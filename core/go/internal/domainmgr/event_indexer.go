@@ -36,31 +36,18 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 		// We compare against the fully qualified string provided by the blockindexer at serialization time,
 		// which includes variables names and whether fields are indexed
 		switch ev.SoliditySignature {
-		case eventSolSig_PaladinNewSmartContract_V0:
-			var parsedEvent event_PaladinNewSmartContract_V0
+		case eventSolSig_PaladinRegisterSmartContract_V0:
+			var parsedEvent event_PaladinRegisterSmartContract_V0
 			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
 			if parseErr != nil {
 				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{
-				DeployTX:      parsedEvent.TXId.UUIDFirst16(),
-				DomainAddress: parsedEvent.Domain,
-				Address:       ev.Address,
-				ConfigBytes:   parsedEvent.Data,
-			})
-		case eventSolSig_PaladinNewSmartContractByFactory_V0:
-			var parsedEvent event_PaladinNewSmartContractByFactory_V0
-			parseErr := json.Unmarshal(ev.Data, &parsedEvent)
-			if parseErr != nil {
-				log.L(ctx).Errorf("Failed to parse domain event (%s): %s", parseErr, tktypes.JSONString(ev))
-				continue
-			}
-			contracts = append(contracts, &PrivateSmartContract{
-				DeployTX:      parsedEvent.TXId.UUIDFirst16(),
-				DomainAddress: parsedEvent.Domain,
-				Address:       parsedEvent.Instance,
-				ConfigBytes:   parsedEvent.Data,
+				DeployTX:        parsedEvent.TXId.UUIDFirst16(),
+				RegistryAddress: ev.Address,
+				Address:         parsedEvent.Instance,
+				ConfigBytes:     parsedEvent.Data,
 			})
 		}
 	}

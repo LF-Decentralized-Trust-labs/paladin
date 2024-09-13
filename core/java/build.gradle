@@ -71,6 +71,10 @@ tasks.named('clean') {
     dependsOn tasks.cleanProto
 }
 
+tasks.register("protoc") {
+    dependsOn tasks.generateProto
+}
+
 def grpcVersion = '1.65+'
 def protobufVersion = '3.25+'
 def protocVersion = protobufVersion
@@ -81,6 +85,7 @@ dependencies {
     implementation "io.grpc:grpc-stub:${grpcVersion}"
     implementation "io.grpc:grpc-netty:${grpcVersion}"
 
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78+'
     implementation 'io.netty:netty-all:4.1+'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17+'
 
@@ -100,6 +105,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.9+')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation project(path: ':toolkit:go', configuration: 'libstarter')
+    testImplementation 'org.skyscreamer:jsonassert:1.5.3'
 
 }
 

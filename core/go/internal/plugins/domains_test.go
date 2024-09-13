@@ -37,6 +37,20 @@ type testDomainManager struct {
 	domains             map[string]plugintk.Plugin
 	domainRegistered    func(name string, id uuid.UUID, toDomain components.DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	findAvailableStates func(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
+	encodeData          func(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
+	recoverSigner       func(context.Context, *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
+}
+
+func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
+	return tp.findAvailableStates(ctx, req)
+}
+
+func (tp *testDomainManager) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	return tp.encodeData(ctx, req)
+}
+
+func (tp *testDomainManager) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
+	return tp.recoverSigner(ctx, req)
 }
 
 func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
@@ -66,10 +80,6 @@ func (tp *testDomainManager) mock(t *testing.T) *componentmocks.DomainManager {
 		mdr.Return(m2p, err)
 	})
 	return mdm
-}
-
-func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-	return tp.findAvailableStates(ctx, req)
 }
 
 func newTestDomainPluginManager(t *testing.T, setup *testManagers) (context.Context, *pluginManager, func()) {
@@ -111,7 +121,9 @@ func TestDomainRequestsOK(t *testing.T) {
 			assert.Equal(t, int64(12345), cdr.ChainId)
 			return &prototk.ConfigureDomainResponse{
 				DomainConfig: &prototk.DomainConfig{
-					FactoryContractAddress: "address1",
+					BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
+						SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
+					},
 				},
 			}, nil
 		},
@@ -185,6 +197,20 @@ func TestDomainRequestsOK(t *testing.T) {
 		}, nil
 	}
 
+	tdm.encodeData = func(ctx context.Context, edr *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+		assert.Equal(t, edr.Body, "some input data")
+		return &prototk.EncodeDataResponse{
+			Data: []byte("some output data"),
+		}, nil
+	}
+
+	tdm.recoverSigner = func(ctx context.Context, edr *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
+		assert.Equal(t, edr.Algorithm, "some algo")
+		return &prototk.RecoverSignerResponse{
+			Verifier: "some verifier",
+		}, nil
+	}
+
 	ctx, pc, done := newTestDomainPluginManager(t, &testManagers{
 		testDomainManager: tdm,
 	})
@@ -196,7 +222,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		ChainId: int64(12345),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "address1", cdr.DomainConfig.FactoryContractAddress)
+	assert.Equal(t, prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION, cdr.DomainConfig.BaseLedgerSubmitConfig.SubmitMode)
 
 	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
 		DomainUuid: domainID,
@@ -257,11 +283,24 @@ func TestDomainRequestsOK(t *testing.T) {
 	assert.Equal(t, `{"test": "value"}`, ptr.Transaction.ParamsJson)
 
 	callbacks := <-waitForCallbacks
+
 	fas, err := callbacks.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 		SchemaId: "schema1",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "12345", fas.States[0].Id)
+
+	edr, err := callbacks.EncodeData(ctx, &prototk.EncodeDataRequest{
+		Body: "some input data",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some output data", string(edr.Data))
+
+	rsr, err := callbacks.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: "some algo",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some verifier", string(rsr.Verifier))
 }
 
 func TestDomainRegisterFail(t *testing.T) {

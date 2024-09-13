@@ -71,6 +71,24 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 				}
 			},
 		)
+	case *prototk.DomainMessage_EncodeData:
+		return callManagerImpl(ctx, req.EncodeData,
+			br.manager.EncodeData,
+			func(resMsg *prototk.DomainMessage, res *prototk.EncodeDataResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_EncodeDataRes{
+					EncodeDataRes: res,
+				}
+			},
+		)
+	case *prototk.DomainMessage_RecoverSigner:
+		return callManagerImpl(ctx, req.RecoverSigner,
+			br.manager.RecoverSigner,
+			func(resMsg *prototk.DomainMessage, res *prototk.RecoverSignerResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_RecoverSignerRes{
+					RecoverSignerRes: res,
+				}
+			},
+		)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
 	}

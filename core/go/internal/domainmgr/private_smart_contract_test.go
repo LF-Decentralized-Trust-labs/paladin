@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statestore"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
@@ -65,10 +66,10 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 
 func goodPSC(d *domain) *domainContract {
 	return d.newSmartContract(&PrivateSmartContract{
-		DeployTX:      uuid.New(),
-		DomainAddress: *d.Address(),
-		Address:       tktypes.EthAddress(tktypes.RandBytes(20)),
-		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
+		DeployTX:        uuid.New(),
+		RegistryAddress: *d.RegistryAddress(),
+		Address:         tktypes.EthAddress(tktypes.RandBytes(20)),
+		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
 	})
 }
 
@@ -95,7 +96,7 @@ func goodPrivateTXWithInputs(psc *domainContract) *components.PrivateTransaction
 	}
 }
 
-func doDomainInitTransactionOK(t *testing.T, ctx context.Context, tp *testPlugin) (*domainContract, *components.PrivateTransaction) {
+func doDomainInitTransactionOK(t *testing.T, ctx context.Context, tp *testPlugin, resFn ...func(*prototk.InitTransactionResponse)) (*domainContract, *components.PrivateTransaction) {
 	psc := goodPSC(tp.d)
 	tx := goodPrivateTXWithInputs(psc)
 	tx.PreAssembly = &components.TransactionPreAssembly{
@@ -104,14 +105,18 @@ func doDomainInitTransactionOK(t *testing.T, ctx context.Context, tp *testPlugin
 	tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 		assert.Equal(t, tktypes.Bytes32UUIDFirst16(tx.ID).String(), itr.Transaction.TransactionId)
 		assert.Equal(t, int64(12345), itr.Transaction.BaseBlock)
-		return &prototk.InitTransactionResponse{
+		res := &prototk.InitTransactionResponse{
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:    tx.Signer,
 					Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 				},
 			},
-		}, nil
+		}
+		for _, fn := range resFn {
+			fn(res)
+		}
+		return res, nil
 	}
 
 	err := psc.InitTransaction(ctx, tx)
@@ -138,6 +143,8 @@ func doDomainInitAssembleTransactionOK(t *testing.T, ctx context.Context, tp *te
 	}
 	err := psc.AssembleTransaction(ctx, tx)
 	require.NoError(t, err)
+	tx.PreAssembly.Verifiers = []*prototk.ResolvedVerifier{}
+	tx.PostAssembly.Signatures = []*prototk.AttestationResult{}
 	return psc, tx
 }
 
@@ -151,6 +158,86 @@ func TestDomainInitTransactionOK(t *testing.T) {
 	assert.Nil(t, tp.d.initError.Load())
 
 	_, _ = doDomainInitTransactionOK(t, ctx, tp)
+}
+
+func TestEncodeABIData(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	_, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_FUNCTION_CALL_DATA,
+		Definition: `{
+			  "type": "function",
+			  "name": "doStuff",
+			  "inputs": [
+				 { "name": "intVal", "type": "uint256" }
+			  ]
+			}`,
+		Body: `{ "intVal": 42 }`,
+	})
+	assert.NoError(t, err)
+
+	_, err = tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_TUPLE,
+		Definition: `{
+		  "type": "tuple",
+		  "components": [
+			 { "name": "intVal", "type": "uint256" }
+		  ]
+		}`,
+		Body: `{ "intVal": 42 }`,
+	})
+	assert.NoError(t, err)
+
+	txEIP1559_a, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
+
+	txEIP1559_b, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "eip1559",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, txEIP1559_a, txEIP1559_b)
+
+	txEIP155, err := tp.d.EncodeData(ctx, &prototk.EncodeDataRequest{
+		EncodingType: prototk.EncodeDataRequest_ETH_TRANSACTION,
+		Definition:   "eip155",
+		Body: `{
+		  "to": "0x05d936207F04D81a85881b72A0D17854Ee8BE45A"
+		}`,
+	})
+	assert.NoError(t, err)
+	assert.NotEqual(t, txEIP155, txEIP1559_a)
+
+}
+
+func TestRecoverSignature(t *testing.T) {
+	ctx, _, tp, done := newTestDomain(t, false, goodDomainConf(), mockSchemas())
+	defer done()
+	assert.Nil(t, tp.d.initError.Load())
+
+	kp, err := secp256k1.GenerateSecp256k1KeyPair()
+	require.NoError(t, err)
+	s, err := kp.SignDirect(([]byte)("some data"))
+	require.NoError(t, err)
+
+	res, err := tp.d.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
+		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+		Payload:   ([]byte)("some data"),
+		Signature: s.CompactRSV(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, kp.Address.String(), res.Verifier)
 }
 
 func TestDomainInitTransactionMissingInput(t *testing.T) {
@@ -286,6 +373,10 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Equal(t, prototk.AssembleTransactionResponse_OK, tx.PostAssembly.AssemblyResult)
 	assert.Len(t, tx.PostAssembly.AttestationPlan, 1)
 
+	// This would be the engine's job
+	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0)
+	tx.PostAssembly.Signatures = make([]*prototk.AttestationResult, 0)
+
 	// Write the output states
 	err = psc.WritePotentialStates(ctx, tx)
 	require.NoError(t, err)
@@ -346,14 +437,16 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 		Verifier:  endorserAddr.String(),
 	}
-	endorsement, err := psc.EndorseTransaction(ctx,
-		tx.PreAssembly.TransactionSpecification,
-		tx.PreAssembly.Verifiers,
-		tx.PostAssembly.Signatures,
-		psc.toEndorsableList(tx.PostAssembly.InputStates),
-		psc.toEndorsableList(tx.PostAssembly.OutputStates),
-		endorsementRequest,
-		endorser)
+	endorsement, err := psc.EndorseTransaction(ctx, &components.PrivateTransactionEndorseRequest{
+		TransactionSpecification: tx.PreAssembly.TransactionSpecification,
+		Verifiers:                tx.PreAssembly.Verifiers,
+		Signatures:               tx.PostAssembly.Signatures,
+		InputStates:              psc.toEndorsableList(tx.PostAssembly.InputStates),
+		ReadStates:               psc.toEndorsableList(tx.PostAssembly.ReadStates),
+		OutputStates:             psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		Endorsement:              endorsementRequest,
+		Endorser:                 endorser,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorsement.Result)
 
@@ -512,14 +605,16 @@ func TestEndorseTransactionFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := psc.EndorseTransaction(ctx,
-		tx.PreAssembly.TransactionSpecification,
-		tx.PreAssembly.Verifiers,
-		tx.PostAssembly.Signatures,
-		psc.toEndorsableList(tx.PostAssembly.InputStates),
-		psc.toEndorsableList(tx.PostAssembly.OutputStates),
-		&prototk.AttestationRequest{},
-		&prototk.ResolvedVerifier{})
+	_, err := psc.EndorseTransaction(ctx, &components.PrivateTransactionEndorseRequest{
+		TransactionSpecification: tx.PreAssembly.TransactionSpecification,
+		Verifiers:                tx.PreAssembly.Verifiers,
+		Signatures:               tx.PostAssembly.Signatures,
+		InputStates:              psc.toEndorsableList(tx.PostAssembly.InputStates),
+		ReadStates:               psc.toEndorsableList(tx.PostAssembly.ReadStates),
+		OutputStates:             psc.toEndorsableList(tx.PostAssembly.OutputStates),
+		Endorsement:              &prototk.AttestationRequest{},
+		Endorser:                 &prototk.ResolvedVerifier{},
+	})
 	assert.Regexp(t, "pop", err)
 }
 
@@ -682,7 +777,7 @@ func TestIncompleteStages(t *testing.T) {
 	err = psc.LockStates(ctx, tx)
 	assert.Regexp(t, "PD011629", err)
 
-	_, err = psc.EndorseTransaction(ctx, nil, nil, nil, nil, nil, nil, nil)
+	_, err = psc.EndorseTransaction(ctx, nil)
 	assert.Regexp(t, "PD011630", err)
 
 	err = psc.ResolveDispatch(ctx, tx)

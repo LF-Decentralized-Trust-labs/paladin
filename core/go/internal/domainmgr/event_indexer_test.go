@@ -35,7 +35,7 @@ func TestSolidityEventSignatures(t *testing.T) {
 	// We don't store it as a constant because we're reliant on us and blockindexer calculating it identically (we use the same lib).
 	//
 	// The standard solidity signature is insufficient, as it doesn't include variable names, or the indexed-ness of fields
-	assert.Equal(t, "event PaladinNewSmartContract_V0(bytes32 indexed txId, address indexed domain, bytes data)", eventSolSig_PaladinNewSmartContract_V0)
+	assert.Equal(t, "event PaladinRegisterSmartContract_V0(bytes32 indexed txId, address indexed instance, bytes data)", eventSolSig_PaladinRegisterSmartContract_V0)
 }
 
 func TestEventIndexingWithDB(t *testing.T) {
@@ -63,34 +63,17 @@ func TestEventIndexingWithDB(t *testing.T) {
 			BatchID:    uuid.New(),
 			Events: []*blockindexer.EventWithData{
 				{
-					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
-					Address:           contractAddr,
+					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
+					Address:           (tktypes.EthAddress)(*tp.d.RegistryAddress()),
 					IndexedEvent: &blockindexer.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
 						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
-						Signature:        eventSig_PaladinNewSmartContract_V0,
+						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: tktypes.RawJSON(`{
 						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"domain": "` + tp.d.factoryContractAddress.String() + `",
-						"data": "0xfeedbeef"
-					}`),
-				},
-				{
-					SoliditySignature: eventSolSig_PaladinNewSmartContractByFactory_V0,
-					Address:           contractAddr,
-					IndexedEvent: &blockindexer.IndexedEvent{
-						BlockNumber:      12345,
-						TransactionIndex: 0,
-						LogIndex:         0,
-						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
-						Signature:        eventSig_PaladinNewSmartContractByFactory_V0,
-					},
-					Data: tktypes.RawJSON(`{
-						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"domain": "` + tp.d.factoryContractAddress.String() + `",
 						"instance": "` + contractAddr.String() + `",
 						"data": "0xfeedbeef"
 					}`),
@@ -108,15 +91,14 @@ func TestEventIndexingWithDB(t *testing.T) {
 	require.NoError(t, err)
 	dc := psc.(*domainContract)
 	assert.Equal(t, &PrivateSmartContract{
-		DeployTX:      deployTX,
-		DomainAddress: *tp.d.factoryContractAddress,
-		Address:       contractAddr,
-		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
+		DeployTX:        deployTX,
+		RegistryAddress: *tp.d.RegistryAddress(),
+		Address:         contractAddr,
+		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
 	}, dc.info)
 	assert.Equal(t, contractAddr, psc.Address())
 	assert.Equal(t, "test1", psc.Domain().Name())
 	assert.Equal(t, "0xfeedbeef", psc.ConfigBytes().String())
-	assert.Equal(t, tp.d.factoryContractAddress, psc.Domain().Address())
 
 	// Get cached
 	psc2, err := dm.GetSmartContractByAddress(ctx, contractAddr)
@@ -142,7 +124,7 @@ func TestEventIndexingBadEvent(t *testing.T) {
 			BatchID:    uuid.New(),
 			Events: []*blockindexer.EventWithData{
 				{
-					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
+					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Data: tktypes.RawJSON(`{
 						 "data": "cannot parse this"
 					 }`),
@@ -174,18 +156,18 @@ func TestEventIndexingInsertError(t *testing.T) {
 			BatchID:    uuid.New(),
 			Events: []*blockindexer.EventWithData{
 				{
-					SoliditySignature: eventSolSig_PaladinNewSmartContract_V0,
-					Address:           contractAddr,
+					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
+					Address:           *tp.d.RegistryAddress(),
 					IndexedEvent: &blockindexer.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
 						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
-						Signature:        eventSig_PaladinNewSmartContract_V0,
+						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: tktypes.RawJSON(`{
 						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",
-						"domain": "` + tp.d.factoryContractAddress.String() + `",
+						"domain": "` + contractAddr.String() + `",
 						"data": "0xfeedbeef"
 					}`),
 				},

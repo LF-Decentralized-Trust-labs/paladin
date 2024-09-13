@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ContractTransactionReceipt, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
-import { Atom } from "../typechain-types";
+import { Atom } from "../../../typechain-types";
 import {
   fakeTXO,
   newTransferHash,
@@ -20,7 +20,6 @@ describe("Atom", function () {
     // Deploy two contracts
     const noto = await Noto.connect(notary1).deploy(
       randomBytes32(),
-      anybody1.address,
       notary1.address,
       "0x"
     );
@@ -109,7 +108,6 @@ describe("Atom", function () {
     // Deploy noto contract
     const noto = await Noto.connect(notary1).deploy(
       randomBytes32(),
-      anybody1.address,
       notary1.address,
       "0x"
     );

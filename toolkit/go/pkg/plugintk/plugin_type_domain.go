@@ -37,6 +37,8 @@ type DomainAPI interface {
 
 type DomainCallbacks interface {
 	FindAvailableStates(context.Context, *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error)
+	EncodeData(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
+	RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
 }
 
 type DomainFactory func(callbacks DomainCallbacks) DomainAPI
@@ -166,6 +168,28 @@ func (dp *domainHandler) FindAvailableStates(ctx context.Context, req *prototk.F
 	}))
 	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_FindAvailableStatesRes) *prototk.FindAvailableStatesResponse {
 		return msg.FindAvailableStatesRes
+	})
+}
+
+func (dp *domainHandler) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_EncodeData{
+			EncodeData: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_EncodeDataRes) *prototk.EncodeDataResponse {
+		return msg.EncodeDataRes
+	})
+}
+
+func (dp *domainHandler) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_RecoverSigner{
+			RecoverSigner: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_RecoverSignerRes) *prototk.RecoverSignerResponse {
+		return msg.RecoverSignerRes
 	})
 }
 

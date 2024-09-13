@@ -13,11 +13,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package io.kaleido.pente.evmrunner;
+package io.kaleido.paladin.pente.evmrunner;
 
 import org.hyperledger.besu.evm.EVM;
 import org.hyperledger.besu.evm.MainnetEVMs;
 import org.hyperledger.besu.evm.gascalculator.GasCalculator;
+import org.hyperledger.besu.evm.gascalculator.LondonGasCalculator;
 import org.hyperledger.besu.evm.gascalculator.ShanghaiGasCalculator;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 
@@ -25,10 +26,21 @@ import java.math.BigInteger;
 
 public record EVMVersion(GasCalculator gasCalculator, EvmConfiguration evmConfiguration, EVM evm) {
 
-    public static EVMVersion Shanghai(long chainId, EvmConfiguration evmConfiguration) {
-        EVM evm = MainnetEVMs.shanghai(BigInteger.valueOf(chainId), evmConfiguration);
-        ShanghaiGasCalculator gasCalculator = new ShanghaiGasCalculator();
+    public static EVMVersion London(long chainId, EvmConfiguration evmConfiguration) {
+        var evm = MainnetEVMs.london(BigInteger.valueOf(chainId), evmConfiguration);
+        var gasCalculator = new LondonGasCalculator();
         return new EVMVersion(gasCalculator, evmConfiguration, evm);
     }
 
+    public static EVMVersion Paris(long chainId, EvmConfiguration evmConfiguration) {
+        var evm = MainnetEVMs.paris(BigInteger.valueOf(chainId), evmConfiguration);
+        var gasCalculator = new LondonGasCalculator();
+        return new EVMVersion(gasCalculator, evmConfiguration, evm);
+    }
+
+    public static EVMVersion Shanghai(long chainId, EvmConfiguration evmConfiguration) {
+        var evm = MainnetEVMs.shanghai(BigInteger.valueOf(chainId), evmConfiguration);
+        var gasCalculator = new ShanghaiGasCalculator();
+        return new EVMVersion(gasCalculator, evmConfiguration, evm);
+    }
 }
