@@ -33,7 +33,7 @@ public class PenteDomainTests {
 
     private final Testbed.Setup testbedSetup = new Testbed.Setup("../../core/go/db/migrations/sqlite", 5000);
 
-    String deployFactory() throws Exception {
+    JsonHex.Address deployFactory() throws Exception {
         try (Testbed deployBed = new Testbed(testbedSetup)) {
             String factoryBytecode = ResourceLoader.jsonResourceEntryText(
                     this.getClass().getClassLoader(),
@@ -45,11 +45,12 @@ public class PenteDomainTests {
                     "contracts/domains/pente/PenteFactory.sol/PenteFactory.json",
                     "abi"
             );
-            return deployBed.getRpcClient().request("testbed_deployBytecode",
+            String contractAddr = deployBed.getRpcClient().request("testbed_deployBytecode",
                     "deployer",
                     factoryABI,
                     factoryBytecode,
                     "{}");
+            return new JsonHex.Address(contractAddr);
         }
     }
 
@@ -86,14 +87,10 @@ public class PenteDomainTests {
 
     @Test
     void testSimpleStorage() throws Exception {
-        String address = deployFactory();
-        Assertions.assertNotEquals("", address);
-        Map<String, Object> config = new HashMap<>();
-        config.put("address", address);
-
+        JsonHex.Address address = deployFactory();
         JsonHex.Bytes32 groupSalt = JsonHex.randomBytes32();
         try (Testbed testbed = new Testbed(testbedSetup, new Testbed.ConfigDomain(
-                "pente", new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), config
+                "pente", address, new Testbed.ConfigPlugin("jar", "", PenteDomainFactory.class.getName()), new HashMap<>()
         ))) {
             PenteConfiguration.GroupTupleJSON groupInfo = new PenteConfiguration.GroupTupleJSON(
                     groupSalt,

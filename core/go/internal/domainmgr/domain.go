@@ -44,11 +44,12 @@ type domain struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	conf *DomainConfig
-	dm   *domainManager
-	id   uuid.UUID
-	name string
-	api  components.DomainManagerToDomain
+	conf            *DomainConfig
+	dm              *domainManager
+	id              uuid.UUID
+	name            string
+	api             components.DomainManagerToDomain
+	registryAddress *tktypes.EthAddress
 
 	stateLock          sync.Mutex
 	initialized        atomic.Bool
@@ -63,13 +64,14 @@ type domain struct {
 
 func (dm *domainManager) newDomain(id uuid.UUID, name string, conf *DomainConfig, toDomain components.DomainManagerToDomain) *domain {
 	d := &domain{
-		dm:        dm,
-		conf:      conf,
-		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:      name,
-		id:        id,
-		api:       toDomain,
-		initDone:  make(chan struct{}),
+		dm:              dm,
+		conf:            conf,
+		initRetry:       retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:            name,
+		id:              id,
+		api:             toDomain,
+		initDone:        make(chan struct{}),
+		registryAddress: tktypes.MustEthAddress(conf.RegistryAddress), // check earlier in startup
 
 		schemasByID:        make(map[string]statestore.Schema),
 		schemasBySignature: make(map[string]statestore.Schema),
@@ -179,7 +181,7 @@ func (d *domain) Name() string {
 }
 
 func (d *domain) RegistryAddress() *tktypes.EthAddress {
-	return d.conf.RegistryAddress
+	return d.registryAddress
 }
 
 func (d *domain) Configuration() *prototk.DomainConfig {

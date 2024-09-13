@@ -18,7 +18,6 @@ package io.kaleido.paladin.pente.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.com.kaleido_io.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
@@ -29,11 +28,12 @@ import org.apache.logging.log4j.Logger;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeEncoder;
 import org.web3j.abi.TypeReference;
-import org.web3j.abi.datatypes.*;
+import org.web3j.abi.datatypes.DynamicArray;
+import org.web3j.abi.datatypes.DynamicStruct;
+import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.abi.datatypes.reflection.Parameterized;
 
-import java.io.*;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -50,8 +50,6 @@ public class PenteConfiguration {
     private final JsonABI privacyGroupABI;
 
     private long chainId;
-
-    private Address registryAddress;
 
     private String schemaId_AccountState_v24_9_0;
 
@@ -143,7 +141,7 @@ public class PenteConfiguration {
             @JsonProperty()
             Bytes32 transactionId,
             @JsonProperty()
-            JsonHex.Bytes config
+            JsonHex.Bytes data
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -228,7 +226,6 @@ public class PenteConfiguration {
 
     synchronized void initFromConfig(ToDomain.ConfigureDomainRequest configReq) {
         this.chainId = configReq.getChainId();
-        this.registryAddress = new Address(configReq.getRegistryContractAddress());
     }
 
     List<String> allPenteSchemas() {

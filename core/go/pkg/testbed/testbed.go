@@ -150,7 +150,7 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 				Library: "loaded/via/unit/test/loader",
 			},
 			Config:          domain.Config,
-			RegistryAddress: domain.RegistryAddress,
+			RegistryAddress: domain.RegistryAddress.String(),
 		}
 	}
 
