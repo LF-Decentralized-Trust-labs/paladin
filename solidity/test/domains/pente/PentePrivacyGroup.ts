@@ -59,20 +59,19 @@ describe("PentePrivacyGroup", function () {
     expect(factoryTX?.logs).to.have.lengthOf(2);
     
     // It should emit an event declaring its existence, linking back to the domain
-    const PentePrivacyGroup = await hre.ethers.getContractFactory("PentePrivacyGroup");
-    const deployEvent = PentePrivacyGroup.interface.parseLog(factoryTX!.logs[0])
-    expect(deployEvent?.name).to.equal('PaladinNewSmartContract_V0');
+    const deployEvent = PenteFactory.interface.parseLog(factoryTX!.logs[1])
+    expect(factoryTX!.logs[1].address).to.equal(await penteFactory.getAddress());
+    expect(deployEvent?.name).to.equal('PaladinRegisterSmartContract_V0');
     expect(deployEvent?.args.toObject()["txId"]).to.equal(deployTxId);
-    expect(deployEvent?.args.toObject()["domain"]).to.equal(await penteFactory.getAddress());
     expect(deployEvent?.args.toObject()["data"]).to.equal(configBytes);
-    const privacyGroup = await hre.ethers.getContractAt("PentePrivacyGroup", factoryTX!.logs[0].address);
+    const privacyGroupAddress = deployEvent?.args.toObject()["instance"];
+    const privacyGroup = await hre.ethers.getContractAt("PentePrivacyGroup", privacyGroupAddress);
 
     return { privacyGroup, endorsers: [endorser1, endorser2, endorser3], deployer };
   }
 
   const randBytes32 = () => "0x" + Buffer.from(hre.ethers.randomBytes(32)).toString('hex');
-  const zeroBytes32 = () => hre.ethers.ZeroHash;
-
+  
   it("successful transitions with full endorsement", async function () {
 
     const { privacyGroup, endorsers } = await pentePrivacyGroupSetup();
@@ -85,7 +84,7 @@ describe("PentePrivacyGroup", function () {
     const tx1ID = randBytes32();
 
     await expect(privacyGroup.transition(tx1ID, [], [], stateSet1, endorsements1)).to.
-      emit(privacyGroup, "PaladinPrivateTransaction_V0")
+      emit(privacyGroup, "UTXOTransfer")
       .withArgs(
         tx1ID,
         [],
@@ -104,7 +103,7 @@ describe("PentePrivacyGroup", function () {
     const tx2ID = randBytes32();
 
     await expect(privacyGroup.transition(tx2ID, inputs2, reads2, stateSet2, endorsements2)).to.
-      emit(privacyGroup, "PaladinPrivateTransaction_V0")
+      emit(privacyGroup, "UTXOTransfer")
       .withArgs(
         tx2ID,
         inputs2,

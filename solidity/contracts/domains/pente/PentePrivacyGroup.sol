@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
+import {IPente} from "../interfaces/IPente.sol";
 
 /// @title Base smart contract for pinning privacy group endorsed private smart
 ///      contract state transitions to the base ledger.
@@ -14,7 +14,7 @@ import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 ///      - Spending the previous account state of smart contracts in this privacy group
 ///      - TODO: Spending privacy group / account states on accounts in other other privacy groups atomically
 ///
-contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContract_V0 {
+contract PentePrivacyGroup is IPente, UUPSUpgradeable, EIP712Upgradeable {
     bytes32 private constant TRANSITION_TYPEHASH =
         keccak256("Transition(bytes32[] inputs,bytes32[] reads,bytes32[] outputs)");
     bytes32 private constant UPGRADE_TYPEHASH =
@@ -46,7 +46,6 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
 
     function initialize(
         bytes32 transactionId,
-        address domain,
         bytes calldata config
     ) public initializer {
         __EIP712_init("pente", "0.0.1");
@@ -62,12 +61,6 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         } else {
             revert PenteUnsupportedConfigType(configSelector);
         }
-
-        emit PaladinNewSmartContract_V0(
-            transactionId,
-            domain,
-            config
-        );
     }
 
     function _authorizeUpgrade(
@@ -117,7 +110,7 @@ contract PentePrivacyGroup is UUPSUpgradeable, EIP712Upgradeable, IPaladinContra
         }
 
         // Emmit the state transition event
-        emit PaladinPrivateTransaction_V0(txId, inputs, outputs, new bytes(0));
+        emit UTXOTransfer(txId, inputs, outputs, new bytes(0));
     }
 
     function _buildTransitionHash(

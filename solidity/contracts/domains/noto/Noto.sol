@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {INoto} from "../interfaces/INoto.sol";
-import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 
 /// @title A sample on-chain implementation of a Confidential UTXO (C-UTXO) pattern,
 ///        with participant confidentiality and anonymity based on notary submission and
@@ -23,7 +22,7 @@ import {IPaladinContract_V0} from "../interfaces/IPaladinContract.sol";
 ///         This allows coordination of DVP with other smart contracts, which could
 ///         be using any model programmable via EVM (not just C-UTXO)
 ///
-contract Noto is EIP712, INoto, IPaladinContract_V0 {
+contract Noto is EIP712, INoto {
     mapping(bytes32 => bool) private _unspent;
     mapping(bytes32 => ApprovalRecord) private _approvals;
     address _notary;
@@ -54,12 +53,10 @@ contract Noto is EIP712, INoto, IPaladinContract_V0 {
 
     constructor(
         bytes32 transactionId,
-        address domain,
         address notary,
         bytes memory data
     ) EIP712("noto", "0.0.1") {
         _notary = notary;
-        emit PaladinNewSmartContract_V0(transactionId, domain, data);
     }
 
     /// @dev query whether a TXO is currently in the unspent list

@@ -79,14 +79,14 @@ func TestEventIndexingWithDB(t *testing.T) {
 					}`),
 				},
 				{
-					SoliditySignature: eventSolSig_PaladinNewSmartContractByFactory_V0,
+					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
 					Address:           contractAddr,
 					IndexedEvent: &blockindexer.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
 						LogIndex:         0,
 						TransactionHash:  tktypes.NewBytes32FromSlice(tktypes.RandBytes(32)),
-						Signature:        eventSig_PaladinNewSmartContractByFactory_V0,
+						Signature:        eventSig_PaladinRegisterSmartContract_V0,
 					},
 					Data: tktypes.RawJSON(`{
 						"txId": "` + tktypes.Bytes32UUIDFirst16(deployTX).String() + `",

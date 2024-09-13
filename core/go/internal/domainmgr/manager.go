@@ -42,7 +42,7 @@ import (
 //go:embed abis/IPaladinContract_V0.json
 var iPaladinContractBuildJSON []byte
 
-//go:embed abis/IPaladinContractFactory_V0.json
+//go:embed abis/IPaladinContractRegistry_V0.json
 var iPaladinContractFactoryBuildJSON []byte
 
 var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
@@ -50,8 +50,8 @@ var iPaladinContractFactoryABI = mustParseEmbeddedBuildABI(iPaladinContractFacto
 
 var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
 var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
-var eventSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSignatureHash(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
-var eventSolSig_PaladinNewSmartContractByFactory_V0 = mustParseEventSoliditySignature(iPaladinContractFactoryABI, "PaladinNewSmartContractByFactory_V0")
+var eventSig_PaladinRegisterSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractFactoryABI, "PaladinRegisterSmartContract_V0")
+var eventSolSig_PaladinRegisterSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractFactoryABI, "PaladinRegisterSmartContract_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
@@ -96,7 +96,7 @@ type event_PaladinNewSmartContract_V0 struct {
 	Data   tktypes.HexBytes   `json:"data"`
 }
 
-type event_PaladinNewSmartContractByFactory_V0 struct {
+type event_PaladinRegisterSmartContract_V0 struct {
 	TXId     tktypes.Bytes32    `json:"txId"`
 	Domain   tktypes.EthAddress `json:"domain"`
 	Instance tktypes.EthAddress `json:"instance"`
