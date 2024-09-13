@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { AbiCoder, concat, Signer, TypedDataEncoder } from "ethers";
 import hre from "hardhat";
-import { PentePrivacyGroup } from "../../typechain-types";
+import { PentePrivacyGroup } from "../../../typechain-types";
 const abiCoder = AbiCoder.defaultAbiCoder();
 
 enum PenteConfigID {

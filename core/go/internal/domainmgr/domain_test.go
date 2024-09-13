@@ -145,8 +145,8 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	ctx, dm, _, done := newTestDomainManager(t, realDB, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config:         map[string]any{"some": "conf"},
-				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				Config:          map[string]any{"some": "conf"},
+				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	}, extraSetup...)
@@ -188,7 +188,7 @@ func goodDomainConf() *prototk.DomainConfig {
 			SubmitMode:       prototk.BaseLedgerSubmitConfig_ONE_TIME_USE_KEYS,
 			OneTimeUsePrefix: "one/time/keys/",
 		},
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
+		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -209,7 +209,7 @@ func TestDomainInitStates(t *testing.T) {
 
 	assert.Nil(t, tp.d.initError.Load())
 	assert.True(t, tp.initialized.Load())
-	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.RegistryContractAddress))
 	require.NoError(t, err)
 	assert.Equal(t, tp.d, byAddr)
 	assert.True(t, tp.d.Initialized())
@@ -233,7 +233,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 	assert.True(t, tp1.initialized.Load())
 
 	// Check we get the second from all the maps
-	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.FactoryContractAddress))
+	byAddr, err := dm.getDomainByAddress(ctx, tktypes.MustEthAddress(domainConf.RegistryContractAddress))
 	require.NoError(t, err)
 	assert.Same(t, tp1.d, byAddr)
 	byName, err := dm.GetDomainByName(ctx, "test1")
@@ -247,8 +247,8 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 func TestDomainInitBadSchemas(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
+		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
+		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			`!!! Wrong`,
 		},
@@ -260,8 +260,8 @@ func TestDomainInitBadSchemas(t *testing.T) {
 
 func TestDomainInitBadAddress(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		FactoryContractAddress: `!wrong`,
+		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
+		RegistryContractAddress: `!wrong`,
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -273,8 +273,8 @@ func TestDomainInitBadAddress(t *testing.T) {
 
 func TestDomainInitFactorySchemaStoreFail(t *testing.T) {
 	_, _, tp, done := newTestDomain(t, false, &prototk.DomainConfig{
-		BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{},
-		FactoryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
+		BaseLedgerSubmitConfig:  &prototk.BaseLedgerSubmitConfig{},
+		RegistryContractAddress: tktypes.MustEthAddress(tktypes.RandHex(20)).String(),
 		AbiStateSchemasJson: []string{
 			fakeCoinStateSchema,
 		},
@@ -291,8 +291,8 @@ func TestDomainConfigureFail(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &DomainManagerConfig{
 		Domains: map[string]*DomainConfig{
 			"test1": {
-				Config:         map[string]any{"some": "config"},
-				FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+				Config:          map[string]any{"some": "config"},
+				RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 			},
 		},
 	})
@@ -527,7 +527,7 @@ func TestDomainPrepareDeployInvokeTX(t *testing.T) {
 	assert.Nil(t, tx.DeployTransaction)
 	assert.Equal(t, "newInstance", tx.InvokeTransaction.FunctionABI.Name)
 	assert.Equal(t, abi.Function, tx.InvokeTransaction.FunctionABI.Type)
-	assert.Equal(t, *domain.factoryContractAddress, tx.InvokeTransaction.To)
+	assert.Equal(t, *domain.registryContractAddress, tx.InvokeTransaction.To)
 	assert.NotNil(t, tx.InvokeTransaction.Inputs)
 	assert.Equal(t, "one/time/keys/"+tx.ID.String(), tx.Signer)
 }

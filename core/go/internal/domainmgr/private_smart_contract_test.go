@@ -66,10 +66,10 @@ func TestPrivateSmartContractQueryNoResult(t *testing.T) {
 
 func goodPSC(d *domain) *domainContract {
 	return d.newSmartContract(&PrivateSmartContract{
-		DeployTX:      uuid.New(),
-		DomainAddress: *d.Address(),
-		Address:       tktypes.EthAddress(tktypes.RandBytes(20)),
-		ConfigBytes:   []byte{0xfe, 0xed, 0xbe, 0xef},
+		DeployTX:        uuid.New(),
+		RegistryAddress: *d.Address(),
+		Address:         tktypes.EthAddress(tktypes.RandBytes(20)),
+		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
 	})
 }
 

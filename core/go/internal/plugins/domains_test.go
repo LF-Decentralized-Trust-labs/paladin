@@ -121,7 +121,7 @@ func TestDomainRequestsOK(t *testing.T) {
 			assert.Equal(t, int64(12345), cdr.ChainId)
 			return &prototk.ConfigureDomainResponse{
 				DomainConfig: &prototk.DomainConfig{
-					FactoryContractAddress: "address1",
+					RegistryContractAddress: "address1",
 				},
 			}, nil
 		},
@@ -220,7 +220,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		ChainId: int64(12345),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "address1", cdr.DomainConfig.FactoryContractAddress)
+	assert.Equal(t, "address1", cdr.DomainConfig.RegistryContractAddress)
 
 	_, err = domainAPI.InitDomain(ctx, &prototk.InitDomainRequest{
 		DomainUuid: domainID,

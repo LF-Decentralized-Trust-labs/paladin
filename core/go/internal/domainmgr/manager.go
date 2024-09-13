@@ -39,19 +39,13 @@ import (
 	"gorm.io/gorm"
 )
 
-//go:embed abis/IPaladinContract_V0.json
-var iPaladinContractBuildJSON []byte
-
 //go:embed abis/IPaladinContractRegistry_V0.json
-var iPaladinContractFactoryBuildJSON []byte
+var iPaladinContractRegistryBuildJSON []byte
 
-var iPaladinContractABI = mustParseEmbeddedBuildABI(iPaladinContractBuildJSON)
-var iPaladinContractFactoryABI = mustParseEmbeddedBuildABI(iPaladinContractFactoryBuildJSON)
+var iPaladinContractRegistryABI = mustParseEmbeddedBuildABI(iPaladinContractRegistryBuildJSON)
 
-var eventSig_PaladinNewSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractABI, "PaladinNewSmartContract_V0")
-var eventSolSig_PaladinNewSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractABI, "PaladinNewSmartContract_V0")
-var eventSig_PaladinRegisterSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractFactoryABI, "PaladinRegisterSmartContract_V0")
-var eventSolSig_PaladinRegisterSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractFactoryABI, "PaladinRegisterSmartContract_V0")
+var eventSig_PaladinRegisterSmartContract_V0 = mustParseEventSignatureHash(iPaladinContractRegistryABI, "PaladinRegisterSmartContract_V0")
+var eventSolSig_PaladinRegisterSmartContract_V0 = mustParseEventSoliditySignature(iPaladinContractRegistryABI, "PaladinRegisterSmartContract_V0")
 
 // var eventSig_PaladinPrivateTransaction_V0 = mustParseEventSignature(iPaladinContractABI, "PaladinPrivateTransaction_V0")
 
@@ -90,12 +84,6 @@ type domainManager struct {
 	contractCache  cache.Cache[tktypes.EthAddress, *domainContract]
 }
 
-type event_PaladinNewSmartContract_V0 struct {
-	TXId   tktypes.Bytes32    `json:"txId"`
-	Domain tktypes.EthAddress `json:"domain"`
-	Data   tktypes.HexBytes   `json:"data"`
-}
-
 type event_PaladinRegisterSmartContract_V0 struct {
 	TXId     tktypes.Bytes32    `json:"txId"`
 	Domain   tktypes.EthAddress `json:"domain"`
@@ -111,19 +99,15 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 
 	var eventStreams []*components.ManagerEventStream
 	for name, d := range dm.conf.Domains {
-		if d.FactoryAddress == nil {
-			return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainFactoryAddressMissing, name)
+		if d.RegistryAddress == nil {
+			return nil, i18n.NewError(dm.bgCtx, msgs.MsgDomainRegistryAddressMissing, name)
 		}
 		eventStreams = append(eventStreams, &components.ManagerEventStream{
-			ABI:     iPaladinContractFactoryABI,
+			ABI:     iPaladinContractRegistryABI,
 			Handler: dm.eventIndexer,
-			Source:  d.FactoryAddress,
+			Source:  d.RegistryAddress,
 		})
 	}
-	eventStreams = append(eventStreams, &components.ManagerEventStream{
-		ABI:     iPaladinContractABI,
-		Handler: dm.eventIndexer,
-	})
 	return &components.ManagerInitResult{
 		EventStreams: eventStreams,
 	}, nil
@@ -153,8 +137,8 @@ func (dm *domainManager) cleanupDomain(d *domain) {
 	d.close()
 	delete(dm.domainsByID, d.id)
 	delete(dm.domainsByName, d.name)
-	if d.factoryContractAddress != nil {
-		delete(dm.domainsByAddress, *d.factoryContractAddress)
+	if d.registryContractAddress != nil {
+		delete(dm.domainsByAddress, *d.registryContractAddress)
 	}
 }
 
@@ -235,7 +219,7 @@ func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.Inflig
 func (dm *domainManager) setDomainAddress(d *domain) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
-	dm.domainsByAddress[*d.factoryContractAddress] = d
+	dm.domainsByAddress[*d.registryContractAddress] = d
 }
 
 func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *tktypes.EthAddress) (d *domain, _ error) {
@@ -285,7 +269,7 @@ func (dm *domainManager) dbGetSmartContract(ctx context.Context, setWhere func(d
 func (dm *domainManager) enrichContractWithDomain(ctx context.Context, def *PrivateSmartContract) (*domainContract, error) {
 
 	// Get the domain by address
-	d, err := dm.getDomainByAddress(ctx, &def.DomainAddress)
+	d, err := dm.getDomainByAddress(ctx, &def.RegistryAddress)
 	if err != nil {
 		return nil, err
 	}

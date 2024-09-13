@@ -37,9 +37,9 @@ type Testbed interface {
 }
 
 type TestbedDomain struct {
-	Config         map[string]any
-	Plugin         plugintk.Plugin
-	FactoryAddress *tktypes.EthAddress
+	Config          map[string]any
+	Plugin          plugintk.Plugin
+	RegistryAddress *tktypes.EthAddress
 }
 
 type testbed struct {
@@ -149,8 +149,8 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 				Type:    components.LibraryTypeCShared.Enum(),
 				Library: "loaded/via/unit/test/loader",
 			},
-			Config:         domain.Config,
-			FactoryAddress: domain.FactoryAddress,
+			Config:          domain.Config,
+			RegistryAddress: domain.RegistryAddress,
 		}
 	}
 
