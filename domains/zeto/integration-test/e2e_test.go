@@ -22,12 +22,13 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
+	internalZeto "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -113,26 +114,23 @@ func deployZetoContracts(t *testing.T) *zetoDomainContracts {
 	return deployedContracts
 }
 
-func newTestDomain(t *testing.T, domainName string, domainContracts *zetoDomainContracts) (context.CancelFunc, zeto.Zeto, rpcbackend.Backend) {
-	config := prepareDomainConfig(t, domainContracts)
+func newZetoDomain(t *testing.T, config *types.DomainFactoryConfig) (zeto.Zeto, *testbed.TestbedDomain) {
+	var domain internalZeto.Zeto
+	return &domain, &testbed.TestbedDomain{
+		Config: mapConfig(t, config),
+		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+			domain.Callbacks = callbacks
+			return &domain
+		}),
+	}
+}
 
-	var domain zeto.Zeto
-	var err error
+func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
 	tb := testbed.NewTestBed()
-	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		domain = zeto.New(callbacks)
-		return domain
-	})
-	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{
-		domainName: {
-			Config:         mapConfig(t, config),
-			Plugin:         plugin,
-			FactoryAddress: domainContracts.factoryAddress,
-		},
-	})
-	require.NoError(t, err)
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", domains)
+	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-	return done, domain, rpc
+	return done, tb, rpc
 }
 
 type zetoDomainTestSuite struct {
@@ -153,7 +151,11 @@ func (s *zetoDomainTestSuite) SetupTest() {
 	ctx := context.Background()
 	domainName := "zeto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
-	done, zeto, rpc := newTestDomain(s.T(), domainName, s.deployedContracts)
+	config := prepareDomainConfig(s.T(), s.deployedContracts)
+	zeto, zetoTestbed := newZetoDomain(s.T(), config)
+	done, _, rpc := newTestbed(s.T(), map[string]*testbed.TestbedDomain{
+		domainName: zetoTestbed,
+	})
 	s.domainName = domainName
 	s.domain = zeto
 	s.rpc = rpc

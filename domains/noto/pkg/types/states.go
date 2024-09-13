@@ -21,9 +21,9 @@ import (
 )
 
 type NotoCoin struct {
-	Salt   string               `json:"salt"`
-	Owner  string               `json:"owner"`
-	Amount *ethtypes.HexInteger `json:"amount"`
+	Salt   string                `json:"salt"`
+	Owner  ethtypes.Address0xHex `json:"owner"`
+	Amount *ethtypes.HexInteger  `json:"amount"`
 }
 
 var NotoCoinABI = &abi.Parameter{

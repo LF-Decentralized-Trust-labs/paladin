@@ -47,13 +47,22 @@ func (h *transferHandler) ValidateParams(ctx context.Context, params string) (in
 }
 
 func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*types.TransferParams)
+
 	return &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
 				Lookup:    tx.DomainConfig.NotaryLookup,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
-			// TODO: should we also resolve "From"/"To" parties?
+			{
+				Lookup:    tx.Transaction.From,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
+			{
+				Lookup:    params.To,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
 		},
 	}, nil
 }
@@ -61,23 +70,38 @@ func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction,
 func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.TransferParams)
 
-	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
-		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
-
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, tx.Transaction.From, params.Amount)
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
+	if from == nil {
+		return nil, fmt.Errorf("error verifying recipient address")
+	}
+	fromAddress, err := ethtypes.NewAddress(from.Verifier)
 	if err != nil {
 		return nil, err
 	}
-	outputCoins, outputStates, err := h.noto.prepareOutputs(params.To, params.Amount)
+	to := domain.FindVerifier(params.To, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
+	if to == nil {
+		return nil, fmt.Errorf("error verifying recipient address")
+	}
+	toAddress, err := ethtypes.NewAddress(to.Verifier)
+	if err != nil {
+		return nil, err
+	}
+
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, *fromAddress, params.Amount)
+	if err != nil {
+		return nil, err
+	}
+	outputCoins, outputStates, err := h.noto.prepareOutputs(*toAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
 	if total.Cmp(params.Amount.BigInt()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(tx.Transaction.From, ethtypes.NewHexInteger(remainder))
+		returnedCoins, returnedStates, err := h.noto.prepareOutputs(*fromAddress, ethtypes.NewHexInteger(remainder))
 		if err != nil {
 			return nil, err
 		}
@@ -86,8 +110,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 
 	var attestation []*pb.AttestationRequest
-	switch h.noto.config.Variant {
-	case "Noto":
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
 		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
 		if err != nil {
 			return nil, err
@@ -109,7 +133,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Parties:         []string{tx.DomainConfig.NotaryLookup},
 			},
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		attestation = []*pb.AttestationRequest{
 			// Notary will endorse the assembled transaction (by providing a signature)
 			{
@@ -126,6 +150,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Parties:         []string{req.Transaction.From},
 			},
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	return &pb.AssembleTransactionResponse{
@@ -150,6 +176,9 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types
 	if signature == nil {
 		return fmt.Errorf("did not find 'sender' attestation")
 	}
+	if signature.Verifier.Lookup != tx.Transaction.From {
+		return fmt.Errorf("sender attestation does not match transaction sender")
+	}
 	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
 		return err
@@ -164,9 +193,18 @@ func (h *transferHandler) validateSenderSignature(ctx context.Context, tx *types
 	return nil
 }
 
-func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, coins *gatheredCoins) error {
+func (h *transferHandler) validateOwners(tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest, coins *gatheredCoins) error {
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
+	if from == nil {
+		return fmt.Errorf("error verifying recipient address")
+	}
+	fromAddress, err := ethtypes.NewAddress(from.Verifier)
+	if err != nil {
+		return err
+	}
+
 	for i, coin := range coins.inCoins {
-		if coin.Owner != tx.Transaction.From {
+		if coin.Owner != *fromAddress {
 			return fmt.Errorf("state %s is not owned by %s", coins.inStates[i].Id, tx.Transaction.From)
 		}
 	}
@@ -181,12 +219,12 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	if err := h.validateAmounts(coins); err != nil {
 		return nil, err
 	}
-	if err := h.validateOwners(tx, coins); err != nil {
+	if err := h.validateOwners(tx, req, coins); err != nil {
 		return nil, err
 	}
 
-	switch h.noto.config.Variant {
-	case "Noto":
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
 			if err := h.validateSenderSignature(ctx, tx, req, coins); err != nil {
@@ -196,7 +234,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 			}, nil
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary provides a signature for the assembled payload (to be verified on base ledger)
 			inputIDs := make([]interface{}, len(req.Inputs))
@@ -217,11 +255,15 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				Payload:           encodedTransfer,
 			}, nil
 		} else if req.EndorsementRequest.Name == "sender" {
-			// Sender submits the transaction
-			return &pb.EndorseTransactionResponse{
-				EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-			}, nil
+			if req.EndorsementVerifier.Lookup == tx.Transaction.From {
+				// Sender submits the transaction
+				return &pb.EndorseTransactionResponse{
+					EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
+				}, nil
+			}
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	return nil, fmt.Errorf("unrecognized endorsement request: %s", req.EndorsementRequest.Name)
@@ -238,19 +280,22 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	var signature *pb.AttestationResult
-	switch h.noto.config.Variant {
-	case "Noto":
-		// Include the signature from the sender (informational only)
+	switch tx.DomainConfig.Variant.String() {
+	case types.NotoVariantDefault:
+		// Include the signature from the sender
+		// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 		signature = domain.FindAttestation("sender", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'sender' attestation")
 		}
-	case "NotoSelfSubmit":
+	case types.NotoVariantSelfSubmit:
 		// Include the signature from the notary (will be verified on base ledger)
 		signature = domain.FindAttestation("notary", req.AttestationResult)
 		if signature == nil {
 			return nil, fmt.Errorf("did not find 'notary' attestation")
 		}
+	default:
+		return nil, fmt.Errorf("unknown variant: %s", tx.DomainConfig.Variant)
 	}
 
 	params := map[string]interface{}{

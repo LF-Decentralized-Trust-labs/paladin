@@ -56,7 +56,8 @@ var NotoABI = abi.ABI{
 }
 
 type ConstructorParams struct {
-	Notary string `json:"notary"`
+	Notary         string `json:"notary"`
+	Implementation string `json:"implementation"`
 }
 
 type MintParams struct {

@@ -16,6 +16,7 @@
 package io.kaleido.paladin;
 
 import io.kaleido.paladin.toolkit.Testbed;
+import io.kaleido.paladin.toolkit.JsonHex;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -35,10 +36,12 @@ public class TestStartTestbedWithNoopDomains {
                 new Testbed.Setup("../go/db/migrations/sqlite", 5000),
                 new Testbed.ConfigDomain(
                         "domain1",
+                        JsonHex.Address.addressFrom("0x1234567890abcdef1234567890abcdef12345678"),
                         new Testbed.ConfigPlugin("c-shared", "starter", ""),
                         new HashMap<>()),
                 new Testbed.ConfigDomain(
                         "domain2",
+                        JsonHex.Address.addressFrom("0x1234567890abcdef1234567890abcdef12345678"),
                         new Testbed.ConfigPlugin("jar", "", TestDomainFactory.class.getName()),
                         new HashMap<>())
         );
