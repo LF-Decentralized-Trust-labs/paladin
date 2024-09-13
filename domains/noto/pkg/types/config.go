@@ -17,23 +17,39 @@ package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type Config struct {
-	FactoryAddress string `json:"factoryAddress"`
-	Variant        string `json:"variant"`
-}
-
 type DomainConfig struct {
-	NotaryLookup  string `json:"notaryLookup"`
-	NotaryAddress string `json:"notaryAddress"`
+	FactoryAddress string `json:"factoryAddress"`
 }
 
-var DomainConfigABI = &abi.ParameterArray{
+var NotoConfigID_V0 = ethtypes.MustNewHexBytes0xPrefix("0x00010000")
+
+type NotoConfigInput_V0 struct {
+	NotaryLookup string `json:"notaryLookup"`
+}
+
+var NotoConfigInputABI_V0 = &abi.ParameterArray{
+	{Name: "notaryLookup", Type: "string"},
+}
+
+type NotoConfigOutput_V0 struct {
+	NotaryLookup  string          `json:"notaryLookup"`
+	NotaryAddress string          `json:"notaryAddress"`
+	Variant       tktypes.Bytes32 `json:"variant"`
+}
+
+var NotoConfigOutputABI_V0 = &abi.ParameterArray{
 	{Name: "notaryLookup", Type: "string"},
 	{Name: "notaryAddress", Type: "address"},
+	{Name: "variant", Type: "bytes32"},
 }
 
-type DomainHandler = domain.DomainHandler[DomainConfig]
-type ParsedTransaction = domain.ParsedTransaction[DomainConfig]
+type DomainHandler = domain.DomainHandler[NotoConfigOutput_V0]
+type ParsedTransaction = domain.ParsedTransaction[NotoConfigOutput_V0]
+
+var NotoVariantDefault = "0x0000000000000000000000000000000000000000000000000000000000000000"
+var NotoVariantSelfSubmit = "0x0000000000000000000000000000000000000000000000000000000000000001"

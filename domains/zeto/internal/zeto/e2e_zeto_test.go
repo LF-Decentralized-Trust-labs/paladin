@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -75,22 +75,23 @@ func deployContracts(ctx context.Context, t *testing.T, contracts []map[string][
 	return deployed
 }
 
-func newTestDomain(t *testing.T, domainName string, config *types.Config) (context.CancelFunc, *Zeto, rpcbackend.Backend) {
-	var domain *Zeto
+func newZetoDomain(t *testing.T, config *types.Config) (*Zeto, *testbed.TestbedDomain) {
+	var domain Zeto
+	return &domain, &testbed.TestbedDomain{
+		Config: mapConfig(t, config),
+		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+			domain.Callbacks = callbacks
+			return &domain
+		}),
+	}
+}
+
+func newTestbed(t *testing.T, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
 	tb := testbed.NewTestBed()
-	plugin := plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
-		domain = &Zeto{Callbacks: callbacks}
-		return domain
-	})
-	url, done, err := tb.StartForTest("../../testbed.config.yaml", map[string]*testbed.TestbedDomain{
-		domainName: {
-			Config: mapConfig(t, config),
-			Plugin: plugin,
-		},
-	})
-	require.NoError(t, err)
+	url, done, err := tb.StartForTest("../../testbed.config.yaml", domains)
+	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-	return done, domain, rpc
+	return done, tb, rpc
 }
 
 func TestZeto(t *testing.T) {
@@ -116,9 +117,12 @@ func TestZeto(t *testing.T) {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	done, zeto, rpc := newTestDomain(t, domainName, &types.Config{
+	zeto, zetoTestbed := newZetoDomain(t, &types.Config{
 		FactoryAddress: contracts["factory"],
 		Libraries:      contracts,
+	})
+	done, _, rpc := newTestbed(t, map[string]*testbed.TestbedDomain{
+		domainName: zetoTestbed,
 	})
 	defer done()
 

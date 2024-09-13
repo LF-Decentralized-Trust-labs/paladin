@@ -39,16 +39,13 @@ var notoFactoryJSON []byte // From "gradle copySolidity"
 //go:embed abis/Noto.json
 var notoJSON []byte // From "gradle copySolidity"
 
-//go:embed abis/NotoSelfSubmitFactory.json
-var notoSelfSubmitFactoryJSON []byte // From "gradle copySolidity"
-
 //go:embed abis/NotoSelfSubmit.json
 var notoSelfSubmitJSON []byte // From "gradle copySolidity"
 
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	config      *types.Config
+	config      types.DomainConfig
 	chainID     int64
 	domainID    string
 	coinSchema  *pb.StateSchema
@@ -57,9 +54,10 @@ type Noto struct {
 }
 
 type NotoDeployParams struct {
+	Name          string                    `json:"name,omitempty"`
 	TransactionID string                    `json:"transactionId"`
 	Notary        string                    `json:"notary"`
-	Data          ethtypes.HexBytes0xPrefix `json:"data"`
+	Config        ethtypes.HexBytes0xPrefix `json:"config"`
 }
 
 type gatheredCoins struct {
@@ -72,26 +70,17 @@ type gatheredCoins struct {
 }
 
 func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainRequest) (*pb.ConfigureDomainResponse, error) {
-	var config types.Config
-	err := json.Unmarshal([]byte(req.ConfigJson), &config)
+	err := json.Unmarshal([]byte(req.ConfigJson), &n.config)
 	if err != nil {
 		return nil, err
 	}
 
-	n.config = &config
-	n.chainID = req.ChainId
+	factory := domain.LoadBuild(notoFactoryJSON)
+	contract := domain.LoadBuild(notoJSON)
 
-	switch config.Variant {
-	case "", "Noto":
-		config.Variant = "Noto"
-		n.factoryABI = domain.LoadBuild(notoFactoryJSON).ABI
-		n.contractABI = domain.LoadBuild(notoJSON).ABI
-	case "NotoSelfSubmit":
-		n.factoryABI = domain.LoadBuild(notoSelfSubmitFactoryJSON).ABI
-		n.contractABI = domain.LoadBuild(notoSelfSubmitJSON).ABI
-	default:
-		return nil, fmt.Errorf("unrecognized variant: %s", config.Variant)
-	}
+	n.chainID = req.ChainId
+	n.factoryABI = factory.ABI
+	n.contractABI = contract.ABI
 
 	schemaJSON, err := json.Marshal(types.NotoCoinABI)
 	if err != nil {
@@ -100,7 +89,7 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *pb.ConfigureDomainReque
 
 	return &pb.ConfigureDomainResponse{
 		DomainConfig: &pb.DomainConfig{
-			FactoryContractAddress: config.FactoryAddress,
+			FactoryContractAddress: n.config.FactoryAddress,
 			AbiStateSchemasJson:    []string{string(schemaJSON)},
 			BaseLedgerSubmitConfig: &pb.BaseLedgerSubmitConfig{
 				SubmitMode: pb.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
@@ -131,33 +120,33 @@ func (n *Noto) InitDeploy(ctx context.Context, req *pb.InitDeployRequest) (*pb.I
 }
 
 func (n *Noto) PrepareDeploy(ctx context.Context, req *pb.PrepareDeployRequest) (*pb.PrepareDeployResponse, error) {
-	_, err := n.validateDeploy(req.Transaction)
+	params, err := n.validateDeploy(req.Transaction)
 	if err != nil {
 		return nil, err
 	}
-	config := &types.DomainConfig{
-		NotaryLookup:  req.ResolvedVerifiers[0].Lookup,
-		NotaryAddress: req.ResolvedVerifiers[0].Verifier,
+	config := &types.NotoConfigInput_V0{
+		NotaryLookup: req.ResolvedVerifiers[0].Lookup,
 	}
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
-	}
-	data, err := types.DomainConfigABI.EncodeABIDataJSONCtx(ctx, configJSON)
+	configABI, err := n.encodeConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	params := &NotoDeployParams{
+	deployParams := &NotoDeployParams{
+		Name:          params.Implementation,
 		TransactionID: req.Transaction.TransactionId,
-		Notary:        config.NotaryAddress,
-		Data:          data,
+		Notary:        req.ResolvedVerifiers[0].Verifier,
+		Config:        configABI,
 	}
-	paramsJSON, err := json.Marshal(params)
+	paramsJSON, err := json.Marshal(deployParams)
 	if err != nil {
 		return nil, err
 	}
-	functionJSON, err := json.Marshal(n.factoryABI.Functions()["deploy"])
+	functionName := "deploy"
+	if deployParams.Name != "" {
+		functionName = "deployImplementation"
+	}
+	functionJSON, err := json.Marshal(n.factoryABI.Functions()[functionName])
 	if err != nil {
 		return nil, err
 	}
@@ -203,8 +192,27 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *pb.PrepareTransactio
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainConfig, error) {
-	configValues, err := types.DomainConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
+func (n *Noto) encodeConfig(config *types.NotoConfigInput_V0) ([]byte, error) {
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	encodedConfig, err := types.NotoConfigInputABI_V0.EncodeABIDataJSON(configJSON)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]byte, 0, len(types.NotoConfigID_V0)+len(encodedConfig))
+	result = append(result, types.NotoConfigID_V0...)
+	result = append(result, encodedConfig...)
+	return result, nil
+}
+
+func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfigOutput_V0, error) {
+	configSelector := ethtypes.HexBytes0xPrefix(domainConfig[0:4])
+	if configSelector.String() != types.NotoConfigID_V0.String() {
+		return nil, fmt.Errorf("unexpected config type: %s", configSelector)
+	}
+	configValues, err := types.NotoConfigOutputABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +220,7 @@ func (n *Noto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*ty
 	if err != nil {
 		return nil, err
 	}
-	var config types.DomainConfig
+	var config types.NotoConfigOutput_V0
 	err = json.Unmarshal(configJSON, &config)
 	return &config, err
 }
@@ -248,7 +256,7 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *pb.TransactionSpecif
 		return nil, nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
 	}
 
-	domainConfig, err := n.decodeDomainConfig(ctx, tx.ContractConfig)
+	domainConfig, err := n.decodeConfig(ctx, tx.ContractConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -284,7 +292,7 @@ func (n *Noto) parseCoinList(label string, states []*pb.EndorsableState) ([]*typ
 		if input.SchemaId != n.coinSchema.Id {
 			return nil, nil, nil, fmt.Errorf("unknown schema ID: %s", input.SchemaId)
 		}
-		if coins[i], err = n.makeCoin(input.StateDataJson); err != nil {
+		if coins[i], err = n.unmarshalCoin(input.StateDataJson); err != nil {
 			return nil, nil, nil, fmt.Errorf("invalid %s[%d] (%s): %s", label, i, input.Id, err)
 		}
 		refs[i] = &pb.StateRef{
@@ -323,7 +331,7 @@ func (n *Noto) FindCoins(ctx context.Context, query string) ([]*types.NotoCoin, 
 
 	coins := make([]*types.NotoCoin, len(states))
 	for i, state := range states {
-		if coins[i], err = n.makeCoin(state.DataJson); err != nil {
+		if coins[i], err = n.unmarshalCoin(state.DataJson); err != nil {
 			return nil, err
 		}
 	}

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import {Noto} from "./Noto.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Noto} from "./Noto.sol";
 
 /**
  * Noto variant which allows _any_ address to submit a transfer, as long as
@@ -10,18 +10,34 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * signature is recovered and verified.
  */
 contract NotoSelfSubmit is Noto {
-    constructor(
+    bytes32 public constant NotoVariantSelfSubmit =
+        0x0000000000000000000000000000000000000000000000000000000000000001;
+
+    function initialize(
         bytes32 transactionId,
         address domain,
         address notary,
-        bytes memory data
-    ) Noto(transactionId, domain, notary, data) {}
+        bytes calldata config
+    ) public override initializer {
+        __EIP712_init("noto", "0.0.1");
+
+        NotoConfig_V0 memory configOut = _decodeConfig(config);
+        configOut.notaryAddress = notary;
+        configOut.variant = NotoVariantSelfSubmit;
+
+        _notary = notary;
+        emit PaladinNewSmartContract_V0(
+            transactionId,
+            domain,
+            _encodeConfig(configOut)
+        );
+    }
 
     function transfer(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) external override {
         bytes32 txhash = _buildTXHash(inputs, outputs, data);
         address signer = ECDSA.recover(txhash, signature);
@@ -32,7 +48,7 @@ contract NotoSelfSubmit is Noto {
     function approve(
         address delegate,
         bytes32 txhash,
-        bytes memory signature
+        bytes calldata signature
     ) external override {
         address signer = ECDSA.recover(txhash, signature);
         requireNotary(signer);

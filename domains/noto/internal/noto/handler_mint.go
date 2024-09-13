@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
@@ -45,6 +46,8 @@ func (h *mintHandler) ValidateParams(ctx context.Context, params string) (interf
 }
 
 func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
+	params := tx.Params.(*types.MintParams)
+
 	if req.Transaction.From != tx.DomainConfig.NotaryLookup {
 		return nil, fmt.Errorf("mint can only be initiated by notary")
 	}
@@ -54,7 +57,10 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 				Lookup:    tx.DomainConfig.NotaryLookup,
 				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
 			},
-			// TODO: should we also resolve "To" party?
+			{
+				Lookup:    params.To,
+				Algorithm: algorithms.ECDSA_SECP256K1_PLAINBYTES,
+			},
 		},
 	}, nil
 }
@@ -62,13 +68,20 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
 
-	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, req.ResolvedVerifiers)
+	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
 	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
-		// TODO: do we need to verify every time?
 		return nil, fmt.Errorf("notary resolved to unexpected address")
 	}
+	to := domain.FindVerifier(params.To, algorithms.ECDSA_SECP256K1_PLAINBYTES, req.ResolvedVerifiers)
+	if to == nil {
+		return nil, fmt.Errorf("error verifying recipient address")
+	}
+	toAddress, err := ethtypes.NewAddress(to.Verifier)
+	if err != nil {
+		return nil, err
+	}
 
-	_, outputStates, err := h.noto.prepareOutputs(params.To, params.Amount)
+	_, outputStates, err := h.noto.prepareOutputs(*toAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +92,8 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 			OutputStates: outputStates,
 		},
 		AttestationPlan: []*pb.AttestationRequest{
+			// Notary will endorse the assembled transaction (by submitting to the ledger)
+			// Note no  additional attestation using req.Transaction.From, because it is guaranteed to be the notary
 			{
 				Name:            "notary",
 				AttestationType: pb.AttestationType_ENDORSE,
@@ -121,7 +136,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 
 	params := map[string]interface{}{
 		"outputs":   outputs,
-		"signature": "0x",
+		"signature": "0x", // no signature, because requester AND submitter are always the notary
 		"data":      req.Transaction.TransactionId,
 	}
 	paramsJSON, err := json.Marshal(params)
