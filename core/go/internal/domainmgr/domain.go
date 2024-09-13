@@ -132,9 +132,10 @@ func (d *domain) init() {
 
 		// Send the configuration to the domain for processing
 		confRes, err := d.api.ConfigureDomain(d.ctx, &prototk.ConfigureDomainRequest{
-			Name:       d.name,
-			ChainId:    d.dm.ethClientFactory.ChainID(),
-			ConfigJson: tktypes.JSONString(d.conf.Config).String(),
+			Name:                    d.name,
+			RegistryContractAddress: d.RegistryAddress().String(),
+			ChainId:                 d.dm.ethClientFactory.ChainID(),
+			ConfigJson:              tktypes.JSONString(d.conf.Config).String(),
 		})
 		if err != nil {
 			return true, err

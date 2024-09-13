@@ -244,7 +244,7 @@ var (
 	MsgDomainABIRecoverRequestSignature       = ffe("PD011638", "Invalid signature")
 	MsgDomainABIEncodingTypedDataInvalid      = ffe("PD011639", "EIP-712 typed data V4 encoding request invalid")
 	MsgDomainABIEncodingTypedDataFail         = ffe("PD011640", "EIP-712 typed data V4 encoding request failed")
-	MsgDomainRegistryAddressMissing           = ffe("PD011641", "Domain registry address not found in the deploy transaction input")
+	MsgDomainRegistryAddressMissing           = ffe("PD011641", "Registry address missing from domain '%s' configuration")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")

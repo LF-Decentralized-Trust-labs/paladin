@@ -51,7 +51,6 @@ public class PenteDomain extends DomainInstance {
         config.initFromConfig(request);
 
         var domainConfig = ToDomain.DomainConfig.newBuilder()
-                .setFactoryContractAddress(config.getAddress().toString())
                 .addAllAbiStateSchemasJson(config.allPenteSchemas())
                 .setBaseLedgerSubmitConfig(ToDomain.BaseLedgerSubmitConfig.newBuilder()
                         .setSubmitMode(ToDomain.BaseLedgerSubmitConfig.Mode.ONE_TIME_USE_KEYS)
