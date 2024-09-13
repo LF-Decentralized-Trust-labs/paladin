@@ -211,7 +211,7 @@ var (
 	MsgDomainNotInitialized                   = ffe("PD011601", "Domain not initialized")
 	MsgDomainInvalidSchema                    = ffe("PD011602", "Domain schema %d is invalid")
 	MsgDomainFactoryAbiJsonInvalid            = ffe("PD011605", "Factory contract ABI invalid")
-	MsgDomainFactoryAddressInvalid            = ffe("PD011606", "Factory contract address invalid")
+	MsgDomainRegistryAddressInvalid           = ffe("PD011606", "Factory contract address invalid")
 	MsgDomainPrivateAbiJsonInvalid            = ffe("PD011607", "Private contract ABI invalid")
 	MsgDomainInvalidQueryJSON                 = ffe("PD011608", "Invalid query JSON")
 	MsgDomainContractNotFoundByAddr           = ffe("PD011609", "A smart contract with address %s has not yet been indexed")
@@ -244,7 +244,7 @@ var (
 	MsgDomainABIRecoverRequestSignature       = ffe("PD011638", "Invalid signature")
 	MsgDomainABIEncodingTypedDataInvalid      = ffe("PD011639", "EIP-712 typed data V4 encoding request invalid")
 	MsgDomainABIEncodingTypedDataFail         = ffe("PD011640", "EIP-712 typed data V4 encoding request failed")
-	MsgDomainFactoryAddressMissing            = ffe("PD011641", "Domain factory address not found in the deploy transaction input")
+	MsgDomainRegistryAddressMissing           = ffe("PD011641", "Domain registry address not found in the deploy transaction input")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownEngine = ffe("PD011700", "Unknown engine '%s'")

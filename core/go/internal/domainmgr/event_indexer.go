@@ -44,10 +44,10 @@ func (dm *domainManager) eventIndexer(ctx context.Context, tx *gorm.DB, batch *b
 				continue
 			}
 			contracts = append(contracts, &PrivateSmartContract{
-				DeployTX:      parsedEvent.TXId.UUIDFirst16(),
-				DomainAddress: parsedEvent.Domain,
-				Address:       parsedEvent.Instance,
-				ConfigBytes:   parsedEvent.Data,
+				DeployTX:        parsedEvent.TXId.UUIDFirst16(),
+				RegistryAddress: ev.Address,
+				Address:         parsedEvent.Instance,
+				ConfigBytes:     parsedEvent.Data,
 			})
 		}
 	}

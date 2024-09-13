@@ -122,7 +122,7 @@ message PrepareTransactionResponse {
 }
 
 message DomainConfig {
-  string factory_contract_address = 1;  // The address of the factory smart contract to invoke when the user requests deployment of a new private smart contract in this domain
+  string registry_contract_address = 1;  // The address of the registry smart contract, which is commonly used as a factory by the domain to perform a deploy
   repeated string abi_state_schemas_json = 2; // A list of Schema definitions (in ABI parameter format) the domain requires for all state types it interacts with
   BaseLedgerSubmitConfig base_ledger_submit_config = 3; // Describe the requirements of this domain for how submission happens
 }

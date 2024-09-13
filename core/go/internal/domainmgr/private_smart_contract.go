@@ -32,10 +32,10 @@ import (
 )
 
 type PrivateSmartContract struct {
-	DeployTX      uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
-	DomainAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
-	Address       tktypes.EthAddress `json:"address"             gorm:"column:address"`
-	ConfigBytes   tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
+	DeployTX        uuid.UUID          `json:"deployTransaction"   gorm:"column:deploy_tx"`
+	RegistryAddress tktypes.EthAddress `json:"domainAddress"       gorm:"column:domain_address"`
+	Address         tktypes.EthAddress `json:"address"             gorm:"column:address"`
+	ConfigBytes     tktypes.HexBytes   `json:"configBytes"         gorm:"column:config_bytes"`
 }
 
 type domainContract struct {

@@ -42,8 +42,8 @@ func (s *starter) configureDomain(ctx context.Context, cdr *prototk.ConfigureDom
 	return &prototk.ConfigureDomainResponse{
 		// This is a useless, but valid, example
 		DomainConfig: &prototk.DomainConfig{
-			FactoryContractAddress: `0x1000000000000000000000000000000000000001`,
-			AbiStateSchemasJson:    []string{},
+			RegistryContractAddress: `0x1000000000000000000000000000000000000001`,
+			AbiStateSchemasJson:     []string{},
 			BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
 				SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
 			},

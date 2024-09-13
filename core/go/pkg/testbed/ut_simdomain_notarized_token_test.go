@@ -318,8 +318,8 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 						BaseLedgerSubmitConfig: &prototk.BaseLedgerSubmitConfig{
 							SubmitMode: prototk.BaseLedgerSubmitConfig_ENDORSER_SUBMISSION,
 						},
-						FactoryContractAddress: deployTx.ContractAddress.String(),
-						AbiStateSchemasJson:    []string{fakeCoinStateSchema},
+						RegistryContractAddress: deployTx.ContractAddress.String(),
+						AbiStateSchemasJson:     []string{fakeCoinStateSchema},
 					},
 				}, nil
 			},
@@ -573,9 +573,9 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	confFile := writeTestConfig(t)
 	url, done, err := tb.StartForTest(confFile, map[string]*TestbedDomain{
 		"domain1": {
-			Plugin:         fakeCoinDomain,
-			Config:         map[string]any{"some": "config"},
-			FactoryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
+			Plugin:          fakeCoinDomain,
+			Config:          map[string]any{"some": "config"},
+			RegistryAddress: tktypes.MustEthAddress(tktypes.RandHex(20)),
 		},
 	}, &UTInitFunction{PreManagerStart: func(c AllComponents) error {
 		ec = c.EthClientFactory().HTTPClient()

@@ -34,10 +34,10 @@ type DomainManagerManagerConfig struct {
 }
 
 type DomainConfig struct {
-	Init           DomainInitConfig        `yaml:"init"`
-	Plugin         components.PluginConfig `yaml:"plugin"`
-	Config         map[string]any          `yaml:"config"`
-	FactoryAddress *tktypes.EthAddress     `yaml:"factoryAddress"`
+	Init            DomainInitConfig        `yaml:"init"`
+	Plugin          components.PluginConfig `yaml:"plugin"`
+	Config          map[string]any          `yaml:"config"`
+	RegistryAddress *tktypes.EthAddress     `yaml:"registryAddress"`
 }
 
 var ContractCacheDefaults = &cache.Config{

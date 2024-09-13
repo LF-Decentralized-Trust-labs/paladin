@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ContractTransactionReceipt, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
-import { Atom } from "../typechain-types";
+import { Atom } from "../../../typechain-types";
 import {
   fakeTXO,
   newTransferHash,

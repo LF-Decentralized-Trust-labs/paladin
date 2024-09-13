@@ -50,13 +50,13 @@ type domain struct {
 	name string
 	api  components.DomainManagerToDomain
 
-	stateLock              sync.Mutex
-	initialized            atomic.Bool
-	initRetry              *retry.Retry
-	config                 *prototk.DomainConfig
-	schemasBySignature     map[string]statestore.Schema
-	schemasByID            map[string]statestore.Schema
-	factoryContractAddress *tktypes.EthAddress
+	stateLock               sync.Mutex
+	initialized             atomic.Bool
+	initRetry               *retry.Retry
+	config                  *prototk.DomainConfig
+	schemasBySignature      map[string]statestore.Schema
+	schemasByID             map[string]statestore.Schema
+	registryContractAddress *tktypes.EthAddress
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -97,9 +97,9 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 	}
 
 	var err error
-	d.factoryContractAddress, err = tktypes.ParseEthAddress(d.config.FactoryContractAddress)
+	d.registryContractAddress, err = tktypes.ParseEthAddress(d.config.RegistryContractAddress)
 	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainFactoryAddressInvalid)
+		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainRegistryAddressInvalid)
 	}
 
 	// Ensure all the schemas are recorded to the DB
@@ -185,7 +185,7 @@ func (d *domain) Name() string {
 }
 
 func (d *domain) Address() *tktypes.EthAddress {
-	return d.factoryContractAddress
+	return d.registryContractAddress
 }
 
 func (d *domain) Configuration() *prototk.DomainConfig {
