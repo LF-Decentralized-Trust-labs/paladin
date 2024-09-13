@@ -137,9 +137,7 @@ func (dm *domainManager) cleanupDomain(d *domain) {
 	d.close()
 	delete(dm.domainsByID, d.id)
 	delete(dm.domainsByName, d.name)
-	if d.registryContractAddress != nil {
-		delete(dm.domainsByAddress, *d.registryContractAddress)
-	}
+	delete(dm.domainsByAddress, *d.RegistryAddress())
 }
 
 func (dm *domainManager) ConfiguredDomains() map[string]*components.PluginConfig {
@@ -219,7 +217,7 @@ func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.Inflig
 func (dm *domainManager) setDomainAddress(d *domain) {
 	dm.mux.Lock()
 	defer dm.mux.Unlock()
-	dm.domainsByAddress[*d.registryContractAddress] = d
+	dm.domainsByAddress[*d.RegistryAddress()] = d
 }
 
 func (dm *domainManager) getDomainByAddress(ctx context.Context, addr *tktypes.EthAddress) (d *domain, _ error) {

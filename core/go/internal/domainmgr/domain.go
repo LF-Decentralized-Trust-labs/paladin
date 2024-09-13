@@ -50,13 +50,12 @@ type domain struct {
 	name string
 	api  components.DomainManagerToDomain
 
-	stateLock               sync.Mutex
-	initialized             atomic.Bool
-	initRetry               *retry.Retry
-	config                  *prototk.DomainConfig
-	schemasBySignature      map[string]statestore.Schema
-	schemasByID             map[string]statestore.Schema
-	registryContractAddress *tktypes.EthAddress
+	stateLock          sync.Mutex
+	initialized        atomic.Bool
+	initRetry          *retry.Retry
+	config             *prototk.DomainConfig
+	schemasBySignature map[string]statestore.Schema
+	schemasByID        map[string]statestore.Schema
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
@@ -96,16 +95,10 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 		}
 	}
 
-	var err error
-	d.registryContractAddress, err = tktypes.ParseEthAddress(d.config.RegistryContractAddress)
-	if err != nil {
-		return nil, i18n.WrapError(d.ctx, err, msgs.MsgDomainRegistryAddressInvalid)
-	}
-
 	// Ensure all the schemas are recorded to the DB
 	// This is a special case where we need a synchronous flush to ensure they're all established
 	var schemas []statestore.Schema
-	err = d.dm.stateStore.RunInDomainContextFlush(d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
+	err := d.dm.stateStore.RunInDomainContextFlush(d.name, func(ctx context.Context, dsi statestore.DomainStateInterface) (err error) {
 		schemas, err = dsi.EnsureABISchemas(abiSchemas)
 		return err
 	})
@@ -184,8 +177,8 @@ func (d *domain) Name() string {
 	return d.name
 }
 
-func (d *domain) Address() *tktypes.EthAddress {
-	return d.registryContractAddress
+func (d *domain) RegistryAddress() *tktypes.EthAddress {
+	return d.conf.RegistryAddress
 }
 
 func (d *domain) Configuration() *prototk.DomainConfig {
@@ -373,7 +366,7 @@ func (d *domain) PrepareDeploy(ctx context.Context, tx *components.PrivateContra
 		tx.DeployTransaction = nil
 		tx.InvokeTransaction = &components.EthTransaction{
 			FunctionABI: &functionABI,
-			To:          *d.Address(),
+			To:          *d.RegistryAddress(),
 			Inputs:      inputs,
 		}
 	} else if res.Deploy != nil && res.Transaction == nil {

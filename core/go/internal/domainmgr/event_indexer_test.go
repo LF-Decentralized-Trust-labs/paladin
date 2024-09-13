@@ -64,7 +64,7 @@ func TestEventIndexingWithDB(t *testing.T) {
 			Events: []*blockindexer.EventWithData{
 				{
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Address:           (tktypes.EthAddress)(*tp.d.registryContractAddress),
+					Address:           (tktypes.EthAddress)(*tp.d.RegistryAddress()),
 					IndexedEvent: &blockindexer.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
@@ -92,14 +92,13 @@ func TestEventIndexingWithDB(t *testing.T) {
 	dc := psc.(*domainContract)
 	assert.Equal(t, &PrivateSmartContract{
 		DeployTX:        deployTX,
-		RegistryAddress: *tp.d.registryContractAddress,
+		RegistryAddress: *tp.d.RegistryAddress(),
 		Address:         contractAddr,
 		ConfigBytes:     []byte{0xfe, 0xed, 0xbe, 0xef},
 	}, dc.info)
 	assert.Equal(t, contractAddr, psc.Address())
 	assert.Equal(t, "test1", psc.Domain().Name())
 	assert.Equal(t, "0xfeedbeef", psc.ConfigBytes().String())
-	assert.Equal(t, tp.d.registryContractAddress, psc.Domain().Address())
 
 	// Get cached
 	psc2, err := dm.GetSmartContractByAddress(ctx, contractAddr)
@@ -158,7 +157,7 @@ func TestEventIndexingInsertError(t *testing.T) {
 			Events: []*blockindexer.EventWithData{
 				{
 					SoliditySignature: eventSolSig_PaladinRegisterSmartContract_V0,
-					Address:           *tp.d.registryContractAddress,
+					Address:           *tp.d.RegistryAddress(),
 					IndexedEvent: &blockindexer.IndexedEvent{
 						BlockNumber:      12345,
 						TransactionIndex: 0,
