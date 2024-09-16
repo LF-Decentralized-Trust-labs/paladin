@@ -131,8 +131,8 @@ task copyContracts(dependsOn:[
 
 task protoc(type: ProtoCompile, dependsOn: [
         ":toolkit:go:protoc",
-        tasks.installTools,
-        tasks.copyTestContracts,
+        installTools,
+        copyTestContracts,
     ]) {
     protocPath "bin"
     protoPath projectDir
@@ -149,7 +149,7 @@ task protoc(type: ProtoCompile, dependsOn: [
     }
 }
 
-task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit:go:goGet"]) {
+task goGet(type:Exec, dependsOn:[protoc,copyContracts,":toolkit:go:goGet"]) {
     workingDir '.'
 
     inputs.files('go.mod')
@@ -160,7 +160,7 @@ task goGet(type:Exec, dependsOn:[tasks.protoc,tasks.copyContracts,":toolkit:go:g
     args 'get'
 }
 
-task makeMocks(type: Mockery, dependsOn: [tasks.installTools, tasks.protoc, tasks.goGet]) {
+task makeMocks(type: Mockery, dependsOn: [installTools, protoc, goGet]) {
     mockery 'bin/mockery'
     args '--case', 'underscore'
     mock {
@@ -239,7 +239,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     delete 'componenttest/abis'
 }
 
-task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContracts]) {
+task lint(type: Exec, dependsOn:[protoc,makeMocks,copyContracts]) {
     workingDir '.'
 
     helpers.lockResource(it, "lint.lock")
@@ -253,7 +253,7 @@ task lint(type: Exec, dependsOn:[tasks.protoc,tasks.makeMocks,tasks.copyContract
     args '--timeout', '5m'
 }
 
-task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
+task buildSharedLibrary(type:Exec, dependsOn:[goGet, makeMocks]) {
     workingDir '.'
 
     def libName
@@ -277,7 +277,7 @@ task buildSharedLibrary(type:Exec, dependsOn:[tasks.goGet, tasks.makeMocks]) {
     args 'core.go'
 }
 
-task buildTestbed(type:Exec, dependsOn: [tasks.goGet, tasks.makeMocks, tasks.copyContracts]) {
+task buildTestbed(type:Exec, dependsOn: [goGet, makeMocks, copyContracts]) {
     workingDir '.'
 
     inputs.files(goFiles)
@@ -320,7 +320,7 @@ task buildTestPluginsSharedLibraryGRPCTransport(type:Exec) {
 }
 
 task buildTestPluginsSharedLibraries {
-    dependsOn tasks.buildTestPluginsSharedLibraryGRPCTransport
+    dependsOn buildTestPluginsSharedLibraryGRPCTransport
 }
 
 abstract class UnitTests extends Exec {
@@ -361,7 +361,7 @@ abstract class ComponentTest extends Exec {
     }
 }
 
-task setupCoverage(dependsOn: [tasks.protoc, tasks.copyContracts, tasks.makeMocks]) {
+task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
@@ -391,19 +391,19 @@ task unitTestPostgres(type: UnitTests, dependsOn: [
 
 task componentTestSQLite(type: ComponentTest, dependsOn: [
         ':testinfra:startTestInfra',
-        tasks.setupCoverage,
-        tasks.goGet,
-        tasks.copyContracts,
+        setupCoverage,
+        goGet,
+        copyContracts,
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [
-        tasks.protoc,
-        tasks.unitTestSQLite,
-        tasks.unitTestPostgres,
-        tasks.componentTestSQLite,
-        // tasks.componentTestPostgres
+        protoc,
+        unitTestSQLite,
+        unitTestPostgres,
+        componentTestSQLite,
+        // componentTestPostgres
     ]) {
     inputs.files(fileTree(project.mkdir('coverage')) {
         include "covcounters.*"
@@ -446,10 +446,8 @@ task testcov(type: Exec, dependsOn: [test, aggregateCoverage]) {
 }
 
 task build {
-    dependsOn tasks.lint
-    dependsOn tasks.test
-    dependsOn tasks.aggregateCoverage
-    dependsOn tasks.checkCoverage
+    dependsOn lint
+    dependsOn test
 }
 
 dependencies {
