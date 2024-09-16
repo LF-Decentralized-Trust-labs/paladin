@@ -20,12 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -87,17 +87,29 @@ func (n *Noto) prepareInputs(ctx context.Context, owner ethtypes.Address0xHex, a
 	stateRefs := []*pb.StateRef{}
 	coins := []*types.NotoCoin{}
 	for {
-		queryBuilder := query.NewQueryBuilder().
-			Limit(10).
-			Sort(".created").
-			Equal("owner", owner.String())
-
+		// Simple oldest coin first algorithm
+		// TODO: make this configurable
+		// TODO: why is filters.QueryJSON not a public interface?
+		query := map[string]interface{}{
+			"limit": 10,
+			"sort":  []string{".created"},
+			"eq": []map[string]string{{
+				"field": "owner",
+				"value": owner.String(),
+			}},
+		}
 		if lastStateTimestamp > 0 {
-			queryBuilder.GreaterThan(".created", lastStateTimestamp)
+			query["gt"] = []map[string]string{{
+				"field": ".created",
+				"value": strconv.FormatInt(lastStateTimestamp, 10),
+			}}
+		}
+		queryJSON, err := json.Marshal(query)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 
-		states, err := n.findAvailableStates(ctx, queryBuilder.Query().String())
-
+		states, err := n.findAvailableStates(ctx, string(queryJSON))
 		if err != nil {
 			return nil, nil, nil, err
 		}
