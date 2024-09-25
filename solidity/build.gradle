@@ -66,6 +66,10 @@ task test(type: Exec, dependsOn: compile) {
     outputs.file(testResults)
 }
 
+task assemble{
+    enabled = false
+}
+
 task build(dependsOn: test) {}
 
 task clean(type: Delete) {

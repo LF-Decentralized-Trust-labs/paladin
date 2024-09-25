@@ -27,3 +27,8 @@ configurations {
 artifacts {
     protoDefinitions(protosDir) {}
 }
+
+task assemble {
+    // this package is not intended to be built independently
+    enabled = false
+}

@@ -3,15 +3,60 @@ plugins {
     id 'application'
 }
 
-mainClassName = 'io.kaleido.Main'
 group = 'io.kaleido'
-version = '1.0-SNAPSHOT'
+
+// Set the main class for the JAR
+jar {
+    dependsOn 'classes'  // Ensure the classes are compiled before creating the JAR
+
+    manifest {
+        attributes(
+            'Main-Class': 'io.kaleido.paladin.Main'
+        )
+    }
+
+    if (project.hasProperty('jarVersion')) {
+        archiveVersion = project.jarVersion
+    } else {
+        archiveVersion = ''
+    }
+
+    archiveBaseName = 'paladin'  // Base name of the JAR, the version will be added to this
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    from sourceSets.main.output
+
+    // Exclude signature files from dependencies
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
 
 task wrapper(type: Wrapper){}
 
+assemble.dependsOn jar
+
 application {
+    mainClassName = 'io.kaleido.paladin.Main'  // Your main class
     applicationDefaultJvmArgs = ["-Djna.library.path=" +
-        file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath ]
+        file("${rootDir}/core/go/build/libs").absolutePath + ":" + file("${rootDir}/toolkit/go/build/libs").absolutePath ]
+}
+
+// run -PconfigFile=config.paladin.yaml -Pmode=node to override the default values
+tasks.named('run') {
+    // Check if 'configFile' and 'mode' properties are passed via the command line
+    def configFile = project.hasProperty('configFile') ? project.getProperty('configFile') : 'config.paladin.yaml'
+    def mode = project.hasProperty('mode') ? project.getProperty('mode') : 'testbed'
+
+    // Pass these arguments to the Java application
+    args = [configFile, mode]
+
+    doFirst {
+        println "Running with config file: $configFile and mode: $mode"
+    }
 }
 
 repositories {
@@ -24,7 +69,7 @@ test {
         showStandardStreams = true
     }
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/core/go/build/libs").absolutePath + ":" + file("${rootDir}/toolkit/go/build/libs").absolutePath
 }
 
 configurations {

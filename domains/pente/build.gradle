@@ -3,7 +3,6 @@ plugins {
 }
 
 group = 'io.kaleido'
-version = '1.0-SNAPSHOT'
 
 configurations {
     // Resolvable configurations
@@ -17,12 +16,19 @@ configurations {
     }
 }
 
+jar {
+    archiveBaseName = 'pente'
+    archiveVersion = ''
+}
+
+assemble.dependsOn jar
+
 test {
     testLogging {
         showStandardStreams = true
     }
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/core/go").absolutePath + ":" + file("${rootDir}/toolkit/go").absolutePath
+    systemProperty "jna.library.path", file("${rootDir}/core/go/build/libs").absolutePath + ":" + file("${rootDir}/toolkit/go/build/libs").absolutePath
     dependsOn ':testinfra:startTestInfra'
 }
 

@@ -90,11 +90,7 @@ protobuf {
     }
 }
 
-// sourceSets {
-//     main {
-//         java {
-//             srcDirs 'build/generated/source/proto/main/grpc'
-//             srcDirs 'build/generated/source/proto/main/java'
-//         }
-//     }
-// }
+tasks.named('assemble') {
+    // this package is not intended to be built independently
+    enabled = false
+}

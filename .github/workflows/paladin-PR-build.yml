@@ -40,3 +40,22 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew -PcomposeLogs=true -PverboseTests=true --no-daemon --parallel build
+      
+      # Run the Gradle assemble task
+      - name: Run Gradle assemble
+        run: ./gradlew assemble
+
+      # Verify the files in build/libs
+      - name: Check files in build/libs
+        run: |
+          test -f build/libs/libcore.dylib || (echo "libcore.dylib not found" && exit 1)
+          test -f build/libs/libcore.h || (echo "libcore.h not found" && exit 1)
+          test -f build/libs/libstarter.dylib || (echo "libstarter.dylib not found" && exit 1)
+          test -f build/libs/libstarter.h || (echo "libstarter.h not found" && exit 1)
+          test -f build/libs/paladin.jar || (echo "paladin.jar not found" && exit 1)
+
+      # Verify the files in build/domains
+      - name: Check files in build/domains
+        run: |
+          test -f build/domains/pente.jar || (echo "pente.jar not found" && exit 1)
+

@@ -171,6 +171,14 @@ task test(type: Exec) {
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
+task buildGo {
+    // TODO: implement buildGo task
+    doFirst() {
+        println ":domain:zeto buildGo task not implemented"
+    }
+}
+
+
 task build {
     dependsOn test
     dependsOn testE2E
@@ -181,4 +189,8 @@ task clean(type: Delete) {
     delete 'internal/zeto/abis'
     delete zkpOut
     delete toolsOut
+}
+
+task assemble {
+    dependsOn buildGo
 }
