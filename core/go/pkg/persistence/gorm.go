@@ -55,6 +55,7 @@ type SQLDBConfig struct {
 	AutoMigrate     *bool   `yaml:"autoMigrate"`
 	MigrationsDir   string  `yaml:"migrationsDir"`
 	DebugQueries    bool    `yaml:"debugQueries"`
+	StatementCache  *bool   `yaml:"statementCache"`
 }
 
 type SQLDBConfigDefaults struct {
@@ -70,7 +71,10 @@ func NewSQLProvider(ctx context.Context, p SQLDBProvider, conf *SQLDBConfig, def
 	}
 
 	var gp *provider
-	gdb, err := gorm.Open(p.Open(conf.URI), &gorm.Config{})
+	gdb, err := gorm.Open(p.Open(conf.URI), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            confutil.Bool(conf.StatementCache, *defs.StatementCache),
+	})
 	if err == nil {
 		gp = &provider{
 			p:    p,

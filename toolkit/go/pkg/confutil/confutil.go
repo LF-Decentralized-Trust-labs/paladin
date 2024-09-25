@@ -39,8 +39,10 @@ func Int(iVal *int, def int) int {
 }
 
 func IntMin(iVal *int, min int, def int) int {
-	if iVal == nil || *iVal < min {
+	if iVal == nil {
 		return def
+	} else if *iVal < min {
+		return min
 	}
 	return *iVal
 }
@@ -53,15 +55,19 @@ func Int64(iVal *int64, def int64) int64 {
 }
 
 func Int64Min(iVal *int64, min int64, def int64) int64 {
-	if iVal == nil || *iVal < min {
+	if iVal == nil {
 		return def
+	} else if *iVal < min {
+		return min
 	}
 	return *iVal
 }
 
 func Float64Min(iVal *float64, min float64, def float64) float64 {
-	if iVal == nil || *iVal < min {
+	if iVal == nil {
 		return def
+	} else if *iVal < min {
+		return min
 	}
 	return *iVal
 }
@@ -119,9 +125,11 @@ func DurationMin(sVal *string, min time.Duration, def string) time.Duration {
 			dVal = &d
 		}
 	}
-	if dVal == nil || *dVal < min {
+	if dVal == nil {
 		defDuration, _ := time.ParseDuration(def)
 		dVal = &defDuration
+	} else if *dVal < min {
+		return min
 	}
 	return *dVal
 }
@@ -164,9 +172,11 @@ func ByteSize(sVal *string, min int64, def string) int64 {
 			iVal = &i
 		}
 	}
-	if iVal == nil || *iVal < min {
+	if iVal == nil {
 		i, _ := units.RAMInBytes(def)
 		iVal = &i
+	} else if *iVal < min {
+		return min
 	}
 	return *iVal
 }

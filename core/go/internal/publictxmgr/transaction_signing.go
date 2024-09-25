@@ -28,7 +28,7 @@ import (
 func (it *InFlightTransactionStageController) signTx(ctx context.Context, signer *ethclient.ResolvedSigner, ethTx *ethsigner.Transaction) ([]byte, *tktypes.Bytes32, error) {
 	log.L(ctx).Debugf("signTx entry")
 	signStart := time.Now()
-	signedMessage, err := it.ethClient.BuildRawTransactionNoResolve(ctx, ethclient.EIP1559, signer, ethTx, nil) // TODO: move the logic inside to here as BuildRawTransaction seems to not be a function that should be used.
+	signedMessage, err := it.ethClient.BuildRawTransactionNoResolve(ctx, ethclient.EIP1559, signer, ethTx)
 
 	if err != nil {
 		it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationSign), string(GenericStatusFail), time.Since(signStart).Seconds())

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -302,6 +303,27 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 										rsc.StageOutputsToBePersisted.UpdateSubStatus(BaseTxActionSign, fftypes.JSONAnyPtr(fmt.Sprintf(`{"hash":"%s"}`, rsIn.SignOutput.TxHash)), nil)
 									}
 								}
+
+								// Very important that we persist the transaction after SIGNING (and before SUBMISSION)
+								// as once submitted we will only be able to match back up if we can recover our TX by
+								// hash from our submission records.
+								if rsc.StageOutput.SignOutput.TxHash != nil {
+									// we add the tx hash in to the submitted transaction array
+									// the persistence logic will add it to the submitted hashes tracking array if it's new
+									if rsc.StageOutputsToBePersisted.TxUpdates == nil {
+										rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{}
+									}
+									rsc.InMemoryTx.GetGasPriceObject()
+									gasPriceJSON, _ := json.Marshal(rsc.InMemoryTx.GetGasPriceObject())
+									rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &publicSubmission{
+										SignerNonce:     rsc.InMemoryTx.GetSignerNonce(),
+										Created:         tktypes.TimestampNow(),
+										TransactionHash: *rsc.StageOutput.SignOutput.TxHash,
+										GasPricing:      gasPriceJSON,
+									}
+									rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash = rsc.StageOutput.SignOutput.TxHash
+								}
+
 								_ = it.TriggerPersistTxState(ctx)
 							}
 						case InFlightTxStageSubmitting:
@@ -383,14 +405,6 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 										rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash = rsc.StageOutput.SubmitOutput.TxHash
 										rsc.StageOutputsToBePersisted.TxUpdates.LastSubmit = rsIn.SubmitOutput.SubmissionTime
 									}
-									if rsc.StageOutput.SubmitOutput.TxHash != nil {
-										// we add the tx hash in to the submitted transaction array
-										// the persistence logic will add it to the submitted hashes tracking array if it's new
-										if rsc.StageOutputsToBePersisted.TxUpdates == nil {
-											rsc.StageOutputsToBePersisted.TxUpdates = &BaseTXUpdates{}
-										}
-										rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash = rsc.StageOutput.SubmitOutput.TxHash
-									}
 								}
 
 								_ = it.TriggerPersistTxState(ctx)
@@ -435,12 +449,6 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 				return unprocessedStageOutputs
 			})
 
-			if rsc.Stage == InFlightTxStageConfirming && time.Since(rsc.InMemoryTx.GetLastSubmitTime().Time()) > it.resubmitInterval {
-				// timed out waiting for confirmation
-				log.L(ctx).Debugf("Clearing stage context to trigger a resubmission TX %s (hash %s)", rsc.InMemoryTx.GetSignerNonce(), rsc.InMemoryTx.GetTransactionHash())
-				it.stateManager.ClearRunningStageContext(ctx)
-			}
-
 			if rsc.StageErrored && time.Since(rsc.StageStartTime) > it.stageRetryTimeout {
 				// if the stage didn't succeed, we retry the stage after the stage timeout
 				log.L(ctx).Debugf("Retrying stage: %s, for transaction with ID: %s after %s", rsc.Stage, rsc.InMemoryTx.GetSignerNonce(), time.Since(rsc.StageStartTime))
@@ -465,12 +473,7 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 	if it.stateManager.GetRunningStageContext(ctx) == nil {
 		// no running context in flight
 		// first check whether the current transaction is before the confirmed nonce
-		if tIn.CurrentConfirmedNonce != nil && it.stateManager.GetNonce() < *tIn.CurrentConfirmedNonce && !it.stateManager.IsReadyToExit() {
-			// check and track the existing transaction hash
-			log.L(ctx).Debugf("Transaction with ID %s has gone past confirmed nonce, entering confirmation stage", it.stateManager.GetSignerNonce())
-			it.stateManager.AddConfirmationsOutput(ctx, nil)
-			it.TriggerNewStageRun(ctx, InFlightTxStageConfirming, BaseTxSubStatusTracking, nil)
-		} else if it.newStatus != nil && !it.stateManager.IsReadyToExit() && *it.newStatus != it.stateManager.GetInFlightStatus() { // first apply any status update that's required
+		if it.newStatus != nil && !it.stateManager.IsReadyToExit() && *it.newStatus != it.stateManager.GetInFlightStatus() { // first apply any status update that's required
 			log.L(ctx).Debugf("Transaction with ID %s entering status update, current status: %s, target status: %s", it.stateManager.GetSignerNonce(), it.stateManager.GetInFlightStatus(), *it.newStatus)
 			it.TriggerNewStageRun(ctx, InFlightTxStageStatusUpdate, BaseTxSubStatusReceived, nil)
 		} else if it.stateManager.IsReadyToExit() {
@@ -509,8 +512,9 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 					it.TriggerNewStageRun(ctx, InFlightTxStageRetrieveGasPrice, BaseTxSubStatusStale, nil)
 				} else {
 					// check and track the existing transaction hash
+					// ... this is the "nil" stage
 					log.L(ctx).Debugf("Transaction with ID %s entering tracking stage", it.stateManager.GetSignerNonce())
-					it.TriggerNewStageRun(ctx, InFlightTxStageConfirming, BaseTxSubStatusTracking, nil)
+					it.stateManager.ClearRunningStageContext(ctx)
 				}
 			}
 
@@ -646,6 +650,7 @@ func (it *InFlightTransactionStageController) executeAsync(funcToExecute func(),
 			if err := recover(); err != nil {
 				// if the function panicked, catch it and write a panic error to the output queue
 				log.L(ctx).Errorf("Panic error detected for transaction %s, when executing: %s, error: %+v", it.stateManager.GetSignerNonce(), stage, err)
+				debug.PrintStack()
 				it.stateManager.AddPanicOutput(ctx, stage)
 			}
 			// trigger another loop of in-flight orchestrator

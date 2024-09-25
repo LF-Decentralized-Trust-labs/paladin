@@ -46,11 +46,13 @@ type PublicTxBatch interface {
 }
 
 var PublicTxFilterFields filters.FieldSet = filters.FieldMap{
-	"transaction":   filters.UUIDField("transaction"),
-	"resubmitIndex": filters.UUIDField("resubmit_idx"),
-	"from":          filters.HexBytesField("from"),
-	"nonce":         filters.Int64Field("nonce"),
-	"created":       filters.Int64Field("created"),
+	"from":            filters.HexBytesField("from"),
+	"nonce":           filters.Int64Field("nonce"),
+	"created":         filters.Int64Field("created"),
+	"completedAt":     filters.Int64Field(`"Completed"."created"`),
+	"transactionHash": filters.Int64Field(`"Completed"."tx_hash"`),
+	"success":         filters.BooleanField(`"Completed"."success"`),
+	"revertData":      filters.HexBytesField(`"Completed"."revert_data"`),
 }
 
 type PublicTxSubmission struct {

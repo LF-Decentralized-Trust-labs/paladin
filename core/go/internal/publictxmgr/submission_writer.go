@@ -41,7 +41,7 @@ func (sw *submissionWriter) runBatch(ctx context.Context, tx *gorm.DB, values []
 	err := tx.
 		Table("public_submissions").
 		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "state"}},
+			Columns:   []clause.Column{{Name: "tx_hash"}},
 			DoNothing: true, // immutable
 		}).
 		Create(values).

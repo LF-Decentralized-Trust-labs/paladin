@@ -479,9 +479,7 @@ func TestUpsertInternalEventStreamUpdateFail(t *testing.T) {
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows(
 		[]string{"id", "abi"},
 	).AddRow(uuid.New().String(), testEventABIJSON))
-	p.Mock.ExpectBegin()
 	p.Mock.ExpectExec("UPDATE.*config").WillReturnError(fmt.Errorf("pop"))
-	p.Mock.ExpectRollback()
 
 	err := bi.Start(&InternalEventStream{
 		Definition: &EventStream{
@@ -504,9 +502,7 @@ func TestUpsertInternalEventStreamCreateFail(t *testing.T) {
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows(
 		[]string{"id", "abi"},
 	))
-	p.Mock.ExpectBegin()
 	p.Mock.ExpectExec("INSERT.*config").WillReturnError(fmt.Errorf("pop"))
-	p.Mock.ExpectRollback()
 
 	err := bi.Start(&InternalEventStream{
 		Definition: &EventStream{

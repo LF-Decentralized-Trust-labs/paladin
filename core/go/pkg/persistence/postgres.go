@@ -34,6 +34,7 @@ var PostgresDefaults = &SQLDBConfig{
 	MaxIdleConns:    confutil.P(100),
 	ConnMaxIdleTime: confutil.P("60s"),
 	ConnMaxLifetime: confutil.P("0"),
+	StatementCache:  confutil.P(true),
 }
 
 type postgresProvider struct{}

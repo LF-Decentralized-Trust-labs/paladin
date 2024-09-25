@@ -395,7 +395,7 @@ func TestUnconnectedRPCClient(t *testing.T) {
 	ctx := context.Background()
 	keymgr, kmDone := newTestHDWalletKeyManager(t)
 	defer kmDone()
-	ec := NewUnconnectedRPCClient(ctx, keymgr, &Config{})
+	ec := NewUnconnectedRPCClient(ctx, keymgr, &Config{}, 0)
 	_, err := ec.GetTransactionReceipt(ctx, testTxHash)
 	assert.Regexp(t, "PD011517", err)
 }

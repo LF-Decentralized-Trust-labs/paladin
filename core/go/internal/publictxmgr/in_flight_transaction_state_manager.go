@@ -17,7 +17,6 @@ package publictxmgr
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"sync"
 	"time"
@@ -229,6 +228,7 @@ func (iftxs *inFlightTransactionState) AddSubmitOutput(ctx context.Context, txHa
 		SubmitOutput: &SubmitOutputs{
 			SubmissionTime:    submissionTime,
 			SubmissionOutcome: submissionOutcome,
+			TxHash:            txHash,
 			ErrorReason:       string(errorReason),
 			Err:               err,
 		},
@@ -263,12 +263,13 @@ func (iftxs *inFlightTransactionState) AddGasPriceOutput(ctx context.Context, ga
 }
 
 func (iftxs *inFlightTransactionState) AddConfirmationsOutput(ctx context.Context, confirmedTx *blockindexer.IndexedTransaction) {
-	start := time.Now()
-	iftxs.AddStageOutputs(ctx, &StageOutput{
-		Stage:              InFlightTxStageConfirming,
-		ConfirmationOutput: &ConfirmationOutputs{},
-	})
-	log.L(ctx).Debugf("%s AddConfirmationsOutput took %s to write the result", iftxs.InMemoryTxStateManager.GetSignerNonce(), time.Since(start))
+	panic("unused")
+	// start := time.Now()
+	// iftxs.AddStageOutputs(ctx, &StageOutput{
+	// 	Stage:              InFlightTxStageConfirming,
+	// 	ConfirmationOutput: &ConfirmationOutputs{},
+	// })
+	// log.L(ctx).Debugf("%s AddConfirmationsOutput took %s to write the result", iftxs.InMemoryTxStateManager.GetSignerNonce(), time.Since(start))
 }
 
 func (iftxs *inFlightTransactionState) AddPanicOutput(ctx context.Context, stage InFlightTxStage) {
@@ -290,15 +291,6 @@ func (iftxs *inFlightTransactionState) PersistTxState(ctx context.Context) (stag
 	}
 
 	confirmationReceived := rsc.StageOutputsToBePersisted.ConfirmationReceived
-	if rsc.StageOutputsToBePersisted.TxUpdates != nil && rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash != nil {
-		b, _ := json.Marshal(mtx.GetGasPriceObject())
-		rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &publicSubmission{
-			SignerNonce:     mtx.GetSignerNonce(),
-			Created:         tktypes.TimestampNow(),
-			TransactionHash: *rsc.StageOutputsToBePersisted.TxUpdates.TransactionHash,
-			GasPricing:      b,
-		}
-	}
 	if confirmationReceived {
 		iftxs.NotifyAddressBalanceChanged(ctx, mtx.GetFrom())
 		if !mtx.GetValue().NilOrZero() && mtx.GetTo() != nil {

@@ -34,6 +34,7 @@ var SQLMockDefaults = &persistence.SQLDBConfig{
 	MaxIdleConns:    confutil.P(1),
 	ConnMaxIdleTime: confutil.P("0"),
 	ConnMaxLifetime: confutil.P("0"),
+	StatementCache:  confutil.P(false),
 }
 
 type SQLMockProvider struct {

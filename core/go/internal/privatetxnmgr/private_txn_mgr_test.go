@@ -1061,7 +1061,7 @@ func NewPrivateTransactionMgrForTestingWithFakePublicTxManager(t *testing.T, dom
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
 	mocks.allComponents.On("Persistence").Return(persistence.NewUnitTestPersistence(ctx)).Maybe()
 	mocks.allComponents.On("EthClientFactory").Return(mocks.ethClientFactory).Maybe()
-	unconnectedRealClient := ethclient.NewUnconnectedRPCClient(ctx, mocks.keyManager, &ethclient.Config{})
+	unconnectedRealClient := ethclient.NewUnconnectedRPCClient(ctx, mocks.keyManager, &ethclient.Config{}, 0)
 	mocks.ethClientFactory.On("SharedWS").Return(unconnectedRealClient).Maybe()
 
 	mocks.stateStore.On("RunInDomainContext", mock.Anything, mock.AnythingOfType("statestore.DomainContextFunction")).Run(func(args mock.Arguments) {

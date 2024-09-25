@@ -23,7 +23,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
@@ -222,11 +221,6 @@ const (
 	//   completion criteria -> receipt / prepare
 	//     the last sub-status is a completed (success/expired) "submit" substatus
 	InFlightTxStageSubmitting InFlightTxStage = "submit"
-	//   entry criteria:
-	//     there is a completed "receipt" substatus (!!!second high priority)
-	//   completion criteria -> complete
-	//      the last sub-status is a completed "confirmed" substatus
-	InFlightTxStageConfirming InFlightTxStage = "confirm"
 	//   entry criteria(OR):
 	//     the last sub-status is a completed "confirmed" substatus
 	//   end of lifecycle, rely on transaction engine to remove the item from the queue
@@ -243,7 +237,6 @@ var AllInFlightStages = []string{
 	string(InFlightTxStageRetrieveGasPrice),
 	string(InFlightTxStageSigning),
 	string(InFlightTxStageSubmitting),
-	string(InFlightTxStageConfirming),
 	string(InFlightTxStageComplete),
 	string(InFlightTxStageQueued),
 }
@@ -394,7 +387,6 @@ type OrchestratorContext struct {
 	// input from transaction engine
 	AvailableToSpend         *big.Int
 	PreviousNonceCostUnknown bool
-	CurrentConfirmedNonce    *uint64
 }
 
 // output of some stages doesn't get written into the database
@@ -429,7 +421,6 @@ type InFlightTransactionStateManager interface {
 	AddSubmitOutput(ctx context.Context, txHash *tktypes.Bytes32, submissionTime *tktypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error)
 	AddSignOutput(ctx context.Context, signedMessage []byte, txHash *tktypes.Bytes32, err error)
 	AddGasPriceOutput(ctx context.Context, gasPriceObject *ptxapi.PublicTxGasPricing, err error)
-	AddConfirmationsOutput(ctx context.Context, indexedTx *blockindexer.IndexedTransaction)
 	AddPanicOutput(ctx context.Context, stage InFlightTxStage)
 
 	PersistTxState(ctx context.Context) (stage InFlightTxStage, persistenceTime time.Time, err error)

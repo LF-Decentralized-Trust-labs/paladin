@@ -21,8 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/confutil"
@@ -167,9 +165,6 @@ type orchestrator struct {
 
 	staleTimeout    time.Duration
 	lastQueueUpdate time.Time
-
-	confirmedNonceLock    sync.Mutex
-	highestConfirmedNonce *uint64
 }
 
 const veryShortMinimum = 50 * time.Millisecond
@@ -219,6 +214,7 @@ func (oc *orchestrator) orchestratorLoop() {
 	defer close(oc.orchestratorLoopDone)
 
 	ticker := time.NewTicker(oc.orchestratorPollingInterval)
+	defer ticker.Stop()
 	for {
 		// an InFlight
 		select {
@@ -255,24 +251,14 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		stageCounts[stageName] = 0
 	}
 
-	var latestCompletedNonce *uint64
-	highestConfirmedNonce := oc.getHighestCompletedNonce()
-	var startFromNonce uint64
-	hasCompletedNonce := false
-	if highestConfirmedNonce != nil {
-		hasCompletedNonce = true
-		startFromNonce = *highestConfirmedNonce
-	}
+	var highestInFlightNonce uint64
 	// Run through copying across from the old InFlight list to the new one, those that aren't ready to be deleted
 	for _, p := range oldInFlight {
-		if !hasCompletedNonce || p.stateManager.GetNonce()-startFromNonce <= 1 {
-			startFromNonce = p.stateManager.GetNonce()
-			hasCompletedNonce = true
+		if p.stateManager.GetNonce() > highestInFlightNonce {
+			highestInFlightNonce = p.stateManager.GetNonce()
 		}
 		if p.stateManager.CanBeRemoved(ctx) {
 			oc.totalCompleted = oc.totalCompleted + 1
-			txNonce := p.stateManager.GetNonce()
-			latestCompletedNonce = &txNonce
 			queueUpdated = true
 			log.L(ctx).Debugf("Orchestrator poll and process, marking %s as complete after: %s", p.stateManager.GetSignerNonce(), time.Since(p.stateManager.GetCreatedTime().Time()))
 		} else {
@@ -287,10 +273,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 	}
 
 	log.L(ctx).Debugf("Orchestrator poll and process, stage counts: %+v", stageCounts)
-
-	if latestCompletedNonce != nil {
-		oc.notifyConfirmedNonceOrchestrator(*latestCompletedNonce)
-	}
 	oldLen := len(oc.InFlightTxs)
 	total = oldLen
 	// check and poll new transactions from the persistence if we can handle more
@@ -304,13 +286,16 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 				WithContext(ctx).
 				Table("public_txns").
 				Joins("Completed").
-				Where("Completed__tx_hash IS NULL").
+				Where(`"Completed"."tx_hash" IS NULL`).
 				Where("suspended IS FALSE").
-				Where("from = ?", oc.signingAddress).
+				Where(`"from" = ?`, oc.signingAddress).
 				Order("nonce").
 				Limit(spaces)
 			if len(oc.InFlightTxs) > 0 {
-				q = q.Where("nonce > ?", startFromNonce)
+				// We don't want to see any of the ones we already have in flight.
+				// The only way something leaves our in-flight list, is if we get a notification from the block indexer
+				// that it committed a DB transaction that removed it from our list.
+				q = q.Where("nonce > ?", highestInFlightNonce)
 			}
 			// Note we do not use an explicit DB transaction to coordinate the read of the
 			// transactions table with the read of the submissions table,
@@ -329,9 +314,6 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		for _, ptx := range additional {
 			queueUpdated = true
 			it := NewInFlightTransactionStageController(oc.pubTxManager, oc, ptx)
-			if highestConfirmedNonce != nil && *highestConfirmedNonce < ptx.Nonce /* an confirmed tx is missed*/ {
-				it.stateManager.AddConfirmationsOutput(ctx, nil) // trigger confirmation stage
-			}
 			oc.InFlightTxs = append(oc.InFlightTxs, it)
 			txStage := it.stateManager.GetStage(ctx)
 			if string(txStage) == "" {
@@ -343,7 +325,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 		total = len(oc.InFlightTxs)
 		polled = total - oldLen
 		if polled > 0 {
-			log.L(ctx).Debugf("InFlight set updated len=%d head-nonce=%d tail-nonce=%d old-tail=%d", len(oc.InFlightTxs), oc.InFlightTxs[0].stateManager.GetNonce(), oc.InFlightTxs[total-1].stateManager.GetNonce(), startFromNonce)
+			log.L(ctx).Debugf("InFlight set updated len=%d head-nonce=%d tail-nonce=%d old-tail=%d", len(oc.InFlightTxs), oc.InFlightTxs[0].stateManager.GetNonce(), oc.InFlightTxs[total-1].stateManager.GetNonce(), highestInFlightNonce)
 		}
 		oc.thMetrics.RecordInFlightTxQueueMetrics(ctx, stageCounts, oc.maxInFlightTxs-len(oc.InFlightTxs))
 	}
@@ -404,7 +386,6 @@ func (oc *orchestrator) ProcessInFlightTransactions(ctx context.Context, its []*
 	}
 
 	previousNonceCostUnknown := false
-	currentConfirmedNonce := oc.getHighestCompletedNonce()
 	for i, it := range its {
 		log.L(ctx).Debugf("%s ProcessInFlightTransaction for signing address %s processing transaction with ID: %s, index: %d", now.String(), oc.signingAddress, it.stateManager.GetSignerNonce(), i)
 		var availableToSpend *big.Int
@@ -414,7 +395,6 @@ func (oc *orchestrator) ProcessInFlightTransactions(ctx context.Context, its []*
 		triggerNextStageOutput := it.ProduceLatestInFlightStageContext(ctx, &OrchestratorContext{
 			AvailableToSpend:         availableToSpend,
 			PreviousNonceCostUnknown: previousNonceCostUnknown,
-			CurrentConfirmedNonce:    currentConfirmedNonce,
 		})
 		if !skipBalanceCheck {
 			if triggerNextStageOutput.Cost != nil {
@@ -448,64 +428,6 @@ func (oc *orchestrator) Start(c context.Context) (done <-chan struct{}, err erro
 	return oc.orchestratorLoopDone, nil
 }
 
-// HandleConfirmedTransactions
-// adds confirmed transactions to the event buffer concurrently for all in-flight transactions
-// currently, the submission queue and tracking queue are the same queue, which means the logic should not miss
-// confirmations for a pending transaction.
-// If the two queues needs to split in the future to allow optimistic submission & delayed confirmation, this logic will need to be updated.
-func (oc *orchestrator) HandleConfirmedTransactions(ctx context.Context, confirmedTransactions map[uint64]*blockindexer.IndexedTransaction, maxNonce uint64) error {
-	recordStart := time.Now()
-	oc.InFlightTxsMux.Lock()
-	defer oc.InFlightTxsMux.Unlock()
-	if len(oc.InFlightTxs) > 0 {
-		addOutputResponse := make(chan struct{}, len(oc.InFlightTxs))
-		for _, it := range oc.InFlightTxs { // no new transaction orchestrator is started, rely on the main loop to apply strict order
-			if it != nil {
-				currentTx := it
-				itNonce := currentTx.stateManager.GetNonce()
-				if maxNonce < itNonce {
-					// there is a confirmed transaction available for this transaction
-					go func() {
-						indexTx := confirmedTransactions[itNonce]
-						if indexTx != nil {
-							currentTx.MarkHistoricalTime("confirmation_event_wait_to_be_recorded", recordStart)
-							currentTx.MarkTime("confirmation_event_wait_to_be_processed")
-							// Will be picked up on the next orchestrator loop - guaranteed to occur before Confirmed
-							currentTx.stateManager.AddConfirmationsOutput(ctx, indexTx)
-							currentTx.MarkInFlightTxStale()
-						}
-						addOutputResponse <- struct{}{}
-					}()
-				} else {
-					addOutputResponse <- struct{}{}
-				}
-
-			} else {
-				addOutputResponse <- struct{}{}
-			}
-		}
-
-		resultCount := 0
-
-		// wait for all add output to complete
-		for {
-			select {
-			case <-addOutputResponse:
-				resultCount++
-			case <-ctx.Done():
-				return i18n.NewError(ctx, msgs.MsgContextCanceled)
-			}
-			if resultCount == len(oc.InFlightTxs) {
-				break
-			}
-		}
-	}
-
-	// we've processed all confirmed nonce in this batch, update the confirmed nonce so any gaps will be filled in
-	oc.notifyConfirmedNonceOrchestrator(maxNonce)
-	return nil
-}
-
 // Stop the InFlight transaction process.
 func (oc *orchestrator) Stop() {
 	// try to send an item in `stopProcess` channel, which has a buffer of 1
@@ -523,18 +445,4 @@ func (oc *orchestrator) MarkInFlightTxStale() {
 	case oc.InFlightTxsStale <- true:
 	default:
 	}
-}
-
-func (oc *orchestrator) notifyConfirmedNonceOrchestrator(nonce uint64) {
-	oc.confirmedNonceLock.Lock()
-	defer oc.confirmedNonceLock.Unlock()
-	if oc.highestConfirmedNonce == nil || nonce > *oc.highestConfirmedNonce {
-		oc.highestConfirmedNonce = &nonce
-	}
-}
-
-func (oc *orchestrator) getHighestCompletedNonce() *uint64 {
-	oc.confirmedNonceLock.Lock()
-	defer oc.confirmedNonceLock.Unlock()
-	return oc.highestConfirmedNonce
 }

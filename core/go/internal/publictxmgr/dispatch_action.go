@@ -47,9 +47,9 @@ func (pte *pubTxManager) dispatchAction(ctx context.Context, from tktypes.EthAdd
 	response := make(chan error, 1)
 	startTime := time.Now()
 	go func() {
-		pte.InFlightOrchestratorMux.Lock()
-		defer pte.InFlightOrchestratorMux.Unlock()
-		inFlightOrchestrator, orchestratorInFlight := pte.InFlightOrchestrators[from]
+		pte.inFlightOrchestratorMux.Lock()
+		defer pte.inFlightOrchestratorMux.Unlock()
+		inFlightOrchestrator, orchestratorInFlight := pte.inFlightOrchestrators[from]
 		switch action {
 		case ActionCompleted:
 			// Only need to pass this on if there's an orchestrator in flight for this signing address
@@ -92,7 +92,8 @@ func (oc *orchestrator) dispatchAction(ctx context.Context, nonce uint64, action
 	if pending != nil {
 		switch action {
 		case ActionCompleted:
-			_, _ = pending.NotifyStatusUpdate(ctx, InFlightStatusConfirmReceived)
+			_, err := pending.NotifyStatusUpdate(ctx, InFlightStatusConfirmReceived)
+			response <- err
 		case ActionSuspend, ActionResume:
 			var suspendedFlag bool
 			if action == ActionSuspend {

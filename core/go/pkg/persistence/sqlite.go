@@ -34,6 +34,7 @@ var SQLiteDefaults = &SQLDBConfig{
 	MaxIdleConns:    confutil.P(1),
 	ConnMaxIdleTime: confutil.P("0"),
 	ConnMaxLifetime: confutil.P("0"),
+	StatementCache:  confutil.P(false),
 }
 
 func newSQLiteProvider(ctx context.Context, conf *Config) (p Persistence, err error) {

@@ -51,7 +51,7 @@ func (it *InFlightTransactionStageController) submitTX(ctx context.Context, mtx 
 	var submissionError error
 
 	retryError := it.transactionSubmissionRetry.Do(ctx, func(attempt int) ( /*retry*/ bool, error) {
-		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, tktypes.HexBytes(tktypes.MustParseHexBytes(string(signedMessage)).HexString0xPrefix()))
+		txHash, submissionError = it.ethClient.SendRawTransaction(ctx, tktypes.HexBytes(signedMessage))
 		if submissionError == nil {
 			submissionOutcome = SubmissionOutcomeFailedRequiresRetry
 			it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationTransactionSend), string(GenericStatusSuccess), time.Since(sendStart).Seconds())

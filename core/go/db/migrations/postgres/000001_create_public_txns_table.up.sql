@@ -17,13 +17,14 @@ CREATE TABLE public_txns (
 CREATE UNIQUE INDEX public_txns_from_nonce ON public_txns("from", "nonce");
 
 CREATE TABLE public_submissions (
+  "tx_hash"                   TEXT            NOT NULL,
   "signer_nonce"              TEXT            NOT NULL,
   "created"                   BIGINT          NOT NULL,
-  "tx_hash"                   TEXT            NOT NULL,
   "gas_pricing"               TEXT,
-  FOREIGN KEY ("signer_nonce") REFERENCES public_txns ("signer_nonce") ON DELETE CASCADE,
-  PRIMARY KEY("signer_nonce")
+  PRIMARY KEY("tx_hash"),
+  FOREIGN KEY ("signer_nonce") REFERENCES public_txns ("signer_nonce") ON DELETE CASCADE
 );
+CREATE INDEX public_submissions_signer_nonce on public_submissions("signer_nonce");
 
 CREATE TABLE public_completions (
   "signer_nonce"              TEXT            NOT NULL,

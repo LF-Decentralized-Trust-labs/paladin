@@ -131,9 +131,7 @@ func TestPublicConfirmMatch(t *testing.T) {
 				},
 			}, nil)
 
-		mc.db.ExpectBegin()
 		mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnResult(driver.ResultNoRows)
-		mc.db.ExpectCommit()
 
 		mc.publicTxMgr.On("NotifyConfirmPersisted", mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
 			return len(matches) == 1 && matches[0].TransactionID == txID
@@ -164,9 +162,7 @@ func TestPrivateConfirmMatch(t *testing.T) {
 				},
 			}, nil)
 
-		mc.db.ExpectBegin()
 		mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnResult(driver.ResultNoRows)
-		mc.db.ExpectCommit()
 
 		mnc := mc.privateTxMgr.On("NotifyConfirmed", mock.Anything, mock.Anything)
 		mnc.Run(func(args mock.Arguments) {
@@ -263,9 +259,7 @@ func TestConfirmInsertError(t *testing.T) {
 				},
 			}, nil)
 
-		mc.db.ExpectBegin()
 		mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnError(fmt.Errorf("pop"))
-		mc.db.ExpectRollback()
 	})
 	defer done()
 

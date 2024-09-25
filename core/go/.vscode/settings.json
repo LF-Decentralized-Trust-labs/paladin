@@ -1,4 +1,5 @@
 {
     "window.title": "${activeEditorShort}${separator}Paladin Core (${rootName})${separator}${profileName}",
-    "go.testTimeout": "30s"
+    "go.testTimeout": "30s",
+    "go.testTags": "testdbpostgres"
 }

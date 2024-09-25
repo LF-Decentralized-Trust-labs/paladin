@@ -27,19 +27,22 @@ import (
 func TestInt(t *testing.T) {
 	assert.Equal(t, 12345, Int(nil, 12345))
 	assert.Equal(t, 23456, Int(P(23456), 12345))
-	assert.Equal(t, 10, IntMin(P(0), 1, 10))
+	assert.Equal(t, 10, IntMin(nil, 1, 10))
+	assert.Equal(t, 1, IntMin(P(0), 1, 10))
 	assert.Equal(t, 5, IntMin(P(5), 1, 10))
 }
 
 func TestInt64(t *testing.T) {
 	assert.Equal(t, int64(12345), Int64(nil, 12345))
 	assert.Equal(t, int64(23456), Int64(P(int64(23456)), 12345))
-	assert.Equal(t, int64(10), Int64Min(P(int64(0)), 1, 10))
+	assert.Equal(t, int64(10), Int64Min(nil, 1, 10))
+	assert.Equal(t, int64(1), Int64Min(P(int64(0)), 1, 10))
 	assert.Equal(t, int64(5), Int64Min(P(int64(5)), 1, 10))
 }
 
 func TestFloat64(t *testing.T) {
-	assert.Equal(t, float64(10), Float64Min(P(float64(0)), 1, 10))
+	assert.Equal(t, float64(10), Float64Min(nil, 1, 10))
+	assert.Equal(t, float64(1), Float64Min(P(float64(0)), 1, 10))
 	assert.Equal(t, float64(5), Float64Min(P(float64(5)), 1, 10))
 }
 
@@ -87,6 +90,7 @@ func TestStringSlice(t *testing.T) {
 
 func TestDuration(t *testing.T) {
 	assert.Equal(t, 50*time.Second, DurationMin(nil, 0, "50s"))
+	assert.Equal(t, 25*time.Millisecond, DurationMin(P("10ms"), 25*time.Millisecond, "50s"))
 	assert.Equal(t, 50*time.Second, DurationMin(P("wrong"), 0, "50s"))
 	assert.Equal(t, 100*time.Millisecond, DurationMin(P("100ms"), 0, "50s"))
 
@@ -96,5 +100,6 @@ func TestDuration(t *testing.T) {
 
 func TestByteSize(t *testing.T) {
 	assert.Equal(t, int64(1024*1024), ByteSize(nil, 0, "1Mb"))
+	assert.Equal(t, int64(1024), ByteSize(P("100b"), 1024, "1Mb"))
 	assert.Equal(t, int64(16*1024), ByteSize(P("16Kb"), 0, "1Mb"))
 }

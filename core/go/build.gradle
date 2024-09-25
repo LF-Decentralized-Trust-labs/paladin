@@ -25,8 +25,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    // targetCoverage = 91
-    targetCoverage = 81 // just while we re-enable the public TX tests
+    targetCoverage = 90
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/core/pkg/proto',
