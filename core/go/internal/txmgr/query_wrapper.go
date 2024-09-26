@@ -57,9 +57,16 @@ func int64OrZero(pi *int64) int64 {
 	return *pi
 }
 
+func checkLimitSet(ctx context.Context, jq *query.QueryJSON) error {
+	if jq.Limit == nil || *jq.Limit <= 0 {
+		return i18n.NewError(ctx, msgs.MsgTxMgrQueryLimitRequired)
+	}
+	return nil
+}
+
 func (qw *queryWrapper[PT, T]) run(ctx context.Context, dbTX *gorm.DB) ([]*T, error) {
-	if qw.query.Limit == nil || *qw.query.Limit <= 0 {
-		return nil, i18n.NewError(ctx, msgs.MsgTxMgrQueryLimitRequired)
+	if err := checkLimitSet(ctx, qw.query); err != nil {
+		return nil, err
 	}
 	if len(qw.query.Sort) == 0 {
 		// By default return the newest in descending order

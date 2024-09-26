@@ -25,11 +25,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -55,46 +53,6 @@ type persistedTransaction struct {
 type transactionDep struct {
 	Transaction uuid.UUID `gorm:"column:transaction;primaryKey"`
 	DependsOn   uuid.UUID `gorm:"column:depends_on"`
-}
-
-var transactionFilters = filters.FieldMap{
-	"id":           filters.UUIDField("id"),
-	"created":      filters.TimestampField("created"),
-	"abiReference": filters.TimestampField("abi_ref"),
-	"functionName": filters.StringField("fn_name"),
-	"domain":       filters.StringField("domain"),
-	"from":         filters.StringField("from"),
-	"to":           filters.HexBytesField("to"),
-}
-
-func mapPersistedTXBase(pt *persistedTransaction) *ptxapi.Transaction {
-	res := &ptxapi.Transaction{
-		ID:             pt.ID,
-		Created:        pt.Created,
-		IdempotencyKey: stringOrEmpty(pt.IdempotencyKey),
-		Type:           pt.Type,
-		Domain:         stringOrEmpty(pt.Domain),
-		Function:       stringOrEmpty(pt.Function),
-		ABIReference:   pt.ABIReference,
-		From:           pt.From,
-		To:             pt.To,
-		Data:           pt.Data,
-	}
-	return res
-}
-
-func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *ptxapi.TransactionFull {
-	res := &ptxapi.TransactionFull{
-		Transaction: mapPersistedTXBase(pt),
-	}
-	receipt := pt.TransactionReceipt
-	if receipt != nil {
-		res.Receipt = mapPersistedReceipt(receipt)
-	}
-	for _, dep := range pt.TransactionDeps {
-		res.DependsOn = append(res.DependsOn, dep.DependsOn)
-	}
-	return res
 }
 
 type resolvedFunction struct {
@@ -407,92 +365,4 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX *gorm.DB, txis
 		return err
 	}
 	return nil
-}
-
-func (tm *txManager) queryTransactions(ctx context.Context, jq *query.QueryJSON, pending bool) ([]*ptxapi.Transaction, error) {
-	qw := &queryWrapper[persistedTransaction, ptxapi.Transaction]{
-		p:           tm.p,
-		table:       "transactions",
-		defaultSort: "-created",
-		filters:     transactionFilters,
-		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
-			// TODO: Join public and private transaction strings
-			if pending {
-				q = q.Joins("TransactionReceipt").
-					Where(`"TransactionReceipt"."transaction" IS NULL`)
-			}
-			return q
-		},
-		mapResult: func(pt *persistedTransaction) (*ptxapi.Transaction, error) {
-			return mapPersistedTXBase(pt), nil
-		},
-	}
-	return qw.run(ctx, nil)
-}
-
-func (tm *txManager) queryTransactionsFull(ctx context.Context, jq *query.QueryJSON, pending bool) ([]*ptxapi.TransactionFull, error) {
-	qw := &queryWrapper[persistedTransaction, ptxapi.TransactionFull]{
-		p:           tm.p,
-		table:       "transactions",
-		defaultSort: "-created",
-		filters:     transactionFilters,
-		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
-			// TODO: Join public and private transaction info
-			q = q.
-				Preload("TransactionDeps").
-				Joins("TransactionReceipt")
-			if pending {
-				q = q.Where(`"TransactionReceipt"."transaction" IS NULL`)
-			}
-			return q
-		},
-		mapResult: func(pt *persistedTransaction) (*ptxapi.TransactionFull, error) {
-			return tm.mapPersistedTXFull(pt), nil
-		},
-	}
-	return qw.run(ctx, nil)
-}
-
-func (tm *txManager) getTransactionByIDFull(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionFull, error) {
-	ptxs, err := tm.queryTransactionsFull(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), false)
-	if len(ptxs) == 0 || err != nil {
-		return nil, err
-	}
-	return ptxs[0], nil
-}
-
-func (tm *txManager) getTransactionByID(ctx context.Context, id uuid.UUID) (*ptxapi.Transaction, error) {
-	ptxs, err := tm.queryTransactions(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), false)
-	if len(ptxs) == 0 || err != nil {
-		return nil, err
-	}
-	return ptxs[0], nil
-}
-
-func (tm *txManager) getTransactionDependencies(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionDependencies, error) {
-	var persistedDeps []*transactionDep
-	err := tm.p.DB().
-		WithContext(ctx).
-		Table(`transaction_deps`).
-		Where(`"transaction" = ?`, id).
-		Or("depends_on = ?", id).
-		Find(&persistedDeps).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	res := &ptxapi.TransactionDependencies{
-		DependsOn: make([]uuid.UUID, 0, len(persistedDeps)),
-		PrereqOf:  make([]uuid.UUID, 0, len(persistedDeps)),
-	}
-	for _, td := range persistedDeps {
-		if td.Transaction == id {
-			res.DependsOn = append(res.DependsOn, td.DependsOn)
-		} else {
-			res.PrereqOf = append(res.PrereqOf, td.Transaction)
-		}
-	}
-	return res, nil
 }

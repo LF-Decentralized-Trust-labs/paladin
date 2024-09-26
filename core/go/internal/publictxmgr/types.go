@@ -52,8 +52,8 @@ type BaseTXUpdates struct {
 	FirstSubmit       *tktypes.Timestamp
 	LastSubmit        *tktypes.Timestamp
 	ErrorMessage      *string
-	NewSubmission     *publicSubmission
-	FlushedSubmission *publicSubmission
+	NewSubmission     *DBPubTxnSubmission
+	FlushedSubmission *DBPubTxnSubmission
 }
 
 // PublicTransactionEventType is a enum type that contains all types of transaction process events
@@ -266,7 +266,7 @@ type InMemoryTxStateReadOnly interface {
 	GetGasPriceObject() *ptxapi.PublicTxGasPricing
 	GetFirstSubmit() *tktypes.Timestamp
 	GetLastSubmitTime() *tktypes.Timestamp
-	GetUnflushedSubmission() *publicSubmission
+	GetUnflushedSubmission() *DBPubTxnSubmission
 	GetInFlightStatus() InFlightStatus
 	GetSignerNonce() string
 	GetGasLimit() uint64

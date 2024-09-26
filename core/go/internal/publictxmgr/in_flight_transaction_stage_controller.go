@@ -118,7 +118,7 @@ type BasicActionError struct {
 func NewInFlightTransactionStageController(
 	enth *pubTxManager,
 	oc *orchestrator,
-	ptx *persistedPubTx,
+	ptx *DBPublicTxn,
 ) *InFlightTransactionStageController {
 
 	ift := &InFlightTransactionStageController{
@@ -315,7 +315,7 @@ func (it *InFlightTransactionStageController) ProduceLatestInFlightStageContext(
 									}
 									rsc.InMemoryTx.GetGasPriceObject()
 									gasPriceJSON, _ := json.Marshal(rsc.InMemoryTx.GetGasPriceObject())
-									rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &publicSubmission{
+									rsc.StageOutputsToBePersisted.TxUpdates.NewSubmission = &DBPubTxnSubmission{
 										SignerNonce:     rsc.InMemoryTx.GetSignerNonce(),
 										Created:         tktypes.TimestampNow(),
 										TransactionHash: *rsc.StageOutput.SignOutput.TxHash,

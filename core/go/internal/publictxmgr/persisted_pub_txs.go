@@ -19,37 +19,56 @@ package publictxmgr
 import (
 	"strings"
 
-	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // public_transactions
-type persistedPubTx struct {
-	SignerNonce     string              `gorm:"column:signer_nonce;primaryKey"`
-	From            tktypes.EthAddress  `gorm:"column:from"`
-	Nonce           uint64              `gorm:"column:nonce"`
-	Created         tktypes.Timestamp   `gorm:"column:created;autoCreateTime:nano"`
-	KeyHandle       string              `gorm:"column:key_handle"` // TODO: might need to revisit storing this once we have reverse lookup in the keymanager by address
-	To              *tktypes.EthAddress `gorm:"column:to"`
-	Gas             uint64              `gorm:"column:gas"`
-	FixedGasPricing tktypes.RawJSON     `gorm:"column:fixed_gas_pricing"`
-	Value           *tktypes.HexUint256 `gorm:"column:value"`
-	Data            tktypes.HexBytes    `gorm:"column:data"`
-	Suspended       bool                `gorm:"column:suspended"`                                // excluded from processing because it's suspended by user
-	Completed       *publicCompletion   `gorm:"foreignKey:signer_nonce;references:signer_nonce"` // excluded from processing because it's done
-	Submissions     []*publicSubmission `gorm:"-"`                                               // we do the aggregation, not GORM
+type DBPublicTxn struct {
+	SignerNonce     string                 `gorm:"column:signer_nonce;primaryKey"`
+	From            tktypes.EthAddress     `gorm:"column:from"`
+	Nonce           uint64                 `gorm:"column:nonce"`
+	Created         tktypes.Timestamp      `gorm:"column:created;autoCreateTime:nano"`
+	KeyHandle       string                 `gorm:"column:key_handle"` // TODO: might need to revisit storing this once we have reverse lookup in the keymanager by address
+	To              *tktypes.EthAddress    `gorm:"column:to"`
+	Gas             uint64                 `gorm:"column:gas"`
+	FixedGasPricing tktypes.RawJSON        `gorm:"column:fixed_gas_pricing"`
+	Value           *tktypes.HexUint256    `gorm:"column:value"`
+	Data            tktypes.HexBytes       `gorm:"column:data"`
+	Suspended       bool                   `gorm:"column:suspended"`                                // excluded from processing because it's suspended by user
+	Completed       *DBPublicTxnCompletion `gorm:"foreignKey:signer_nonce;references:signer_nonce"` // excluded from processing because it's done
+	Submissions     []*DBPubTxnSubmission  `gorm:"-"`                                               // we do the aggregation, not GORM
 	// Binding is used only on queries by transaction (GORM doesn't seem to allow us to define a separate struct for this)
-	Binding *components.PublicTxnBinding `gorm:"foreignKey:signer_nonce;references:signer_nonce;"`
+	Binding *DBPublicTxnBinding `gorm:"foreignKey:signer_nonce;references:signer_nonce;"`
 }
 
-type publicSubmission struct {
+func (DBPublicTxn) TableName() string {
+	return "public_txns"
+}
+
+type DBPublicTxnBinding struct {
+	SignerNonce     string                               `gorm:"column:signer_nonce;primaryKey"`
+	Transaction     uuid.UUID                            `gorm:"column:transaction"`
+	TransactionType tktypes.Enum[ptxapi.TransactionType] `gorm:"column:tx_type"`
+}
+
+func (DBPublicTxnBinding) TableName() string {
+	return "public_txn_bindings"
+}
+
+type DBPubTxnSubmission struct {
 	SignerNonce     string            `gorm:"column:signer_nonce;primaryKey"`
 	Created         tktypes.Timestamp `gorm:"column:created;autoCreateTime:false"` // we set this as we track the record in memory too
 	TransactionHash tktypes.Bytes32   `gorm:"column:tx_hash"`
 	GasPricing      tktypes.RawJSON   `gorm:"column:gas_pricing"` // no filtering allowed on this field as it's complex JSON gasPrice/maxFeePerGas/maxPriorityFeePerGas calculation
 }
 
-type publicCompletion struct {
+func (DBPubTxnSubmission) TableName() string {
+	return "public_submissions"
+}
+
+type DBPublicTxnCompletion struct {
 	SignerNonce     string            `gorm:"column:signer_nonce;primaryKey"`
 	Created         tktypes.Timestamp `gorm:"column:created;autoCreateTime:nano"`
 	TransactionHash tktypes.Bytes32   `gorm:"column:tx_hash"`
@@ -57,14 +76,18 @@ type publicCompletion struct {
 	RevertData      tktypes.HexBytes  `gorm:"column:revert_data"` // block indexer does not keep this for all TXs
 }
 
-func (s *publicSubmission) WriteKey() string {
+func (DBPublicTxnCompletion) TableName() string {
+	return "public_completions"
+}
+
+func (s *DBPubTxnSubmission) WriteKey() string {
 	// Just use the from address as the write key, so all submissions on the same signing address get batched together
 	return strings.Split(s.SignerNonce, ":")[0]
 }
 
-type transactionsMatchingSubmission struct {
-	components.PublicTxnBinding `gorm:"embedded"`
-	Submission                  *publicSubmission `gorm:"foreignKey:signer_nonce;references:signer_nonce;"`
+type bindingsMatchingSubmission struct {
+	DBPublicTxnBinding `gorm:"embedded"`
+	Submission         *DBPubTxnSubmission `gorm:"foreignKey:signer_nonce;references:signer_nonce;"`
 }
 
 type txFromOnly struct {

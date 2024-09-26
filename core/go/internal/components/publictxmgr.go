@@ -46,7 +46,7 @@ type PublicTxBatch interface {
 }
 
 var PublicTxFilterFields filters.FieldSet = filters.FieldMap{
-	"from":            filters.HexBytesField("from"),
+	"from":            filters.HexBytesField(`"from"`),
 	"nonce":           filters.Int64Field("nonce"),
 	"created":         filters.Int64Field("created"),
 	"completedAt":     filters.Int64Field(`"Completed"."created"`),
@@ -70,20 +70,13 @@ type PublicTxMatch struct {
 	*blockindexer.IndexedTransactionNotify
 }
 
-// Database record used for efficiency in both public and Paladin transaction managers as part of a JOIN
-// PublicTxMgr owns insertion of these records at creation time of the public Txn (inside the batch)
-type PublicTxnBinding struct {
-	Sequence        uint64                               `gorm:"column:sequence;autoIncrement"` // unique identifier for this record
-	SignerNonce     string                               `gorm:"column:signer_nonce"`
-	Transaction     uuid.UUID                            `gorm:"column:transaction"`
-	TransactionType tktypes.Enum[ptxapi.TransactionType] `gorm:"column:tx_type"`
-}
-
 type PublicTxManager interface {
 	ManagerLifecycle
 
 	// Synchronous functions that are executed on the callers thread
-	QueryTransactions(ctx context.Context, dbTX *gorm.DB, scopeToTxn *uuid.UUID, jq *query.QueryJSON) ([]*ptxapi.PublicTx, error)
+	QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*ptxapi.PublicTx, error)
+	QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*ptxapi.PublicTxWithBinding, error)
+	GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*ptxapi.PublicTxWithBinding, error)
 	PrepareSubmissionBatch(ctx context.Context, transactions []*PublicTxSubmission) (batch PublicTxBatch, err error)
 	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX *gorm.DB, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
 	NotifyConfirmPersisted(ctx context.Context, confirms []*PublicTxMatch)

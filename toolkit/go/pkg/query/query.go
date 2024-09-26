@@ -89,11 +89,8 @@ type queryBuilderImpl struct {
 }
 
 func NewQueryBuilder() QueryBuilder {
-	qj := QueryJSON{}
-	return &queryBuilderImpl{
-		rootQuery:  &qj,
-		statements: &qj.Statements,
-	}
+	qj := &QueryJSON{}
+	return qj.ToBuilder()
 }
 
 // Limit sets the limit of the query

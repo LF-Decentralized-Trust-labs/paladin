@@ -68,8 +68,8 @@ type TransactionFull struct {
 	*Transaction
 	DependsOn []uuid.UUID             `json:"dependsOn,omitempty"` // transactions registered as dependencies when the transaction was created
 	Receipt   *TransactionReceiptData `json:"receipt"`             // available if the transaction has reached a final state
+	Public    []*PublicTx             `json:"public"`              // list of public transactions associated
 	// TODO: PrivateTransactions object list
-	// TODO: PublicTransactions object list
 }
 
 type TransactionReceipt struct {

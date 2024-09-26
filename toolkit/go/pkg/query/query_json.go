@@ -88,3 +88,11 @@ func (jq *QueryJSON) String() string {
 func (jq *QueryJSON) JSON() ([]byte, error) {
 	return json.Marshal(jq)
 }
+
+// Converts to a builder - which will add to the underlying query structure (cannot remove existing elements)
+func (jq *QueryJSON) ToBuilder() QueryBuilder {
+	return &queryBuilderImpl{
+		rootQuery:  jq,
+		statements: &jq.Statements,
+	}
+}

@@ -280,7 +280,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 	spaces := oc.maxInFlightTxs - oldLen
 	if spaces > 0 {
 		// We retry the get from persistence indefinitely (until the context cancels)
-		var additional []*persistedPubTx
+		var additional []*DBPublicTxn
 		err := oc.retry.Do(ctx, func(attempt int) (retry bool, err error) {
 			q := oc.p.DB().
 				WithContext(ctx).
@@ -302,7 +302,7 @@ func (oc *orchestrator) pollAndProcess(ctx context.Context) (polled int, total i
 			// as we are the only thread that writes to the submissions table, for
 			// inflight transactions we have in memory that would not be overwritten
 			// by this query.
-			additional, err = oc.runTransactionQuery(ctx, oc.p.DB(), nil, q)
+			additional, err = oc.runTransactionQuery(ctx, oc.p.DB(), false /* just the individual transactions - no duplication for bindings */, nil, q)
 			return true, err
 		})
 		if err != nil {

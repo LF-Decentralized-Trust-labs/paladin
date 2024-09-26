@@ -17,6 +17,7 @@
 package ptxapi
 
 import (
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -67,4 +68,14 @@ type PublicTx struct {
 	Submissions     []*PublicTxSubmissionData   `json:"submissions,omitempty"`
 	Activity        []TransactionActivityRecord `json:"activity,omitempty"`
 	PublicTxOptions
+}
+
+type PublicTxBinding struct {
+	Transaction     uuid.UUID                     `json:"transaction"`
+	TransactionType tktypes.Enum[TransactionType] `json:"transactionType"`
+}
+
+type PublicTxWithBinding struct {
+	*PublicTx
+	PublicTxBinding
 }

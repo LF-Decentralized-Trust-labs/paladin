@@ -34,10 +34,10 @@ CREATE INDEX transactions_domain ON transactions("domain");
 CREATE INDEX transactions_idempotency_key ON transactions("idempotency_key");
 
 CREATE TABLE public_txn_bindings (
-  "sequence"                  INTEGER         PRIMARY KEY AUTOINCREMENT, -- allows us to use insertion order to order lists
   "signer_nonce"              TEXT            NOT NULL,
   "transaction"               UUID            NOT NULL,
   "tx_type"                   TEXT            NOT NULL,
+  PRIMARY KEY ("signer_nonce"), -- a binding is not mandatory for a public TXN, but it is singular (see #210)
   FOREIGN KEY ("transaction") REFERENCES transactions ("id") ON DELETE CASCADE,
   FOREIGN KEY ("signer_nonce") REFERENCES public_txns ("signer_nonce") ON DELETE CASCADE
 );

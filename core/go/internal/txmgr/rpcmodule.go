@@ -35,6 +35,10 @@ func (tm *txManager) buildRPCModule() {
 		Add("ptx_getTransactionReceipt", tm.rpcGetTransactionReceipt()).
 		Add("ptx_queryTransactionReceipts", tm.rpcQueryTransactionReceipts()).
 		Add("ptx_getTransactionDependencies", tm.rpcGetTransactionDependencies()).
+		Add("ptx_queryPublicTransactions", tm.rpcQueryPublicTransactions()).
+		Add("ptx_queryPendingPublicTransactions", tm.rpcQueryPendingPublicTransactions()).
+		Add("ptx_getPublicTransactionByNonce", tm.rpcGetPublicTransactionByNonce()).
+		Add("ptx_getPublicTransactionByHash", tm.rpcGetPublicTransactionByHash()).
 		Add("ptx_storeABI", tm.rpcStoreABI()).
 		Add("ptx_getStoredABI", tm.rpcGetStoredABI()).
 		Add("ptx_queryStoredABIs", tm.rpcQueryStoredABIs())
@@ -105,6 +109,39 @@ func (tm *txManager) rpcQueryTransactionReceipts() rpcserver.RPCHandler {
 		query query.QueryJSON,
 	) ([]*ptxapi.TransactionReceipt, error) {
 		return tm.queryTransactionReceipts(ctx, &query)
+	})
+}
+
+func (tm *txManager) rpcQueryPublicTransactions() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		query query.QueryJSON,
+	) ([]*ptxapi.PublicTxWithBinding, error) {
+		return tm.queryPublicTransactions(ctx, &query)
+	})
+}
+
+func (tm *txManager) rpcQueryPendingPublicTransactions() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		query query.QueryJSON,
+	) ([]*ptxapi.PublicTxWithBinding, error) {
+		return tm.queryPublicTransactions(ctx, query.ToBuilder().Null("transactionHash").Query())
+	})
+}
+
+func (tm *txManager) rpcGetPublicTransactionByNonce() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod2(func(ctx context.Context,
+		from tktypes.EthAddress,
+		nonce tktypes.HexUint64,
+	) (*ptxapi.PublicTxWithBinding, error) {
+		return tm.getPublicTransactionByNonce(ctx, from, nonce)
+	})
+}
+
+func (tm *txManager) rpcGetPublicTransactionByHash() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context,
+		hash tktypes.Bytes32,
+	) (*ptxapi.PublicTxWithBinding, error) {
+		return tm.getPublicTransactionByHash(ctx, hash)
 	})
 }
 
