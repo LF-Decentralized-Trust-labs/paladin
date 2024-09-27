@@ -116,7 +116,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 
 	var attestation []*prototk.AttestationRequest
-	switch tx.DomainConfig.Variant.String() {
+	switch tx.DomainConfig.Variant {
 	case types.NotoVariantDefault:
 		encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
 		if err != nil {
@@ -188,7 +188,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 		return nil, err
 	}
 
-	switch tx.DomainConfig.Variant.String() {
+	switch tx.DomainConfig.Variant {
 	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
@@ -248,7 +248,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	var signature *prototk.AttestationResult
-	switch tx.DomainConfig.Variant.String() {
+	switch tx.DomainConfig.Variant {
 	case types.NotoVariantDefault:
 		// Include the signature from the sender
 		// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
