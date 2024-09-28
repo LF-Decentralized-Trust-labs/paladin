@@ -77,8 +77,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	params := tx.Params.(*types.TransferParams)
 
 	notary := domain.FindVerifier(tx.DomainConfig.NotaryLookup, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
-	if notary == nil || notary.Verifier != tx.DomainConfig.NotaryAddress {
-		return nil, i18n.NewError(ctx, msgs.MsgNotaryUnexpectedAddress, tx.DomainConfig.NotaryAddress, notary.Verifier)
+	if notary == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "notary")
 	}
 	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
 	if from == nil {

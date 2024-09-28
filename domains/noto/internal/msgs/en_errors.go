@@ -49,7 +49,6 @@ var (
 	MsgParameterRequired           = ffe("PD200007", "Parameter '%s' is required")
 	MsgParameterGreaterThanZero    = ffe("PD200008", "Parameter '%s' must be greater than 0")
 	MsgMintOnlyNotary              = ffe("PD200009", "Mint can only be initiated by notary")
-	MsgNotaryUnexpectedAddress     = ffe("PD200010", "Notary resolved to unexpected address: expected=%s actual=%s")
 	MsgErrorVerifyingAddress       = ffe("PD200011", "Error verifying '%s' address")
 	MsgInvalidInputs               = ffe("PD200012", "Invalid inputs to '%s': %v")
 	MsgInvalidAmount               = ffe("PD200013", "Invalid amount for '%s': expected=%s actual=%s")
