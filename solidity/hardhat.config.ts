@@ -1,13 +1,14 @@
-import "@nomicfoundation/hardhat-toolbox";
-import "@openzeppelin/hardhat-upgrades";
-import "@typechain/hardhat";
-import { HardhatUserConfig } from "hardhat/config";
+import '@nomicfoundation/hardhat-toolbox';
+import '@openzeppelin/hardhat-upgrades';
+import '@typechain/hardhat';
+import 'solidity-coverage';
+import { HardhatUserConfig } from 'hardhat/config';
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.24",
+    version: '0.8.24',
     settings: {
-      evmVersion: "paris",
+      evmVersion: 'paris',
       optimizer: {
         enabled: true,
         runs: 1000,
