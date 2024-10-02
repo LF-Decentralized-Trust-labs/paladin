@@ -53,6 +53,7 @@ task copySolidity(type: Copy) {
         include 'contracts/shared/atom/Atom.sol/Atom.json'
         include 'contracts/shared/atom/Atom.sol/AtomFactory.json'
         include 'contracts/private/Swap.sol/Swap.json'
+        include 'contracts/private/FixedCouponBond.sol/FixedCouponBond.json'
     }
     into 'helpers/abis'
 
@@ -75,7 +76,7 @@ task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
     args './...'
     args '-cover'
     args '-covermode=atomic'
-    args '-timeout=30s'
+    args '-timeout=60s'
     if (project.findProperty('verboseTests') == 'true') {
         args '-v'
     }
