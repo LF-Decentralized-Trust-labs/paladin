@@ -2,8 +2,8 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { AbiCoder, ContractTransactionReceipt, Signer } from "ethers";
 import hre, { ethers } from "hardhat";
-import { NotoSelfSubmit } from "../../../typechain-types";
-import { fakeTXO, NotoConfigID_V0, randomBytes32 } from "./Noto";
+import { NotoFactory, NotoSelfSubmit } from "../../../typechain-types";
+import { fakeTXO, randomBytes32 } from "./Noto";
 
 export async function prepareSignature(
   noto: NotoSelfSubmit,
@@ -29,6 +29,31 @@ export async function prepareSignature(
   return notary.signTypedData(domain, types, value);
 }
 
+export async function deployNotoInstance(
+  notoFactory: NotoFactory,
+  notary: string
+) {
+  const abi = AbiCoder.defaultAbiCoder();
+  const Noto = await ethers.getContractFactory("NotoSelfSubmit");
+  const notoImpl = await Noto.deploy();
+  await notoFactory.registerImplementation("selfsubmit", notoImpl);
+  const deployTx = await notoFactory.deployImplementation(
+    "selfsubmit",
+    randomBytes32(),
+    "",
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    notary
+  );
+  const deployReceipt = await deployTx.wait();
+  const deployEvent = deployReceipt?.logs.find(
+    (l) =>
+      notoFactory.interface.parseLog(l)?.name ===
+      "PaladinRegisterSmartContract_V0"
+  );
+  expect(deployEvent).to.exist;
+  return deployEvent && "args" in deployEvent ? deployEvent.args.instance : "";
+}
+
 describe("NotoSelfSubmit", function () {
   async function deployNotoFixture() {
     const [notary, other] = await ethers.getSigners();
@@ -36,21 +61,10 @@ describe("NotoSelfSubmit", function () {
 
     const NotoFactory = await ethers.getContractFactory("NotoFactory");
     const notoFactory = await NotoFactory.deploy();
-    const Noto = await ethers.getContractFactory("NotoSelfSubmit");
-    const notoImpl = await Noto.deploy();
-    await notoFactory.registerImplementation("selfsubmit", notoImpl);
-    const deployTx = await notoFactory.deployImplementation(
-      "selfsubmit",
-      randomBytes32(),
-      notary.address,
-      NotoConfigID_V0 + abi.encode(["string"], [""]).substring(2)
+    const Noto = await ethers.getContractFactory("Noto");
+    const noto = Noto.attach(
+      await deployNotoInstance(notoFactory, notary.address)
     );
-    const deployReceipt = await deployTx.wait();
-    const deployEvent = deployReceipt?.logs.find(
-      (l) => NotoFactory.interface.parseLog(l)?.name === "PaladinRegisterSmartContract_V0"
-    );
-    expect(deployEvent).to.exist;
-    const noto = Noto.attach(deployEvent?.args.instance ?? "");
 
     return { noto: noto as NotoSelfSubmit, notary, other };
   }

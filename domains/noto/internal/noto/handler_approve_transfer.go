@@ -27,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -34,7 +35,7 @@ type approveHandler struct {
 	noto *Noto
 }
 
-func (h *approveHandler) ValidateParams(ctx context.Context, config *types.NotoConfigOutput_V0, params string) (interface{}, error) {
+func (h *approveHandler) ValidateParams(ctx context.Context, config *types.NotoConfig_V0, params string) (interface{}, error) {
 	var approveParams types.ApproveParams
 	if err := json.Unmarshal([]byte(params), &approveParams); err != nil {
 		return nil, err
@@ -130,14 +131,15 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
-func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	params := tx.Params.(*types.ApproveParams)
-	transferHash, err := h.transferHash(ctx, tx, params)
+func (h *approveHandler) baseLedgerApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.ApproveParams)
+	transferHash, err := h.transferHash(ctx, tx, inParams)
 	if err != nil {
 		return nil, err
 	}
-	signature := domain.FindAttestation("sender", req.AttestationResult)
-	if signature == nil {
+
+	sender := domain.FindAttestation("sender", req.AttestationResult)
+	if sender == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
@@ -145,25 +147,68 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	approveParams := map[string]interface{}{
-		"delegate":  params.Delegate,
-		"txhash":    transferHash,
-		"signature": ethtypes.HexBytes0xPrefix(signature.Payload),
-		"data":      data,
+	params := &NotoApproveTransferParams{
+		Delegate:  inParams.Delegate,
+		TXHash:    tktypes.HexBytes(transferHash),
+		Signature: sender.Payload,
+		Data:      data,
 	}
-	paramsJSON, err := json.Marshal(approveParams)
+	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	functionJSON, err := json.Marshal(h.noto.contractABI.Functions()["approveTransfer"])
+	return &TransactionWrapper{
+		functionABI: h.noto.contractABI.Functions()["approveTransfer"],
+		paramsJSON:  paramsJSON,
+	}, nil
+}
+
+func (h *approveHandler) guardApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.ApproveParams)
+
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
+	if from == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "from")
+	}
+	fromAddress, err := tktypes.ParseEthAddress(from.Verifier)
 	if err != nil {
 		return nil, err
 	}
 
-	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.PreparedTransaction{
-			FunctionAbiJson: string(functionJSON),
-			ParamsJson:      string(paramsJSON),
+	encodedCall, err := baseTransaction.encode(ctx)
+	if err != nil {
+		return nil, err
+	}
+	params := &GuardApproveTransferParams{
+		From:     fromAddress,
+		Delegate: inParams.Delegate,
+		Prepared: PreparedTransaction{
+			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			EncodedCall:     encodedCall,
 		},
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	return &TransactionWrapper{
+		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["approveTransfer"],
+		paramsJSON:      paramsJSON,
+		contractAddress: &tx.DomainConfig.NotaryAddress,
 	}, nil
+}
+
+func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	baseTransaction, err := h.baseLedgerApprove(ctx, tx, req)
+	if err != nil {
+		return nil, err
+	}
+	if req.Transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
+		guardTransaction, err := h.guardApprove(ctx, tx, req, baseTransaction)
+		if err != nil {
+			return nil, err
+		}
+		return guardTransaction.prepare()
+	}
+	return baseTransaction.prepare()
 }

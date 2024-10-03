@@ -59,6 +59,7 @@ task copySolidity(type: Copy) {
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/noto/Noto.sol/Noto.json'
         include 'contracts/domains/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
+        include 'contracts/private/interfaces/INotoGuard.sol/INotoGuard.json'
     }
     into 'internal/noto/abis'
 

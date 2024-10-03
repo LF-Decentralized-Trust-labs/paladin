@@ -53,13 +53,6 @@ var (
 	recipient2Name = "recipient2"
 )
 
-type NotoTransferParams struct {
-	Inputs    []interface{}    `json:"inputs"`
-	Outputs   []interface{}    `json:"outputs"`
-	Data      tktypes.HexBytes `json:"data"`
-	Signature tktypes.HexBytes `json:"signature,omitempty"`
-}
-
 func toJSON(t *testing.T, v any) []byte {
 	result, err := json.Marshal(v)
 	require.NoError(t, err)

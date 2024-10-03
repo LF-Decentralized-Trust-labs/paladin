@@ -27,30 +27,27 @@ type DomainConfig struct {
 
 var NotoConfigID_V0 = tktypes.MustParseHexBytes("0x00010000")
 
-type NotoConfigInput_V0 struct {
-	NotaryLookup string `json:"notaryLookup"`
-}
-
-var NotoConfigInputABI_V0 = &abi.ParameterArray{
-	{Name: "notaryLookup", Type: "string"},
-}
-
-type NotoConfigOutput_V0 struct {
+type NotoConfig_V0 struct {
 	NotaryLookup  string          `json:"notaryLookup"`
+	NotaryType    tktypes.Bytes32 `json:"notaryType"`
 	NotaryAddress string          `json:"notaryAddress"`
 	Variant       tktypes.Bytes32 `json:"variant"`
 }
 
-var NotoConfigOutputABI_V0 = &abi.ParameterArray{
+var NotoConfigABI_V0 = &abi.ParameterArray{
 	{Name: "notaryLookup", Type: "string"},
+	{Name: "notaryType", Type: "bytes32"},
 	{Name: "notaryAddress", Type: "address"},
 	{Name: "variant", Type: "bytes32"},
 }
 
 var NotoTransactionData_V0 = tktypes.MustParseHexBytes("0x00010000")
 
-type DomainHandler = domain.DomainHandler[NotoConfigOutput_V0]
-type ParsedTransaction = domain.ParsedTransaction[NotoConfigOutput_V0]
+type DomainHandler = domain.DomainHandler[NotoConfig_V0]
+type ParsedTransaction = domain.ParsedTransaction[NotoConfig_V0]
+
+var NotaryTypeSigner = tktypes.MustParseBytes32("0x0000000000000000000000000000000000000000000000000000000000000000")
+var NotaryTypeContract = tktypes.MustParseBytes32("0x0000000000000000000000000000000000000000000000000000000000000001")
 
 var NotoVariantDefault = tktypes.MustParseBytes32("0x0000000000000000000000000000000000000000000000000000000000000000")
 var NotoVariantSelfSubmit = tktypes.MustParseBytes32("0x0000000000000000000000000000000000000000000000000000000000000001")

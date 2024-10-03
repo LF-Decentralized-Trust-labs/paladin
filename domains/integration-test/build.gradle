@@ -65,6 +65,7 @@ task copySolidity(type: Copy) {
         include 'contracts/shared/Atom.sol/Atom.json'
         include 'contracts/shared/Atom.sol/AtomFactory.json'
         include 'contracts/private/Swap.sol/Swap.json'
+        include 'contracts/private/NotoGuardSimple.sol/NotoGuardSimple.json'
     }
 
     inputs.files(configurations.zetoArtifacts)

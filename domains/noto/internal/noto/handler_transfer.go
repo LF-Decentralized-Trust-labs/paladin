@@ -21,7 +21,6 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -36,7 +35,7 @@ type transferHandler struct {
 	noto *Noto
 }
 
-func (h *transferHandler) ValidateParams(ctx context.Context, config *types.NotoConfigOutput_V0, params string) (interface{}, error) {
+func (h *transferHandler) ValidateParams(ctx context.Context, config *types.NotoConfig_V0, params string) (interface{}, error) {
 	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
@@ -238,7 +237,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	return nil, i18n.NewError(ctx, msgs.MsgUnrecognizedEndorsement, req.EndorsementRequest.Name)
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+func (h *transferHandler) baseLedgerTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -271,25 +270,77 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	if err != nil {
 		return nil, err
 	}
-	params := map[string]interface{}{
-		"inputs":    inputs,
-		"outputs":   outputs,
-		"signature": ethtypes.HexBytes0xPrefix(signature.Payload),
-		"data":      data,
+	params := &NotoTransferParams{
+		Inputs:    inputs,
+		Outputs:   outputs,
+		Signature: signature.Payload,
+		Data:      data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	functionJSON, err := json.Marshal(h.noto.contractABI.Functions()["transfer"])
+	return &TransactionWrapper{
+		functionABI: h.noto.contractABI.Functions()[tx.FunctionABI.Name],
+		paramsJSON:  paramsJSON,
+	}, nil
+}
+
+func (h *transferHandler) guardTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.TransferParams)
+
+	from := domain.FindVerifier(tx.Transaction.From, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
+	if from == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "from")
+	}
+	fromAddress, err := tktypes.ParseEthAddress(from.Verifier)
+	if err != nil {
+		return nil, err
+	}
+	to := domain.FindVerifier(inParams.To, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
+	if to == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "to")
+	}
+	toAddress, err := tktypes.ParseEthAddress(to.Verifier)
 	if err != nil {
 		return nil, err
 	}
 
-	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.PreparedTransaction{
-			FunctionAbiJson: string(functionJSON),
-			ParamsJson:      string(paramsJSON),
+	encodedCall, err := baseTransaction.encode(ctx)
+	if err != nil {
+		return nil, err
+	}
+	params := &GuardTransferParams{
+		From:   fromAddress,
+		To:     toAddress,
+		Amount: inParams.Amount,
+		Prepared: PreparedTransaction{
+			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			EncodedCall:     encodedCall,
 		},
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	return &TransactionWrapper{
+		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["transfer"],
+		paramsJSON:      paramsJSON,
+		contractAddress: &tx.DomainConfig.NotaryAddress,
 	}, nil
+}
+
+func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	baseTransaction, err := h.baseLedgerTransfer(ctx, tx, req)
+	if err != nil {
+		return nil, err
+	}
+	if req.Transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
+		guardTransaction, err := h.guardTransfer(ctx, tx, req, baseTransaction)
+		if err != nil {
+			return nil, err
+		}
+		return guardTransaction.prepare()
+	}
+	return baseTransaction.prepare()
 }

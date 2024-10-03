@@ -44,9 +44,17 @@ type NotoTransferParams struct {
 	Data    tktypes.HexBytes `json:"data"`
 }
 
-func TestNotoForNoto(t *testing.T) {
+func TestPvP(t *testing.T) {
+	pvpNotoNoto(t, false)
+}
+
+func TestPvPWithNotoGuard(t *testing.T) {
+	pvpNotoNoto(t, true)
+}
+
+func pvpNotoNoto(t *testing.T, withGuard bool) {
 	ctx := context.Background()
-	log.L(ctx).Infof("TestNotoForNoto")
+	log.L(ctx).Infof("TestPvP (withGuard=%t)", withGuard)
 	domainName := "noto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
@@ -76,9 +84,15 @@ func TestNotoForNoto(t *testing.T) {
 
 	atomFactory := helpers.InitAtom(t, tb, rpc, contracts["atom"])
 
+	var guardAddress *tktypes.EthAddress
+	if withGuard {
+		guard := helpers.DeployGuard(ctx, t, tb, notary)
+		guardAddress = guard.Address
+	}
+
 	log.L(ctx).Infof("Deploying 2 instances of Noto")
-	notoGold := helpers.DeployNoto(ctx, t, rpc, domainName, notary)
-	notoSilver := helpers.DeployNoto(ctx, t, rpc, domainName, notary)
+	notoGold := helpers.DeployNoto(ctx, t, rpc, domainName, notary, guardAddress)
+	notoSilver := helpers.DeployNoto(ctx, t, rpc, domainName, notary, nil)
 	log.L(ctx).Infof("Noto gold deployed to %s", notoGold.Address)
 	log.L(ctx).Infof("Noto silver deployed to %s", notoSilver.Address)
 
@@ -207,7 +221,7 @@ func TestNotoForZeto(t *testing.T) {
 	atomFactory := helpers.InitAtom(t, tb, rpc, contracts["atom"])
 
 	log.L(ctx).Infof("Deploying Noto and Zeto")
-	noto := helpers.DeployNoto(ctx, t, rpc, notoDomainName, notary)
+	noto := helpers.DeployNoto(ctx, t, rpc, notoDomainName, notary, nil)
 	zeto := helpers.DeployZeto(ctx, t, rpc, zetoDomainName, notary, "Zeto_Anon")
 	log.L(ctx).Infof("Noto deployed to %s", noto.Address)
 	log.L(ctx).Infof("Zeto deployed to %s", zeto.Address)

@@ -23,7 +23,7 @@ describe("Atom", function () {
 
     // Deploy two contracts
     const noto = Noto.attach(
-      await deployNotoInstance(notoFactory, Noto.interface, notary1.address)
+      await deployNotoInstance(notoFactory, notary1.address)
     ) as Noto;
     const erc20 = await ERC20Simple.connect(notary2).deploy("Token", "TOK");
 
@@ -112,7 +112,7 @@ describe("Atom", function () {
 
     // Deploy noto contract
     const noto = Noto.attach(
-      await deployNotoInstance(notoFactory, Noto.interface, notary1.address)
+      await deployNotoInstance(notoFactory, notary1.address)
     ) as Noto;
 
     // Fake up a delegation

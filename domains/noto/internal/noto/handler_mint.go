@@ -34,7 +34,7 @@ type mintHandler struct {
 	noto *Noto
 }
 
-func (h *mintHandler) ValidateParams(ctx context.Context, config *types.NotoConfigOutput_V0, params string) (interface{}, error) {
+func (h *mintHandler) ValidateParams(ctx context.Context, config *types.NotoConfig_V0, params string) (interface{}, error) {
 	var mintParams types.MintParams
 	if err := json.Unmarshal([]byte(params), &mintParams); err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+func (h *mintHandler) baseLedgerMint(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		outputs[i] = state.Id
@@ -146,8 +146,8 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 
 	// Include the signature from the sender/notary
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
-	signature := domain.FindAttestation("sender", req.AttestationResult)
-	if signature == nil {
+	sender := domain.FindAttestation("sender", req.AttestationResult)
+	if sender == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
@@ -155,25 +155,67 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-
-	params := map[string]interface{}{
-		"outputs":   outputs,
-		"signature": tktypes.HexBytes(signature.Payload),
-		"data":      data,
+	params := &NotoMintParams{
+		Outputs:   outputs,
+		Signature: sender.Payload,
+		Data:      data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	functionJSON, err := json.Marshal(h.noto.contractABI.Functions()["mint"])
+	return &TransactionWrapper{
+		functionABI: h.noto.contractABI.Functions()["mint"],
+		paramsJSON:  paramsJSON,
+	}, nil
+}
+
+func (h *mintHandler) guardMint(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.MintParams)
+
+	to := domain.FindVerifier(inParams.To, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, req.ResolvedVerifiers)
+	if to == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "to")
+	}
+	toAddress, err := tktypes.ParseEthAddress(to.Verifier)
 	if err != nil {
 		return nil, err
 	}
 
-	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.PreparedTransaction{
-			FunctionAbiJson: string(functionJSON),
-			ParamsJson:      string(paramsJSON),
+	encodedCall, err := baseTransaction.encode(ctx)
+	if err != nil {
+		return nil, err
+	}
+	params := &GuardMintParams{
+		To:     toAddress,
+		Amount: inParams.Amount,
+		Prepared: PreparedTransaction{
+			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			EncodedCall:     encodedCall,
 		},
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	return &TransactionWrapper{
+		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["mint"],
+		paramsJSON:      paramsJSON,
+		contractAddress: &tx.DomainConfig.NotaryAddress,
 	}, nil
+}
+
+func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+	baseTransaction, err := h.baseLedgerMint(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if req.Transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
+		guardTransaction, err := h.guardMint(ctx, tx, req, baseTransaction)
+		if err != nil {
+			return nil, err
+		}
+		return guardTransaction.prepare()
+	}
+	return baseTransaction.prepare()
 }

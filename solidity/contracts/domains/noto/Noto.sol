@@ -32,19 +32,24 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
-    error NotoUnsupportedConfigType(bytes4 configSelector);
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V0 = 0x00010000;
 
     struct NotoConfig_V0 {
         string notaryLookup;
+        bytes32 notaryType;
         address notaryAddress;
         bytes32 variant;
     }
 
     bytes32 public constant NotoVariantDefault =
         0x0000000000000000000000000000000000000000000000000000000000000000;
+
+    bytes32 public constant NotaryTypeSigner =
+        0x0000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 public constant NotaryTypeContract =
+        0x0000000000000000000000000000000000000000000000000000000000000001;
 
     bytes32 private constant TRANSFER_TYPEHASH =
         keccak256("Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)");
@@ -66,29 +71,19 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     function initialize(
-        address notary,
-        bytes calldata config
+        string calldata notaryLookup,
+        bytes32 notaryType,
+        address notaryAddress
     ) public virtual initializer returns (bytes memory) {
         __EIP712_init("noto", "0.0.1");
-        _notary = notary;
+        _notary = notaryAddress;
 
-        NotoConfig_V0 memory configOut = _decodeConfig(config);
-        configOut.notaryAddress = notary;
-        configOut.variant = NotoVariantDefault;
-
-        return _encodeConfig(configOut);
-    }
-
-    function _decodeConfig(
-        bytes calldata config
-    ) internal pure returns (NotoConfig_V0 memory) {
-        bytes4 configSelector = bytes4(config[0:4]);
-        if (configSelector == NotoConfigID_V0) {
-            NotoConfig_V0 memory configOut;
-            (configOut.notaryLookup) = abi.decode(config[4:], (string));
-            return configOut;
-        }
-        revert NotoUnsupportedConfigType(configSelector);
+        return _encodeConfig(NotoConfig_V0({
+            notaryLookup: notaryLookup,
+            notaryType: notaryType,
+            notaryAddress: notaryAddress,
+            variant: NotoVariantDefault
+        }));
     }
 
     function _encodeConfig(
@@ -96,6 +91,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     ) internal pure returns (bytes memory) {
         bytes memory configOut = abi.encode(
             config.notaryLookup,
+            config.notaryType,
             config.notaryAddress,
             config.variant
         );

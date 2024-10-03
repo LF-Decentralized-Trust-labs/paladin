@@ -4,14 +4,11 @@ import { randomBytes } from "crypto";
 import {
   AbiCoder,
   ContractTransactionReceipt,
-  Interface,
   Signer,
   TypedDataEncoder,
 } from "ethers";
 import hre, { ethers } from "hardhat";
 import { NotoFactory, Noto } from "../../../typechain-types";
-
-export const NotoConfigID_V0 = "0x00010000";
 
 export async function newTransferHash(
   noto: Noto,
@@ -48,21 +45,23 @@ export function fakeTXO() {
 
 export async function deployNotoInstance(
   notoFactory: NotoFactory,
-  notoInterface: Interface,
   notary: string
 ) {
   const abi = AbiCoder.defaultAbiCoder();
   const deployTx = await notoFactory.deploy(
     randomBytes32(),
-    notary,
-    NotoConfigID_V0 + abi.encode(["string"], [""]).substring(2)
+    "",
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    notary
   );
   const deployReceipt = await deployTx.wait();
   const deployEvent = deployReceipt?.logs.find(
-    (l) => notoFactory.interface.parseLog(l)?.name === "PaladinRegisterSmartContract_V0"
+    (l) =>
+      notoFactory.interface.parseLog(l)?.name ===
+      "PaladinRegisterSmartContract_V0"
   );
   expect(deployEvent).to.exist;
-  return deployEvent?.args.instance ?? "";
+  return deployEvent && "args" in deployEvent ? deployEvent.args.instance : "";
 }
 
 describe("Noto", function () {
@@ -73,7 +72,7 @@ describe("Noto", function () {
     const notoFactory = await NotoFactory.deploy();
     const Noto = await ethers.getContractFactory("Noto");
     const noto = Noto.attach(
-      await deployNotoInstance(notoFactory, Noto.interface, notary.address)
+      await deployNotoInstance(notoFactory, notary.address)
     );
 
     return { noto: noto as Noto, notary, other };

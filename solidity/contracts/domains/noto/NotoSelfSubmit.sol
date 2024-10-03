@@ -14,17 +14,19 @@ contract NotoSelfSubmit is Noto {
         0x0000000000000000000000000000000000000000000000000000000000000001;
 
     function initialize(
-        address notary,
-        bytes calldata config
+        string calldata notaryLookup,
+        bytes32 notaryType,
+        address notaryAddress
     ) public override initializer returns (bytes memory) {
         __EIP712_init("noto", "0.0.1");
+        _notary = notaryAddress;
 
-        NotoConfig_V0 memory configOut = _decodeConfig(config);
-        configOut.notaryAddress = notary;
-        configOut.variant = NotoVariantSelfSubmit;
-
-        _notary = notary;
-        return _encodeConfig(configOut);
+        return _encodeConfig(NotoConfig_V0({
+            notaryLookup: notaryLookup,
+            notaryType: notaryType,
+            notaryAddress: notaryAddress,
+            variant: NotoVariantSelfSubmit
+        }));
     }
 
     function transfer(
