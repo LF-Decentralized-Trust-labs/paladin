@@ -172,7 +172,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		PrepareTransaction: func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 			assert.Equal(t, "tx2_prepare", ptr.Transaction.TransactionId)
 			return &prototk.PrepareTransactionResponse{
-				Transaction: &prototk.BaseLedgerTransaction{
+				Transaction: &prototk.PreparedTransaction{
 					ParamsJson: `{"test": "value"}`,
 				},
 			}, nil

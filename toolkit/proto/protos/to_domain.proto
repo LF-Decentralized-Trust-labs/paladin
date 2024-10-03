@@ -54,7 +54,7 @@ message PrepareDeployRequest {
 
 message PrepareDeployResponse {
   optional string signer = 1; // The identifier of a signing address to use to submit the transaction to the chain. Default behavior if not supplied defined by domain config. Uses standard Paladin resolution of signing addresses (including dynamic allocation, if for example the transaction_id is supplied as part of the string to require a different key for each TX)
-  optional BaseLedgerTransaction transaction = 2; // The instruction for a transaction to submit to the base ledger
+  optional PreparedTransaction transaction = 2; // The instruction for a transaction to submit to the base ledger
   optional BaseLedgerDeployTransaction deploy = 3; // The instruction for deploy request to submit to the base ledger
 }
 
@@ -143,7 +143,7 @@ message PrepareTransactionRequest {
 }
 
 message PrepareTransactionResponse {
-  BaseLedgerTransaction transaction = 1; // The instruction for submission to the base ledger
+  PreparedTransaction transaction = 1; // The instruction for submission to the base ledger
 }
 
 // **EVENTS** handler called with batches of blockchain events that match an event signature and contract address registered by this domain
@@ -286,10 +286,15 @@ message AttestationResult {
   repeated AttestationConstraint constraints = 6; // If the attester requires this transaction is submitted by their identity
 }
 
-message BaseLedgerTransaction {
+message PreparedTransaction {
+  enum TransactionType {
+    PUBLIC = 0;
+    PRIVATE = 1;
+  }
   string function_abi_json = 1; // The ABI of the function to invoke on the base smart contract, based on processing the user's parameters in the private smart contract layer
   string params_json = 2; // The parameters to pass to the base smart contract function, in JSON format. Paladin will submit this transaction to the base blockchain
   optional string contract_address = 3; // The target contract address (defaults to the domain's public contract address if omitted)
+  TransactionType type = 4; // Indicates whether this is a public (base ledger) or private transaction
 }
 
 message BaseLedgerDeployTransaction {

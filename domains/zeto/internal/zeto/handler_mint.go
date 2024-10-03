@@ -141,7 +141,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	}
 
 	return &pb.PrepareTransactionResponse{
-		Transaction: &pb.BaseLedgerTransaction{
+		Transaction: &pb.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},

@@ -568,7 +568,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		params, err := json.Marshal(onChain)
 		require.NoError(t, err)
 		return &prototk.PrepareTransactionResponse{
-			Transaction: &prototk.BaseLedgerTransaction{
+			Transaction: &prototk.PreparedTransaction{
 				FunctionAbiJson: fakeCoinExecuteABI,
 				ParamsJson:      string(params),
 			},
@@ -815,7 +815,7 @@ func TestPrepareTransactionABIInvalid(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
-			Transaction: &prototk.BaseLedgerTransaction{
+			Transaction: &prototk.PreparedTransaction{
 				FunctionAbiJson: `!!!wrong`,
 			},
 		}, nil
@@ -834,7 +834,7 @@ func TestPrepareTransactionBadData(t *testing.T) {
 
 	tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 		return &prototk.PrepareTransactionResponse{
-			Transaction: &prototk.BaseLedgerTransaction{
+			Transaction: &prototk.PreparedTransaction{
 				FunctionAbiJson: fakeCoinExecuteABI,
 				ParamsJson:      `{"missing": "expected"}`,
 			},

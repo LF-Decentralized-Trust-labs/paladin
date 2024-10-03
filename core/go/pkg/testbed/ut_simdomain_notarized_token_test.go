@@ -362,7 +362,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
 					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
-					Transaction: &prototk.BaseLedgerTransaction{
+					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simDomainABI.Functions()["newSIMTokenNotarized"]),
 						ParamsJson: fmt.Sprintf(`{
 							"txId": "%s",
@@ -570,7 +570,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 					newStateIds[i] = s.Id
 				}
 				return &prototk.PrepareTransactionResponse{
-					Transaction: &prototk.BaseLedgerTransaction{
+					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simTokenABI.Functions()["executeNotarized"]),
 						ParamsJson: toJSONString(t, map[string]interface{}{
 							"txId":      req.Transaction.TransactionId,

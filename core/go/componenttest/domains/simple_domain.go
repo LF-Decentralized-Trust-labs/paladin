@@ -432,7 +432,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
 					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
-					Transaction: &prototk.BaseLedgerTransaction{
+					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simpleDomainABI.Functions()["newSimpleTokenNotarized"]),
 						ParamsJson: fmt.Sprintf(`{
 							"txId": "%s",
@@ -643,7 +643,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					newStateIds[i] = s.Id
 				}
 				return &prototk.PrepareTransactionResponse{
-					Transaction: &prototk.BaseLedgerTransaction{
+					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simpleTokenABI.Functions()["executeNotarized"]),
 						ParamsJson: toJSONString(t, map[string]interface{}{
 							"txId":      req.Transaction.TransactionId,

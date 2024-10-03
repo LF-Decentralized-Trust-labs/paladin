@@ -390,7 +390,7 @@ public class PenteDomain extends DomainInstance {
                 );
             }};
             var transitionFunctionABI = config.getPrivacyGroupABI().getABIEntry("function", "transition").toJSON(false);
-            var preparedTx = ToDomain.BaseLedgerTransaction.newBuilder().
+            var preparedTx = ToDomain.PreparedTransaction.newBuilder().
                     setFunctionAbiJson(transitionFunctionABI).
                     setParamsJson(new ObjectMapper().writeValueAsString(params));
             var result = ToDomain.PrepareTransactionResponse.newBuilder().setTransaction(preparedTx);

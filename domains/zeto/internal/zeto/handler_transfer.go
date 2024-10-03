@@ -231,7 +231,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	return &pb.PrepareTransactionResponse{
-		Transaction: &pb.BaseLedgerTransaction{
+		Transaction: &pb.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},

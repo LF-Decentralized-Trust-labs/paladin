@@ -161,7 +161,7 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	}
 
 	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.BaseLedgerTransaction{
+		Transaction: &prototk.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},

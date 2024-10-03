@@ -286,7 +286,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	}
 
 	return &prototk.PrepareTransactionResponse{
-		Transaction: &prototk.BaseLedgerTransaction{
+		Transaction: &prototk.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
 		},
