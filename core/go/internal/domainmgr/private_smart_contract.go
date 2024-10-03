@@ -397,9 +397,14 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		return err
 	}
 
+	contractAddress := dc.Address()
+	if res.Transaction.ContractAddress != nil {
+		contractAddress = *tktypes.MustEthAddress(*res.Transaction.ContractAddress)
+	}
+
 	tx.PreparedTransaction = &components.EthTransaction{
 		FunctionABI: &functionABI,
-		To:          dc.Address(),
+		To:          contractAddress,
 		Inputs:      inputs,
 	}
 	return nil
