@@ -17,7 +17,6 @@ package types
 
 import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -69,23 +68,24 @@ var NotoABI = abi.ABI{
 }
 
 type ConstructorParams struct {
-	Notary         string `json:"notary"`
-	Implementation string `json:"implementation"`
+	Notary         string              `json:"notary"`
+	GuardAddress   *tktypes.EthAddress `json:"guardAddress,omitempty"`
+	Implementation string              `json:"implementation"`
 }
 
 type MintParams struct {
-	To     string               `json:"to"`
-	Amount *ethtypes.HexInteger `json:"amount"`
+	To     string              `json:"to"`
+	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 type TransferParams struct {
-	To     string               `json:"to"`
-	Amount *ethtypes.HexInteger `json:"amount"`
+	To     string              `json:"to"`
+	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 type ApproveParams struct {
 	Inputs   []*tktypes.FullState `json:"inputs"`
 	Outputs  []*tktypes.FullState `json:"outputs"`
 	Data     tktypes.HexBytes     `json:"data"`
-	Delegate tktypes.EthAddress   `json:"delegate"`
+	Delegate *tktypes.EthAddress  `json:"delegate"`
 }

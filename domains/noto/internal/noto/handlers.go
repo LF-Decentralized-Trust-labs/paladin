@@ -19,12 +19,12 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -46,8 +46,8 @@ func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams
 	if len(coins.inCoins) > 0 {
 		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "mint", coins.inCoins)
 	}
-	if coins.outTotal.Cmp(params.Amount.BigInt()) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.BigInt().Text(10), coins.outTotal.Text(10))
+	if coins.outTotal.Cmp(params.Amount.Int()) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.Int().Text(10), coins.outTotal.Text(10))
 	}
 	return nil
 }
@@ -105,13 +105,13 @@ func (n *Noto) validateOwners(ctx context.Context, tx *types.ParsedTransaction, 
 	if from == nil {
 		return i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "from")
 	}
-	fromAddress, err := ethtypes.NewAddress(from.Verifier)
+	fromAddress, err := tktypes.ParseEthAddress(from.Verifier)
 	if err != nil {
 		return err
 	}
 
 	for i, coin := range coins.inCoins {
-		if coin.Owner != *fromAddress {
+		if !coin.Owner.Equals(fromAddress) {
 			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, coins.inStates[i].Id, tx.Transaction.From)
 		}
 	}

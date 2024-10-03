@@ -18,16 +18,16 @@ package zeto
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	internal "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Zeto interface {
 	plugintk.DomainAPI
 	GetHandler(method string) types.DomainHandler
-	FindCoins(ctx context.Context, contractAddress ethtypes.Address0xHex, query string) ([]*types.ZetoCoin, error)
+	FindCoins(ctx context.Context, contractAddress *tktypes.EthAddress, query string) ([]*types.ZetoCoin, error)
 }
 
 func New(callbacks plugintk.DomainCallbacks) Zeto {

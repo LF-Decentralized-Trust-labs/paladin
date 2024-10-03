@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
@@ -38,19 +37,19 @@ type SwapHelper struct {
 	t       *testing.T
 	tb      testbed.Testbed
 	eth     ethclient.EthClient
-	Address ethtypes.Address0xHex
+	Address *tktypes.EthAddress
 	ABI     abi.ABI
 }
 
 type TradeRequestInput struct {
-	Holder1       string                    `json:"holder1"`
-	Holder2       string                    `json:"holder2"`
-	TokenAddress1 ethtypes.Address0xHex     `json:"tokenAddress1"`
-	TokenAddress2 ethtypes.Address0xHex     `json:"tokenAddress2"`
-	TokenValue1   *ethtypes.HexInteger      `json:"tokenValue1"`
-	TokenValue2   *ethtypes.HexInteger      `json:"tokenValue2"`
-	TradeData1    ethtypes.HexBytes0xPrefix `json:"tradeData1"`
-	TradeData2    ethtypes.HexBytes0xPrefix `json:"tradeData2"`
+	Holder1       string              `json:"holder1"`
+	Holder2       string              `json:"holder2"`
+	TokenAddress1 *tktypes.EthAddress `json:"tokenAddress1"`
+	TokenAddress2 *tktypes.EthAddress `json:"tokenAddress2"`
+	TokenValue1   *tktypes.HexUint256 `json:"tokenValue1"`
+	TokenValue2   *tktypes.HexUint256 `json:"tokenValue2"`
+	TradeData1    tktypes.HexBytes    `json:"tradeData1"`
+	TradeData2    tktypes.HexBytes    `json:"tradeData2"`
 }
 
 type StateData struct {
@@ -69,21 +68,20 @@ func DeploySwap(
 	eth := tb.Components().EthClientFactory().HTTPClient()
 	builder := deployBuilder(ctx, t, eth, build.ABI, build.Bytecode).
 		Input(toJSON(t, map[string]any{"inputData": input}))
-	bondDeploy := NewTransactionHelper(ctx, t, tb, builder).SignAndSend(signer).Wait()
-	address := ethtypes.Address0xHex(*bondDeploy.ContractAddress)
-	assert.NotNil(t, address)
+	deploy := NewTransactionHelper(ctx, t, tb, builder).SignAndSend(signer).Wait()
+	assert.NotNil(t, deploy.ContractAddress)
 	return &SwapHelper{
 		t:       t,
 		tb:      tb,
 		eth:     eth,
-		Address: address,
+		Address: deploy.ContractAddress,
 		ABI:     build.ABI,
 	}
 }
 
 func (s *SwapHelper) Prepare(ctx context.Context, states *StateData) *TransactionHelper {
 	builder := functionBuilder(ctx, s.t, s.eth, s.ABI, "prepare").
-		To(&s.Address).
+		To(s.Address.Address0xHex()).
 		Input(toJSON(s.t, map[string]any{
 			"states": states,
 		}))
@@ -91,12 +89,12 @@ func (s *SwapHelper) Prepare(ctx context.Context, states *StateData) *Transactio
 }
 
 func (s *SwapHelper) Execute(ctx context.Context) *TransactionHelper {
-	builder := functionBuilder(ctx, s.t, s.eth, s.ABI, "execute").To(&s.Address)
+	builder := functionBuilder(ctx, s.t, s.eth, s.ABI, "execute").To(s.Address.Address0xHex())
 	return NewTransactionHelper(ctx, s.t, s.tb, builder)
 }
 
 func (s *SwapHelper) GetTrade(ctx context.Context) map[string]any {
-	output, err := functionBuilder(ctx, s.t, s.eth, s.ABI, "trade").To(&s.Address).CallResult()
+	output, err := functionBuilder(ctx, s.t, s.eth, s.ABI, "trade").To(s.Address.Address0xHex()).CallResult()
 	require.NoError(s.t, err)
 	var jsonOutput map[string]any
 	err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)

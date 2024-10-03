@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
@@ -72,9 +71,9 @@ func (th *TransactionHelper) SignAndSend(signer string) *SentTransaction {
 	}
 }
 
-func (th *TransactionHelper) Prepare() ethtypes.HexBytes0xPrefix {
+func (th *TransactionHelper) Prepare() tktypes.HexBytes {
 	require.NoError(th.t, th.builder.BuildCallData())
-	return th.builder.TX().Data
+	return tktypes.HexBytes(th.builder.TX().Data)
 }
 
 func (st *SentTransaction) Wait() *blockindexer.IndexedTransaction {
@@ -99,13 +98,13 @@ func (st *SentTransaction) FindEvent(abi abi.ABI, eventName string, eventParams 
 	return nil
 }
 
-func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, to tktypes.EthAddress, fn *abi.Entry, inputs tktypes.RawJSON) *DomainTransactionHelper {
+func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, to *tktypes.EthAddress, fn *abi.Entry, inputs tktypes.RawJSON) *DomainTransactionHelper {
 	return &DomainTransactionHelper{
 		ctx: ctx,
 		t:   t,
 		rpc: rpc,
 		tx: &tktypes.PrivateContractInvoke{
-			To:       to,
+			To:       *to,
 			Function: *fn,
 			Inputs:   inputs,
 		},

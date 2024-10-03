@@ -71,6 +71,6 @@ type TransferParams struct {
 }
 
 type LockParams struct {
-	Delegate tktypes.EthAddress `json:"delegate"`
-	Call     tktypes.HexBytes   `json:"call"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+	Call     tktypes.HexBytes    `json:"call"`
 }

@@ -20,13 +20,13 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -42,7 +42,7 @@ func (h *mintHandler) ValidateParams(ctx context.Context, config *types.NotoConf
 	if mintParams.To == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
 	}
-	if mintParams.Amount.BigInt().Sign() != 1 {
+	if mintParams.Amount == nil || mintParams.Amount.Int().Sign() != 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterGreaterThanZero, "amount")
 	}
 	return &mintParams, nil
@@ -81,12 +81,12 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if to == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "to")
 	}
-	toAddress, err := ethtypes.NewAddress(to.Verifier)
+	toAddress, err := tktypes.ParseEthAddress(to.Verifier)
 	if err != nil {
 		return nil, err
 	}
 
-	outputCoins, outputStates, err := h.noto.prepareOutputs(notary.Lookup, to.Lookup, *toAddress, params.Amount)
+	outputCoins, outputStates, err := h.noto.prepareOutputs(notary.Lookup, to.Lookup, toAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 
 	params := map[string]interface{}{
 		"outputs":   outputs,
-		"signature": ethtypes.HexBytes0xPrefix(signature.Payload),
+		"signature": tktypes.HexBytes(signature.Payload),
 		"data":      data,
 	}
 	paramsJSON, err := json.Marshal(params)

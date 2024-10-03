@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
@@ -43,7 +44,7 @@ func (h *transferHandler) ValidateParams(ctx context.Context, config *types.Noto
 	if transferParams.To == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
 	}
-	if transferParams.Amount.BigInt().Sign() != 1 {
+	if transferParams.Amount == nil || transferParams.Amount.Int().Sign() != 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterGreaterThanZero, "amount")
 	}
 	return &transferParams, nil
@@ -84,7 +85,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if from == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "from")
 	}
-	fromAddress, err := ethtypes.NewAddress(from.Verifier)
+	fromAddress, err := tktypes.ParseEthAddress(from.Verifier)
 	if err != nil {
 		return nil, err
 	}
@@ -92,22 +93,22 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	if to == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorVerifyingAddress, "to")
 	}
-	toAddress, err := ethtypes.NewAddress(to.Verifier)
+	toAddress, err := tktypes.ParseEthAddress(to.Verifier)
 	if err != nil {
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.Transaction.ContractAddress, *fromAddress, params.Amount)
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.Transaction.ContractAddress, fromAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
-	outputCoins, outputStates, err := h.noto.prepareOutputs(notary.Lookup, to.Lookup, *toAddress, params.Amount)
+	outputCoins, outputStates, err := h.noto.prepareOutputs(notary.Lookup, to.Lookup, toAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
-	if total.Cmp(params.Amount.BigInt()) == 1 {
-		remainder := big.NewInt(0).Sub(total, params.Amount.BigInt())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(notary.Lookup, from.Lookup, *fromAddress, ethtypes.NewHexInteger(remainder))
+	if total.Cmp(params.Amount.Int()) == 1 {
+		remainder := big.NewInt(0).Sub(total, params.Amount.Int())
+		returnedCoins, returnedStates, err := h.noto.prepareOutputs(notary.Lookup, from.Lookup, fromAddress, (*tktypes.HexUint256)(remainder))
 		if err != nil {
 			return nil, err
 		}

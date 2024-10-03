@@ -59,10 +59,10 @@ type Noto struct {
 }
 
 type NotoDeployParams struct {
-	Name          string                    `json:"name,omitempty"`
-	TransactionID string                    `json:"transactionId"`
-	Notary        string                    `json:"notary"`
-	Config        ethtypes.HexBytes0xPrefix `json:"config"`
+	Name          string           `json:"name,omitempty"`
+	TransactionID string           `json:"transactionId"`
+	Notary        string           `json:"notary"`
+	Config        tktypes.HexBytes `json:"config"`
 }
 
 type NotoTransfer_Event struct {
@@ -358,7 +358,7 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 			SchemaId: state.SchemaId,
 			Id:       state.Id,
 		}
-		total = total.Add(total, coins[i].Amount.BigInt())
+		total = total.Add(total, coins[i].Amount.Int())
 	}
 	return coins, refs, total, nil
 }
@@ -382,7 +382,7 @@ func (n *Noto) gatherCoins(ctx context.Context, inputs, outputs []*prototk.Endor
 	}, nil
 }
 
-func (n *Noto) FindCoins(ctx context.Context, contractAddress ethtypes.Address0xHex, query string) ([]*types.NotoCoin, error) {
+func (n *Noto) FindCoins(ctx context.Context, contractAddress *tktypes.EthAddress, query string) ([]*types.NotoCoin, error) {
 	states, err := n.findAvailableStates(ctx, contractAddress.String(), query)
 	if err != nil {
 		return nil, err

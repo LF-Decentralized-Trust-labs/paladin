@@ -20,7 +20,6 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -33,11 +32,11 @@ var ZetoFactoryJSON []byte
 type ZetoHelper struct {
 	t       *testing.T
 	rpc     rpcbackend.Backend
-	Address ethtypes.Address0xHex
+	Address *tktypes.EthAddress
 }
 
 func DeployZeto(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, domainName, controllerName, tokenName string) *ZetoHelper {
-	var addr ethtypes.Address0xHex
+	var addr tktypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deploy", domainName, &types.InitializerParams{
 		From:      controllerName,
 		TokenName: tokenName,
@@ -48,13 +47,13 @@ func DeployZeto(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, domai
 	return &ZetoHelper{
 		t:       t,
 		rpc:     rpc,
-		Address: addr,
+		Address: &addr,
 	}
 }
 
 func (n *ZetoHelper) Mint(ctx context.Context, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.ZetoABI.Functions()["mint"]
-	return NewDomainTransactionHelper(ctx, n.t, n.rpc, tktypes.EthAddress(n.Address), fn, toJSON(n.t, &types.MintParams{
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.MintParams{
 		To:     to,
 		Amount: tktypes.Uint64ToUint256(amount),
 	}))
@@ -62,15 +61,15 @@ func (n *ZetoHelper) Mint(ctx context.Context, to string, amount uint64) *Domain
 
 func (n *ZetoHelper) Transfer(ctx context.Context, to string, amount uint64) *DomainTransactionHelper {
 	fn := types.ZetoABI.Functions()["transfer"]
-	return NewDomainTransactionHelper(ctx, n.t, n.rpc, tktypes.EthAddress(n.Address), fn, toJSON(n.t, &types.TransferParams{
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, &types.TransferParams{
 		To:     to,
 		Amount: tktypes.Uint64ToUint256(amount),
 	}))
 }
 
-func (z *ZetoHelper) LockProof(ctx context.Context, delegate tktypes.EthAddress, call []byte) *DomainTransactionHelper {
+func (z *ZetoHelper) LockProof(ctx context.Context, delegate *tktypes.EthAddress, call []byte) *DomainTransactionHelper {
 	fn := types.ZetoABI.Functions()["lockProof"]
-	return NewDomainTransactionHelper(ctx, z.t, z.rpc, tktypes.EthAddress(z.Address), fn, toJSON(z.t, &types.LockParams{
+	return NewDomainTransactionHelper(ctx, z.t, z.rpc, z.Address, fn, toJSON(z.t, &types.LockParams{
 		Delegate: delegate,
 		Call:     call,
 	}))

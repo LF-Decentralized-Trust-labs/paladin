@@ -23,11 +23,11 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +43,7 @@ type AtomFactoryHelper struct {
 	tb          testbed.Testbed
 	rpc         rpcbackend.Backend
 	eth         ethclient.EthClient
-	Address     ethtypes.Address0xHex
+	Address     *tktypes.EthAddress
 	FactoryABI  abi.ABI
 	InstanceABI abi.ABI
 }
@@ -52,17 +52,17 @@ type AtomHelper struct {
 	t           *testing.T
 	tb          testbed.Testbed
 	eth         ethclient.EthClient
-	Address     ethtypes.Address0xHex
+	Address     *tktypes.EthAddress
 	InstanceABI abi.ABI
 }
 
 type AtomOperation struct {
-	ContractAddress ethtypes.Address0xHex     `json:"contractAddress"`
-	CallData        ethtypes.HexBytes0xPrefix `json:"callData"`
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
+	CallData        tktypes.HexBytes    `json:"callData"`
 }
 
 type AtomDeployed struct {
-	Address ethtypes.Address0xHex `json:"addr"`
+	Address *tktypes.EthAddress `json:"addr"`
 }
 
 func InitAtom(
@@ -76,7 +76,7 @@ func InitAtom(
 		tb:          tb,
 		rpc:         rpc,
 		eth:         tb.Components().EthClientFactory().HTTPClient(),
-		Address:     *ethtypes.MustNewAddress(address),
+		Address:     tktypes.MustEthAddress(address),
 		FactoryABI:  domain.LoadBuild(AtomFactoryJSON).ABI,
 		InstanceABI: domain.LoadBuild(AtomJSON).ABI,
 	}
@@ -84,7 +84,7 @@ func InitAtom(
 
 func (a *AtomFactoryHelper) Create(ctx context.Context, signer string, operations []*AtomOperation) *AtomHelper {
 	builder := functionBuilder(ctx, a.t, a.eth, a.FactoryABI, "create").
-		To(&a.Address).
+		To(a.Address.Address0xHex()).
 		Input(toJSON(a.t, map[string]any{"operations": operations}))
 	tx := NewTransactionHelper(ctx, a.t, a.tb, builder).SignAndSend(signer)
 	tx.Wait()
@@ -102,13 +102,13 @@ func (a *AtomFactoryHelper) Create(ctx context.Context, signer string, operation
 }
 
 func (a *AtomHelper) Execute(ctx context.Context) *TransactionHelper {
-	builder := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "execute").To(&a.Address)
+	builder := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "execute").To(a.Address.Address0xHex())
 	return NewTransactionHelper(ctx, a.t, a.tb, builder)
 }
 
 func (a *AtomHelper) GetOperationCount(ctx context.Context) int {
 	output, err := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "getOperationCount").
-		To(&a.Address).
+		To(a.Address.Address0xHex()).
 		CallResult()
 	require.NoError(a.t, err)
 	var jsonOutput map[string]any
@@ -124,7 +124,7 @@ func (a *AtomHelper) GetOperations(ctx context.Context) []map[string]any {
 	var operations []map[string]any
 	for i := 0; i < opCount; i++ {
 		output, err := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "getOperation").
-			To(&a.Address).
+			To(a.Address.Address0xHex()).
 			Input(map[string]int{"n": i}).
 			CallResult()
 		require.NoError(a.t, err)

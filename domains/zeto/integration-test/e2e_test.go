@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	internalZeto "github.com/kaleido-io/paladin/domains/zeto/internal/zeto"
@@ -186,7 +185,7 @@ func (s *zetoDomainTestSuite) TestZeto_AnonNullifier() {
 func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
 	ctx := context.Background()
 	log.L(ctx).Infof("Deploying an instance of the %s token", tokenName)
-	var zetoAddress ethtypes.Address0xHex
+	var zetoAddress tktypes.EthAddress
 	rpcerr := s.rpc.CallRPC(ctx, &zetoAddress, "testbed_deploy",
 		s.domainName, &types.InitializerParams{
 			From:      controllerName,
@@ -212,7 +211,7 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
 		require.NoError(t, rpcerr.Error())
 	}
 
-	coins, err := s.domain.FindCoins(ctx, zetoAddress, "{}")
+	coins, err := s.domain.FindCoins(ctx, &zetoAddress, "{}")
 	require.NoError(t, err)
 	require.Len(t, coins, 1)
 	assert.Equal(t, int64(10), coins[0].Amount.Int().Int64())
@@ -232,7 +231,7 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
 		require.NoError(t, rpcerr.Error())
 	}
 
-	coins, err = s.domain.FindCoins(ctx, zetoAddress, "{}")
+	coins, err = s.domain.FindCoins(ctx, &zetoAddress, "{}")
 	require.NoError(t, err)
 	require.Len(t, coins, 2)
 	assert.Equal(t, int64(10), coins[0].Amount.Int().Int64())
@@ -268,7 +267,7 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
 	}
 
 	// check that we now only have one unspent coin, of value 5
-	coins, err = s.domain.FindCoins(ctx, zetoAddress, "{}")
+	coins, err = s.domain.FindCoins(ctx, &zetoAddress, "{}")
 	require.NoError(t, err)
 	// one for the controller from the failed transaction
 	// one for the controller from the successful transaction as change (value=5)

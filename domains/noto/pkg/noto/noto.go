@@ -18,16 +18,16 @@ package noto
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	internal "github.com/kaleido-io/paladin/domains/noto/internal/noto"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type Noto interface {
 	plugintk.DomainAPI
 	GetHandler(method string) types.DomainHandler
-	FindCoins(ctx context.Context, contractAddress ethtypes.Address0xHex, query string) ([]*types.NotoCoin, error)
+	FindCoins(ctx context.Context, contractAddress *tktypes.EthAddress, query string) ([]*types.NotoCoin, error)
 }
 
 func New(callbacks plugintk.DomainCallbacks) Noto {
