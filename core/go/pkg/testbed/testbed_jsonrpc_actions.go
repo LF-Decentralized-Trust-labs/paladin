@@ -179,7 +179,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	})
 }
 
-func (tb *testbed) prepareTransaction(ctx context.Context, invocation tktypes.PrivateContractInvoke) (*components.PrivateTransaction, error) {
+func (tb *testbed) prepareTransaction(ctx context.Context, invocation tktypes.PrivateContractInvoke, intent prototk.TransactionSpecification_Intent) (*components.PrivateTransaction, error) {
 	psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
 	if err != nil {
 		return nil, err
@@ -193,6 +193,7 @@ func (tb *testbed) prepareTransaction(ctx context.Context, invocation tktypes.Pr
 			From:     invocation.From,
 			To:       psc.Address(),
 			Inputs:   invocation.Inputs,
+			Intent:   intent,
 		},
 	}
 
@@ -310,7 +311,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		waitForCompletion bool,
 	) (*tktypes.PrivateContractTransaction, error) {
 
-		tx, err := tb.prepareTransaction(ctx, invocation)
+		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_SUBMIT)
 		if err != nil {
 			return nil, err
 		}
@@ -336,7 +337,7 @@ func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
 		invocation tktypes.PrivateContractInvoke,
 	) (*tktypes.PrivateContractTransaction, error) {
 
-		tx, err := tb.prepareTransaction(ctx, invocation)
+		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_PREPARE)
 		if err != nil {
 			return nil, err
 		}

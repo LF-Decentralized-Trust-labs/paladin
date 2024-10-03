@@ -99,6 +99,7 @@ func (dc *domainContract) InitTransaction(ctx context.Context, tx *components.Pr
 		FunctionParamsJson: string(paramsJSON),
 		FunctionSignature:  txi.Function.SolString(), // we use the proprietary "Solidity inspired" form that is very specific, including param names and nested struct defs
 		BaseBlock:          int64(confirmedBlockHeight),
+		Intent:             txi.Intent,
 	}
 	// Do the request with the domain
 	res, err := dc.api.InitTransaction(ctx, &prototk.InitTransactionRequest{

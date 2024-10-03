@@ -28,6 +28,7 @@ type TransactionInputs struct {
 	To       tktypes.EthAddress
 	Function *abi.Entry
 	Inputs   tktypes.RawJSON
+	Intent   prototk.TransactionSpecification_Intent
 }
 
 type TransactionPreAssembly struct {
