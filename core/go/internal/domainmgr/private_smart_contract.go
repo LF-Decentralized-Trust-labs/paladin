@@ -381,6 +381,7 @@ func (dc *domainContract) PrepareTransaction(ctx context.Context, tx *components
 		ReadStates:        dc.toEndorsableList(postAssembly.ReadStates),
 		OutputStates:      dc.toEndorsableList(postAssembly.OutputStates),
 		AttestationResult: dc.allAttestations(tx),
+		ResolvedVerifiers: preAssembly.Verifiers,
 		ExtraData:         postAssembly.ExtraData,
 	})
 	if err != nil {

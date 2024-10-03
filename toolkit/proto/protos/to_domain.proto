@@ -138,7 +138,8 @@ message PrepareTransactionRequest {
   repeated EndorsableState read_states = 3; // The list of read states
   repeated EndorsableState output_states = 4; // The list of output states
   repeated AttestationResult attestation_result = 5; // The results of any proofs/attestations that came out of the endorsement phase
-  optional string extra_data = 6; // Any extra data that was included in the transaction assembly
+  repeated ResolvedVerifier resolved_verifiers = 6; // A list of transaction signatures/proofs that have been resolved
+  optional string extra_data = 7; // Any extra data that was included in the transaction assembly
 }
 
 message PrepareTransactionResponse {
