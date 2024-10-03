@@ -137,7 +137,7 @@ func TestTransferAssemble(t *testing.T) {
 		},
 	}
 	h.zeto.Callbacks = testCallbacks
-	req.ResolvedVerifiers[1].Verifier = "0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"
+	req.ResolvedVerifiers[1].Verifier = "0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922"
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "failed to prepare inputs. test error")
 
@@ -145,7 +145,7 @@ func TestTransferAssemble(t *testing.T) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
-					DataJson: "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"Alice\",\"ownerKey\":\"0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025\",\"amount\":\"0x0f\",\"hash\":\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\"}",
+					DataJson: "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"Alice\",\"ownerKey\":\"0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922\",\"amount\":\"0x0f\"}",
 				},
 			},
 		}, nil
@@ -165,11 +165,31 @@ func TestTransferAssemble(t *testing.T) {
 	assert.Equal(t, "Bob", coin2.Owner)
 	assert.Equal(t, "0x05", coin2.Amount.String())
 
-	// tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
-	// tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
-	// res, err = h.Assemble(ctx, tx, req)
-	// assert.NoError(t, err)
-	// assert.Len(t, res.AssembledTransaction.OutputStates, 2)
+	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
+	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
+	called := 0
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		var dataJson string
+		if called == 0 {
+			dataJson = "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"Alice\",\"ownerKey\":\"0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922\",\"amount\":\"0x0f\"}"
+		} else if called == 1 {
+			dataJson = "{\"rootIndex\": \"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\"}"
+		} else {
+			dataJson = "{\"index\":\"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\",\"leftChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"refKey\":\"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\",\"rightChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"type\":\"0x02\"}"
+		}
+		called++
+		return &prototk.FindAvailableStatesResponse{
+			States: []*prototk.StoredState{
+				{
+					DataJson: dataJson,
+				},
+			},
+		}, nil
+
+	}
+	res, err = h.Assemble(ctx, tx, req)
+	assert.NoError(t, err)
+	assert.Len(t, res.AssembledTransaction.OutputStates, 2)
 }
 
 func TestTransferEndorse(t *testing.T) {

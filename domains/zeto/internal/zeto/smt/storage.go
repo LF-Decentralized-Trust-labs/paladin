@@ -88,21 +88,22 @@ func (s *statesStorage) GetRootNodeIndex() (core.NodeIndex, error) {
 		return nil, fmt.Errorf("failed to unmarshal root node index. %s", err)
 	}
 
-	idx, err := node.NewNodeIndexFromHex(root.RootIndex)
+	idx, err := node.NewNodeIndexFromBigInt(root.RootIndex.Int())
 	return idx, err
 }
 
 func (s *statesStorage) UpsertRootNodeIndex(root core.NodeIndex) error {
 	newRoot := &MerkleTreeRoot{
 		SmtName:   s.smtName,
-		RootIndex: "0x" + root.Hex(),
+		RootIndex: tktypes.HexUint256(*root.BigInt()),
 	}
 	data, err := json.Marshal(newRoot)
 	if err != nil {
 		return fmt.Errorf("failed to upsert root node. %s", err)
 	}
+	id := newRoot.RootIndex.String()
 	newRootState := &prototk.NewLocalState{
-		Id:            &newRoot.RootIndex,
+		Id:            &id,
 		SchemaId:      s.rootSchemaId,
 		StateDataJson: string(data),
 		TransactionId: s.transactionId,
@@ -165,34 +166,15 @@ func (s *statesStorage) GetNode(ref core.NodeIndex) (core.Node, error) {
 
 func (s *statesStorage) InsertNode(n core.Node) error {
 	// we clone the node so that the value properties are not saved
-	refKeyBytes, err := tktypes.ParseBytes32(n.Ref().Hex())
-	if err != nil {
-		return err
-	}
 	newNode := &MerkleTreeNode{
-		RefKey: refKeyBytes,
+		RefKey: tktypes.HexUint256(*n.Ref().BigInt()),
 		Type:   tktypes.HexBytes([]byte{n.Type().ToByte()}),
 	}
 	if n.Type() == core.NodeTypeBranch {
-		left := n.LeftChild().Hex()
-		leftBytes, err := tktypes.ParseBytes32(left)
-		if err != nil {
-			return err
-		}
-		newNode.LeftChild = leftBytes
-		right := n.RightChild().Hex()
-		rightBytes, err := tktypes.ParseBytes32(right)
-		if err != nil {
-			return err
-		}
-		newNode.RightChild = rightBytes
+		newNode.LeftChild = tktypes.HexUint256(*n.LeftChild().BigInt())
+		newNode.RightChild = tktypes.HexUint256(*n.RightChild().BigInt())
 	} else if n.Type() == core.NodeTypeLeaf {
-		idx := n.Index().Hex()
-		idxBytes, err := tktypes.ParseBytes32(idx)
-		if err != nil {
-			return err
-		}
-		newNode.Index = idxBytes
+		newNode.Index = tktypes.HexUint256(*n.Index().BigInt())
 	}
 
 	data, err := json.Marshal(newNode)

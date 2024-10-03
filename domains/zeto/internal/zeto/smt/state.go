@@ -21,8 +21,8 @@ import (
 )
 
 type MerkleTreeRoot struct {
-	SmtName   string `json:"smtName"`
-	RootIndex string `json:"rootIndex"`
+	SmtName   string             `json:"smtName"`
+	RootIndex tktypes.HexUint256 `json:"rootIndex"`
 }
 
 var MerkleTreeRootABI = &abi.Parameter{
@@ -35,11 +35,11 @@ var MerkleTreeRootABI = &abi.Parameter{
 }
 
 type MerkleTreeNode struct {
-	RefKey     tktypes.Bytes32  `json:"refKey"`
-	Index      tktypes.Bytes32  `json:"index"`
-	Type       tktypes.HexBytes `json:"type"`
-	LeftChild  tktypes.Bytes32  `json:"leftChild"`
-	RightChild tktypes.Bytes32  `json:"rightChild"`
+	RefKey     tktypes.HexUint256 `json:"refKey"`
+	Index      tktypes.HexUint256 `json:"index"`
+	Type       tktypes.HexBytes   `json:"type"`
+	LeftChild  tktypes.HexUint256 `json:"leftChild"`
+	RightChild tktypes.HexUint256 `json:"rightChild"`
 }
 
 var MerkleTreeNodeABI = &abi.Parameter{

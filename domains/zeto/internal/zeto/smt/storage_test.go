@@ -144,7 +144,7 @@ func TestStorage(t *testing.T) {
 	var root MerkleTreeRoot
 	err = json.Unmarshal([]byte(storage.(*statesStorage).newNodes[0].StateDataJson), &root)
 	assert.NoError(t, err)
-	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", root.RootIndex)
+	assert.Equal(t, "0x00", root.RootIndex.String())
 
 	storage, smt, err = New(&testDomainCallbacks{returnFunc: returnBadData}, "test", contractAddress, "root-schema", "node-schema")
 	assert.EqualError(t, err, "failed to unmarshal root node index. invalid character 'b' looking for beginning of value")
@@ -155,7 +155,7 @@ func TestStorage(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, smt)
-	assert.Equal(t, "1234567890123456789012345678901234567890123456789012345678901234", storage.(*statesStorage).rootNode.Hex())
+	assert.Equal(t, "3412907856341290785634129078563412907856341290785634129078563412", storage.(*statesStorage).rootNode.Hex())
 
 	assert.Empty(t, storage.(*statesStorage).GetNewStates())
 	idx, err := storage.(*statesStorage).GetRootNodeIndex()
