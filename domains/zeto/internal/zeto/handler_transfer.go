@@ -357,7 +357,11 @@ func (h *transferHandler) generateMerkleProofs(tokenName string, contractAddress
 			return nil, nil, fmt.Errorf("failed to create Poseidon hash for an input coin. %s", err)
 		}
 		if n.Index().BigInt().Cmp(hash.Int()) != 0 {
-			return nil, nil, fmt.Errorf("coin %s has not been indexed", hash.String())
+			expectedIndex, err := node.NewNodeIndexFromBigInt(hash.Int())
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create new node index from the local coin hash. %s", err)
+			}
+			return nil, nil, fmt.Errorf("coin (ref=%s) found in the merkle tree but the persisted hash %s (index=%s) did not match the expected hash %s (index=%s)", leaf.Ref().Hex(), n.Index().BigInt().Text(16), n.Index().Hex(), hash.HexString0xPrefix(), expectedIndex.Hex())
 		}
 		indexes = append(indexes, n.Index().BigInt())
 	}

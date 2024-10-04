@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"gorm.io/gorm"
 )
 
 type StatesStorage interface {
@@ -88,20 +87,24 @@ func (s *statesStorage) GetRootNodeIndex() (core.NodeIndex, error) {
 		return nil, fmt.Errorf("failed to unmarshal root node index. %s", err)
 	}
 
-	idx, err := node.NewNodeIndexFromBigInt(root.RootIndex.Int())
+	idx, err := node.NewNodeIndexFromHex(root.RootIndex.HexString())
 	return idx, err
 }
 
 func (s *statesStorage) UpsertRootNodeIndex(root core.NodeIndex) error {
+	bytes, err := tktypes.ParseBytes32(root.Hex())
+	if err != nil {
+		return fmt.Errorf("failed to parse root node index. %s", err)
+	}
 	newRoot := &MerkleTreeRoot{
 		SmtName:   s.smtName,
-		RootIndex: tktypes.HexUint256(*root.BigInt()),
+		RootIndex: bytes,
 	}
 	data, err := json.Marshal(newRoot)
 	if err != nil {
 		return fmt.Errorf("failed to upsert root node. %s", err)
 	}
-	id := newRoot.RootIndex.String()
+	id := newRoot.RootIndex.HexString0xPrefix()
 	newRootState := &prototk.NewLocalState{
 		Id:            &id,
 		SchemaId:      s.rootSchemaId,
@@ -126,9 +129,7 @@ func (s *statesStorage) GetNode(ref core.NodeIndex) (core.Node, error) {
 		SchemaId:        s.nodeSchemaId,
 		QueryJson:       queryBuilder.Query().String(),
 	})
-	if err == gorm.ErrRecordNotFound {
-		return nil, core.ErrNotFound
-	} else if err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to find available states. %s", err)
 	}
 	if len(res.States) == 0 {
@@ -146,7 +147,7 @@ func (s *statesStorage) GetNode(ref core.NodeIndex) (core.Node, error) {
 	case core.NodeTypeLeaf:
 		idx, err1 := node.NewNodeIndexFromHex(n.Index.HexString())
 		if err1 != nil {
-			return nil, fmt.Errorf("failed to create lead node index. %s", err1)
+			return nil, fmt.Errorf("failed to create leaf node index. %s", err1)
 		}
 		v := node.NewIndexOnly(idx)
 		newNode, err = node.NewLeafNode(v)
@@ -166,22 +167,38 @@ func (s *statesStorage) GetNode(ref core.NodeIndex) (core.Node, error) {
 
 func (s *statesStorage) InsertNode(n core.Node) error {
 	// we clone the node so that the value properties are not saved
+	refBytes, err := tktypes.ParseBytes32(n.Ref().Hex())
+	if err != nil {
+		return fmt.Errorf("failed to parse node reference. %s", err)
+	}
 	newNode := &MerkleTreeNode{
-		RefKey: tktypes.HexUint256(*n.Ref().BigInt()),
+		RefKey: refBytes,
 		Type:   tktypes.HexBytes([]byte{n.Type().ToByte()}),
 	}
 	if n.Type() == core.NodeTypeBranch {
-		newNode.LeftChild = tktypes.HexUint256(*n.LeftChild().BigInt())
-		newNode.RightChild = tktypes.HexUint256(*n.RightChild().BigInt())
+		leftBytes, err1 := tktypes.ParseBytes32(n.LeftChild().Hex())
+		if err1 != nil {
+			return fmt.Errorf("failed to parse left child node reference. %s", err1)
+		}
+		rightBytes, err2 := tktypes.ParseBytes32(n.RightChild().Hex())
+		if err2 != nil {
+			return fmt.Errorf("failed to parse right child node reference. %s", err2)
+		}
+		newNode.LeftChild = leftBytes
+		newNode.RightChild = rightBytes
 	} else if n.Type() == core.NodeTypeLeaf {
-		newNode.Index = tktypes.HexUint256(*n.Index().BigInt())
+		idxBytes, err := tktypes.ParseBytes32(n.Index().Hex())
+		if err != nil {
+			return fmt.Errorf("failed to parse leaf node index. %s", err)
+		}
+		newNode.Index = idxBytes
 	}
 
 	data, err := json.Marshal(newNode)
 	if err != nil {
 		return fmt.Errorf("failed to insert node. %s", err)
 	}
-	refKey := newNode.RefKey.HexString()
+	refKey := newNode.RefKey.HexString0xPrefix()
 	newNodeState := &prototk.NewLocalState{
 		Id:            &refKey,
 		SchemaId:      s.nodeSchemaId,

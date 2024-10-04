@@ -106,7 +106,7 @@ func TestMintAssemble(t *testing.T) {
 		},
 	}
 	_, err = h.Assemble(ctx, tx, req)
-	assert.EqualError(t, err, "expected 32 bytes in hex string, got 20")
+	assert.EqualError(t, err, "failed to decode recipient public key. invalid compressed public key length: 20")
 
 	privKey := babyjub.NewRandPrivKey()
 	pubKey := privKey.Public()

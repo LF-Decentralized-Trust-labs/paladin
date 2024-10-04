@@ -32,6 +32,9 @@ func DecodeBabyJubJubPublicKey(pubKeyHex string) (*babyjub.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(pubKeyCompBytes) != 32 {
+		return nil, fmt.Errorf("invalid compressed public key length: %d", len(pubKeyCompBytes))
+	}
 	var compressedPubKey babyjub.PublicKeyComp
 	copy(compressedPubKey[:], pubKeyCompBytes)
 	return compressedPubKey.Decompress()

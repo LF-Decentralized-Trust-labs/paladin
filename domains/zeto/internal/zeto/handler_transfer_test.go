@@ -21,6 +21,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -92,7 +93,7 @@ func TestTransferAssemble(t *testing.T) {
 	tx := &types.ParsedTransaction{
 		Params: &types.TransferParams{
 			To:     "Alice",
-			Amount: tktypes.MustParseHexUint256("0x0a"),
+			Amount: tktypes.MustParseHexUint256("0x09"),
 		},
 		Transaction: txSpec,
 		DomainConfig: &types.DomainInstanceConfig{
@@ -157,13 +158,13 @@ func TestTransferAssemble(t *testing.T) {
 	err = json.Unmarshal([]byte(res.AssembledTransaction.OutputStates[0].StateDataJson), &coin1)
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", coin1.Owner)
-	assert.Equal(t, "0x0a", coin1.Amount.String())
+	assert.Equal(t, "0x09", coin1.Amount.String())
 
 	var coin2 types.ZetoCoin
 	err = json.Unmarshal([]byte(res.AssembledTransaction.OutputStates[1].StateDataJson), &coin2)
 	assert.NoError(t, err)
 	assert.Equal(t, "Bob", coin2.Owner)
-	assert.Equal(t, "0x05", coin2.Amount.String())
+	assert.Equal(t, "0x06", coin2.Amount.String())
 
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
 	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
@@ -171,11 +172,11 @@ func TestTransferAssemble(t *testing.T) {
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
 		var dataJson string
 		if called == 0 {
-			dataJson = "{\"salt\":\"0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec\",\"owner\":\"Alice\",\"ownerKey\":\"0x19d2ee6b9770a4f8d7c3b7906bc7595684509166fa42d718d1d880b62bcb7922\",\"amount\":\"0x0f\"}"
+			dataJson = "{\"salt\":\"0x13de02d64a5736a56b2d35d2a83dd60397ba70aae6f8347629f0960d4fee5d58\",\"owner\":\"Alice\",\"ownerKey\":\"0xc1d218cf8993f940e75eabd3fee23dadc4e89cd1de479f03a61e91727959281b\",\"amount\":\"0x0a\"}"
 		} else if called == 1 {
-			dataJson = "{\"rootIndex\": \"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\"}"
+			dataJson = "{\"rootIndex\": \"0x28025a624a1e83687e84451d04190f081d79d470f9d50a7059508476be02d401\"}"
 		} else {
-			dataJson = "{\"index\":\"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\",\"leftChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"refKey\":\"0x113842d0d1c21d02baf98d1ddbf9a88e6c2a8e2aaf48ee1e35659f7de53da5f0\",\"rightChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"type\":\"0x02\"}"
+			dataJson = "{\"index\":\"0x3801702a0a958207c485bbf0137ff64327bdf16ad9a5acdb4d5ab1469b87e326\",\"leftChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"refKey\":\"0x89ea7fc1e5e9722566083823f288a45d6dc7ef30b68094f006530dfe9f5cf90f\",\"rightChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"type\":\"0x02\"}"
 		}
 		called++
 		return &prototk.FindAvailableStatesResponse{
@@ -329,6 +330,124 @@ func TestTransferPrepare(t *testing.T) {
 	res, err = h.Prepare(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, "{\"data\":\"0x000100001234567890123456789012345678901234567890123456789012345678901234\",\"nullifiers\":[\"0x1234567890\",\"0x1234567890\"],\"outputs\":[\"0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f\",\"0\"],\"proof\":{\"pA\":[\"0x1234567890\",\"0x1234567890\"],\"pB\":[[\"0x1234567890\",\"0x1234567890\"],[\"0x1234567890\",\"0x1234567890\"]],\"pC\":[\"0x1234567890\",\"0x1234567890\"]},\"root\":\"0x1234567890\"}", res.Transaction.ParamsJson)
+}
+
+func TestGenerateMerkleProofs(t *testing.T) {
+	testCallbacks := &testDomainCallbacks{
+		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+			return nil, errors.New("test error")
+		},
+	}
+	h := transferHandler{
+		zeto: &Zeto{
+			name:      "test1",
+			Callbacks: testCallbacks,
+			coinSchema: &prototk.StateSchema{
+				Id: "coin",
+			},
+			merkleTreeRootSchema: &prototk.StateSchema{
+				Id: "merkle_tree_root",
+			},
+			merkleTreeNodeSchema: &prototk.StateSchema{
+				Id: "merkle_tree_node",
+			},
+		},
+	}
+	addr, err := ethtypes.NewAddress("0x1234567890123456789012345678901234567890")
+	assert.NoError(t, err)
+	inputCoins := []*types.ZetoCoin{
+		{
+			Salt:     tktypes.MustParseHexUint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			Owner:    "Alice",
+			OwnerKey: tktypes.MustParseHexBytes("0x1234"),
+			Amount:   tktypes.MustParseHexUint256("0x0f"),
+		},
+	}
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.EqualError(t, err, "failed to create new smt object. failed to find available states. test error")
+
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		return &prototk.FindAvailableStatesResponse{
+			States: []*prototk.StoredState{
+				{
+					DataJson: "{\"rootIndex\":\"0x28025a624a1e83687e84451d04190f081d79d470f9d50a7059508476be02d401\"}",
+				},
+			},
+		}, nil
+	}
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.EqualError(t, err, "failed to decode owner key. invalid compressed public key length: 2")
+
+	inputCoins[0].OwnerKey = tktypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.EqualError(t, err, "failed to create new leaf node. inputs values not inside Finite Field")
+
+	inputCoins[0].Salt = tktypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
+	calls := 0
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		defer func() { calls++ }()
+		if calls == 0 {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"rootIndex\":\"0x28025a624a1e83687e84451d04190f081d79d470f9d50a7059508476be02d401\"}",
+					},
+				},
+			}, nil
+		} else {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{},
+			}, nil
+		}
+	}
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.EqualError(t, err, "failed to query the smt DB for leaf node (index=5f5d5e50a650a20986d496e6645ea31770758d924796f0dfc5ac2ad234b03e30). key not found")
+
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		defer func() { calls++ }()
+		if calls == 0 {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"rootIndex\":\"0x28025a624a1e83687e84451d04190f081d79d470f9d50a7059508476be02d401\"}",
+					},
+				},
+			}, nil
+		} else {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"index\":\"0x3801702a0a958207c485bbf0137ff64327bdf16ad9a5acdb4d5ab1469b87e326\",\"leftChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"refKey\":\"0x89ea7fc1e5e9722566083823f288a45d6dc7ef30b68094f006530dfe9f5cf90f\",\"rightChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"type\":\"0x02\"}",
+					},
+				},
+			}, nil
+		}
+	}
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.EqualError(t, err, "coin (ref=789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a) found in the merkle tree but the persisted hash 26e3879b46b15a4ddbaca5d96af1bd2743f67f13f0bb85c40782950a2a700138 (index=3801702a0a958207c485bbf0137ff64327bdf16ad9a5acdb4d5ab1469b87e326) did not match the expected hash 0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f (index=5f5d5e50a650a20986d496e6645ea31770758d924796f0dfc5ac2ad234b03e30)")
+
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		defer func() { calls++ }()
+		if calls == 0 {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"rootIndex\":\"0x789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a\"}",
+					},
+				},
+			}, nil
+		} else {
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"index\":\"0x5f5d5e50a650a20986d496e6645ea31770758d924796f0dfc5ac2ad234b03e30\",\"leftChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"refKey\":\"0x789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a\",\"rightChild\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"type\":\"0x02\"}",
+					},
+				},
+			}, nil
+		}
+	}
+	_, _, err = h.generateMerkleProofs("Zeto_Anon", addr, inputCoins)
+	assert.NoError(t, err)
 }
 
 type testDomainCallbacks struct {

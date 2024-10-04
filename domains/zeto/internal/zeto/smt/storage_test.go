@@ -72,38 +72,38 @@ func returnNode(t int) func() (*prototk.FindAvailableStatesResponse, error) {
 		data, _ = json.Marshal(map[string]string{"rootIndex": "0x1234567890123456789012345678901234567890123456789012345678901234"})
 	} else if t == 1 {
 		data, _ = json.Marshal(map[string]string{
-			"index":      "0x6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a",
+			"index":      "0x197b0dc3f167041e03d3eafacec1aa3ab12a0d7a606581af01447c269935e521",
 			"leftChild":  "0x0000000000000000000000000000000000000000000000000000000000000000",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
 			"rightChild": "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"type":       "0x02", // leaf node
 		})
 	} else if t == 2 {
 		data, _ = json.Marshal(map[string]string{
-			"leftChild":  "0x6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
-			"rightChild": "0x6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a",
+			"leftChild":  "0x197b0dc3f167041e03d3eafacec1aa3ab12a0d7a606581af01447c269935e521",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
+			"rightChild": "0xd23ae67af3b0e9f4854eb76954c27c7607b2a37b633d6b107e607cee460a6425",
 			"type":       "0x01", // branch node
 		})
 	} else if t == 3 {
 		data, _ = json.Marshal(map[string]string{
-			"leftChild":  "0x1234567890123456789012345678901234567890123456789012345678901234",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
-			"rightChild": "0x6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a",
+			"leftChild":  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
+			"rightChild": "0xd23ae67af3b0e9f4854eb76954c27c7607b2a37b633d6b107e607cee460a6425",
 			"type":       "0x01", // branch node
 		})
 	} else if t == 4 {
 		data, _ = json.Marshal(map[string]string{
-			"leftChild":  "0x6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
-			"rightChild": "0x1234567890123456789012345678901234567890123456789012345678901234",
+			"leftChild":  "0x197b0dc3f167041e03d3eafacec1aa3ab12a0d7a606581af01447c269935e521",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
+			"rightChild": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"type":       "0x01", // branch node
 		})
 	} else if t == 5 {
 		data, _ = json.Marshal(map[string]string{
 			"index":      "baddata",
 			"leftChild":  "0x0000000000000000000000000000000000000000000000000000000000000000",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
 			"rightChild": "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"type":       "0x02", // leaf node
 		})
@@ -111,7 +111,7 @@ func returnNode(t int) func() (*prototk.FindAvailableStatesResponse, error) {
 		data, _ = json.Marshal(map[string]string{
 			"index":      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"leftChild":  "0x0000000000000000000000000000000000000000000000000000000000000000",
-			"refKey":     "0xedca9c581dad38731c33e94afb39cb78c44d602de59440e128ad3ce882cce409",
+			"refKey":     "0x040a1f5b3aca49a82b256b9250a0665e8e6fee7713d7d67fbf0d9e4728561fe8",
 			"rightChild": "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"type":       "0x02", // leaf node
 		})
@@ -144,7 +144,7 @@ func TestStorage(t *testing.T) {
 	var root MerkleTreeRoot
 	err = json.Unmarshal([]byte(storage.(*statesStorage).newNodes[0].StateDataJson), &root)
 	assert.NoError(t, err)
-	assert.Equal(t, "0x00", root.RootIndex.String())
+	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", root.RootIndex.String())
 
 	storage, smt, err = New(&testDomainCallbacks{returnFunc: returnBadData}, "test", contractAddress, "root-schema", "node-schema")
 	assert.EqualError(t, err, "failed to unmarshal root node index. invalid character 'b' looking for beginning of value")
@@ -155,7 +155,7 @@ func TestStorage(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.NotNil(t, smt)
-	assert.Equal(t, "3412907856341290785634129078563412907856341290785634129078563412", storage.(*statesStorage).rootNode.Hex())
+	assert.Equal(t, "1234567890123456789012345678901234567890123456789012345678901234", storage.(*statesStorage).rootNode.Hex())
 
 	assert.Empty(t, storage.(*statesStorage).GetNewStates())
 	idx, err := storage.(*statesStorage).GetRootNodeIndex()
@@ -179,7 +179,7 @@ func TestGetNode(t *testing.T) {
 	n, err := storage.GetNode(idx)
 	assert.NoError(t, err)
 	assert.NotNil(t, n)
-	assert.Equal(t, "6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a", n.Index().Hex())
+	assert.Equal(t, "197b0dc3f167041e03d3eafacec1aa3ab12a0d7a606581af01447c269935e521", n.Index().Hex())
 	assert.Equal(t, core.NodeTypeLeaf, n.Type())
 
 	storage = NewStatesStorage(&testDomainCallbacks{returnFunc: returnNode(2)}, "test", contractAddress, "root-schema", "node-schema")
@@ -187,7 +187,7 @@ func TestGetNode(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, n)
 	assert.Empty(t, n.Index())
-	assert.Equal(t, "6c94440e443d2dd1cae86d38edab44749a05bccfdfb0755c6c5c67315ade9f0a", n.LeftChild().Hex())
+	assert.Equal(t, "197b0dc3f167041e03d3eafacec1aa3ab12a0d7a606581af01447c269935e521", n.LeftChild().Hex())
 
 	storage = NewStatesStorage(&testDomainCallbacks{returnFunc: returnNode(3)}, "test", contractAddress, "root-schema", "node-schema")
 	_, err = storage.GetNode(idx)
@@ -220,4 +220,13 @@ func TestInsertNode(t *testing.T) {
 	err = storage.InsertNode(n)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(storage.(*statesStorage).newNodes))
+}
+
+func TestUnimplementedMethods(t *testing.T) {
+	contractAddress := tktypes.RandAddress().Address0xHex()
+	storage := NewStatesStorage(&testDomainCallbacks{returnFunc: returnEmptyStates}, "test", contractAddress, "root-schema", "node-schema")
+	assert.NotNil(t, storage)
+	assert.Nil(t, storage.(*statesStorage).Commit())
+	assert.Nil(t, storage.(*statesStorage).Rollback())
+	storage.(*statesStorage).Close()
 }
