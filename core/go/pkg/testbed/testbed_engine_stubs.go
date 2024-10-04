@@ -77,6 +77,30 @@ func (tb *testbed) execBaseLedgerTransaction(ctx context.Context, signer string,
 	return nil
 }
 
+func (tb *testbed) execBaseLedgerCall(ctx context.Context, signer string, txInstruction *components.EthTransaction) error {
+
+	var abiFunc ethclient.ABIFunctionClient
+	ec := tb.c.EthClientFactory().HTTPClient()
+	abiFunc, err := ec.ABIFunction(ctx, txInstruction.FunctionABI)
+	if err != nil {
+		return err
+	}
+
+	// Send the transaction
+	var ignored any
+	addr := ethtypes.Address0xHex(txInstruction.To)
+	err = abiFunc.R(ctx).
+		Signer(signer).
+		To(&addr).
+		Input(txInstruction.Inputs).
+		Output(&ignored).
+		Call()
+	if err != nil {
+		return fmt.Errorf("failed to perform base ledger call: %s", err)
+	}
+	return nil
+}
+
 func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateTransaction) error {
 	tx.PostAssembly.Signatures = []*prototk.AttestationResult{}
 	for _, ar := range tx.PostAssembly.AttestationPlan {

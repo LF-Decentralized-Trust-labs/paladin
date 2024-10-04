@@ -311,7 +311,7 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		waitForCompletion bool,
 	) (*tktypes.PrivateContractTransaction, error) {
 
-		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_SUBMIT)
+		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_SEND_TRANSACTION)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +337,11 @@ func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
 		invocation tktypes.PrivateContractInvoke,
 	) (*tktypes.PrivateContractTransaction, error) {
 
-		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_PREPARE)
+		tx, err := tb.prepareTransaction(ctx, invocation, prototk.TransactionSpecification_CALL)
+		if err != nil {
+			return nil, err
+		}
+		err = tb.execBaseLedgerCall(ctx, tx.Signer, tx.PreparedTransaction)
 		if err != nil {
 			return nil, err
 		}
