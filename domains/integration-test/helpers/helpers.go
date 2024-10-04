@@ -112,15 +112,19 @@ func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcbacken
 	}
 }
 
-func (dth *DomainTransactionHelper) SignAndSend(signer string) *SentDomainTransaction {
+func (dth *DomainTransactionHelper) SignAndSend(signer string, confirm ...bool) *SentDomainTransaction {
 	tx := &SentDomainTransaction{
 		t:      dth.t,
 		result: make(chan any),
 	}
 	dth.tx.From = signer
+	confirmEvents := false
+	if len(confirm) > 0 {
+		confirmEvents = confirm[0]
+	}
 	go func() {
 		var result any
-		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_invoke", dth.tx, true)
+		rpcerr := dth.rpc.CallRPC(dth.ctx, &result, "testbed_invoke", dth.tx, confirmEvents)
 		if rpcerr != nil && rpcerr.Error() != nil {
 			tx.result <- rpcerr.Error()
 		}

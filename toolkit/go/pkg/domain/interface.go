@@ -32,7 +32,7 @@ type ParsedTransaction[C any] struct {
 }
 
 type DomainHandler[C any] interface {
-	ValidateParams(ctx context.Context, params string) (interface{}, error)
+	ValidateParams(ctx context.Context, config *C, params string) (interface{}, error)
 	Init(ctx context.Context, tx *ParsedTransaction[C], req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error)
 	Assemble(ctx context.Context, tx *ParsedTransaction[C], req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error)
 	Endorse(ctx context.Context, tx *ParsedTransaction[C], req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error)

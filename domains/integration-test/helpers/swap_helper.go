@@ -18,6 +18,7 @@ package helpers
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -27,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed abis/Swap.json
@@ -91,4 +93,13 @@ func (s *SwapHelper) Prepare(ctx context.Context, states *StateData) *Transactio
 func (s *SwapHelper) Execute(ctx context.Context) *TransactionHelper {
 	builder := functionBuilder(ctx, s.t, s.eth, s.ABI, "execute").To(&s.Address)
 	return NewTransactionHelper(ctx, s.t, s.tb, builder)
+}
+
+func (s *SwapHelper) GetTrade(ctx context.Context) map[string]any {
+	output, err := functionBuilder(ctx, s.t, s.eth, s.ABI, "trade").To(&s.Address).CallResult()
+	require.NoError(s.t, err)
+	var jsonOutput map[string]any
+	err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)
+	require.NoError(s.t, err)
+	return jsonOutput
 }

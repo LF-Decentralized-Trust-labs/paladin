@@ -43,6 +43,20 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+
+    // Consumable configurations
+    goSource {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    zetoArtifacts {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    poseidonArtifacts {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
 
 dependencies {
@@ -133,6 +147,7 @@ task extractZetoArtifacts(type: Copy, dependsOn: [protoc, downloadZetoProver, do
 }
 
 task copySolidity(type: Copy, dependsOn: [protoc, ":solidity:compile", extractZetoArtifacts]) {
+    inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
     }
@@ -150,7 +165,8 @@ task copySolidity(type: Copy, dependsOn: [protoc, ":solidity:compile", extractZe
 }
 
 task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, generatePoseidonArtifacts, ":solidity:compile"]) {
-    from fileTree("${rootDir}/solidity/artifacts") {
+    inputs.files(configurations.contractCompile)
+    from fileTree(configurations.contractCompile.asPath) {
         include 'contracts/domains/zeto/ZetoFactory.sol/ZetoFactory.json'
     }
     from fileTree("${zkpOut}/artifacts/contracts") {
@@ -197,7 +213,6 @@ task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copySolidityForTest, 
 }
 
 task test(type: Exec, dependsOn: [protoc, ":core:go:makeMocks"]) {
-
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
@@ -246,4 +261,10 @@ task clean(type: Delete) {
 
 task assemble {
     dependsOn buildGo
+}
+
+dependencies {
+    goSource files(goFiles, copySolidity)
+    zetoArtifacts files(extractZetoArtifacts)
+    poseidonArtifacts files(generatePoseidonArtifacts)
 }

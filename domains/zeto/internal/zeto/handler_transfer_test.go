@@ -35,13 +35,13 @@ import (
 func TestTransferValidateParams(t *testing.T) {
 	h := transferHandler{}
 	ctx := context.Background()
-	_, err := h.ValidateParams(ctx, "bad json")
+	_, err := h.ValidateParams(ctx, nil, "bad json")
 	assert.EqualError(t, err, "invalid character 'b' looking for beginning of value")
 
-	_, err = h.ValidateParams(ctx, "{}")
+	_, err = h.ValidateParams(ctx, nil, "{}")
 	assert.EqualError(t, err, "parameter 'to' is required")
 
-	_, err = h.ValidateParams(ctx, "{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":0}")
+	_, err = h.ValidateParams(ctx, nil, "{\"to\":\"0x1234567890123456789012345678901234567890\",\"amount\":0}")
 	assert.NoError(t, err)
 }
 

@@ -24,14 +24,16 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
-	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
-func mapConfig(t *testing.T, config *types.DomainConfig) (m map[string]any) {
+func mapConfig(t *testing.T, config any) (m map[string]any) {
 	configJSON, err := json.Marshal(&config)
 	assert.NoError(t, err)
 	err = json.Unmarshal(configJSON, &m)
@@ -68,7 +70,7 @@ func deployContracts(ctx context.Context, t *testing.T, deployer string, contrac
 	return deployed
 }
 
-func newNotoDomain(t *testing.T, config *types.DomainConfig) (*noto.Noto, *testbed.TestbedDomain) {
+func newNotoDomain(t *testing.T, config *nototypes.DomainConfig) (*noto.Noto, *testbed.TestbedDomain) {
 	var domain noto.Noto
 	return &domain, &testbed.TestbedDomain{
 		Config: mapConfig(t, config),
@@ -77,5 +79,18 @@ func newNotoDomain(t *testing.T, config *types.DomainConfig) (*noto.Noto, *testb
 			return domain
 		}),
 		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
+	}
+}
+
+func newZetoDomain(t *testing.T, config *zetotypes.DomainFactoryConfig) (*zeto.Zeto, *testbed.TestbedDomain) {
+	var domain zeto.Zeto
+	return &domain, &testbed.TestbedDomain{
+		Config: mapConfig(t, config),
+		Plugin: plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
+			domain = zeto.New(callbacks)
+			return domain
+		}),
+		RegistryAddress: tktypes.MustEthAddress(config.FactoryAddress),
+		AllowSigning:    true,
 	}
 }

@@ -270,12 +270,17 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 		return nil, nil, fmt.Errorf("failed to unmarshal function abi json. %s", err)
 	}
 
+	domainConfig, err := z.decodeDomainConfig(ctx, tx.ContractConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode domain config. %s", err)
+	}
+
 	abi := types.ZetoABI.Functions()[functionABI.Name]
 	handler := z.GetHandler(functionABI.Name)
 	if abi == nil || handler == nil {
 		return nil, nil, fmt.Errorf("unknown function: %s", functionABI.Name)
 	}
-	params, err := handler.ValidateParams(ctx, tx.FunctionParamsJson)
+	params, err := handler.ValidateParams(ctx, domainConfig, tx.FunctionParamsJson)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate function params. %s", err)
 	}
@@ -286,11 +291,6 @@ func (z *Zeto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 	}
 	if tx.FunctionSignature != signature {
 		return nil, nil, fmt.Errorf("unexpected signature for function '%s': expected=%s actual=%s", functionABI.Name, signature, tx.FunctionSignature)
-	}
-
-	domainConfig, err := z.decodeDomainConfig(ctx, tx.ContractConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode domain config. %s", err)
 	}
 
 	contractAddress, err := ethtypes.NewAddress(tx.ContractAddress)

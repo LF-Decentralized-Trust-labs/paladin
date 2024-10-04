@@ -23,6 +23,8 @@ func (z *Zeto) GetHandler(method string) types.DomainHandler {
 		return &mintHandler{zeto: z}
 	case "transfer":
 		return &transferHandler{zeto: z}
+	case "lockProof":
+		return &lockHandler{zeto: z}
 	default:
 		return nil
 	}

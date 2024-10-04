@@ -42,7 +42,7 @@ type TransferWithApprovalParams struct {
 	Data    ethtypes.HexBytes0xPrefix `json:"data"`
 }
 
-func (h *approveHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
+func (h *approveHandler) ValidateParams(ctx context.Context, config *types.NotoConfigOutput_V0, params string) (interface{}, error) {
 	var approveParams types.ApproveParams
 	if err := json.Unmarshal([]byte(params), &approveParams); err != nil {
 		return nil, err

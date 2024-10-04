@@ -31,9 +31,11 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -41,7 +43,7 @@ type transferHandler struct {
 	zeto *Zeto
 }
 
-func (h *transferHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
+func (h *transferHandler) ValidateParams(ctx context.Context, config *types.DomainInstanceConfig, params string) (interface{}, error) {
 	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
@@ -138,9 +140,8 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 			{
 				Name:            "submitter",
 				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       h.zeto.getAlgoZetoSnarkBJJ(),
-				VerifierType:    zetosigner.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
-				PayloadType:     zetosigner.PAYLOAD_DOMAIN_ZETO_SNARK,
+				Algorithm:       algorithms.ECDSA_SECP256K1,
+				VerifierType:    verifiers.ETH_ADDRESS,
 				Parties:         []string{tx.Transaction.From},
 			},
 		},

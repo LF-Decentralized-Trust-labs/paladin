@@ -35,7 +35,7 @@ type transferHandler struct {
 	noto *Noto
 }
 
-func (h *transferHandler) ValidateParams(ctx context.Context, params string) (interface{}, error) {
+func (h *transferHandler) ValidateParams(ctx context.Context, config *types.NotoConfigOutput_V0, params string) (interface{}, error) {
 	var transferParams types.TransferParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err

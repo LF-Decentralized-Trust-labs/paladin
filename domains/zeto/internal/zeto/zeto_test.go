@@ -172,6 +172,17 @@ func TestInitTransaction(t *testing.T) {
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"test\"}"
 	_, err = z.InitTransaction(context.Background(), req)
+	assert.ErrorContains(t, err, "failed to validate init transaction spec. failed to decode domain config. FF22045: Insufficient bytes")
+
+	conf := types.DomainInstanceConfig{
+		CircuitId: "circuit1",
+		TokenName: "testToken1",
+	}
+	configJSON, _ := json.Marshal(conf)
+	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
+	assert.NoError(t, err)
+	req.Transaction.ContractConfig = encoded
+	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "failed to validate init transaction spec. unknown function: test")
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
@@ -195,17 +206,6 @@ func TestInitTransaction(t *testing.T) {
 	assert.EqualError(t, err, "failed to validate init transaction spec. unexpected signature for function 'mint': expected=function mint(string memory to, uint256 amount) external { } actual=")
 
 	req.Transaction.FunctionSignature = "function mint(string memory to, uint256 amount) external { }"
-	_, err = z.InitTransaction(context.Background(), req)
-	assert.ErrorContains(t, err, "failed to validate init transaction spec. failed to decode domain config. FF22045: Insufficient bytes")
-
-	conf := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
-		TokenName: "testToken1",
-	}
-	configJSON, _ := json.Marshal(conf)
-	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
-	assert.NoError(t, err)
-	req.Transaction.ContractConfig = encoded
 	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "failed to validate init transaction spec. failed to decode contract address. bad address - must be 20 bytes (len=0)")
 
@@ -239,7 +239,7 @@ func TestAssembleTransaction(t *testing.T) {
 		},
 	}
 	_, err := z.AssembleTransaction(context.Background(), req)
-	assert.ErrorContains(t, err, "failed to validate assemble transaction spec. unexpected signature for function 'mint'")
+	assert.ErrorContains(t, err, "failed to validate assemble transaction spec. failed to decode domain config. FF22045: Insufficient bytes")
 
 	req.Transaction.FunctionSignature = "function mint(string memory to, uint256 amount) external { }"
 	conf := types.DomainInstanceConfig{
@@ -363,4 +363,8 @@ func TestHandleEventBatch(t *testing.T) {
 	ctx := context.Background()
 	_, err := z.HandleEventBatch(ctx, req)
 	assert.EqualError(t, err, "failed to unmarshal events. invalid character 'b' looking for beginning of value")
+
+	req.JsonEvents = "[{\"soliditySignature\":\"mint\",\"address\":\"0x1234567890123456789012345678901234567890\"}]"
+	_, err = z.HandleEventBatch(ctx, req)
+
 }

@@ -5,11 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../../domains/interfaces/INoto.sol";
+import "../domains/interfaces/INoto.sol";
 
 contract Atom is Initializable {
     uint256 private _operationCount;
     Operation[] private _operations;
+    bool public cancelled;
 
     struct Operation {
         address contractAddress;
@@ -29,9 +30,15 @@ contract Atom is Initializable {
     }
 
     function execute() public {
+        require(!cancelled, "Atom has been cancelled");
         for (uint256 i = 0; i < _operationCount; i++) {
             _executeOperation(_operations[i]);
         }
+    }
+
+    function cancel() public {
+        require(!cancelled, "Atom has already been cancelled");
+        cancelled = true;
     }
 
     function _executeOperation(Operation storage op) internal {
@@ -50,6 +57,10 @@ contract Atom is Initializable {
 
     function getOperationCount() public view returns (uint256) {
         return _operationCount;
+    }
+
+    function getOperation(uint256 n) public view returns (Operation memory) {
+        return _operations[n];
     }
 }
 

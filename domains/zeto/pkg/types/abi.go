@@ -37,6 +37,14 @@ var ZetoABI = abi.ABI{
 			{Name: "amount", Type: "uint256"},
 		},
 	},
+	{
+		Name: "lockProof",
+		Type: abi.Function,
+		Inputs: abi.ParameterArray{
+			{Name: "delegate", Type: "address"},
+			{Name: "call", Type: "bytes"}, // assumed to be an encoded "transfer"
+		},
+	},
 }
 
 type InitializerParams struct {
@@ -60,4 +68,9 @@ type MintParams struct {
 type TransferParams struct {
 	To     string              `json:"to"`
 	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
+type LockParams struct {
+	Delegate tktypes.EthAddress `json:"delegate"`
+	Call     tktypes.HexBytes   `json:"call"`
 }

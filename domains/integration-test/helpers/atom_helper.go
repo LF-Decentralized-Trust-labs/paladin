@@ -18,6 +18,8 @@ package helpers
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -27,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed abis/AtomFactory.json
@@ -101,4 +104,34 @@ func (a *AtomFactoryHelper) Create(ctx context.Context, signer string, operation
 func (a *AtomHelper) Execute(ctx context.Context) *TransactionHelper {
 	builder := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "execute").To(&a.Address)
 	return NewTransactionHelper(ctx, a.t, a.tb, builder)
+}
+
+func (a *AtomHelper) GetOperationCount(ctx context.Context) int {
+	output, err := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "getOperationCount").
+		To(&a.Address).
+		CallResult()
+	require.NoError(a.t, err)
+	var jsonOutput map[string]any
+	err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)
+	require.NoError(a.t, err)
+	opCount, err := strconv.Atoi(jsonOutput["0"].(string))
+	require.NoError(a.t, err)
+	return opCount
+}
+
+func (a *AtomHelper) GetOperations(ctx context.Context) []map[string]any {
+	opCount := a.GetOperationCount(ctx)
+	var operations []map[string]any
+	for i := 0; i < opCount; i++ {
+		output, err := functionBuilder(ctx, a.t, a.eth, a.InstanceABI, "getOperation").
+			To(&a.Address).
+			Input(map[string]int{"n": i}).
+			CallResult()
+		require.NoError(a.t, err)
+		var jsonOutput map[string]any
+		err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)
+		require.NoError(a.t, err)
+		operations = append(operations, jsonOutput["0"].(map[string]any))
+	}
+	return operations
 }
