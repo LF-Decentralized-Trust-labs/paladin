@@ -192,7 +192,7 @@ func (h *approveHandler) guardApprove(ctx context.Context, tx *types.ParsedTrans
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["approveTransfer"],
+		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["onApproveTransfer"],
 		paramsJSON:      paramsJSON,
 		contractAddress: &tx.DomainConfig.NotaryAddress,
 	}, nil
@@ -203,7 +203,7 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	if req.Transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
+	if tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
 		guardTransaction, err := h.guardApprove(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err

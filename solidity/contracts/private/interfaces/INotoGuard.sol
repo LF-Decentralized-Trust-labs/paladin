@@ -14,20 +14,20 @@ interface INotoGuard is IPenteExternalCall {
         bytes encodedCall;
     }
 
-    function mint(
+    function onMint(
         address to,
         uint256 amount,
         PreparedTransaction calldata prepared
     ) external;
 
-    function transfer(
+    function onTransfer(
         address from,
         address to,
         uint256 amount,
         PreparedTransaction calldata prepared
     ) external;
 
-    function approveTransfer(
+    function onApproveTransfer(
         address from,
         address delegate,
         PreparedTransaction calldata prepared

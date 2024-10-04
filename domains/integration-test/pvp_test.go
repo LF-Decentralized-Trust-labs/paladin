@@ -28,8 +28,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 )
 
 var (
@@ -39,22 +39,34 @@ var (
 )
 
 type NotoTransferParams struct {
-	Inputs  []interface{}    `json:"inputs"`
-	Outputs []interface{}    `json:"outputs"`
-	Data    tktypes.HexBytes `json:"data"`
+	Inputs  []tktypes.Bytes32 `json:"inputs"`
+	Outputs []tktypes.Bytes32 `json:"outputs"`
+	Data    tktypes.HexBytes  `json:"data"`
+}
+
+type NotoTrackerTransferParams struct {
+	From     *tktypes.EthAddress            `json:"from"`
+	To       *tktypes.EthAddress            `json:"to"`
+	Amount   *tktypes.HexUint256            `json:"amount"`
+	Prepared NotoTrackerPreparedTransaction `json:"prepared"`
+}
+
+type NotoTrackerPreparedTransaction struct {
+	ContractAddress tktypes.EthAddress `json:"contractAddress"`
+	EncodedCall     tktypes.HexBytes   `json:"encodedCall"`
 }
 
 func TestPvP(t *testing.T) {
 	pvpNotoNoto(t, false)
 }
 
-func TestPvPWithNotoGuard(t *testing.T) {
+func TestPvPWithTracker(t *testing.T) {
 	pvpNotoNoto(t, true)
 }
 
-func pvpNotoNoto(t *testing.T, withGuard bool) {
+func pvpNotoNoto(t *testing.T, withTracker bool) {
 	ctx := context.Background()
-	log.L(ctx).Infof("TestPvP (withGuard=%t)", withGuard)
+	log.L(ctx).Infof("TestPvP (withTracker=%t)", withTracker)
 	domainName := "noto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
@@ -84,9 +96,10 @@ func pvpNotoNoto(t *testing.T, withGuard bool) {
 
 	atomFactory := helpers.InitAtom(t, tb, rpc, contracts["atom"])
 
+	var guard *helpers.NotoTrackerHelper
 	var guardAddress *tktypes.EthAddress
-	if withGuard {
-		guard := helpers.DeployGuard(ctx, t, tb, notary)
+	if withTracker {
+		guard = helpers.DeployTracker(ctx, t, tb, notary)
 		guardAddress = guard.Address
 	}
 
@@ -114,7 +127,12 @@ func pvpNotoNoto(t *testing.T, withGuard bool) {
 	})
 
 	log.L(ctx).Infof("Prepare the transfers")
-	transferGold := notoGold.Transfer(ctx, bob, 1).Prepare(alice)
+	var transferGold *tktypes.PrivateContractTransaction
+	if withTracker {
+		transferGold = notoGold.Transfer(ctx, bob, 1).Prepare(alice)
+	} else {
+		transferGold = notoGold.Transfer(ctx, bob, 1).Prepare(alice)
+	}
 	transferSilver := notoSilver.Transfer(ctx, alice, 10).Prepare(bob)
 
 	// TODO: this should actually be a Pente state transition
@@ -132,25 +150,46 @@ func pvpNotoNoto(t *testing.T, withGuard bool) {
 	}).SignAndSend(bob).Wait()
 
 	var transferGoldParams NotoTransferParams
-	err = json.Unmarshal(transferGold.ParamsJSON, &transferGoldParams)
-	require.NoError(t, err)
-	var transferSilverParams NotoTransferParams
-	err = json.Unmarshal(transferSilver.ParamsJSON, &transferSilverParams)
-	require.NoError(t, err)
+	var transferGoldEncoded []byte
+	if withTracker {
+		// Unpack the inner "transfer" and replace with "transferWithApproval"
+		// TODO: make this simpler
+		var trackerParams NotoTrackerTransferParams
+		err = json.Unmarshal(transferGold.ParamsJSON, &trackerParams)
+		require.NoError(t, err)
+		decoded, err := notoGold.ABI.Functions()["transfer"].DecodeCallDataCtx(ctx, trackerParams.Prepared.EncodedCall)
+		require.NoError(t, err)
+		decodedJSON, err := decoded.JSON()
+		require.NoError(t, err)
+		trackerParams.Prepared.EncodedCall, err = notoGold.ABI.Functions()["transferWithApproval"].EncodeCallDataJSONCtx(ctx, decodedJSON)
+		require.NoError(t, err)
+		newParamsJSON, err := json.Marshal(trackerParams)
+		require.NoError(t, err)
+		transferGoldEncoded, err = guard.ABI.Functions()["onTransfer"].EncodeCallDataJSONCtx(ctx, newParamsJSON)
+		require.NoError(t, err)
+		err = json.Unmarshal(decodedJSON, &transferGoldParams)
+		require.NoError(t, err)
+	} else {
+		transferGoldEncoded, err = notoGold.ABI.Functions()["transferWithApproval"].EncodeCallDataJSONCtx(ctx, transferGold.ParamsJSON)
+		require.NoError(t, err)
+		err = json.Unmarshal(transferGold.ParamsJSON, &transferGoldParams)
+		require.NoError(t, err)
+	}
 
-	transferGoldEncoded, err := notoGold.ABI.Functions()["transferWithApproval"].EncodeCallDataJSONCtx(ctx, transferGold.ParamsJSON)
-	require.NoError(t, err)
+	var transferSilverParams NotoTransferParams
 	transferSilverEncoded, err := notoSilver.ABI.Functions()["transferWithApproval"].EncodeCallDataJSONCtx(ctx, transferSilver.ParamsJSON)
+	require.NoError(t, err)
+	err = json.Unmarshal(transferSilver.ParamsJSON, &transferSilverParams)
 	require.NoError(t, err)
 
 	log.L(ctx).Infof("Create Atom instance")
 	transferAtom := atomFactory.Create(ctx, alice, []*helpers.AtomOperation{
 		{
-			ContractAddress: notoGold.Address,
+			ContractAddress: &transferGold.To,
 			CallData:        transferGoldEncoded,
 		},
 		{
-			ContractAddress: notoSilver.Address,
+			ContractAddress: &transferSilver.To,
 			CallData:        transferSilverEncoded,
 		},
 		{
@@ -163,12 +202,21 @@ func pvpNotoNoto(t *testing.T, withGuard bool) {
 	// If any party found a discrepancy at this point, they could cancel the swap (last chance to back out)
 
 	log.L(ctx).Infof("Approve both Noto transactions")
-	notoGold.ApproveTransfer(ctx, &nototypes.ApproveParams{
-		Inputs:   transferGold.InputStates,
-		Outputs:  transferGold.OutputStates,
-		Data:     transferGoldParams.Data,
-		Delegate: transferAtom.Address,
-	}).SignAndSend(alice).Wait()
+	if withTracker {
+		notoGold.ApproveTransfer(ctx, &nototypes.ApproveParams{
+			Inputs:   transferGold.InputStates,
+			Outputs:  transferGold.OutputStates,
+			Data:     transferGoldParams.Data,
+			Delegate: guardAddress,
+		}).SignAndSend(alice).Wait()
+	} else {
+		notoGold.ApproveTransfer(ctx, &nototypes.ApproveParams{
+			Inputs:   transferGold.InputStates,
+			Outputs:  transferGold.OutputStates,
+			Data:     transferGoldParams.Data,
+			Delegate: transferAtom.Address,
+		}).SignAndSend(alice).Wait()
+	}
 	notoSilver.ApproveTransfer(ctx, &nototypes.ApproveParams{
 		Inputs:   transferSilver.InputStates,
 		Outputs:  transferSilver.OutputStates,
@@ -178,6 +226,11 @@ func pvpNotoNoto(t *testing.T, withGuard bool) {
 
 	log.L(ctx).Infof("Execute the atomic operation")
 	transferAtom.Execute(ctx).SignAndSend(alice).Wait()
+
+	if withTracker {
+		assert.Equal(t, int64(9), guard.GetBalance(ctx, aliceKey))
+		assert.Equal(t, int64(1), guard.GetBalance(ctx, bobKey))
+	}
 }
 
 func TestNotoForZeto(t *testing.T) {

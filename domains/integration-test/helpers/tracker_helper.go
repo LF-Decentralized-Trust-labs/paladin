@@ -18,6 +18,8 @@ package helpers
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
+	"math/big"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -26,12 +28,13 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-//go:embed abis/NotoGuardSimple.json
-var NotoGuardJSON []byte
+//go:embed abis/NotoTrackerERC20.json
+var NotoTrackerJSON []byte
 
-type NotoGuardHelper struct {
+type NotoTrackerHelper struct {
 	t       *testing.T
 	tb      testbed.Testbed
 	eth     ethclient.EthClient
@@ -39,22 +42,39 @@ type NotoGuardHelper struct {
 	ABI     abi.ABI
 }
 
-func DeployGuard(
+func DeployTracker(
 	ctx context.Context,
 	t *testing.T,
 	tb testbed.Testbed,
 	signer string,
-) *NotoGuardHelper {
-	build := domain.LoadBuild(NotoGuardJSON)
+) *NotoTrackerHelper {
+	build := domain.LoadBuild(NotoTrackerJSON)
 	eth := tb.Components().EthClientFactory().HTTPClient()
-	builder := deployBuilder(ctx, t, eth, build.ABI, build.Bytecode)
+	builder := deployBuilder(ctx, t, eth, build.ABI, build.Bytecode).Input(map[string]any{
+		"name":   "NotoTracker",
+		"symbol": "NOTO",
+	})
 	deploy := NewTransactionHelper(ctx, t, tb, builder).SignAndSend(signer).Wait()
 	assert.NotNil(t, deploy.ContractAddress)
-	return &NotoGuardHelper{
+	return &NotoTrackerHelper{
 		t:       t,
 		tb:      tb,
 		eth:     eth,
 		Address: deploy.ContractAddress,
 		ABI:     build.ABI,
 	}
+}
+
+func (h *NotoTrackerHelper) GetBalance(ctx context.Context, account string) int64 {
+	output, err := functionBuilder(ctx, h.t, h.eth, h.ABI, "balanceOf").
+		To(h.Address.Address0xHex()).
+		Input(map[string]any{"account": account}).
+		CallResult()
+	require.NoError(h.t, err)
+	var jsonOutput map[string]any
+	err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)
+	require.NoError(h.t, err)
+	var balance big.Int
+	balance.SetString(jsonOutput["0"].(string), 10)
+	return balance.Int64()
 }

@@ -199,7 +199,7 @@ func (h *mintHandler) guardMint(ctx context.Context, tx *types.ParsedTransaction
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["mint"],
+		functionABI:     domain.LoadBuild(notoGuardJSON).ABI.Functions()["onMint"],
 		paramsJSON:      paramsJSON,
 		contractAddress: &tx.DomainConfig.NotaryAddress,
 	}, nil
@@ -210,7 +210,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	if req.Transaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
+	if tx.DomainConfig.NotaryType.Equals(&types.NotaryTypeContract) {
 		guardTransaction, err := h.guardMint(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
