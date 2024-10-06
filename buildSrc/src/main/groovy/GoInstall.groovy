@@ -1,8 +1,7 @@
 
 import org.gradle.api.DefaultTask
-import org.gradle.api.GradleException
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecResult
 
@@ -13,6 +12,9 @@ class GoInstall extends DefaultTask {
 
     @Input
     String toolVersion
+
+    @OutputDirectory
+    File outputDir = project.file(["go", "env", "GOMODCACHE"].execute().text)
 
     @TaskAction
     void exec() {
