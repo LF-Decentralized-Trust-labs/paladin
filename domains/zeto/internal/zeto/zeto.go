@@ -340,10 +340,13 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 	if err := json.Unmarshal([]byte(req.JsonEvents), &events); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal events. %s", err)
 	}
-	bytes := tktypes.MustParseHexBytes(req.ConfigBytes)
-	cv, err := types.DomainInstanceConfigABI.DecodeABIData(bytes, 0)
+	bytes, err := tktypes.ParseHexBytes(ctx, req.ConfigBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse domain instance config bytes. %s", err)
+	}
+	cv, err := types.DomainInstanceConfigABI.DecodeABIDataCtx(ctx, bytes, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode domain instance config. %s", err)
 	}
 	j, err := cv.JSON()
 	if err != nil {
@@ -355,61 +358,116 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 	}
 
 	var res prototk.HandleEventBatchResponse
+	var errors []string
 	for _, ev := range events {
+		var err error
 		switch ev.SoliditySignature {
 		case z.mintSignature:
-			var mint MintEvent
-			if err := json.Unmarshal(ev.Data, &mint); err == nil {
-				txID := decodeTransactionData(mint.Data)
-				res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
-				res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, mint.Outputs)...)
-				if domainConfig.TokenName == constants.TOKEN_ANON_NULLIFIER {
-					newStates, err := z.updateMerkleTree(txID, domainConfig.TokenName, ev.Address, mint.Outputs)
-					if err != nil {
-						return nil, err
-					}
-					res.NewStates = append(res.NewStates, newStates...)
-				}
-			} else {
-				log.L(ctx).Errorf("Failed to unmarshal mint event: %s", err)
-			}
+			err = z.handleMintEvent(ctx, ev, domainConfig.TokenName, &res)
 		case z.transferSignature:
-			var transfer TransferEvent
-			if err := json.Unmarshal(ev.Data, &transfer); err == nil {
-				txID := decodeTransactionData(transfer.Data)
-				res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
-				res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
-				res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
-				if domainConfig.TokenName == constants.TOKEN_ANON_NULLIFIER {
-					newStates, err := z.updateMerkleTree(txID, domainConfig.TokenName, ev.Address, transfer.Outputs)
-					if err != nil {
-						return nil, err
-					}
-					res.NewStates = append(res.NewStates, newStates...)
-				}
-			} else {
-				log.L(ctx).Errorf("Failed to unmarshal transfer event: %s", err)
-			}
+			err = z.handleTransferEvent(ctx, ev, domainConfig.TokenName, &res)
 		case z.transferWithEncSignature:
-			var transfer TransferWithEncryptedValuesEvent
-			if err := json.Unmarshal(ev.Data, &transfer); err == nil {
-				txID := decodeTransactionData(transfer.Data)
-				res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
-				res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
-				res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
-				if domainConfig.TokenName == constants.TOKEN_ANON_NULLIFIER {
-					newStates, err := z.updateMerkleTree(txID, domainConfig.TokenName, ev.Address, transfer.Outputs)
-					if err != nil {
-						return nil, err
-					}
-					res.NewStates = append(res.NewStates, newStates...)
-				}
-			} else {
-				log.L(ctx).Errorf("Failed to unmarshal transfer with encrypted values event: %s", err)
-			}
+			err = z.handleTransferWithEncryptionEvent(ctx, ev, domainConfig.TokenName, &res)
+		}
+		if err != nil {
+			errors = append(errors, err.Error())
 		}
 	}
+	if len(errors) > 0 {
+		return &res, fmt.Errorf("failed to handle events %s", formatErrors(errors))
+	}
 	return &res, nil
+}
+
+func (z *Zeto) GetVerifier(ctx context.Context, req *prototk.GetVerifierRequest) (*prototk.GetVerifierResponse, error) {
+	verifier, err := z.snarkProver.GetVerifier(ctx, req.Algorithm, req.VerifierType, req.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get verifier. %s", err)
+	}
+	return &prototk.GetVerifierResponse{
+		Verifier: verifier,
+	}, nil
+}
+
+func (z *Zeto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {
+	proof, err := z.snarkProver.Sign(ctx, req.Algorithm, req.PayloadType, req.PrivateKey, req.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign. %s", err)
+	}
+	return &prototk.SignResponse{
+		Payload: proof,
+	}, nil
+}
+
+func (z *Zeto) handleMintEvent(ctx context.Context, ev *blockindexer.EventWithData, tokenName string, res *prototk.HandleEventBatchResponse) error {
+	var mint MintEvent
+	if err := json.Unmarshal(ev.Data, &mint); err == nil {
+		txID := decodeTransactionData(mint.Data)
+		if txID == nil {
+			log.L(ctx).Errorf("Failed to decode transaction data for mint event: %s. Skip to the next event", mint.Data)
+			return nil
+		}
+		res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, mint.Outputs)...)
+		if tokenName == constants.TOKEN_ANON_NULLIFIER {
+			newStates, err := z.updateMerkleTree(txID, tokenName, ev.Address, mint.Outputs)
+			if err != nil {
+				return fmt.Errorf("failed to update merkle tree for the UTXOMint event. %s", err)
+			}
+			res.NewStates = append(res.NewStates, newStates...)
+		}
+	} else {
+		log.L(ctx).Errorf("Failed to unmarshal mint event: %s", err)
+	}
+	return nil
+}
+
+func (z *Zeto) handleTransferEvent(ctx context.Context, ev *blockindexer.EventWithData, tokenName string, res *prototk.HandleEventBatchResponse) error {
+	var transfer TransferEvent
+	if err := json.Unmarshal(ev.Data, &transfer); err == nil {
+		txID := decodeTransactionData(transfer.Data)
+		if txID == nil {
+			log.L(ctx).Errorf("Failed to decode transaction data for transfer event: %s. Skip to the next event", transfer.Data)
+			return nil
+		}
+		res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
+		if tokenName == constants.TOKEN_ANON_NULLIFIER {
+			newStates, err := z.updateMerkleTree(txID, tokenName, ev.Address, transfer.Outputs)
+			if err != nil {
+				return fmt.Errorf("failed to update merkle tree for the UTXOTransfer event. %s", err)
+			}
+			res.NewStates = append(res.NewStates, newStates...)
+		}
+	} else {
+		log.L(ctx).Errorf("Failed to unmarshal transfer event: %s", err)
+	}
+	return nil
+}
+
+func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, ev *blockindexer.EventWithData, tokenName string, res *prototk.HandleEventBatchResponse) error {
+	var transfer TransferWithEncryptedValuesEvent
+	if err := json.Unmarshal(ev.Data, &transfer); err == nil {
+		txID := decodeTransactionData(transfer.Data)
+		if txID == nil {
+			log.L(ctx).Errorf("Failed to decode transaction data for transfer event: %s. Skip to the next event", transfer.Data)
+			return nil
+		}
+		res.TransactionsComplete = append(res.TransactionsComplete, txID.String())
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
+		if tokenName == constants.TOKEN_ANON_NULLIFIER {
+			newStates, err := z.updateMerkleTree(txID, tokenName, ev.Address, transfer.Outputs)
+			if err != nil {
+				return fmt.Errorf("failed to update merkle tree for the UTXOTransfer event. %s", err)
+			}
+			res.NewStates = append(res.NewStates, newStates...)
+		}
+	} else {
+		log.L(ctx).Errorf("Failed to unmarshal transfer event: %s", err)
+	}
+	return nil
 }
 
 func (z *Zeto) updateMerkleTree(txID tktypes.HexBytes, tokenName string, address tktypes.EthAddress, output []tktypes.HexUint256) ([]*prototk.NewLocalState, error) {
@@ -483,22 +541,10 @@ func parseStatesFromEvent(txID tktypes.HexBytes, states []tktypes.HexUint256) []
 	return refs
 }
 
-func (z *Zeto) GetVerifier(ctx context.Context, req *prototk.GetVerifierRequest) (*prototk.GetVerifierResponse, error) {
-	verifier, err := z.snarkProver.GetVerifier(ctx, req.Algorithm, req.VerifierType, req.PrivateKey)
-	if err != nil {
-		return nil, err
+func formatErrors(errors []string) string {
+	msg := fmt.Sprintf("(failures=%d)", len(errors))
+	for i, err := range errors {
+		msg = fmt.Sprintf("%s. [%d]%s", msg, i, err)
 	}
-	return &prototk.GetVerifierResponse{
-		Verifier: verifier,
-	}, nil
-}
-
-func (z *Zeto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {
-	proof, err := z.snarkProver.Sign(ctx, req.Algorithm, req.PayloadType, req.PrivateKey, req.Payload)
-	if err != nil {
-		return nil, err
-	}
-	return &prototk.SignResponse{
-		Payload: proof,
-	}, nil
+	return msg
 }

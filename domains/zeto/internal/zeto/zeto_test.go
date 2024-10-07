@@ -17,16 +17,25 @@ package zeto
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math/big"
 	"testing"
 
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
+	protoz "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNew(t *testing.T) {
@@ -357,6 +366,19 @@ func TestHandleEventBatch(t *testing.T) {
 	testCallbacks := &testDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
+	z.coinSchema = &prototk.StateSchema{
+		Id: "coin",
+	}
+	z.merkleTreeRootSchema = &prototk.StateSchema{
+		Id: "merkle_tree_root",
+	}
+	z.merkleTreeNodeSchema = &prototk.StateSchema{
+		Id: "merkle_tree_node",
+	}
+	z.mintSignature = "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)"
+	z.transferSignature = "event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)"
+	z.transferWithEncSignature = "event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)"
+
 	req := &prototk.HandleEventBatchRequest{
 		JsonEvents: "bad json",
 	}
@@ -364,7 +386,222 @@ func TestHandleEventBatch(t *testing.T) {
 	_, err := z.HandleEventBatch(ctx, req)
 	assert.EqualError(t, err, "failed to unmarshal events. invalid character 'b' looking for beginning of value")
 
-	req.JsonEvents = "[{\"soliditySignature\":\"mint\",\"address\":\"0x1234567890123456789012345678901234567890\"}]"
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
+	req.ConfigBytes = "bad config"
 	_, err = z.HandleEventBatch(ctx, req)
+	assert.ErrorContains(t, err, "failed to parse domain instance config bytes. PD020007: Invalid hex")
 
+	req.ConfigBytes = "0x1234"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.ErrorContains(t, err, "failed to decode domain instance config. FF22045: Insufficient bytes")
+
+	config := types.DomainInstanceConfig{
+		CircuitId: "circuit1",
+		TokenName: "testToken1",
+	}
+	configJSON, _ := json.Marshal(config)
+	encoded, _ := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
+	req.ConfigBytes = tktypes.HexBytes(encoded).String()
+	res1, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Len(t, res1.TransactionsComplete, 0)
+
+	// bad transaction data for the mint event - should be logged and move on
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+
+	// bad data for the transfer event - should be logged and move on
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+
+	// bad transaction data for the transfer event - should be logged and move on
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+
+	// bad data for the transfer with encrypted values event - should be logged and move on
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+
+	// bad transaction data for the transfer with encrypted values event - should be logged and move on
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res2, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res2.TransactionsComplete[0])
+
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res3, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res3.TransactionsComplete[0])
+
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res4, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res4.TransactionsComplete[0])
+
+	config = types.DomainInstanceConfig{
+		CircuitId: "circuit1",
+		TokenName: "Zeto_AnonNullifier",
+	}
+	configJSON, _ = json.Marshal(config)
+	encoded, _ = types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
+	req.ConfigBytes = tktypes.HexBytes(encoded).String()
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		return nil, errors.New("find coins error")
+	}
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. Failed to create Merkle tree for smt_Zeto_AnonNullifier_0x057826c8929372ac7215ebc572eaf6dc396625d3: failed to find available states. find coins error")
+
+	calls := 0
+	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+		if calls == 0 {
+			calls++
+			return &prototk.FindAvailableStatesResponse{
+				States: []*prototk.StoredState{
+					{
+						DataJson: "{\"salt\":\"0x13de02d64a5736a56b2d35d2a83dd60397ba70aae6f8347629f0960d4fee5d58\",\"owner\":\"Alice\",\"ownerKey\":\"0xc1d218cf8993f940e75eabd3fee23dadc4e89cd1de479f03a61e91727959281b\",\"amount\":\"0x0a\"}",
+					},
+				},
+			}, nil
+		} else {
+			return &prototk.FindAvailableStatesResponse{}, nil
+		}
+	}
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. Failed to create node index for 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff: key for the new node not inside the Finite Field")
+
+	calls = 0
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res5, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Len(t, res5.TransactionsComplete, 1)
+	assert.Len(t, res5.NewStates, 2)
+	assert.Equal(t, "merkle_tree_node", res5.NewStates[0].SchemaId)
+	assert.Equal(t, "merkle_tree_root", res5.NewStates[1].SchemaId)
+
+	calls = 0
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res6, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Len(t, res6.TransactionsComplete, 1)
+	assert.Len(t, res6.NewStates, 2)
+	assert.Equal(t, "merkle_tree_node", res6.NewStates[0].SchemaId)
+	assert.Equal(t, "merkle_tree_root", res6.NewStates[1].SchemaId)
+
+	calls = 0
+	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	res7, err := z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
+	assert.Len(t, res7.TransactionsComplete, 1)
+	assert.Len(t, res7.NewStates, 2)
+	assert.Equal(t, "merkle_tree_node", res7.NewStates[0].SchemaId)
+	assert.Equal(t, "merkle_tree_root", res7.NewStates[1].SchemaId)
+}
+
+func TestGetVerifier(t *testing.T) {
+	testCallbacks := &testDomainCallbacks{}
+	z := New(testCallbacks)
+	z.name = "z1"
+	z.coinSchema = &prototk.StateSchema{
+		Id: "coin",
+	}
+	snarkProver, err := zetosigner.NewSnarkProver(&zetosigner.SnarkProverConfig{})
+	assert.NoError(t, err)
+	z.snarkProver = snarkProver
+	req := &prototk.GetVerifierRequest{
+		Algorithm: "bad algo",
+	}
+	_, err = z.GetVerifier(context.Background(), req)
+	assert.ErrorContains(t, err, "failed to get verifier. 'bad algo' does not match supported algorithm")
+
+	bytes, err := hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	assert.NoError(t, err)
+	req = &prototk.GetVerifierRequest{
+		Algorithm:    z.getAlgoZetoSnarkBJJ(),
+		VerifierType: zetosigner.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
+		PrivateKey:   bytes,
+	}
+	res, err := z.GetVerifier(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Equal(t, "0x7045538ed4083e2cffffca1e98783aa97103226d1c44f3a54e11455822469e20", res.Verifier)
+}
+
+func TestSign(t *testing.T) {
+	testCallbacks := &testDomainCallbacks{}
+	z := New(testCallbacks)
+	z.name = "z1"
+	z.coinSchema = &prototk.StateSchema{
+		Id: "coin",
+	}
+	snarkProver := zetosigner.NewTestProver(t)
+	z.snarkProver = snarkProver
+
+	req := &prototk.SignRequest{
+		Algorithm: "bad algo",
+	}
+	_, err := z.Sign(context.Background(), req)
+	assert.ErrorContains(t, err, "failed to sign. 'bad algo' does not match supported algorithm")
+
+	bytes, err := hex.DecodeString("7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
+	assert.NoError(t, err)
+	alice := zetosigner.NewTestKeypair()
+	bob := zetosigner.NewTestKeypair()
+
+	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
+	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
+
+	salt1 := crypto.NewSalt()
+	input1, _ := poseidon.Hash([]*big.Int{inputValues[0], salt1, alice.PublicKey.X, alice.PublicKey.Y})
+	salt2 := crypto.NewSalt()
+	input2, _ := poseidon.Hash([]*big.Int{inputValues[1], salt2, alice.PublicKey.X, alice.PublicKey.Y})
+	inputCommitments := []string{input1.Text(16), input2.Text(16)}
+
+	inputValueInts := []uint64{inputValues[0].Uint64(), inputValues[1].Uint64()}
+	inputSalts := []string{salt1.Text(16), salt2.Text(16)}
+	outputValueInts := []uint64{outputValues[0].Uint64(), outputValues[1].Uint64()}
+
+	alicePubKey := zetosigner.EncodeBabyJubJubPublicKey(alice.PublicKey)
+	bobPubKey := zetosigner.EncodeBabyJubJubPublicKey(bob.PublicKey)
+
+	provingReq := protoz.ProvingRequest{
+		CircuitId: constants.CIRCUIT_ANON,
+		Common: &protoz.ProvingRequestCommon{
+			InputCommitments: inputCommitments,
+			InputValues:      inputValueInts,
+			InputSalts:       inputSalts,
+			InputOwner:       "alice/key0",
+			OutputValues:     outputValueInts,
+			OutputSalts:      []string{crypto.NewSalt().Text(16), crypto.NewSalt().Text(16)},
+			OutputOwners:     []string{bobPubKey, alicePubKey},
+		},
+	}
+	payload, err := proto.Marshal(&provingReq)
+	require.NoError(t, err)
+	req = &prototk.SignRequest{
+		Algorithm:   z.getAlgoZetoSnarkBJJ(),
+		PayloadType: "domain:zeto:snark",
+		PrivateKey:  bytes,
+		Payload:     payload,
+	}
+	res, err := z.Sign(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Len(t, res.Payload, 36)
 }

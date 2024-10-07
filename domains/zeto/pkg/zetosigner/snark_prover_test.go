@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
-	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -35,25 +34,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
-
-type User struct {
-	PrivateKey       *babyjub.PrivateKey
-	PublicKey        *babyjub.PublicKey
-	PrivateKeyBigInt *big.Int
-}
-
-func NewKeypair() *User {
-	babyJubjubPrivKey := babyjub.NewRandPrivKey()
-	babyJubjubPubKey := babyJubjubPrivKey.Public()
-	// convert the private key to big.Int for use inside circuits
-	privKeyBigInt := babyjub.SkToBigInt(&babyJubjubPrivKey)
-
-	return &User{
-		PrivateKey:       &babyJubjubPrivKey,
-		PublicKey:        babyJubjubPubKey,
-		PrivateKeyBigInt: privKeyBigInt,
-	}
-}
 
 func TestNewProver(t *testing.T) {
 	config := &SnarkProverConfig{
@@ -66,45 +46,11 @@ func TestNewProver(t *testing.T) {
 	assert.NotNil(t, prover.provingKeysCache)
 }
 
-type testWitnessCalculator struct{}
-
-func (t *testWitnessCalculator) CalculateWTNSBin(inputs map[string]interface{}, _ bool) ([]byte, error) {
-	return []byte{}, nil
-}
-func (t *testWitnessCalculator) CalculateWitness(inputs map[string]interface{}, sanityCheck bool) ([]*big.Int, error) {
-	return []*big.Int{}, nil
-}
-func (t *testWitnessCalculator) CalculateBinWitness(inputs map[string]interface{}, sanityCheck bool) ([]byte, error) {
-	return []byte{}, nil
-}
-
 func TestSnarkProve(t *testing.T) {
-	config := &SnarkProverConfig{
-		CircuitsDir:    "test",
-		ProvingKeysDir: "test",
-	}
-	prover, err := newSnarkProver(config)
-	require.NoError(t, err)
+	prover := NewTestProver(t)
 
-	testCircuitLoader := func(circuitID string, config *SnarkProverConfig) (witness.Calculator, []byte, error) {
-		return &testWitnessCalculator{}, []byte("proving key"), nil
-	}
-	prover.circuitLoader = testCircuitLoader
-
-	testProofGenerator := func(witness []byte, provingKey []byte) (*types.ZKProof, error) {
-		return &types.ZKProof{
-			Proof: &types.ProofData{
-				A:        []string{"a"},
-				B:        [][]string{{"b1.1", "b1.2"}, {"b2.1", "b2.2"}},
-				C:        []string{"c"},
-				Protocol: "super snark",
-			},
-		}, nil
-	}
-	prover.proofGenerator = testProofGenerator
-
-	alice := NewKeypair()
-	bob := NewKeypair()
+	alice := NewTestKeypair()
+	bob := NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
@@ -190,8 +136,8 @@ func TestConcurrentSnarkProofGeneration(t *testing.T) {
 	}
 	prover.proofGenerator = testProofGenerator
 
-	alice := NewKeypair()
-	bob := NewKeypair()
+	alice := NewTestKeypair()
+	bob := NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
@@ -254,7 +200,7 @@ func TestSnarkProveError(t *testing.T) {
 	prover, err := newSnarkProver(config)
 	require.NoError(t, err)
 
-	alice := NewKeypair()
+	alice := NewTestKeypair()
 
 	// construct a bad payload by using the inner object
 	req := pb.ProvingRequestCommon{
@@ -280,7 +226,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 	prover, err := newSnarkProver(config)
 	require.NoError(t, err)
 
-	alice := NewKeypair()
+	alice := NewTestKeypair()
 
 	// leave the circuit ID empty
 	req := pb.ProvingRequest{
@@ -309,7 +255,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	prover, err := newSnarkProver(config)
 	require.NoError(t, err)
 
-	alice := NewKeypair()
+	alice := NewTestKeypair()
 
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
@@ -399,8 +345,8 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 	}
 	prover.circuitLoader = testCircuitLoader
 
-	alice := NewKeypair()
-	bob := NewKeypair()
+	alice := NewTestKeypair()
+	bob := NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
@@ -449,7 +395,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 	}
 	prover.circuitLoader = testCircuitLoader
 
-	alice := NewKeypair()
+	alice := NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
@@ -495,8 +441,8 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	}
 	prover.circuitLoader = testCircuitLoader
 
-	alice := NewKeypair()
-	bob := NewKeypair()
+	alice := NewTestKeypair()
+	bob := NewTestKeypair()
 
 	inputValues := []*big.Int{big.NewInt(30), big.NewInt(40)}
 	outputValues := []*big.Int{big.NewInt(32), big.NewInt(38)}
