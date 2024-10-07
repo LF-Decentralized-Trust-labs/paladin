@@ -43,11 +43,12 @@ type TransferParams struct {
 func (h *lockHandler) ValidateParams(ctx context.Context, config *types.DomainInstanceConfig, params string) (interface{}, error) {
 	var lockParams types.LockParams
 	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal lockProof parameters. %s", err)
 	}
-	_, err := h.decodeTransferCall(context.Background(), config, lockParams.Call)
+	// the lockProof() function expects an encoded call to the transfer() function
+	_, err := h.decodeTransferCall(ctx, config, lockParams.Call)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode the transfer call. %s", err)
 	}
 	return &lockParams, nil
 }
@@ -111,7 +112,7 @@ func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	params := tx.Params.(*types.LockParams)
 	decodedTransfer, err := h.decodeTransferCall(context.Background(), tx.DomainConfig, params.Call)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode transfer call data. %s", err)
 	}
 
 	data, err := encodeTransactionData(ctx, req.Transaction)

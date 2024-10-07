@@ -27,5 +27,6 @@ func TestGetHandler(t *testing.T) {
 	}
 	assert.NotNil(t, z.GetHandler("mint"))
 	assert.NotNil(t, z.GetHandler("transfer"))
+	assert.NotNil(t, z.GetHandler("lockProof"))
 	assert.Nil(t, z.GetHandler("bad"))
 }
