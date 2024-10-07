@@ -22,7 +22,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
@@ -33,8 +32,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-
-	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -514,146 +511,6 @@ func emptyJSONIfBlank(js string) []byte {
 func (d *domain) close() {
 	d.cancelCtx()
 	<-d.initDone
-}
-
-func (d *domain) groupEventsByAddress(ctx context.Context, tx *gorm.DB, events []*blockindexer.EventWithData) (map[tktypes.EthAddress][]*blockindexer.EventWithData, map[tktypes.EthAddress]tktypes.HexBytes, error) {
-	eventsByAddress := make(map[tktypes.EthAddress][]*blockindexer.EventWithData)
-	configBytesByAddress := make(map[tktypes.EthAddress]tktypes.HexBytes)
-	for _, ev := range events {
-		// Note: hits will be cached, but events from unrecognized contracts will always
-		// result in a cache miss and a database lookup
-		// TODO: revisit if we should optimize this
-		psc, err := d.dm.getSmartContractCached(ctx, tx, ev.Address)
-		if err != nil {
-			return nil, nil, err
-		}
-		if psc != nil && psc.Domain().Name() == d.name {
-			eventsByAddress[ev.Address] = append(eventsByAddress[ev.Address], ev)
-			configBytesByAddress[ev.Address] = psc.info.ConfigBytes
-		}
-	}
-	return eventsByAddress, configBytesByAddress, nil
-}
-
-func (d *domain) handleEventBatch(ctx context.Context, tx *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
-	// First index any domain contract deployments
-	notifyTX, err := d.dm.registrationIndexer(ctx, tx, batch)
-	if err != nil {
-		return nil, err
-	}
-
-	// Then divide events by contract address and dispatch to the appropriate domain context
-	transactionsComplete := make([]uuid.UUID, 0, len(batch.Events))
-	eventsByAddress, configBytesByAddress, err := d.groupEventsByAddress(ctx, tx, batch.Events)
-	if err != nil {
-		return nil, err
-	}
-	for addr, events := range eventsByAddress {
-		res, err := d.handleEventBatchForContract(ctx, batch.BatchID, addr, events, configBytesByAddress[addr])
-		if err != nil {
-			return nil, err
-		}
-		for _, txIDStr := range res.TransactionsComplete {
-			txID, err := d.recoverTransactionID(ctx, txIDStr)
-			if err != nil {
-				return nil, err
-			}
-			transactionsComplete = append(transactionsComplete, *txID)
-		}
-	}
-
-	return func() {
-		notifyTX()
-		for _, c := range transactionsComplete {
-			inflight := d.dm.transactionWaiter.GetInflight(c)
-			if inflight != nil {
-				inflight.Complete(nil)
-			}
-		}
-	}, nil
-}
-
-func (d *domain) recoverTransactionID(ctx context.Context, txIDString string) (*uuid.UUID, error) {
-	txIDBytes, err := tktypes.ParseBytes32Ctx(ctx, txIDString)
-	if err != nil {
-		return nil, err
-	}
-	txUUID := txIDBytes.UUIDFirst16()
-	return &txUUID, nil
-}
-
-func (d *domain) handleEventBatchForContract(ctx context.Context, batchID uuid.UUID, contractAddress tktypes.EthAddress, events []*blockindexer.EventWithData, configBytes tktypes.HexBytes) (*prototk.HandleEventBatchResponse, error) {
-	var res *prototk.HandleEventBatchResponse
-	eventsJSON, err := json.Marshal(events)
-	if err == nil {
-		res, err = d.api.HandleEventBatch(ctx, &prototk.HandleEventBatchRequest{
-			BatchId:     batchID.String(),
-			JsonEvents:  string(eventsJSON),
-			ConfigBytes: configBytes.HexString(),
-		})
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	spentStates := make(map[uuid.UUID][]string, len(res.SpentStates))
-	for _, state := range res.SpentStates {
-		txUUID, err := d.recoverTransactionID(ctx, state.TransactionId)
-		if err != nil {
-			return nil, err
-		}
-		spentStates[*txUUID] = append(spentStates[*txUUID], state.Id)
-	}
-
-	confirmedStates := make(map[uuid.UUID][]string, len(res.ConfirmedStates))
-	for _, state := range res.ConfirmedStates {
-		txUUID, err := d.recoverTransactionID(ctx, state.TransactionId)
-		if err != nil {
-			return nil, err
-		}
-		confirmedStates[*txUUID] = append(confirmedStates[*txUUID], state.Id)
-	}
-
-	newStates := make(map[uuid.UUID][]*components.StateUpsert, len(res.NewStates))
-	for _, state := range res.NewStates {
-		txUUID, err := d.recoverTransactionID(ctx, state.TransactionId)
-		if err != nil {
-			return nil, err
-		}
-		var id tktypes.HexBytes
-		if state.Id != nil {
-			id, err = tktypes.ParseHexBytes(ctx, *state.Id)
-			if err != nil {
-				return nil, err
-			}
-		}
-		newStates[*txUUID] = append(newStates[*txUUID], &components.StateUpsert{
-			ID:       id,
-			SchemaID: state.SchemaId,
-			Data:     tktypes.RawJSON(state.StateDataJson),
-			Creating: true,
-		})
-	}
-
-	err = d.dm.stateStore.RunInDomainContext(d.name, contractAddress, func(ctx context.Context, dsi components.DomainStateInterface) error {
-		for txID, states := range newStates {
-			if _, err = dsi.UpsertStates(&txID, states); err != nil {
-				return err
-			}
-		}
-		for txID, states := range spentStates {
-			if err = dsi.MarkStatesSpent(txID, states); err != nil {
-				return err
-			}
-		}
-		for txID, states := range confirmedStates {
-			if err = dsi.MarkStatesConfirmed(txID, states); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return res, err
 }
 
 func (d *domain) getVerifier(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (verifier string, err error) {

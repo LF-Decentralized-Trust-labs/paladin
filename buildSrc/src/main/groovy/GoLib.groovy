@@ -1,9 +1,9 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecResult
 
@@ -16,7 +16,7 @@ class GoLib extends DefaultTask {
     String mainFile
 
     @InputFiles
-    Set<File> goFiles = []
+    FileCollection sources
 
     @Internal
     String outputDir
@@ -27,8 +27,12 @@ class GoLib extends DefaultTask {
     @Internal
     String outputHeader
 
-    void goFiles(Object... goFiles) {
-        this.goFiles += [*goFiles]
+    void sources(Object... sources) {
+        if (this.sources == null) {
+            this.sources = project.files(sources)
+        } else {
+            this.sources += project.files(sources)
+        }
     }
 
     void baseName(String baseName) {

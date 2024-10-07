@@ -121,8 +121,8 @@ class PenteTransaction {
 
     PenteTransaction(PenteDomain domain, ToDomain.TransactionSpecification tx) throws IOException, IllegalArgumentException {
         this.domain = domain;
-        contractAddress = new Address(tx.getContractAddress());
-        contractConfig = tx.getContractConfig().toByteArray();
+        contractAddress = new Address(tx.getContractInfo().getContractAddress());
+        contractConfig = tx.getContractInfo().getContractConfig().toByteArray();
         from = tx.getFrom();
         baseBlock = tx.getBaseBlock();
         // Check the ABI params we expect at the top level (we don't mind the order)

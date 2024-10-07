@@ -123,7 +123,7 @@ func (z *Zeto) prepareInputs(ctx context.Context, contractAddress, owner string,
 	}
 }
 
-func (z *Zeto) addHash(newCoin *types.ZetoCoin, ownerKey *babyjub.PublicKey) error {
+func (z *Zeto) addHash(_ *types.ZetoCoin, _ *babyjub.PublicKey) error {
 	return nil
 }
 

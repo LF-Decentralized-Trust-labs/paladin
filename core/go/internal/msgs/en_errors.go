@@ -233,6 +233,7 @@ var (
 	MsgDomainABIDecodingRequestEntryInvalid   = ffe("PD011645", "ABI decoding request could not be completed as ABI entry is invalid")
 	MsgDomainABIDecodingRequestFail           = ffe("PD011646", "ABI decoding request failed")
 	MsgDomainABIDecodingRequestInvalidType    = ffe("PD011647", "ABI decoding request is of invalid type '%s'")
+	MsgDomainTransactionWasNotADeployment     = ffe("PD011648", "Transaction %s did not result in a deployment")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownRunMode = ffe("PD011700", "Unknown run mode '%s'")

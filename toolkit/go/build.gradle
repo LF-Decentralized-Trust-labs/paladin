@@ -179,7 +179,7 @@ task checkCoverage(type: GoCheckCoverage, dependsOn: [aggregateCoverage]) {
 
 task buildStarterLibrary(type:GoLib, dependsOn:[goGet]) {
     baseName "starter"
-    goFiles goFiles
+    sources goFiles
     mainFile './domainstarter'
 }
 

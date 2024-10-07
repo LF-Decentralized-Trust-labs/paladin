@@ -260,7 +260,7 @@ task lint(type: Exec, dependsOn:[
 
 task buildSharedLibrary(type:GoLib, dependsOn:[goGet]) {
     baseName "core"
-    goFiles goFiles
+    sources goFilesBuildOnly
     mainFile 'core.go'
 }
 

@@ -394,7 +394,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		assert.Same(t, req.Transaction, tx.PreAssembly.TransactionSpecification)
 
 		stateRes, err := domain.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
-			ContractAddress: req.Transaction.ContractAddress,
+			ContractAddress: req.Transaction.ContractInfo.ContractAddress,
 			SchemaId:        tp.stateSchemas[0].Id,
 			QueryJson: `{
 				"or": [

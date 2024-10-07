@@ -1,10 +1,11 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: besugeneses.core.paladin.io
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
-  name: besugeneses.core.paladin.io
+  labels:
+  {{- include "paladin-operator-crd.labels" . | nindent 4 }}
 spec:
   group: core.paladin.io
   names:
@@ -47,12 +48,12 @@ spec:
                   Note only modelled fields of the genesis are supported, so check besugenesis.GenesisJSON for support of the field you wish to modify
                 type: string
               blockPeriod:
-                description: Block period can be in seconds (s) or milliseconds -
-                  cannot be changed once set (used in genesis generation)
+                description: Block period can be in seconds (s) or milliseconds - cannot
+                  be changed once set (used in genesis generation)
                 type: string
               chainId:
-                description: The chain ID - must not change after creation without
-                  chain reset
+                description: The chain ID - must not change after creation without chain
+                  reset
                 format: int64
                 type: integer
               consensus:
@@ -92,3 +93,9 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

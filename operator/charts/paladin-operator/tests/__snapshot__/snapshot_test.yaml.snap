@@ -3,12 +3,13 @@ Basic snapshot test:
     raw: Welcome to Paladin!
   2: |
     apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
+    kind: RoleBinding
     metadata:
       name: paladin-operator
+      namespace: paladin
     roleRef:
       apiGroup: rbac.authorization.k8s.io
-      kind: ClusterRole
+      kind: Role
       name: paladin-operator
     subjects:
       - kind: ServiceAccount
@@ -16,15 +17,18 @@ Basic snapshot test:
         namespace: paladin
   3: |
     apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
+    kind: Role
     metadata:
       name: paladin-operator
+      namespace: paladin
     rules:
       - apiGroups:
           - core.paladin.io
         resources:
-          - nodes
           - smartcontracts
+          - besus
+          - paladins
+          - besugeneses
         verbs:
           - get
           - list
@@ -34,7 +38,10 @@ Basic snapshot test:
       - apiGroups:
           - core.paladin.io
         resources:
-          - nodes/status
+          - smartcontracts/status
+          - besus/status
+          - paladins/status
+          - besugeneses/status
         verbs:
           - get
       - apiGroups:
@@ -46,11 +53,16 @@ Basic snapshot test:
           - list
           - create
           - delete
+          - update
+          - patch
+          - watch
       - apiGroups:
           - ""
         resources:
           - services
           - configmaps
+          - secrets
+          - persistentvolumeclaims
         verbs:
           - get
           - list
@@ -58,17 +70,39 @@ Basic snapshot test:
           - delete
           - update
           - patch
+          - watch
+      - apiGroups:
+          - policy
+        resources:
+          - poddisruptionbudgets
+        verbs:
+          - get
+          - list
+          - create
+          - delete
+          - update
+          - patch
+          - watch
   4: |
     apiVersion: v1
     data:
-      config.yaml: |2
+      config.json: |
         {
-            "paladin": {
-                "image": "paladin:test",
-                "labels": {
-                    "app": "paladin"
-                }
+          "paladin": {
+            "image": "paladin:test",
+            "labels": {
+              "app": "paladin"
             }
+          },
+          "besu": {
+            "image": "hyperledger/besu:latest",
+            "labels": {
+              "app": "besu"
+            }
+          },
+          "postgres": {
+            "image": "postgres:latest"
+          }
         }
     kind: ConfigMap
     metadata:
@@ -98,6 +132,10 @@ Basic snapshot test:
             - command:
                 - /manager
               env:
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
                 - name: CONFIG_PATH
                   value: /etc/config
               image: paladin-operator:latest
@@ -130,9 +168,9 @@ Basic snapshot test:
                   drop:
                     - ALL
               volumeMounts:
-                - mountPath: /etc/config/config.yaml
+                - mountPath: /etc/config/config.json
                   name: config
-                  subPath: config.yaml
+                  subPath: config.json
           securityContext:
             runAsNonRoot: true
           serviceAccountName: paladin-operator
@@ -167,12 +205,13 @@ Change namespace:
     raw: Welcome to Paladin!
   2: |
     apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
+    kind: RoleBinding
     metadata:
       name: paladin-operator
+      namespace: test
     roleRef:
       apiGroup: rbac.authorization.k8s.io
-      kind: ClusterRole
+      kind: Role
       name: paladin-operator
     subjects:
       - kind: ServiceAccount
@@ -180,15 +219,18 @@ Change namespace:
         namespace: test
   3: |
     apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
+    kind: Role
     metadata:
       name: paladin-operator
+      namespace: test
     rules:
       - apiGroups:
           - core.paladin.io
         resources:
-          - nodes
           - smartcontracts
+          - besus
+          - paladins
+          - besugeneses
         verbs:
           - get
           - list
@@ -198,7 +240,10 @@ Change namespace:
       - apiGroups:
           - core.paladin.io
         resources:
-          - nodes/status
+          - smartcontracts/status
+          - besus/status
+          - paladins/status
+          - besugeneses/status
         verbs:
           - get
       - apiGroups:
@@ -210,11 +255,16 @@ Change namespace:
           - list
           - create
           - delete
+          - update
+          - patch
+          - watch
       - apiGroups:
           - ""
         resources:
           - services
           - configmaps
+          - secrets
+          - persistentvolumeclaims
         verbs:
           - get
           - list
@@ -222,17 +272,39 @@ Change namespace:
           - delete
           - update
           - patch
+          - watch
+      - apiGroups:
+          - policy
+        resources:
+          - poddisruptionbudgets
+        verbs:
+          - get
+          - list
+          - create
+          - delete
+          - update
+          - patch
+          - watch
   4: |
     apiVersion: v1
     data:
-      config.yaml: |2
+      config.json: |
         {
-            "paladin": {
-                "image": "paladin:test",
-                "labels": {
-                    "app": "paladin"
-                }
+          "paladin": {
+            "image": "paladin:test",
+            "labels": {
+              "app": "paladin"
             }
+          },
+          "besu": {
+            "image": "hyperledger/besu:latest",
+            "labels": {
+              "app": "besu"
+            }
+          },
+          "postgres": {
+            "image": "postgres:latest"
+          }
         }
     kind: ConfigMap
     metadata:
@@ -262,6 +334,10 @@ Change namespace:
             - command:
                 - /manager
               env:
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
                 - name: CONFIG_PATH
                   value: /etc/config
               image: paladin-operator:latest
@@ -294,9 +370,9 @@ Change namespace:
                   drop:
                     - ALL
               volumeMounts:
-                - mountPath: /etc/config/config.yaml
+                - mountPath: /etc/config/config.json
                   name: config
-                  subPath: config.yaml
+                  subPath: config.json
           securityContext:
             runAsNonRoot: true
           serviceAccountName: paladin-operator

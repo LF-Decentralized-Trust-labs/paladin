@@ -67,7 +67,7 @@ task copySolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
+task test(type: Exec, dependsOn: [":core:go:makeMocks", copySolidity]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
@@ -86,15 +86,16 @@ task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
     }
     args "-test.gocoverdir=${projectDir}/coverage"
 
-    dependsOn copySolidity
     dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task buildGo(type: GoLib, dependsOn: [":toolkit:go:protoc", copySolidity]) {
-     baseName "noto"
-     goFiles goFiles
-     mainFile 'noto.go'
+    inputs.files(configurations.coreGo)
+    inputs.files(configurations.toolkitGo)
+    baseName "noto"
+    sources goFiles
+    mainFile 'noto.go'
 }
 
 task build {

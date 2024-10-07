@@ -58,10 +58,6 @@ func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *ptxapi.Transa
 	}
 	receipt := pt.TransactionReceipt
 	if receipt != nil {
-		deployment := pt.ContractDeployment
-		if deployment != nil {
-			receipt.ContractDeployment = deployment
-		}
 		res.Receipt = mapPersistedReceipt(receipt)
 	}
 	for _, dep := range pt.TransactionDeps {
@@ -110,8 +106,7 @@ func (tm *txManager) queryTransactionsFullTx(ctx context.Context, jq *query.Quer
 		finalize: func(q *gorm.DB) *gorm.DB {
 			q = q.
 				Preload("TransactionDeps").
-				Joins("TransactionReceipt").
-				Joins("ContractDeployment")
+				Joins("TransactionReceipt")
 
 			if pending {
 				q = q.Where(`"TransactionReceipt"."transaction" IS NULL`)

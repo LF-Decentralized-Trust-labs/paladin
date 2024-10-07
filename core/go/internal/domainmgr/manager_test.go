@@ -45,6 +45,8 @@ type mockComponents struct {
 	domainStateInterface *componentmocks.DomainStateInterface
 	blockIndexer         *componentmocks.BlockIndexer
 	keyManager           *componentmocks.KeyManager
+	txManager            *componentmocks.TXManager
+	privateTxManager     *componentmocks.PrivateTxManager
 }
 
 func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *domainManager, *mockComponents, func()) {
@@ -56,6 +58,8 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 		domainStateInterface: componentmocks.NewDomainStateInterface(t),
 		ethClientFactory:     componentmocks.NewEthClientFactory(t),
 		keyManager:           componentmocks.NewKeyManager(t),
+		txManager:            componentmocks.NewTXManager(t),
+		privateTxManager:     componentmocks.NewPrivateTxManager(t),
 	}
 
 	// Blockchain stuff is always mocked
@@ -67,6 +71,8 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 	componentMocks.On("BlockIndexer").Return(mc.blockIndexer)
 	mc.keyManager.On("AddInMemorySigner", "domain", mock.Anything).Return().Maybe()
 	componentMocks.On("KeyManager").Return(mc.keyManager)
+	componentMocks.On("TxManager").Return(mc.txManager)
+	componentMocks.On("PrivateTxManager").Return(mc.privateTxManager)
 
 	var p persistence.Persistence
 	var err error
@@ -176,6 +182,8 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 		stateStore:       componentmocks.NewStateManager(t),
 		ethClientFactory: componentmocks.NewEthClientFactory(t),
 		keyManager:       componentmocks.NewKeyManager(t),
+		txManager:        componentmocks.NewTXManager(t),
+		privateTxManager: componentmocks.NewPrivateTxManager(t),
 	}
 	componentMocks := componentmocks.NewAllComponents(t)
 	componentMocks.On("EthClientFactory").Return(mc.ethClientFactory)
@@ -185,6 +193,8 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 	componentMocks.On("BlockIndexer").Return(mc.blockIndexer)
 	mc.keyManager.On("AddInMemorySigner", "domain", mock.Anything).Return().Maybe()
 	componentMocks.On("KeyManager").Return(mc.keyManager)
+	componentMocks.On("TxManager").Return(mc.txManager)
+	componentMocks.On("PrivateTxManager").Return(mc.privateTxManager)
 
 	mp, err := mockpersistence.NewSQLMockProvider()
 	require.NoError(t, err)
@@ -254,6 +264,47 @@ func TestWaitForDeployQueryError(t *testing.T) {
 }
 
 func TestWaitForDeployDomainNotFound(t *testing.T) {
+	reqID := uuid.New()
+	domainAddr := tktypes.RandAddress()
+	contractAddr := tktypes.RandAddress()
+
+	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
+		Domains: map[string]*pldconf.DomainConfig{
+			"domain1": {
+				RegistryAddress: tktypes.RandHex(20),
+			},
+		},
+	}, func(mc *mockComponents) {
+		// Once before wait, which returns empty
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
+		// Once after wait, when the contract exists
+		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{
+			"deploy_tx", "domain_address", "address", "config_bytes",
+		}).AddRow(
+			reqID, domainAddr, contractAddr, "",
+		))
+	})
+	defer done()
+
+	received := make(chan struct{})
+	go func() {
+		_, err := dm.WaitForDeploy(ctx, reqID)
+		assert.Regexp(t, "PD011600", err)
+		close(received)
+	}()
+
+	for dm.privateTxWaiter.InFlightCount() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	dm.privateTxWaiter.GetInflight(reqID).Complete(&components.ReceiptInput{
+		ContractAddress: contractAddr,
+	})
+
+	<-received
+
+}
+
+func TestWaitForDeployNotADeploy(t *testing.T) {
 	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
 		Domains: map[string]*pldconf.DomainConfig{
 			"domain1": {
@@ -270,14 +321,16 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 	received := make(chan struct{})
 	go func() {
 		_, err := dm.WaitForDeploy(ctx, reqID)
-		assert.Regexp(t, "PD011600", err)
+		assert.Regexp(t, "PD011648", err)
 		close(received)
 	}()
 
-	for dm.contractWaiter.InFlightCount() == 0 {
+	for dm.privateTxWaiter.InFlightCount() == 0 {
 		time.Sleep(10 * time.Millisecond)
 	}
-	dm.contractWaiter.GetInflight(reqID).Complete(&PrivateSmartContract{})
+	dm.privateTxWaiter.GetInflight(reqID).Complete(&components.ReceiptInput{
+		ContractAddress: nil, // we complete without a contract address
+	})
 
 	<-received
 
@@ -295,7 +348,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	_, err := dm.waitAndEnrich(cancelled, dm.contractWaiter.AddInflight(cancelled, uuid.New()))
+	_, err := dm.waitAndEnrich(cancelled, dm.privateTxWaiter.AddInflight(cancelled, uuid.New()))
 	assert.Regexp(t, "PD020100", err)
 }
 

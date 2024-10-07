@@ -803,16 +803,15 @@ func (pte *pubTxManager) GetPublicTransactionForHash(ctx context.Context, dbTX *
 
 }
 
+// note this function guarantees the return order of the matches corresponds to the input order
 func (pte *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, dbTX *gorm.DB, itxs []*blockindexer.IndexedTransactionNotify) ([]*components.PublicTxMatch, error) {
 
 	// Do a DB query in the TX to reverse lookup the TX details we need to match/update the completed status
 	// and return the list that matched (which is very possibly none as we only track transactions submitted
 	// via our node to the network).
-	txiByHash := make(map[tktypes.Bytes32]*blockindexer.IndexedTransactionNotify)
 	txHashes := make([]tktypes.Bytes32, len(itxs))
 	for i, itx := range itxs {
 		txHashes[i] = itx.Hash
-		txiByHash[itx.Hash] = itx
 	}
 	var lookups []*bindingsMatchingSubmission
 	err := dbTX.
@@ -826,30 +825,35 @@ func (pte *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 		return nil, err
 	}
 
-	// Correlate our results with the inputs to build:
-	// - the result to return so the Paladin tx manager knows the linkage
-	// - the insert we will do in this DB transaction of all the completion records
-	results := make([]*components.PublicTxMatch, len(lookups))
-	completions := make([]*DBPublicTxnCompletion, len(lookups))
-	for i, match := range lookups {
-		txi := txiByHash[match.Submission.TransactionHash]
-		results[i] = &components.PublicTxMatch{
-			PaladinTXReference: components.PaladinTXReference{
-				TransactionID:   match.Transaction,
-				TransactionType: match.TransactionType,
-			},
-			IndexedTransactionNotify: txi,
-		}
-		completions[i] = &DBPublicTxnCompletion{
-			SignerNonce:     match.Submission.SignerNonce,
-			TransactionHash: match.Submission.TransactionHash,
-			Success:         txi.Result.V() == blockindexer.TXResult_SUCCESS,
-			RevertData:      txi.RevertReason,
+	// Correlate our results with the inputs to build - we guarantee to insert and return
+	// the results in the original order
+	results := make([]*components.PublicTxMatch, 0, len(lookups))
+	completions := make([]*DBPublicTxnCompletion, 0, len(lookups))
+	for _, txi := range itxs {
+		for _, match := range lookups {
+			if txi.Hash.Equals(&match.Submission.TransactionHash) {
+				// matched results in the order of the inputs
+				results = append(results, &components.PublicTxMatch{
+					PaladinTXReference: components.PaladinTXReference{
+						TransactionID:   match.Transaction,
+						TransactionType: match.TransactionType,
+					},
+					IndexedTransactionNotify: txi,
+				})
+				// completions to insert, in the order of the inputs
+				completions = append(completions, &DBPublicTxnCompletion{
+					SignerNonce:     match.SignerNonce,
+					TransactionHash: txi.Hash,
+					Success:         txi.Result.V() == blockindexer.TXResult_SUCCESS,
+					RevertData:      txi.RevertReason,
+				})
+				break
+			}
 		}
 	}
 
 	if len(completions) > 0 {
-		// We have some contracts to persist
+		// We have some completions to persis - in the same order as the confirmations that came in
 		err := dbTX.
 			Table("public_completions").
 			Clauses(clause.OnConflict{

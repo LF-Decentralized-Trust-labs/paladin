@@ -58,13 +58,12 @@ func NewDomainManager(bgCtx context.Context, conf *pldconf.DomainManagerConfig) 
 	}
 	log.L(bgCtx).Infof("Domains configured: %v", allDomains)
 	return &domainManager{
-		bgCtx:             bgCtx,
-		conf:              conf,
-		domainsByName:     make(map[string]*domain),
-		domainsByAddress:  make(map[tktypes.EthAddress]*domain),
-		contractWaiter:    inflight.NewInflightManager[uuid.UUID, *PrivateSmartContract](uuid.Parse),
-		transactionWaiter: inflight.NewInflightManager[uuid.UUID, any](uuid.Parse),
-		contractCache:     cache.NewCache[tktypes.EthAddress, *domainContract](&conf.DomainManager.ContractCache, pldconf.ContractCacheDefaults),
+		bgCtx:            bgCtx,
+		conf:             conf,
+		domainsByName:    make(map[string]*domain),
+		domainsByAddress: make(map[tktypes.EthAddress]*domain),
+		privateTxWaiter:  inflight.NewInflightManager[uuid.UUID, *components.ReceiptInput](uuid.Parse),
+		contractCache:    cache.NewCache[tktypes.EthAddress, *domainContract](&conf.DomainManager.ContractCache, pldconf.ContractCacheDefaults),
 	}
 }
 
@@ -75,6 +74,8 @@ type domainManager struct {
 	conf             *pldconf.DomainManagerConfig
 	persistence      persistence.Persistence
 	stateStore       components.StateManager
+	privateTxManager components.PrivateTxManager
+	txManager        components.TXManager
 	blockIndexer     blockindexer.BlockIndexer
 	ethClientFactory ethclient.EthClientFactory
 	domainSigner     *domainSigner
@@ -82,9 +83,8 @@ type domainManager struct {
 	domainsByName    map[string]*domain
 	domainsByAddress map[tktypes.EthAddress]*domain
 
-	contractWaiter    *inflight.InflightManager[uuid.UUID, *PrivateSmartContract]
-	transactionWaiter *inflight.InflightManager[uuid.UUID, any]
-	contractCache     cache.Cache[tktypes.EthAddress, *domainContract]
+	privateTxWaiter *inflight.InflightManager[uuid.UUID, *components.ReceiptInput]
+	contractCache   cache.Cache[tktypes.EthAddress, *domainContract]
 }
 
 type event_PaladinRegisterSmartContract_V0 struct {
@@ -100,6 +100,8 @@ func (dm *domainManager) PreInit(pic components.PreInitComponents) (*components.
 
 func (dm *domainManager) PostInit(c components.AllComponents) error {
 	dm.stateStore = c.StateManager()
+	dm.txManager = c.TxManager()
+	dm.privateTxManager = c.PrivateTxManager()
 	dm.persistence = c.Persistence()
 	dm.ethClientFactory = c.EthClientFactory()
 	dm.blockIndexer = c.BlockIndexer()
@@ -191,7 +193,7 @@ func (dm *domainManager) getDomainByName(ctx context.Context, name string) (*dom
 func (dm *domainManager) WaitForDeploy(ctx context.Context, txID uuid.UUID) (components.DomainSmartContract, error) {
 	// Waits for the event that confirms a smart contract has been deployed (or a context timeout)
 	// using the transaction ID of the deploy transaction
-	req := dm.contractWaiter.AddInflight(ctx, txID)
+	req := dm.privateTxWaiter.AddInflight(ctx, txID)
 	defer req.Cancel()
 
 	dc, err := dm.dbGetSmartContract(ctx, dm.persistence.DB(), func(db *gorm.DB) *gorm.DB { return db.Where("deploy_tx = ?", txID) })
@@ -209,19 +211,25 @@ func (dm *domainManager) GetSigner() signerapi.InMemorySigner {
 	return dm.domainSigner
 }
 
-func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *PrivateSmartContract]) (components.DomainSmartContract, error) {
+func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *components.ReceiptInput]) (components.DomainSmartContract, error) {
 	// wait until the event gets indexed (or the context expires)
-	def, err := req.Wait()
+	receipt, err := req.Wait()
 	if err != nil {
 		return nil, err
 	}
-	return dm.enrichContractWithDomain(ctx, def)
+
+	if receipt.ContractAddress == nil {
+		log.L(ctx).Errorf("Waiter expected a contract deployment: %+v", receipt)
+		return nil, i18n.NewError(ctx, msgs.MsgDomainTransactionWasNotADeployment, receipt.TransactionID)
+	}
+
+	return dm.GetSmartContractByAddress(ctx, *receipt.ContractAddress)
 }
 
 func (dm *domainManager) WaitForTransaction(ctx context.Context, txID uuid.UUID) error {
 	// Waits for the event that confirms a transaction has been processed (or a context timeout)
 	// using the ID of the transaction
-	req := dm.transactionWaiter.AddInflight(ctx, txID)
+	req := dm.privateTxWaiter.AddInflight(ctx, txID)
 	defer req.Cancel()
 	_, err := req.Wait()
 	return err
@@ -278,15 +286,15 @@ func (dm *domainManager) dbGetSmartContract(ctx context.Context, tx *gorm.DB, se
 
 }
 
-func (dm *domainManager) enrichContractWithDomain(ctx context.Context, def *PrivateSmartContract) (*domainContract, error) {
+func (dm *domainManager) enrichContractWithDomain(ctx context.Context, contract *PrivateSmartContract) (*domainContract, error) {
 
 	// Get the domain by address
-	d, err := dm.getDomainByAddress(ctx, &def.RegistryAddress)
+	d, err := dm.getDomainByAddress(ctx, &contract.RegistryAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	return d.newSmartContract(def), nil
+	return d.newSmartContract(contract), nil
 }
 
 // If an embedded ABI is broken, we don't even run the tests / start the runtime

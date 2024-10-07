@@ -32,7 +32,6 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -173,7 +172,9 @@ func TestInitTransaction(t *testing.T) {
 			TransactionId:      "0x1234",
 			FunctionAbiJson:    "bad json",
 			FunctionParamsJson: "bad json",
-			ContractConfig:     []byte("bad config"),
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: []byte("bad config"),
+			},
 		},
 	}
 	_, err := z.InitTransaction(context.Background(), req)
@@ -190,7 +191,7 @@ func TestInitTransaction(t *testing.T) {
 	configJSON, _ := json.Marshal(conf)
 	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
 	assert.NoError(t, err)
-	req.Transaction.ContractConfig = encoded
+	req.Transaction.ContractInfo.ContractConfig = encoded
 	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "failed to validate init transaction spec. unknown function: test")
 
@@ -218,7 +219,7 @@ func TestInitTransaction(t *testing.T) {
 	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "failed to validate init transaction spec. failed to decode contract address. bad address - must be 20 bytes (len=0)")
 
-	req.Transaction.ContractAddress = "0x1234567890123456789012345678901234567890"
+	req.Transaction.ContractInfo.ContractAddress = "0x1234567890123456789012345678901234567890"
 	res, err := z.InitTransaction(context.Background(), req)
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", res.RequiredVerifiers[0].Lookup)
@@ -236,7 +237,9 @@ func TestAssembleTransaction(t *testing.T) {
 			TransactionId:      "0x1234",
 			FunctionAbiJson:    "{\"type\":\"function\",\"name\":\"mint\"}",
 			FunctionParamsJson: "{\"to\":\"Alice\",\"amount\":\"10\"}",
-			ContractAddress:    "0x1234567890123456789012345678901234567890",
+			ContractInfo: &prototk.ContractInfo{
+				ContractAddress: "0x1234567890123456789012345678901234567890",
+			},
 		},
 		ResolvedVerifiers: []*prototk.ResolvedVerifier{
 			{
@@ -258,7 +261,7 @@ func TestAssembleTransaction(t *testing.T) {
 	configJSON, _ := json.Marshal(conf)
 	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
 	assert.NoError(t, err)
-	req.Transaction.ContractConfig = encoded
+	req.Transaction.ContractInfo.ContractConfig = encoded
 	_, err = z.AssembleTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -270,7 +273,9 @@ func TestEndorseTransaction(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionParamsJson: "{\"to\":\"Alice\",\"amount\":\"10\"}",
-			ContractAddress:    "0x1234567890123456789012345678901234567890",
+			ContractInfo: &prototk.ContractInfo{
+				ContractAddress: "0x1234567890123456789012345678901234567890",
+			},
 		},
 	}
 	_, err := z.EndorseTransaction(context.Background(), req)
@@ -285,7 +290,7 @@ func TestEndorseTransaction(t *testing.T) {
 	configJSON, _ := json.Marshal(conf)
 	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
 	assert.NoError(t, err)
-	req.Transaction.ContractConfig = encoded
+	req.Transaction.ContractInfo.ContractConfig = encoded
 	_, err = z.EndorseTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -308,7 +313,9 @@ func TestPrepareTransaction(t *testing.T) {
 		Transaction: &prototk.TransactionSpecification{
 			TransactionId:      "0x1234",
 			FunctionParamsJson: "{\"to\":\"Alice\",\"amount\":\"10\"}",
-			ContractAddress:    "0x1234567890123456789012345678901234567890",
+			ContractInfo: &prototk.ContractInfo{
+				ContractAddress: "0x1234567890123456789012345678901234567890",
+			},
 		},
 		OutputStates: []*prototk.EndorsableState{
 			{
@@ -328,7 +335,7 @@ func TestPrepareTransaction(t *testing.T) {
 	configJSON, _ := json.Marshal(conf)
 	encoded, err := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
 	assert.NoError(t, err)
-	req.Transaction.ContractConfig = encoded
+	req.Transaction.ContractInfo.ContractConfig = encoded
 	_, err = z.PrepareTransaction(context.Background(), req)
 	assert.NoError(t, err)
 }
@@ -379,95 +386,102 @@ func TestHandleEventBatch(t *testing.T) {
 	z.transferSignature = "event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)"
 	z.transferWithEncSignature = "event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)"
 
-	req := &prototk.HandleEventBatchRequest{
-		JsonEvents: "bad json",
-	}
 	ctx := context.Background()
-	_, err := z.HandleEventBatch(ctx, req)
-	assert.EqualError(t, err, "failed to unmarshal events. invalid character 'b' looking for beginning of value")
-
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
-	req.ConfigBytes = "bad config"
-	_, err = z.HandleEventBatch(ctx, req)
-	assert.ErrorContains(t, err, "failed to parse domain instance config bytes. PD020007: Invalid hex")
-
-	req.ConfigBytes = "0x1234"
-	_, err = z.HandleEventBatch(ctx, req)
-	assert.ErrorContains(t, err, "failed to decode domain instance config. FF22045: Insufficient bytes")
-
-	config := types.DomainInstanceConfig{
-		CircuitId: "circuit1",
-		TokenName: "testToken1",
+	req := &prototk.HandleEventBatchRequest{
+		Events: []*prototk.OnChainEvent{
+			{
+				DataJson:          "bad data",
+				SoliditySignature: "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)",
+			},
+		},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfig: []byte("bad config"),
+		},
 	}
-	configJSON, _ := json.Marshal(config)
-	encoded, _ := types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
-	req.ConfigBytes = tktypes.HexBytes(encoded).String()
+	_, err := z.HandleEventBatch(ctx, req)
+	assert.ErrorContains(t, err, "failed to abi decode domain instance config bytes. FF22045: Insufficient bytes")
+
+	config := map[string]interface{}{
+		"circuitId": "circuit1",
+		"tokenName": "testToken1",
+	}
+	bytes, err := types.DomainInstanceConfigABI.EncodeABIDataValues(config)
+	require.NoError(t, err)
+	req.ContractInfo.ContractConfig = bytes
+	req.ContractInfo.ContractAddress = "0x1234"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.ErrorContains(t, err, "failed to parse contract address. bad address - must be 20 bytes (len=2)")
+
+	req.ContractInfo.ContractAddress = "0x1234567890123456789012345678901234567890"
 	res1, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res1.TransactionsComplete, 0)
 
 	// bad transaction data for the mint event - should be logged and move on
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 
 	// bad data for the transfer event - should be logged and move on
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
+	req.Events[0].DataJson = "bad data"
+	req.Events[0].SoliditySignature = "event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 
 	// bad transaction data for the transfer event - should be logged and move on
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 
 	// bad data for the transfer with encrypted values event - should be logged and move on
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":\"bad data\"}]"
+	req.Events[0].DataJson = "bad data"
+	req.Events[0].SoliditySignature = "event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 
 	// bad transaction data for the transfer with encrypted values event - should be logged and move on
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001ffff\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)"
 	res2, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res2.TransactionsComplete[0])
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res2.TransactionsComplete[0].TransactionId)
 
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)"
 	res3, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res3.TransactionsComplete[0])
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res3.TransactionsComplete[0].TransactionId)
 
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)"
 	res4, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res4.TransactionsComplete[0])
+	assert.Equal(t, "0x30e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000", res4.TransactionsComplete[0].TransactionId)
 
-	config = types.DomainInstanceConfig{
-		CircuitId: "circuit1",
-		TokenName: "Zeto_AnonNullifier",
-	}
-	configJSON, _ = json.Marshal(config)
-	encoded, _ = types.DomainInstanceConfigABI.EncodeABIDataJSON(configJSON)
-	req.ConfigBytes = tktypes.HexBytes(encoded).String()
+	config["tokenName"] = "Zeto_AnonNullifier"
+	bytes, err = types.DomainInstanceConfigABI.EncodeABIDataValues(config)
+	require.NoError(t, err)
+	req.ContractInfo.ContractConfig = bytes
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
 		return nil, errors.New("find coins error")
 	}
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)"
 	_, err = z.HandleEventBatch(ctx, req)
-	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. Failed to create Merkle tree for smt_Zeto_AnonNullifier_0x057826c8929372ac7215ebc572eaf6dc396625d3: failed to find available states. find coins error")
+	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. failed to create Merkle tree for smt_Zeto_AnonNullifier_0x1234567890123456789012345678901234567890: failed to find available states. find coins error")
 
 	calls := 0
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -484,12 +498,12 @@ func TestHandleEventBatch(t *testing.T) {
 			return &prototk.FindAvailableStatesResponse{}, nil
 		}
 	}
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	_, err = z.HandleEventBatch(ctx, req)
-	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. Failed to create node index for 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff: key for the new node not inside the Finite Field")
+	assert.EqualError(t, err, "failed to handle events (failures=1). [0]failed to update merkle tree for the UTXOMint event. failed to create node index for 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff: key for the new node not inside the Finite Field")
 
 	calls = 0
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOMint(uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
 	res5, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res5.TransactionsComplete, 1)
@@ -498,7 +512,8 @@ func TestHandleEventBatch(t *testing.T) {
 	assert.Equal(t, "merkle_tree_root", res5.NewStates[1].SchemaId)
 
 	calls = 0
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOTransfer(uint256[] inputs, uint256[] outputs, address indexed submitter, bytes data)"
 	res6, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res6.TransactionsComplete, 1)
@@ -507,7 +522,8 @@ func TestHandleEventBatch(t *testing.T) {
 	assert.Equal(t, "merkle_tree_root", res6.NewStates[1].SchemaId)
 
 	calls = 0
-	req.JsonEvents = "[{\"blockNumber\":132541,\"transactionIndex\":0,\"logIndex\":0,\"transactionHash\":\"0x88fa99ee10427eb18687876b2fee9dfe674834e1a18770b742d98612c4a032d8\",\"signature\":\"0x7ff08e0ca1fce6b202b83128811e4f6ceda54930aa074cd365bf68f95c20ce19\",\"soliditySignature\":\"event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)\",\"address\":\"0x057826c8929372ac7215ebc572eaf6dc396625d3\",\"data\":{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}}]"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"outputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	req.Events[0].SoliditySignature = "event UTXOTransferWithEncryptedValues(uint256[] inputs, uint256[] outputs, uint256 encryptionNonce, uint256[2] ecdhPublicKey, uint256[] encryptedValues, address indexed submitter, bytes data)"
 	res7, err := z.HandleEventBatch(ctx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res7.TransactionsComplete, 1)

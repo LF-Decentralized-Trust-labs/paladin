@@ -77,13 +77,24 @@ type TransactionReceipt struct {
 	TransactionReceiptData
 }
 
+type TransactionReceiptDataOnchain struct {
+	TransactionHash  *tktypes.Bytes32 `json:"transactionHash,omitempty"`
+	BlockNumber      int64            `json:"blockNumber,omitempty"`
+	TransactionIndex int64            `json:"transactionIndex,omitempty"`
+}
+
+type TransactionReceiptDataOnchainEvent struct {
+	LogIndex int64              `json:"logIndex,omitempty"`
+	Source   tktypes.EthAddress `json:"source,omitempty"`
+}
+
 type TransactionReceiptData struct {
-	Success         bool                `json:"success,omitempty"`         // true for success (note "status" is reserved for future use)
-	TransactionHash *tktypes.Bytes32    `json:"transactionHash,omitempty"` // if the result was finalized by the blockchain, this is the on-chain blockchain transaction hash
-	BlockNumber     int64               `json:"blockNumber,omitempty"`     // if the result was finalized by the blockchain
-	FailureMessage  string              `json:"failureMessage,omitempty"`  // always set to a non-empty string if the transaction reverted, with as much detail as could be extracted
-	RevertData      tktypes.HexBytes    `json:"revertData,omitempty"`      // encoded revert data if available
-	ContractAddress *tktypes.EthAddress `json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
+	Success                             bool                `json:"success,omitempty"` // true for success (note "status" is reserved for future use)
+	*TransactionReceiptDataOnchain      `json:",inline"`    // if the result was finalized by the blockchain (note quirk of omitempty that we can't put zero-valid int pointers on main struct)
+	*TransactionReceiptDataOnchainEvent `json:",inline"`    // if the result was finalized by the blockchain by an event
+	FailureMessage                      string              `json:"failureMessage,omitempty"`  // always set to a non-empty string if the transaction reverted, with as much detail as could be extracted
+	RevertData                          tktypes.HexBytes    `json:"revertData,omitempty"`      // encoded revert data if available
+	ContractAddress                     *tktypes.EthAddress `json:"contractAddress,omitempty"` // address of the new contract address, to be used in the `To` field for subsequent invoke transactions.  Nil if this transaction itself was an invoke
 }
 
 type TransactionActivityRecord struct {

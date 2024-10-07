@@ -28,7 +28,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/componenttest/domains"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
@@ -394,14 +393,13 @@ func TestResolveIdentityFromRemoteNode(t *testing.T) {
 	t.Logf("Bob address: %s", bobAddress)
 
 	// send JSON RPC message to node 1 to deploy a private contract
-	var resolveVerifierResponse ptxapi.ResolvedVerifier
-	err := client1.CallRPC(ctx, &resolveVerifierResponse, "ptx_resolveVerifier", &ptxapi.ResolveVerifierRequest{
-		Lookup:       &bobIdentity,
-		Algorithm:    confutil.P(algorithms.ECDSA_SECP256K1),
-		VerifierType: confutil.P(verifiers.ETH_ADDRESS),
-	})
+	var verifier string
+	err := client1.CallRPC(ctx, &verifier, "ptx_resolveVerifier",
+		bobIdentity,
+		algorithms.ECDSA_SECP256K1,
+		verifiers.ETH_ADDRESS,
+	)
 	require.NoError(t, err)
-	require.NotNil(t, resolveVerifierResponse.Verifier)
-	assert.Equal(t, bobAddress, *resolveVerifierResponse.Verifier)
+	require.NotNil(t, verifier)
 
 }

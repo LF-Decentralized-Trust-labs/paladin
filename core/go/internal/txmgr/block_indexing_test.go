@@ -120,6 +120,7 @@ func TestPublicConfirmMatch(t *testing.T) {
 
 	txi := newTestConfirm()
 	txID := uuid.New()
+	txi.ContractAddress = tktypes.RandAddress()
 
 	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
 		mc.publicTxMgr.On("MatchUpdateConfirmedTransactions", mock.Anything, mock.Anything, []*blockindexer.IndexedTransactionNotify{txi}).
@@ -147,43 +148,55 @@ func TestPublicConfirmMatch(t *testing.T) {
 	postCommit()
 }
 
-func TestPrivateConfirmMatch(t *testing.T) {
+func TestPrivateConfirmMatchPrivateFailures(t *testing.T) {
 
-	txi := newTestConfirm()
-	txID := uuid.New()
+	testABI := abi.ABI{
+		{Type: abi.Function, Name: "doIt", Inputs: abi.ParameterArray{}},
+		{Type: abi.Error, Name: "ErrorNum", Inputs: abi.ParameterArray{{Type: "uint256"}}},
+	}
+	revertData, err := testABI.Errors()["ErrorNum"].EncodeCallDataJSON([]byte(`[12345]`))
+	require.NoError(t, err)
+
+	txiOk1 := newTestConfirm() // one succeeded
+	txID1 := uuid.New()
+	txiFail2 := newTestConfirm(revertData) // one failed
+	txID2 := uuid.New()
 
 	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
-		mc.publicTxMgr.On("MatchUpdateConfirmedTransactions", mock.Anything, mock.Anything, []*blockindexer.IndexedTransactionNotify{txi}).
+		mc.publicTxMgr.On("MatchUpdateConfirmedTransactions", mock.Anything, mock.Anything,
+			[]*blockindexer.IndexedTransactionNotify{txiOk1, txiFail2}).
 			Return([]*components.PublicTxMatch{
 				{
 					PaladinTXReference: components.PaladinTXReference{
-						TransactionID:   txID,
+						TransactionID:   txID1,
 						TransactionType: ptxapi.TransactionTypePrivate.Enum(),
 					},
-					IndexedTransactionNotify: txi,
+					IndexedTransactionNotify: txiOk1,
+				},
+				{
+					PaladinTXReference: components.PaladinTXReference{
+						TransactionID:   txID2,
+						TransactionType: ptxapi.TransactionTypePrivate.Enum(),
+					},
+					IndexedTransactionNotify: txiFail2,
 				},
 			}, nil)
 
-		mc.db.ExpectExec("INSERT.*transaction_receipts").WillReturnResult(driver.ResultNoRows)
-
-		mnc := mc.privateTxMgr.On("NotifyConfirmed", mock.Anything, mock.Anything)
-		mnc.Run(func(args mock.Arguments) {
-			completed := make(map[uuid.UUID]bool)
-			confirms := args[1].([]*components.PublicTxMatch)
-			for _, c := range confirms {
-				completed[c.TransactionID] = true
-			}
-			mnc.Return(completed, nil)
-		})
+		mc.privateTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
+			return len(matches) == 1 &&
+				matches[0].TransactionID == txID2
+		})).Return(nil)
 
 		mc.publicTxMgr.On("NotifyConfirmPersisted", mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
-			return len(matches) == 1 && matches[0].TransactionID == txID
+			return len(matches) == 2 &&
+				matches[0].TransactionID == txID1 &&
+				matches[1].TransactionID == txID2
 		}))
 	})
 	defer done()
 
 	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
-		[]*blockindexer.IndexedTransactionNotify{txi})
+		[]*blockindexer.IndexedTransactionNotify{txiOk1, txiFail2})
 	require.NoError(t, err)
 	postCommit()
 }
@@ -221,7 +234,7 @@ func TestConfirmMatchFAil(t *testing.T) {
 
 func TestPrivateConfirmError(t *testing.T) {
 
-	txi := newTestConfirm()
+	txi := newTestConfirm([]byte("revert data"))
 	txID := uuid.New()
 
 	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
@@ -235,7 +248,7 @@ func TestPrivateConfirmError(t *testing.T) {
 					IndexedTransactionNotify: txi,
 				},
 			}, nil)
-		mc.privateTxMgr.On("NotifyConfirmed", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("pop"))
+		mc.privateTxMgr.On("NotifyFailedPublicTx", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("pop"))
 	})
 	defer done()
 

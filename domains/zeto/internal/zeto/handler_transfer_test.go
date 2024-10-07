@@ -87,8 +87,10 @@ func TestTransferAssemble(t *testing.T) {
 	}
 	ctx := context.Background()
 	txSpec := &prototk.TransactionSpecification{
-		From:            "Bob",
-		ContractAddress: "0x1234567890123456789012345678901234567890",
+		From: "Bob",
+		ContractInfo: &prototk.ContractInfo{
+			ContractAddress: "0x1234567890123456789012345678901234567890",
+		},
 	}
 	tx := &types.ParsedTransaction{
 		Params: &types.TransferParams{

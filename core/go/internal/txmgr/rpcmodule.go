@@ -171,18 +171,11 @@ func (tm *txManager) rpcQueryStoredABIs() rpcserver.RPCHandler {
 }
 
 func (tm *txManager) rpcResolveVerifier() rpcserver.RPCHandler {
-	return rpcserver.RPCMethod1(func(ctx context.Context,
-		resolveVerifierRequest *ptxapi.ResolveVerifierRequest,
-	) (*ptxapi.ResolvedVerifier, error) {
-
-		verifier, err := tm.identityResolver.ResolveVerifier(ctx, *resolveVerifierRequest.Lookup, *resolveVerifierRequest.Algorithm, *resolveVerifierRequest.VerifierType)
-		if err != nil {
-			return nil, err
-		}
-		return &ptxapi.ResolvedVerifier{
-			Lookup:    resolveVerifierRequest.Lookup,
-			Algorithm: resolveVerifierRequest.Algorithm,
-			Verifier:  &verifier,
-		}, nil
+	return rpcserver.RPCMethod3(func(ctx context.Context,
+		lookup string,
+		algorithm string,
+		verifierType string,
+	) (string, error) {
+		return tm.identityResolver.ResolveVerifier(ctx, lookup, algorithm, verifierType)
 	})
 }

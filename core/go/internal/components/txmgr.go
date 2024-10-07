@@ -35,16 +35,17 @@ const (
 )
 
 type ReceiptInput struct {
-	ReceiptType     ReceiptType      // required
-	TransactionID   uuid.UUID        // required
-	TransactionHash *tktypes.Bytes32 // if it made it to the chain - for success or failure
-	BlockNumber     *int64           // if it made it to the chain
-	FailureMessage  string           // set for RT_FailedWithMessage
-	RevertData      tktypes.HexBytes // set for RT_FailedOnChainWithRevertData
+	ReceiptType     ReceiptType             // required
+	TransactionID   uuid.UUID               // required
+	OnChain         tktypes.OnChainLocation // OnChain.Type must be set for an on-chain transaction/event
+	ContractAddress *tktypes.EthAddress     // the contract address - deployments only
+	FailureMessage  string                  // set for RT_FailedWithMessage
+	RevertData      tktypes.HexBytes        // set for RT_FailedOnChainWithRevertData
 }
 
 type TXManager interface {
 	ManagerLifecycle
-	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput, existenceConfirmed bool) error
+	MatchAndFinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) ([]uuid.UUID, error) // returns which transactions were known
+	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) error                        // requires all transactions to be known
 	CalculateRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes) error
 }

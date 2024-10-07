@@ -42,7 +42,7 @@ contract Swap {
     }
 
     struct FullState {
-        bytes32 id;
+        bytes id;
         bytes32 schema;
         bytes data;
     }

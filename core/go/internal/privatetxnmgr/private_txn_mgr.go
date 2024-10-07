@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/privatetxnstore"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
@@ -549,12 +549,22 @@ func (p *privateTxManager) publishToSubscribers(ctx context.Context, event compo
 	}
 }
 
-func (p *privateTxManager) NotifyConfirmed(ctx context.Context, confirms []*components.PublicTxMatch) (completed map[uuid.UUID]bool, err error) {
-	// TODO: We have processing we need to do here, particularly for failures
-	// For now, we just ack everything as "done" driving a receipt to be recorded
-	completed = make(map[uuid.UUID]bool)
-	for _, confirm := range confirms {
-		completed[confirm.TransactionID] = true
+func (p *privateTxManager) NotifyFailedPublicTx(ctx context.Context, dbTX *gorm.DB, failures []*components.PublicTxMatch) error {
+	// TODO: We have processing we need to do here to resubmit
+	// For now, we directly raise a failure receipt for them back with the main transaction manager
+	privateFailureReceipts := make([]*components.ReceiptInput, len(failures))
+	for i, tx := range failures {
+		privateFailureReceipts[i] = &components.ReceiptInput{
+			ReceiptType:   components.RT_FailedOnChainWithRevertData,
+			TransactionID: tx.TransactionID,
+			OnChain: tktypes.OnChainLocation{
+				Type:             tktypes.OnChainTransaction,
+				TransactionHash:  tx.Hash,
+				BlockNumber:      tx.BlockNumber,
+				TransactionIndex: tx.BlockNumber,
+			},
+			RevertData: tx.RevertReason,
+		}
 	}
-	return completed, nil
+	return p.components.TxManager().FinalizeTransactions(ctx, dbTX, privateFailureReceipts)
 }

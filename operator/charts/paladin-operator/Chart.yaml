@@ -23,8 +23,8 @@ version: 0.0.0
 # It is recommended to use it with quotes.
 appVersion: "0.0.0"
 
-dependencies:
-  - name: paladin-operator-crds-definitions
-    version: 0.0.0
-    repository: "file://charts/crds-definitions"
-    condition: installCRDs
+# dependencies:
+#   - name: paladin-operator-crds
+#     version: 0.0.0
+#     repository: "file://../paladin-operator-crds/"
+#     condition: installCRDs

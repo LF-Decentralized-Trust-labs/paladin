@@ -180,7 +180,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		HandleEventBatch: func(ctx context.Context, hebr *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
 			assert.Equal(t, "batch1", hebr.BatchId)
 			return &prototk.HandleEventBatchResponse{
-				TransactionsComplete: []string{"tx1"},
+				TransactionsComplete: []*prototk.CompletedTransaction{{TransactionId: "tx1"}},
 			}, nil
 		},
 		Sign: func(ctx context.Context, sr *prototk.SignRequest) (*prototk.SignResponse, error) {
@@ -314,7 +314,7 @@ func TestDomainRequestsOK(t *testing.T) {
 		BatchId: "batch1",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"tx1"}, heb.TransactionsComplete)
+	assert.Equal(t, "tx1", heb.TransactionsComplete[0].TransactionId)
 
 	sr, err := domainAPI.Sign(ctx, &prototk.SignRequest{
 		Algorithm: "algo1",

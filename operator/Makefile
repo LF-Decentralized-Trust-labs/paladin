@@ -1,110 +1,80 @@
 # VERSION defines the project version for the bundle.
-# Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
 CLUSTER_NAME ?= paladin
-
-# CHANNELS define the bundle channels used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
-# To re-generate a bundle for other specific channels without changing the standard setup, you can:
-# - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
-# - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
-ifneq ($(origin CHANNELS), undefined)
-BUNDLE_CHANNELS := --channels=$(CHANNELS)
-endif
-
-# DEFAULT_CHANNEL defines the default channel used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
-# To re-generate a bundle for any other default channel without changing the default setup, you can:
-# - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
-# - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
-endif
-BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+NAMESPACE ?= paladin
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
-#
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# paladin.io/operator-go-bundle:$VERSION and paladin.io/operator-go-catalog:$VERSION.
 IMAGE_TAG_BASE ?= paladin.io/operator-go
-
-# BUNDLE_IMG defines the image:tag used for the bundle.
-# You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
+IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
-# BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
-# You can enable this value if you would like to use SHA Based Digests
-# To enable set flag to true
 USE_IMAGE_DIGESTS ?= false
-ifeq ($(USE_IMAGE_DIGESTS), true)
-	BUNDLE_GEN_FLAGS += --use-image-digests
-endif
 
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
+# Set the Operator SDK version
 OPERATOR_SDK_VERSION ?= v1.37.0
-# Image URL to use all building/pushing image targets
-IMG ?= paladin-operator:latest
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
-# CONTAINER_TOOL defines the container tool to be used for building images.
-# Be aware that the target commands are only tested with Docker which is
-# scaffolded by default. However, you might want to replace it to use other
-# tools. (i.e. podman)
+# Tool Binaries and Versions
+KUBECTL ?= kubectl
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
+ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
+HELMIFY ?= $(LOCALBIN)/helmify
 CONTAINER_TOOL ?= docker
+HELM ?= helm
 KIND_CLUSTER ?= kind
 
-NAMESPACE ?= paladin
+# PLATFORMS defines the target platforms for cross-platform builds
+PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+# Tool Versions
+KUSTOMIZE_VERSION ?= v5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.16.3
+ENVTEST_VERSION ?= release-0.17
+GOLANGCI_LINT_VERSION ?= v1.57.2
+
+# Paths for Helm charts
+CHART_PATH_CRD = charts/paladin-operator-crd
+CHART_NAME_CRD = paladin-crds
+CHART_PATH_OPERATOR = charts/paladin-operator
+CHART_NAME_OPERATOR = paladin
+
+# SHELL setup to allow bash commands
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# Helper to install go tools
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
+
+##@ General Targets
 .PHONY: all
 all: build
 
-##@ General
-
-# The help target prints out all targets with their descriptions organized
-# beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk command is responsible for reading the
-# entire set of makefiles included in this invocation, looking for lines of the
-# file as xyz: ## something, and then pretty-format the target and help. Then,
-# if there's a line with ##@ something, that gets pretty-printed as a category.
-# More info on the usage of ANSI control characters for terminal formatting:
-# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
-# More info on the awk command:
-# http://linuxcommand.org/lc3_adv_awk.php
-
 .PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+help: ## Display help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
-
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen ## Generate CRDs and Webhook configs.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen ## Generate DeepCopy and related methods.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
@@ -116,212 +86,202 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest ## Run unit tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
-test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
-
 .PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter & yamllint
+lint: golangci-lint ## Run linters (go and yaml).
 	$(GOLANGCI_LINT) run
 
 .PHONY: lint-fix
-lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
+lint-fix: golangci-lint ## Run linters and apply fixes.
 	$(GOLANGCI_LINT) run --fix
 
-##@ Kind - the E2E tests expect a kind cluster called "kind"
+##@ E2E Testing (Kind)
+.PHONY: test-e2e
+test-e2e: ## Run e2e tests with Kind.
+	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: kind-start
-kind-start:	
-	if [ "$(shell kind get nodes --name "${CLUSTER_NAME}")" == "" ]; \
-		then kind create cluster --name "${CLUSTER_NAME}" --config paladin-kind.yaml; \
+kind-start:	## Create a Kind cluster.
+	if ! $(KIND_CLUSTER) get clusters | grep -q "^${CLUSTER_NAME}$$"; then \
+		$(KIND_CLUSTER) create cluster --name "${CLUSTER_NAME}" --config paladin-kind.yaml; \
 	fi
-	kubectl version # fail the build if we can't connect to the cluster
+	$(KUBECTL) version
 
 .PHONY: kind-promote
-kind-promote: kind-start
-	kind load docker-image paladin-operator:latest --name "${CLUSTER_NAME}"
-	kind load docker-image paladin:test --name "${CLUSTER_NAME}"
-	kind load docker-image postgres:latest --name "${CLUSTER_NAME}"
-	kind load docker-image hyperledger/besu:latest --name "${CLUSTER_NAME}"	
+kind-promote: kind-start ## Load Docker images into Kind cluster.
+	$(KIND_CLUSTER) load docker-image paladin-operator:latest --name "${CLUSTER_NAME}"
+	$(KIND_CLUSTER) load docker-image paladin:test --name "${CLUSTER_NAME}"
+	$(KIND_CLUSTER) load docker-image postgres:latest --name "${CLUSTER_NAME}"
+	$(KIND_CLUSTER) load docker-image hyperledger/besu:latest --name "${CLUSTER_NAME}"
+
+.PHONY: kind-delete
+kind-delete:	## Delete the Kind cluster.
+	$(KIND_CLUSTER) delete cluster --name "${CLUSTER_NAME}" || true
 
 ##@ Build
-
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run 
-run: manifests generate fmt vet install-dependencies ## Run a controller from your host.
+run: manifests generate fmt vet ## Run controller locally.
 	go run ./cmd/main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
+docker-build: ## Build Docker image for manager.
 	$(CONTAINER_TOOL) build -f Dockerfile -t ${IMG} ..
 
-# Load the docker image into the kind cluster. This is useful when you want to test the image in a kind cluster.
 .PHONY: docker-load
-docker-load: docker-build ## First build docker image
+docker-load: docker-build ## Load Docker image into Kind.
 	$(KIND_CLUSTER) load docker-image ${IMG} --name ${CLUSTER_NAME}
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
+docker-push: ## Push Docker image to registry.
 	$(CONTAINER_TOOL) push ${IMG}
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+docker-buildx: ## Build and push Docker image for cross-platform support.
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
-	$(CONTAINER_TOOL) buildx use project-v3-builder
+	- $(CONTAINER_TOOL) buildx create --name paladin-builder
+	$(CONTAINER_TOOL) buildx use paladin-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm project-v3-builder
+	- $(CONTAINER_TOOL) buildx rm paladin-builder
 	rm Dockerfile.cross
 
 .PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: manifests generate ## Build consolidated installer YAML.
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
-##@ helm-chart - Deployment
+##@ Helm Chart - Deployment
+.PHONY: build-crds
+build-crds: manifests helmify ## Build CRDs using helmify.
+	$(KUSTOMIZE) build config/default | $(HELMIFY) ${CHART_PATH_CRD}
+	find ${CHART_PATH_CRD}/templates/ -type f ! \( -name '*-crd.yaml' -o -name '_helpers.tpl' \) -exec rm -f {} +
+	rm -f ${CHART_PATH_CRD}/values.yaml
+	touch ${CHART_PATH_CRD}/values.yaml
 
-.PHONY: helm-build
-helm-build: manifests
-	CRDs_DIR=
-	rm -rf deploy/paladin-operator/charts/crds-definitions/crds/*.crd.yaml
-	cp -f config/crd/bases/* deploy/paladin-operator/charts/crds-definitions/crds
-	@for file in deploy/paladin-operator/charts/crds-definitions/crds/*.yaml; do \
-		mv "$$file" "$${file%.yaml}.crd.yaml"; \
-	done
+.PHONY: install-crds
+install-crds: build-crds ## Install CRDs using Helm.
+	$(HELM) upgrade --install ${CHART_NAME_CRD} ${CHART_PATH_CRD}
 
-.PHONY: install-dependencies
-install-dependencies: helm-build ## Install the dependencies independently of helm-install (useful for VSCode)
-	helm upgrade --install paladin-operator-crds-definitions deploy/paladin-operator/charts/crds-definitions -n ${NAMESPACE} --create-namespace
+.PHONY: uninstall-crds
+uninstall-crds: ## Uninstall CRDs.
+	$(HELM) uninstall ${CHART_NAME_CRD} || true
 
-.PHONY: uninstall-dependencies
-uninstall-dependencies: ## unnstall the dependencies independently of helm-install
-	helm uninstall paladin-operator-crds-definitions -n ${NAMESPACE} || true
+.PHONY: helm-template
+helm-template: ## Install operator using Helm.
+	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --set operator.namespace=${NAMESPACE} 
 
-# Note Helm will not update CRDs https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations
-# See update-crds
 .PHONY: helm-install
-helm-install: helm-build
-	helm upgrade --install paladin deploy/paladin-operator -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE}
-
-# If you want to run in VSCode, but you want the CRDs updated via helm
-.PHONY: helm-pause
-helm-pause: 
-	helm upgrade --install paladin deploy/paladin-operator -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE} --set replicaCount=0
+helm-install: ## Install operator using Helm.
+	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE}
 
 .PHONY: helm-uninstall
-helm-uninstall: 
-	helm uninstall paladin -n ${NAMESPACE} || true
+helm-uninstall: ## Uninstall operator using Helm.
+	$(HELM) uninstall ${CHART_NAME_OPERATOR} -n ${NAMESPACE} || true
 	$(KUBECTL) delete namespace ${NAMESPACE} || true
 
-##@ kustomize - Deployment
+.PHONY: helm-pause
+helm-pause: ## Pause the operator (set replica count to 0).
+	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE} --set replicaCount=0
 
-ifndef ignore-not-found
-  ignore-not-found = false
-endif
-
+##@ Kustomize - Deployment
 .PHONY: kustomize-install
-kustomize-install: manifests ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+kustomize-install: manifests ## Install CRDs using Kustomize.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
 
 .PHONY: kustomize-uninstall
-kustomize-uninstall: manifests ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+kustomize-uninstall: manifests ## Uninstall CRDs using Kustomize.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=true -f -
 
 .PHONY: kustomize-deploy
-kustomize-deploy: manifests ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+kustomize-deploy: manifests ## Deploy controller using Kustomize.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: kustomize-undeploy
-kustomize-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+kustomize-undeploy: ## Undeploy controller using Kustomize.
+	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=true -f -
 
 ##@ Dependencies
-
-## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Tool Binaries
-KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
-ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.16.3
-ENVTEST_VERSION ?= release-0.17
-GOLANGCI_LINT_VERSION ?= v1.57.2
-
- 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+controller-gen: $(CONTROLLER_GEN) ## Install controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+envtest: $(ENVTEST) ## Install envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
 .PHONY: golangci-lint
-golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
+golangci-lint: $(GOLANGCI_LINT) ## Install golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
 
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary (ideally with version)
-# $2 - package url which can be installed
-# $3 - specific version of package
-define go-install-tool
-@[ -f $(1) ] || { \
-set -e; \
-package=$(2)@$(3) ;\
-echo "Downloading $${package}" ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
-}
-endef
- 
-##@ Dev helpers
+.PHONY: helmify
+helmify: $(HELMIFY) ## Install helmify locally if necessary.
+$(HELMIFY): $(LOCALBIN)
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
 
+.PHONY: crd-ref-docs
+crd-ref-docs: $(CRD_REF_DOCS) ## Install crd-ref-docs locally if necessary.
+$(CRD_REF_DOCS): $(LOCALBIN)
+	test -s $(LOCALBIN)/crd-ref-docs || GOBIN=$(LOCALBIN) go install github.com/elastic/crd-ref-docs@v0.0.9
+
+##@ Dev Helpers
 .PHONY: update-crds
-update-crds: manifests generate
+update-crds: manifests generate ## Update CRDs in the cluster.
 	$(KUBECTL) apply -k config/crd
 
-##@ Paladin
+.PHONY: generate-reference-docs
+generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
+	${CRD_REF_DOCS} --source-path "${PWD}/api/" --config "${PWD}/docs/config.yaml" --renderer=markdown --output-path="${PWD}/docs/api.md"
 
-.PHONY: create-instance
-create-instance: ## Add a new instance of the paladin operator 
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_paladin.yaml
+##@ Paladin Operator
 
-.PHONY: delete-instance
-delete-instance: ## Delete an instance of the paladin operator 
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_paladin.yaml || true
+##@ Paladin Operator Instances
 
-## Cleanup
+.PHONY: create-node-besu
+create-node-besu: ## Create a Besu Node instance.
+	$(KUBECTL) apply -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE}
 
+.PHONY: create-genesis
+create-genesis: ## Create a Besu Genesis instance.
+	$(KUBECTL) apply -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE}
+
+.PHONY: create-node-paladin
+create-node-paladin: ## Create a Paladin Node instance.
+	$(KUBECTL) apply -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE}
+
+.PHONY: create-node
+create-node: create-node-besu create-genesis create-node-paladin ## Create all instances.
+	@echo "All instances have been created."
+
+.PHONY: delete-node
+delete-node-paladin: ## Delete the Paladin Node instance.
+	$(KUBECTL) delete -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE} || true
+
+.PHONY: delete-genesis
+delete-genesis: ## Delete the Besu Genesis instance.
+	$(KUBECTL) delete -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE} || true
+
+.PHONY: delete-node-besu
+delete-node-besu: ## Delete the Besu Node instance.
+	$(KUBECTL) delete -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE} || true
+
+.PHONY: delete-node
+delete-node: delete-node-paladin delete-genesis delete-node-besu  ## Delete all instances.
+	@echo "All instances have been deleted."
+
+##@ Cleanup
 .PHONY: clean
-clean: delete-instance helm-uninstall  ## Clean up all resources and delete the namespace.
+clean: delete-node helm-uninstall uninstall-crds ## Clean up all resources.

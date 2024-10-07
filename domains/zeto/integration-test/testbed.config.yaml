@@ -14,10 +14,12 @@ db:
 rpcServer:
   http:
     port: 0
+    shutdownTimeout: 0s
   ws:
     disabled: true
+    shutdownTimeout: 0s
 grpc:
-  shutdownTimeout: 1s
+  shutdownTimeout: 0s
 blockchain:
   http:
     url: http://localhost:8545
@@ -25,7 +27,7 @@ blockchain:
     url: ws://localhost:8546
     initialConnectAttempts: 25
 log:
-  level: info
+  level: debug
 signer:
   keyDerivation:
     type: 'bip32'

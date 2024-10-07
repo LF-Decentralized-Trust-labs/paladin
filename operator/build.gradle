@@ -38,36 +38,97 @@ task copySolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-// The operator uses the standard build experience for a Go based kubernetes operator.
-// The gradle wrapper is just to orchestrate it into the overall Paladin build system.
-task docker(type: Exec) {
+// Task to build the Paladin image from the parent project
+task buildPaladinImage {
+    dependsOn ':docker' // Builds the Paladin image in the parent project
+}
+
+// Task to build the operator Docker image
+task docker(type: Exec, dependsOn: buildPaladinImage) {
     executable 'make'
     args 'docker-build'
 }
 
+// Task to start the Kind cluster
 task startKindCluster(type: Exec) {
     executable 'make'
     args 'kind-start'
 }
 
+// Task to load images into the Kind cluster
 task promoteKindImages(type: Exec, dependsOn: [
     startKindCluster,
-    ":docker",
-    docker,
+    docker
 ]) {
     executable 'make'
     args 'kind-promote'
 }
 
-task e2e(type: Exec, dependsOn: promoteKindImages) {
+// Task to install Helm CRDs
+task installCrds(type: Exec) {
+    executable 'make'
+    args 'install-crds'
+}
+
+// Task to install the operator using Helm
+task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages]) {
+    executable 'make'
+    args 'helm-install'
+}
+
+// Task to verify the operator is running in the 'paladin' namespace
+task verifyOperator(dependsOn: installOperator) {
+    doLast {
+        println 'Waiting for operator deployment to become ready...'
+        def process = ['kubectl', 'wait', '--for=condition=available', 'deployment/paladin-operator', '-n', 'paladin', '--timeout=60s'].execute()
+        process.waitFor()
+        def output = process.in.text.trim()
+        def errorOutput = process.err.text.trim()
+
+        if (process.exitValue() == 0) {
+            println 'Operator deployment is ready.'
+        } else {
+            println errorOutput
+            panic 'Operator deployment did not become ready in the expected time.'
+        }
+    }
+}
+
+
+// Task to create the nodes
+task createNode(type: Exec, dependsOn: verifyOperator) {
+    executable 'make'
+    args 'create-node'
+}
+
+// The 'e2e' task runs the whole flow
+task e2e(dependsOn: createNode) {
+    doLast {
+        println 'E2E setup completed. Operator is running in the paladin namespace.'
+    }
+}
+
+// Task to run E2E tests (if needed)
+task runE2ETests(type: Exec, dependsOn: e2e) {
     executable 'make'
     args 'test-e2e'
 }
 
-task make(type: Exec, dependsOn: [copySolidity]) {
+// Task to clean up resources
+task cleanCluster(type: Exec) {
     executable 'make'
+    args 'clean'
 }
 
+task clean {
+    dependsOn cleanCluster
+}
+// Default 'build' task
 task build {
-    dependsOn make
+    dependsOn docker
+}
+
+// Existing 'make' task
+task make(type: Exec, dependsOn: [copySolidity]) {
+    executable 'make'
 }

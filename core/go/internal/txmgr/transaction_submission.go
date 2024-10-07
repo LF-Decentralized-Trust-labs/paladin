@@ -48,7 +48,6 @@ type persistedTransaction struct {
 	Data               tktypes.RawJSON                      `gorm:"column:data"` // we always store in JSON object format
 	TransactionDeps    []*transactionDep                    `gorm:"foreignKey:transaction;references:id"`
 	TransactionReceipt *transactionReceipt                  `gorm:"foreignKey:transaction;references:id"`
-	ContractDeployment *contractDeployment                  `gorm:"foreignKey:deploy_transaction;references:id"`
 }
 
 type transactionDep struct {

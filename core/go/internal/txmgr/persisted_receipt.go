@@ -34,35 +34,41 @@ import (
 )
 
 type transactionReceipt struct {
-	TransactionID      uuid.UUID           `gorm:"column:transaction"`
-	Indexed            tktypes.Timestamp   `gorm:"column:indexed"`
-	Success            bool                `gorm:"column:success"`
-	TransactionHash    *tktypes.Bytes32    `gorm:"column:tx_hash"`
-	BlockNumber        *int64              `gorm:"column:block_number"`
-	FailureMessage     *string             `gorm:"column:failure_message"`
-	RevertData         tktypes.HexBytes    `gorm:"column:revert_data"`
-	ContractDeployment *contractDeployment `gorm:"foreignKey:deploy_transaction;references:transaction"`
-}
-
-type contractDeployment struct {
-	DeployTransaction uuid.UUID `gorm:"column:deploy_transaction"`
-	ContractAddress   *string   `gorm:"column:contract_address"`
+	TransactionID    uuid.UUID           `gorm:"column:transaction"`
+	Indexed          tktypes.Timestamp   `gorm:"column:indexed"`
+	Success          bool                `gorm:"column:success"`
+	TransactionHash  *tktypes.Bytes32    `gorm:"column:tx_hash"`
+	BlockNumber      *int64              `gorm:"column:block_number"`
+	TransactionIndex *int64              `gorm:"column:tx_index"`
+	LogIndex         *int64              `gorm:"column:log_index"`
+	Source           *tktypes.EthAddress `gorm:"column:source"`
+	FailureMessage   *string             `gorm:"column:failure_message"`
+	RevertData       tktypes.HexBytes    `gorm:"column:revert_data"`
+	ContractAddress  *tktypes.EthAddress `gorm:"column:contract_address"`
 }
 
 func mapPersistedReceipt(receipt *transactionReceipt) *ptxapi.TransactionReceiptData {
-	deployment := receipt.ContractDeployment
-	var contractAddress *tktypes.EthAddress
-	if deployment != nil && deployment.ContractAddress != nil {
-		contractAddress = tktypes.MustEthAddress(*deployment.ContractAddress)
-	}
-	return &ptxapi.TransactionReceiptData{
+	r := &ptxapi.TransactionReceiptData{
 		Success:         receipt.Success,
-		BlockNumber:     int64OrZero(receipt.BlockNumber),
-		TransactionHash: receipt.TransactionHash,
 		FailureMessage:  stringOrEmpty(receipt.FailureMessage),
 		RevertData:      receipt.RevertData,
-		ContractAddress: contractAddress,
+		ContractAddress: receipt.ContractAddress,
 	}
+	if receipt.TransactionHash != nil {
+		r.TransactionReceiptDataOnchain = &ptxapi.TransactionReceiptDataOnchain{
+			TransactionHash:  receipt.TransactionHash,
+			BlockNumber:      int64OrZero(receipt.BlockNumber),
+			TransactionIndex: int64OrZero(receipt.TransactionIndex),
+		}
+	}
+	if receipt.Source != nil {
+		r.TransactionReceiptDataOnchainEvent = &ptxapi.TransactionReceiptDataOnchainEvent{
+			LogIndex: int64OrZero(receipt.LogIndex),
+			Source:   *receipt.Source,
+		}
+	}
+
+	return r
 }
 
 var transactionReceiptFilters = filters.FieldMap{
@@ -73,47 +79,47 @@ var transactionReceiptFilters = filters.FieldMap{
 	"blockNumber":     filters.Int64Field("block_number"),
 }
 
+func (tm *txManager) MatchAndFinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*components.ReceiptInput) ([]uuid.UUID, error) {
+	// It's possible for transactions to be deleted out of band, and we don't place a responsibility
+	// on the caller to know that. So we take the hit of querying for the existence of these transactions
+	// and only marking completion on those that exist.
+	// The batching should make this acceptably efficient.
+	allIDs := make([]uuid.UUID, len(info))
+	for i, ri := range info {
+		allIDs[i] = ri.TransactionID
+	}
+	var existingTXs []uuid.UUID
+	err := dbTX.Table("transactions").
+		Where("id IN (?)", allIDs).
+		Pluck("id", &existingTXs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	confirmedInfo := make([]*components.ReceiptInput, 0, len(info))
+	for _, ri := range info {
+		exists := false
+		for _, existing := range existingTXs {
+			if ri.TransactionID == existing {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			log.L(ctx).Warnf("Receipt notification for untracked transaction %s: %+v", ri.TransactionID, tktypes.JSONString(ri))
+		} else {
+			confirmedInfo = append(confirmedInfo, ri)
+		}
+	}
+	return existingTXs, tm.FinalizeTransactions(ctx, dbTX, confirmedInfo)
+}
+
 // FinalizeTransactions is called by the block indexing routine, but also can be called
 // by the private transaction manager if transactions fail without making it to the blockchain
-func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*components.ReceiptInput, existenceChecked bool) error {
+func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*components.ReceiptInput) error {
 
 	if len(info) == 0 {
 		return nil
-	}
-
-	if !existenceChecked {
-		// It's possible for transactions to be deleted out of band, and we don't place a responsibility
-		// on the caller to know that. So we take the hit of querying for the existence of these transactions
-		// and only marking completion on those that exist.
-		// The batching should make this acceptably efficient.
-		allIDs := make([]uuid.UUID, len(info))
-		for i, ri := range info {
-			allIDs[i] = ri.TransactionID
-		}
-		var existingTXs []uuid.UUID
-		err := dbTX.Table("transactions").
-			Where("id IN (?)", allIDs).
-			Pluck("id", &existingTXs).
-			Error
-		if err != nil {
-			return err
-		}
-		confirmedInfo := make([]*components.ReceiptInput, 0, len(info))
-		for _, ri := range info {
-			exists := false
-			for _, existing := range existingTXs {
-				if ri.TransactionID == existing {
-					exists = true
-					break
-				}
-			}
-			if !exists {
-				log.L(ctx).Warnf("Receipt notification for untracked transaction %s: %+v", ri.TransactionID, tktypes.JSONString(ri))
-			} else {
-				confirmedInfo = append(confirmedInfo, ri)
-			}
-		}
-		info = confirmedInfo
 	}
 
 	receiptsToInsert := make([]*transactionReceipt, 0, len(info))
@@ -121,8 +127,14 @@ func (tm *txManager) FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, in
 		receipt := &transactionReceipt{
 			TransactionID:   ri.TransactionID,
 			Indexed:         tktypes.TimestampNow(),
-			TransactionHash: ri.TransactionHash,
-			BlockNumber:     ri.BlockNumber,
+			ContractAddress: ri.ContractAddress,
+		}
+		if ri.OnChain.Type != tktypes.NotOnChain {
+			receipt.TransactionHash = &ri.OnChain.TransactionHash
+			receipt.BlockNumber = &ri.OnChain.BlockNumber
+			receipt.TransactionIndex = &ri.OnChain.TransactionIndex
+			receipt.LogIndex = &ri.OnChain.LogIndex
+			receipt.Source = ri.OnChain.Source
 		}
 		// Process each type, checking for coding errors in the calling component
 		var failureMsg string
@@ -216,11 +228,6 @@ func (tm *txManager) queryTransactionReceipts(ctx context.Context, jq *query.Que
 		defaultSort: "-indexed",
 		filters:     transactionReceiptFilters,
 		query:       jq,
-		finalize: func(q *gorm.DB) *gorm.DB {
-			q = q.
-				Joins("ContractDeployment")
-			return q
-		},
 		mapResult: func(pt *transactionReceipt) (*ptxapi.TransactionReceipt, error) {
 			return &ptxapi.TransactionReceipt{
 				ID:                     pt.TransactionID,

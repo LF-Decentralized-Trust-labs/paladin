@@ -97,7 +97,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.Transaction.ContractAddress, *fromAddress, params.Amount)
+	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.Transaction.ContractInfo.ContractAddress, *fromAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}

@@ -18,11 +18,11 @@ package txmgr
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -33,63 +33,70 @@ func (tm *txManager) blockIndexerPreCommit(
 	transactions []*blockindexer.IndexedTransactionNotify,
 ) (blockindexer.PostCommit, error) {
 
-	// Pass the list of transactions to the public transaction manager, who will pass us back a list
-	// of matches that we need to write receipts for and/or notify the private transaction manager
-	// of the completion.
-	publicTxMatches, err := tm.publicTxMgr.MatchUpdateConfirmedTransactions(ctx, dbTX, transactions)
+	// Pass the list of transactions to the public transaction manager, who will pass us back an
+	// ORDERED list of matches to transaction IDs based on the bindings.
+	txMatches, err := tm.publicTxMgr.MatchUpdateConfirmedTransactions(ctx, dbTX, transactions)
 	if err != nil {
 		return nil, err
 	}
 
-	// Work out which we need to write public receipts for, and which we need to ask the private TX mgr about
-	privateNotifications := make([]*components.PublicTxMatch, 0, len(publicTxMatches))
-	for _, pubTx := range publicTxMatches {
-		if pubTx.TransactionType.V() == ptxapi.TransactionTypePrivate {
-			privateNotifications = append(privateNotifications, pubTx)
-		}
-	}
-
-	// Notify the private manager, who might ask us to write some more receipts
-	finalizedPrivate := make(map[uuid.UUID]bool)
-	if len(privateNotifications) > 0 {
-		finalizedPrivate, err = tm.privateTxMgr.NotifyConfirmed(ctx, privateNotifications)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Ok now we can finally determine which receipts we need - in the ORIGINAL order
-	finalizeInfo := make([]*components.ReceiptInput, 0, len(publicTxMatches))
-	for _, pubTx := range publicTxMatches {
-		if pubTx.TransactionType.V() == ptxapi.TransactionTypePublic || // it's public
-			finalizedPrivate[pubTx.TransactionID] { // or it's a finalized private
-			log.L(ctx).Infof("Writing receipt for %s transaction hash=%s block=%d result=%s",
-				pubTx.TransactionID, pubTx.Hash, pubTx.BlockNumber, pubTx.Result)
+	// Ok now we have an ordered list of completions that match Paladin transactions
+	// - If they are public paladin transactions - just finalize the receipts on this routine
+	// - If they are private paladin transactions - the private TX manager only needs to be
+	// notified if it was a failure. Because success cases are processed as events on the
+	// separate ordering context of the block listener of that domain (we do not promise
+	// order of confirmation delivery between public and private transactions)
+	finalizeInfo := make([]*components.ReceiptInput, 0, len(txMatches))
+	failedForPrivateTx := make([]*components.PublicTxMatch, 0)
+	for _, match := range txMatches {
+		switch match.TransactionType.V() {
+		case ptxapi.TransactionTypePublic:
+			log.L(ctx).Infof("Writing receipt for transaction %s hash=%s block=%d result=%s",
+				match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 			// Map to the common format for finalizing transactions whether the make it on chain or not
-			finalizeInfo = append(finalizeInfo, tm.mapBlockchainReceipt(pubTx))
+			finalizeInfo = append(finalizeInfo, tm.mapBlockchainReceipt(match))
+		case ptxapi.TransactionTypePrivate:
+			if match.Result.V() != blockindexer.TXResult_SUCCESS {
+				log.L(ctx).Infof("Base ledger transaction for private transaction %s FAILED hash=%s block=%d result=%s",
+					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
+				failedForPrivateTx = append(failedForPrivateTx, match)
+			}
 		}
 	}
 
 	// Write the receipts themselves - only way of duplicates should be a rewind of
 	// the block explorer, so we simply OnConflict ignore
-	if err := tm.FinalizeTransactions(ctx, dbTX, finalizeInfo, true /* already checked existence */); err != nil {
+	if err := tm.FinalizeTransactions(ctx, dbTX, finalizeInfo); err != nil {
 		return nil, err
 	}
 
+	// Deliver the failures to the private transaction manager
+	if len(failedForPrivateTx) > 0 {
+		if err := tm.privateTxMgr.NotifyFailedPublicTx(ctx, dbTX, failedForPrivateTx); err != nil {
+			return nil, err
+		}
+	}
+
 	return func() {
-		// We need to notify the public TX manager when the DB transaction for these has completed
-		if len(publicTxMatches) > 0 {
-			tm.publicTxMgr.NotifyConfirmPersisted(ctx, publicTxMatches)
+		// We need to notify the public TX manager when the DB transaction for these has completed,
+		// so it can remove any in-memory processing (this is regardless of they were matched to
+		// a public or private transaction)
+		if len(txMatches) > 0 {
+			tm.publicTxMgr.NotifyConfirmPersisted(ctx, txMatches)
 		}
 	}, nil
 }
 
 func (tm *txManager) mapBlockchainReceipt(pubTx *components.PublicTxMatch) *components.ReceiptInput {
 	receipt := &components.ReceiptInput{
-		TransactionID:   pubTx.TransactionID,
-		TransactionHash: &pubTx.Hash,
-		BlockNumber:     &pubTx.BlockNumber,
-		RevertData:      pubTx.RevertReason,
+		TransactionID: pubTx.TransactionID,
+		OnChain: tktypes.OnChainLocation{
+			Type:             tktypes.OnChainTransaction,
+			TransactionHash:  pubTx.Hash,
+			BlockNumber:      pubTx.BlockNumber,
+			TransactionIndex: pubTx.TransactionIndex,
+		},
+		RevertData: pubTx.RevertReason,
 	}
 	if pubTx.Result.V() == blockindexer.TXResult_SUCCESS {
 		receipt.ReceiptType = components.RT_Success

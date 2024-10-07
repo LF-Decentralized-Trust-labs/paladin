@@ -56,7 +56,7 @@ func TestLockValidateParams(t *testing.T) {
 
 	config.TokenName = "Zeto_Anon"
 	_, err = h.ValidateParams(ctx, config, "{}")
-	assert.EqualError(t, err, "failed to decode the transfer call. Unknown function: transfer")
+	assert.EqualError(t, err, "failed to decode the transfer call. unknown function: transfer")
 
 	h.zeto.config.DomainContracts.Implementations[0].Abi = "[{\"inputs\": [{\"internalType\": \"uint256[2]\",\"name\": \"inputs\",\"type\": \"uint256[2]\"}],\"name\": \"transfer\",\"outputs\": [],\"type\": \"function\"}]"
 	lockParams := types.LockParams{

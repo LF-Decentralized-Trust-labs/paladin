@@ -1,0 +1,17 @@
+{
+  "paladin": {
+    "image": "paladin:test",
+    "labels": {
+      "app": "paladin"
+    }
+  },
+  "besu": {
+    "image": "hyperledger/besu:latest",
+    "labels": {
+      "app": "besu"
+    }
+  },
+  "postgres": {
+    "image": "postgres:latest"
+  }
+}

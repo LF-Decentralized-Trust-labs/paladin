@@ -12,7 +12,6 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 data:
-  {{- range $key, $value := .Values.operator.configMap.data }}
-  {{ $key }}: |
-    {{ $value | nindent 4 }}
-  {{- end }}
+  config.json: |
+{{ .Files.Get (.Values.operator.configMap.dataFile) | indent 4 }}
+

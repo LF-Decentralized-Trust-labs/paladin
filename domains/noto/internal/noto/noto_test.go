@@ -80,7 +80,9 @@ func TestInitTransactionBadFunction(t *testing.T) {
 	n := &Noto{}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
-			ContractConfig:  encodedConfig,
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: encodedConfig,
+			},
 			FunctionAbiJson: `{"name": "does-not-exist"}`,
 		},
 	})
@@ -91,7 +93,9 @@ func TestInitTransactionBadParams(t *testing.T) {
 	n := &Noto{}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
-			ContractConfig:     encodedConfig,
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: encodedConfig,
+			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: "!!wrong",
 		},
@@ -103,7 +107,9 @@ func TestInitTransactionMissingTo(t *testing.T) {
 	n := &Noto{}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
-			ContractConfig:     encodedConfig,
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: encodedConfig,
+			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: "{}",
 		},
@@ -115,7 +121,9 @@ func TestInitTransactionMissingAmount(t *testing.T) {
 	n := &Noto{}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
-			ContractConfig:     encodedConfig,
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: encodedConfig,
+			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: `{"to": "recipient"}`,
 		},
@@ -127,7 +135,9 @@ func TestInitTransactionBadSignature(t *testing.T) {
 	n := &Noto{}
 	_, err := n.InitTransaction(context.Background(), &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
-			ContractConfig:     encodedConfig,
+			ContractInfo: &prototk.ContractInfo{
+				ContractConfig: encodedConfig,
+			},
 			FunctionAbiJson:    `{"name": "transfer"}`,
 			FunctionParamsJson: `{"to": "recipient", "amount": 1}`,
 		},

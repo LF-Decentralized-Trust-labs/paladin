@@ -94,7 +94,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, fmt.Errorf("failed load receiver public key. %s", err)
 	}
 
-	inputCoins, inputStates, total, err := h.zeto.prepareInputs(ctx, req.Transaction.ContractAddress, tx.Transaction.From, params.Amount)
+	inputCoins, inputStates, total, err := h.zeto.prepareInputs(ctx, req.Transaction.ContractInfo.ContractAddress, tx.Transaction.From, params.Amount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare inputs. %s", err)
 	}
@@ -112,7 +112,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	contract, err := ethtypes.NewAddress(req.Transaction.ContractAddress)
+	contract, err := ethtypes.NewAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse contract address. %s", err)
 	}

@@ -216,7 +216,7 @@ public class PenteDomain extends DomainInstance {
             var tx = new PenteTransaction(this, request.getTransaction());
 
             // Execution throws an EVMExecutionException if fails
-            var accountLoader = new AssemblyAccountLoader(request.getTransaction().getContractAddress());
+            var accountLoader = new AssemblyAccountLoader(request.getTransaction().getContractInfo().getContractAddress());
             var execResult = tx.executeEVM(config.getChainId(), tx.getFromVerifier(request.getResolvedVerifiersList()), accountLoader);
             var result = ToDomain.AssembleTransactionResponse.newBuilder();
             var assembledTransaction = tx.buildAssembledTransaction(execResult.evm(), accountLoader, buildExtraData(execResult));
@@ -404,10 +404,9 @@ public class PenteDomain extends DomainInstance {
     protected CompletableFuture<ToDomain.HandleEventBatchResponse> handleEventBatch(ToDomain.HandleEventBatchRequest request) {
         try {
             var mapper = new ObjectMapper();
-            List<EventWithData> events = mapper.readerForListOf(EventWithData.class).readValue(request.getJsonEvents());
-            for (var event : events) {
-                if (config.getTransferSignature().equals(event.soliditySignature)) {
-                    var transfer = mapper.convertValue(event.data, UTXOTransferJSON.class);
+            for (var event : request.getEventsList()) {
+                if (config.getTransferSignature().equals(event.getSoliditySignature())) {
+                    var transfer = mapper.readValue(event.getDataJson(), UTXOTransferJSON.class);
                     var inputs = Arrays.stream(transfer.inputs).map(id -> ToDomain.StateUpdate.newBuilder()
                             .setId(id.to0xHex())
                             .setTransactionId(transfer.txId.to0xHex())
@@ -417,12 +416,15 @@ public class PenteDomain extends DomainInstance {
                             .setTransactionId(transfer.txId.to0xHex())
                             .build()).toList();
                     var result = ToDomain.HandleEventBatchResponse.newBuilder()
-                            .addTransactionsComplete(transfer.txId.to0xHex())
+                            .addTransactionsComplete(ToDomain.CompletedTransaction.newBuilder()
+                                    .setTransactionId(transfer.txId.to0xHex())
+                                    .setLocation(event.getLocation())
+                                    .build())
                             .addAllSpentStates(inputs)
                             .addAllConfirmedStates(outputs);
                     return CompletableFuture.completedFuture(result.build());
                 } else {
-                    throw new Exception("Unknown signature: " + event.soliditySignature);
+                    throw new Exception("Unknown signature: " + event.getSoliditySignature());
                 }
             }
             return CompletableFuture.completedFuture(null);

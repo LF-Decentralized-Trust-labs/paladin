@@ -17,8 +17,6 @@ syntax = "proto3";
 
 package io.kaleido.paladin.kata.identityresolver;
 option go_package = "pkg/proto/identityresolver";
-import "google/protobuf/any.proto";
-
 
 message ResolveVerifierRequest {
     string lookup = 1;

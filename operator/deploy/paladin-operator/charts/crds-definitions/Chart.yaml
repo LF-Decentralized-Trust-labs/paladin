@@ -1,9 +1,0 @@
-apiVersion: v2
-name: paladin-operator-crds-definitions
-description: A Helm chart CRDs required the paladin operator
-
-type: application
-
-version: 0.0.0
-
-appVersion: "0.0.0"

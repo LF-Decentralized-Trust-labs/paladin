@@ -64,7 +64,7 @@ func (h *lockHandler) decodeTransferCall(ctx context.Context, config *types.Doma
 	}
 	transfer := contractAbi.Functions()["transfer"]
 	if transfer == nil {
-		return nil, fmt.Errorf("Unknown function: transfer")
+		return nil, fmt.Errorf("unknown function: transfer")
 	}
 	paramsJSON, err := decodeParams(ctx, transfer, encodedCall)
 	if err != nil {
