@@ -37,6 +37,7 @@ type RPCServer interface {
 	EthPublish(eventType string, result interface{}) // Note this is an `eth_` specific extension, with no ack or reliability
 	HTTPAddr() net.Addr
 	WSAddr() net.Addr
+	WSHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ RPCServer, err error) {
@@ -92,6 +93,10 @@ func (s *rpcServer) WSAddr() (a net.Addr) {
 		a = s.wsServer.Addr()
 	}
 	return a
+}
+
+func (s *rpcServer) WSHandler(res http.ResponseWriter, req *http.Request) {
+	s.wsHandler(res, req)
 }
 
 func (s *rpcServer) httpHandler(res http.ResponseWriter, req *http.Request) {

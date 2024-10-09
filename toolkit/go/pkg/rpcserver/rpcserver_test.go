@@ -116,3 +116,18 @@ func TestBadWSUpgrade(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 
 }
+
+func TestWSHandler(t *testing.T) {
+	rpcServer, err := NewRPCServer(context.Background(), &pldconf.RPCServerConfig{
+		HTTP: pldconf.RPCServerConfigHTTP{Disabled: true},
+		WS: pldconf.RPCServerConfigWS{
+			HTTPServerConfig: pldconf.HTTPServerConfig{
+				Port: confutil.P(0),
+			},
+		},
+	})
+	require.NoError(t, err)
+	defer rpcServer.Stop()
+
+	assert.NotNil(t, rpcServer.WSHandler)
+}
