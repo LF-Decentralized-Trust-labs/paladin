@@ -16,7 +16,10 @@
 package signerapi
 
 import (
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type ResolveKeyRequest struct {
@@ -40,10 +43,10 @@ type SignRequest struct {
 	KeyHandle string `json:"keyHandle"`
 
 	// identifier for the signing engine and algorithm to use in signing. Examples: "ecdsa:secp256k1" or "domain:zeto:circuit1"
-	Algorithm string `json:"algorithm"`
+	Algorithm algorithms.Algorithm `json:"algorithm"`
 
 	// describes the input and output payload combination to the signer. Example: "opaque:rsv" or "groth16:zeto"
-	PayloadType string `json:"payloadType"`
+	PayloadType signpayloads.SignPayloadType `json:"payloadType"`
 
 	// the input payload to process according to the algorithm
 	Payload tktypes.HexBytes `json:"payload"`
@@ -92,12 +95,12 @@ type ListKeyPathSegment struct {
 }
 
 type PublicKeyIdentifierType struct {
-	Algorithm    string `json:"algorithm"`
-	VerifierType string `json:"verifierType"`
+	Algorithm    algorithms.Algorithm   `json:"algorithm"`
+	VerifierType verifiers.VerifierType `json:"verifierType"`
 }
 
 type PublicKeyIdentifier struct {
-	Algorithm    string `json:"algorithm"`
-	VerifierType string `json:"verifierType"`
-	Verifier     string `json:"verifier"`
+	Algorithm    algorithms.Algorithm   `json:"algorithm"`
+	VerifierType verifiers.VerifierType `json:"verifierType"`
+	Verifier     string                 `json:"verifier"`
 }

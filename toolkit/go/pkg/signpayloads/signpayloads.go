@@ -15,11 +15,15 @@
 
 package signpayloads
 
-// Input:
-// An opaque payload goes into the signing module. No validation, or other processing
-// of the payload is performed before signing.
-// Output:
-// A compact 65 byte encoded R,S,V byte string (R=32b, S=32b, V=1b) with the V value
-// according to the Bitcoin/Eth standard of 27+recid (27 or 28)
-// denoting an uncompressed public key.
-const OPAQUE_TO_RSV = "opaque:rsv"
+type SignPayloadType string
+
+const (
+	// Input:
+	// An opaque payload goes into the signing module. No validation, or other processing
+	// of the payload is performed before signing.
+	// Output:
+	// A compact 65 byte encoded R,S,V byte string (R=32b, S=32b, V=1b) with the V value
+	// according to the Bitcoin/Eth standard of 27+recid (27 or 28)
+	// denoting an uncompressed public key.
+	OPAQUE_TO_RSV SignPayloadType = "opaque:rsv"
+)

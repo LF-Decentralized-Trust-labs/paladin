@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,13 +32,13 @@ func TestNewDomainPrefixRouterOk(t *testing.T) {
 
 	signerFactory := &testInMemorySignerFactory{
 		signer: &testMemSigner{
-			sign: func(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error) {
+			sign: func(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error) {
 				return []byte("signed"), nil
 			},
-			getVerifier: func(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+			getVerifier: func(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 				return "verifier", nil
 			},
-			getMinimumKeyLen: func(ctx context.Context, algorithm string) (int, error) {
+			getMinimumKeyLen: func(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
 				return 32, nil
 			},
 		},

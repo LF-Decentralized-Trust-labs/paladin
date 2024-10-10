@@ -31,29 +31,29 @@ import (
 
 type ecdsaSigner struct{}
 
-func (s *ecdsaSigner) Sign(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error) {
+func (s *ecdsaSigner) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error) {
 	// We register for all ECDSA algorithms
-	curve := strings.TrimPrefix(strings.ToLower(algorithm), algorithms.Prefix_ECDSA+":")
+	curve := strings.TrimPrefix(strings.ToLower(string(algorithm)), string(algorithms.Prefix_ECDSA)+":")
 	switch curve {
-	case algorithms.Curve_SECP256K1:
+	case string(algorithms.Curve_SECP256K1):
 		return s.Sign_secp256k1(ctx, algorithm, payloadType, privateKey, payload)
 	default:
 		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedECDSACurve, curve)
 	}
 }
 
-func (s *ecdsaSigner) GetVerifier(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+func (s *ecdsaSigner) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 	// We register for all ECDSA algorithms
-	curve := strings.TrimPrefix(strings.ToLower(algorithm), algorithms.Prefix_ECDSA+":")
+	curve := strings.TrimPrefix(strings.ToLower(string(algorithm)), string(algorithms.Prefix_ECDSA)+":")
 	switch curve {
-	case algorithms.Curve_SECP256K1:
+	case string(algorithms.Curve_SECP256K1):
 		return s.GetVerifier_secp256k1(ctx, algorithm, verifierType, privateKey)
 	default:
 		return "", i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedECDSACurve, curve)
 	}
 }
 
-func (s *ecdsaSigner) Sign_secp256k1(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) (_ []byte, err error) {
+func (s *ecdsaSigner) Sign_secp256k1(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) (_ []byte, err error) {
 	kp := secp256k1.KeyPairFromBytes(privateKey)
 	switch payloadType {
 	case signpayloads.OPAQUE_TO_RSV:
@@ -73,7 +73,7 @@ func (s *ecdsaSigner) Sign_secp256k1(ctx context.Context, algorithm, payloadType
 	}
 }
 
-func (s *ecdsaSigner) GetVerifier_secp256k1(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+func (s *ecdsaSigner) GetVerifier_secp256k1(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 	kp := secp256k1.KeyPairFromBytes(privateKey)
 	switch verifierType {
 	case verifiers.ETH_ADDRESS:
@@ -89,10 +89,10 @@ func (s *ecdsaSigner) GetVerifier_secp256k1(ctx context.Context, algorithm, veri
 	}
 }
 
-func (s *ecdsaSigner) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
-	curve := strings.TrimPrefix(strings.ToLower(algorithm), algorithms.Prefix_ECDSA+":")
+func (s *ecdsaSigner) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
+	curve := strings.TrimPrefix(strings.ToLower(string(algorithm)), string(algorithms.Prefix_ECDSA)+":")
 	switch curve {
-	case algorithms.Curve_SECP256K1:
+	case string(algorithms.Curve_SECP256K1):
 		return 32, nil
 	default:
 		return -1, i18n.NewError(ctx, tkmsgs.MsgSigningUnsupportedECDSACurve, curve)

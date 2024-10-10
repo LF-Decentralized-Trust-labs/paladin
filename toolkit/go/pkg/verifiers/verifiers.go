@@ -15,14 +15,18 @@
 
 package verifiers
 
-// An ethereum address - 20 byte compressed public key identifier with 0x prefix (no checksum)
-const ETH_ADDRESS = "eth_address"
+type VerifierType string
 
-// An ethereum address - 20 byte compressed public key identifier with 0x prefix and ERC-55 mixed-case checksum address encoding
-const ETH_ADDRESS_CHECKSUM = "eth_address_checksum"
+const (
+	// An ethereum address - 20 byte compressed public key identifier with 0x prefix (no checksum)
+	ETH_ADDRESS VerifierType = "eth_address"
 
-// ECDSA public key in uncompressed form hex encoded (x and y [FIPS186] in uncompressed form [X9.62] without leading 0x04 "uncompressed" constant prefix)
-const HEX_ECDSA_PUBKEY_UNCOMPRESSED = "hex_ecdsa_pubkey_uncompressed"
+	// An ethereum address - 20 byte compressed public key identifier with 0x prefix and ERC-55 mixed-case checksum address encoding
+	ETH_ADDRESS_CHECKSUM VerifierType = "eth_address_checksum"
 
-// ECDSA public key in uncompressed form hex encoded (x and y [FIPS186] in uncompressed form [X9.62] without leading 0x04 "uncompressed" constant prefix)
-const HEX_ECDSA_PUBKEY_UNCOMPRESSED_0X = "hex_ecdsa_pubkey_uncompressed_0x"
+	// ECDSA public key in uncompressed form hex encoded (x and y [FIPS186] in uncompressed form [X9.62] without leading 0x04 "uncompressed" constant prefix)
+	HEX_ECDSA_PUBKEY_UNCOMPRESSED VerifierType = "hex_ecdsa_pubkey_uncompressed"
+
+	// ECDSA public key in uncompressed form hex encoded (x and y [FIPS186] in uncompressed form [X9.62] without leading 0x04 "uncompressed" constant prefix)
+	HEX_ECDSA_PUBKEY_UNCOMPRESSED_0X VerifierType = "hex_ecdsa_pubkey_uncompressed_0x"
+)

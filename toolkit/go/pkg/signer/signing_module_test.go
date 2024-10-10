@@ -96,20 +96,20 @@ func (tf *testInMemorySignerFactory) NewSigner(ctx context.Context, conf *signer
 }
 
 type testMemSigner struct {
-	sign             func(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error)
-	getVerifier      func(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error)
-	getMinimumKeyLen func(ctx context.Context, algorithm string) (int, error)
+	sign             func(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error)
+	getVerifier      func(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error)
+	getMinimumKeyLen func(ctx context.Context, algorithm algorithms.Algorithm) (int, error)
 }
 
-func (tf *testMemSigner) Sign(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error) {
+func (tf *testMemSigner) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error) {
 	return tf.sign(ctx, algorithm, payloadType, privateKey, payload)
 }
 
-func (tf *testMemSigner) GetVerifier(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+func (tf *testMemSigner) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 	return tf.getVerifier(ctx, algorithm, verifierType, privateKey)
 }
 
-func (tf *testMemSigner) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
+func (tf *testMemSigner) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
 	return tf.getMinimumKeyLen(ctx, algorithm)
 }
 
@@ -502,7 +502,7 @@ func TestResolveLateBindMemSignerError(t *testing.T) {
 	require.NoError(t, err)
 
 	testSigner := &testMemSigner{
-		getVerifier: func(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+		getVerifier: func(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 			return "", fmt.Errorf("pop")
 		},
 	}

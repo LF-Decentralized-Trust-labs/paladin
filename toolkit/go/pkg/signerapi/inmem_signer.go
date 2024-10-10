@@ -17,6 +17,10 @@ package signerapi
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type InMemorySignerFactory[C ExtensibleConfig] interface {
@@ -25,10 +29,10 @@ type InMemorySignerFactory[C ExtensibleConfig] interface {
 
 type InMemorySigner interface {
 	// Perform signing using the specified algorithm, with the specified private key
-	Sign(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error)
+	Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error)
 	// Translate a signing key into a verifier of the requested type
-	GetVerifier(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error)
+	GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error)
 	// Get the minimum key length required for the supplied algorithm
 	// The key will be created and managed on behalf of the in memory signing using the configured key store
-	GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error)
+	GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error)
 }

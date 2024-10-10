@@ -24,9 +24,10 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer/keystores"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signers"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
@@ -85,7 +86,7 @@ func NewSigningModule[C signerapi.ExtensibleConfig](ctx context.Context, conf C,
 	ecdsaSigner, _ := signers.NewECDSASignerFactory[C]().NewSigner(ctx, conf) // this factory has no errors as it does not parse any config
 	sm := &signingModule[C]{
 		signingImplementations: map[string]signerapi.InMemorySigner{
-			algorithms.Prefix_ECDSA: ecdsaSigner,
+			string(algorithms.Prefix_ECDSA): ecdsaSigner,
 		},
 	}
 	keyStoreImplementations := map[string]signerapi.KeyStoreFactory[C]{
@@ -155,8 +156,8 @@ func (sm *signingModule[C]) AddInMemorySigner(prefix string, signer signerapi.In
 	sm.signingImplementations[prefix] = signer
 }
 
-func (sm *signingModule[C]) getSignerForAlgorithm(ctx context.Context, algorithm string) (signerapi.InMemorySigner, error) {
-	lookupPrefix := strings.ToLower(strings.SplitN(algorithm, ":", 2)[0])
+func (sm *signingModule[C]) getSignerForAlgorithm(ctx context.Context, algorithm algorithms.Algorithm) (signerapi.InMemorySigner, error) {
+	lookupPrefix := strings.ToLower(strings.SplitN(string(algorithm), ":", 2)[0])
 	signer := sm.signingImplementations[lookupPrefix]
 	if signer == nil {
 		// No signer registered for this algorithm prefix
@@ -189,7 +190,7 @@ func (sm *signingModule[C]) newKeyForAlgorithms(ctx context.Context, requiredIde
 	return buff, err
 }
 
-func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) (res *signerapi.SignResponse, err error) {
+func (sm *signingModule[C]) signInMemory(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) (res *signerapi.SignResponse, err error) {
 	var resultBytes []byte
 	signer, err := sm.getSignerForAlgorithm(ctx, algorithm)
 	if err == nil {

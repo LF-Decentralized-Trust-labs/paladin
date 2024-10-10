@@ -20,7 +20,10 @@ import (
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 )
 
@@ -66,8 +69,8 @@ func (d *domainPrefixRouter[C]) NewSigner(ctx context.Context, conf C) (_ signer
 	return d, nil
 }
 
-func (d *domainPrefixRouter[C]) getDomainSignerForAlgorithm(ctx context.Context, algorithm string) (signerapi.InMemorySigner, error) {
-	algoNoDomain, ok := strings.CutPrefix(strings.ToLower(algorithm), "domain:")
+func (d *domainPrefixRouter[C]) getDomainSignerForAlgorithm(ctx context.Context, algorithm algorithms.Algorithm) (signerapi.InMemorySigner, error) {
+	algoNoDomain, ok := strings.CutPrefix(strings.ToLower(string(algorithm)), "domain:")
 	if !ok {
 		return nil, i18n.NewError(ctx, tkmsgs.MsgSigningInvalidDomainAlgorithmNoPrefix, algorithm)
 	}
@@ -79,7 +82,7 @@ func (d *domainPrefixRouter[C]) getDomainSignerForAlgorithm(ctx context.Context,
 	return s, nil
 }
 
-func (d *domainPrefixRouter[C]) GetMinimumKeyLen(ctx context.Context, algorithm string) (keyLen int, err error) {
+func (d *domainPrefixRouter[C]) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (keyLen int, err error) {
 	s, err := d.getDomainSignerForAlgorithm(ctx, algorithm)
 	if err == nil {
 		keyLen, err = s.GetMinimumKeyLen(ctx, algorithm)
@@ -88,7 +91,7 @@ func (d *domainPrefixRouter[C]) GetMinimumKeyLen(ctx context.Context, algorithm 
 }
 
 // GetVerifier implements signerapi.InMemorySigner.
-func (d *domainPrefixRouter[C]) GetVerifier(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (verifier string, err error) {
+func (d *domainPrefixRouter[C]) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (verifier string, err error) {
 	s, err := d.getDomainSignerForAlgorithm(ctx, algorithm)
 	if err == nil {
 		verifier, err = s.GetVerifier(ctx, algorithm, verifierType, privateKey)
@@ -97,7 +100,7 @@ func (d *domainPrefixRouter[C]) GetVerifier(ctx context.Context, algorithm strin
 }
 
 // Sign implements signerapi.InMemorySigner.
-func (d *domainPrefixRouter[C]) Sign(ctx context.Context, algorithm string, payloadType string, privateKey []byte, payload []byte) (signed []byte, err error) {
+func (d *domainPrefixRouter[C]) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey []byte, payload []byte) (signed []byte, err error) {
 	s, err := d.getDomainSignerForAlgorithm(ctx, algorithm)
 	if err == nil {
 		signed, err = s.Sign(ctx, algorithm, payloadType, privateKey, payload)
