@@ -31,8 +31,11 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -72,8 +75,8 @@ func newSnarkProver(conf *SnarkProverConfig) (*snarkProver, error) {
 	}, nil
 }
 
-func (sp *snarkProver) GetVerifier(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
-	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(algorithm) {
+func (sp *snarkProver) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
+	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(string(algorithm)) {
 		return "", fmt.Errorf("'%s' does not match supported algorithm '%s'", algorithm, ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP)
 	}
 	if verifierType != IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X {
@@ -86,15 +89,15 @@ func (sp *snarkProver) GetVerifier(ctx context.Context, algorithm, verifierType 
 	return EncodeBabyJubJubPublicKey(pk.Public()), nil
 }
 
-func (sp *snarkProver) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
-	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(algorithm) {
+func (sp *snarkProver) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
+	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(string(algorithm)) {
 		return -1, fmt.Errorf("'%s' does not match supported algorithm '%s'", algorithm, ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP)
 	}
 	return 32, nil
 }
 
-func (sp *snarkProver) Sign(ctx context.Context, algorithm, payloadType string, privateKey, payload []byte) ([]byte, error) {
-	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(algorithm) {
+func (sp *snarkProver) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey, payload []byte) ([]byte, error) {
+	if !ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP.MatchString(string(algorithm)) {
 		return nil, fmt.Errorf("'%s' does not match supported algorithm '%s'", algorithm, ALGO_DOMAIN_ZETO_SNARK_BJJ_REGEXP)
 	}
 	if payloadType != PAYLOAD_DOMAIN_ZETO_SNARK {

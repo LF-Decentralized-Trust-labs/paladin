@@ -25,11 +25,13 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 func (tb *testbed) initRPC() {
@@ -140,7 +142,7 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 		keyMgr := tb.c.KeyManager()
 		tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 		for i, v := range tx.RequiredVerifiers {
-			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
+			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, algorithms.Algorithm(v.Algorithm), verifiers.VerifierType(v.VerifierType))
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
@@ -218,7 +220,7 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, psc components.Do
 	keyMgr := tb.c.KeyManager()
 	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
 	for i, v := range tx.PreAssembly.RequiredVerifiers {
-		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
+		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, algorithms.Algorithm(v.Algorithm), verifiers.VerifierType(v.VerifierType))
 		if err != nil {
 			return fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 		}
@@ -405,8 +407,8 @@ func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
 func (tb *testbed) rpcResolveVerifier() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		lookup string,
-		algorithm string,
-		verifierType string,
+		algorithm algorithms.Algorithm,
+		verifierType verifiers.VerifierType,
 	) (verifier string, _ error) {
 		identifier, err := tktypes.PrivateIdentityLocator(lookup).Identity(ctx)
 		if err == nil {

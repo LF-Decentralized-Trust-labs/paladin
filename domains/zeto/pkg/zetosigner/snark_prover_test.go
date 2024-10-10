@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -83,7 +84,7 @@ func TestSnarkProve(t *testing.T) {
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 
-	proof, err := prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	proof, err := prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	require.NoError(t, err)
 	assert.Equal(t, 36, len(proof))
 }
@@ -174,7 +175,7 @@ func TestConcurrentSnarkProofGeneration(t *testing.T) {
 
 	for i := 0; i < expectReqCount; i++ {
 		go func() {
-			proof, err := prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+			proof, err := prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 			require.NoError(t, err)
 			assert.Equal(t, 36, len(proof))
 			reqChan <- struct{}{}
@@ -214,7 +215,7 @@ func TestSnarkProveError(t *testing.T) {
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "cannot parse invalid wire-format data")
 }
 
@@ -243,7 +244,7 @@ func TestSnarkProveErrorCircuit(t *testing.T) {
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "circuit ID is required")
 }
 
@@ -263,7 +264,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "input commitments are required")
 
 	req = pb.ProvingRequest{
@@ -274,7 +275,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "input values are required")
 
 	req = pb.ProvingRequest{
@@ -286,7 +287,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "input salts are required")
 
 	req = pb.ProvingRequest{
@@ -299,7 +300,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "output values are required")
 
 	req = pb.ProvingRequest{
@@ -313,7 +314,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "output owner keys are required")
 
 	req = pb.ProvingRequest{
@@ -328,7 +329,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "anon.wasm: no such file or directory")
 }
 
@@ -378,7 +379,7 @@ func TestSnarkProveErrorLoadcircuits(t *testing.T) {
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.EqualError(t, err, "bang!")
 }
 
@@ -424,7 +425,7 @@ func TestSnarkProveErrorGenerateProof(t *testing.T) {
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "witness is empty")
 }
 
@@ -474,7 +475,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	}
 	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "failed to parse input commitment")
 
 	req = pb.ProvingRequest{
@@ -491,7 +492,7 @@ func TestSnarkProveErrorGenerateProof2(t *testing.T) {
 	}
 	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), AlgoDomainZetoSnarkBJJ("zeto"), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
+	_, err = prover.Sign(context.Background(), algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "failed to parse input salt")
 }
 
@@ -556,22 +557,22 @@ func TestZKPProverInvalidAlgos(t *testing.T) {
 	_, err = prover.GetVerifier(ctx, "domain:zeto:unsupported", "", nil)
 	assert.Regexp(t, "algorithm", err)
 
-	_, err = prover.GetVerifier(ctx, AlgoDomainZetoSnarkBJJ("zeto"), "not_hex", nil)
+	_, err = prover.GetVerifier(ctx, algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), "not_hex", nil)
 	assert.Regexp(t, "verifier", err)
 
-	_, err = prover.GetVerifier(ctx, AlgoDomainZetoSnarkBJJ("zeto"), IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, nil)
+	_, err = prover.GetVerifier(ctx, algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, nil)
 	assert.Regexp(t, "invalid key", err)
 
 	_, err = prover.Sign(ctx, "domain:zeto:unsupported", "", nil, nil)
 	assert.Regexp(t, "algorithm", err)
 
-	_, err = prover.Sign(ctx, AlgoDomainZetoSnarkBJJ("zeto"), "domain:zeto:unsupported", nil, nil)
+	_, err = prover.Sign(ctx, algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")), "domain:zeto:unsupported", nil, nil)
 	assert.Regexp(t, "payloadType", err)
 
 	_, err = prover.GetMinimumKeyLen(ctx, "domain:zeto:unsupported")
 	assert.Regexp(t, "algorithm", err)
 
-	keyLen, err := prover.GetMinimumKeyLen(ctx, AlgoDomainZetoSnarkBJJ("zeto"))
+	keyLen, err := prover.GetMinimumKeyLen(ctx, algorithms.Algorithm(AlgoDomainZetoSnarkBJJ("zeto")))
 	require.NoError(t, err)
 	assert.Equal(t, 32, keyLen)
 }

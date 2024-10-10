@@ -34,6 +34,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
@@ -166,8 +167,8 @@ func (z *Zeto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
 				Lookup:       initParams.From,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
+				Algorithm:    string(algorithms.ECDSA_SECP256K1),
+				VerifierType: string(verifiers.ETH_ADDRESS),
 			},
 		},
 	}, nil
@@ -370,7 +371,7 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 }
 
 func (z *Zeto) GetVerifier(ctx context.Context, req *prototk.GetVerifierRequest) (*prototk.GetVerifierResponse, error) {
-	verifier, err := z.snarkProver.GetVerifier(ctx, req.Algorithm, req.VerifierType, req.PrivateKey)
+	verifier, err := z.snarkProver.GetVerifier(ctx, algorithms.Algorithm(req.Algorithm), verifiers.VerifierType(req.VerifierType), req.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verifier. %s", err)
 	}
@@ -380,7 +381,7 @@ func (z *Zeto) GetVerifier(ctx context.Context, req *prototk.GetVerifierRequest)
 }
 
 func (z *Zeto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {
-	proof, err := z.snarkProver.Sign(ctx, req.Algorithm, req.PayloadType, req.PrivateKey, req.Payload)
+	proof, err := z.snarkProver.Sign(ctx, algorithms.Algorithm(req.Algorithm), signpayloads.SignPayloadType(req.PayloadType), req.PrivateKey, req.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign. %s", err)
 	}

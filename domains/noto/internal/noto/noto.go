@@ -192,8 +192,8 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
 				Lookup:       params.Notary,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
+				Algorithm:    string(algorithms.ECDSA_SECP256K1),
+				VerifierType: string(verifiers.ETH_ADDRESS),
 			},
 		},
 	}, nil

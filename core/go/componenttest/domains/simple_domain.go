@@ -412,8 +412,8 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 						{
 							Lookup:       "domain1.contract1.notary",
-							Algorithm:    algorithms.ECDSA_SECP256K1,
-							VerifierType: verifiers.ETH_ADDRESS,
+							Algorithm:    string(algorithms.ECDSA_SECP256K1),
+							VerifierType: string(verifiers.ETH_ADDRESS),
 						},
 					},
 				}, nil
@@ -426,8 +426,8 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					"symbol": "FT1"
 				}`, req.Transaction.ConstructorParamsJson)
 				assert.Len(t, req.ResolvedVerifiers, 1)
-				assert.Equal(t, algorithms.ECDSA_SECP256K1, req.ResolvedVerifiers[0].Algorithm)
-				assert.Equal(t, verifiers.ETH_ADDRESS, req.ResolvedVerifiers[0].VerifierType)
+				assert.Equal(t, string(algorithms.ECDSA_SECP256K1), req.ResolvedVerifiers[0].Algorithm)
+				assert.Equal(t, string(verifiers.ETH_ADDRESS), req.ResolvedVerifiers[0].VerifierType)
 				assert.Equal(t, "domain1.contract1.notary", req.ResolvedVerifiers[0].Lookup)
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
@@ -451,27 +451,27 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				requiredVerifiers := []*prototk.ResolveVerifierRequest{
 					{
 						Lookup:       req.Transaction.From,
-						Algorithm:    algorithms.ECDSA_SECP256K1,
-						VerifierType: verifiers.ETH_ADDRESS,
+						Algorithm:    string(algorithms.ECDSA_SECP256K1),
+						VerifierType: string(verifiers.ETH_ADDRESS),
 					},
 					{
 						Lookup:       notaryLocator,
-						Algorithm:    algorithms.ECDSA_SECP256K1,
-						VerifierType: verifiers.ETH_ADDRESS,
+						Algorithm:    string(algorithms.ECDSA_SECP256K1),
+						VerifierType: string(verifiers.ETH_ADDRESS),
 					},
 				}
 				if txInputs.From != "" {
 					requiredVerifiers = append(requiredVerifiers, &prototk.ResolveVerifierRequest{
 						Lookup:       txInputs.From,
-						Algorithm:    algorithms.ECDSA_SECP256K1,
-						VerifierType: verifiers.ETH_ADDRESS,
+						Algorithm:    string(algorithms.ECDSA_SECP256K1),
+						VerifierType: string(verifiers.ETH_ADDRESS),
 					})
 				}
 				if txInputs.To != "" && (txInputs.From == "" || txInputs.From != txInputs.To) {
 					requiredVerifiers = append(requiredVerifiers, &prototk.ResolveVerifierRequest{
 						Lookup:       txInputs.To,
-						Algorithm:    algorithms.ECDSA_SECP256K1,
-						VerifierType: verifiers.ETH_ADDRESS,
+						Algorithm:    string(algorithms.ECDSA_SECP256K1),
+						VerifierType: string(verifiers.ETH_ADDRESS),
 					})
 				}
 				return &prototk.InitTransactionResponse{
@@ -534,9 +534,9 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 						{
 							Name:            "sender",
 							AttestationType: prototk.AttestationType_SIGN,
-							Algorithm:       algorithms.ECDSA_SECP256K1,
-							VerifierType:    verifiers.ETH_ADDRESS,
-							PayloadType:     signpayloads.OPAQUE_TO_RSV,
+							Algorithm:       string(algorithms.ECDSA_SECP256K1),
+							VerifierType:    string(verifiers.ETH_ADDRESS),
+							PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 							Payload:         eip712Payload,
 							Parties: []string{
 								req.Transaction.From,
@@ -546,9 +546,9 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 							Name:            "notary",
 							AttestationType: prototk.AttestationType_ENDORSE,
 							// we expect an endorsement is of the form ENDORSER_SUBMIT - so we need an eth signing key to exist
-							Algorithm:    algorithms.ECDSA_SECP256K1,
-							VerifierType: verifiers.ETH_ADDRESS,
-							PayloadType:  signpayloads.OPAQUE_TO_RSV,
+							Algorithm:    string(algorithms.ECDSA_SECP256K1),
+							VerifierType: string(verifiers.ETH_ADDRESS),
+							PayloadType:  string(signpayloads.OPAQUE_TO_RSV),
 							Parties: []string{
 								notaryLocator,
 							},
@@ -585,8 +585,8 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				for _, ar := range req.Signatures {
 					if ar.AttestationType == prototk.AttestationType_SIGN &&
 						ar.Name == "sender" &&
-						ar.Verifier.Algorithm == algorithms.ECDSA_SECP256K1 &&
-						ar.Verifier.VerifierType == verifiers.ETH_ADDRESS {
+						ar.Verifier.Algorithm == string(algorithms.ECDSA_SECP256K1) &&
+						ar.Verifier.VerifierType == string(verifiers.ETH_ADDRESS) {
 						signerVerification = ar
 						break
 					}

@@ -21,14 +21,17 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type domainSigner struct {
 	dm *domainManager
 }
 
-func (ds *domainSigner) getDomainCheckSupport(ctx context.Context, algorithm string) (*domain, int, error) {
-	domainName := strings.SplitN(strings.TrimPrefix(strings.ToLower(algorithm), "domain:"), ":", 2)[0]
+func (ds *domainSigner) getDomainCheckSupport(ctx context.Context, algorithm algorithms.Algorithm) (*domain, int, error) {
+	domainName := strings.SplitN(strings.TrimPrefix(strings.ToLower(string(algorithm)), "domain:"), ":", 2)[0]
 	domain, err := ds.dm.getDomainByName(ctx, domainName)
 	if err != nil {
 		return nil, -1, err
@@ -46,7 +49,7 @@ func (ds *domainSigner) getDomainCheckSupport(ctx context.Context, algorithm str
 	domainConf := domain.Configuration()
 	algoMap := domainConf.SigningAlgorithms
 	if algoMap != nil {
-		keyLen, algoFound = algoMap[algorithm]
+		keyLen, algoFound = algoMap[string(algorithm)]
 	}
 	if !algoFound {
 		return nil, -1, i18n.NewError(ctx, msgs.MsgDomainSigningAlgorithmNotSupported, domainName, algorithm)
@@ -55,12 +58,12 @@ func (ds *domainSigner) getDomainCheckSupport(ctx context.Context, algorithm str
 
 }
 
-func (ds *domainSigner) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
+func (ds *domainSigner) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
 	_, keyLen, err := ds.getDomainCheckSupport(ctx, algorithm)
 	return keyLen, err
 }
 
-func (ds *domainSigner) GetVerifier(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (verifier string, err error) {
+func (ds *domainSigner) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (verifier string, err error) {
 	domain, _, err := ds.getDomainCheckSupport(ctx, algorithm)
 	if err == nil {
 		verifier, err = domain.getVerifier(ctx, algorithm, verifierType, privateKey)
@@ -68,7 +71,7 @@ func (ds *domainSigner) GetVerifier(ctx context.Context, algorithm string, verif
 	return
 }
 
-func (ds *domainSigner) Sign(ctx context.Context, algorithm string, payloadType string, privateKey []byte, payload []byte) (signature []byte, err error) {
+func (ds *domainSigner) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey []byte, payload []byte) (signature []byte, err error) {
 	domain, _, err := ds.getDomainCheckSupport(ctx, algorithm)
 	if err == nil {
 		signature, err = domain.sign(ctx, algorithm, payloadType, privateKey, payload)

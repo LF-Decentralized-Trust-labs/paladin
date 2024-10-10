@@ -22,8 +22,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type SolidityBuild struct {
@@ -88,9 +90,9 @@ func linkBytecode(artifact SolidityBuildWithLinks, libraries map[string]*tktypes
 	return hex.DecodeString(strings.TrimPrefix(bytecode, "0x"))
 }
 
-func FindVerifier(lookup, algorithm, verifierType string, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
+func FindVerifier(lookup string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, verifiers []*pb.ResolvedVerifier) *pb.ResolvedVerifier {
 	for _, verifier := range verifiers {
-		if verifier.Lookup == lookup && verifier.Algorithm == algorithm && verifier.VerifierType == verifierType {
+		if verifier.Lookup == lookup && verifier.Algorithm == string(algorithm) && verifier.VerifierType == string(verifierType) {
 			return verifier
 		}
 	}

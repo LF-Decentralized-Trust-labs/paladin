@@ -28,8 +28,10 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pbIdentityResolver "github.com/kaleido-io/paladin/core/pkg/proto/identityresolver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -76,7 +78,7 @@ func (ir *identityResolver) Start() error {
 func (ir *identityResolver) Stop() {
 }
 
-func (ir *identityResolver) ResolveVerifier(ctx context.Context, lookup string, algorithm string, verifierType string) (string, error) {
+func (ir *identityResolver) ResolveVerifier(ctx context.Context, lookup string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (string, error) {
 	//TODO should we have a timeout here? Shoudl be related to the async timeout and reaping of the inflight requests?
 	replyChan := make(chan string)
 	errChan := make(chan error)
@@ -93,7 +95,7 @@ func (ir *identityResolver) ResolveVerifier(ctx context.Context, lookup string, 
 	}
 }
 
-func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup string, algorithm string, verifierType string, resolved func(ctx context.Context, verifier string), failed func(ctx context.Context, err error)) {
+func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, resolved func(ctx context.Context, verifier string), failed func(ctx context.Context, err error)) {
 	// if the verifier lookup is a local key, we can resolve it here
 	// if it is a remote key, we need to delegate to the remote node
 
@@ -120,8 +122,8 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 
 		resolveVerifierRequest := &pbIdentityResolver.ResolveVerifierRequest{
 			Lookup:       lookup,
-			Algorithm:    algorithm,
-			VerifierType: verifierType,
+			Algorithm:    string(algorithm),
+			VerifierType: string(verifierType),
 		}
 		resolveVerifierRequestBytes, err := proto.Marshal(resolveVerifierRequest)
 		if err != nil {
@@ -231,7 +233,7 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 
 	// contractAddress and transactionID in the request message are simply used to populate the response
 	// so that the requesting node can correlate the response with the transaction that needs it
-	_, verifier, err := ir.keyManager.ResolveKey(ctx, resolveVerifierRequest.Lookup, resolveVerifierRequest.Algorithm, resolveVerifierRequest.VerifierType)
+	_, verifier, err := ir.keyManager.ResolveKey(ctx, resolveVerifierRequest.Lookup, algorithms.Algorithm(resolveVerifierRequest.Algorithm), verifiers.VerifierType(resolveVerifierRequest.VerifierType))
 	if err == nil {
 		resolveVerifierResponse := &pbIdentityResolver.ResolveVerifierResponse{
 			Lookup:       resolveVerifierRequest.Lookup,

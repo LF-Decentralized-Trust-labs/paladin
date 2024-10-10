@@ -23,8 +23,10 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type simpleKeyManager struct {
@@ -66,7 +68,7 @@ func (km *simpleKeyManager) AddInMemorySigner(prefix string, signer signerapi.In
 	km.signer.AddInMemorySigner(prefix, signer)
 }
 
-func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error) {
+func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (keyHandle, verifier string, err error) {
 	km.lock.Lock()
 	defer km.lock.Unlock()
 

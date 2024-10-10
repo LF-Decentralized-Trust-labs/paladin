@@ -112,8 +112,8 @@ func doDomainInitTransactionOK(t *testing.T, td *testDomainContext, resFn ...fun
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:       tx.Signer,
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			},
 		}
@@ -139,8 +139,8 @@ func doDomainInitAssembleTransactionOK(t *testing.T, td *testDomainContext) (*do
 				{
 					Name:            "ensorsement1",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 					Parties:         []string{"endorser1"},
 				},
 			},
@@ -302,8 +302,8 @@ func TestRecoverSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	res, err := td.d.RecoverSigner(td.ctx, &prototk.RecoverSignerRequest{
-		Algorithm:   algorithms.ECDSA_SECP256K1,
-		PayloadType: signpayloads.OPAQUE_TO_RSV,
+		Algorithm:   string(algorithms.ECDSA_SECP256K1),
+		PayloadType: string(signpayloads.OPAQUE_TO_RSV),
 		Payload:     ([]byte)("some data"),
 		Signature:   s.CompactRSV(),
 	})
@@ -437,8 +437,8 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 				{
 					Name:            "sign",
 					AttestationType: prototk.AttestationType_SIGN,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 				},
 			},
 		}, nil
@@ -515,8 +515,8 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	endorserAddr := tktypes.EthAddress(tktypes.RandBytes(20))
 	endorser := &prototk.ResolvedVerifier{
 		Lookup:       "endorser1",
-		Algorithm:    algorithms.ECDSA_SECP256K1,
-		VerifierType: verifiers.ETH_ADDRESS,
+		Algorithm:    string(algorithms.ECDSA_SECP256K1),
+		VerifierType: string(verifiers.ETH_ADDRESS),
 		Verifier:     endorserAddr.String(),
 	}
 	endorsement, err := psc.EndorseTransaction(dCtx, &components.PrivateTransactionEndorseRequest{
@@ -628,8 +628,8 @@ func TestDomainAssembleTransactionLoadInputError(t *testing.T) {
 				{
 					Name:            "sign",
 					AttestationType: prototk.AttestationType_SIGN,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 				},
 			},
 		}, nil
@@ -657,8 +657,8 @@ func TestDomainAssembleTransactionLoadReadError(t *testing.T) {
 				{
 					Name:            "sign",
 					AttestationType: prototk.AttestationType_SIGN,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 				},
 			},
 		}, nil

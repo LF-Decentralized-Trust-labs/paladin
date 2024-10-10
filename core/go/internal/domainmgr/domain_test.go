@@ -578,8 +578,8 @@ func TestDomainInitDeployOK(t *testing.T) {
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:       "signer1",
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			},
 		}, nil
@@ -647,8 +647,8 @@ func goodTXForDeploy() *components.PrivateContractDeploy {
 		TransactionSpecification: &prototk.DeployTransactionSpecification{TransactionId: tktypes.Bytes32UUIDFirst16(txID).String()},
 		Verifiers: []*prototk.ResolvedVerifier{
 			{
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
+				Algorithm:    string(algorithms.ECDSA_SECP256K1),
+				VerifierType: string(verifiers.ETH_ADDRESS),
 				Lookup:       "notary",
 				Verifier:     tktypes.EthAddress(tktypes.RandBytes(20)).String(),
 			},
@@ -999,8 +999,8 @@ func TestRecoverSignerFailCases(t *testing.T) {
 	})
 	assert.Regexp(t, "PD011637", err)
 	_, err = d.RecoverSigner(ctx, &prototk.RecoverSignerRequest{
-		Algorithm:   algorithms.ECDSA_SECP256K1,
-		PayloadType: signpayloads.OPAQUE_TO_RSV,
+		Algorithm:   string(algorithms.ECDSA_SECP256K1),
+		PayloadType: string(signpayloads.OPAQUE_TO_RSV),
 		Signature:   ([]byte)("not a signature RSV"),
 	})
 	assert.Regexp(t, "PD011638", err)

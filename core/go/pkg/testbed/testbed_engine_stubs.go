@@ -24,9 +24,12 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
@@ -106,15 +109,15 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 	for _, ar := range tx.PostAssembly.AttestationPlan {
 		if ar.AttestationType == prototk.AttestationType_SIGN {
 			for _, partyName := range ar.Parties {
-				keyHandle, verifier, err := tb.c.KeyManager().ResolveKey(ctx, partyName, ar.Algorithm, ar.VerifierType)
+				keyHandle, verifier, err := tb.c.KeyManager().ResolveKey(ctx, partyName, algorithms.Algorithm(ar.Algorithm), verifiers.VerifierType(ar.VerifierType))
 				if err != nil {
 					return fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
 				signaturePayload, err := tb.c.KeyManager().Sign(ctx, &signerapi.SignRequest{
 					KeyHandle:   keyHandle,
-					Algorithm:   ar.Algorithm,
+					Algorithm:   algorithms.Algorithm(ar.Algorithm),
 					Payload:     ar.Payload,
-					PayloadType: ar.PayloadType,
+					PayloadType: signpayloads.SignPayloadType(ar.PayloadType),
 				})
 				if err != nil {
 					return fmt.Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)
@@ -157,7 +160,7 @@ func (tb *testbed) gatherEndorsements(dCtx components.DomainContext, psc compone
 		if ar.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, partyName := range ar.Parties {
 				// Look up the endorser
-				keyHandle, verifier, err := keyMgr.ResolveKey(dCtx.Ctx(), partyName, ar.Algorithm, ar.VerifierType)
+				keyHandle, verifier, err := keyMgr.ResolveKey(dCtx.Ctx(), partyName, algorithms.Algorithm(ar.Algorithm), verifiers.VerifierType(ar.VerifierType))
 				if err != nil {
 					return fmt.Errorf("failed to resolve (local in testbed case) endorser for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
@@ -196,9 +199,9 @@ func (tb *testbed) gatherEndorsements(dCtx components.DomainContext, psc compone
 					// Build the signature
 					signaturePayload, err := keyMgr.Sign(dCtx.Ctx(), &signerapi.SignRequest{
 						KeyHandle:   keyHandle,
-						Algorithm:   ar.Algorithm,
+						Algorithm:   algorithms.Algorithm(ar.Algorithm),
 						Payload:     endorseRes.Payload,
-						PayloadType: ar.PayloadType,
+						PayloadType: signpayloads.SignPayloadType(ar.PayloadType),
 					})
 					if err != nil {
 						return fmt.Errorf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, ar.Algorithm, err)

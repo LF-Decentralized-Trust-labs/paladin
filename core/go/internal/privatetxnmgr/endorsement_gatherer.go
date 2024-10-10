@@ -25,9 +25,12 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	verifiersType "github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 func NewEndorsementGatherer(psc components.DomainSmartContract, dCtx components.DomainContext, keyMgr ethclient.KeyManager) ptmgrtypes.EndorsementGatherer {
@@ -49,7 +52,7 @@ func (e *endorsementGatherer) DomainContext() components.DomainContext {
 }
 
 func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error) {
-	keyHandle, verifier, err := e.keyMgr.ResolveKey(ctx, partyName, endorsementRequest.Algorithm, endorsementRequest.VerifierType)
+	keyHandle, verifier, err := e.keyMgr.ResolveKey(ctx, partyName, algorithms.Algorithm(endorsementRequest.Algorithm), verifiersType.VerifierType(endorsementRequest.VerifierType))
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to resolve key for party %s (algorithm=%s,verifierType=%s): %s", partyName, endorsementRequest.Algorithm, endorsementRequest.VerifierType, err)
 		log.L(ctx).Error(errorMessage)
@@ -93,9 +96,9 @@ func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transaction
 		// Build the signature
 		signaturePayload, err := e.keyMgr.Sign(ctx, &signerapi.SignRequest{
 			KeyHandle:   keyHandle,
-			Algorithm:   endorsementRequest.Algorithm,
+			Algorithm:   algorithms.Algorithm(endorsementRequest.Algorithm),
 			Payload:     endorseRes.Payload,
-			PayloadType: endorsementRequest.PayloadType,
+			PayloadType: signpayloads.SignPayloadType(endorsementRequest.PayloadType),
 		})
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, endorsementRequest.Algorithm, err)

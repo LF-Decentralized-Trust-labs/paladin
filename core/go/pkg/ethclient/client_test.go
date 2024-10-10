@@ -26,8 +26,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +41,7 @@ func TestResolveKeyFail(t *testing.T) {
 	ec := ecf.HTTPClient().(*ethClient)
 
 	ec.keymgr = &mockKeyManager{
-		resolveKey: func(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle string, verifier string, err error) {
+		resolveKey: func(ctx context.Context, identifier string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (keyHandle string, verifier string, err error) {
 			return "", "", fmt.Errorf("pop")
 		},
 	}
@@ -231,7 +233,7 @@ func TestSignFail(t *testing.T) {
 
 	ec := ecf.HTTPClient().(*ethClient)
 	ec.keymgr = &mockKeyManager{
-		resolveKey: func(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle string, verifier string, err error) {
+		resolveKey: func(ctx context.Context, identifier string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (keyHandle string, verifier string, err error) {
 			return "kh1", "0x1d0cD5b99d2E2a380e52b4000377Dd507c6df754", nil
 		},
 		sign: func(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error) {

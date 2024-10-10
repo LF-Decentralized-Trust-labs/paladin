@@ -25,10 +25,13 @@ import (
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -334,7 +337,7 @@ func (ts *PaladinTxProcessor) HandleResolveVerifierErrorEvent(ctx context.Contex
 
 func (ts *PaladinTxProcessor) requestSignature(ctx context.Context, attRequest *prototk.AttestationRequest, partyName string) {
 
-	keyHandle, verifier, err := ts.components.KeyManager().ResolveKey(ctx, partyName, attRequest.Algorithm, attRequest.VerifierType)
+	keyHandle, verifier, err := ts.components.KeyManager().ResolveKey(ctx, partyName, algorithms.Algorithm(attRequest.Algorithm), verifiers.VerifierType(attRequest.VerifierType))
 	if err != nil {
 		log.L(ctx).Errorf("Failed to resolve local signer for %s (algorithm=%s): %s", partyName, attRequest.Algorithm, err)
 
@@ -343,9 +346,9 @@ func (ts *PaladinTxProcessor) requestSignature(ctx context.Context, attRequest *
 	// TODO this could be calling out to a remote signer, should we be doing these in parallel?
 	signaturePayload, err := ts.components.KeyManager().Sign(ctx, &signerapi.SignRequest{
 		KeyHandle:   keyHandle,
-		Algorithm:   attRequest.Algorithm,
+		Algorithm:   algorithms.Algorithm(attRequest.Algorithm),
 		Payload:     attRequest.Payload,
-		PayloadType: attRequest.PayloadType,
+		PayloadType: signpayloads.SignPayloadType(attRequest.PayloadType),
 	})
 	if err != nil {
 		log.L(ctx).Errorf("failed to sign for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, attRequest.Algorithm, err)
@@ -651,8 +654,8 @@ func (ts *PaladinTxProcessor) requestVerifierResolution(ctx context.Context) err
 		ts.identityResolver.ResolveVerifierAsync(
 			ctx,
 			v.Lookup,
-			v.Algorithm,
-			v.VerifierType,
+			algorithms.Algorithm(v.Algorithm),
+			verifiers.VerifierType(v.VerifierType),
 			func(ctx context.Context, verifier string) {
 				//response event needs to be handled by the orchestrator so that the dispatch to a handling thread is done in fairness to all other in flight transactions
 				ts.publisher.PublishResolveVerifierResponseEvent(ctx, ts.transaction.ID.String(), v.Lookup, v.Algorithm, verifier)

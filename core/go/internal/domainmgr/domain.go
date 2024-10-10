@@ -41,6 +41,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 type domain struct {
@@ -448,7 +449,7 @@ func (d *domain) DecodeData(ctx context.Context, decRequest *prototk.DecodeDataR
 func (d *domain) RecoverSigner(ctx context.Context, recoverRequest *prototk.RecoverSignerRequest) (_ *prototk.RecoverSignerResponse, err error) {
 	switch {
 	// If we add more signer algorithms to this utility in the future, we should make it an interface on the signer.
-	case recoverRequest.Algorithm == algorithms.ECDSA_SECP256K1 && recoverRequest.PayloadType == signpayloads.OPAQUE_TO_RSV:
+	case recoverRequest.Algorithm == string(algorithms.ECDSA_SECP256K1) && recoverRequest.PayloadType == string(signpayloads.OPAQUE_TO_RSV):
 		var addr *ethtypes.Address0xHex
 		signature, err := secp256k1.DecodeCompactRSV(ctx, recoverRequest.Signature)
 		if err == nil {
@@ -570,10 +571,10 @@ func (d *domain) close() {
 	<-d.initDone
 }
 
-func (d *domain) getVerifier(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (verifier string, err error) {
+func (d *domain) getVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (verifier string, err error) {
 	res, err := d.api.GetVerifier(ctx, &prototk.GetVerifierRequest{
-		Algorithm:    algorithm,
-		VerifierType: verifierType,
+		Algorithm:    string(algorithm),
+		VerifierType: string(verifierType),
 		PrivateKey:   privateKey,
 	})
 	if err != nil {
@@ -582,10 +583,10 @@ func (d *domain) getVerifier(ctx context.Context, algorithm string, verifierType
 	return res.Verifier, nil
 }
 
-func (d *domain) sign(ctx context.Context, algorithm string, payloadType string, privateKey []byte, payload []byte) (signature []byte, err error) {
+func (d *domain) sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey []byte, payload []byte) (signature []byte, err error) {
 	res, err := d.api.Sign(ctx, &prototk.SignRequest{
-		Algorithm:   algorithm,
-		PayloadType: payloadType,
+		Algorithm:   string(algorithm),
+		PayloadType: string(payloadType),
 		PrivateKey:  privateKey,
 		Payload:     payload,
 	})

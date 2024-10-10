@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
@@ -32,14 +33,14 @@ import (
 )
 
 type mockKeyManager struct {
-	resolveKey func(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error)
+	resolveKey func(ctx context.Context, identifier string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (keyHandle, verifier string, err error)
 	sign       func(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error)
 }
 
 // AddInMemorySigner implements KeyManager.
 func (mkm *mockKeyManager) AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) {}
 
-func (mkm *mockKeyManager) ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error) {
+func (mkm *mockKeyManager) ResolveKey(ctx context.Context, identifier string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (keyHandle, verifier string, err error) {
 	return mkm.resolveKey(ctx, identifier, algorithm, verifierType)
 }
 
@@ -52,20 +53,20 @@ func (mkm *mockKeyManager) Close() {
 }
 
 type mockSigner struct {
-	getMinimumKeyLen func(ctx context.Context, algorithm string) (int, error)
-	getVerifier      func(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (string, error)
-	sign             func(ctx context.Context, algorithm string, payloadType string, privateKey []byte, payload []byte) ([]byte, error)
+	getMinimumKeyLen func(ctx context.Context, algorithm algorithms.Algorithm) (int, error)
+	getVerifier      func(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error)
+	sign             func(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey []byte, payload []byte) ([]byte, error)
 }
 
-func (m *mockSigner) GetMinimumKeyLen(ctx context.Context, algorithm string) (int, error) {
+func (m *mockSigner) GetMinimumKeyLen(ctx context.Context, algorithm algorithms.Algorithm) (int, error) {
 	return m.getMinimumKeyLen(ctx, algorithm)
 }
 
-func (m *mockSigner) GetVerifier(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (string, error) {
+func (m *mockSigner) GetVerifier(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 	return m.getVerifier(ctx, algorithm, verifierType, privateKey)
 }
 
-func (m *mockSigner) Sign(ctx context.Context, algorithm string, payloadType string, privateKey []byte, payload []byte) ([]byte, error) {
+func (m *mockSigner) Sign(ctx context.Context, algorithm algorithms.Algorithm, payloadType signpayloads.SignPayloadType, privateKey []byte, payload []byte) ([]byte, error) {
 	return m.sign(ctx, algorithm, payloadType, privateKey, payload)
 }
 
@@ -122,7 +123,7 @@ func TestSimpleKeyManagerPassThoroughInMemSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	sm.AddInMemorySigner("bad", &mockSigner{
-		getVerifier: func(ctx context.Context, algorithm, verifierType string, privateKey []byte) (string, error) {
+		getVerifier: func(ctx context.Context, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, privateKey []byte) (string, error) {
 			return "", fmt.Errorf("pop")
 		},
 	})

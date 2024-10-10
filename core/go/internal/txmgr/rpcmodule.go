@@ -20,10 +20,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 func (tm *txManager) buildRPCModule() {
@@ -173,8 +175,8 @@ func (tm *txManager) rpcQueryStoredABIs() rpcserver.RPCHandler {
 func (tm *txManager) rpcResolveVerifier() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod3(func(ctx context.Context,
 		lookup string,
-		algorithm string,
-		verifierType string,
+		algorithm algorithms.Algorithm,
+		verifierType verifiers.VerifierType,
 	) (string, error) {
 		return tm.identityResolver.ResolveVerifier(ctx, lookup, algorithm, verifierType)
 	})

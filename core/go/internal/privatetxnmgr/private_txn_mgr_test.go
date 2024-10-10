@@ -113,8 +113,8 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:       "alice",
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			},
 		}
@@ -144,9 +144,9 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 				{
 					Name:            "notary",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					VerifierType:    verifiers.ETH_ADDRESS,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					VerifierType:    string(verifiers.ETH_ADDRESS),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 					Parties: []string{
 						"domain1.contract1.notary",
 					},
@@ -173,8 +173,8 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 		Endorser: &prototk.ResolvedVerifier{
 			Lookup:       "notaryKeyHandle",
 			Verifier:     "notaryVerifier",
-			Algorithm:    algorithms.ECDSA_SECP256K1,
-			VerifierType: verifiers.ETH_ADDRESS,
+			Algorithm:    string(algorithms.ECDSA_SECP256K1),
+			VerifierType: string(verifiers.ETH_ADDRESS),
 		},
 	}, nil)
 
@@ -266,8 +266,8 @@ func TestPrivateTxManagerRemoteEndorser(t *testing.T) {
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:       "alice",
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			},
 		}
@@ -296,9 +296,9 @@ func TestPrivateTxManagerRemoteEndorser(t *testing.T) {
 				{
 					Name:            "notary",
 					AttestationType: prototk.AttestationType_ENDORSE,
-					Algorithm:       algorithms.ECDSA_SECP256K1,
-					VerifierType:    verifiers.ETH_ADDRESS,
-					PayloadType:     signpayloads.OPAQUE_TO_RSV,
+					Algorithm:       string(algorithms.ECDSA_SECP256K1),
+					VerifierType:    string(verifiers.ETH_ADDRESS),
+					PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 					Parties: []string{
 						"domain1.contract1.notary@othernode",
 					},
@@ -341,8 +341,8 @@ func TestPrivateTxManagerRemoteEndorser(t *testing.T) {
 		Endorser: &prototk.ResolvedVerifier{
 			Lookup:       "notaryKeyHandle",
 			Verifier:     "notaryVerifier",
-			Algorithm:    algorithms.ECDSA_SECP256K1,
-			VerifierType: verifiers.ETH_ADDRESS,
+			Algorithm:    string(algorithms.ECDSA_SECP256K1),
+			VerifierType: string(verifiers.ETH_ADDRESS),
 		},
 	}, nil)
 	remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerapi.SignRequest{
@@ -432,8 +432,8 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
 					Lookup:       "alice",
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			},
 		}
@@ -478,9 +478,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 					{
 						Name:            "notary",
 						AttestationType: prototk.AttestationType_ENDORSE,
-						Algorithm:       algorithms.ECDSA_SECP256K1,
-						VerifierType:    verifiers.ETH_ADDRESS,
-						PayloadType:     signpayloads.OPAQUE_TO_RSV,
+						Algorithm:       string(algorithms.ECDSA_SECP256K1),
+						VerifierType:    string(verifiers.ETH_ADDRESS),
+						PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 						Parties: []string{
 							"domain1.contract1.notary@othernode",
 						},
@@ -495,9 +495,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 					{
 						Name:            "notary",
 						AttestationType: prototk.AttestationType_ENDORSE,
-						Algorithm:       algorithms.ECDSA_SECP256K1,
-						VerifierType:    verifiers.ETH_ADDRESS,
-						PayloadType:     signpayloads.OPAQUE_TO_RSV,
+						Algorithm:       string(algorithms.ECDSA_SECP256K1),
+						VerifierType:    string(verifiers.ETH_ADDRESS),
+						PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 						Parties: []string{
 							"domain1.contract1.notary@othernode",
 						},
@@ -695,8 +695,8 @@ func TestPrivateTxManagerMiniLoad(t *testing.T) {
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 						{
 							Lookup:       "alice",
-							Algorithm:    algorithms.ECDSA_SECP256K1,
-							VerifierType: verifiers.ETH_ADDRESS,
+							Algorithm:    string(algorithms.ECDSA_SECP256K1),
+							VerifierType: string(verifiers.ETH_ADDRESS),
 						},
 					},
 				}
@@ -767,9 +767,9 @@ func TestPrivateTxManagerMiniLoad(t *testing.T) {
 						{
 							Name:            "notary",
 							AttestationType: prototk.AttestationType_ENDORSE,
-							Algorithm:       algorithms.ECDSA_SECP256K1,
-							VerifierType:    verifiers.ETH_ADDRESS,
-							PayloadType:     signpayloads.OPAQUE_TO_RSV,
+							Algorithm:       string(algorithms.ECDSA_SECP256K1),
+							VerifierType:    string(verifiers.ETH_ADDRESS),
+							PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 							Parties: []string{
 								"domain1.contract1.notary@othernode",
 							},
@@ -813,8 +813,8 @@ func TestPrivateTxManagerMiniLoad(t *testing.T) {
 				Endorser: &prototk.ResolvedVerifier{
 					Lookup:       "notaryKeyHandle",
 					Verifier:     "notaryVerifier",
-					Algorithm:    algorithms.ECDSA_SECP256K1,
-					VerifierType: verifiers.ETH_ADDRESS,
+					Algorithm:    string(algorithms.ECDSA_SECP256K1),
+					VerifierType: string(verifiers.ETH_ADDRESS),
 				},
 			}, nil)
 			remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerapi.SignRequest{

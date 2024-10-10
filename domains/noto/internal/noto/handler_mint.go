@@ -58,13 +58,13 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
 				Lookup:       tx.DomainConfig.DecodedData.NotaryLookup,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
+				Algorithm:    string(algorithms.ECDSA_SECP256K1),
+				VerifierType: string(verifiers.ETH_ADDRESS),
 			},
 			{
 				Lookup:       params.To,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
+				Algorithm:    string(algorithms.ECDSA_SECP256K1),
+				VerifierType: string(verifiers.ETH_ADDRESS),
 			},
 		},
 	}, nil
@@ -106,18 +106,18 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 			{
 				Name:            "sender",
 				AttestationType: prototk.AttestationType_SIGN,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
+				Algorithm:       string(algorithms.ECDSA_SECP256K1),
+				VerifierType:    string(verifiers.ETH_ADDRESS),
 				Payload:         encodedTransfer,
-				PayloadType:     signpayloads.OPAQUE_TO_RSV,
+				PayloadType:     string(signpayloads.OPAQUE_TO_RSV),
 				Parties:         []string{req.Transaction.From},
 			},
 			// Notary will endorse the assembled transaction (by submitting to the ledger)
 			{
 				Name:            "notary",
 				AttestationType: prototk.AttestationType_ENDORSE,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
+				Algorithm:       string(algorithms.ECDSA_SECP256K1),
+				VerifierType:    string(verifiers.ETH_ADDRESS),
 				Parties:         []string{tx.DomainConfig.DecodedData.NotaryLookup},
 			},
 		},

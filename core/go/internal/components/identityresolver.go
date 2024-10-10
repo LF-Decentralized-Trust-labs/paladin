@@ -15,7 +15,12 @@
 
 package components
 
-import "context"
+import (
+	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+)
 
 // IdentityResolver is the interface for resolving verifiers for a given alorithm from a lookup identity
 // It can integrate with a local key manager or can communicate with an other IdentityResolver on a remote node
@@ -23,6 +28,6 @@ import "context"
 type IdentityResolver interface {
 	ManagerLifecycle
 	TransportClient
-	ResolveVerifier(ctx context.Context, lookup string, algorithm string, verifierType string) (string, error)
-	ResolveVerifierAsync(ctx context.Context, lookup string, algorithm string, verifierType string, resolved func(ctx context.Context, verifier string), failed func(ctx context.Context, err error))
+	ResolveVerifier(ctx context.Context, lookup string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType) (string, error)
+	ResolveVerifierAsync(ctx context.Context, lookup string, algorithm algorithms.Algorithm, verifierType verifiers.VerifierType, resolved func(ctx context.Context, verifier string), failed func(ctx context.Context, err error))
 }
