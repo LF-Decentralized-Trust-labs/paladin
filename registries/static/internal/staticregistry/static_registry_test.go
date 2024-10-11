@@ -27,11 +27,11 @@ import (
 )
 
 type testCallbacks struct {
-	upsertTransportDetails func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error)
+	upsertRegistryRecords func(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error)
 }
 
-func (tc *testCallbacks) UpsertTransportDetails(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
-	return tc.upsertTransportDetails(ctx, req)
+func (tc *testCallbacks) UpsertRegistryRecords(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
+	return tc.upsertRegistryRecords(ctx, req)
 }
 
 func TestPluginLifecycle(t *testing.T) {
@@ -54,21 +54,65 @@ func TestBadConfigJSON(t *testing.T) {
 func TestRegistryStringEntry(t *testing.T) {
 
 	callbacks := &testCallbacks{
-		upsertTransportDetails: func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
-			assert.Equal(t, "node1", req.Node)
-			assert.Equal(t, "transport1", req.Transport)
-			assert.Equal(t, "these are directly the details of the transport", req.TransportDetails)
-			return &prototk.UpsertTransportDetailsResponse{}, nil
+		upsertRegistryRecords: func(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
+			require.Len(t, req.Entries, 1)
+			assert.Equal(t, "", req.Entries[0].ParentId)
+			assert.Equal(t, "node1", req.Entries[0].Name)
+			require.Len(t, req.Properties, 1)
+			assert.NotEmpty(t, req.Properties[0].EntryId)
+			assert.Equal(t, req.Entries[0].Id, req.Properties[0].EntryId)
+			assert.Equal(t, "transport.grpc", req.Properties[0].Name)
+			assert.Equal(t, "these are directly the details of the transport", req.Properties[0].Value)
+			return &prototk.UpsertRegistryRecordsResponse{}, nil
 		},
 	}
 	transport := staticRegistryFactory(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
-		Name: "grpc",
+		Name: "registry1",
 		ConfigJson: `{
-		  "nodes": {
+		  "entries": {
 		     "node1": {
-			   "transports": {
-			      "transport1": "these are directly the details of the transport"
+			   "properties": {
+			      "transport.grpc": "these are directly the details of the transport"
+			   }
+			 }
+		  }
+		}`,
+	})
+	require.NoError(t, err)
+
+}
+
+func TestRegistryHierarchicalEntry(t *testing.T) {
+
+	callbacks := &testCallbacks{
+		upsertRegistryRecords: func(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
+			require.Len(t, req.Entries, 2)
+			assert.Equal(t, "", req.Entries[0].ParentId)
+			assert.Equal(t, "org1", req.Entries[0].Name)
+			assert.NotEmpty(t, req.Entries[1].ParentId)
+			assert.Equal(t, req.Entries[0].Id, req.Entries[1].ParentId)
+			assert.Equal(t, "node1", req.Entries[1].Name)
+			require.Len(t, req.Properties, 1)
+			assert.NotEmpty(t, req.Properties[0].EntryId)
+			assert.Equal(t, req.Entries[1].Id, req.Properties[0].EntryId)
+			assert.Equal(t, "transport.grpc", req.Properties[0].Name)
+			assert.Equal(t, "these are directly the details of the transport", req.Properties[0].Value)
+			return &prototk.UpsertRegistryRecordsResponse{}, nil
+		},
+	}
+	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
+		Name: "registry1",
+		ConfigJson: `{
+		  "entries": {
+		     "org1": {
+			   "children": {
+			     "node1": {
+					"properties": {
+						"transport.grpc": "these are directly the details of the transport"
+					}
+				 }
 			   }
 			 }
 		  }
@@ -81,21 +125,26 @@ func TestRegistryStringEntry(t *testing.T) {
 func TestRegistryObjectEntry(t *testing.T) {
 
 	callbacks := &testCallbacks{
-		upsertTransportDetails: func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
-			assert.Equal(t, "node1", req.Node)
-			assert.Equal(t, "transport1", req.Transport)
-			assert.JSONEq(t, `{"endpoint": "dns:///127.0.0.1:12345", "issuers": "certificate\ndata\nhere"}`, req.TransportDetails)
-			return &prototk.UpsertTransportDetailsResponse{}, nil
+		upsertRegistryRecords: func(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
+			require.Len(t, req.Entries, 1)
+			assert.Equal(t, "", req.Entries[0].ParentId)
+			assert.Equal(t, "node1", req.Entries[0].Name)
+			require.Len(t, req.Properties, 1)
+			assert.NotEmpty(t, req.Properties[0].EntryId)
+			assert.Equal(t, req.Entries[0].Id, req.Properties[0].EntryId)
+			assert.Equal(t, "transport.grpc", req.Properties[0].Name)
+			assert.JSONEq(t, `{"endpoint": "dns:///127.0.0.1:12345", "issuers": "certificate\ndata\nhere"}`, req.Properties[0].Value)
+			return &prototk.UpsertRegistryRecordsResponse{}, nil
 		},
 	}
 	transport := staticRegistryFactory(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "grpc",
 		ConfigJson: `{
-		  "nodes": {
+		  "entries": {
 		     "node1": {
-			   "transports": {
-			      "transport1": {
+			   "properties": {
+			      "transport.grpc": {
 				  	"endpoint": "dns:///127.0.0.1:12345",
 					"issuers": "certificate\ndata\nhere"
 				  }
@@ -111,7 +160,7 @@ func TestRegistryObjectEntry(t *testing.T) {
 func TestRegistryUpsertFail(t *testing.T) {
 
 	callbacks := &testCallbacks{
-		upsertTransportDetails: func(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
+		upsertRegistryRecords: func(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
 			return nil, fmt.Errorf("pop")
 		},
 	}
@@ -119,10 +168,10 @@ func TestRegistryUpsertFail(t *testing.T) {
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "grpc",
 		ConfigJson: `{
-		  "nodes": {
+		  "entries": {
 		     "node1": {
-			   "transports": {
-			      "transport1": "anything"
+			   "properties": {
+			      "transport.1": "anything"
 			   }
 			 }
 		  }
@@ -132,9 +181,31 @@ func TestRegistryUpsertFail(t *testing.T) {
 
 }
 
-func TestRegistryUpsertBadDAta(t *testing.T) {
+func TestRegistryEventBatch(t *testing.T) {
+
 	callbacks := &testCallbacks{}
 	transport := staticRegistryFactory(callbacks).(*staticRegistry)
-	err := transport.registerNodeTransport(context.Background(), "node1", "transport1", tktypes.RawJSON(`{!!! bad json`))
+	_, err := transport.HandleRegistryEvents(context.Background(), &prototk.HandleRegistryEventsRequest{})
+	assert.Regexp(t, "PD040002", err)
+
+}
+
+func TestRegistryUpsertBadData(t *testing.T) {
+	callbacks := &testCallbacks{}
+	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	err := transport.recurseBuildUpsert(context.Background(),
+		&prototk.UpsertRegistryRecordsRequest{},
+		nil,
+		"org1",
+		&StaticEntry{
+			Children: map[string]*StaticEntry{
+				"node1": {
+					Properties: map[string]tktypes.RawJSON{
+						"anything": tktypes.RawJSON(`{!!! bad json`),
+					},
+				},
+			},
+		},
+	)
 	assert.Error(t, err)
 }

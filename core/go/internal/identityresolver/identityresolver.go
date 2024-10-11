@@ -141,8 +141,8 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 		err = ir.transportManager.Send(ctx, &components.TransportMessage{
 			MessageType: "ResolveVerifierRequest",
 			MessageID:   requestID,
-			Destination: tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITIY_RESOLVER_DESTINATION, remoteNodeId)),
-			ReplyTo:     tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITIY_RESOLVER_DESTINATION, ir.nodeID)),
+			Destination: tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, remoteNodeId)),
+			ReplyTo:     tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
 			Payload:     resolveVerifierRequestBytes,
 		})
 		if err != nil {
@@ -244,7 +244,7 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 			err = ir.transportManager.Send(ctx, &components.TransportMessage{
 				MessageType:   "ResolveVerifierResponse",
 				CorrelationID: requestID,
-				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITIY_RESOLVER_DESTINATION, ir.nodeID)),
+				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
 				Destination:   replyTo,
 				Payload:       resolveVerifierResponseBytes,
 			})
@@ -272,7 +272,7 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 			err = ir.transportManager.Send(ctx, &components.TransportMessage{
 				MessageType:   "ResolveVerifierError",
 				CorrelationID: requestID,
-				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITIY_RESOLVER_DESTINATION, ir.nodeID)),
+				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
 				Destination:   replyTo,
 				Payload:       resolveVerifierErrorBytes,
 			})

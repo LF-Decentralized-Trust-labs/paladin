@@ -17,9 +17,33 @@ syntax = "proto3";
 
 package io.kaleido.paladin.toolkit;
 
+import "on_chain_events.proto";
+import "from_registry.proto";
+
 message ConfigureRegistryRequest {
     string name = 1; // The name
     string config_json= 2; // The block of config supplied in the configuration for the domain by the Paladin administrator (converted from YAML to JSON for transport)
   }
 
-message ConfigureRegistryResponse {}
+message ConfigureRegistryResponse {
+  RegistryConfig registry_config = 1;
+}
+
+message RegistryConfig {
+  repeated RegistryEventSource event_sources = 1;
+}
+
+message HandleRegistryEventsRequest {
+  string batch_id = 2; // A unique identifier for this batch
+  repeated OnChainEvent events = 4; // The list of events from the block indexer
+}
+
+message HandleRegistryEventsResponse {
+  repeated RegistryEntry entries = 1; // Upserts to entities
+  repeated RegistryProperty properties = 2; // Upserts to properties
+}
+
+message RegistryEventSource {
+  string contract_address = 1; // the contract address to listen to
+  string abi_events_json = 2; // ABI events that the registry listens to from the chain
+}

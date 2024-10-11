@@ -310,11 +310,19 @@ var (
 	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 	MsgTransportClientAlreadyRegistered       = ffe("PD012010", "Client '%s' already registered")
 	MsgTransportDestinationNotFound           = ffe("PD012011", "Destination '%s' not found")
+	MsgTransportClientRegisterAfterStartup    = ffe("PD012012", "Client '%s' attempted registration after startup")
 
 	// RegistryManager module PD0121XX
-	MsgRegistryNodeEntiresNotFound = ffe("PD012100", "No entries found for node '%s'")
-	MsgRegistryInvalidEntry        = ffe("PD012101", "Invalid entry")
-	MsgRegistryNotFound            = ffe("PD012102", "Registry %q not found")
+	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")
+	MsgRegistryNotFound                = ffe("PD012101", "Registry %q not found")
+	MsgRegistryInvalidEventSource      = ffe("PD012102", "Events source %d is invalid")
+	MsgRegistryInvalidEntryID          = ffe("PD012103", "Invalid entry ID '%s'")
+	MsgRegistryInvalidEntryName        = ffe("PD012104", "Invalid entry name '%s'")
+	MsgRegistryInvalidPropertyName     = ffe("PD012105", "Invalid property name '%s'")
+	MsgRegistryInvalidParentID         = ffe("PD012106", "Invalid parent ID '%s'")
+	MsgRegistryQueryLimitRequired      = ffe("PD012107", "Limit is required on all queries")
+	MsgRegistryTransportPropertyRegexp = ffe("PD012108", "transports.propertyRegexp for registry '%s' is invalid")
+	MsgRegistryDollarPrefixReserved    = ffe("PD012109", "Name '%s' is invalid. Dollar ('$') prefix is allowed only for reserved properties, and then is required (pluginReserved=%t)")
 
 	// TxMgr module PD0122XX
 	MsgTxMgrQueryLimitRequired           = ffe("PD012200", "limit is required on all queries")

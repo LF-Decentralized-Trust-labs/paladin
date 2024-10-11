@@ -22,7 +22,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -43,12 +45,18 @@ func newMockComponents(t *testing.T) *mockComponents {
 	return mc
 }
 
-func newTestTransportManager(t *testing.T, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
+func newTestTransportManager(t *testing.T, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents) components.TransportClient) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	oldLevel := logrus.GetLevel()
+	logrus.SetLevel(logrus.TraceLevel)
 
 	mc := newMockComponents(t)
+	var clients []components.TransportClient
 	for _, fn := range extraSetup {
-		fn(mc)
+		client := fn(mc)
+		if client != nil {
+			clients = append(clients, client)
+		}
 	}
 
 	tm := NewTransportManager(ctx, conf)
@@ -56,6 +64,12 @@ func newTestTransportManager(t *testing.T, conf *pldconf.TransportManagerConfig,
 	ir, err := tm.PreInit(mc.c)
 	require.NoError(t, err)
 	assert.NotNil(t, ir)
+
+	// registration happens during init
+	for _, c := range clients {
+		err := tm.RegisterClient(ctx, c)
+		require.NoError(t, err)
+	}
 
 	err = tm.PostInit(mc.c)
 	require.NoError(t, err)
@@ -66,8 +80,8 @@ func newTestTransportManager(t *testing.T, conf *pldconf.TransportManagerConfig,
 	assert.Equal(t, conf.NodeName, tm.LocalNodeName())
 
 	return ctx, tm.(*transportManager), mc, func() {
+		logrus.SetLevel(oldLevel)
 		cancelCtx()
-		// pDone()
 		tm.Stop()
 	}
 }
@@ -131,4 +145,28 @@ func TestConfigureTransportFail(t *testing.T) {
 
 	registerTestTransport(t, tm, tp)
 	assert.Regexp(t, "pop", *tp.t.initError.Load())
+}
+
+func TestDoubleRegisterClient(t *testing.T) {
+	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{})
+
+	receivingClient := componentmocks.NewTransportClient(t)
+	receivingClient.On("Destination").Return("receivingClient1")
+
+	err := tm.RegisterClient(context.Background(), receivingClient)
+	require.NoError(t, err)
+
+	err = tm.RegisterClient(context.Background(), receivingClient)
+	assert.Regexp(t, "PD012010", err)
+}
+
+func TestDoubleRegisterAfterStart(t *testing.T) {
+	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{})
+	tm.(*transportManager).destinationsFixed = true
+
+	receivingClient := componentmocks.NewTransportClient(t)
+	receivingClient.On("Destination").Return("receivingClient1")
+
+	err := tm.RegisterClient(context.Background(), receivingClient)
+	assert.Regexp(t, "PD012012", err)
 }

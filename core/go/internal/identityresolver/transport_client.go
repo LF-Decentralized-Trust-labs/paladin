@@ -23,12 +23,12 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-// If we had lots of these we woudl probably want to centralise the assignment of the constants to avoid duplication
-// but curretnly there is only 2 ( the other being PRIVATE_TX_MANAGER_DESTINATION )
-const IDENTITIY_RESOLVER_DESTINATION = "identity-resolver-manager"
+// If we had lots of these we would probably want to centralise the assignment of the constants to avoid duplication
+// but currently there is only 2 ( the other being PRIVATE_TX_MANAGER_DESTINATION )
+const IDENTITY_RESOLVER_DESTINATION = "identity-resolver-manager"
 
 func (p *identityResolver) Destination() string {
-	return IDENTITIY_RESOLVER_DESTINATION
+	return IDENTITY_RESOLVER_DESTINATION
 }
 
 func (ir *identityResolver) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {

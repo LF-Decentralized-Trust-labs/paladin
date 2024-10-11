@@ -62,16 +62,16 @@ func setupRegistryTests(t *testing.T) (context.Context, *pluginExerciser[prototk
 	}
 }
 
-func TestRegistryallback_UpsertTransportDetails(t *testing.T) {
+func TestRegistryallback_UpsertRegistryRecords(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupRegistryTests(t)
 	defer done()
 
-	inOutMap[fmt.Sprintf("%T", &prototk.RegistryMessage_UpsertTransportDetails{})] = func(dm *prototk.RegistryMessage) {
-		dm.ResponseToRegistry = &prototk.RegistryMessage_UpsertTransportDetailsRes{
-			UpsertTransportDetailsRes: &prototk.UpsertTransportDetailsResponse{},
+	inOutMap[fmt.Sprintf("%T", &prototk.RegistryMessage_UpsertRegistryRecords{})] = func(dm *prototk.RegistryMessage) {
+		dm.ResponseToRegistry = &prototk.RegistryMessage_UpsertRegistryRecordsRes{
+			UpsertRegistryRecordsRes: &prototk.UpsertRegistryRecordsResponse{},
 		}
 	}
-	_, err := callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{})
+	_, err := callbacks.UpsertRegistryRecords(ctx, &prototk.UpsertRegistryRecordsRequest{})
 	require.NoError(t, err)
 }
 
@@ -89,6 +89,23 @@ func TestRegistryFunction_ConfigureRegistry(t *testing.T) {
 		}
 	}, func(res *prototk.RegistryMessage) {
 		assert.IsType(t, &prototk.RegistryMessage_ConfigureRegistryRes{}, res.ResponseFromRegistry)
+	})
+}
+
+func TestRegistryFunction_HandleRegistryEvents(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupRegistryTests(t)
+	defer done()
+
+	// HandleRegistryEvents - paladin to registry
+	funcs.HandleRegistryEvents = func(ctx context.Context, cdr *prototk.HandleRegistryEventsRequest) (*prototk.HandleRegistryEventsResponse, error) {
+		return &prototk.HandleRegistryEventsResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.RegistryMessage) {
+		req.RequestToRegistry = &prototk.RegistryMessage_HandleRegistryEvents{
+			HandleRegistryEvents: &prototk.HandleRegistryEventsRequest{},
+		}
+	}, func(res *prototk.RegistryMessage) {
+		assert.IsType(t, &prototk.RegistryMessage_HandleRegistryEventsRes{}, res.ResponseFromRegistry)
 	})
 }
 

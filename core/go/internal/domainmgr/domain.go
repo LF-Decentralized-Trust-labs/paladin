@@ -151,19 +151,13 @@ func (d *domain) processDomainConfig(confRes *prototk.ConfigureDomainResponse) (
 
 	// We build a stream name in a way assured to result in a new stream if the ABI changes
 	// TODO: clean up defunct streams
-	var abiHashes []byte
-	for _, s := range stream.Sources {
-		hash, err := tktypes.ABISolDefinitionHash(d.ctx, s.ABI)
-		if err != nil {
-			return nil, err
-		}
-		abiHashes = append(abiHashes, hash[:]...)
+	streamHash, err := stream.Sources.Hash(d.ctx)
+	if err != nil {
+		return nil, err
 	}
-	streamHash := tktypes.Bytes32Keccak(abiHashes)
 	stream.Name = fmt.Sprintf("domain_%s_%s", d.name, streamHash)
 
 	// Create the event stream
-	var err error
 	d.eventStream, err = d.dm.blockIndexer.AddEventStream(d.ctx, &blockindexer.InternalEventStream{
 		Definition: stream,
 		Handler:    d.handleEventBatch,

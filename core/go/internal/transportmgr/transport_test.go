@@ -53,7 +53,7 @@ func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestTransport(t *testing.T, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+func newTestTransport(t *testing.T, extraSetup ...func(mc *mockComponents) components.TransportClient) (context.Context, *transportManager, *testPlugin, func()) {
 
 	ctx, tm, _, done := newTestTransportManager(t, &pldconf.TransportManagerConfig{
 		NodeName: "node1",
@@ -122,14 +122,15 @@ func testMessage() *components.TransportMessage {
 }
 
 func TestSendMessage(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
+	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
-				Node:             "node2",
-				Transport:        "test1",
-				TransportDetails: `{"likely":"json stuff"}`,
+				Node:      "node2",
+				Transport: "test1",
+				Details:   `{"likely":"json stuff"}`,
 			},
 		}, nil)
+		return nil
 	})
 	defer done()
 
@@ -162,14 +163,15 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestSendMessageNotInit(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
+	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
-				Node:             "node1",
-				Transport:        "test1",
-				TransportDetails: `{"likely":"json stuff"}`,
+				Node:      "node1",
+				Transport: "test1",
+				Details:   `{"likely":"json stuff"}`,
 			},
 		}, nil)
+		return nil
 	})
 	defer done()
 
@@ -183,14 +185,15 @@ func TestSendMessageNotInit(t *testing.T) {
 }
 
 func TestSendMessageFail(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
+	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
-				Node:             "node1",
-				Transport:        "test1",
-				TransportDetails: `{"likely":"json stuff"}`,
+				Node:      "node1",
+				Transport: "test1",
+				Details:   `{"likely":"json stuff"}`,
 			},
 		}, nil)
+		return nil
 	})
 	defer done()
 
@@ -206,8 +209,9 @@ func TestSendMessageFail(t *testing.T) {
 }
 
 func TestSendMessageDestNotFound(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t, func(mc *mockComponents) {
+	ctx, tm, _, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, fmt.Errorf("not found"))
+		return nil
 	})
 	defer done()
 
@@ -219,14 +223,15 @@ func TestSendMessageDestNotFound(t *testing.T) {
 }
 
 func TestSendMessageDestNotAvailable(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) {
+	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
-				Node:             "node1",
-				Transport:        "another",
-				TransportDetails: `{"not":"the stuff we need"}`,
+				Node:      "node1",
+				Transport: "another",
+				Details:   `{"not":"the stuff we need"}`,
 			},
 		}, nil)
+		return nil
 	})
 	defer done()
 
@@ -281,16 +286,15 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 func TestReceiveMessage(t *testing.T) {
 	receivedMessages := make(chan *components.TransportMessage, 1)
 
-	ctx, tm, tp, done := newTestTransport(t)
-	defer done()
-
-	receivingClient := componentmocks.NewTransportClient(t)
-	receivingClient.On("Destination").Return("receivingClient1")
-	receivingClient.On("ReceiveTransportMessage", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
-		receivedMessages <- args[1].(*components.TransportMessage)
+	ctx, _, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+		receivingClient := componentmocks.NewTransportClient(t)
+		receivingClient.On("Destination").Return("receivingClient1")
+		receivingClient.On("ReceiveTransportMessage", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
+			receivedMessages <- args[1].(*components.TransportMessage)
+		})
+		return receivingClient
 	})
-	err := tm.RegisterClient(ctx, receivingClient)
-	assert.NoError(t, err)
+	defer done()
 
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
@@ -308,6 +312,44 @@ func TestReceiveMessage(t *testing.T) {
 	assert.NotNil(t, rmr)
 
 	<-receivedMessages
+}
+
+func TestReceiveMessageNoReceiver(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t)
+	defer done()
+
+	msg := &prototk.Message{
+		MessageId:     uuid.NewString(),
+		CorrelationId: confutil.P(uuid.NewString()),
+		Destination:   "receivingClient1@node1",
+		ReplyTo:       "from@node2",
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
+	}
+
+	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		Message: msg,
+	})
+	require.Regexp(t, "PD012011", err)
+}
+
+func TestReceiveMessageInvalidDestination(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t)
+	defer done()
+
+	msg := &prototk.Message{
+		MessageId:     uuid.NewString(),
+		CorrelationId: confutil.P(uuid.NewString()),
+		Destination:   "___@node1",
+		ReplyTo:       "from@node2",
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
+	}
+
+	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		Message: msg,
+	})
+	require.Regexp(t, "PD012005", err)
 }
 
 func TestReceiveMessageNotInit(t *testing.T) {

@@ -269,6 +269,72 @@ func TestABIsMustMatchOrder(t *testing.T) {
 
 }
 
+func TestABIsHashSubSelect(t *testing.T) {
+
+	var abiA abi.ABI
+	err := json.Unmarshal(([]byte)(`[
+		{
+			"type": "event",
+			"name": "aaa",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "function",
+			"name": "bbb",
+			"inputs": [
+			  {
+			    "name": "nameInB",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiA)
+	require.NoError(t, err)
+
+	var abiB abi.ABI
+	err = json.Unmarshal(([]byte)(`[
+		{
+			"type": "function",
+			"name": "ccc",
+			"inputs": [
+			  {
+			    "name": "nameInC",
+				"type": "uint256"
+			  }
+			]
+		},
+		{
+			"type": "event",
+			"name": "aaa",
+			"inputs": [
+			  {
+			    "name": "nameInA",
+				"type": "uint256"
+			  }
+			]
+		}
+	]`), &abiB)
+	require.NoError(t, err)
+
+	hashA, err := ABISolDefinitionHash(context.Background(), abiA, "event")
+	require.NoError(t, err)
+	hashB, err := ABISolDefinitionHash(context.Background(), abiB, "event")
+	require.NoError(t, err)
+	assert.Equal(t, *hashA, *hashB)
+
+	hashA, err = ABISolDefinitionHash(context.Background(), abiA)
+	require.NoError(t, err)
+	hashB, err = ABISolDefinitionHash(context.Background(), abiB)
+	require.NoError(t, err)
+	assert.NotEqual(t, *hashA, *hashB)
+
+}
+
 func TestABIsDeepMisMatchName(t *testing.T) {
 
 	var abiA abi.ABI

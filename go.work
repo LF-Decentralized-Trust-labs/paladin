@@ -7,6 +7,7 @@ use (
 	./domains/noto
 	./domains/zeto
 	./operator
+	./registries/evm
 	./registries/static
 	./testinfra
 	./toolkit/go

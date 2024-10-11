@@ -17,11 +17,28 @@ syntax = "proto3";
 
 package io.kaleido.paladin.toolkit;
 
-message UpsertTransportDetails {
-    string node = 1; // The node
-    string transport = 2; // The name of the transport (such as "grpc")
-    string transport_details = 3; // The transport details (opaque to registry)
-  }
+import "on_chain_events.proto";
 
-message UpsertTransportDetailsResponse {}
+message UpsertRegistryRecordsRequest {
+  repeated RegistryEntry entries = 1;
+  repeated RegistryProperty properties = 2;
+}
 
+message UpsertRegistryRecordsResponse {}
+
+message RegistryEntry {
+  string id = 1; // The id must be unique within this registry
+  string name = 2; // The name must be unique within the scope, and a valid Paladin name string
+  string parent_id = 3; // The id of the parent record, or the empty string if this is a root record
+  bool   active = 4; // Queries against the registry will by default ignore all inactive records
+  optional OnChainEventLocation location = 5; // Recorded for provenance if provided
+}
+
+message RegistryProperty {
+  string entry_id = 1; // The parent entry - must already exist, but can be created in the same payload
+  string name = 2; // The property name. Must be a valid Paladin name string, unless plugin_reserved=true in which case it must be a valid Palidin name string prefixed with "$"
+  string value = 3; // The property value - always stored and queried as a string
+  bool   active = 4; // Queries against the registry will by default ignore all inactive records
+  bool   plugin_reserved = 5; // Allows a registry plugin to claim reserved property names like "$owner" that cannot clash with either Palading reserved ones like ".created", or user one
+  optional OnChainEventLocation location = 6; // Recorded for provenance if provided
+}

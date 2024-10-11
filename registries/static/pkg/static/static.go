@@ -25,4 +25,4 @@ func NewPlugin(ctx context.Context) plugintk.PluginBase {
 	return staticregistry.NewPlugin(ctx)
 }
 
-type NodeStaticEntry staticregistry.NodeStaticEntry
+type StaticEntry staticregistry.StaticEntry

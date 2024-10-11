@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -31,36 +34,66 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestRegistryManager(t *testing.T, conf *pldconf.RegistryManagerConfig, extraSetup ...func(mc *componentmocks.AllComponents)) (context.Context, *registryManager, func()) {
+type mockComponents struct {
+	noInit        bool
+	db            sqlmock.Sqlmock
+	allComponents *componentmocks.AllComponents
+	blockIndexer  *componentmocks.BlockIndexer
+}
+
+func newTestRegistryManager(t *testing.T, realDB bool, conf *pldconf.RegistryManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *registryManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	mc := componentmocks.NewAllComponents(t)
+	mc := &mockComponents{
+		blockIndexer:  componentmocks.NewBlockIndexer(t),
+		allComponents: componentmocks.NewAllComponents(t),
+	}
+	mc.allComponents.On("BlockIndexer").Return(mc.blockIndexer).Maybe()
+
+	var p persistence.Persistence
+	var err error
+	var pDone func()
+	if realDB {
+		p, pDone, err = persistence.NewUnitTestPersistence(ctx)
+		require.NoError(t, err)
+	} else {
+		mp, err := mockpersistence.NewSQLMockProvider()
+		require.NoError(t, err)
+		p = mp.P
+		mc.db = mp.Mock
+		pDone = func() {
+			require.NoError(t, mp.Mock.ExpectationsWereMet())
+		}
+	}
+	mc.allComponents.On("Persistence").Return(p)
 
 	for _, fn := range extraSetup {
 		fn(mc)
 	}
 
-	tm := NewRegistryManager(ctx, conf)
+	rm := NewRegistryManager(ctx, conf)
 
-	initData, err := tm.PreInit(mc)
-	require.NoError(t, err)
-	assert.NotNil(t, initData)
+	if !mc.noInit {
+		initData, err := rm.PreInit(mc.allComponents)
+		require.NoError(t, err)
+		assert.NotNil(t, initData)
 
-	err = tm.PostInit(mc)
-	require.NoError(t, err)
+		err = rm.PostInit(mc.allComponents)
+		require.NoError(t, err)
 
-	err = tm.Start()
-	require.NoError(t, err)
+		err = rm.Start()
+		require.NoError(t, err)
+	}
 
-	return ctx, tm.(*registryManager), func() {
+	return ctx, rm.(*registryManager), mc, func() {
 		cancelCtx()
-		// pDone()
-		tm.Stop()
+		pDone()
+		rm.Stop()
 	}
 }
 
 func TestConfiguredRegistries(t *testing.T) {
-	_, dm, done := newTestRegistryManager(t, &pldconf.RegistryManagerConfig{
+	_, dm, _, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerConfig{
 		Registries: map[string]*pldconf.RegistryConfig{
 			"test1": {
 				Plugin: pldconf.PluginConfig{
@@ -81,17 +114,17 @@ func TestConfiguredRegistries(t *testing.T) {
 }
 
 func TestRegistryRegisteredNotFound(t *testing.T) {
-	_, dm, done := newTestRegistryManager(t, &pldconf.RegistryManagerConfig{
+	_, dm, _, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerConfig{
 		Registries: map[string]*pldconf.RegistryConfig{},
 	})
 	defer done()
 
 	_, err := dm.RegistryRegistered("unknown", uuid.New(), nil)
-	assert.Regexp(t, "PD012102", err)
+	assert.Regexp(t, "PD012101", err)
 }
 
 func TestConfigureRegistryFail(t *testing.T) {
-	_, tm, done := newTestRegistryManager(t, &pldconf.RegistryManagerConfig{
+	_, tm, _, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerConfig{
 		Registries: map[string]*pldconf.RegistryConfig{
 			"test1": {
 				Config: map[string]any{"some": "conf"},
@@ -109,4 +142,14 @@ func TestConfigureRegistryFail(t *testing.T) {
 
 	registerTestRegistry(t, tm, tp)
 	assert.Regexp(t, "pop", *tp.r.initError.Load())
+}
+
+func TestGetRegistryNotFound(t *testing.T) {
+	ctx, dm, _, done := newTestRegistryManager(t, false, &pldconf.RegistryManagerConfig{
+		Registries: map[string]*pldconf.RegistryConfig{},
+	})
+	defer done()
+
+	_, err := dm.GetRegistry(ctx, "unknown")
+	assert.Regexp(t, "PD012101", err)
 }

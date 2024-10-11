@@ -37,8 +37,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/kaleido-io/paladin/kata => ../../kata
-
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 
 replace github.com/kaleido-io/paladin/config => ../../config

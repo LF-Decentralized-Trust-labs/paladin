@@ -102,6 +102,10 @@ func TestHexBytesScanValue(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", v)
 
+	dbv, err := ((HexBytes)(nil)).Value()
+	require.NoError(t, err)
+	require.Nil(t, dbv)
+
 	scanner := &HexBytes{}
 
 	err = scanner.Scan("0xfeedbeef")

@@ -95,8 +95,20 @@ func ABIBySolDefinition(ctx context.Context, a abi.ABI) (map[string]*abi.Entry, 
 	return byDefs, nil
 }
 
-func ABISolDefinitionHash(ctx context.Context, a abi.ABI) (*Bytes32, error) {
+func ABISolDefinitionHash(ctx context.Context, a abi.ABI, subMatch ...abi.EntryType) (*Bytes32, error) {
 	hash := sha256.New()
+	if len(subMatch) > 0 {
+		subSelected := make(abi.ABI, 0, len(a))
+		for _, e := range a {
+			for _, t := range subMatch {
+				if e.Type == t {
+					subSelected = append(subSelected, e)
+					break
+				}
+			}
+		}
+		a = subSelected
+	}
 	bySolDef, err := ABIBySolDefinition(ctx, a)
 	if err != nil {
 		return nil, err

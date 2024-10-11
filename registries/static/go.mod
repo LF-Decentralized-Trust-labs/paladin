@@ -6,6 +6,7 @@ require (
 	github.com/hyperledger/firefly-common v1.4.11
 	github.com/kaleido-io/paladin/toolkit v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
+	golang.org/x/crypto v0.27.0
 	golang.org/x/text v0.18.0
 )
 
@@ -24,7 +25,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/term v0.24.0 // indirect
@@ -36,8 +36,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/kaleido-io/paladin/kata => ../../kata
 
 replace github.com/kaleido-io/paladin/toolkit => ../../toolkit/go
 

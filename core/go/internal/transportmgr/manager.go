@@ -42,8 +42,9 @@ type transportManager struct {
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	destinations    map[string]components.TransportClient
-	destinationsMux sync.RWMutex
+	destinations      map[string]components.TransportClient
+	destinationsFixed bool
+	destinationsMux   sync.RWMutex
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
@@ -72,7 +73,13 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	return nil
 }
 
-func (tm *transportManager) Start() error { return nil }
+func (tm *transportManager) Start() error {
+	tm.destinationsMux.Lock()
+	defer tm.destinationsMux.Unlock()
+	// All destinations must be registered as part of the startup sequence
+	tm.destinationsFixed = true
+	return nil
+}
 
 func (tm *transportManager) Stop() {
 	tm.mux.Lock()
@@ -90,6 +97,9 @@ func (tm *transportManager) Stop() {
 func (tm *transportManager) RegisterClient(ctx context.Context, client components.TransportClient) error {
 	tm.destinationsMux.Lock()
 	defer tm.destinationsMux.Unlock()
+	if tm.destinationsFixed {
+		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientRegisterAfterStartup, client.Destination())
+	}
 	if _, found := tm.destinations[client.Destination()]; found {
 		log.L(ctx).Errorf("Client already registered for destination %s", client.Destination())
 		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientAlreadyRegistered, client.Destination())

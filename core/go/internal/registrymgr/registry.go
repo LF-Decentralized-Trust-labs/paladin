@@ -18,18 +18,25 @@ package registrymgr
 import (
 	"context"
 	"encoding/json"
-	"sync"
+	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-
+	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type registry struct {
@@ -42,27 +49,25 @@ type registry struct {
 	name string
 	api  components.RegistryManagerToRegistry
 
-	// TODO: Replace with a cache-backed DB system
-	stateLock           sync.Mutex
-	inMemoryPlaceholder map[string][]*components.RegistryNodeTransportEntry
-
 	initialized atomic.Bool
 	initRetry   *retry.Retry
 
 	initError atomic.Pointer[error]
 	initDone  chan struct{}
+
+	config      *prototk.RegistryConfig
+	eventStream *blockindexer.EventStream
 }
 
 func (rm *registryManager) newRegistry(id uuid.UUID, name string, conf *pldconf.RegistryConfig, toRegistry components.RegistryManagerToRegistry) *registry {
 	r := &registry{
-		rm:                  rm,
-		conf:                conf,
-		initRetry:           retry.NewRetryIndefinite(&conf.Init.Retry),
-		name:                name,
-		id:                  id,
-		api:                 toRegistry,
-		inMemoryPlaceholder: make(map[string][]*components.RegistryNodeTransportEntry),
-		initDone:            make(chan struct{}),
+		rm:        rm,
+		conf:      conf,
+		initRetry: retry.NewRetryIndefinite(&conf.Init.Retry),
+		name:      name,
+		id:        id,
+		api:       toRegistry,
+		initDone:  make(chan struct{}),
 	}
 	r.ctx, r.cancelCtx = context.WithCancel(log.WithLogField(rm.bgCtx, "registry", r.name))
 	return r
@@ -76,10 +81,14 @@ func (r *registry) init() {
 	err := r.initRetry.Do(r.ctx, func(attempt int) (bool, error) {
 		// Send the configuration to the registry for processing
 		confJSON, _ := json.Marshal(&r.conf.Config)
-		_, err := r.api.ConfigureRegistry(r.ctx, &prototk.ConfigureRegistryRequest{
+		res, err := r.api.ConfigureRegistry(r.ctx, &prototk.ConfigureRegistryRequest{
 			Name:       r.name,
 			ConfigJson: string(confJSON),
 		})
+		if err == nil {
+			r.config = res.RegistryConfig
+			err = r.configureEventStream(r.ctx)
+		}
 		return true, err
 	})
 	if err != nil {
@@ -93,37 +102,443 @@ func (r *registry) init() {
 	}
 }
 
-func (r *registry) getNodeTransports(node string) []*components.RegistryNodeTransportEntry {
-	r.stateLock.Lock()
-	defer r.stateLock.Unlock()
-	return r.inMemoryPlaceholder[node]
+func (r *registry) configureEventStream(ctx context.Context) (err error) {
+
+	if len(r.config.EventSources) == 0 {
+		return nil
+	}
+
+	stream := &blockindexer.EventStream{
+		Type:    blockindexer.EventStreamTypeInternal.Enum(),
+		Sources: []blockindexer.EventStreamSource{},
+	}
+
+	for i, es := range r.config.EventSources {
+
+		var contractAddr *tktypes.EthAddress
+		if es.ContractAddress != "" {
+			contractAddr, err = tktypes.ParseEthAddress(es.ContractAddress)
+			if err != nil {
+				return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEventSource, i)
+			}
+		}
+
+		var eventsABI abi.ABI
+		if err := json.Unmarshal([]byte(es.AbiEventsJson), &eventsABI); err != nil {
+			return i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEventSource, i)
+		}
+
+		stream.Sources = append(stream.Sources, blockindexer.EventStreamSource{
+			Address: contractAddr,
+			ABI:     eventsABI,
+		})
+	}
+
+	streamHash, err := stream.Sources.Hash(ctx)
+	if err != nil {
+		return err
+	}
+	stream.Name = fmt.Sprintf("registry_%s_%s", r.name, streamHash)
+
+	r.eventStream, err = r.rm.blockIndexer.AddEventStream(ctx, &blockindexer.InternalEventStream{
+		Definition: stream,
+		Handler:    r.handleEventBatch,
+	})
+	return err
 }
 
-// Registry callback to the registry manager when new entries are available to upsert & cache
-// (can be called during and after initialization asynchronously as pre-configured and updated information becomes known)
-func (r *registry) UpsertTransportDetails(ctx context.Context, req *prototk.UpsertTransportDetails) (*prototk.UpsertTransportDetailsResponse, error) {
-
-	r.stateLock.Lock()
-	defer r.stateLock.Unlock()
-
-	if req.Node == "" || req.Transport == "" {
-		return nil, i18n.NewError(ctx, msgs.MsgRegistryInvalidEntry)
+func (r *registry) UpsertRegistryRecords(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest) (*prototk.UpsertRegistryRecordsResponse, error) {
+	var postCommit func()
+	err := r.rm.p.DB().Transaction(func(dbTX *gorm.DB) (err error) {
+		postCommit, err = r.upsertRegistryRecords(ctx, dbTX, req.Entries, req.Properties)
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
+	postCommit()
+	return &prototk.UpsertRegistryRecordsResponse{}, nil
+}
 
-	existingEntries := r.inMemoryPlaceholder[req.Node]
-	deDuped := make([]*components.RegistryNodeTransportEntry, 0, len(existingEntries))
-	for _, existing := range existingEntries {
-		if existing.Node != req.Node || existing.Transport != req.Transport {
-			deDuped = append(deDuped, existing)
+func (r *registry) handleEventBatch(ctx context.Context, dbTX *gorm.DB, batch *blockindexer.EventDeliveryBatch) (blockindexer.PostCommit, error) {
+
+	// Build the proto version of these events
+	events := make([]*prototk.OnChainEvent, len(batch.Events))
+	for i, be := range batch.Events {
+		events[i] = &prototk.OnChainEvent{
+			Location: &prototk.OnChainEventLocation{
+				TransactionHash:  be.TransactionHash.String(),
+				BlockNumber:      be.BlockNumber,
+				TransactionIndex: be.TransactionIndex,
+				LogIndex:         be.LogIndex,
+			},
+			Signature:         be.Signature.String(),
+			SoliditySignature: be.SoliditySignature,
+			DataJson:          string(be.Data),
 		}
 	}
-	r.inMemoryPlaceholder[req.Node] = append(deDuped, &components.RegistryNodeTransportEntry{
-		Node:             req.Node,
-		Transport:        req.Transport,
-		TransportDetails: req.TransportDetails,
-	})
 
-	return &prototk.UpsertTransportDetailsResponse{}, nil
+	// Push them down synchronously to the registry to parse
+	res, err := r.api.HandleRegistryEvents(ctx, &prototk.HandleRegistryEventsRequest{
+		BatchId: batch.BatchID.String(),
+		Events:  events,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Upsert any transport details that are detected by the registry
+	return r.upsertRegistryRecords(ctx, dbTX, res.Entries, res.Properties)
+
+}
+
+func (r *registry) upsertRegistryRecords(ctx context.Context, dbTX *gorm.DB, protoEntries []*prototk.RegistryEntry, protoProps []*prototk.RegistryProperty) (func(), error) {
+
+	dbEntries := make([]*DBEntry, len(protoEntries))
+	for i, protoEntry := range protoEntries {
+		// The registry plugin code is responsible for ensuring these rules are followed
+		// before pushing any data to the registry manager.
+		// If the registry detects any data that is invalid according to these rules
+		// published in their underlying store (such as the blockchain) it must
+		// exclude it and act appropriately.
+		// Otherwise the registry plugin will receive failures, and it might then stall indexing the
+		// its event source in a failure loop with the registry manager.
+
+		// The ID must be parsable as Hex bytes - this could be a 16 byte UUID formatted as plain hex,
+		// or it could (more likely) be a hash of the parent_id and the name of the entry meaning
+		// it is unique within the whole registry scope.
+		entryID, err := tktypes.ParseHexBytes(ctx, protoEntry.Id)
+		if err != nil || len(entryID) == 0 {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoEntry.Id)
+		}
+
+		var parentID tktypes.HexBytes
+		if protoEntry.ParentId != "" {
+			parentID, err = tktypes.ParseHexBytes(ctx, protoEntry.ParentId)
+			if err != nil || len(parentID) == 0 {
+				return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidParentID, protoEntry.ParentId)
+			}
+		}
+
+		// Names must meet the criteria that is set out in tktypes.PrivateIdentryLocator for use
+		// as a node name. That is not to say this is the only use of entries, but applying this
+		// common rule to all entry names ensures we meet the criteria of node names.
+		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, protoEntry.Name, tktypes.DefaultNameMaxLen, "name"); err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryName, protoEntry.Name)
+		}
+
+		dbe := &DBEntry{
+			Registry: r.name,
+			ID:       entryID,
+			ParentID: parentID,
+			Name:     protoEntry.Name,
+			Active:   protoEntry.Active,
+		}
+		if protoEntry.Location != nil {
+			txHash, _ := tktypes.ParseBytes32(protoEntry.Location.TransactionHash)
+			dbe.TransactionHash = &txHash
+			dbe.BlockNumber = &protoEntry.Location.BlockNumber
+			dbe.TransactionIndex = &protoEntry.Location.LogIndex
+			dbe.LogIndex = &protoEntry.Location.LogIndex
+		}
+		dbEntries[i] = dbe
+	}
+
+	dbProps := make([]*DBProperty, len(protoProps))
+	for i, protoProp := range protoProps {
+
+		// DB will check for relationship to entry, but we need to parse the ID consistently into bytes
+		entryID, err := tktypes.ParseHexBytes(ctx, protoProp.EntryId)
+		if err != nil || len(entryID) == 0 {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidEntryID, protoProp.EntryId)
+		}
+
+		// Plugin reserved property names must start with $, which is not valid in the name so we
+		// cut it before checking the rest of the string.
+		nameToCheck, hasReservedPrefix := strings.CutPrefix(protoProp.Name, "$")
+		if protoProp.PluginReserved != hasReservedPrefix {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryDollarPrefixReserved, protoProp.Name, protoProp.PluginReserved)
+		}
+
+		// We require the names of properties to conform to rules, so that we can distinguish
+		// these properties from our ".id", ".created", ".updated" properties.
+		// Note as above it is the registry plugin's responsibility to handle cases where a
+		// value that does not conform is published to it (by logging and discarding it etc.)
+		if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nameToCheck, tktypes.DefaultNameMaxLen, "name"); err != nil {
+			return nil, i18n.WrapError(ctx, err, msgs.MsgRegistryInvalidPropertyName, protoProp.Name)
+		}
+
+		dbp := &DBProperty{
+			Registry: r.name,
+			EntryID:  entryID,
+			Name:     protoProp.Name,
+			Active:   protoProp.Active,
+			Value:    protoProp.Value,
+		}
+		if protoProp.Location != nil {
+			txHash, _ := tktypes.ParseBytes32(protoProp.Location.TransactionHash)
+			dbp.TransactionHash = &txHash
+			dbp.BlockNumber = &protoProp.Location.BlockNumber
+			dbp.TransactionIndex = &protoProp.Location.LogIndex
+			dbp.LogIndex = &protoProp.Location.LogIndex
+		}
+		dbProps[i] = dbp
+	}
+
+	var err error
+
+	if len(dbEntries) > 0 {
+		err = dbTX.
+			WithContext(ctx).
+			Table("reg_entries").
+			Clauses(clause.OnConflict{
+				Columns: []clause.Column{
+					{Name: "registry"},
+					{Name: "id"},
+				},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"updated",
+					"active", // this is the primary thing that can actually be mutated
+					"tx_hash",
+					"block_number",
+					"tx_index",
+					"log_index",
+				}),
+			}).
+			Create(dbEntries).
+			Error
+	}
+
+	if len(dbProps) > 0 {
+		err = dbTX.
+			WithContext(ctx).
+			Table("reg_props").
+			Clauses(clause.OnConflict{
+				Columns: []clause.Column{
+					{Name: "registry"},
+					{Name: "entry_id"},
+					{Name: "name"},
+				},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"updated",
+					"active",
+					"value",
+					"tx_hash",
+					"block_number",
+					"tx_index",
+					"log_index",
+				}),
+			}).
+			Create(dbProps).
+			Error
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return func() {
+		// It's a lot of work to determine which parts of the node transport cache are affected,
+		// as the upserts above happen simply by storing properties that might/might-not match
+		// queries that resolve node transports to names.
+		//
+		// So instead we just zap the whole cache when we have an update.
+		r.rm.transportDetailsCache.Clear()
+	}, nil
+}
+
+type dynamicFieldSet struct {
+	props       []string
+	propIndexes map[string]int
+}
+
+// Track which fields are used in the query, as we create a dynamic join for each
+func (dfs *dynamicFieldSet) ResolverFor(propName string) filters.FieldResolver {
+	switch propName {
+	case ".id":
+		return filters.HexBytesField(`"reg_entries"."id"`)
+	case ".parentId":
+		return filters.HexBytesField(`"reg_entries"."parent_id"`)
+	case ".name":
+		return filters.StringField(`"reg_entries"."name"`)
+	case ".created":
+		return filters.TimestampField(`"reg_entries"."created"`)
+	case ".updated":
+		return filters.TimestampField(`"reg_entries"."updated"`)
+	}
+
+	idx, exists := dfs.propIndexes[propName]
+	if !exists {
+		idx = len(dfs.props)
+		dfs.propIndexes[propName] = idx
+		dfs.props = append(dfs.props, propName)
+	}
+	return filters.StringField(fmt.Sprintf("p%d.value", idx))
+}
+
+func (r *registry) QueryEntries(ctx context.Context, dbTX *gorm.DB, fActive components.ActiveFilter, jq *query.QueryJSON) ([]*components.RegistryEntry, error) {
+
+	if jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgRegistryQueryLimitRequired)
+	}
+
+	dfs := &dynamicFieldSet{propIndexes: make(map[string]int)}
+
+	q := filters.BuildGORM(ctx, jq,
+		dbTX.WithContext(ctx).
+			Table("reg_entries").
+			Where(`"reg_entries"."registry" = ?`, r.name),
+		dfs)
+
+	switch fActive {
+	case components.ActiveFilterAny: // no filter
+	case components.ActiveFilterInactive:
+		q = q.Where(`"reg_entries"."active" IS FALSE`)
+	case components.ActiveFilterActive:
+		fallthrough
+	default:
+		q = q.Where(`"reg_entries"."active" IS TRUE`)
+	}
+
+	// After BuildGORM completes, dfs will have a list of all the fields used in the query.
+	// We create a join to a virtual column for each.
+	for idx, prop := range dfs.props {
+		q = q.Joins(fmt.Sprintf(
+			// The property might not exist, so LEFT JOIN (assured to be zero or one),
+			// this will give us NULL for unset properties.
+			`LEFT JOIN reg_props AS p%[1]d `+
+				`ON p%[1]d.registry = ? `+
+				`AND p%[1]d.active IS TRUE `+ // only select on active props, regardless of active query on entry
+				`AND p%[1]d.entry_id = "reg_entries"."id" `+
+				`AND p%[1]d.name = ?`, idx),
+			r.name,
+			prop)
+	}
+
+	var dbEntries []*DBEntry
+	err := q.Find(&dbEntries).Error
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]*components.RegistryEntry, len(dbEntries))
+	for i, dbe := range dbEntries {
+		entry := &components.RegistryEntry{
+			Registry: dbe.Registry,
+			ID:       dbe.ID,
+			Name:     dbe.Name,
+		}
+		// Return nil (not empty) for parent string here - this avoids DB index complexity with null values
+		if len(dbe.ParentID) > 0 {
+			entry.ParentID = dbe.ParentID
+		}
+		// Return the active field in the JSON if the query was anything apart from "active"
+		if fActive != components.ActiveFilterActive {
+			entry.ActiveFlag = &components.ActiveFlag{Active: dbe.Active}
+		}
+		// For block info, our insert logic ensures if one is set they are all set
+		if dbe.BlockNumber != nil {
+			entry.OnChainLocation = &components.OnChainLocation{
+				BlockNumber:      *dbe.BlockNumber,
+				TransactionIndex: *dbe.TransactionIndex,
+				LogIndex:         *dbe.TransactionIndex,
+			}
+		}
+		entries[i] = entry
+	}
+
+	return entries, nil
+
+}
+
+func (r *registry) GetEntryProperties(ctx context.Context, dbTX *gorm.DB, fActive components.ActiveFilter, entryIDs ...tktypes.HexBytes) ([]*components.RegistryProperty, error) {
+
+	var dbProps []*DBProperty
+	q := dbTX.WithContext(ctx).
+		Table("reg_props").
+		Where("registry = ?", r.name).
+		Where("entry_id IN (?)", entryIDs)
+
+	switch fActive {
+	case components.ActiveFilterAny: // no filter
+	case components.ActiveFilterInactive:
+		q = q.Where("active IS FALSE")
+	case components.ActiveFilterActive:
+		fallthrough
+	default:
+		q = q.Where("active IS TRUE")
+	}
+
+	err := q.Order("name").Find(&dbProps).Error
+	if err != nil {
+		return nil, err
+	}
+
+	props := make([]*components.RegistryProperty, len(dbProps))
+	for i, dbp := range dbProps {
+		prop := &components.RegistryProperty{
+			Registry: dbp.Registry,
+			EntryID:  dbp.EntryID,
+			Name:     dbp.Name,
+			Value:    dbp.Value,
+		}
+		// Return the active field in the JSON if the query was anything apart from "active"
+		if fActive != components.ActiveFilterActive {
+			prop.ActiveFlag = &components.ActiveFlag{Active: dbp.Active}
+		}
+		// For block info, our insert logic ensures if one is set they are all set
+		if dbp.BlockNumber != nil {
+			prop.OnChainLocation = &components.OnChainLocation{
+				BlockNumber:      *dbp.BlockNumber,
+				TransactionIndex: *dbp.TransactionIndex,
+				LogIndex:         *dbp.TransactionIndex,
+			}
+		}
+		props[i] = prop
+	}
+
+	return props, nil
+
+}
+
+func filteredPropsMap(entryProps []*components.RegistryProperty, entryID tktypes.HexBytes) map[string]string {
+	props := make(map[string]string)
+	for _, p := range entryProps {
+		if p.EntryID.Equals(entryID) {
+			props[p.Name] = p.Value
+		}
+	}
+	return props
+}
+
+func (r *registry) QueryEntriesWithProps(ctx context.Context, dbTX *gorm.DB, fActive components.ActiveFilter, jq *query.QueryJSON) ([]*components.RegistryEntryWithProperties, error) {
+
+	entries, err := r.QueryEntries(ctx, dbTX, fActive, jq)
+	if err != nil {
+		return nil, err
+	}
+
+	entryIDs := make([]tktypes.HexBytes, len(entries))
+	for i, e := range entries {
+		entryIDs[i] = e.ID
+	}
+
+	withProps := make([]*components.RegistryEntryWithProperties, len(entries))
+	if len(entryIDs) > 0 {
+		entryProps, err := r.GetEntryProperties(ctx, dbTX, components.ActiveFilterActive /* still active props regardless of filter on active for entry */, entryIDs...)
+		if err != nil {
+			return nil, err
+		}
+		for i, e := range entries {
+			withProps[i] = &components.RegistryEntryWithProperties{
+				RegistryEntry: e,
+				Properties:    filteredPropsMap(entryProps, e.ID),
+			}
+		}
+
+	}
+
+	return withProps, nil
 }
 
 func (r *registry) close() {

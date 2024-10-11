@@ -21,9 +21,11 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/registries/static/internal/msgs"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"golang.org/x/crypto/sha3"
 )
 
 type Server interface {
@@ -59,39 +61,77 @@ func (r *staticRegistry) ConfigureRegistry(ctx context.Context, req *prototk.Con
 	}
 
 	// We simply publish everything here and now with the static registry.
-	for nodeName, nodeRecord := range r.conf.Nodes {
-		for transportName, transportRecordUnparsed := range nodeRecord.Transports {
-			if err := r.registerNodeTransport(ctx, nodeName, transportName, transportRecordUnparsed); err != nil {
-				return nil, err
-			}
+	upsert := &prototk.UpsertRegistryRecordsRequest{}
+	for name, entry := range r.conf.Entries {
+		if err == nil {
+			err = r.recurseBuildUpsert(ctx, upsert, nil, name, entry)
+		}
+	}
+	if err == nil {
+		_, err = r.callbacks.UpsertRegistryRecords(ctx, upsert)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &prototk.ConfigureRegistryResponse{
+		RegistryConfig: &prototk.RegistryConfig{},
+	}, nil
+}
+
+func (r *staticRegistry) HandleRegistryEvents(ctx context.Context, req *prototk.HandleRegistryEventsRequest) (*prototk.HandleRegistryEventsResponse, error) {
+	return nil, i18n.NewError(ctx, msgs.MsgFunctionUnsupported)
+}
+
+func (r *staticRegistry) recurseBuildUpsert(ctx context.Context, req *prototk.UpsertRegistryRecordsRequest, parentID tktypes.HexBytes, name string, inEntry *StaticEntry) error {
+
+	idHash := sha3.NewLegacyKeccak256()
+	if parentID != nil {
+		idHash.Write([]byte(parentID))
+	}
+	idHash.Write([]byte(name))
+	entryID := tktypes.HexBytes(idHash.Sum(nil))
+	entry := prototk.RegistryEntry{
+		Id:       entryID.String(),
+		Name:     name,
+		ParentId: parentID.String(),
+		Active:   true,
+	}
+	properties := make([]*prototk.RegistryProperty, 0, len(inEntry.Properties))
+	for propName, jsonValue := range inEntry.Properties {
+		var untyped any
+		err := json.Unmarshal(jsonValue, &untyped)
+		if err != nil {
+			return i18n.WrapError(ctx, err, msgs.MsgInvalidRegistryConfig)
+		}
+
+		// We let the config contain structured JSON (well YAML in it's original form before it was passed as JSON to us)
+		// Or we let the config contain a string
+		var strValue string
+		switch v := untyped.(type) {
+		case string:
+			// it's already a string - so it's our details directly
+			strValue = v
+		default:
+			// otherwise we preserve the JSON
+			strValue = jsonValue.String()
+		}
+
+		log.L(ctx).Infof("Registering %s prop=%s (parentId=%s)", entry.Name, propName, parentID)
+		properties = append(properties, &prototk.RegistryProperty{
+			EntryId: entry.Id,
+			Name:    propName,
+			Value:   strValue,
+			Active:  true,
+		})
+	}
+	req.Entries = append(req.Entries, &entry)
+	req.Properties = append(req.Properties, properties...)
+
+	for childName, child := range inEntry.Children {
+		if err := r.recurseBuildUpsert(ctx, req, entryID, childName, child); err != nil {
+			return err
 		}
 	}
 
-	return &prototk.ConfigureRegistryResponse{}, nil
-}
-
-func (r *staticRegistry) registerNodeTransport(ctx context.Context, nodeName, transportName string, transportRecordUnparsed tktypes.RawJSON) error {
-	var untyped any
-	err := json.Unmarshal(transportRecordUnparsed, &untyped)
-	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgInvalidRegistryConfig, nodeName, transportName)
-	}
-
-	// We let the config contain structured JSON (well YAML in it's original form before it was passed as JSON to us)
-	// Or we let the config contain a string
-	var transportDetails string
-	switch v := untyped.(type) {
-	case string:
-		// it's already a string - so it's our details directly
-		transportDetails = v
-	default:
-		// otherwise we preserve the JSON
-		transportDetails = transportRecordUnparsed.String()
-	}
-	_, err = r.callbacks.UpsertTransportDetails(ctx, &prototk.UpsertTransportDetails{
-		Node:             nodeName,
-		Transport:        transportName,
-		TransportDetails: transportDetails,
-	})
-	return err
+	return nil
 }

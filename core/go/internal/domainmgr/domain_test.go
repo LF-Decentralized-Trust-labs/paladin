@@ -359,7 +359,7 @@ func TestDomainInitBadEventsABI(t *testing.T) {
 		AbiStateSchemasJson:    []string{},
 		AbiEventsJson: `[
 			{
-				"type": "badbadwrong",
+				"type": "event",
 				"name": "bad",
 				"inputs": [{"type": "verywrong"}]
 			}

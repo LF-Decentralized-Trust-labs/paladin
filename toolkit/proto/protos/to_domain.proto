@@ -17,6 +17,8 @@ syntax = "proto3";
 
 package io.kaleido.paladin.toolkit;
 
+import "on_chain_events.proto";
+
 // **CONFIGURE** happens once when the domain is loaded into Paladin
 message ConfigureDomainRequest {
   string name = 1; // The name
@@ -317,20 +319,6 @@ message BaseLedgerDeployTransaction {
 
 message DomainAPIError {
   string error_message = 1;
-}
-
-message OnChainEventLocation {
-  string transaction_hash = 1; // The on-chain ethereum hash of the blockchain transaction
-  int64 block_number = 2; // The block number of the transaction
-  int64 transaction_index = 3; // The index of the transaction within the block
-  int64 log_index = 4; // The index of the log of the event that completed the transaction
-}
-
-message OnChainEvent {
-  OnChainEventLocation location = 1; // the event locator information on the blockchain
-  string signature = 2; // 32 byte hex signature
-  string solidity_signature = 3; // The friendly solidity signature to match against
-  string data_json = 4; // The parsed event data
 }
 
 message CompletedTransaction {

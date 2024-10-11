@@ -33,6 +33,6 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 
 var (
 	// Generic PD0400XX
-	MsgInvalidRegistryConfig     = ffe("PD040001", "Invalid registry configuration")
-	MsgInvalidEntryNodeTransport = ffe("PD040002", "Invalid entry for node '%s' transport '%s'")
+	MsgInvalidRegistryConfig = ffe("PD040001", "Invalid registry configuration")
+	MsgFunctionUnsupported   = ffe("PD040002", "Function not supported")
 )

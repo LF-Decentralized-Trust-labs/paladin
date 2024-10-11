@@ -62,12 +62,12 @@ func (br *RegistryBridge) Initialized() {
 // requests to callbacks in the Registry manager
 func (br *RegistryBridge) RequestReply(ctx context.Context, reqMsg plugintk.PluginMessage[prototk.RegistryMessage]) (resFn func(plugintk.PluginMessage[prototk.RegistryMessage]), err error) {
 	switch req := reqMsg.Message().RequestFromRegistry.(type) {
-	case *prototk.RegistryMessage_UpsertTransportDetails:
-		return callManagerImpl(ctx, req.UpsertTransportDetails,
-			br.manager.UpsertTransportDetails,
-			func(resMsg *prototk.RegistryMessage, res *prototk.UpsertTransportDetailsResponse) {
-				resMsg.ResponseToRegistry = &prototk.RegistryMessage_UpsertTransportDetailsRes{
-					UpsertTransportDetailsRes: res,
+	case *prototk.RegistryMessage_UpsertRegistryRecords:
+		return callManagerImpl(ctx, req.UpsertRegistryRecords,
+			br.manager.UpsertRegistryRecords,
+			func(resMsg *prototk.RegistryMessage, res *prototk.UpsertRegistryRecordsResponse) {
+				resMsg.ResponseToRegistry = &prototk.RegistryMessage_UpsertRegistryRecordsRes{
+					UpsertRegistryRecordsRes: res,
 				}
 			},
 		)
@@ -84,6 +84,21 @@ func (br *RegistryBridge) ConfigureRegistry(ctx context.Context, req *prototk.Co
 		func(dm plugintk.PluginMessage[prototk.RegistryMessage]) bool {
 			if r, ok := dm.Message().ResponseFromRegistry.(*prototk.RegistryMessage_ConfigureRegistryRes); ok {
 				res = r.ConfigureRegistryRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *RegistryBridge) HandleRegistryEvents(ctx context.Context, req *prototk.HandleRegistryEventsRequest) (res *prototk.HandleRegistryEventsResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.RegistryMessage]) {
+			dm.Message().RequestToRegistry = &prototk.RegistryMessage_HandleRegistryEvents{HandleRegistryEvents: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.RegistryMessage]) bool {
+			if r, ok := dm.Message().ResponseFromRegistry.(*prototk.RegistryMessage_HandleRegistryEventsRes); ok {
+				res = r.HandleRegistryEventsRes
 			}
 			return res != nil
 		},

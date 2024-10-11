@@ -120,19 +120,21 @@ message RegistryMessage {
 
   oneof request_to_registry {
     ConfigureRegistryRequest configure_registry =                   1010;
+    HandleRegistryEventsRequest handle_registry_events =            1020;
   }
 
   oneof response_from_registry {
     ConfigureRegistryResponse configure_registry_res =              1011;
+    HandleRegistryEventsResponse handle_registry_events_res =       1021;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
   oneof request_from_registry {
-    UpsertTransportDetails upsert_transport_details =               2010;
+    UpsertRegistryRecordsRequest  upsert_registry_records =         2010;
   }
 
   oneof response_to_registry {
-    UpsertTransportDetailsResponse upsert_transport_details_res   = 2011;
+    UpsertRegistryRecordsResponse upsert_registry_records_res =     2011;
   }
 }
 

@@ -18,9 +18,12 @@ package blockindexer
 
 import (
 	"context"
+	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -59,7 +62,37 @@ type EventStream struct {
 	Updated tktypes.Timestamp             `json:"updated"        gorm:"autoUpdateTime:nano"`
 	Type    tktypes.Enum[EventStreamType] `json:"type"`
 	Config  EventStreamConfig             `json:"config"         gorm:"type:bytes;serializer:json"`
-	Sources []EventStreamSource           `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
+	Sources EventSources                  `json:"sources"        gorm:"serializer:json"` // immutable (event delivery behavior would be too undefined with mutability)
+}
+
+type EventSources []EventStreamSource
+
+// Build a hash that covers the unique set of combinations events + address.
+// - Order independent
+// - Ignores non-event parts of the ABI
+func (ess EventSources) Hash(ctx context.Context) (*tktypes.Bytes32, error) {
+	// string hashes so we can sort them in a deterministic order
+	sourceHashes := make([]string, len(ess))
+	for i, s := range ess {
+		hash, err := tktypes.ABISolDefinitionHash(ctx, s.ABI, abi.Event /* only events matter */)
+		if err != nil {
+			return nil, err
+		}
+		// Need to factor the address into the hash
+		if s.Address != nil {
+			sourceHashes[i] = fmt.Sprintf("%s:%s", s.Address, hash)
+		} else {
+			sourceHashes[i] = fmt.Sprintf("*:%s", hash)
+		}
+	}
+	sort.Strings(sourceHashes)
+	hash := sha3.NewLegacyKeccak256()
+	for _, h := range sourceHashes {
+		hash.Write([]byte(h))
+	}
+	var h32 tktypes.Bytes32
+	_ = hash.Sum(h32[0:0])
+	return &h32, nil
 }
 
 type EventStreamSource struct {

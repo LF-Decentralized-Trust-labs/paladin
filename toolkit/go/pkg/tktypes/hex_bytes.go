@@ -92,6 +92,9 @@ func (id HexBytes) HexString() string {
 }
 
 func (id HexBytes) Value() (driver.Value, error) {
+	if id == nil {
+		return nil, nil
+	}
 	return id.HexString(), nil // no 0x prefix
 }
 

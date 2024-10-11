@@ -872,3 +872,65 @@ func TestProcessCatchupEventMultiPageRealDB(t *testing.T) {
 		require.Equal(t, allEvents[i].LogIndex, d.event.LogIndex)
 	}
 }
+
+func TestEventSourcesHashing(t *testing.T) {
+
+	abiEventIndexed := &abi.Entry{
+		Type: abi.Event,
+		Name: "Purple",
+		Inputs: abi.ParameterArray{
+			{
+				Name:    "maybeIndexed",
+				Type:    "uint256",
+				Indexed: true, //only diff to other purple
+			},
+		},
+	}
+	abiEventUnindexed := &abi.Entry{
+		Type: abi.Event,
+		Name: "Purple",
+		Inputs: abi.ParameterArray{
+			{
+				Name: "maybeIndexed",
+				Type: "uint256",
+			},
+		},
+	}
+	abiFunction := &abi.Entry{
+		Type:   abi.Function,
+		Name:   "goPurple",
+		Inputs: abi.ParameterArray{},
+	}
+	address1 := tktypes.RandAddress()
+	address2 := tktypes.RandAddress()
+
+	mustHash := func(ess EventSources) string {
+		hash, err := ess.Hash(context.Background())
+		require.NoError(t, err)
+		return hash.String()
+	}
+
+	// order and ancillary entries do not matter
+	assert.Equal(t,
+		mustHash(EventSources{{ABI: abi.ABI{abiEventIndexed, abiEventUnindexed, abiFunction}}}),
+		mustHash(EventSources{{ABI: abi.ABI{abiEventUnindexed, abiEventIndexed}}}),
+	)
+
+	// address or not does matter
+	assert.NotEqual(t,
+		mustHash(EventSources{{ABI: abi.ABI{abiEventIndexed}, Address: address1}}),
+		mustHash(EventSources{{ABI: abi.ABI{abiEventIndexed}}}),
+	)
+
+	// addresses matter
+	assert.NotEqual(t,
+		mustHash(EventSources{{ABI: abi.ABI{abiEventIndexed}, Address: address1}}),
+		mustHash(EventSources{{ABI: abi.ABI{abiEventIndexed}, Address: address2}}),
+	)
+
+	// error case
+	ess := EventSources{{ABI: abi.ABI{{Type: abi.Event, Inputs: abi.ParameterArray{{Type: "wrong"}}}}}}
+	_, err := ess.Hash(context.Background())
+	assert.Regexp(t, "FF22025", err)
+
+}
