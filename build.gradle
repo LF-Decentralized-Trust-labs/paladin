@@ -31,19 +31,19 @@ ext {
         },
 
         dumpLogsOnFailure: { task, dockerTaskPath ->
-            // If invoked with -PcomposeLogs=true and the given Exec task fails, look up the
-            // DockerCompose task specified, and ask it to dump logs.
-            task.ignoreExitValue(true)
-            task.doLast {
-                def execResult = getExecutionResult().get()
+            if (task.state.failure != null) {
                 def composeLogs = project.findProperty('composeLogs')
-                if (execResult.exitValue != 0 && composeLogs == "true") {
+                if (composeLogs == "true") {
                     def docker = project.tasks.getByPath(dockerTaskPath)
                     println "\nTask '${task.path}' failed. Dumping Docker logs from '${dockerTaskPath}'."
                     docker.dumpLogs()
                 }
-                execResult.assertNormalExitValue()
             }
+        },
+
+        generateResultsFileName: { taskName, prefix ->
+            def fileName = "${prefix}.${taskName}.txt"
+            return fileName
         }
     ]
 }

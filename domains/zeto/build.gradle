@@ -197,50 +197,48 @@ task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, generateP
     includeEmptyDirs = false
 }
 
-task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copySolidityForTest, ':testinfra:startTestInfra', ":core:go:makeMocks"]) {
+task goTestE2E(type: GoTestRunner, dependsOn: [protoc, copySolidity, copySolidityForTest, ':testinfra:startTestInfra', ":core:go:makeMocks"]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
     inputs.files(goFilesE2E)
-    inputs.file('./integration-test/config-for-deploy.yaml')
-    outputs.dir('coverage')
+    inputs.files('./integration-test/config-for-deploy.yaml')
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './integration-test'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
-
-    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    addTestArgs("./integration-test")
+    testTimeout = "60s" 
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.e2e_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
 }
 
-task unitTests(type: Exec, dependsOn: [protoc, ":core:go:makeMocks"]) {
+task testE2E(dependsOn: goTestE2E) {
+    mustRunAfter goTestE2E
+    doLast {
+        project.helpers.dumpLogsOnFailure(goTestE2E, ':testinfra:startTestInfra')
+    }
+}
+
+task goUnitTests(type: GoTestRunner, dependsOn: [protoc, ":core:go:makeMocks", copySolidity, ':testinfra:startTestInfra']) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
-    outputs.dir('coverage')
-
+    
     def packages = project.properties["coveragePackages"].join(",")
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './internal/...'
-    args './pkg/...'
-    args '-cover'
-    args '-covermode=atomic'
-    args '-timeout=30s'
-    args "-coverpkg=${packages}"
-    args '-coverprofile=coverage.txt'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
+    addTestArgs("./internal/...", "./pkg/...")
+    addTestArgs("-coverpkg=${packages}")
+    addTestArgs("-coverprofile=coverage.txt")
 
-    dependsOn copySolidity
-    dependsOn ':testinfra:startTestInfra'
-    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.unit_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+}
+
+task unitTests(dependsOn: goUnitTests) {
+    mustRunAfter goUnitTests
+    doLast {
+        project.helpers.dumpLogsOnFailure(goUnitTests, ':testinfra:startTestInfra')
+    }
 }
 
 task checkCoverage(type: GoCheckCoverage, dependsOn: [unitTests]) {
@@ -268,6 +266,7 @@ task build {
 
 task clean(type: Delete) {
     delete 'coverage'
+    delete 'results'
     delete 'internal/zeto/abis'
     delete 'integration-test/abis'
     delete zkpOut

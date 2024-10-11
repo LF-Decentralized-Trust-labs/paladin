@@ -235,6 +235,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     }
     delete 'coverage'
     delete 'mocks'
+    delete 'results'
     delete 'internal/domainmgr/abis'
     delete 'componenttest/abis'
 }
@@ -310,51 +311,7 @@ task buildTestPluginsSharedLibraries {
     dependsOn buildTestPluginsSharedLibraryGRPCTransport
 }
 
-abstract class UnitTests extends Exec {
-    UnitTests() {
-        inputs.files(project.goFiles)
-        outputs.dir('coverage')
-
-        workingDir '.'
-        executable 'go'
-        args 'test'
-        args './pkg/...', './internal/...'
-        args '-cover'
-        args '-covermode=atomic'
-        args '-timeout=30s'
-        if (project.findProperty('verboseTests') == 'true') {
-            args '-v'
-        }
-        args "-test.gocoverdir=${project.projectDir}/coverage"
-    }
-}
-
-abstract class ComponentTest extends Exec {
-    ComponentTest() {
-        inputs.files(project.goFiles)
-        inputs.files(project.fileTree("testbed") {
-            include "**/*.json"
-        })
-        outputs.dir('coverage')
-
-        workingDir '.'
-        executable 'go'
-        args 'test'
-        args './componenttest', './pkg/testbed'
-        args '-cover'
-        args "-coverpkg=github.com/kaleido-io/paladin/core/..." // toolkit handled seperately
-        args '-covermode=atomic'
-        args '-timeout=120s'
-        if (project.findProperty('verboseTests') == 'true') {
-            args '-v'
-        }
-        args "-test.gocoverdir=${project.projectDir}/coverage"
-
-        project.helpers.dumpLogsOnFailure(this, ':testinfra:startTestInfra')
-    }
-}
-
-task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
+ task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     inputs.files(goFiles)
     outputs.dir('coverage')
     doLast {
@@ -366,30 +323,66 @@ task setupCoverage(dependsOn: [protoc, copyContracts, makeMocks]) {
     }
 }
 
-task unitTestSQLite(type: UnitTests, dependsOn: [
+task goUnitTest(type: GoTestRunner, dependsOn: [
         makeMocks,
         ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
     ]) {
+
+    addTestArgs("./pkg/...", "./internal/...")
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.unit_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
 }
 
-task unitTestPostgres(type: UnitTests, dependsOn: [
-        makeMocks,
-        ':testinfra:startTestInfra',
-        setupCoverage,
-        goGet,
-    ]) {
-    args '-tags', "testdbpostgres"
+task unitTestSQLite(dependsOn: goUnitTest) {
+}
+
+task unitTestPostgres(type: GoTestRunner, dependsOn: goUnitTest) {
+    testTimeout = goUnitTest.testTimeout
+    testArgs = goUnitTest.testArgs
+
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.component_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+
+    addTestArgs('-tags', "testdbpostgres")
+    
     mustRunAfter 'unitTestSQLite' // these tests cannot run concurrently
 }
 
-task componentTestSQLite(type: ComponentTest, dependsOn: [
+task goComponentTest(type: GoTestRunner, dependsOn: [
         makeMocks,
         ':testinfra:startTestInfra',
         setupCoverage,
         goGet,
         copyContracts, // Ensure this task depends on copying the test contracts
+    ]) {
+    
+    inputs.files(project.goFiles)
+    inputs.files(project.fileTree("testbed") {
+        include "**/*.json"
+    })
+
+    addTestArgs("./componenttest", "./pkg/testbed")
+    testTimeout = "120s"
+    coverPkg = "github.com/kaleido-io/paladin/core/..."
+
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.component_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+}
+
+task goComponentTestWrap(dependsOn: goComponentTest ) {
+    mustRunAfter goComponentTest
+    doLast {
+        project.helpers.dumpLogsOnFailure(goComponentTest, ':testinfra:startTestInfra')
+    }
+}
+
+task componentTestSQLite(dependsOn: [ 
+        goComponentTestWrap
     ]) {
     mustRunAfter 'unitTestPostgres' // these tests cannot run concurrently
 }

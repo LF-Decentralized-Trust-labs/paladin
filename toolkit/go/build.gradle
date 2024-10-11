@@ -87,6 +87,7 @@ task clean(type: Delete, dependsOn: ':testinfra:stopTestInfra') {
     delete fileTree(".") {
         include "**/*.pb.go"
     }
+    delete 'results'
     delete 'coverage'
     delete 'componenttest/abis'
 }
@@ -127,21 +128,16 @@ task lint(type: Exec, dependsOn:[protoc, makeMocks, ":installGolangCILint"]) {
     args '--timeout', '5m'
 }
 
-task test(type: Exec, dependsOn: [goGet, makeMocks]) {
+task goIntegrationTest(type: GoTestRunner, dependsOn: [goGet, makeMocks]) {
     inputs.files(getProject().goFiles)
-    outputs.dir('coverage')
+    addTestArgs("./pkg/...")
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.integration_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+}
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './pkg/...'
-    args '-cover'
-    args '-covermode=atomic'
-    args '-timeout=30s'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
-    args "-test.gocoverdir=${getProject().projectDir}/coverage"
+task test(dependsOn: goIntegrationTest) {
+    mustRunAfter goIntegrationTest
 }
 
 task buildCoverageTxt(type: Exec, dependsOn: [

@@ -64,24 +64,17 @@ task lint(type: Exec, dependsOn:[":installGolangCILint", tasks.protoc]) {
     args '--timeout', '5m'
 }
 
-task test(type: Exec, dependsOn:[tasks.protoc]) {
+task goUnitTest(type: GoTestRunner, dependsOn: [tasks.protoc, ':testinfra:startTestInfra']) {
     inputs.files(configurations.toolkitGo)
     inputs.files(goFiles)
-    outputs.dir('coverage')
+    addTestArgs("./internal/...")
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.unit_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+}
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './internal/...'
-    args '-cover'
-    args '-covermode=atomic'
-    args '-timeout=30s'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
-    args "-test.gocoverdir=${projectDir}/coverage"
-
-    dependsOn ':testinfra:startTestInfra'
+task test(dependsOn: goUnitTest) {
+    mustRunAfter goUnitTest
 }
 
 task build {
@@ -91,4 +84,5 @@ task build {
 
 task clean(type: Delete) {
     delete 'coverage'
+    delete 'results'
 }

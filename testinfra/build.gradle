@@ -20,10 +20,10 @@ task besuBootstrapTool(type: Exec) {
     args "-f", "besu_bootstrap/Dockerfile"
     args "."
 
-    inputs.dir "besu_bootstrap"
-    outputs.upToDateWhen {
-        ["docker", "images", "-q", "paladin/besu_bootstrap"].execute().text != ""
-    }
+    // inputs.dir "besu_bootstrap"
+    // outputs.upToDateWhen {
+    //     ["docker", "images", "-q", "paladin/besu_bootstrap"].execute().text != ""
+    // }
 }
 
 task startTestInfra(type: DockerCompose, dependsOn: tasks.besuBootstrapTool) {

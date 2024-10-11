@@ -1,4 +1,6 @@
 **/coverage*.txt
+**/results/*.json
+**/results/*.txt
 **/debug.test
 **/__debug_*
 **/.DS_Store

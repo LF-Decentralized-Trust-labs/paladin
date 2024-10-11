@@ -41,24 +41,18 @@ dependencies {
     // It is a pure go set of code that can be shared between the operator and core.
 }
 
-task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
+task goUnitTest(type: GoTestRunner, dependsOn: ":core:go:makeMocks") {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
-    inputs.files(goFiles)
-    outputs.dir('coverage')
+    
+    addTestArgs("./internal/...", "./pkg/...")
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.unit_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)
+}
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './internal/...'
-    args './pkg/...'
-    args '-cover'
-    args '-covermode=atomic'
-    args '-timeout=30s'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
-    }
-    args "-test.gocoverdir=${projectDir}/coverage"
+task test(dependsOn: goUnitTest) {
+    mustRunAfter goUnitTest
 }
 
 task build {
@@ -67,6 +61,7 @@ task build {
 
 task clean(type: Delete) {
     delete 'coverage'
+    delete 'results'
 }
 
 dependencies {

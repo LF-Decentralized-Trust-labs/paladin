@@ -82,30 +82,23 @@ task copySolidity(type: Copy) {
     includeEmptyDirs = false
 }
 
-task test(type: Exec, dependsOn: [":core:go:makeMocks"]) {
+task goUnitTest(type: GoTestRunner, dependsOn: [":core:go:makeMocks", ':testinfra:startTestInfra', copySolidity]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(configurations.notoGo)
     inputs.files(configurations.zetoGo)
     inputs.files(goFiles)
     inputs.files(copySolidity)
-    outputs.dir('coverage')
+    addTestArgs("./...")
+    testTimeout = "90s"
+    def relativePath = project.path.replace(":", "_").replaceAll("^_","").replace("/", "_")
+    def prefix = "${relativePath}.unit_test"
+    resultsOutputFile = project.helpers.generateResultsFileName(name, prefix)}
 
-    workingDir '.'
-    executable 'go'
-    args 'test'
-    args './...'
-    args '-v'
-    args '-cover'
-    args '-covermode=atomic'
-    args '-timeout=90s'
-    if (project.findProperty('verboseTests') == 'true') {
-        args '-v'
+task test(dependsOn: goUnitTest) {
+    doLast {
+        project.helpers.dumpLogsOnFailure(goUnitTest, ':testinfra:startTestInfra')
     }
-    args "-test.gocoverdir=${projectDir}/coverage"
-
-    dependsOn ':testinfra:startTestInfra'
-    helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
 task build {
@@ -114,5 +107,6 @@ task build {
 
 task clean(type: Delete) {
     delete 'coverage'
+    delete 'results'
     delete 'helpers/abis'
 }

@@ -34,9 +34,12 @@ class Mockery extends DefaultTask {
     @TaskAction
     void exec() {
         List<String> commonArgs = args
+        
+        // Get GOBIN path from environment variables
+        String goBinPath = System.getenv("GOBIN")
         mocks.each { m ->
             project.exec { spec ->
-                executable 'mockery'
+                executable goBinPath != null ? "$goBinPath/mockery" : "mockery"
                 args commonArgs
                 m.configure spec
             }

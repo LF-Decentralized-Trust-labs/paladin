@@ -47,7 +47,17 @@ jobs:
       # This does not build any docker images, and does not run any dockerized tests.
       # It does run Go/Java/Solidity component and integration tests that use PostgreSQL and Besu
       - name: Build with Gradle
-        run: ./gradlew -PcomposeLogs=true -PverboseTests=true --no-daemon --parallel --max-workers=5 build
+        run: ./gradlew -PcomposeLogs=true -PverboseTests=true -Pci=true --no-daemon --parallel --max-workers=5 build
+
+      - name: Upload Go test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/results/**.json"
+          retention-days: 7 # default is 90 days
+          compression-level: 0 # 0-9, 0 is no compression, 9 is maximum compression, default is 6
+
   
   image-build:
     runs-on: ubuntu-latest
