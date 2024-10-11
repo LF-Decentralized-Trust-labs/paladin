@@ -20,7 +20,7 @@ import (
 
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
-	protosigner "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -74,7 +74,7 @@ func TestDecodeProvingRequest_AnonNullifier(t *testing.T) {
 	bytes, err := proto.Marshal(req)
 	assert.NoError(t, err)
 
-	signReq := &protosigner.SignRequest{
+	signReq := &signerapi.SignRequest{
 		Payload: bytes,
 	}
 
@@ -96,7 +96,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	bytes, err := proto.Marshal(req)
 	require.NoError(t, err)
 
-	signReq := &protosigner.SignRequest{
+	signReq := &signerapi.SignRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(signReq.Payload)
@@ -106,7 +106,7 @@ func TestDecodeProvingRequest_Fail(t *testing.T) {
 	bytes, err = proto.Marshal(req)
 	assert.NoError(t, err)
 
-	signReq = &protosigner.SignRequest{
+	signReq = &signerapi.SignRequest{
 		Payload: bytes,
 	}
 	_, _, err = decodeProvingRequest(signReq.Payload)

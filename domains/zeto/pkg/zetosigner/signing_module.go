@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
 // This is a direct implementation of the extension point for signing in the Paladin signing toolkit.

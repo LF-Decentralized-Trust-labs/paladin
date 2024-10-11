@@ -24,8 +24,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	proto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -224,9 +223,9 @@ func TestStaticStoreResolveOK(t *testing.T) {
 		},
 	})
 
-	keyData, keyHandle, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
+	keyData, keyHandle, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
 		Name: "key ten",
-		Path: []*proto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
 		},
@@ -246,12 +245,12 @@ func TestStaticStoreResolveBadPath(t *testing.T) {
 		},
 	})
 
-	_, _, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{}, nil)
+	_, _, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{}, nil)
 	assert.Regexp(t, "PD020803", err)
 
-	_, _, err = store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
+	_, _, err = store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
 		Name: "something",
-		Path: []*proto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{Name: ""},
 		},
 	}, nil)
@@ -268,9 +267,9 @@ func TestStaticStoreResolveNotFound(t *testing.T) {
 		},
 	})
 
-	_, _, err := store.FindOrCreateLoadableKey(ctx, &proto.ResolveKeyRequest{
+	_, _, err := store.FindOrCreateLoadableKey(ctx, &signerapi.ResolveKeyRequest{
 		Name: "key eleven",
-		Path: []*proto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{Name: "my"},
 			{Name: "shiny"},
 		},
@@ -300,7 +299,7 @@ key1:
 	})
 	require.NoError(t, err)
 
-	key, _, err := store.FindOrCreateLoadableKey(context.Background(), &proto.ResolveKeyRequest{
+	key, _, err := store.FindOrCreateLoadableKey(context.Background(), &signerapi.ResolveKeyRequest{
 		Name: "key1",
 	}, nil)
 	require.NoError(t, err)

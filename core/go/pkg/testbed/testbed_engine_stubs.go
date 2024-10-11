@@ -25,8 +25,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
 func (tb *testbed) execBaseLedgerDeployTransaction(ctx context.Context, signer string, txInstruction *components.EthDeployTransaction) error {
@@ -110,7 +110,7 @@ func (tb *testbed) gatherSignatures(ctx context.Context, tx *components.PrivateT
 				if err != nil {
 					return fmt.Errorf("failed to resolve local signer for %s (algorithm=%s): %s", partyName, ar.Algorithm, err)
 				}
-				signaturePayload, err := tb.c.KeyManager().Sign(ctx, &signerproto.SignRequest{
+				signaturePayload, err := tb.c.KeyManager().Sign(ctx, &signerapi.SignRequest{
 					KeyHandle:   keyHandle,
 					Algorithm:   ar.Algorithm,
 					Payload:     ar.Payload,
@@ -194,7 +194,7 @@ func (tb *testbed) gatherEndorsements(dCtx components.DomainContext, psc compone
 					return fmt.Errorf("reverted: %s", revertReason)
 				case prototk.EndorseTransactionResponse_SIGN:
 					// Build the signature
-					signaturePayload, err := keyMgr.Sign(dCtx.Ctx(), &signerproto.SignRequest{
+					signaturePayload, err := keyMgr.Sign(dCtx.Ctx(), &signerapi.SignRequest{
 						KeyHandle:   keyHandle,
 						Algorithm:   ar.Algorithm,
 						Payload:     endorseRes.Payload,

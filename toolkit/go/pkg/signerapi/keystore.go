@@ -17,8 +17,6 @@ package signerapi
 
 import (
 	"context"
-
-	proto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 )
 
 type KeyStoreFactory[C ExtensibleConfig] interface {
@@ -33,7 +31,7 @@ type KeyStoreFactory[C ExtensibleConfig] interface {
 // keyHandle. If the implementation finds it does not exist, it can invoke the callback function to generate
 // a new suitable random string to encrypt and store.
 type KeyStore interface {
-	FindOrCreateLoadableKey(ctx context.Context, req *proto.ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
+	FindOrCreateLoadableKey(ctx context.Context, req *ResolveKeyRequest, newKeyMaterial func() ([]byte, error)) (keyMaterial []byte, keyHandle string, err error)
 	LoadKeyMaterial(ctx context.Context, keyHandle string) ([]byte, error)
 	Close()
 }
@@ -53,7 +51,7 @@ type KeyStore interface {
 //
 // This behavior can be explicitly disabled in the configuration for any store type.
 type KeyStoreListable interface {
-	ListKeys(ctx context.Context, req *proto.ListKeysRequest) (res *proto.ListKeysResponse, err error)
+	ListKeys(ctx context.Context, req *ListKeysRequest) (res *ListKeysResponse, err error)
 }
 
 // Some cryptographic storage systems, in particular Hardware Security Modules (HSMs) and Cloud HSM systems,
@@ -70,6 +68,6 @@ type KeyStoreListable interface {
 //
 // See the Paladin architecture docs for more details.
 type KeyStoreSigner interface {
-	FindOrCreateInStoreSigningKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error)
-	SignWithinKeystore(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error)
+	FindOrCreateInStoreSigningKey(ctx context.Context, req *ResolveKeyRequest) (res *ResolveKeyResponse, err error)
+	SignWithinKeystore(ctx context.Context, req *SignRequest) (res *SignResponse, err error)
 }

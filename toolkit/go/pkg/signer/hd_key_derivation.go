@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	proto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -41,15 +41,15 @@ type hdWalletPathEntry struct {
 	Index uint64
 }
 
-func configToKeyResolutionRequest(k *pldconf.SigningKeyConfigEntry) *proto.ResolveKeyRequest {
-	keyReq := &proto.ResolveKeyRequest{
+func configToKeyResolutionRequest(k *pldconf.SigningKeyConfigEntry) *signerapi.ResolveKeyRequest {
+	keyReq := &signerapi.ResolveKeyRequest{
 		Name:       k.Name,
 		Index:      k.Index,
 		Attributes: k.Attributes,
-		Path:       []*proto.ResolveKeyPathSegment{},
+		Path:       []*signerapi.ResolveKeyPathSegment{},
 	}
 	for _, p := range k.Path {
-		keyReq.Path = append(keyReq.Path, &proto.ResolveKeyPathSegment{
+		keyReq.Path = append(keyReq.Path, &signerapi.ResolveKeyPathSegment{
 			Name:  p.Name,
 			Index: p.Index,
 		})
@@ -93,7 +93,7 @@ func (sm *signingModule[C]) new32ByteRandomSeed() ([]byte, error) {
 	return buff, err
 }
 
-func (hd *hdDerivation[C]) flatPathList(req *proto.ResolveKeyRequest) []hdWalletPathEntry {
+func (hd *hdDerivation[C]) flatPathList(req *signerapi.ResolveKeyRequest) []hdWalletPathEntry {
 	ret := make([]hdWalletPathEntry, len(req.Path)+1)
 	for i, p := range req.Path {
 		ret[i] = hdWalletPathEntry{Name: p.Name, Index: p.Index}
@@ -105,7 +105,7 @@ func (hd *hdDerivation[C]) flatPathList(req *proto.ResolveKeyRequest) []hdWallet
 	return ret
 }
 
-func (hd *hdDerivation[C]) resolveHDWalletKey(ctx context.Context, req *proto.ResolveKeyRequest) (res *proto.ResolveKeyResponse, err error) {
+func (hd *hdDerivation[C]) resolveHDWalletKey(ctx context.Context, req *signerapi.ResolveKeyRequest) (res *signerapi.ResolveKeyResponse, err error) {
 	keyHandle := hd.bip44Prefix
 	for i, s := range hd.flatPathList(req) {
 		var derivation uint64
@@ -183,7 +183,7 @@ func (hd *hdDerivation[C]) loadHDWalletPrivateKey(ctx context.Context, keyHandle
 	return privateKey, err
 }
 
-func (hd *hdDerivation[C]) signHDWalletKey(ctx context.Context, req *proto.SignRequest) (res *proto.SignResponse, err error) {
+func (hd *hdDerivation[C]) signHDWalletKey(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error) {
 	privateKey, err := hd.loadHDWalletPrivateKey(ctx, req.KeyHandle)
 	if err != nil {
 		return nil, err

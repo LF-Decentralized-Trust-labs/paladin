@@ -23,9 +23,8 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
 type simpleKeyManager struct {
@@ -71,9 +70,9 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 	km.lock.Lock()
 	defer km.lock.Unlock()
 
-	resolveRequest := &signerproto.ResolveKeyRequest{
+	resolveRequest := &signerapi.ResolveKeyRequest{
 		Attributes: make(map[string]string),
-		RequiredIdentifiers: []*signerproto.PublicKeyIdentifierType{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{
 			{
 				Algorithm:    algorithm,
 				VerifierType: verifierType,
@@ -97,7 +96,7 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 			loc.Children++ // increment for folders optimistically (and keys pessimistically below)
 		}
 		loc = folder
-		resolveRequest.Path = append(resolveRequest.Path, &signerproto.ResolveKeyPathSegment{
+		resolveRequest.Path = append(resolveRequest.Path, &signerapi.ResolveKeyPathSegment{
 			Name:  folder.Name,
 			Index: folder.Index,
 		})
@@ -142,7 +141,7 @@ func (km *simpleKeyManager) ResolveKey(ctx context.Context, identifier, algorith
 	return key.KeyHandle, key.Identifiers[algoAndVerifierType], nil
 }
 
-func (km *simpleKeyManager) Sign(ctx context.Context, req *signerproto.SignRequest) (res *signerproto.SignResponse, err error) {
+func (km *simpleKeyManager) Sign(ctx context.Context, req *signerapi.SignRequest) (res *signerapi.SignResponse, err error) {
 	return km.signer.Sign(ctx, req)
 }
 

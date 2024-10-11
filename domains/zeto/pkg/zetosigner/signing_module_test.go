@@ -21,9 +21,8 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
@@ -63,13 +62,13 @@ func TestZKPSigningModuleKeyResolution(t *testing.T) {
 	ctx, sm, done := newZetoSigningModule(t)
 	defer done()
 
-	resp1, err := sm.Resolve(ctx, &signerproto.ResolveKeyRequest{
-		RequiredIdentifiers: []*signerproto.PublicKeyIdentifierType{
+	resp1, err := sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{
 			{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS},
 			{Algorithm: AlgoDomainZetoSnarkBJJ("zeto"), VerifierType: IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X},
 		},
 		Name: "blueKey",
-		Path: []*signerproto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{Name: "alice"},
 		},
 	})

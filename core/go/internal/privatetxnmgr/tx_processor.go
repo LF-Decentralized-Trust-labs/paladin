@@ -23,11 +23,11 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -341,7 +341,7 @@ func (ts *PaladinTxProcessor) requestSignature(ctx context.Context, attRequest *
 		//TODO return nil, err
 	}
 	// TODO this could be calling out to a remote signer, should we be doing these in parallel?
-	signaturePayload, err := ts.components.KeyManager().Sign(ctx, &signerproto.SignRequest{
+	signaturePayload, err := ts.components.KeyManager().Sign(ctx, &signerapi.SignRequest{
 		KeyHandle:   keyHandle,
 		Algorithm:   attRequest.Algorithm,
 		Payload:     attRequest.Payload,

@@ -37,9 +37,9 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -178,12 +178,12 @@ func TestPrivateTxManagerSimpleTransaction(t *testing.T) {
 		},
 	}, nil)
 
-	mocks.keyManager.On("Sign", mock.Anything, &signerproto.SignRequest{
+	mocks.keyManager.On("Sign", mock.Anything, &signerapi.SignRequest{
 		KeyHandle:   "notaryKeyHandle",
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		Payload:     []byte("some-endorsement-bytes"),
-	}).Return(&signerproto.SignResponse{
+	}).Return(&signerapi.SignResponse{
 		Payload: []byte("some-signature-bytes"),
 	}, nil)
 
@@ -345,12 +345,12 @@ func TestPrivateTxManagerRemoteEndorser(t *testing.T) {
 			VerifierType: verifiers.ETH_ADDRESS,
 		},
 	}, nil)
-	remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerproto.SignRequest{
+	remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerapi.SignRequest{
 		KeyHandle:   "notaryKeyHandle",
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		Payload:     []byte("some-endorsement-bytes"),
-	}).Return(&signerproto.SignResponse{
+	}).Return(&signerapi.SignResponse{
 		Payload: []byte("some-signature-bytes"),
 	}, nil)
 
@@ -817,12 +817,12 @@ func TestPrivateTxManagerMiniLoad(t *testing.T) {
 					VerifierType: verifiers.ETH_ADDRESS,
 				},
 			}, nil)
-			remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerproto.SignRequest{
+			remoteEngineMocks.keyManager.On("Sign", mock.Anything, &signerapi.SignRequest{
 				KeyHandle:   "notaryKeyHandle",
 				Algorithm:   algorithms.ECDSA_SECP256K1,
 				PayloadType: signpayloads.OPAQUE_TO_RSV,
 				Payload:     []byte("some-endorsement-bytes"),
-			}).Return(&signerproto.SignResponse{
+			}).Return(&signerapi.SignResponse{
 				Payload: []byte("some-signature-bytes"),
 			}, nil)
 

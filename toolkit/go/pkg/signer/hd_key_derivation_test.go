@@ -25,9 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	proto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,8 +58,8 @@ func TestHDSigningStaticExample(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		RequiredIdentifiers: []*proto.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
+	res, err := sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
 		Name:                "key1",
 		Index:               0,
 	})
@@ -67,7 +67,7 @@ func TestHDSigningStaticExample(t *testing.T) {
 	assert.Equal(t, "m/44'/60'/0'/0/0", res.KeyHandle)
 	assert.Equal(t, "0x6331ccb948aaf903a69d6054fd718062bd0d535c", res.Identifiers[0].Verifier)
 
-	resSign, err := sm.Sign(ctx, &proto.SignRequest{
+	resSign, err := sm.Sign(ctx, &signerapi.SignRequest{
 		KeyHandle:   res.KeyHandle,
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
@@ -95,11 +95,11 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		RequiredIdentifiers: []*proto.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
+	res, err := sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
 		Name:                "50'",
 		Index:               0,
-		Path: []*proto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{
 				Name:  "10'",
 				Index: 0,
@@ -121,21 +121,21 @@ func TestHDSigningDirectResNoPrefix(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "m/10'/20'/30/40/50'", res.KeyHandle)
 
-	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		RequiredIdentifiers: []*proto.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
+	_, err = sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
 		Name:                "key1",
 		Index:               0,
 	})
 	assert.Regexp(t, "PD020813", err)
 
-	_, err = sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		RequiredIdentifiers: []*proto.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
+	_, err = sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
 		Name:                "2147483648", // too big
 		Index:               0,
 	})
 	assert.Regexp(t, "PD020814", err)
 
-	_, err = sm.(*signingModule[*signerapi.ConfigNoExt]).hd.signHDWalletKey(ctx, &proto.SignRequest{
+	_, err = sm.(*signingModule[*signerapi.ConfigNoExt]).hd.signHDWalletKey(ctx, &signerapi.SignRequest{
 		KeyHandle: "m/wrong",
 	})
 	assert.Regexp(t, "PD020813", err)
@@ -179,11 +179,11 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err := sm.Resolve(ctx, &proto.ResolveKeyRequest{
-		RequiredIdentifiers: []*proto.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
+	res, err := sm.Resolve(ctx, &signerapi.ResolveKeyRequest{
+		RequiredIdentifiers: []*signerapi.PublicKeyIdentifierType{{Algorithm: algorithms.ECDSA_SECP256K1, VerifierType: verifiers.ETH_ADDRESS}},
 		Name:                "E82D5A3F-D154-4C5B-A297-F8D49528DA73",
 		Index:               0x7FFFFFFF, // largest possible - not in hardened range
-		Path: []*proto.ResolveKeyPathSegment{
+		Path: []*signerapi.ResolveKeyPathSegment{
 			{
 				Name:  "bob",
 				Index: 0x7FFFFFFF, // largest possible - will be pushed to hardened range (default config)
@@ -218,7 +218,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 	testKeyPair := secp256k1.KeyPairFromBytes(keyBytes[:])
 	assert.Equal(t, testKeyPair.Address.String(), res.Identifiers[0].Verifier)
 
-	resSign, err := sm.Sign(ctx, &proto.SignRequest{
+	resSign, err := sm.Sign(ctx, &signerapi.SignRequest{
 		KeyHandle:   res.KeyHandle,
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
@@ -228,7 +228,7 @@ func TestHDSigningDefaultBehaviorOK(t *testing.T) {
 
 	testSign, err := testKeyPair.SignDirect(([]byte)("some data"))
 	require.NoError(t, err)
-	assert.Equal(t, testSign.CompactRSV(), resSign.Payload)
+	assert.Equal(t, tktypes.HexBytes(testSign.CompactRSV()), resSign.Payload)
 	sig, err := secp256k1.DecodeCompactRSV(ctx, resSign.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, testSign, sig)

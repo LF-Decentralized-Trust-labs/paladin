@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
 func NewEndorsementGatherer(psc components.DomainSmartContract, dCtx components.DomainContext, keyMgr ethclient.KeyManager) ptmgrtypes.EndorsementGatherer {
@@ -91,7 +91,7 @@ func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transaction
 		return nil, confutil.P(revertReason), nil
 	case prototk.EndorseTransactionResponse_SIGN:
 		// Build the signature
-		signaturePayload, err := e.keyMgr.Sign(ctx, &signerproto.SignRequest{
+		signaturePayload, err := e.keyMgr.Sign(ctx, &signerapi.SignRequest{
 			KeyHandle:   keyHandle,
 			Algorithm:   endorsementRequest.Algorithm,
 			Payload:     endorseRes.Payload,

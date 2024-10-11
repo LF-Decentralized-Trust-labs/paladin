@@ -24,8 +24,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +33,7 @@ import (
 
 type mockKeyManager struct {
 	resolveKey func(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error)
-	sign       func(ctx context.Context, req *signerproto.SignRequest) (*signerproto.SignResponse, error)
+	sign       func(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error)
 }
 
 // AddInMemorySigner implements KeyManager.
@@ -44,7 +43,7 @@ func (mkm *mockKeyManager) ResolveKey(ctx context.Context, identifier, algorithm
 	return mkm.resolveKey(ctx, identifier, algorithm, verifierType)
 }
 
-func (mkm *mockKeyManager) Sign(ctx context.Context, req *signerproto.SignRequest) (*signerproto.SignResponse, error) {
+func (mkm *mockKeyManager) Sign(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error) {
 	return mkm.sign(ctx, req)
 }
 

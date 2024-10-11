@@ -35,9 +35,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	signerproto "github.com/kaleido-io/paladin/toolkit/pkg/prototk/signer"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signer/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -126,7 +125,7 @@ func (cr CallResult) JSON() (s string) {
 type KeyManager interface {
 	AddInMemorySigner(prefix string, signer signerapi.InMemorySigner) // should only be called on initialization routine
 	ResolveKey(ctx context.Context, identifier, algorithm, verifierType string) (keyHandle, verifier string, err error)
-	Sign(ctx context.Context, req *signerproto.SignRequest) (*signerproto.SignResponse, error)
+	Sign(ctx context.Context, req *signerapi.SignRequest) (*signerapi.SignResponse, error)
 	Close()
 }
 
@@ -402,7 +401,7 @@ func (ec *ethClient) BuildRawTransactionNoResolve(ctx context.Context, txVersion
 	}
 	hash := sha3.NewLegacyKeccak256()
 	_, _ = hash.Write(sigPayload.Bytes())
-	signature, err := ec.keymgr.Sign(ctx, &signerproto.SignRequest{
+	signature, err := ec.keymgr.Sign(ctx, &signerapi.SignRequest{
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
 		KeyHandle:   from.KeyHandle,
