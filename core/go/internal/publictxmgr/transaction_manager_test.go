@@ -99,6 +99,9 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 				MaxAttempts: confutil.P(1),
 			},
 		},
+		GasPrice: pldconf.GasPriceConfig{
+			FixedGasPrice: 0,
+		},
 	}
 
 	mocks := baseMocks(t)
@@ -155,6 +158,8 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 		pmgr.nonceManager = newNonceCache(1*time.Hour, func(ctx context.Context, signer tktypes.EthAddress) (uint64, error) {
 			return mockBaseNonce, nil
 		})
+		pmgr.ethClient = pmgr.ethClientFactory.SharedWS()
+		pmgr.gasPriceClient.Init(ctx, pmgr.ethClient)
 	} else {
 		err = pmgr.Start()
 		require.NoError(t, err)
@@ -189,6 +194,7 @@ func TestNewEngineErrors(t *testing.T) {
 
 	mockKeyManager := componentmocks.NewKeyManager(t)
 	mocks.keyManager = mockKeyManager
+	mocks.allComponents.On("Persistence").Return(mocks.db)
 	mocks.allComponents.On("KeyManager").Return(mocks.keyManager)
 	pmgr := NewPublicTransactionManager(context.Background(), &pldconf.PublicTxManagerConfig{
 		BalanceManager: pldconf.BalanceManagerConfig{
@@ -212,6 +218,7 @@ func TestTransactionLifecycleRealKeyMgrAndDB(t *testing.T) {
 		conf.Manager.Interval = confutil.P("50ms")
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
+		conf.GasPrice.FixedGasPrice = nil
 	})
 	defer done()
 
@@ -547,6 +554,7 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 		conf.Orchestrator.Interval = confutil.P("50ms")
 		conf.Manager.OrchestratorIdleTimeout = confutil.P("1ms")
 		conf.Orchestrator.StageRetryTime = confutil.P("0ms") // without this we stick in the stage for 10s before we look to suspend
+		conf.GasPrice.FixedGasPrice = nil
 	})
 	defer done()
 

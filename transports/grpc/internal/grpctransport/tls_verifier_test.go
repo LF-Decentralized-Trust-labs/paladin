@@ -104,7 +104,7 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 
 	//  construct the plugin
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	res, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: string(jsonConf),

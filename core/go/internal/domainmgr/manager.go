@@ -201,6 +201,7 @@ func (dm *domainManager) getDomainByName(ctx context.Context, name string) (*dom
 func (dm *domainManager) WaitForDeploy(ctx context.Context, txID uuid.UUID) (components.DomainSmartContract, error) {
 	// Waits for the event that confirms a smart contract has been deployed (or a context timeout)
 	// using the transaction ID of the deploy transaction
+	log.L(ctx).Debugf("Waiting for domain deployment event for transactionId %s", txID)
 	req := dm.privateTxWaiter.AddInflight(ctx, txID)
 	defer req.Cancel()
 

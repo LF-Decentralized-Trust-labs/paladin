@@ -140,7 +140,7 @@ func getContractSpec(contract *domainContract, deployedContracts map[string]*tkt
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*tktypes.EthAddress, error) {
 	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
 	}

@@ -119,6 +119,9 @@ func (ecf *ethClientFactory) HTTPClient() EthClient {
 }
 
 func (ecf *ethClientFactory) SharedWS() EthClient {
+	if ecf.sharedWSClient == nil {
+		panic("call to SharedWS() before Start")
+	}
 	return ecf.sharedWSClient
 }
 

@@ -33,7 +33,7 @@ func Run(grpcTargetPtr, loaderUUIDPtr, configFilePtr, modePtr *C.char) (rc int) 
 		panicked := recover()
 		if panicked != nil {
 			// print the stack
-			fmt.Fprintf(os.Stderr, "%s\n", debug.Stack())
+			fmt.Fprintf(os.Stderr, "%s %s\n", panicked, debug.Stack())
 			// set the rc
 			rc = 1
 		}

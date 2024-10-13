@@ -21,14 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // PaladinSpec defines the desired state of Paladin
 type PaladinSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Settings from this config will be loaded as YAML and used as the base of the configuration.
 	Config *string `json:"config,omitempty"`
 
@@ -48,6 +42,30 @@ type PaladinSpec struct {
 	// "rpc-http" - 8545 (TCP),
 	// "rpc-ws" - 8546 (TCP)
 	Service corev1.ServiceSpec `json:"service,omitempty"`
+
+	// A list of domains to merge into the configuration, and rebuild the config of paladin when this list changes
+	Domains []DomainReference `json:"domains"`
+
+	// A list of registries to merge into the configuration, and rebuild the config of paladin when this list changes
+	Registries []RegistryReference `json:"registries"`
+}
+
+type LabelReference struct {
+	// Label selectors provide a flexible many-to-many mapping between nodes and domains in a namespace.
+	// The domain CRs you reference must be labelled to match. For example you could use a label like "paladin.io/domain-name" to select by name.
+	LabelSelector metav1.LabelSelector `json:"labelSelector"`
+}
+
+// Each domain reference can select one or more domains to include via label selectors
+// Most common to use a simple one-reference-per-domain approach.
+type DomainReference struct {
+	LabelReference `json:",inline"`
+}
+
+// Each registry reference can select one or more domains to include via label selectors
+// Most common to use a simple one-reference-per-domain approach.
+type RegistryReference struct {
+	LabelReference `json:",inline"`
 }
 
 const DBMode_EmbeddedSQLite = "embeddedSQLite"
@@ -86,20 +104,6 @@ type SecretBackedSigner struct {
 // TODO: move to apiserver
 type StatusReason string
 
-// PaladinStatus defines the observed state of Paladin
-type PaladinStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-
-	// TODO: What fields should be here?
-	// Here are some ideas, but this means the operator will have to track the state of the pod as well (which is not ideal)
-	// IP        string `json:"ip,omitempty"`
-	// Name      string `json:"name,omitempty"`
-	// Namespace string `json:"namespace,omitempty"`
-
-	// Important: Run "make" to regenerate code after modifying this file
-	Status string `json:"Status,omitempty"`
-}
-
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
@@ -108,8 +112,8 @@ type Paladin struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PaladinSpec   `json:"spec,omitempty"`
-	Status PaladinStatus `json:"status,omitempty"`
+	Spec   PaladinSpec `json:"spec,omitempty"`
+	Status Status      `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

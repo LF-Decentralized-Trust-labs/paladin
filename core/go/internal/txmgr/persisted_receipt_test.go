@@ -149,7 +149,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	callData, err := exampleABI[0].EncodeCallDataJSON([]byte(`[]`))
 	require.NoError(t, err)
 
-	txID, err := txm.sendTransaction(ctx, &ptxapi.TransactionInput{
+	txID, err := txm.SendTransaction(ctx, &ptxapi.TransactionInput{
 		Transaction: ptxapi.Transaction{
 			Type:     ptxapi.TransactionTypePrivate.Enum(),
 			Domain:   "domain1",
@@ -171,7 +171,7 @@ func TestFinalizeTransactionsInsertOkOffChain(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	receipt, err := txm.getTransactionReceiptByID(ctx, *txID)
+	receipt, err := txm.GetTransactionReceiptByID(ctx, *txID)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
@@ -192,7 +192,7 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 	callData, err := exampleABI[0].EncodeCallDataJSON([]byte(`[]`))
 	require.NoError(t, err)
 
-	txID, err := txm.sendTransaction(ctx, &ptxapi.TransactionInput{
+	txID, err := txm.SendTransaction(ctx, &ptxapi.TransactionInput{
 		Transaction: ptxapi.Transaction{
 			Type:     ptxapi.TransactionTypePrivate.Enum(),
 			Domain:   "domain1",
@@ -222,7 +222,7 @@ func TestFinalizeTransactionsInsertOkEvent(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	receipt, err := txm.getTransactionReceiptByID(ctx, *txID)
+	receipt, err := txm.GetTransactionReceiptByID(ctx, *txID)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.JSONEq(t, fmt.Sprintf(`{
@@ -294,7 +294,7 @@ func TestGetTransactionReceiptNoResult(t *testing.T) {
 	})
 	defer done()
 
-	res, err := txm.getTransactionReceiptByID(ctx, uuid.New())
+	res, err := txm.GetTransactionReceiptByID(ctx, uuid.New())
 	assert.NoError(t, err)
 	assert.Nil(t, res)
 

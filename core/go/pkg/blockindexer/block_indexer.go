@@ -30,16 +30,16 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/internal/msgs"
-
-	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
-
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/internal/filters"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/inflight"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -53,6 +53,7 @@ type BlockIndexer interface {
 	GetIndexedTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce uint64) (*IndexedTransaction, error)
 	GetBlockTransactionsByNumber(ctx context.Context, blockNumber int64) ([]*IndexedTransaction, error)
 	GetTransactionEventsByHash(ctx context.Context, hash tktypes.Bytes32) ([]*IndexedEvent, error)
+	QueryTransactions(ctx context.Context, jq *query.QueryJSON) ([]*IndexedTransaction, error)
 	ListTransactionEvents(ctx context.Context, lastBlock int64, lastIndex, limit int, withTransaction, withBlock bool) ([]*IndexedEvent, error)
 	DecodeTransactionEvents(ctx context.Context, hash tktypes.Bytes32, abi abi.ABI) ([]*EventWithData, error)
 	WaitForTransactionSuccess(ctx context.Context, hash tktypes.Bytes32, errorABI abi.ABI) (*IndexedTransaction, error)
@@ -93,6 +94,7 @@ type blockIndexer struct {
 	eventStreamsLock           sync.Mutex
 	esBlockDispatchQueueLength int
 	esCatchUpQueryPageSize     int
+	started                    bool
 	dispatcherTap              chan struct{}
 	processorDone              chan struct{}
 	dispatcherDone             chan struct{}
@@ -156,7 +158,13 @@ func (bi *blockIndexer) Start(internalStreams ...*InternalEventStream) error {
 
 func (bi *blockIndexer) AddEventStream(ctx context.Context, stream *InternalEventStream) (*EventStream, error) {
 	es, err := bi.upsertInternalEventStream(ctx, stream)
-	if err == nil {
+
+	// Can be called before start as managers start before the block indexer
+	bi.stateLock.Lock()
+	started := bi.started
+	bi.stateLock.Unlock()
+
+	if started && err == nil {
 		bi.startEventStream(es)
 	}
 	return es.definition, err
@@ -181,6 +189,7 @@ func (bi *blockIndexer) startOrReset() {
 	bi.processorDone = make(chan struct{})
 	bi.dispatcherDone = make(chan struct{})
 	bi.cancelFunc = cancelFunc
+	bi.started = true
 	bi.stateLock.Unlock()
 
 	go bi.startup(runCtx)
@@ -209,25 +218,29 @@ func (bi *blockIndexer) startup(runCtx context.Context) {
 
 func (bi *blockIndexer) Stop() {
 	bi.stateLock.Lock()
+	wasStarted := bi.started
 	processorDone := bi.processorDone
 	dispatcherDone := bi.dispatcherDone
 	cancelCtx := bi.cancelFunc
+	bi.started = false
 	bi.stateLock.Unlock()
 
-	bi.eventStreamsLock.Lock()
-	for _, es := range bi.eventStreams {
-		es.stop()
-	}
-	bi.eventStreamsLock.Unlock()
+	if wasStarted {
+		bi.eventStreamsLock.Lock()
+		for _, es := range bi.eventStreams {
+			es.stop()
+		}
+		bi.eventStreamsLock.Unlock()
 
-	if cancelCtx != nil {
-		cancelCtx()
-	}
-	if processorDone != nil {
-		<-processorDone
-	}
-	if dispatcherDone != nil {
-		<-dispatcherDone
+		if cancelCtx != nil {
+			cancelCtx()
+		}
+		if processorDone != nil {
+			<-processorDone
+		}
+		if dispatcherDone != nil {
+			<-dispatcherDone
+		}
 	}
 }
 
@@ -499,7 +512,7 @@ func (bi *blockIndexer) hydrateBlock(ctx context.Context, batch *blockWriterBatc
 			if err == nil {
 				// TODO: We've seen this with Besu instead of an error, and need to diagnose
 				// Convert to a not found, but DO retry here.
-				log.L(ctx).Warnf("Blockchain node return null from eth_getBlockReceipts")
+				log.L(ctx).Warnf("Blockchain node returned null from eth_getBlockReceipts")
 				err = i18n.NewError(ctx, msgs.MsgBlockIndexerConfirmedBlockNotFound, batch.blocks[blockIndex].Hash, batch.blocks[blockIndex].Number)
 			} else if isNotFound(err) {
 				// If we get a not-found, that's an indication the confirmations are not set correctly,
@@ -964,4 +977,19 @@ func (bi *blockIndexer) matchLog(ctx context.Context, abi abi.ABI, in *LogJSONRP
 		}
 	}
 	return false
+}
+
+func (bi *blockIndexer) QueryTransactions(ctx context.Context, jq *query.QueryJSON) ([]*IndexedTransaction, error) {
+
+	if jq.Limit == nil || *jq.Limit == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgBlockIndexerLimitRequired)
+	}
+	db := bi.persistence.DB()
+	q := db.Table("indexed_transactions").WithContext(ctx)
+	if jq != nil {
+		q = filters.BuildGORM(ctx, jq, q, IndexedTransactionFilters)
+	}
+	var results []*IndexedTransaction
+	err := q.Find(&results).Error
+	return results, err
 }

@@ -48,10 +48,10 @@ type evmRegistry struct {
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewRegistry(evmRegistryFactory)
+	return plugintk.NewRegistry(NewEVMRegistry)
 }
 
-func evmRegistryFactory(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
+func NewEVMRegistry(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &evmRegistry{
 		bgCtx:     context.Background(),
 		callbacks: callbacks,

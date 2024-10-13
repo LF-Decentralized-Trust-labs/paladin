@@ -36,7 +36,7 @@ func TestGetTransactionByIDFullFail(t *testing.T) {
 	})
 	defer done()
 
-	_, err := txm.getTransactionByIDFull(ctx, uuid.New())
+	_, err := txm.GetTransactionByIDFull(ctx, uuid.New())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -51,7 +51,7 @@ func TestGetTransactionByIDFullPublicFail(t *testing.T) {
 	}))
 	defer done()
 
-	_, err := txm.getTransactionByIDFull(ctx, uuid.New())
+	_, err := txm.GetTransactionByIDFull(ctx, uuid.New())
 	assert.Regexp(t, "pop", err)
 }
 
@@ -61,7 +61,7 @@ func TestGetTransactionByIDFail(t *testing.T) {
 	})
 	defer done()
 
-	_, err := txm.getTransactionByID(ctx, uuid.New())
+	_, err := txm.GetTransactionByID(ctx, uuid.New())
 	assert.Regexp(t, "pop", err)
 }
 

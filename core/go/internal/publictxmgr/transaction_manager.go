@@ -126,7 +126,7 @@ type txActivityRecords struct {
 }
 
 func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxManagerConfig) components.PublicTxManager {
-	log.L(ctx).Debugf("Creating new enterprise transaction handler")
+	log.L(ctx).Debugf("Creating new public transaction manager")
 
 	gasPriceClient := NewGasPriceClient(ctx, conf)
 	gasPriceIncreaseMax := confutil.BigIntOrNil(conf.GasPrice.IncreaseMax)
@@ -163,30 +163,30 @@ func (ble *pubTxManager) PreInit(pic components.PreInitComponents) (result *comp
 // Post-init allows the manager to cross-bind to other components, or the Engine
 func (ble *pubTxManager) PostInit(pic components.AllComponents) error {
 	ctx := ble.ctx
-	log.L(ctx).Debugf("Initializing enterprise transaction handler")
+	log.L(ctx).Debugf("Initializing public transaction manager")
 	ble.ethClientFactory = pic.EthClientFactory()
-	ble.ethClient = ble.ethClientFactory.SharedWS()
 	ble.keymgr = pic.KeyManager()
-
+	ble.p = pic.Persistence()
 	ble.bIndexer = pic.BlockIndexer()
 	ble.rootTxMgr = pic.TxManager()
-
-	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble.ethClient, ble)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to create balance manager for enterprise transaction handler due to %+v", err)
-		return err
-	}
-	log.L(ctx).Debugf("Initialized enterprise transaction handler")
-	ble.balanceManager = balanceManager
-	ble.p = pic.Persistence()
 	ble.submissionWriter = newSubmissionWriter(ble.ctx, ble.p, ble.conf)
 
+	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to create balance manager for public transaction manager due to %+v", err)
+		return err
+	}
+	ble.balanceManager = balanceManager
+
+	log.L(ctx).Debugf("Initialized public transaction manager")
 	return nil
 }
 
 func (ble *pubTxManager) Start() error {
 	ctx := ble.ctx
-	log.L(ctx).Debugf("Starting enterprise transaction handler")
+	log.L(ctx).Debugf("Starting public transaction manager")
+
+	// The client is assured to be started by this point and available
 	ble.ethClient = ble.ethClientFactory.SharedWS()
 	ble.gasPriceClient.Init(ctx, ble.ethClient)
 	ble.nonceManager = newNonceCache(ble.nonceCacheTimeout, func(ctx context.Context, signer tktypes.EthAddress) (uint64, error) {
@@ -206,7 +206,7 @@ func (ble *pubTxManager) Start() error {
 	}
 	ble.MarkInFlightOrchestratorsStale()
 	ble.submissionWriter.Start()
-	log.L(ctx).Infof("Started enterprise transaction handler")
+	log.L(ctx).Infof("Started public transaction manager")
 	return nil
 }
 

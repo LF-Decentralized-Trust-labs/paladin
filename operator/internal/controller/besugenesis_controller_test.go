@@ -32,15 +32,20 @@ import (
 
 var _ = Describe("BesuGenesis Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "testnet"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
-		besugenesis := &corev1alpha1.BesuGenesis{}
+		besugenesis := &corev1alpha1.BesuGenesis{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceName,
+				Namespace: "default",
+			},
+		}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind BesuGenesis")
@@ -51,7 +56,14 @@ var _ = Describe("BesuGenesis Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: corev1alpha1.BesuGenesisSpec{
+						ChainID:           1337,
+						GasLimit:          700000000,
+						Consensus:         "qbft",
+						BlockPeriod:       "100ms",
+						EmptyBlockPeriod:  "10s",
+						InitialValidators: []string{"node1"},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

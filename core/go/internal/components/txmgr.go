@@ -19,6 +19,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -48,4 +50,12 @@ type TXManager interface {
 	MatchAndFinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) ([]uuid.UUID, error) // returns which transactions were known
 	FinalizeTransactions(ctx context.Context, dbTX *gorm.DB, info []*ReceiptInput) error                        // requires all transactions to be known
 	CalculateRevertError(ctx context.Context, dbTX *gorm.DB, revertData tktypes.HexBytes) error
+	SendTransaction(ctx context.Context, tx *ptxapi.TransactionInput) (*uuid.UUID, error)
+	SendTransactions(ctx context.Context, txs []*ptxapi.TransactionInput) (txIDs []uuid.UUID, err error)
+	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *ptxapi.TransactionFull, err error)
+	GetTransactionByID(ctx context.Context, id uuid.UUID) (*ptxapi.Transaction, error)
+	QueryTransactions(ctx context.Context, jq *query.QueryJSON, pending bool) ([]*ptxapi.Transaction, error)
+	QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*ptxapi.TransactionFull, error)
+	GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionReceipt, error)
+	QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*ptxapi.TransactionReceipt, error)
 }

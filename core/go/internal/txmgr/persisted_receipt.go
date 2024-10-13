@@ -221,7 +221,7 @@ func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX *gorm.DB, re
 	return i18n.NewError(ctx, msgs.MsgTxMgrRevertedDataNotDecoded)
 }
 
-func (tm *txManager) queryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*ptxapi.TransactionReceipt, error) {
+func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*ptxapi.TransactionReceipt, error) {
 	qw := &queryWrapper[transactionReceipt, ptxapi.TransactionReceipt]{
 		p:           tm.p,
 		table:       "transaction_receipts",
@@ -238,8 +238,8 @@ func (tm *txManager) queryTransactionReceipts(ctx context.Context, jq *query.Que
 	return qw.run(ctx, nil)
 }
 
-func (tm *txManager) getTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionReceipt, error) {
-	prs, err := tm.queryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
+func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionReceipt, error) {
+	prs, err := tm.QueryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(prs) == 0 || err != nil {
 		return nil, err
 	}

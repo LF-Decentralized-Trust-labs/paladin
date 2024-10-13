@@ -27,6 +27,13 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+
+    // Consumable configurations
+    libstatic {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+
 }
 
 dependencies {
@@ -68,11 +75,27 @@ task test(type: Exec) {
     dependsOn ':testinfra:startTestInfra'
 }
 
+task buildGo(type: GoLib, dependsOn: []) {
+    inputs.files(configurations.toolkitGo)
+    baseName "static"
+    sources goFiles
+    mainFile 'static.go'
+}
+
 task build {
     dependsOn lint
     dependsOn test
 }
 
+task assemble {
+    dependsOn buildGo
+}
+
+
 task clean(type: Delete) {
     delete 'coverage'
+}
+
+dependencies {
+    libstatic files(buildGo)
 }

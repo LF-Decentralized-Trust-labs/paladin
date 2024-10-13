@@ -60,7 +60,7 @@ public class DomainIntegrationTests {
                     "deployer",
                     factoryABI,
                     factoryBytecode,
-                    "{}");
+                    tktypes.RawJSON("{}"));
             return new JsonHex.Address(contractAddr);
         }
     }
@@ -81,7 +81,7 @@ public class DomainIntegrationTests {
                     "deployer",
                     factoryABI,
                     factoryBytecode,
-                    "{}");
+                    tktypes.RawJSON("{}"));
             return new JsonHex.Address(contractAddr);
         }
     }

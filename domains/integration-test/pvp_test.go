@@ -318,14 +318,14 @@ func TestNotoForZeto(t *testing.T) {
 	log.L(ctx).Infof("Mint 10 Zeto to Bob")
 	zeto.Mint(ctx, bob, 10).SignAndSend(notary).Wait()
 
-	notoCoins := findAvailableCoins[nototypes.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil, func(coins []*nototypes.NotoCoinState) bool {
+	notoCoins := findAvailableCoins(t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil, func(coins []*nototypes.NotoCoinState) bool {
 		return len(coins) >= 1
 	})
 	require.Len(t, notoCoins, 1)
 	assert.Equal(t, int64(10), notoCoins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, aliceKey, notoCoins[0].Data.Owner.String())
 
-	zetoCoins := findAvailableCoins[zetotypes.ZetoCoinState](t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil, func(coins []*zetotypes.ZetoCoinState) bool {
+	zetoCoins := findAvailableCoins(t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil, func(coins []*zetotypes.ZetoCoinState) bool {
 		return len(coins) >= 1
 	})
 	require.NoError(t, err)
@@ -420,20 +420,22 @@ func TestNotoForZeto(t *testing.T) {
 	log.L(ctx).Infof("Execute the atomic operation")
 	transferAtom.Execute(ctx).SignAndSend(alice).Wait()
 
-	// TODO: better way to wait for events to be indexed after Atom execution
-	time.Sleep(3 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for !t.Failed() {
+		<-ticker.C
+		notoCoins = findAvailableCoins[nototypes.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
+		zetoCoins = findAvailableCoins[zetotypes.ZetoCoinState](t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil)
+		if len(notoCoins) == 2 && len(zetoCoins) == 2 {
+			break
+		}
+	}
 
-	notoCoins = findAvailableCoins[nototypes.NotoCoinState](t, ctx, rpc, notoDomain.Name(), notoDomain.CoinSchemaID(), noto.Address, nil)
-	require.NoError(t, err)
-	require.Len(t, notoCoins, 2)
 	assert.Equal(t, int64(1), notoCoins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, bobKey, notoCoins[0].Data.Owner.String())
 	assert.Equal(t, int64(9), notoCoins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, aliceKey, notoCoins[1].Data.Owner.String())
 
-	zetoCoins = findAvailableCoins[zetotypes.ZetoCoinState](t, ctx, rpc, zetoDomain.Name(), zetoDomain.CoinSchemaID(), zeto.Address, nil)
-	require.NoError(t, err)
-	require.Len(t, zetoCoins, 2)
 	assert.Equal(t, int64(1), zetoCoins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, alice, zetoCoins[0].Data.Owner)
 	assert.Equal(t, int64(9), zetoCoins[1].Data.Amount.Int().Int64())

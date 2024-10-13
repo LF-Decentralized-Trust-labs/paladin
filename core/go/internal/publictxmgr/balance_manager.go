@@ -26,7 +26,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -40,9 +39,6 @@ import (
 // - handle auto fueling requests when the feature is turned on
 
 type BalanceManagerWithInMemoryTracking struct {
-	// ethClient APIs are used to fetch information on chain
-	ethClient ethclient.EthClient
-
 	// transaction handler is used to submit and fetch autofueling transaction status
 	pubTxMgr *pubTxManager
 
@@ -183,7 +179,7 @@ func (af *BalanceManagerWithInMemoryTracking) GetAddressBalance(ctx context.Cont
 	if balanceChangedOnChain || cachedAddressBalance == nil {
 		log.L(ctx).Debugf("Retrieving balance for address %s from connector", address)
 		// fetch the latest balance from the chain
-		addressBalancePtr, err := af.ethClient.GetBalance(ctx, address, "latest")
+		addressBalancePtr, err := af.pubTxMgr.ethClient.GetBalance(ctx, address, "latest")
 		if err != nil {
 			log.L(ctx).Errorf("Failed retrieving balance for address %s from connector due to: %+v", address, err)
 			return nil, err
@@ -301,7 +297,7 @@ func (af *BalanceManagerWithInMemoryTracking) TransferGasFromAutoFuelingSource(c
 	return fuelingTx, nil
 }
 
-func NewBalanceManagerWithInMemoryTracking(ctx context.Context, conf *pldconf.PublicTxManagerConfig, ethClient ethclient.EthClient, publicTxMgr *pubTxManager) (_ BalanceManager, err error) {
+func NewBalanceManagerWithInMemoryTracking(ctx context.Context, conf *pldconf.PublicTxManagerConfig, publicTxMgr *pubTxManager) (_ BalanceManager, err error) {
 
 	minSourceBalance := confutil.BigIntOrNil(conf.BalanceManager.AutoFueling.MinDestBalance)
 	minDestBalance := confutil.BigIntOrNil(conf.BalanceManager.AutoFueling.MinDestBalance)
@@ -338,7 +334,6 @@ func NewBalanceManagerWithInMemoryTracking(ctx context.Context, conf *pldconf.Pu
 	bm := &BalanceManagerWithInMemoryTracking{
 		source:                             autoFuelingSource,
 		sourceAddress:                      autoFuelingSourceAddress,
-		ethClient:                          ethClient,
 		pubTxMgr:                           publicTxMgr,
 		balanceCache:                       cache.NewCache[tktypes.EthAddress, *big.Int](&conf.BalanceManager.Cache, &pldconf.PublicTxManagerDefaults.BalanceManager.Cache),
 		minSourceBalance:                   minSourceBalance,

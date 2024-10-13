@@ -187,6 +187,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
         }
         // We've got a success
         resetReconnectCount();
+        LOGGER.info("Loaded plugin {}", plugin.info.name());
         plugins.put(loadInstruction.getPlugin().getId(), plugin);
     }
 

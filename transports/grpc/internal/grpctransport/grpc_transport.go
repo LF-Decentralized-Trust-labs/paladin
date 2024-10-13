@@ -69,10 +69,10 @@ type outboundConn struct {
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewTransport(grpcTransportFactory)
+	return plugintk.NewTransport(NewGRPCTransport)
 }
 
-func grpcTransportFactory(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
+func NewGRPCTransport(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
 	return &grpcTransport{
 		bgCtx:               context.Background(),
 		callbacks:           callbacks,

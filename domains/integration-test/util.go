@@ -61,7 +61,7 @@ func deployContracts(ctx context.Context, t *testing.T, hdWalletSeed *testbed.UT
 		build := domain.LoadBuild(contract)
 		var addr string
 		rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode",
-			deployer, build.ABI, build.Bytecode.String(), `{}`)
+			deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
 		if rpcerr != nil {
 			assert.NoError(t, rpcerr.Error())
 		}

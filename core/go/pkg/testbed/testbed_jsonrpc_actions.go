@@ -18,13 +18,13 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
@@ -88,31 +88,37 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 		abi abi.ABI,
 		bytecode tktypes.HexBytes,
 		params tktypes.RawJSON,
-	) (*ethtypes.Address0xHex, error) {
+	) (*tktypes.EthAddress, error) {
 
-		var constructor ethclient.ABIFunctionClient
-		ec := tb.c.EthClientFactory().HTTPClient()
-		abic, err := ec.ABI(ctx, abi)
-		if err == nil {
-			constructor, err = abic.Constructor(ctx, bytecode)
-		}
+		txID, err := tb.c.TxManager().SendTransaction(ctx, &ptxapi.TransactionInput{
+			ABI:      abi,
+			Bytecode: bytecode,
+			Transaction: ptxapi.Transaction{
+				Type: ptxapi.TransactionTypePublic.Enum(),
+				From: from,
+				Data: params,
+			},
+		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to build client for constructor: %s", err)
+			return nil, err
 		}
 
-		var tx *blockindexer.IndexedTransaction
-		txHash, err := constructor.R(ctx).
-			Signer(from).
-			Input(params).
-			SignAndSend()
-		if err == nil {
-			tx, err = tb.c.BlockIndexer().WaitForTransactionSuccess(ctx, *txHash, abi)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				return nil, i18n.NewError(ctx, msgs.MsgContextCanceled)
+			}
+			receipt, err := tb.c.TxManager().GetTransactionReceiptByID(ctx, *txID)
+			if err != nil {
+				return nil, err
+			}
+			if receipt != nil {
+				return receipt.ContractAddress, nil
+			}
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to send transaction: %s", err)
-		}
-
-		return tx.ContractAddress.Address0xHex(), nil
 	})
 }
 

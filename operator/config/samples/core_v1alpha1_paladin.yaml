@@ -20,3 +20,26 @@ spec:
     - name: signer-1
       secret: node1.keys
       type: autoHDWallet
+  domains:
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: noto
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: zeto          
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: pente
+  registries:
+    - labelSelector:
+        matchLabels:
+          paladin.io/registry-name: evm-registry
+  service:
+    type: NodePort
+    ports:
+    - name: rpc-http
+      port: 8548
+      nodePort: 31548 # see paladin-kind.yaml
+    - name: rpc-ws
+      port: 8549
+      nodePort: 31549 # see paladin-kind.yaml

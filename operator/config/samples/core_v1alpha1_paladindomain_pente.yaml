@@ -1,0 +1,16 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinDomain
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+    paladin.io/domain-name: pente
+  name: pente
+spec:
+  smartContractDeployment: pente
+  plugin:
+    type: jar
+    library: /app/domains/pente.jar
+    class: io.kaleido.paladin.pente.domain.PenteDomainFactory
+  configJSON: |
+    {}

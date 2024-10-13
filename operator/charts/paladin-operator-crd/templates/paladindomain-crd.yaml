@@ -1,0 +1,120 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: paladindomains.core.paladin.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.3
+  labels:
+  {{- include "paladin-operator-crd.labels" . | nindent 4 }}
+spec:
+  group: core.paladin.io
+  names:
+    kind: PaladinDomain
+    listKind: PaladinDomainList
+    plural: paladindomains
+    shortNames:
+    - domain
+    singular: paladindomain
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.status
+      name: Status
+      type: string
+    - jsonPath: .status.registryAddress
+      name: Domain_Registry
+      type: string
+    - jsonPath: .spec.smartContractDeployment
+      name: Deployment
+      type: string
+    - jsonPath: .spec.plugin.library
+      name: Library
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PaladinDomain is the Schema for the paladindomains API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PaladinDomainSpec defines the desired state of PaladinDomain
+            properties:
+              allowSigning:
+                description: |-
+                  Whether the code inside of this domain is allowed to perform processing using in-memory key materials.
+                  Required when Zero Knowledge Proof (ZKP) generation is being co-located with the Paladin core process
+                  for domains like Zeto.
+                type: boolean
+              configJSON:
+                description: JSON configuration specific to the individual domain
+                type: string
+              plugin:
+                description: Details of the plugin to load for the domain
+                properties:
+                  class:
+                    description: For Java only, the name of the class to load from the
+                      Jar
+                    type: string
+                  library:
+                    description: The location of the library - do not include the "lib"
+                      prefix or the ".so" suffix for shared libraries
+                    type: string
+                  type:
+                    description: The library type to load
+                    enum:
+                    - c-shared
+                    - jar
+                    type: string
+                required:
+                - library
+                - type
+                type: object
+              registryAddress:
+                description: If you have separately deployed the registry for this domain,
+                  supply the registry address directly
+                type: string
+              smartContractDeployment:
+                description: Reference to a SmartContractDeployment CR that is used
+                  to deploy a new registry contract
+                type: string
+            required:
+            - configJSON
+            - plugin
+            type: object
+          status:
+            description: PaladinDomainStatus defines the observed state of PaladinDomain
+            properties:
+              registryAddress:
+                type: string
+              status:
+                type: string
+            required:
+            - status
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

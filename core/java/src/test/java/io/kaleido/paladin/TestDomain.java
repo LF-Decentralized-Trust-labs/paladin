@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 public class TestDomain extends DomainInstance {
     TestDomain(String grpcTarget, String instanceId) {
         super(grpcTarget, instanceId);
+        init();
     }
 
     @Override

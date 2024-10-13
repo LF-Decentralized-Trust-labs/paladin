@@ -1,0 +1,15 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinDomain
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+    paladin.io/domain-name: noto
+  name: noto
+spec:
+  smartContractDeployment: noto
+  plugin:
+    type: c-shared
+    library: /app/domains/libnoto.so
+  configJSON: |
+    {}

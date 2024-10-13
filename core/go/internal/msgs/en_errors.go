@@ -178,6 +178,7 @@ var (
 	MsgBlockIndexerNoBlocksIndexed          = ffe("PD011308", "No confirmed blocks have yet been indexed")
 	MsgBlockIndexerTransactionReverted      = ffe("PD011309", "Transaction reverted: %s")
 	MsgBlockIndexerConfirmedBlockNotFound   = ffe("PD011310", "Block %s (%d) not found on retrieval after detection and requested number of confirmations")
+	MsgBlockIndexerLimitRequired            = ffe("PD011311", "limit is required on all queries")
 
 	// EthClient module PD0115XX
 	MsgEthClientInvalidInput            = ffe("PD011500", "Unable to convert to ABI function input (func=%s)")
@@ -344,6 +345,7 @@ var (
 	MsgTxMgrRevertedDecodedData          = ffe("PD012216", "Transaction reverted %s")
 	MsgTxMgrInvalidStoredData            = ffe("PD012217", "Stored data is invalid")
 	MsgTxMgrNoABIOrReference             = ffe("PD012218", "An ABI containing a function/constructor definition or an abiReference to an existing stored ABI must be supplied")
+	MsgTxMgrIdempotencyKeyClash          = ffe("PD012220", "idempotencyKey already used by submitted transaction %s") // important error code (relied on by operator, and apps)
 
 	// FlushWriter module PD0123XX
 	MsgFlushWriterQuiescing      = ffe("PD012300", "Writer shutting down")

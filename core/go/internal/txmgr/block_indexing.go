@@ -96,7 +96,8 @@ func (tm *txManager) mapBlockchainReceipt(pubTx *components.PublicTxMatch) *comp
 			BlockNumber:      pubTx.BlockNumber,
 			TransactionIndex: pubTx.TransactionIndex,
 		},
-		RevertData: pubTx.RevertReason,
+		ContractAddress: pubTx.ContractAddress,
+		RevertData:      pubTx.RevertReason,
 	}
 	if pubTx.Result.V() == blockindexer.TXResult_SUCCESS {
 		receipt.ReceiptType = components.RT_Success

@@ -53,7 +53,7 @@ type GasPriceClient interface {
 type HybridGasPriceClient struct {
 	hasZeroGasPrice bool
 	fixedGasPrice   *fftypes.JSONAny
-	cAPI            ethclient.EthClient
+	ethClient       ethclient.EthClient
 	gasPriceCache   cache.Cache[string, *fftypes.JSONAny]
 }
 
@@ -108,7 +108,7 @@ func (hGpc *HybridGasPriceClient) getGasPriceJSON(ctx context.Context) (gasPrice
 
 	// then try to use the node eth call
 	log.L(ctx).Debugf("Retrieving gas price from node eth call")
-	gasPriceHexInt, err := hGpc.cAPI.GasPrice(ctx)
+	gasPriceHexInt, err := hGpc.ethClient.GasPrice(ctx)
 	if err != nil {
 		// no fallback is available, return the error
 		log.L(ctx).Errorf("Failed to retrieve gas price from the node")
@@ -122,8 +122,8 @@ func (hGpc *HybridGasPriceClient) getGasPriceJSON(ctx context.Context) (gasPrice
 	return gasPriceJSON, nil
 
 }
-func (hGpc *HybridGasPriceClient) Init(ctx context.Context, cAPI ethclient.EthClient) {
-	hGpc.cAPI = cAPI
+func (hGpc *HybridGasPriceClient) Init(ctx context.Context, ethClient ethclient.EthClient) {
+	hGpc.ethClient = ethClient
 	// check whether it's a gasless chain
 	gasPriceJson := hGpc.GetFixedGasPriceJSON(ctx)
 	gpo, err := hGpc.ParseGasPriceJSON(ctx, gasPriceJson)

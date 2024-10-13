@@ -182,6 +182,7 @@ func TestPrivateTransactionsDeployAndExecute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, txns, 0)
 	var dplyTxID uuid.UUID
+
 	err = rpcClient.CallRPC(ctx, &dplyTxID, "ptx_sendTransaction", &ptxapi.TransactionInput{
 		ABI: *domains.SimpleTokenConstructorABI(),
 		Transaction: ptxapi.Transaction{

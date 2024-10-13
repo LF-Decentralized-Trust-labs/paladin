@@ -17,6 +17,7 @@
 package blockindexer
 
 import (
+	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -41,6 +42,17 @@ func (pl EthTransactionResult) Options() []string {
 		string(TXResult_FAILURE),
 		string(TXResult_SUCCESS),
 	}
+}
+
+var IndexedTransactionFilters filters.FieldSet = filters.FieldMap{
+	"hash":              filters.HexBytesField(`"hash"`),
+	"blockNumber":       filters.HexBytesField("block_number"),
+	"transaction_index": filters.Int64Field("transactionIndex"),
+	"from":              filters.HexBytesField(`"from"`),
+	"to":                filters.HexBytesField(`"to"`),
+	"nonce":             filters.Int64Field("nonce"),
+	"contractAddress":   filters.HexBytesField("contract_address"),
+	"result":            filters.StringField("result"),
 }
 
 type IndexedTransaction struct {

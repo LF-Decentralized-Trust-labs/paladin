@@ -50,24 +50,24 @@ func newTestBalanceManager(t *testing.T, autoFuel bool, cbs ...func(m *mocksAndT
 		}
 	})
 
-	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, m.ethClient, ble)
+	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble)
 	require.NoError(t, err)
 	return ctx, balanceManager.(*BalanceManagerWithInMemoryTracking), ble, m, done
 }
 
 func TestNewBalanceManagerError(t *testing.T) {
-	ctx, ble, m, done := newTestPublicTxManager(t, false)
+	ctx, ble, _, done := newTestPublicTxManager(t, false)
 	defer done()
 
 	ble.conf.BalanceManager.AutoFueling.MaxDestBalance = confutil.P("2")
 	ble.conf.BalanceManager.AutoFueling.MinDestBalance = confutil.P("3")
-	_, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, m.ethClient, ble)
+	_, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble)
 	assert.Regexp(t, "PD011903", err.Error())
 
 	ble.conf.BalanceManager.AutoFueling.MaxDestBalance = confutil.P("4")
 	ble.conf.BalanceManager.AutoFueling.MinThreshold = confutil.P("10")
 
-	_, err = NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, m.ethClient, ble)
+	_, err = NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble)
 	assert.Error(t, err)
 	assert.Regexp(t, "PD011904", err.Error())
 }

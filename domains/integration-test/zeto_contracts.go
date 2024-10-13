@@ -20,6 +20,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -96,19 +97,34 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 }
 
 func deployImplementations(ctx context.Context, rpc rpcbackend.Backend, deployer string, contracts []domainContract) (map[string]*tktypes.EthAddress, map[string]abi.ABI, error) {
+	var l sync.Mutex
 	deployedContracts := make(map[string]*tktypes.EthAddress)
 	deployedContractAbis := make(map[string]abi.ABI)
+	results := make(chan error, len(contracts))
 	for _, contract := range contracts {
-		addr, abi, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
-		if err != nil {
-			return nil, nil, err
+		go func() {
+			addr, abi, err := deployContract(ctx, rpc, deployer, &contract, deployedContracts)
+			if err != nil {
+				log.L(ctx).Errorf("failed to deploy %s: %s", contract.Name, err)
+				results <- err
+				return
+			}
+			log.L(ctx).Infof("Deployed contract %s to %s", contract.Name, addr.String())
+			l.Lock()
+			defer l.Unlock()
+			deployedContracts[contract.Name] = addr
+			deployedContractAbis[contract.Name] = abi
+			results <- nil
+		}()
+	}
+	var lastErr error
+	for range contracts {
+		if err := <-results; err != nil {
+			lastErr = err
 		}
-		log.L(ctx).Infof("Deployed contract %s to %s", contract.Name, addr.String())
-		deployedContracts[contract.Name] = addr
-		deployedContractAbis[contract.Name] = abi
 	}
 
-	return deployedContracts, deployedContractAbis, nil
+	return deployedContracts, deployedContractAbis, lastErr
 }
 
 func deployContract(ctx context.Context, rpc rpcbackend.Backend, deployer string, contract *domainContract, deployedContracts map[string]*tktypes.EthAddress) (*tktypes.EthAddress, abi.ABI, error) {
@@ -138,7 +154,7 @@ func getContractSpec(contract *domainContract, deployedContracts map[string]*tkt
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*tktypes.EthAddress, error) {
 	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
 	}

@@ -1,7 +1,6 @@
 apiVersion: core.paladin.io/v1alpha1
 kind: Besu
 metadata:
-  namespace: paladin-e2e
   name: node1
 spec:
   genesis: testnet

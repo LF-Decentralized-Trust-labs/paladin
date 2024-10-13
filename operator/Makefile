@@ -110,12 +110,13 @@ kind-start:	## Create a Kind cluster.
 	fi
 	$(KUBECTL) version
 
+# $(CONTAINER_TOOL) images -q postgres:latest || $(CONTAINER_TOOL) pull postgres:latest
+# $(CONTAINER_TOOL) images -q hyperledger/besu:latest || $(CONTAINER_TOOL) pull hyperledger/besu:latest
 .PHONY: kind-promote
 kind-promote: kind-start ## Load Docker images into Kind cluster.
+	echo "Loading images into Kind cluster..."
 	$(KIND_CLUSTER) load docker-image ${OPERATOR_IMG} --name "${CLUSTER_NAME}"
 	$(KIND_CLUSTER) load docker-image ${PALADIN_IMG} --name "${CLUSTER_NAME}"
-	$(KIND_CLUSTER) load docker-image postgres:latest --name "${CLUSTER_NAME}"
-	$(KIND_CLUSTER) load docker-image hyperledger/besu:latest --name "${CLUSTER_NAME}"
 
 .PHONY: kind-delete
 kind-delete:	## Delete the Kind cluster.
@@ -231,9 +232,6 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 	test -s $(LOCALBIN)/crd-ref-docs || GOBIN=$(LOCALBIN) go install github.com/elastic/crd-ref-docs@latest
 
 ##@ Dev Helpers
-.PHONY: update-crds
-update-crds: manifests generate ## Update CRDs in the cluster.
-	$(KUBECTL) apply -k config/crd
 
 .PHONY: generate-reference-docs
 generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
@@ -245,31 +243,31 @@ generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
 
 .PHONY: create-node-besu
 create-node-besu: ## Create a Besu Node instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE}
+	$(KUBECTL) apply -f test/e2e/e2e_single_node_besu.yaml -n ${NAMESPACE}
 
 .PHONY: create-genesis
 create-genesis: ## Create a Besu Genesis instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE}
+	$(KUBECTL) apply -f test/e2e/e2e_single_node_besugenesis.yaml -n ${NAMESPACE}
 
 .PHONY: create-node-paladin
 create-node-paladin: ## Create a Paladin Node instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE}
+	$(KUBECTL) apply -f test/e2e/e2e_single_node_paladin_psql_nodomains.yaml -n ${NAMESPACE}
 
 .PHONY: create-node
 create-node: create-node-besu create-genesis create-node-paladin ## Create all instances.
 	@echo "All instances have been created."
 
-.PHONY: delete-node
+.PHONY: delete-node-paladin
 delete-node-paladin: ## Delete the Paladin Node instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE} || true
+	$(KUBECTL) delete -f test/e2e/e2e_single_node_paladin_psql_nodomains.yaml -n ${NAMESPACE} || true
 
 .PHONY: delete-genesis
 delete-genesis: ## Delete the Besu Genesis instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE} || true
+	$(KUBECTL) delete -f test/e2e/e2e_single_node_besugenesis.yaml -n ${NAMESPACE} || true
 
 .PHONY: delete-node-besu
 delete-node-besu: ## Delete the Besu Node instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE} || true
+	$(KUBECTL) delete -f test/e2e/e2e_single_node_besu.yaml -n ${NAMESPACE} || true
 
 .PHONY: delete-node
 delete-node: delete-node-paladin delete-genesis delete-node-besu  ## Delete all instances.

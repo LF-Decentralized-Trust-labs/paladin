@@ -61,6 +61,12 @@ abstract class PluginInstance<MSG> {
     public PluginInstance(String grpcTarget, String pluginId) {
         this.grpcTarget = grpcTarget;
         this.pluginId = pluginId;
+    }
+
+    /* Must immediately after construction in the child (can't be called during construction otherwise
+       in super() call otherwise we cannot guarantee the child constructor will have
+       finished initializing variables before we go async */
+    protected void init() {
         scheduleConnect();
     }
 

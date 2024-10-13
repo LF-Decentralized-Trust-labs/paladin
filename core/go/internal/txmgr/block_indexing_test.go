@@ -95,7 +95,7 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 	abiRef, err := txm.storeABI(ctx, testABI)
 	require.NoError(t, err)
 
-	txID, err = txm.sendTransaction(ctx, &ptxapi.TransactionInput{
+	txID, err = txm.SendTransaction(ctx, &ptxapi.TransactionInput{
 		Transaction: ptxapi.Transaction{
 			Type:         ptxapi.TransactionTypePublic.Enum(),
 			ABIReference: abiRef,
@@ -110,7 +110,7 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 	postCommit()
 
 	// Check we can query the receipt
-	receipt, err := txm.getTransactionReceiptByID(ctx, *txID)
+	receipt, err := txm.GetTransactionReceiptByID(ctx, *txID)
 	require.NoError(t, err)
 	assert.False(t, receipt.Success)
 	assert.Equal(t, `PD012216: Transaction reverted ErrorNum("12345")`, receipt.FailureMessage)

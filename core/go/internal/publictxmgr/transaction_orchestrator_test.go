@@ -71,6 +71,7 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 
 	ctx, o, m, done := newTestOrchestrator(t, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(2) // only poll once then we're full
+		conf.GasPrice.FixedGasPrice = 1
 	})
 	defer done()
 
@@ -90,8 +91,11 @@ func TestNewOrchestratorLoadsSecondTxAndQueuesBalanceCheck(t *testing.T) {
 	m.ethClient.On("GetBalance", mock.Anything, o.signingAddress, "latest").Return(tktypes.Uint64ToUint256(100), nil).Run(func(args mock.Arguments) {
 		close(addressBalanceChecked)
 	}).Once()
-	_, _ = o.Start(ctx)
+	oDone, _ := o.Start(ctx)
 	<-addressBalanceChecked
+	o.Stop()
+	<-oDone
+
 }
 
 func TestNewOrchestratorPollingLoopContextCancelled(t *testing.T) {
@@ -162,6 +166,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	autoFuelingSourceAddr := *tktypes.RandAddress()
 	ctx, o, m, done := newTestOrchestrator(t, func(m *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
 		conf.Orchestrator.MaxInFlight = confutil.P(1) // just one inflight - which we inject in
+		conf.GasPrice.FixedGasPrice = 1
 		conf.BalanceManager.AutoFueling.Source = confutil.P("autofueler")
 
 		m.keyManager.(*componentmocks.KeyManager).On("ResolveKey", mock.Anything, "autofueler", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS).
@@ -200,7 +205,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
 		Return(ethclient.EstimateGasResult{GasLimit: tktypes.HexUint64(10)}, nil)
 
-	_, err := o.Start(ctx)
+	oDone, err := o.Start(ctx)
 	require.NoError(t, err)
 
 	var trackedTx *ptxapi.PublicTx
@@ -214,4 +219,7 @@ func TestOrchestratorTriggerTopUp(t *testing.T) {
 		trackedTx = af.trackedFuelingTransactions[o.signingAddress]
 		af.addressBalanceChangedMapMux.Unlock()
 	}
+
+	o.Stop()
+	<-oDone
 }

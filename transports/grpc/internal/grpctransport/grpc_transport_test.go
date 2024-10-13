@@ -52,7 +52,7 @@ func TestPluginLifecycle(t *testing.T) {
 func TestBadConfigJSON(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{!!!!`,
@@ -64,7 +64,7 @@ func TestBadConfigJSON(t *testing.T) {
 func TestMissingListenerPort(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{}`,
@@ -76,7 +76,7 @@ func TestMissingListenerPort(t *testing.T) {
 func TestBadCertSubjectMatcher(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{"address": "127.0.0.1", "port": 0, "certSubjectMatcher": "[[[[[[[badness"}`,
@@ -88,7 +88,7 @@ func TestBadCertSubjectMatcher(t *testing.T) {
 func TestBadTLSConf(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{"address": "127.0.0.1", "port": 0, "tls": { "caFile": "` + t.TempDir() + `" }}`,
@@ -100,7 +100,7 @@ func TestBadTLSConf(t *testing.T) {
 func TestBadDirectCertVerificationConf(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{"address": "127.0.0.1", "port": 0, "tls": { "requiredDNAttributes": {"cn":"anything"} }}`,
@@ -112,7 +112,7 @@ func TestBadDirectCertVerificationConf(t *testing.T) {
 func TestBadListenerConf(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	_, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: `{"address": "::::::::", "port": 0}`,

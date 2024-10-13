@@ -27,6 +27,12 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+
+    // Consumable configurations
+    libgrpc {
+        canBeConsumed = true
+        canBeResolved = false
+    }    
 }
 
 dependencies {
@@ -84,9 +90,20 @@ task test(type: Exec, dependsOn:[tasks.protoc]) {
     dependsOn ':testinfra:startTestInfra'
 }
 
+task buildGo(type: GoLib, dependsOn: [tasks.protoc]) {
+    inputs.files(configurations.toolkitGo)
+    baseName "grpc"
+    sources goFiles
+    mainFile 'grpc.go'
+}
+
 task build {
     dependsOn lint
     dependsOn test
+}
+
+task assemble {
+    dependsOn buildGo
 }
 
 task clean(type: Delete) {

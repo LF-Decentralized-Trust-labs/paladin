@@ -41,11 +41,11 @@ type staticRegistry struct {
 	name string
 }
 
-func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewRegistry(staticRegistryFactory)
+func NewPlugin() plugintk.PluginBase {
+	return plugintk.NewRegistry(NewStatic)
 }
 
-func staticRegistryFactory(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
+func NewStatic(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &staticRegistry{
 		bgCtx:     context.Background(),
 		callbacks: callbacks,

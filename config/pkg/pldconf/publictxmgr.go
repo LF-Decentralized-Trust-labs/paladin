@@ -143,10 +143,16 @@ type AutoFuelingConfig struct {
 }
 
 type GasPriceConfig struct {
-	IncreaseMax        *string     `json:"increaseMax"`
-	IncreasePercentage *int        `json:"increasePercentage"`
-	FixedGasPrice      any         `json:"fixedGasPrice"` // number or object
-	Cache              CacheConfig `json:"cache"`
+	IncreaseMax        *string            `json:"increaseMax"`
+	IncreasePercentage *int               `json:"increasePercentage"`
+	FixedGasPrice      any                `json:"fixedGasPrice"` // number or object
+	GasOracleAPI       GasOracleAPIConfig `json:"gasOracleAPI"`
+	Cache              CacheConfig        `json:"cache"`
+}
+
+type GasOracleAPIConfig struct {
+	URL      string `json:"url"`
+	Template string `json:"template"`
 }
 
 type PublicTxManagerOrchestratorConfig struct {

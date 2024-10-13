@@ -128,9 +128,6 @@ func unitTestComponentManagerStart(ctx context.Context, conf *pldconf.PaladinCon
 		cm = componentmgr.NewComponentManager(ctx, socketFile, uuid.New(), conf, tb)
 		err = cm.Init()
 	}
-	if err == nil {
-		err = cm.StartComponents()
-	}
 	for _, cb := range callbacks {
 		if err == nil && cb.PreManagerStart != nil {
 			err = cb.PreManagerStart(cm)

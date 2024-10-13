@@ -31,7 +31,6 @@ func TestSignalHandlerStop(t *testing.T) {
 	cmStarted := make(chan struct{})
 	socketFile, loaderUUID, configFile, done := setupTestConfig(t, func(mockCM *componentmocks.ComponentManager) {
 		mockCM.On("Init").Return(nil)
-		mockCM.On("StartComponents").Return(nil)
 		mockCM.On("StartManagers").Return(nil)
 		mockCM.On("CompleteStart").Return(nil).Run(func(args mock.Arguments) {
 			close(cmStarted)
@@ -80,7 +79,6 @@ func TestComponentManagerStartFail(t *testing.T) {
 
 	socketFile, loaderUUID, configFile, done := setupTestConfig(t, func(mockCM *componentmocks.ComponentManager) {
 		mockCM.On("Init").Return(nil)
-		mockCM.On("StartComponents").Return(nil)
 		mockCM.On("StartManagers").Return(nil)
 		mockCM.On("CompleteStart").Return(fmt.Errorf("pop"))
 		mockCM.On("Stop").Return()

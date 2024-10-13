@@ -47,7 +47,7 @@ public class PluginJAR extends Plugin {
             URI fileURI = new File(libName).toURI();
             classLoader = new URLClassLoader(new URL[]{fileURI.toURL()}, classLoader);
         }
-        Class<?> clazz = Class.forName(className);
+        Class<?> clazz = classLoader.loadClass(className);
         pluginImpl = clazz.getDeclaredConstructor().newInstance();
         Method startInstanceMethod = clazz.getMethod("startInstance", String.class, String.class);
         stopInstanceMethod = clazz.getMethod("stopInstance", String.class);
@@ -56,7 +56,9 @@ public class PluginJAR extends Plugin {
 
     @Override
     public synchronized void stop() throws Exception {
-        stopInstanceMethod.invoke(pluginImpl, info.instanceId());
+        if (stopInstanceMethod != null) {
+            stopInstanceMethod.invoke(pluginImpl, info.instanceId());
+        }
         onStop.pluginStopped(info.instanceId(), this, null);
     }
 

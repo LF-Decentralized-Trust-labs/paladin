@@ -1,0 +1,117 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.3
+  name: smartcontractdeployments.core.paladin.io
+spec:
+  group: core.paladin.io
+  names:
+    kind: SmartContractDeployment
+    listKind: SmartContractDeploymentList
+    plural: smartcontractdeployments
+    shortNames:
+    - scd
+    singular: smartcontractdeployment
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.transactionStatus
+      name: Status
+      type: string
+    - jsonPath: .status.transactionID
+      name: TransactionID
+      type: string
+    - jsonPath: .status.contractAddress
+      name: Contract
+      type: string
+    - jsonPath: .status.transactionHash
+      name: TxHash
+      type: string
+    - jsonPath: .status.failureMessage
+      name: Failure
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SmartContractDeployment is the Schema for the smartcontractdeployments
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SmartContractDeploymentSpec defines the desired state of
+              SmartContractDeployment
+            properties:
+              abi:
+                description: The ABI of the smart contract - provides the constructor
+                  parameter definition
+                type: string
+              bytecode:
+                description: The bytecode of the smart contract
+                type: string
+              deployKey:
+                description: Reference to the signing key to use to deploy
+                type: string
+              deployNode:
+                description: The node to use to deploy - reference to a PaladinNode
+                  CR
+                type: string
+              domain:
+                description: Domain for private transactions
+                type: string
+              paramsJSON:
+                description: JSON parameter data (array, object, or empty if no params)
+                type: string
+              txType:
+                default: public
+                description: Type of transaction to submit to Paladin
+                enum:
+                - public
+                - private
+                type: string
+            required:
+            - abi
+            - bytecode
+            - deployKey
+            - deployNode
+            - txType
+            type: object
+          status:
+            description: SmartContractDeploymentStatus defines the observed state
+              of SmartContractDeployment
+            properties:
+              contractAddress:
+                type: string
+              failureMessage:
+                type: string
+              idempotencyKey:
+                type: string
+              transactionHash:
+                type: string
+              transactionID:
+                type: string
+              transactionStatus:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

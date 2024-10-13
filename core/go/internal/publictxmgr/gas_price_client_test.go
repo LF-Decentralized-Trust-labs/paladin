@@ -66,7 +66,7 @@ func NewTestFixedPriceGasPriceClientEIP1559(t *testing.T) GasPriceClient {
 
 func NewTestNodeGasPriceClient(t *testing.T, connectorAPI ethclient.EthClient) GasPriceClient {
 	hgc := &HybridGasPriceClient{}
-	hgc.cAPI = connectorAPI
+	hgc.ethClient = connectorAPI
 	hgc.gasPriceCache = longLivedGasPriceTestCache()
 	return hgc
 }

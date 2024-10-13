@@ -149,19 +149,12 @@ func GetProjectDir() (string, error) {
 	return wd, nil
 }
 
-func KubectlApplyYAML(yaml string) error {
-	cmd := exec.Command("kubectl", "apply", "-f", "-")
-	cmd.Stdin = strings.NewReader(yaml)
-	_, err := Run(cmd)
-	return err
-}
-
 type TestDeployer struct {
 	RPC  rpcclient.Client
 	From string
 }
 
-func (td *TestDeployer) DeploySmartContractBytecode(ctx context.Context, buildJSON string, params any) (receipt *ptxapi.TransactionReceipt, err error) {
+func (td *TestDeployer) DeploySmartContractDeploymentBytecode(ctx context.Context, buildJSON string, params any) (receipt *ptxapi.TransactionReceipt, err error) {
 	type buildDefinition struct {
 		Bytecode tktypes.HexBytes `json:"bytecode"`
 		ABI      abi.ABI          `json:"abi"`

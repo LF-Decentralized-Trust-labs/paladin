@@ -45,12 +45,6 @@ type BesuGenesisSpec struct {
 	InitialValidators []string `json:"initialValidators"`
 }
 
-// BesuGenesisStatus defines the observed state of BesuGenesis
-type BesuGenesisStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
@@ -59,8 +53,8 @@ type BesuGenesis struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BesuGenesisSpec   `json:"spec,omitempty"`
-	Status BesuGenesisStatus `json:"status,omitempty"`
+	Spec   BesuGenesisSpec `json:"spec,omitempty"`
+	Status Status          `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

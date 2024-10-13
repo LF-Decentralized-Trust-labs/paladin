@@ -41,7 +41,7 @@ func (tt TransactionType) Options() []string {
 }
 
 type Transaction struct {
-	ID             uuid.UUID                     `json:"id,omitempty"`             // server generated UUID for this transaction (query only)
+	ID             *uuid.UUID                    `json:"id,omitempty"`             // server generated UUID for this transaction (query only)
 	Created        tktypes.Timestamp             `json:"created,omitempty"`        // server generated creation timestamp for this transaction (query only)
 	IdempotencyKey string                        `json:"idempotencyKey,omitempty"` // externally supplied unique identifier for this transaction. 409 Conflict will be returned on attempt to re-submit
 	Type           tktypes.Enum[TransactionType] `json:"type,omitempty"`           // public transactions go straight to a base ledger EVM smart contract. Private transactions use a Paladin domain to mask the on-chain data

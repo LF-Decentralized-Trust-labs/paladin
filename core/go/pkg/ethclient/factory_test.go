@@ -248,3 +248,10 @@ func TestMismatchedChainID(t *testing.T) {
 	assert.Regexp(t, "PD011512", err)
 
 }
+
+func TestSharedWSBeforeStart(t *testing.T) {
+	assert.PanicsWithValue(t, "call to SharedWS() before Start", func() {
+		_ = (&ethClientFactory{}).SharedWS()
+	})
+
+}
