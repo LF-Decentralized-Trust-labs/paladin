@@ -2,8 +2,6 @@ name: Paladin Operator Build
 
 on:
   push:
-    branches:
-      - main
     paths:
       - 'operator/**'
   pull_request:
@@ -13,7 +11,7 @@ on:
 
 
 jobs:
-  build:
+  operator-build:
     runs-on: ubuntu-latest
     env:
       CLUSTER_NAME: paladin
