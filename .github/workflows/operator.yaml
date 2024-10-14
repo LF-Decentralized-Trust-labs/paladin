@@ -6,9 +6,9 @@ on:
       - main
     paths:
       - 'operator/**'
-  # pull_request:
-  #   paths:
-  #     - 'operator/**'
+  pull_request:
+    paths:
+      - 'operator/**'
   workflow_dispatch:
 
 
@@ -50,9 +50,9 @@ jobs:
           install_only: true # only install kind, the cluster creation is managed by the deploy step
           ignore_failed_clean: true
 
-      - name: Deploy Operator
+      - name: E2E Operator
         working-directory: operator
-        run: gradle deploy -PclusterName=${{ env.CLUSTER_NAME }} -Pnamespace=${{ env.NAMESPACE }} 
+        run: gradle e2e -PclusterName=${{ env.CLUSTER_NAME }} -Pnamespace=${{ env.NAMESPACE }} 
 
       - name: Uninstall Operator
         working-directory: operator
