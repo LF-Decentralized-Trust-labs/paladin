@@ -50,6 +50,9 @@ type StateManager interface {
 
 	// Write a batch of states that have been received over the network. ID hash calculation will be validated by the domain as prior to storage
 	WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*StateUpsertOutsideContext) ([]*State, error)
+
+	// GetState returns a state by ID, with optional labels
+	GetState(ctx context.Context, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*State, error)
 }
 
 type DomainContextInfo struct {

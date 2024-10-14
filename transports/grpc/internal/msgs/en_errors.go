@@ -46,4 +46,5 @@ var (
 	MsgInvalidReplyToNode                   = ffe("PD030010", "replyTo node does not match sending node")
 	MsgConnectionToWrongNode                = ffe("PD030011", "the TLS identity of the node '%s' does not match the expected node '%s'")
 	MsgPEMCertificateInvalid                = ffe("PD030012", "invalid PEM encoded x509 certificate")
+	MsgErrorNoTargetNode                    = ffe("PD030013", "request to send message but no target node specified")
 )

@@ -294,7 +294,7 @@ func (dc *domainContext) UpsertStates(stateUpserts ...*components.StateUpsert) (
 	withValues := make([]*components.StateWithLabels, len(stateUpserts))
 	toMakeAvailable := make([]*components.StateWithLabels, 0, len(stateUpserts))
 	for i, ns := range stateUpserts {
-		schema, err := dc.ss.GetSchema(dc, dc.domainName, ns.SchemaID, true)
+		schema, err := dc.ss.GetSchema(dc, dc.domainName, ns.SchemaID, nil, true)
 		if err != nil {
 			return nil, err
 		}

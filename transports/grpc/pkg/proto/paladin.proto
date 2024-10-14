@@ -27,8 +27,9 @@ message Empty {}
 message Message {
   string message_id = 1;
   optional string correlation_id = 2;
-  string destination = 3;
-  string reply_to = 4;
-  string message_type = 5;
-  bytes payload = 6;
+  string node = 3;
+  string component = 4;
+  string reply_to = 5;
+  string message_type = 6;
+  bytes payload = 7;
 }

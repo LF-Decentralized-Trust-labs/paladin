@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -44,12 +45,23 @@ type DispatchBatch struct {
 
 // PersistDispatches persists the dispatches to the store and coordinates with the public transaction manager
 // to submit public transactions.
-func (s *store) PersistDispatchBatch(ctx context.Context, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch) error {
+func (s *store) PersistDispatchBatch(ctx context.Context, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*statedistribution.StateDistribution) error {
 
+	stateDistributionsPersisted := make([]*statedistribution.StateDistributionPersisted, 0, len(stateDistributions))
+	for _, stateDistribution := range stateDistributions {
+		stateDistributionsPersisted = append(stateDistributionsPersisted, &statedistribution.StateDistributionPersisted{
+			ID:              stateDistribution.ID,
+			StateID:         stateDistribution.StateID,
+			IdentityLocator: stateDistribution.IdentityLocator,
+			DomainName:      stateDistribution.Domain,
+			ContractAddress: stateDistribution.ContractAddress,
+		})
+	}
 	// Send the write operation with all of the batch sequence operations to the flush worker
 	op := s.writer.Queue(ctx, &dispatchSequenceOperation{
-		contractAddress: contractAddress,
-		dispatches:      dispatchBatch.DispatchSequences,
+		contractAddress:    contractAddress,
+		dispatches:         dispatchBatch.DispatchSequences,
+		stateDistributions: stateDistributionsPersisted,
 	})
 
 	//wait for the flush to complete

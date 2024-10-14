@@ -449,6 +449,13 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 		},
 	}
 
+	potentialStates := []*prototk.NewState{
+		{
+			SchemaId:      states[0].Schema.String(),
+			StateDataJson: states[0].Data.String(),
+		},
+	}
+
 	tx1 := &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
@@ -472,8 +479,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 		switch tx.ID.String() {
 		case tx1.ID.String():
 			tx.PostAssembly = &components.TransactionPostAssembly{
-				AssemblyResult: prototk.AssembleTransactionResponse_OK,
-				OutputStates:   states,
+				AssemblyResult:        prototk.AssembleTransactionResponse_OK,
+				OutputStates:          states,
+				OutputStatesPotential: potentialStates,
 				AttestationPlan: []*prototk.AttestationRequest{
 					{
 						Name:            "notary",
@@ -1115,6 +1123,7 @@ func NewPrivateTransactionMgrForTestingWithFakePublicTxManager(t *testing.T, dom
 	mocks.ethClientFactory.On("SharedWS").Return(unconnectedRealClient).Maybe()
 	mocks.domainSmartContract.On("Domain").Return(mocks.domain).Maybe()
 	mocks.stateStore.On("NewDomainContext", mock.Anything, mocks.domain, *domainAddress).Return(mocks.domainContext).Maybe()
+	mocks.domain.On("Name").Return("domain1").Maybe()
 
 	e := NewPrivateTransactionMgr(ctx, tktypes.RandHex(16), &pldconf.PrivateTxManagerConfig{
 		Writer: pldconf.FlushWriterConfig{

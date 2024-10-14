@@ -189,13 +189,9 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 
 		// Check the message is from the node we expect.
 		// Note the destination node is checked by Paladin - just just have to verify the sender.
-		replyToNode, err := tktypes.PrivateIdentityLocator(msg.ReplyTo).Node(ctx, false)
-		if err == nil && replyToNode != ai.verifiedNodeName {
-			err = i18n.NewError(ctx, msgs.MsgInvalidReplyToNode)
-		}
-		if err != nil {
-			log.L(ctx).Errorf("Invalid replyTo (err=%s): %s", err, tktypes.ProtoToJSON(msg))
-			return err
+		if msg.ReplyTo != ai.verifiedNodeName {
+			log.L(ctx).Errorf("Invalid replyTo: %s", msg.ReplyTo)
+			return i18n.NewError(ctx, msgs.MsgInvalidReplyToNode)
 		}
 
 		// Deliver it to Paladin
@@ -203,7 +199,8 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 			Message: &prototk.Message{
 				MessageId:     msg.MessageId,
 				CorrelationId: msg.CorrelationId,
-				Destination:   msg.Destination,
+				Component:     msg.Component,
+				Node:          msg.Node,
 				ReplyTo:       msg.ReplyTo,
 				MessageType:   msg.MessageType,
 				Payload:       msg.Payload,
@@ -315,16 +312,16 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (*ou
 }
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-	node, err := tktypes.PrivateIdentityLocator(req.Message.Destination).Node(ctx, false)
-	if err != nil {
-		return nil, err
+	if req.Message.Node == "" {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorNoTargetNode)
 	}
-	oc, err := t.getConnection(ctx, node)
+	oc, err := t.getConnection(ctx, req.Message.Node)
 	if err == nil {
 		err = t.send(ctx, oc, &proto.Message{
 			MessageId:     req.Message.MessageId,
 			CorrelationId: req.Message.CorrelationId,
-			Destination:   req.Message.Destination,
+			Component:     req.Message.Component,
+			Node:          req.Message.Node,
 			ReplyTo:       req.Message.ReplyTo,
 			MessageType:   req.Message.MessageType,
 			Payload:       req.Message.Payload,

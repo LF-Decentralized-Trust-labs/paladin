@@ -22,14 +22,14 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type TransportMessage struct {
 	MessageID     uuid.UUID
 	CorrelationID *uuid.UUID
-	Destination   tktypes.PrivateIdentityLocator
-	ReplyTo       tktypes.PrivateIdentityLocator
+	Component     string // The name of the component to route the message to once it arrives at the destination node
+	Node          string // The node id to send the message to
+	ReplyTo       string // The node id to send replies to
 	MessageType   string
 	Payload       []byte
 }

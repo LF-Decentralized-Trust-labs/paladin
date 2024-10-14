@@ -196,8 +196,9 @@ func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 	// Connect and send from plugin1 to plugin2
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.NoError(t, err)
@@ -240,8 +241,9 @@ func TestGRPCTransport_DirectCertVerificationWithKeyRotation_OK(t *testing.T) {
 	// Connect and send from plugin1 to plugin2
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.NoError(t, err)
@@ -294,8 +296,9 @@ func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
 	// Connect and send from plugin1 to plugin2
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.NoError(t, err)
@@ -338,8 +341,9 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 
 	_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Error(t, err)
@@ -377,8 +381,9 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 
 	_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Error(t, err)
@@ -407,8 +412,9 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerServer(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "PD030007", err)
@@ -437,8 +443,9 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Error(t, err)
@@ -464,8 +471,9 @@ func TestGRPCTransport_DirectCertVerification_BadIssuersServer(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "PD030012", err)
@@ -492,8 +500,9 @@ func TestGRPCTransport_SubjectRegexpMismatch(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "PD030008", err)
@@ -518,8 +527,9 @@ func TestGRPCTransport_ClientWrongNode(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node3",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node3",
 		},
 	})
 	assert.Regexp(t, "PD030011", err)
@@ -548,8 +558,9 @@ func TestGRPCTransport_BadTransportDetails(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "PD030006", err)
@@ -576,8 +587,9 @@ func TestGRPCTransport_BadTransportIssuerPEM(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "PD030012", err)
@@ -602,8 +614,9 @@ func TestGRPCTransport_NodeUnknownToServer(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Error(t, err)
@@ -628,8 +641,9 @@ func TestGRPCTransport_NodeUnknownToClient(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node3",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node3",
 		},
 	})
 	assert.Regexp(t, "not found", err)
@@ -655,8 +669,9 @@ func TestGRPCTransport_ServerRejectNoCerts(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Error(t, err)

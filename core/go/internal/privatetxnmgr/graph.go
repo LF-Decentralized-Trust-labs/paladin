@@ -30,6 +30,7 @@ import (
 type Graph interface {
 	AddTransaction(ctx context.Context, txID string, inputStates []string, outputStates []string) error
 	GetDispatchableTransactions(ctx context.Context) (ptmgrtypes.DispatchableTransactions, error)
+	RemoveTransaction(ctx context.Context, txID string)
 	RemoveTransactions(ctx context.Context, transactionsToRemove ptmgrtypes.DispatchableTransactions) error
 	RecordSigner(ctx context.Context, txID string, signer string) error
 	RecordEndorsement(ctx context.Context, txID string) error
@@ -68,6 +69,7 @@ func (g *graph) AddTransaction(ctx context.Context, txID string, inputStates []s
 
 	// TODO should probably cache this graph and only rebuild it when needed (e.g. on restart)
 	// and incrementally update it when new transactions are added etc...
+	// or if we do build it every time, then we should remove the allTransactions field of the graph struct ( and AddTransaction and RemoveTransaction funcs) because it is just duplicating the data from the sequencer struct
 	err := g.buildMatrix(ctx)
 	if err != nil {
 		log.L(ctx).Errorf("Error building graph: %s", err)
@@ -115,7 +117,7 @@ func (g *graph) buildMatrix(ctx context.Context) error {
 		for _, stateID := range txn.inputStateIDs {
 			if stateToSpender[stateID] != nil {
 				//TODO this is expected in some cases and represents a contention that needs to be resolved
-				//TBC do we assert that it is resovled before we get to this point?
+				//TBC do we assert that it is resolved before we get to this point?
 				log.L(ctx).Errorf("State hash %s is spent by multiple transactions", stateID)
 				return i18n.NewError(ctx, msgs.MsgSequencerInternalError, "State hash %s is spent by multiple transactions")
 			}
@@ -216,6 +218,9 @@ func (g *graph) GetDispatchableTransactions(ctx context.Context) (ptmgrtypes.Dis
 		}, nil
 	}
 	return map[string][]string{}, nil
+}
+func (g *graph) RemoveTransaction(ctx context.Context, txID string) {
+	delete(g.allTransactions, txID)
 }
 
 func (g *graph) RemoveTransactions(ctx context.Context, transactionsToRemove ptmgrtypes.DispatchableTransactions) error {

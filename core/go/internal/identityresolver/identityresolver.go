@@ -18,7 +18,6 @@ package identityresolver
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -141,8 +140,9 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 		err = ir.transportManager.Send(ctx, &components.TransportMessage{
 			MessageType: "ResolveVerifierRequest",
 			MessageID:   requestID,
-			Destination: tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, remoteNodeId)),
-			ReplyTo:     tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
+			Component:   IDENTITY_RESOLVER_DESTINATION,
+			Node:        remoteNodeId,
+			ReplyTo:     ir.nodeID,
 			Payload:     resolveVerifierRequestBytes,
 		})
 		if err != nil {
@@ -217,7 +217,7 @@ func (ir *identityResolver) handleResolveVerifierError(ctx context.Context, mess
 }
 
 // TODO some common code with ResolveVerifierAsync. Refactor out to a re-usable function
-func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, messagePayload []byte, replyTo tktypes.PrivateIdentityLocator, requestID *uuid.UUID) {
+func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, messagePayload []byte, replyTo string, requestID *uuid.UUID) {
 
 	resolveVerifierRequest := &pbIdentityResolver.ResolveVerifierRequest{}
 	err := proto.Unmarshal(messagePayload, resolveVerifierRequest)
@@ -244,8 +244,8 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 			err = ir.transportManager.Send(ctx, &components.TransportMessage{
 				MessageType:   "ResolveVerifierResponse",
 				CorrelationID: requestID,
-				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
-				Destination:   replyTo,
+				Component:     IDENTITY_RESOLVER_DESTINATION,
+				Node:          replyTo,
 				Payload:       resolveVerifierResponseBytes,
 			})
 			if err != nil {
@@ -272,8 +272,9 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 			err = ir.transportManager.Send(ctx, &components.TransportMessage{
 				MessageType:   "ResolveVerifierError",
 				CorrelationID: requestID,
-				ReplyTo:       tktypes.PrivateIdentityLocator(fmt.Sprintf("%s@%s", IDENTITY_RESOLVER_DESTINATION, ir.nodeID)),
-				Destination:   replyTo,
+				ReplyTo:       ir.nodeID,
+				Component:     IDENTITY_RESOLVER_DESTINATION,
+				Node:          replyTo,
 				Payload:       resolveVerifierErrorBytes,
 			})
 			if err != nil {

@@ -23,11 +23,12 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/kaleido-io/paladin/transports/grpc/pkg/proto"
 )
 
 type testCallbacks struct {
@@ -135,8 +136,9 @@ func TestReceiveFail(t *testing.T) {
 	for err == nil {
 		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 			Message: &prototk.Message{
-				ReplyTo:     "to.me@node1",
-				Destination: "to.you@node2",
+				ReplyTo:   "node1",
+				Component: "to.you",
+				Node:      "node2",
 			},
 		})
 	}
@@ -156,8 +158,9 @@ func TestBadReplyTo(t *testing.T) {
 	for err == nil {
 		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 			Message: &prototk.Message{
-				ReplyTo:     "to.me@not.mine",
-				Destination: "to.you@node2",
+				ReplyTo:   "not.mine",
+				Component: "to.you",
+				Node:      "node2",
 			},
 		})
 	}
@@ -180,8 +183,9 @@ func TestConnectFail(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "rpc error", err)
@@ -203,15 +207,16 @@ func TestConnectBadTransport(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "to.you@node2",
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node2",
 		},
 	})
 	assert.Regexp(t, "WRONG", err)
 
 }
 
-func TestSendBadDest(t *testing.T) {
+func TestSendNoNode(t *testing.T) {
 
 	ctx := context.Background()
 
@@ -224,11 +229,11 @@ func TestSendBadDest(t *testing.T) {
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Message: &prototk.Message{
-			ReplyTo:     "to.me@node1",
-			Destination: "!wrong",
+			ReplyTo:   "node1",
+			Component: "someComponent",
 		},
 	})
-	assert.Regexp(t, "PD020006", err)
+	assert.Regexp(t, "PD030013", err)
 
 }
 
@@ -258,8 +263,9 @@ func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 
 	for err == nil {
 		err = s.Send(&proto.Message{
-			ReplyTo:     "to.me@not.mine",
-			Destination: "to.you@node2",
+			ReplyTo:   "not.mine",
+			Component: "to.you",
+			Node:      "node2",
 		})
 	}
 	assert.Error(t, err)

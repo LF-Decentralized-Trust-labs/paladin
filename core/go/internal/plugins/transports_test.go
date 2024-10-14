@@ -122,7 +122,7 @@ func TestTransportRequestsOK(t *testing.T) {
 			return &prototk.ConfigureTransportResponse{}, nil
 		},
 		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-			assert.Equal(t, "node1", smr.Message.Destination)
+			assert.Equal(t, "node1", smr.Message.Node)
 			return &prototk.SendMessageResponse{}, nil
 		},
 	}
@@ -163,7 +163,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 
 	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{Destination: "node1"},
+		Message: &prototk.Message{Node: "node1"},
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, smr)

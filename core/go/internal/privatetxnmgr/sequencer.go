@@ -42,6 +42,7 @@ func NewSequencer(
 		unconfirmedTransactionsByID: make(map[string]*transaction),
 		stateSpenders:               make(map[string]string),
 		transportWriter:             transportWriter,
+		invalidTransactions:         make([]string, 0),
 	}
 }
 
@@ -86,8 +87,9 @@ type sequencer struct {
 	blockedTransactions         []*blockedTransaction // naive implementation of a list of blocked transaction TODO may need to make this a graph so that we can analyise knock on effects of unblocking a transaction but this simple list will do for now to prove out functional behaviour
 	unconfirmedStatesByID       map[string]*unconfirmedState
 	unconfirmedTransactionsByID map[string]*transaction
-	stateSpenders               map[string]string /// map of state hash to our recognised spender of that state
-	lock                        sync.Mutex        //put one massive mutex around the whole sequencer for now.  We can optimise this later
+	stateSpenders               map[string]string /// map of state hash to our recognized spender of that state
+	invalidTransactions         []string          // transactions that have been added but are no longer valid - e.g. maybe on of its dependencies has been re-assembled
+	lock                        sync.Mutex        //put one massive mutex around the whole sequencer for now.  We can optimize this later
 	transportWriter             ptmgrtypes.TransportWriter
 }
 
@@ -213,7 +215,7 @@ func (s *sequencer) delegateIfAppropriate(ctx context.Context, transaction *tran
 	}
 	if len(keys) == 1 && keys[0] != s.nodeID {
 		// we are dependent on one other node so we can delegate
-		log.L(ctx).Debugf("Transaction %s is dependant on transaction(s). Delagating to node %s", transaction.id, keys[0])
+		log.L(ctx).Debugf("Transaction %s is dependant on transaction(s). Delegating to node %s", transaction.id, keys[0])
 		err := s.delegate(ctx, transaction.id, keys[0])
 		if err != nil {
 			log.L(ctx).Errorf("Error delegating: %s", err)
@@ -298,7 +300,7 @@ func (s *sequencer) acceptTransaction(ctx context.Context, transaction *transact
 	return nil
 }
 
-func (s *sequencer) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error {
+func (s *sequencer) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) {
 	log.L(ctx).Infof("Received transaction assembled event: %s", event.String())
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -316,11 +318,6 @@ func (s *sequencer) HandleTransactionAssembledEvent(ctx context.Context, event *
 			mintingTransactionID: event.TransactionId,
 		}
 	}
-
-	//TODO this could be a dependency on a transaction that we have already added to our graph but
-	// we didn't know about it when we added the dependant transaction
-
-	return nil
 }
 
 func (s *sequencer) HandleTransactionDispatchResolvedEvent(ctx context.Context, event *pb.TransactionDispatchResolvedEvent) error {
@@ -339,7 +336,7 @@ func (s *sequencer) HandleTransactionDispatchResolvedEvent(ctx context.Context, 
 	}
 
 	//TODO we evaluate the graph here because resolving the signer theoretically might unblock some transactions
-	// however, in reality, this is typcially going to happen immediately before we are informed of an endorsement
+	// however, in reality, this is typically going to happen immediately before we are informed of an endorsement
 	// so maybe more efficient to not evaluate the graph right now because we will do it again very soon
 	err = s.evaluateGraph(ctx)
 	if err != nil {
@@ -419,28 +416,66 @@ func (s *sequencer) HandleTransactionDelegatedEvent(ctx context.Context, event *
 	}
 	log.L(ctx).Infof("HandleTransactionDelegatedEvent transaction %s delegated from %s to %s", event.TransactionId, event.DelegatingNodeId, event.DelegateNodeId)
 	if transaction.sequencingNodeID != event.DelegatingNodeId {
-		log.L(ctx).Debugf("local info about transaction %s out of date current sequening node is thought to be  %s", event.TransactionId, transaction.sequencingNodeID)
+		log.L(ctx).Debugf("local info about transaction %s out of date current sequencing node is thought to be  %s", event.TransactionId, transaction.sequencingNodeID)
 	}
 
 	transaction.sequencingNodeID = event.DelegateNodeId
 	return nil
 }
 
-func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) error {
+func (s *sequencer) RemoveTransaction(ctx context.Context, txnID string) {
+	log.L(ctx).Infof("RemoveTransaction: %s", txnID)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	//release the transaction's claim on any states
+	for inputState, spender := range s.stateSpenders {
+		if spender == txnID {
+			delete(s.stateSpenders, inputState)
+		}
+	}
+	//any other transactions that were speculatively spending the output states of the transaction will need to be re-assembled
+	for _, outputState := range s.unconfirmedTransactionsByID[txnID].outputStateIDs {
+		spender, found := s.stateSpenders[outputState]
+		if found {
+			s.invalidTransactions = append(s.invalidTransactions, spender)
+		}
+	}
+
+	// remove it from the graph
+	s.graph.RemoveTransaction(ctx, txnID)
+
+	//then forget about the transaction
+	delete(s.unconfirmedTransactionsByID, txnID)
+}
+
+func (s *sequencer) AssignTransaction(ctx context.Context, txnID string) {
 	log.L(ctx).Infof("AssignTransaction: %s", txnID)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	//TODO we assume that the AssignTransaction message always comes _after_ the transactionAssembled event.  Is this safe to assume?  Should we pass the full transaction details on the delegateTransaction message? Or should we wait for the transactionAssembled event before actioning the delgation?
+	//TODO we assume that the AssignTransaction message always comes _after_ the transactionAssembled event.  Is this safe to assume?  Should we pass the full transaction details on the delegateTransaction message? Or should we wait for the transactionAssembled event before actioning the delegation?
 	txn, ok := s.unconfirmedTransactionsByID[txnID]
 	if !ok {
-		log.L(ctx).Errorf("Transaction %s does not exist", txnID)
-		return i18n.NewError(ctx, msgs.MsgSequencerInternalError, txnID)
+		panic("transaction not found")
+		//TODO refactor sequencer so that this is not a situation we need to worry about
+		// the sequencer should not need to be told about transactions that are assembled on other nodes
+		// it should only worry about the graph for the current coordinator.  If that results in potential contention, the coordinator will
+		// resolve that
+		// so we don't need separate `HandleTransactionAssembledEvent` and `AssignTransaction` methods
 	}
 
 	// txn is passed as a pointer so that it can be updated in the acceptTransaction method
 	// this is not thread safe but we assume that the sequencer is single threaded
-	return s.acceptTransaction(ctx, txn)
+	err := s.acceptTransaction(ctx, txn)
+	if err != nil {
+		log.L(ctx).Errorf("Error accepting transaction: %s", err)
+		// This error is most likely caused by errors from actions we take to resolve contention in the graph
+		//TODO need to refactor the sequencer so that
+		// - event handlers simply record the information provided and do not throw any error
+		// - separate function to evaluate the graph and return any actions (dispatch, delegate, block) that need to be taken
+		// - rethink how many of those actions can be decided upon and actioned from the sequencer itself
+		//   i.e. the coordinator should should decide when to delegate and it is most likely not because we somehow managed to spend a pending state of a transaction on another coordinator.  That should not be possible in the first place
+	}
 }
 
 func (s *sequencer) ApproveEndorsement(ctx context.Context, endorsementRequst ptmgrtypes.EndorsementRequest) (bool, error) {

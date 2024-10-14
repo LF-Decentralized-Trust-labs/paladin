@@ -35,12 +35,12 @@ import (
 
 type FakeEngine interface {
 	Invoke(ctx context.Context) error
-	HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error
+	HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent)
 	HandleTransactionEndorsedEvent(ctx context.Context, event *pb.TransactionEndorsedEvent) error
 	HandleTransactionConfirmedEvent(ctx context.Context, event *pb.TransactionConfirmedEvent) error
 	HandleTransactionRevertedEvent(ctx context.Context, event *pb.TransactionRevertedEvent) error
 	ApproveEndorsement(ctx context.Context, endorsementRequest ptmgrtypes.EndorsementRequest) (bool, error)
-	DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction) error
+	DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction)
 }
 
 type fakeEngine struct {
@@ -79,8 +79,7 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 	require.NoError(f.t, err)
 
 	// Assign to the local sequencer
-	err = f.sequencer.AssignTransaction(ctx, txnID.String())
-	require.NoError(f.t, err)
+	f.sequencer.AssignTransaction(ctx, txnID.String())
 
 	//initiate an endorsement flow
 	//TODO - for more complex scenarios, may need to revert rather than endorse some transactions but for now, we just tell all sequencers that the transaction is endorsed
@@ -91,11 +90,11 @@ func (f *fakeEngine) Invoke(ctx context.Context) error {
 	return err
 }
 
-func (f *fakeEngine) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) error {
+func (f *fakeEngine) HandleTransactionAssembledEvent(ctx context.Context, event *pb.TransactionAssembledEvent) {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
 	f.currentState = event.OutputStateId[0]
-	return f.sequencer.HandleTransactionAssembledEvent(ctx, event)
+	f.sequencer.HandleTransactionAssembledEvent(ctx, event)
 
 }
 
@@ -124,10 +123,10 @@ func (f *fakeEngine) ApproveEndorsement(ctx context.Context, endorsementRequest 
 	return f.sequencer.ApproveEndorsement(ctx, endorsementRequest)
 }
 
-func (f *fakeEngine) DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction) error {
+func (f *fakeEngine) DelegateTransaction(ctx context.Context, message *pb.DelegateTransaction) {
 	ctx = log.WithLogField(ctx, "node", f.nodeID)
 
-	return f.sequencer.AssignTransaction(ctx, message.TransactionId)
+	f.sequencer.AssignTransaction(ctx, message.TransactionId)
 }
 
 // Test cases to assert the emergent behaviour when multiple concurrent copies of the sequencer are running
@@ -146,8 +145,7 @@ func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event interface{}
 	case *pb.TransactionBlockedEvent:
 	case *pb.TransactionAssembledEvent:
 		for _, engine := range f.engines {
-			err := engine.HandleTransactionAssembledEvent(ctx, event)
-			require.NoError(f.t, err)
+			engine.HandleTransactionAssembledEvent(ctx, event)
 		}
 	case *pb.TransactionEndorsedEvent:
 		for _, engine := range f.engines {
@@ -183,12 +181,11 @@ func (f *fakeDelegator) Delegate(ctx context.Context, txnID, delegate string) er
 
 	log.L(ctx).Info("DelegateTransaction")
 	engine := f.engines[delegate]
-	err := engine.DelegateTransaction(ctx, &pb.DelegateTransaction{
+	engine.DelegateTransaction(ctx, &pb.DelegateTransaction{
 		TransactionId:    txnID,
 		DelegatingNodeId: f.nodeID,
 		DelegateNodeId:   delegate,
 	})
-	require.NoError(f.t, err)
 	return nil
 }
 
@@ -251,20 +248,17 @@ func TestConcurrentSequencing(t *testing.T) {
 
 	transportWriterMock.On("SendDelegateTransactionMessage", mock.Anything, mock.Anything, node1ID).Run(func(args mock.Arguments) {
 		transactionID := args.Get(1).(string)
-		err := node1Sequencer.AssignTransaction(ctx, transactionID)
-		require.NoError(t, err)
+		node1Sequencer.AssignTransaction(ctx, transactionID)
 	}).Return(nil).Maybe()
 
 	transportWriterMock.On("SendDelegateTransactionMessage", mock.Anything, mock.Anything, node2ID).Run(func(args mock.Arguments) {
 		transactionID := args.Get(1).(string)
-		err := node2Sequencer.AssignTransaction(ctx, transactionID)
-		require.NoError(t, err)
+		node2Sequencer.AssignTransaction(ctx, transactionID)
 	}).Return(nil).Maybe()
 
 	transportWriterMock.On("SendDelegateTransactionMessage", mock.Anything, mock.Anything, node3ID).Run(func(args mock.Arguments) {
 		transactionID := args.Get(1).(string)
-		err := node3Sequencer.AssignTransaction(ctx, transactionID)
-		require.NoError(t, err)
+		node3Sequencer.AssignTransaction(ctx, transactionID)
 	}).Return(nil).Maybe()
 
 	testTransactionInvoker1 := newtestTransactionInvoker(node1ID, "testTransactionInvoker1", node1Engine)

@@ -22,6 +22,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/flushwriter"
+	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -39,7 +40,7 @@ type PublicTransactionsSubmit func(tx *gorm.DB) (publicTxID []string, err error)
 type Store interface {
 	//We persist multiple sequences in a single call, one for each signing address
 	Start()
-	PersistDispatchBatch(ctx context.Context, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch) error
+	PersistDispatchBatch(ctx context.Context, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*statedistribution.StateDistribution) error
 	Close()
 }
 

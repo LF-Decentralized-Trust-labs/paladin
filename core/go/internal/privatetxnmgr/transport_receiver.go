@@ -19,7 +19,6 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
-
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
@@ -44,7 +43,9 @@ func (p *privateTxManager) ReceiveTransportMessage(ctx context.Context, message 
 		go p.handleEndorsementRequest(ctx, messagePayload, replyToDestination)
 	case "EndorsementResponse":
 		go p.handleEndorsementResponse(ctx, messagePayload)
+
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}
+
 }

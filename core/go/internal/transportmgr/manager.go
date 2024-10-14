@@ -167,19 +167,17 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	targetNode, err := msg.Destination.Node(ctx, false)
-	if err != nil || targetNode == tm.localNodeName {
-		return i18n.WrapError(ctx, err, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, msg.Destination)
+	if msg.Node == "" || msg.Node == tm.localNodeName {
+		return i18n.NewError(ctx, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, msg.Node)
 	}
 
-	msg.ReplyTo, err = msg.ReplyTo.FullyQualified(ctx, tm.localNodeName)
-	if err != nil {
-		return i18n.WrapError(ctx, err, msgs.MsgTransportInvalidReplyToReceived, msg.ReplyTo)
+	if msg.ReplyTo == "" {
+		msg.ReplyTo = tm.localNodeName
 	}
 
 	// Note the registry is responsible for caching to make this call as efficient as if
 	// we maintained the transport details in-memory ourselves.
-	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, targetNode)
+	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, msg.Node)
 	if err != nil {
 		return err
 	}
@@ -197,7 +195,7 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 		for _, rtd := range registeredTransportDetails {
 			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
 		}
-		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, targetNode, registeredTransportNames)
+		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, msg.Node, registeredTransportNames)
 	}
 
 	// Call the selected transport to send
@@ -217,8 +215,9 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 		MessageType:   msg.MessageType,
 		MessageId:     msg.MessageID.String(),
 		CorrelationId: correlID,
-		Destination:   msg.Destination.String(),
-		ReplyTo:       msg.ReplyTo.String(),
+		Component:     msg.Component,
+		Node:          msg.Node,
+		ReplyTo:       msg.ReplyTo,
 		Payload:       msg.Payload,
 	})
 	if err != nil {

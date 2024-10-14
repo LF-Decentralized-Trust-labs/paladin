@@ -15,11 +15,18 @@
 
 package ptmgrtypes
 
+/*
+   This package defines interfaces that are used within the privatetxnmgr package
+   They are defined in a separate package to avoid circular dependencies between the privatetxnmgr package mocks.
+   All interfaces of privatetxnmgr intended to be consumed by other packages should be defined in components package
+*/
+
 import (
 	"context"
 	"time"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pbSequence "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -102,7 +109,7 @@ type Sequencer interface {
 	/*
 		HandleTransactionAssembledEvent needs to be called whenever a transaction has been assembled by any node in the network, including the local node.
 	*/
-	HandleTransactionAssembledEvent(ctx context.Context, event *pbSequence.TransactionAssembledEvent) error
+	HandleTransactionAssembledEvent(ctx context.Context, event *pbSequence.TransactionAssembledEvent)
 
 	/*
 		HandleTransactionEndorsedEvent needs to be called whenever a the endorsement rules for the given domain have been satisfied for a given transaction.
@@ -137,7 +144,13 @@ type Sequencer interface {
 	/*
 		AssignTransaction is an instruction for the given transaction to be managed by this sequencer
 	*/
-	AssignTransaction(ctx context.Context, transactionID string) error
+	AssignTransaction(ctx context.Context, transactionID string)
+
+	/*
+		RemoveTransaction is an instruction for the given transaction to be no longer be managed by this sequencer
+		A re-assembled version ( with the same ID ) of the transaction may be assigned to the sequencer at a later time.
+	*/
+	RemoveTransaction(ctx context.Context, transactionID string)
 
 	/*
 		ApproveEndorsement is a synchronous check of whether a given transaction could be endorsed by the local node. It asks the question:
@@ -155,7 +168,7 @@ type Publisher interface {
 	PublishTransactionDispatchedEvent(ctx context.Context, transactionId string, nonce uint64, signingAddress string) error
 	PublishTransactionSignedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult) error
 	PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult, revertReason *string) error
-	PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier string)
+	PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier, verifierType string)
 	PublishResolveVerifierErrorEvent(ctx context.Context, transactionId string, lookup, algorithm, errorMessage string)
 }
 
@@ -191,6 +204,7 @@ type ContentionResolver interface {
 type TransportWriter interface {
 	// Provided to the sequencer to allow it to send messages to other nodes in the network
 	SendDelegateTransactionMessage(ctx context.Context, transactionId string, delegateNodeId string) error
+	SendState(ctx context.Context, stateId string, schemaId string, stateDataJson string, party string) error
 }
 
 type TxProcessorStatus int
@@ -207,15 +221,16 @@ type TxProcessor interface {
 	GetTxStatus(ctx context.Context) (components.PrivateTxStatus, error)
 	GetStatus(ctx context.Context) TxProcessorStatus
 
-	HandleTransactionSubmittedEvent(ctx context.Context, event *TransactionSubmittedEvent)
-	HandleTransactionAssembledEvent(ctx context.Context, event *TransactionAssembledEvent)
-	HandleTransactionSignedEvent(ctx context.Context, event *TransactionSignedEvent)
-	HandleTransactionEndorsedEvent(ctx context.Context, event *TransactionEndorsedEvent)
-	HandleTransactionDispatchedEvent(ctx context.Context, event *TransactionDispatchedEvent)
-	HandleTransactionConfirmedEvent(ctx context.Context, event *TransactionConfirmedEvent)
-	HandleTransactionRevertedEvent(ctx context.Context, event *TransactionRevertedEvent)
-	HandleTransactionDelegatedEvent(ctx context.Context, event *TransactionDelegatedEvent)
-	HandleResolveVerifierResponseEvent(ctx context.Context, event *ResolveVerifierResponseEvent)
-	HandleResolveVerifierErrorEvent(ctx context.Context, event *ResolveVerifierErrorEvent)
+	HandleTransactionSubmittedEvent(ctx context.Context, event *TransactionSubmittedEvent) error
+	HandleTransactionAssembledEvent(ctx context.Context, event *TransactionAssembledEvent) error
+	HandleTransactionSignedEvent(ctx context.Context, event *TransactionSignedEvent) error
+	HandleTransactionEndorsedEvent(ctx context.Context, event *TransactionEndorsedEvent) error
+	HandleTransactionDispatchedEvent(ctx context.Context, event *TransactionDispatchedEvent) error
+	HandleTransactionConfirmedEvent(ctx context.Context, event *TransactionConfirmedEvent) error
+	HandleTransactionRevertedEvent(ctx context.Context, event *TransactionRevertedEvent) error
+	HandleTransactionDelegatedEvent(ctx context.Context, event *TransactionDelegatedEvent) error
+	HandleResolveVerifierResponseEvent(ctx context.Context, event *ResolveVerifierResponseEvent) error
+	HandleResolveVerifierErrorEvent(ctx context.Context, event *ResolveVerifierErrorEvent) error
 	PrepareTransaction(ctx context.Context) (*components.PrivateTransaction, error)
+	GetStateDistributions(ctx context.Context) []*statedistribution.StateDistribution
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/privatetxnstore"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -100,8 +101,8 @@ type Orchestrator struct {
 	endorsementGatherer ptmgrtypes.EndorsementGatherer
 	publisher           ptmgrtypes.Publisher
 	identityResolver    components.IdentityResolver
-
-	store privatetxnstore.Store
+	store               privatetxnstore.Store
+	stateDistributer    statedistribution.StateDistributer
 }
 
 func NewOrchestrator(
@@ -116,6 +117,7 @@ func NewOrchestrator(
 	publisher ptmgrtypes.Publisher,
 	store privatetxnstore.Store,
 	identityResolver components.IdentityResolver,
+	stateDistributer statedistribution.StateDistributer,
 ) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
@@ -143,6 +145,7 @@ func NewOrchestrator(
 		publisher:                    publisher,
 		store:                        store,
 		identityResolver:             identityResolver,
+		stateDistributer:             stateDistributer,
 	}
 
 	newOrchestrator.sequencer = sequencer
@@ -166,29 +169,37 @@ func (oc *Orchestrator) handleEvent(ctx context.Context, event ptmgrtypes.Privat
 	// and pass the event to it
 	transactionID := event.GetTransactionID()
 	transactionProccessor := oc.getTransactionProcessor(transactionID)
+	var err error
 	switch event := event.(type) {
 	case *ptmgrtypes.TransactionSubmittedEvent:
-		transactionProccessor.HandleTransactionSubmittedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionSubmittedEvent(ctx, event)
 	case *ptmgrtypes.TransactionAssembledEvent:
-		transactionProccessor.HandleTransactionAssembledEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionAssembledEvent(ctx, event)
 	case *ptmgrtypes.TransactionSignedEvent:
-		transactionProccessor.HandleTransactionSignedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionSignedEvent(ctx, event)
 	case *ptmgrtypes.TransactionEndorsedEvent:
-		transactionProccessor.HandleTransactionEndorsedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionEndorsedEvent(ctx, event)
 	case *ptmgrtypes.TransactionDispatchedEvent:
-		transactionProccessor.HandleTransactionDispatchedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionDispatchedEvent(ctx, event)
 	case *ptmgrtypes.TransactionConfirmedEvent:
-		transactionProccessor.HandleTransactionConfirmedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionConfirmedEvent(ctx, event)
 	case *ptmgrtypes.TransactionRevertedEvent:
-		transactionProccessor.HandleTransactionRevertedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionRevertedEvent(ctx, event)
 	case *ptmgrtypes.TransactionDelegatedEvent:
-		transactionProccessor.HandleTransactionDelegatedEvent(ctx, event)
+		err = transactionProccessor.HandleTransactionDelegatedEvent(ctx, event)
 	case *ptmgrtypes.ResolveVerifierResponseEvent:
-		transactionProccessor.HandleResolveVerifierResponseEvent(ctx, event)
+		err = transactionProccessor.HandleResolveVerifierResponseEvent(ctx, event)
 	case *ptmgrtypes.ResolveVerifierErrorEvent:
-		transactionProccessor.HandleResolveVerifierErrorEvent(ctx, event)
+		err = transactionProccessor.HandleResolveVerifierErrorEvent(ctx, event)
 	default:
 		log.L(ctx).Warnf("Unknown event type: %T", event)
+	}
+	if err != nil {
+		// Any expected errors like assembly failed or endorsement failed should have been handled by the transaction processor
+		// Any errors that get back here mean that event has not been fully applied and we rely on the
+		// event being re-sent, most likely after the transaction processor re-sends an async request
+		// because it has detected a stale transaction that has timedout waiting for a response
+		log.L(ctx).Errorf("Error handling %T event: %s ", event, err.Error())
 	}
 }
 
@@ -222,7 +233,7 @@ func (oc *Orchestrator) evaluationLoop() {
 			// TODO: trigger parent loop for removal
 			return
 		}
-		// TODO while we have woken up, itterate through all transactions in memory and check if any are stale or completed and query the database for any in flight transactions that need to be brougt into memory
+		// TODO while we have woken up, iterate through all transactions in memory and check if any are stale or completed and query the database for any in flight transactions that need to be brougt into memory
 	}
 }
 
@@ -312,6 +323,8 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 		DispatchSequences: make([]*privatetxnstore.DispatchSequence, 0, len(dispatchableTransactions)),
 	}
 
+	stateDistributions := make([]*statedistribution.StateDistribution, 0)
+
 	completed := false // and include whether we committed the DB transaction or not
 	for signingAddress, transactionIDs := range dispatchableTransactions {
 		log.L(ctx).Debugf("DispatchTransactions: %d transactions for signingAddress %s", len(transactionIDs), signingAddress)
@@ -347,6 +360,8 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 				panic("private transactions triggering private transactions currently supported only in testbed")
 			}
 			preparedTransactions[i] = preparedTransaction
+
+			stateDistributions = append(stateDistributions, txProcessor.GetStateDistributions(ctx)...)
 		}
 
 		preparedTransactionPayloads := make([]*components.EthTransaction, len(preparedTransactions))
@@ -398,7 +413,7 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 		dispatchBatch.DispatchSequences = append(dispatchBatch.DispatchSequences, sequence)
 	}
 
-	err := oc.store.PersistDispatchBatch(ctx, oc.contractAddress, dispatchBatch)
+	err := oc.store.PersistDispatchBatch(ctx, oc.contractAddress, dispatchBatch, stateDistributions)
 	if err != nil {
 		log.L(ctx).Errorf("Error persisting batch: %s", err)
 		return err
@@ -414,6 +429,8 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 			}
 		}
 	}
+	//now that the DB write has been persisted, we can trigger the in-memory state distribution
+	oc.stateDistributer.DistributeStates(ctx, stateDistributions)
 
 	return nil
 

@@ -75,11 +75,11 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX *gorm.DB, schem
 		Error
 }
 
-func (ss *stateManager) GetSchema(ctx context.Context, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
-	return ss.getSchemaByID(ctx, domainName, schemaID, failNotFound)
+func (ss *stateManager) GetSchema(ctx context.Context, domainName string, schemaID tktypes.Bytes32, dbTX *gorm.DB, failNotFound bool) (components.Schema, error) {
+	return ss.getSchemaByID(ctx, domainName, schemaID, dbTX, failNotFound)
 }
 
-func (ss *stateManager) getSchemaByID(ctx context.Context, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
+func (ss *stateManager) getSchemaByID(ctx context.Context, domainName string, schemaID tktypes.Bytes32, dbTX *gorm.DB, failNotFound bool) (components.Schema, error) {
 
 	cacheKey := schemaCacheKey(domainName, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
@@ -87,8 +87,12 @@ func (ss *stateManager) getSchemaByID(ctx context.Context, domainName string, sc
 		return s, nil
 	}
 
+	if dbTX == nil {
+		dbTX = ss.p.DB()
+	}
+
 	var results []*components.SchemaPersisted
-	err := ss.p.DB().
+	err := dbTX.
 		Table("schemas").
 		Where("domain_name = ?", domainName).
 		Where("id = ?", schemaID).
@@ -129,7 +133,7 @@ func (ss *stateManager) ListSchemas(ctx context.Context, domainName string) (res
 	}
 	results = make([]components.Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, domainName, tktypes.Bytes32(id.ID), true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, domainName, tktypes.Bytes32(id.ID), nil, true); err != nil {
 			return nil, err
 		}
 	}

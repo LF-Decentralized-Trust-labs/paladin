@@ -35,8 +35,10 @@ message SendMessageResponse {
 message Message {
     string message_id = 1;
     optional string correlation_id = 2;
-    string destination = 3;
-    string reply_to = 4;
-    string message_type = 5;
-    bytes payload = 6;
+    string component = 3; // component name to route message to once it arrives at the destination node
+    string node = 4;      // id of the node to send to
+    string reply_to = 5;  // id of the node to reply to 
+    string message_type =65;
+    bytes payload = 7;
+
 }

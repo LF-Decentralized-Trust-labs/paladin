@@ -91,16 +91,18 @@ func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transac
 	return nil
 }
 
-func (p *publisher) PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier string) {
+func (p *publisher) PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier, verifierType string) {
 	event := &ptmgrtypes.ResolveVerifierResponseEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
 			TransactionID:   transactionId,
 		},
-		Lookup:    &lookup,
-		Algorithm: &algorithm,
-		Verifier:  &verifier,
+		Lookup:       &lookup,
+		Algorithm:    &algorithm,
+		Verifier:     &verifier,
+		VerifierType: &verifierType,
 	}
+
 	p.privateTxManager.HandleNewEvent(ctx, event)
 
 }

@@ -89,9 +89,10 @@ type TransactionBlockedEvent struct {
 
 type ResolveVerifierResponseEvent struct {
 	PrivateTransactionEventBase
-	Lookup    *string
-	Algorithm *string
-	Verifier  *string
+	Lookup       *string
+	Algorithm    *string
+	Verifier     *string
+	VerifierType *string
 }
 
 type ResolveVerifierErrorEvent struct {

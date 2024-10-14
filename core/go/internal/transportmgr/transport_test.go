@@ -18,7 +18,6 @@ package transportmgr
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -113,8 +111,9 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 func testMessage() *components.TransportMessage {
 	return &components.TransportMessage{
-		Destination:   "me@node2",
-		ReplyTo:       "me@node1",
+		Node:          "node2",
+		Component:     "someComponent",
+		ReplyTo:       "node1",
 		CorrelationID: confutil.P(uuid.New()),
 		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
@@ -141,17 +140,48 @@ func TestSendMessage(t *testing.T) {
 		sent := req.Message
 		assert.NotEmpty(t, sent.MessageId)
 		assert.Equal(t, message.CorrelationID.String(), *sent.CorrelationId)
-		assert.Equal(t, message.Destination.String(), sent.Destination)
-		assert.Equal(t, message.ReplyTo.String(), sent.ReplyTo)
+		assert.Equal(t, message.Node, sent.Node)
+		assert.Equal(t, message.Component, sent.Component)
+		assert.Equal(t, message.ReplyTo, sent.ReplyTo)
 		assert.Equal(t, message.Payload, sent.Payload)
 
 		// ... if we didn't have a connection established we'd expect to come back to request the details
 		gtdr, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-			Node: strings.Split(message.Destination.String(), "@")[1],
+			Node: message.Node,
 		})
 		require.NoError(t, err)
 		assert.NotEmpty(t, gtdr.TransportDetails)
 
+		sentMessages <- sent
+		return nil, nil
+	}
+
+	err := tm.Send(ctx, message)
+	require.NoError(t, err)
+
+	<-sentMessages
+}
+
+func TestSendMessageReplyToDefaultsToLocalNode(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+			{
+				Node:      "node2",
+				Transport: "test1",
+				Details:   `{"likely":"json stuff"}`,
+			},
+		}, nil)
+		return nil
+	})
+	defer done()
+
+	message := testMessage()
+	message.ReplyTo = ""
+
+	sentMessages := make(chan *prototk.Message, 1)
+	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+		sent := req.Message
+		assert.Equal(t, message.ReplyTo, sent.ReplyTo)
 		sentMessages <- sent
 		return nil, nil
 	}
@@ -258,18 +288,15 @@ func TestSendMessageDestWrong(t *testing.T) {
 
 	message := testMessage()
 
-	message.Destination = tktypes.PrivateIdentityLocator("no_node")
+	message.Component = "some_component"
+	message.Node = ""
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD012007", err)
 
-	message.Destination = tktypes.PrivateIdentityLocator("this_is_local@node1")
+	message.Component = "this_is_local"
+	message.Node = "node1"
 	err = tm.Send(ctx, message)
 	assert.Regexp(t, "PD012007", err)
-
-	message.Destination = tktypes.PrivateIdentityLocator("ok@node2")
-	message.ReplyTo = tktypes.PrivateIdentityLocator("wrong@@syntax")
-	err = tm.Send(ctx, message)
-	assert.Regexp(t, "PD012006", err)
 
 }
 
@@ -299,8 +326,9 @@ func TestReceiveMessage(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination:   "receivingClient1@node1",
-		ReplyTo:       "from@node2",
+		Node:          "node1",
+		Component:     "receivingClient1",
+		ReplyTo:       "node2",
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -321,8 +349,9 @@ func TestReceiveMessageNoReceiver(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination:   "receivingClient1@node1",
-		ReplyTo:       "from@node2",
+		Node:          "node1",
+		Component:     "receivingClient1",
+		ReplyTo:       "node2",
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -340,8 +369,9 @@ func TestReceiveMessageInvalidDestination(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination:   "___@node1",
-		ReplyTo:       "from@node2",
+		Component:     "___",
+		Node:          "node1",
+		ReplyTo:       "node2",
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -349,7 +379,7 @@ func TestReceiveMessageInvalidDestination(t *testing.T) {
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	require.Regexp(t, "PD012005", err)
+	require.Regexp(t, "PD012011", err)
 }
 
 func TestReceiveMessageNotInit(t *testing.T) {
@@ -361,8 +391,9 @@ func TestReceiveMessageNotInit(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Destination:   "to@node1",
-		ReplyTo:       "from@node2",
+		Component:     "to",
+		Node:          "node1",
+		ReplyTo:       "node2",
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -388,8 +419,9 @@ func TestReceiveMessageWrongNode(t *testing.T) {
 	defer done()
 
 	msg := &prototk.Message{
-		Destination: "to@node2",
-		ReplyTo:     "from@node2",
+		Component:   "to",
+		Node:        "node2",
+		ReplyTo:     "node2",
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -405,8 +437,9 @@ func TestReceiveMessageBadDestination(t *testing.T) {
 
 	msg := &prototk.Message{
 		MessageId:   uuid.NewString(),
-		Destination: "to@node2",
-		ReplyTo:     "from@node1",
+		Component:   "to",
+		Node:        "node2",
+		ReplyTo:     "node1",
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -416,30 +449,14 @@ func TestReceiveMessageBadDestination(t *testing.T) {
 	assert.Regexp(t, "PD012005", err)
 }
 
-func TestReceiveMessageBadReplyToDestination(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
-	defer done()
-
-	msg := &prototk.Message{
-		MessageId:   uuid.NewString(),
-		Destination: "to@node1",
-		ReplyTo:     "from",
-		MessageType: "myMessageType",
-		Payload:     []byte("some data"),
-	}
-	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
-		Message: msg,
-	})
-	assert.Regexp(t, "PD012006", err)
-}
-
 func TestReceiveMessageBadMsgID(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t)
 	defer done()
 
 	msg := &prototk.Message{
-		Destination: "to@node1",
-		ReplyTo:     "from@node2",
+		Component:   "to",
+		Node:        "node1",
+		ReplyTo:     "node2",
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -456,8 +473,9 @@ func TestReceiveMessageBadCorrelID(t *testing.T) {
 	msg := &prototk.Message{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P("wrong"),
-		Destination:   "to@node1",
-		ReplyTo:       "from@node2",
+		Component:     "to",
+		Node:          "node1",
+		ReplyTo:       "node2",
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}

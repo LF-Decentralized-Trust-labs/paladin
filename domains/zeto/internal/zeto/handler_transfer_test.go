@@ -161,6 +161,9 @@ func TestTransferAssemble(t *testing.T) {
 	assert.Equal(t, "Alice", coin1.Owner)
 	assert.Equal(t, "0x09", coin1.Amount.String())
 
+	assert.Len(t, res.AssembledTransaction.OutputStates[0].DistributionList, 1)
+	assert.Equal(t, "Alice", res.AssembledTransaction.OutputStates[0].DistributionList[0])
+
 	var coin2 types.ZetoCoin
 	err = json.Unmarshal([]byte(res.AssembledTransaction.OutputStates[1].StateDataJson), &coin2)
 	assert.NoError(t, err)

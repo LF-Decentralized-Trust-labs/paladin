@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/core/pkg/proto/sequence"
@@ -76,7 +80,7 @@ func (ts *PaladinTxProcessor) GetTxStatus(ctx context.Context) (components.Priva
 	}, nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionSubmittedEvent(ctx context.Context, event *ptmgrtypes.TransactionSubmittedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionSubmittedEvent(ctx context.Context, event *ptmgrtypes.TransactionSubmittedEvent) error {
 	ts.latestEvent = "HandleTransactionSubmittedEvent"
 	// if the transaction is ready to be assembled, go ahead and do that otherwise, we assume some future event will trigger that
 	if ts.isReadyToAssemble(ctx) {
@@ -85,9 +89,10 @@ func (ts *PaladinTxProcessor) HandleTransactionSubmittedEvent(ctx context.Contex
 		err := ts.requestVerifierResolution(ctx)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to request verifier resolution: %s", err)
-			//TODO error handling and retry
+			return err
 		}
 	}
+	return nil
 }
 
 func (ts *PaladinTxProcessor) isReadyToAssemble(ctx context.Context) bool {
@@ -120,7 +125,13 @@ func (ts *PaladinTxProcessor) isReadyToAssemble(ctx context.Context) bool {
 
 }
 
-func (ts *PaladinTxProcessor) HandleVerifierResolvedEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierResponseEvent) {
+func (ts *PaladinTxProcessor) revertTransaction(ctx context.Context, err error) {
+	log.L(ctx).Errorf("Reverting transaction %s: %s", ts.transaction.ID.String(), err)
+	//TODO this needs to update the transaction as reverted and flush that to the txmgr database
+	// so that the user can see that it is reverted and so that we stop retrying to assemble and endorse it
+}
+
+func (ts *PaladinTxProcessor) HandleVerifierResolvedEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierResponseEvent) error {
 	log.L(ctx).Debug("PaladinTxProcessor:HandleVerifierResolvedEvent")
 
 	ts.latestEvent = "HandleVerifierResolvedEvent"
@@ -130,8 +141,18 @@ func (ts *PaladinTxProcessor) HandleVerifierResolvedEvent(ctx context.Context, e
 		ts.assembleTransaction(ctx)
 	} else {
 		log.L(ctx).Debug("not ready to assemble")
-
 	}
+	return nil
+}
+
+func (ts *PaladinTxProcessor) reassembleTransaction(ctx context.Context) {
+	log.L(ctx).Debug("PaladinTxProcessor:reassembleTransaction")
+	ts.transaction.PostAssembly = nil
+
+	//It will get re added once it has been re-assembled
+	ts.sequencer.RemoveTransaction(ctx, ts.transaction.ID.String())
+
+	ts.assembleTransaction(ctx)
 }
 
 func (ts *PaladinTxProcessor) assembleTransaction(ctx context.Context) {
@@ -143,7 +164,7 @@ func (ts *PaladinTxProcessor) assembleTransaction(ctx context.Context) {
 		return
 	}
 
-	//syncronously assemble the transaction then inform the local sequencer and remote nodes for any parties in the
+	//synchronously assemble the transaction then inform the local sequencer and remote nodes for any parties in the
 	// privacy group that need to know about the transaction
 	// this could be other parties that have potential to attempt to spend the same state(s) as this transaction is assembled to spend
 	// or parties that could potentially spend the output states of this transaction
@@ -151,26 +172,26 @@ func (ts *PaladinTxProcessor) assembleTransaction(ctx context.Context) {
 	err := ts.domainAPI.AssembleTransaction(ts.endorsementGatherer.DomainContext(), ts.transaction)
 	if err != nil {
 		log.L(ctx).Errorf("AssembleTransaction failed: %s", err)
+		ts.revertTransaction(ctx, err)
 		return
-		// TODO assembly failed, need to revert the transaction
+	}
+	if ts.transaction.PostAssembly == nil {
+		// This is most likely a programming error in the domain
+		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
+		ts.revertTransaction(ctx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "AssembleTransaction returned nil PostAssembly"))
+		return
 	}
 	ts.status = "assembled"
+	if ts.transaction.PostAssembly.Signatures == nil {
+		ts.transaction.PostAssembly.Signatures = make([]*prototk.AttestationResult, 0)
+	}
 	// inform the sequencer that the transaction has been assembled
-	err = ts.sequencer.HandleTransactionAssembledEvent(ctx, &sequence.TransactionAssembledEvent{
+	ts.sequencer.HandleTransactionAssembledEvent(ctx, &sequence.TransactionAssembledEvent{
 		TransactionId: ts.transaction.ID.String(),
 		NodeId:        ts.nodeID,
 		InputStateId:  stateIDs(ts.transaction.PostAssembly.InputStates),
 		OutputStateId: stateIDs(ts.transaction.PostAssembly.OutputStates),
 	})
-	if err != nil {
-		log.L(ctx).Errorf("HandleTransactionAssembledEvent failed: %s", err)
-		panic("todo")
-	}
-
-	if ts.transaction.PostAssembly == nil {
-		log.L(ctx).Errorf("PostAssembly is nil. Should never have reached this stage without a PostAssembly")
-		//return nil, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "")
-	}
 
 	if ts.transaction.PostAssembly.OutputStatesPotential != nil && ts.transaction.PostAssembly.OutputStates == nil {
 		//TODO - a bit of a chicken and egg situation here.
@@ -181,18 +202,17 @@ func (ts *PaladinTxProcessor) assembleTransaction(ctx context.Context) {
 
 		err := ts.domainAPI.WritePotentialStates(ts.endorsementGatherer.DomainContext(), ts.transaction)
 		if err != nil {
-			//TODO better error message
+			//Any error from WritePotentialStates is likely to be caused by an invalid initiliase or assemble of the transaction
+			// which ist most likely a programming error in the domain or the domain manager or privateTxManager
+			// not much we can do other than revert the transaction with an internal error
 			errorMessage := fmt.Sprintf("Failed to write potential states: %s", err)
 			log.L(ctx).Error(errorMessage)
-			//return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			ts.revertTransaction(ctx, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, errorMessage))
+			return
 		}
 	}
 
-	err = ts.sequencer.AssignTransaction(ctx, ts.transaction.ID.String())
-	if err != nil {
-		log.L(ctx).Errorf("Failed to assign transaction to sequencer: %s", err)
-		//TODO return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError)
-	}
+	ts.sequencer.AssignTransaction(ctx, ts.transaction.ID.String())
 
 	//start an async process to gather signatures
 	// this will emit a TransactionSignedEvent for each signature collected
@@ -203,12 +223,13 @@ func (ts *PaladinTxProcessor) assembleTransaction(ctx context.Context) {
 	}
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionAssembledEvent(ctx context.Context, event *ptmgrtypes.TransactionAssembledEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionAssembledEvent(ctx context.Context, event *ptmgrtypes.TransactionAssembledEvent) error {
 	//TODO inform the sequencer about a transaction assembled by another node
 	ts.latestEvent = "HandleTransactionAssembledEvent"
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionSignedEvent(ctx context.Context, event *ptmgrtypes.TransactionSignedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionSignedEvent(ctx context.Context, event *ptmgrtypes.TransactionSignedEvent) error {
 	ts.latestEvent = "HandleTransactionSignedEvent"
 	log.L(ctx).Debugf("Adding signature to transaction %s", ts.transaction.ID.String())
 	ts.transaction.PostAssembly.Signatures = append(ts.transaction.PostAssembly.Signatures, event.AttestationResult)
@@ -216,13 +237,19 @@ func (ts *PaladinTxProcessor) HandleTransactionSignedEvent(ctx context.Context, 
 		ts.status = "signed"
 		ts.requestEndorsements(ctx)
 	}
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionEndorsedEvent(ctx context.Context, event *ptmgrtypes.TransactionEndorsedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionEndorsedEvent(ctx context.Context, event *ptmgrtypes.TransactionEndorsedEvent) error {
 	ts.latestEvent = "HandleTransactionEndorsedEvent"
 	if event.RevertReason != nil {
 		log.L(ctx).Infof("Endorsement for transaction %s was rejected: %s", ts.transaction.ID.String(), *event.RevertReason)
-		//TODO
+		// endorsement errors trigger a re-assemble
+		// if the reason for the endorsement error is a change of state of the universe since the transaction was assembled, then the re-assemble may fail and cause the transaction to be reverted
+		// on the other hand, the re-assemble may result in an endorsable version of the transaction.
+		// either way, we trigger the re-assembly and hope for the best
+		ts.reassembleTransaction(ctx)
+		return nil
 	} else {
 		log.L(ctx).Infof("Adding endorsement to transaction %s", ts.transaction.ID.String())
 		ts.transaction.PostAssembly.Endorsements = append(ts.transaction.PostAssembly.Endorsements, event.Endorsement)
@@ -242,73 +269,75 @@ func (ts *PaladinTxProcessor) HandleTransactionEndorsedEvent(ctx context.Context
 			ts.status = "endorsed"
 			//resolve the signing address here before informing the sequencer about endorsement
 			// because endorsement will could trigger a dispatch but
-			// a change of signing address could affect the dispatchabiliy of the transaction and/or any transations that depend on it
+			// a change of signing address could affect the dispatchabiliy of the transaction and/or any transactions that depend on it
 
-			if err := ts.domainAPI.ResolveDispatch(ctx, ts.transaction); err != nil {
+			err := ts.domainAPI.ResolveDispatch(ctx, ts.transaction)
+			if err != nil {
 				log.L(ctx).Errorf("Failed to resolve dispatch for transaction %s: %s", ts.transaction.ID.String(), err)
-				//TODO
+				return err
 			}
-			err := ts.sequencer.HandleTransactionDispatchResolvedEvent(ctx, &sequence.TransactionDispatchResolvedEvent{
+
+			err = ts.sequencer.HandleTransactionDispatchResolvedEvent(ctx, &sequence.TransactionDispatchResolvedEvent{
 				TransactionId: ts.transaction.ID.String(),
 				Signer:        ts.transaction.Signer,
 			})
 			if err != nil {
 				log.L(ctx).Errorf("Failed to publish transaction dispatch resolved event: %s", err)
+				return err
 			}
-
-			//TODO should really call out to the engine to publish this event because it needs
-			// to go to other nodes too?
 
 			//Tell the sequencer that this transaction has been endorsed and wait until it publishes a TransactionDispatched event before moving to the next stage
 			err = ts.sequencer.HandleTransactionEndorsedEvent(ctx, &sequence.TransactionEndorsedEvent{
 				TransactionId: ts.transaction.ID.String(),
 			})
 			if err != nil {
-				//TODO need better error handling here.  Should we retry? Should we fail the transaction? Should we try sending the other requests?
 				log.L(ctx).Errorf("Failed to publish transaction endorsed event: %s", err)
+				return err
 			}
 		}
 	}
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionDispatchedEvent(ctx context.Context, event *ptmgrtypes.TransactionDispatchedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionDispatchedEvent(ctx context.Context, event *ptmgrtypes.TransactionDispatchedEvent) error {
 	ts.latestEvent = "HandleTransactionDispatchedEvent"
 	ts.status = "dispatched"
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionConfirmedEvent(ctx context.Context, event *ptmgrtypes.TransactionConfirmedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionConfirmedEvent(ctx context.Context, event *ptmgrtypes.TransactionConfirmedEvent) error {
 	ts.latestEvent = "HandleTransactionConfirmedEvent"
 	ts.status = "confirmed"
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionRevertedEvent(ctx context.Context, event *ptmgrtypes.TransactionRevertedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionRevertedEvent(ctx context.Context, event *ptmgrtypes.TransactionRevertedEvent) error {
 	ts.latestEvent = "HandleTransactionRevertedEvent"
 	ts.status = "reverted"
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleTransactionDelegatedEvent(ctx context.Context, event *ptmgrtypes.TransactionDelegatedEvent) {
+func (ts *PaladinTxProcessor) HandleTransactionDelegatedEvent(ctx context.Context, event *ptmgrtypes.TransactionDelegatedEvent) error {
 	ts.latestEvent = "HandleTransactionDelegatedEvent"
 	ts.status = "delegated"
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleResolveVerifierResponseEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierResponseEvent) {
+func (ts *PaladinTxProcessor) HandleResolveVerifierResponseEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierResponseEvent) error {
 	log.L(ctx).Debug("HandleResolveVerifierResponseEvent")
 	ts.latestEvent = "HandleResolveVerifierResponseEvent"
-	if event == nil {
-		log.L(ctx).Error("event is nil")
-		return
-	}
+
 	if event.Lookup == nil {
 		log.L(ctx).Error("Lookup is nil")
-		return
+		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInvalidEventMissingField, "Lookup")
 	}
 	if event.Algorithm == nil {
 		log.L(ctx).Error("Algorithm is nil")
-		return
+		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInvalidEventMissingField, "Algorithm")
 	}
 	if event.Verifier == nil {
 		log.L(ctx).Error("Verifier is nil")
-		return
+		return i18n.NewError(ctx, msgs.MsgPrivateTxManagerInvalidEventMissingField, "Verifier")
 	}
 
 	if ts.transaction.PreAssembly.Verifiers == nil {
@@ -316,20 +345,25 @@ func (ts *PaladinTxProcessor) HandleResolveVerifierResponseEvent(ctx context.Con
 	}
 	// assuming that the order of resolved verifiers in .PreAssembly.Verifiers does not need to match the order of .PreAssembly.RequiredVerifiers
 	ts.transaction.PreAssembly.Verifiers = append(ts.transaction.PreAssembly.Verifiers, &prototk.ResolvedVerifier{
-		Lookup:    *event.Lookup,
-		Algorithm: *event.Algorithm,
-		Verifier:  *event.Verifier,
+		Lookup:       *event.Lookup,
+		Algorithm:    *event.Algorithm,
+		Verifier:     *event.Verifier,
+		VerifierType: *event.VerifierType,
 	})
 
 	if ts.isReadyToAssemble(ctx) {
 		ts.assembleTransaction(ctx)
 	}
+	return nil
 }
 
-func (ts *PaladinTxProcessor) HandleResolveVerifierErrorEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierErrorEvent) {
+func (ts *PaladinTxProcessor) HandleResolveVerifierErrorEvent(ctx context.Context, event *ptmgrtypes.ResolveVerifierErrorEvent) error {
 	ts.latestEvent = "HandleResolveVerifierErrorEvent"
 	log.L(ctx).Errorf("Failed to resolve verifier %s: %s", *event.Lookup, *event.ErrorMessage)
-	//TODO - mark error on the transaction so that it gets retried or reverted?
+	//it is possible that this identity was valid when the transaction was assembled but is no longer valid
+	// all we can do it try to re-assemble the transaction
+	ts.reassembleTransaction(ctx)
+	return nil
 }
 
 func (ts *PaladinTxProcessor) requestSignature(ctx context.Context, attRequest *prototk.AttestationRequest, partyName string) {
@@ -520,8 +554,9 @@ func (ts *PaladinTxProcessor) requestEndorsement(ctx context.Context, party stri
 		}
 		err = ts.components.TransportManager().Send(ctx, &components.TransportMessage{
 			MessageType: "EndorsementRequest",
-			Destination: tktypes.PrivateIdentityLocator(party),
-			ReplyTo:     tktypes.PrivateIdentityLocator(ts.nodeID),
+			Node:        partyNode,
+			Component:   PRIVATE_TX_MANAGER_DESTINATION,
+			ReplyTo:     ts.nodeID,
 			Payload:     endorsementRequestBytes,
 		})
 		if err != nil {
@@ -655,7 +690,7 @@ func (ts *PaladinTxProcessor) requestVerifierResolution(ctx context.Context) err
 			v.VerifierType,
 			func(ctx context.Context, verifier string) {
 				//response event needs to be handled by the orchestrator so that the dispatch to a handling thread is done in fairness to all other in flight transactions
-				ts.publisher.PublishResolveVerifierResponseEvent(ctx, ts.transaction.ID.String(), v.Lookup, v.Algorithm, verifier)
+				ts.publisher.PublishResolveVerifierResponseEvent(ctx, ts.transaction.ID.String(), v.Lookup, v.Algorithm, verifier, v.VerifierType)
 			},
 			func(ctx context.Context, err error) {
 				ts.publisher.PublishResolveVerifierErrorEvent(ctx, ts.transaction.ID.String(), v.Lookup, v.Algorithm, err.Error())
@@ -664,4 +699,36 @@ func (ts *PaladinTxProcessor) requestVerifierResolution(ctx context.Context) err
 	}
 	return nil
 
+}
+
+func (ts *PaladinTxProcessor) GetStateDistributions(ctx context.Context) []*statedistribution.StateDistribution {
+	log.L(ctx).Debug("PaladinTxProcessor:GetStateDistributions")
+
+	stateDistributions := make([]*statedistribution.StateDistribution, 0)
+	if ts.transaction.PostAssembly == nil {
+		log.L(ctx).Error("PostAssembly is nil")
+		return stateDistributions
+	}
+	if ts.transaction.PostAssembly.OutputStates == nil {
+		log.L(ctx).Debug("OutputStates is nil")
+		return stateDistributions
+	}
+	for stateIndex, outputState := range ts.transaction.PostAssembly.OutputStates {
+		//need the output state for the state ID and need the outputStatePotential for the distribution list
+		outputStatePotential := ts.transaction.PostAssembly.OutputStatesPotential[stateIndex]
+
+		for _, party := range outputStatePotential.DistributionList {
+			stateDistributions = append(stateDistributions, &statedistribution.StateDistribution{
+				ID:              uuid.New().String(),
+				StateID:         outputState.ID.String(),
+				IdentityLocator: party,
+				Domain:          ts.domainAPI.Domain().Name(),
+				ContractAddress: ts.transaction.Inputs.To.String(),
+				SchemaID:        outputState.Schema.String(),
+				StateDataJson:   string(outputState.Data), // the state data json is available on both but we take it
+				// from the outputState to make sure it is the same json that was used to generate the hash
+			})
+		}
+	}
+	return stateDistributions
 }

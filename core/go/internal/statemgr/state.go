@@ -76,7 +76,7 @@ func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, 
 
 	processedStates = make([]*components.State, len(inStates))
 	for i, inState := range inStates {
-		schema, err := ss.GetSchema(ctx, d.Name(), inState.SchemaID, true)
+		schema, err := ss.GetSchema(ctx, d.Name(), inState.SchemaID, dbTX, true)
 		if err != nil {
 			return nil, err
 		}
@@ -288,7 +288,7 @@ func (ss *stateManager) findStatesCommon(
 		jq.Sort = []string{".created"}
 	}
 
-	schema, err = ss.GetSchema(ctx, domainName, schemaID, true)
+	schema, err = ss.GetSchema(ctx, domainName, schemaID, nil, true)
 	if err != nil {
 		return nil, nil, err
 	}

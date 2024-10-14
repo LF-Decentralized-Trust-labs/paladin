@@ -94,6 +94,7 @@ func transactionLatencyThreshold(t *testing.T) time.Duration {
 type componentTestInstance struct {
 	grpcTarget             string
 	id                     uuid.UUID
+	name                   string // useful for debugging and logging
 	conf                   *pldconf.PaladinConfig
 	ctx                    context.Context
 	client                 rpcclient.Client
@@ -136,9 +137,10 @@ type nodeConfiguration struct {
 	port     int
 	cert     string
 	key      string
+	name     string
 }
 
-func newNodeConfiguration(t *testing.T) *nodeConfiguration {
+func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
 	identity := uuid.New()
 	port, err := getFreePort()
 	require.NoError(t, err)
@@ -149,12 +151,13 @@ func newNodeConfiguration(t *testing.T) *nodeConfiguration {
 		port:     port,
 		cert:     cert,
 		key:      key,
+		name:     nodeName,
 	}
 }
 
 func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration) *componentTestInstance {
 	if binding == nil {
-		binding = newNodeConfiguration(t)
+		binding = newNodeConfiguration(t, "default")
 	}
 	f, err := os.CreateTemp("", "component-test.*.sock")
 	require.NoError(t, err)
@@ -171,9 +174,11 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	i := &componentTestInstance{
 		grpcTarget: grpcTarget,
 		id:         binding.identity,
+		name:       binding.name,
 		conf:       &conf,
 	}
-	i.ctx = log.WithLogField(context.Background(), "instance", binding.identity.String())
+	i.ctx = log.WithLogField(context.Background(), "node-id", binding.identity.String())
+	i.ctx = log.WithLogField(i.ctx, "node-name", binding.name)
 
 	i.conf.Log.Level = confutil.P("info")
 	i.conf.DomainManagerConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
@@ -232,6 +237,10 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 			},
 		},
 	}
+
+	//uncomment for debugging
+	//i.conf.DB.SQLite.DSN = "./sql." + i.name + ".db"
+	//i.conf.Log.Level = confutil.P("debug")
 
 	var pl plugins.UnitTestPluginLoader
 
