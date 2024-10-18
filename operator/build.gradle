@@ -168,28 +168,28 @@ task createNode(type: Exec, dependsOn: verifyOperator) {
     args "NAMESPACE=${namespace}"
 }
 
-// // Task to verify the besu statefulSet
-// task verifyBesu(dependsOn: createNode) {
-//     doLast {
-//         println 'Waiting for besu statefulSet to become ready...'
+// Task to verify the besu statefulSet
+task verifyBesu(dependsOn: createNode) {
+    doLast {
+        println 'Waiting for besu statefulSet to become ready...'
 
-//         verifyResourceCreated(namespace, 'statefulset', 'besu-node1', 120)
-//         verifyResourceReady(namespace, 'statefulset', 'besu-node1', 'jsonpath=.status.readyReplicas=1', 60)
-//     }
-// }
+        verifyResourceCreated(namespace, 'statefulset', 'besu-node1', 120)
+        verifyResourceReady(namespace, 'statefulset', 'besu-node1', 'jsonpath=.status.readyReplicas=1', 60)
+    }
+}
 
-// // Task to verify the paladin statefulSet
-// task verifyPaladin(dependsOn: createNode) {
-//     doLast {
-//         println 'Waiting for paladin statefulSet to become ready...'
+// Task to verify the paladin statefulSet
+task verifyPaladin(dependsOn: createNode) {
+    doLast {
+        println 'Waiting for paladin statefulSet to become ready...'
 
-//         verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', 120)
-//         verifyResourceReady(namespace, 'statefulset', 'paladin-node1', 'jsonpath=.status.readyReplicas=1', 60)
-//     }
-// }
+        verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', 120)
+        verifyResourceReady(namespace, 'statefulset', 'paladin-node1', 'jsonpath=.status.readyReplicas=1', 60)
+    }
+}
 
 // The 'deplay' runs the whole flow
-task deploy(dependsOn: [copySolidity, createNode]) {
+task deploy(dependsOn: [copySolidity, verifyBesu, verifyPaladin]) {
     doLast {
         println 'Deplopy setup completed. Operator is running in the paladin namespace.'
     }
@@ -203,7 +203,6 @@ task e2e(type: Exec, dependsOn: [copySolidity, deploy]) {
     args "CLUSTER_NAME=${clusterName}"
 }
 
- 
 // Task to clean up resources
 task cleanCluster(type: Exec) {
     executable 'make'

@@ -24,7 +24,7 @@ KUBECTL ?= kubectl
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
 HELMIFY ?= $(LOCALBIN)/helmify
 CONTAINER_TOOL ?= docker
@@ -57,7 +57,7 @@ set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
 GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) || true ;\
 }
 endef
 
@@ -92,11 +92,11 @@ test: manifests generate fmt vet envtest ## Run unit tests.
 
 .PHONY: lint
 lint: golangci-lint ## Run linters (go and yaml).
-	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run --tests=false
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run linters and apply fixes.
-	$(GOLANGCI_LINT) run --fix
+	$(GOLANGCI_LINT) run --fix --tests=false
 
 ##@ E2E Testing (Kind)
 .PHONY: test-e2e

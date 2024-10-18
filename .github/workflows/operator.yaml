@@ -32,9 +32,9 @@ jobs:
           go-version: '1.22'
           check-latest: true
 
-      # - name: Go Lint
-      #   working-directory: operator
-      #   run: make lint
+      - name: Go Lint
+        working-directory: operator
+        run: make lint
 
       # - name: Unit Tests
       #   working-directory: operator

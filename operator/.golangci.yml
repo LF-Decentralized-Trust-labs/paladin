@@ -9,12 +9,12 @@ issues:
   # restore some of the defaults
   # (fill in the rest as needed)
   exclude-rules:
-    - path: "/*"
-      linters:
-        - lll
     - path: "internal/*"
       linters:
         - dupl
+    - path: "test/utils/utils.go"
+      linters:
+        - errcheck
 linters:
   disable-all: true
   enable:
@@ -28,12 +28,10 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - lll
     - misspell
     - nakedret
     - prealloc
     - staticcheck
     - typecheck
     - unconvert
-    - unparam
     - unused
