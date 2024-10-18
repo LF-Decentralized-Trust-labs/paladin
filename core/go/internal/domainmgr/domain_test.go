@@ -218,14 +218,14 @@ func newTestDomain(t *testing.T, realDB bool, domainConfig *prototk.DomainConfig
 	var mdc *componentmocks.DomainContext
 	addr := *tktypes.RandAddress()
 	if realDB {
-		dCtx := dm.stateStore.NewDomainContext(ctx, tp.d, addr)
+		dCtx := dm.stateStore.NewDomainContext(ctx, tp.d, addr, dm.persistence.DB())
 		c = tp.d.newInFlightDomainRequest(dm.persistence.DB(), dCtx)
 	} else {
 		mdc = componentmocks.NewDomainContext(t)
 		mdc.On("Ctx").Return(ctx).Maybe()
 		mdc.On("Close").Return()
 		c = tp.d.newInFlightDomainRequest(dm.persistence.DB(), mdc)
-		mc.stateStore.On("NewDomainContext", mock.Anything, tp.d, mock.Anything).Return(mdc).Maybe()
+		mc.stateStore.On("NewDomainContext", mock.Anything, tp.d, mock.Anything, mock.Anything).Return(mdc).Maybe()
 	}
 
 	return &testDomainContext{

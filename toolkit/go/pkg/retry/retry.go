@@ -34,18 +34,25 @@ type Retry struct {
 	maxAttempts  int
 }
 
-func NewRetryIndefinite(conf *pldconf.RetryConfig) *Retry {
+func NewRetryIndefinite(conf *pldconf.RetryConfig, defaults ...*pldconf.RetryConfig) *Retry {
+	def := &pldconf.GenericRetryDefaults.RetryConfig
+	if len(defaults) > 0 {
+		def = defaults[0]
+	}
 	return &Retry{
-		initialDelay: confutil.DurationMin(conf.InitialDelay, 0, *pldconf.RetryDefaults.InitialDelay),
-		maxDelay:     confutil.DurationMin(conf.MaxDelay, 0, *pldconf.RetryDefaults.MaxDelay),
-		factor:       confutil.Float64Min(conf.Factor, 1.0, *pldconf.RetryDefaults.Factor),
+		initialDelay: confutil.DurationMin(conf.InitialDelay, 0, *def.InitialDelay),
+		maxDelay:     confutil.DurationMin(conf.MaxDelay, 0, *def.MaxDelay),
+		factor:       confutil.Float64Min(conf.Factor, 1.0, *def.Factor),
 	}
 }
 
-func NewRetryLimited(conf *pldconf.RetryConfigWithMax) *Retry {
-	base := NewRetryIndefinite(&conf.RetryConfig)
-	base.maxAttempts = confutil.IntMin(conf.MaxAttempts, 0, *pldconf.RetryDefaults.MaxAttempts)
-	base.maxDelay = confutil.DurationMin(conf.MaxDelay, 0, *pldconf.RetryDefaults.MaxDelay)
+func NewRetryLimited(conf *pldconf.RetryConfigWithMax, defaults ...*pldconf.RetryConfigWithMax) *Retry {
+	def := pldconf.GenericRetryDefaults
+	if len(defaults) > 0 {
+		def = defaults[0]
+	}
+	base := NewRetryIndefinite(&conf.RetryConfig, &def.RetryConfig)
+	base.maxAttempts = confutil.IntMin(conf.MaxAttempts, 0, *def.MaxAttempts)
 	return base
 }
 

@@ -26,6 +26,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -111,7 +112,7 @@ type EventStreamSignature struct {
 }
 
 type EventWithData struct {
-	*IndexedEvent
+	*pldapi.IndexedEvent
 
 	// SoliditySignature allows a deterministic comparison to which ABI to use in the runtime,
 	// when both the blockindexer and consuming code are using the same version of firefly-signer.
@@ -133,7 +134,7 @@ type EventDeliveryBatch struct {
 // Post commit callback is invoked after the DB transaction completes (only on success)
 type PostCommit func()
 
-type PreCommitHandler func(ctx context.Context, dbTX *gorm.DB, blocks []*IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error)
+type PreCommitHandler func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error)
 
 type InternalStreamCallback func(ctx context.Context, dbTX *gorm.DB, batch *EventDeliveryBatch) (PostCommit, error)
 

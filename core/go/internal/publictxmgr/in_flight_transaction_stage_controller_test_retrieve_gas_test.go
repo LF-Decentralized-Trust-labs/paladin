@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
@@ -62,7 +62,7 @@ func TestProduceLatestInFlightStageContextRetrieveGas(t *testing.T) {
 
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 
-	retrievedGasPrice := &ptxapi.PublicTxGasPricing{
+	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
 	}
 	// succeed retrieving gas price
@@ -172,12 +172,12 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrements(t *testing.T) {
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 
 	// Set old gas price in memory
-	mTS.InMemoryTxStateManager.(*inMemoryTxState).mtx.GasPricing = &ptxapi.PublicTxGasPricing{
+	mTS.InMemoryTxStateManager.(*inMemoryTxState).mtx.GasPricing = &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(20),
 	}
 
 	// We will retrieve the new price of 10
-	retrievedGasPrice := &ptxapi.PublicTxGasPricing{
+	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
 	}
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
@@ -228,13 +228,13 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsReachedCap(t *tes
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(20),
 		},
 	})
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when reached the max gas price cap
-	retrievedGasPrice := &ptxapi.PublicTxGasPricing{
+	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
 	}
 
@@ -286,11 +286,11 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsRetrievedHigherPr
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// retrieved price is higher
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(20),
 		},
 	})
-	higherRetrievedPrice := &ptxapi.PublicTxGasPricing{
+	higherRetrievedPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(21),
 	}
 	it.gasPriceIncreaseMax = big.NewInt(26)
@@ -340,14 +340,14 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559HigherExis
 
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// EIP-1559 gas price
-	retrievedGasPriceEIP1559 := &ptxapi.PublicTxGasPricing{
+	retrievedGasPriceEIP1559 := &pldapi.PublicTxGasPricing{
 		MaxFeePerGas:         tktypes.Int64ToInt256(10),
 		MaxPriorityFeePerGas: tktypes.Int64ToInt256(1),
 	}
 	it.gasPriceIncreaseMax = nil
 	// the highest gas price used is higher than the retrieved gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
 			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
 		},
@@ -400,13 +400,13 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559MismatchFo
 
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 
-	retrievedGasPrice := &ptxapi.PublicTxGasPricing{
+	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(10),
 	}
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when the old format doesn't match the new format, return the new gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
 			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
 		},
@@ -455,11 +455,11 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	assert.Equal(t, InFlightTxStageRetrieveGasPrice, rsc.Stage)
 	inFlightStageMananger := it.stateManager.(*inFlightTransactionState)
 
-	retrievedGasPrice := &ptxapi.PublicTxGasPricing{
+	retrievedGasPrice := &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Uint64ToUint256(10),
 	}
 
-	retrievedGasPriceEIP1559 := &ptxapi.PublicTxGasPricing{
+	retrievedGasPriceEIP1559 := &pldapi.PublicTxGasPricing{
 		MaxFeePerGas:         tktypes.Uint64ToUint256(10),
 		MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
 	}
@@ -467,7 +467,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 	it.gasPriceIncreasePercent = 50 // increase 50 percent
 	// when the old format doesn't match the new format, return the new gas price
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
 			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
 		},
@@ -493,7 +493,7 @@ func TestProduceLatestInFlightStageContextRetrieveGasIncrementsEIP1559ReachedCap
 
 	// when reached the cap
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxFeePerGas:         tktypes.Uint64ToUint256(20),
 			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(1),
 		},

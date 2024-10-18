@@ -7,10 +7,13 @@ rules:
 - apiGroups:
   - core.paladin.io
   resources:
-  - smartcontracts
+  - smartcontractdeployments
   - besus
   - paladins
   - besugeneses
+  - paladinregistries
+  - paladindomains
+  - paladinregistrations 
   verbs:
   - get
   - list
@@ -20,12 +23,29 @@ rules:
 - apiGroups:
   - core.paladin.io
   resources:
-  - smartcontracts/status
+  - smartcontractdeployments/status
   - besus/status
   - paladins/status
   - besugeneses/status
+  - paladinregistries/status
+  - paladindomains/status
+  - paladinregistrations/status
   verbs:
   - get
+  - patch
+  - update
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  verbs:
+  - get
+  - list
+  - create
+  - delete
+  - update
+  - patch
+  - watch
 - apiGroups:
   - apps
   resources:

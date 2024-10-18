@@ -7,14 +7,14 @@ The **Paladin Kubernetes Operator** is a custom controller for managing Paladin 
 The operator will perform the following tasks:
 1. **Manage Paladin CRs**: Create and manage Paladin nodes as StatefulSets in Kubernetes.
 2. **Manage Besu CRs**: Create and manage Besu nodes as StatefulSets in Kubernetes.
-3. **Manage SmartContract CRs**: Submit smart contracts to the blockchain and track their status (via paladin or directly to the blockchain).
+3. **Manage SmartContractDeployment CRs**: Submit smart contracts to the blockchain and track their status (via paladin or directly to the blockchain).
 
 ## Architecture
 
 - **Custom Resources (CRs)**: 
   - `Paladin`: Represents a Paladin node.
   - `Besu`: Represents a Besu node for simple dev blockchain networks
-  - `SmartContract`: Represents a smart contract that will be submitted to the blockchain.
+  - `SmartContractDeployment`: Represents a smart contract that will be submitted to the blockchain.
 - **Operator**: Manages the CR lifecycle and interacts with the blockchain via the Paladin/Besu API.
 
 ## High-Level Workflow
@@ -40,11 +40,11 @@ The operator will perform the following tasks:
 3. The operator creates a StatefulSet that runs an instance of Besu.
 4. The StatefulSet mounts the ConfigMap as a volume, and the Besu instance uses the configuration file in its command line.
 
-### 4. SmartContract CR Lifecycle
+### 4. SmartContractDeployment CR Lifecycle
 
-1. User creates a `SmartContract` custom resource with the Solidity code and target (Paladin or blockchain directly).
+1. User creates a `SmartContractDeployment` custom resource with the Solidity code and target (Paladin or blockchain directly).
 2. The operator compiles and submits the smart contract to the blockchain via Besu's API.
-3. The operator updates the `SmartContract` CR's status with the transaction ID and tracks the contract deployment status (e.g., **Pending**, **Success**, **Failed**, **Rejected**).
+3. The operator updates the `SmartContractDeployment` CR's status with the transaction ID and tracks the contract deployment status (e.g., **Pending**, **Success**, **Failed**, **Rejected**).
 
 ## Custom Resource Definitions (CRDs)
 
@@ -68,11 +68,11 @@ spec:
 - **Status**:
     ???? Do we need a status? (maybe pod name) ????
 
-### SmartContract CRD
+### SmartContractDeployment CRD
 
 ```yaml
 apiVersion: core.paladin.io/v1alpha1
-kind: SmartContract
+kind: SmartContractDeployment
 metadata:
   name: <contract-name>
 spec:
@@ -112,19 +112,19 @@ graph TD
 
 ```
 
-### SmartContract CR Workflow
+### SmartContractDeployment CR Workflow
 
 ```mermaid
 
 graph TD
-    A[User creates SmartContract CR] --> B[Operator fetches CR]
+    A[User creates SmartContractDeployment CR] --> B[Operator fetches CR]
     B --> C[Compile and submit contract via Besu/Paladin API]
-    C --> D[Set SmartContract status to Pending]
-    D --> E[Set SmartContract status with transaction ID]
+    C --> D[Set SmartContractDeployment status to Pending]
+    D --> E[Set SmartContractDeployment status with transaction ID]
     E --> F[Wait for transaction confirmation]
     F --> G{Transaction successful?}
-    G -->|Yes| H[Set SmartContract status to Success]
-    G -->|No| I[Set SmartContract status to Failed]
+    G -->|Yes| H[Set SmartContractDeployment status to Success]
+    G -->|No| I[Set SmartContractDeployment status to Failed]
 
 ```
 

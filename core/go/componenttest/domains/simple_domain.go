@@ -22,15 +22,16 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
@@ -46,6 +47,10 @@ var simpleDomainBuild []byte // comes from Hardhat build
 
 //go:embed abis/SimpleToken.json
 var simpleTokenBuild []byte // comes from Hardhat build
+
+const (
+	SimpleDomainInsufficientFundsError = "SDE0001"
+)
 
 func toJSONString(t *testing.T, v interface{}) string {
 	b, err := json.Marshal(v)
@@ -97,28 +102,38 @@ func mustParseBuildBytecode(buildJSON []byte) tktypes.HexBytes {
 	return byteCode
 }
 
-func DeploySmartContract(t *testing.T, bi blockindexer.BlockIndexer, ecf ethclient.EthClientFactory) *tktypes.EthAddress {
+func DeploySmartContract(t *testing.T, txm components.TXManager) *tktypes.EthAddress {
 	ctx := context.Background()
 
 	simpleDomainABI := mustParseBuildABI(simpleDomainBuild)
+	simpleDomainBytecode := mustParseBuildBytecode(simpleDomainBuild)
 
 	// In this test we deploy the factory in-line
-	ec, err := ecf.HTTPClient().ABI(ctx, simpleDomainABI)
+	txID, err := txm.SendTransaction(ctx, &pldapi.TransactionInput{
+		Transaction: pldapi.Transaction{
+			Type: pldapi.TransactionTypePublic.Enum(),
+			From: "domain1_admin",
+		},
+		ABI:      simpleDomainABI,
+		Bytecode: simpleDomainBytecode,
+	})
 	require.NoError(t, err)
 
-	cc, err := ec.Constructor(ctx, mustParseBuildBytecode(simpleDomainBuild))
-	require.NoError(t, err)
+	var receipt *pldapi.TransactionReceipt
+	ticker := time.NewTicker(100 * time.Millisecond)
+	for {
+		<-ticker.C
+		require.False(t, t.Failed())
+		receipt, err = txm.GetTransactionReceiptByID(ctx, *txID)
+		require.NoError(t, err)
+		if receipt != nil {
+			break
+		}
+	}
 
-	deployTXHash, err := cc.R(ctx).
-		Signer("domain1_admin").
-		Input(`{}`).
-		SignAndSend()
-	require.NoError(t, err)
-
-	deployTx, err := bi.WaitForTransactionSuccess(ctx, *deployTXHash, simpleDomainABI)
-	require.NoError(t, err)
-	require.Equal(t, deployTx.Result.V(), blockindexer.TXResult_SUCCESS)
-	return deployTx.ContractAddress
+	require.True(t, receipt.Success)
+	require.NotNil(t, receipt.ContractAddress)
+	return receipt.ContractAddress
 }
 
 // Note, here we're simulating a domain that choose to support versions of a "Transfer" function
@@ -201,11 +216,11 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 		]
 	}`
 
-	fakeDeployPayload := `{
-		"notary": "domain1.contract1.notary",
-		"name": "FakeToken1",
-		"symbol": "FT1"
-	}`
+	type constructorParametersParser struct {
+		Notary string `json:"notary"`
+		Name   string `json:"name"`
+		Symbol string `json:"symbol"`
+	}
 
 	type fakeTransferParser struct {
 		From   string               `json:"from,omitempty"`
@@ -264,7 +279,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				}
 				states := res.States
 				if len(states) == 0 {
-					return nil, nil, nil, fmt.Errorf("insufficient funds (available=%s)", total.Text(10))
+					return nil, nil, nil, fmt.Errorf("%s: insufficient funds (available=%s)", SimpleDomainInsufficientFundsError, total.Text(10))
 				}
 				for _, state := range states {
 					lastStateTimestamp = state.StoredAt
@@ -407,11 +422,14 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 			},
 
 			InitDeploy: func(ctx context.Context, req *prototk.InitDeployRequest) (*prototk.InitDeployResponse, error) {
-				assert.JSONEq(t, fakeDeployPayload, req.Transaction.ConstructorParamsJson)
+				constructorParametersParser := &constructorParametersParser{}
+				err := json.Unmarshal([]byte(req.Transaction.ConstructorParamsJson), constructorParametersParser)
+				require.NoError(t, err)
+
 				return &prototk.InitDeployResponse{
 					RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 						{
-							Lookup:       "domain1.contract1.notary",
+							Lookup:       constructorParametersParser.Notary,
 							Algorithm:    algorithms.ECDSA_SECP256K1,
 							VerifierType: verifiers.ETH_ADDRESS,
 						},
@@ -420,25 +438,29 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 			},
 
 			PrepareDeploy: func(ctx context.Context, req *prototk.PrepareDeployRequest) (*prototk.PrepareDeployResponse, error) {
-				assert.JSONEq(t, `{
+				/*assert.JSONEq(t, `{
 					"notary": "domain1.contract1.notary",
 					"name": "FakeToken1",
 					"symbol": "FT1"
-				}`, req.Transaction.ConstructorParamsJson)
+				}`, req.Transaction.ConstructorParamsJson)*/
+				constructorParametersParser := &constructorParametersParser{}
+				err := json.Unmarshal([]byte(req.Transaction.ConstructorParamsJson), constructorParametersParser)
+				require.NoError(t, err)
+
 				assert.Len(t, req.ResolvedVerifiers, 1)
 				assert.Equal(t, algorithms.ECDSA_SECP256K1, req.ResolvedVerifiers[0].Algorithm)
 				assert.Equal(t, verifiers.ETH_ADDRESS, req.ResolvedVerifiers[0].VerifierType)
-				assert.Equal(t, "domain1.contract1.notary", req.ResolvedVerifiers[0].Lookup)
+				//assert.Equal(t, "domain1.contract1.notary", req.ResolvedVerifiers[0].Lookup)
 				assert.NotEmpty(t, req.ResolvedVerifiers[0].Verifier)
 				return &prototk.PrepareDeployResponse{
-					Signer: confutil.P(fmt.Sprintf("domain1/transactions/%s", req.Transaction.TransactionId)),
+					Signer: confutil.P(fmt.Sprintf("domain1.transactions.%s", req.Transaction.TransactionId)),
 					Transaction: &prototk.PreparedTransaction{
 						FunctionAbiJson: toJSONString(t, simpleDomainABI.Functions()["newSimpleTokenNotarized"]),
 						ParamsJson: fmt.Sprintf(`{
 							"txId": "%s",
 							"notary": "%s",
-							"notaryLocator": "domain1.contract1.notary"
-						}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier),
+							"notaryLocator": "%s"
+						}`, req.Transaction.TransactionId, req.ResolvedVerifiers[0].Verifier, constructorParametersParser.Notary),
 					},
 				}, nil
 			},

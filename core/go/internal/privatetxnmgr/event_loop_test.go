@@ -24,8 +24,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/privatetxnstore"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/privatetxnmgrmocks"
 	"github.com/kaleido-io/paladin/core/mocks/statedistributionmocks"
@@ -50,6 +50,8 @@ type orchestratorDepencyMocks struct {
 	publisher           *privatetxnmgrmocks.Publisher
 	identityResolver    *componentmocks.IdentityResolver
 	stateDistributer    *statedistributionmocks.StateDistributer
+	txManager           *componentmocks.TXManager
+	transportWriter     *privatetxnmgrmocks.TransportWriter
 }
 
 func newOrchestratorForTesting(t *testing.T, ctx context.Context, domainAddress *tktypes.EthAddress) (*Orchestrator, *orchestratorDepencyMocks, func()) {
@@ -70,20 +72,24 @@ func newOrchestratorForTesting(t *testing.T, ctx context.Context, domainAddress 
 		publisher:           privatetxnmgrmocks.NewPublisher(t),
 		identityResolver:    componentmocks.NewIdentityResolver(t),
 		stateDistributer:    statedistributionmocks.NewStateDistributer(t),
+		txManager:           componentmocks.NewTXManager(t),
+		transportWriter:     privatetxnmgrmocks.NewTransportWriter(t),
 	}
 	mocks.allComponents.On("StateManager").Return(mocks.stateStore).Maybe()
 	mocks.allComponents.On("DomainManager").Return(mocks.domainMgr).Maybe()
 	mocks.allComponents.On("TransportManager").Return(mocks.transportManager).Maybe()
 	mocks.allComponents.On("KeyManager").Return(mocks.keyManager).Maybe()
+	mocks.allComponents.On("TxManager").Return(mocks.txManager).Maybe()
 	mocks.domainMgr.On("GetSmartContractByAddress", mock.Anything, *domainAddress).Maybe().Return(mocks.domainSmartContract, nil)
 	mocks.sequencer.On("SetDispatcher", mock.Anything).Maybe().Return()
 	p, persistenceDone, err := persistence.NewUnitTestPersistence(ctx)
 	require.NoError(t, err)
 	mocks.allComponents.On("Persistence").Return(p).Maybe()
 	mocks.endorsementGatherer.On("DomainContext").Return(mocks.domainContext).Maybe()
+	mocks.domainSmartContract.On("Address").Return(*domainAddress).Maybe()
 
-	store := privatetxnstore.NewStore(ctx, &pldconf.FlushWriterConfig{}, p)
-	o := NewOrchestrator(ctx, tktypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerOrchestratorConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.sequencer, mocks.endorsementGatherer, mocks.publisher, store, mocks.identityResolver, mocks.stateDistributer)
+	syncPoints := syncpoints.NewSyncPoints(ctx, &pldconf.FlushWriterConfig{}, p, mocks.txManager)
+	o := NewOrchestrator(ctx, tktypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerOrchestratorConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.sequencer, mocks.endorsementGatherer, mocks.publisher, syncPoints, mocks.identityResolver, mocks.stateDistributer, mocks.transportWriter)
 	ocDone, err := o.Start(ctx)
 	require.NoError(t, err)
 
@@ -118,10 +124,16 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 		PreAssembly: &components.TransactionPreAssembly{},
 	}
 
-	waitForAssemble := make(chan bool, 1)
-	dependencyMocks.domainSmartContract.On("AssembleTransaction", mock.Anything, mock.Anything).Return(errors.New("fail assembly. Just happy that we got this far")).Run(func(args mock.Arguments) {
-		waitForAssemble <- true
-	})
+	waitForFinalize := make(chan bool, 1)
+	dependencyMocks.domainSmartContract.On("AssembleTransaction", mock.Anything, mock.Anything).Return(errors.New("fail assembly. Just happy that we got this far"))
+
+	dependencyMocks.txManager.On("FinalizeTransactions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	dependencyMocks.publisher.On("PublishTransactionFinalizedEvent", mock.Anything, newTxID.String()).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			waitForFinalize <- true
+		})
 
 	assert.Empty(t, testOc.incompleteTxSProcessMap)
 
@@ -135,7 +147,7 @@ func TestNewOrchestratorProcessNewTransaction(t *testing.T) {
 	assert.False(t, testOc.ProcessNewTransaction(ctx, testTx))
 	assert.Equal(t, 1, len(testOc.incompleteTxSProcessMap))
 
-	_ = waitForChannel(waitForAssemble)
+	_ = waitForChannel(waitForFinalize)
 
 	// add again doesn't cause a repeat process of the current stage context
 	assert.False(t, testOc.ProcessNewTransaction(ctx, testTx))
@@ -154,6 +166,13 @@ func TestOrchestratorHandleEvents(t *testing.T) {
 			name:        "TransactionSubmittedEvent",
 			handlerName: "HandleTransactionSubmittedEvent",
 			event: &ptmgrtypes.TransactionSubmittedEvent{
+				PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{TransactionID: newTxID.String()},
+			},
+		},
+		{
+			name:        "TransactionSwappedInEvent",
+			handlerName: "HandleTransactionSwappedInEvent",
+			event: &ptmgrtypes.TransactionSwappedInEvent{
 				PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{TransactionID: newTxID.String()},
 			},
 		},

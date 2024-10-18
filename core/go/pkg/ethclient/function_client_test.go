@@ -180,14 +180,14 @@ func testInvokeNewWidgetOk(t *testing.T, isWS bool, txVersion EthTXVersion, gasL
 	})
 	defer done()
 
-	var ec EthClient
+	var ec EthClientWithKeyManager
 	if isWS {
 		ec = ecf.SharedWS()
 	} else {
 		ec = ecf.HTTPClient()
 	}
 
-	_, key1, err := ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	_, key1, err := ecf.ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
@@ -227,7 +227,7 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	var testABI ABIClient
 	var key1 string
 	var err error
-	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
 		eth_call: func(ctx context.Context, tx ethsigner.Transaction, s string) (tktypes.HexBytes, error) {
 			if withBlock {
 				assert.Equal(t, "0x3039", s)
@@ -266,13 +266,13 @@ func testCallGetWidgetsOk(t *testing.T, withFrom, withBlock, withBlockRef bool) 
 	defer done()
 
 	if withFrom {
-		_, key1, err = ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		_, key1, err = ecf.ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 		require.NoError(t, err)
 	}
 
 	fakeContractAddr := ethtypes.MustNewAddress("0xCC3b61E636B395a4821Df122d652820361FF26f1")
 
-	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)
+	testABI = ecf.HTTPClient().MustABIJSON(testABIJSON)
 	getWidgetsReq := testABI.MustFunction("getWidgets").R(ctx).
 		To(fakeContractAddr).
 		Input(`{"sku": 1122334455}`)
@@ -541,7 +541,7 @@ func TestInvokeConstructor(t *testing.T) {
 
 	var testABI ABIClient
 	var key1 string
-	ctx, ec, done := newTestClientAndServer(t, &mockEth{
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
 		eth_getTransactionCount: func(ctx context.Context, a tktypes.EthAddress, block string) (tktypes.HexUint64, error) {
 			assert.Equal(t, key1, a.String())
 			assert.Equal(t, "latest", block)
@@ -572,10 +572,10 @@ func TestInvokeConstructor(t *testing.T) {
 	})
 	defer done()
 
-	_, key1, err := ec.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	_, key1, err := ecf.ecf.keymgr.ResolveKey(ctx, "key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 
-	testABI = ec.HTTPClient().MustABIJSON(testABIJSON)
+	testABI = ecf.HTTPClient().MustABIJSON(testABIJSON)
 	req := testABI.MustConstructor(fakeBytecode).R(ctx).
 		Signer("key1").
 		Input(`{"supplier": "0xFB75836Dc4130a9462FAFD8fe96c8Ee376e2f32e"}`)
@@ -632,5 +632,26 @@ func TestInvokeNewWidgetCustomError(t *testing.T) {
 	// Check we can override the options if we wish, disabling ability to decode the errors
 	_, err = req.CallOptions(WithErrorsFrom(abi.ABI{})).CallResult()
 	assert.EqualError(t, err, `PD011513: Reverted: 0xf852c6da0000000000000000000000000000000000000000000000000000000042e576f7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000126e6f74207769646765747920656e6f7567680000000000000000000000000000`)
+
+}
+
+func TestNewWSOk(t *testing.T) {
+
+	expected := tktypes.Bytes32(tktypes.RandBytes(32))
+	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
+		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
+			return tktypes.HexBytes(expected[:]), nil
+		},
+	})
+
+	wsc, err := ecf.NewWS()
+	require.NoError(t, err)
+	res, err := wsc.SendRawTransaction(ctx, []byte{})
+	require.NoError(t, err)
+	assert.Equal(t, expected.String(), res.String())
+
+	done()
+	_, err = ecf.NewWS()
+	require.Regexp(t, "FF00148", err)
 
 }

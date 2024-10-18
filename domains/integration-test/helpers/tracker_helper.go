@@ -18,14 +18,13 @@ package helpers
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"math/big"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,7 @@ var NotoTrackerJSON []byte
 type NotoTrackerHelper struct {
 	t       *testing.T
 	tb      testbed.Testbed
-	eth     ethclient.EthClient
+	pld     pldclient.PaladinClient
 	Address *tktypes.EthAddress
 	ABI     abi.ABI
 }
@@ -46,33 +45,35 @@ func DeployTracker(
 	ctx context.Context,
 	t *testing.T,
 	tb testbed.Testbed,
+	pld pldclient.PaladinClient,
 	signer string,
 ) *NotoTrackerHelper {
 	build := domain.LoadBuild(NotoTrackerJSON)
-	eth := tb.Components().EthClientFactory().HTTPClient()
-	builder := deployBuilder(ctx, t, eth, build.ABI, build.Bytecode).Input(map[string]any{
+	builder := deployBuilder(ctx, t, pld, build.ABI, build.Bytecode).Input(map[string]any{
 		"name":   "NotoTracker",
 		"symbol": "NOTO",
 	})
-	deploy := NewTransactionHelper(ctx, t, tb, builder).SignAndSend(signer).Wait()
-	assert.NotNil(t, deploy.ContractAddress)
+	deploy, err := NewTransactionHelper(ctx, t, tb, builder).SignAndSend(signer).Wait(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, deploy.Receipt().ContractAddress)
 	return &NotoTrackerHelper{
 		t:       t,
 		tb:      tb,
-		eth:     eth,
-		Address: deploy.ContractAddress,
+		pld:     pld,
+		Address: deploy.Receipt().ContractAddress,
 		ABI:     build.ABI,
 	}
 }
 
 func (h *NotoTrackerHelper) GetBalance(ctx context.Context, account string) int64 {
-	output, err := functionBuilder(ctx, h.t, h.eth, h.ABI, "balanceOf").
-		To(h.Address.Address0xHex()).
+	call, err := functionBuilder(ctx, h.t, h.pld, h.ABI, "balanceOf").
+		Public().
+		To(h.Address).
 		Input(map[string]any{"account": account}).
-		CallResult()
+		BuildTX()
 	require.NoError(h.t, err)
 	var jsonOutput map[string]any
-	err = json.Unmarshal([]byte(output.JSON()), &jsonOutput)
+	err = h.tb.ExecBaseLedgerCall(ctx, &jsonOutput, call)
 	require.NoError(h.t, err)
 	var balance big.Int
 	balance.SetString(jsonOutput["0"].(string), 10)

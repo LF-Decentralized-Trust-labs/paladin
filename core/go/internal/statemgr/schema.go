@@ -75,20 +75,16 @@ func (ss *stateManager) persistSchemas(ctx context.Context, dbTX *gorm.DB, schem
 		Error
 }
 
-func (ss *stateManager) GetSchema(ctx context.Context, domainName string, schemaID tktypes.Bytes32, dbTX *gorm.DB, failNotFound bool) (components.Schema, error) {
-	return ss.getSchemaByID(ctx, domainName, schemaID, dbTX, failNotFound)
+func (ss *stateManager) GetSchema(ctx context.Context, dbTX *gorm.DB, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
+	return ss.getSchemaByID(ctx, dbTX, domainName, schemaID, failNotFound)
 }
 
-func (ss *stateManager) getSchemaByID(ctx context.Context, domainName string, schemaID tktypes.Bytes32, dbTX *gorm.DB, failNotFound bool) (components.Schema, error) {
+func (ss *stateManager) getSchemaByID(ctx context.Context, dbTX *gorm.DB, domainName string, schemaID tktypes.Bytes32, failNotFound bool) (components.Schema, error) {
 
 	cacheKey := schemaCacheKey(domainName, schemaID)
 	s, cached := ss.abiSchemaCache.Get(cacheKey)
 	if cached {
 		return s, nil
-	}
-
-	if dbTX == nil {
-		dbTX = ss.p.DB()
 	}
 
 	var results []*components.SchemaPersisted
@@ -120,7 +116,7 @@ func (ss *stateManager) getSchemaByID(ctx context.Context, domainName string, sc
 	return s, nil
 }
 
-func (ss *stateManager) ListSchemas(ctx context.Context, domainName string) (results []components.Schema, err error) {
+func (ss *stateManager) ListSchemas(ctx context.Context, dbTX *gorm.DB, domainName string) (results []components.Schema, err error) {
 	var ids []*idOnly
 	err = ss.p.DB().
 		Table("schemas").
@@ -133,7 +129,7 @@ func (ss *stateManager) ListSchemas(ctx context.Context, domainName string) (res
 	}
 	results = make([]components.Schema, len(ids))
 	for i, id := range ids {
-		if results[i], err = ss.getSchemaByID(ctx, domainName, tktypes.Bytes32(id.ID), nil, true); err != nil {
+		if results[i], err = ss.getSchemaByID(ctx, dbTX, domainName, tktypes.Bytes32(id.ID), true); err != nil {
 			return nil, err
 		}
 	}

@@ -37,14 +37,12 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 
@@ -81,7 +79,7 @@ type pubTxManager struct {
 	p                persistence.Persistence
 	bIndexer         blockindexer.BlockIndexer
 	ethClient        ethclient.EthClient
-	keymgr           ethclient.KeyManager
+	keymgr           components.KeyManager
 	rootTxMgr        components.TXManager
 	ethClientFactory ethclient.EthClientFactory
 	// gas price
@@ -122,11 +120,11 @@ type pubTxManager struct {
 
 type txActivityRecords struct {
 	lock    sync.Mutex
-	records []ptxapi.TransactionActivityRecord
+	records []pldapi.TransactionActivityRecord
 }
 
 func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxManagerConfig) components.PublicTxManager {
-	log.L(ctx).Debugf("Creating new enterprise transaction handler")
+	log.L(ctx).Debugf("Creating new public transaction manager")
 
 	gasPriceClient := NewGasPriceClient(ctx, conf)
 	gasPriceIncreaseMax := confutil.BigIntOrNil(conf.GasPrice.IncreaseMax)
@@ -163,30 +161,30 @@ func (ble *pubTxManager) PreInit(pic components.PreInitComponents) (result *comp
 // Post-init allows the manager to cross-bind to other components, or the Engine
 func (ble *pubTxManager) PostInit(pic components.AllComponents) error {
 	ctx := ble.ctx
-	log.L(ctx).Debugf("Initializing enterprise transaction handler")
+	log.L(ctx).Debugf("Initializing public transaction manager")
 	ble.ethClientFactory = pic.EthClientFactory()
-	ble.ethClient = ble.ethClientFactory.SharedWS()
 	ble.keymgr = pic.KeyManager()
-
+	ble.p = pic.Persistence()
 	ble.bIndexer = pic.BlockIndexer()
 	ble.rootTxMgr = pic.TxManager()
-
-	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble.ethClient, ble)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to create balance manager for enterprise transaction handler due to %+v", err)
-		return err
-	}
-	log.L(ctx).Debugf("Initialized enterprise transaction handler")
-	ble.balanceManager = balanceManager
-	ble.p = pic.Persistence()
 	ble.submissionWriter = newSubmissionWriter(ble.ctx, ble.p, ble.conf)
 
+	balanceManager, err := NewBalanceManagerWithInMemoryTracking(ctx, ble.conf, ble)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to create balance manager for public transaction manager due to %+v", err)
+		return err
+	}
+	ble.balanceManager = balanceManager
+
+	log.L(ctx).Debugf("Initialized public transaction manager")
 	return nil
 }
 
 func (ble *pubTxManager) Start() error {
 	ctx := ble.ctx
-	log.L(ctx).Debugf("Starting enterprise transaction handler")
+	log.L(ctx).Debugf("Starting public transaction manager")
+
+	// The client is assured to be started by this point and available
 	ble.ethClient = ble.ethClientFactory.SharedWS()
 	ble.gasPriceClient.Init(ctx, ble.ethClient)
 	ble.nonceManager = newNonceCache(ble.nonceCacheTimeout, func(ctx context.Context, signer tktypes.EthAddress) (uint64, error) {
@@ -206,7 +204,7 @@ func (ble *pubTxManager) Start() error {
 	}
 	ble.MarkInFlightOrchestratorsStale()
 	ble.submissionWriter.Start()
-	log.L(ctx).Infof("Started enterprise transaction handler")
+	log.L(ctx).Infof("Started public transaction manager")
 	return nil
 }
 
@@ -225,8 +223,7 @@ func (ble *pubTxManager) Stop() {
 
 type preparedTransaction struct {
 	bindings    []*components.PaladinTXReference
-	tx          *ptxapi.PublicTx
-	keyHandle   string
+	tx          *pldapi.PublicTx
 	rejectError error                 // only if rejected
 	revertData  tktypes.HexBytes      // only if rejected, and was available
 	nsi         NonceAssignmentIntent // only if accepted
@@ -299,7 +296,7 @@ func (pt *preparedTransaction) Bindings() []*components.PaladinTXReference {
 	return pt.bindings
 }
 
-func (pt *preparedTransaction) PublicTx() *ptxapi.PublicTx {
+func (pt *preparedTransaction) PublicTx() *pldapi.PublicTx {
 	return pt.tx
 }
 
@@ -375,7 +372,7 @@ func buildEthTX(
 	nonce *uint64,
 	to *tktypes.EthAddress,
 	data tktypes.HexBytes,
-	options *ptxapi.PublicTxOptions,
+	options *pldapi.PublicTxOptions,
 ) *ethsigner.Transaction {
 	ethTx := &ethsigner.Transaction{
 		From:                 json.RawMessage(tktypes.JSONString(from)),
@@ -402,25 +399,17 @@ func (ble *pubTxManager) prepareSubmission(ctx context.Context, batchSoFar []*pr
 
 	pt := &preparedTransaction{
 		bindings: txi.Bindings,
-		tx: &ptxapi.PublicTx{
+		tx: &pldapi.PublicTx{
 			To:              txi.To,
 			Data:            txi.Data,
 			PublicTxOptions: txi.PublicTxOptions,
 		},
 	}
 
-	var fromAddr *tktypes.EthAddress
-	keyHandle, fromAddrString, err := ble.keymgr.ResolveKey(ctx, txi.From, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-	if err == nil {
-		fromAddr, err = tktypes.ParseEthAddress(fromAddrString)
+	if txi.From == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidTXMissingFromAddr)
 	}
-	if err != nil {
-		// Treat a failure to resolve as a rejected error for this individual transaction, rather than a system error
-		pt.rejectError = err
-		return pt, nil
-	}
-	pt.keyHandle = keyHandle
-	pt.tx.From = *fromAddr
+	pt.tx.From = *txi.From
 
 	prepareStart := time.Now()
 	var txType InFlightTxOperation
@@ -428,7 +417,7 @@ func (ble *pubTxManager) prepareSubmission(ctx context.Context, batchSoFar []*pr
 	rejected := false
 	if pt.tx.Gas == nil || *pt.tx.Gas == 0 {
 		gasEstimateResult, err := ble.ethClient.EstimateGasNoResolve(ctx, buildEthTX(
-			*fromAddr,
+			*txi.From,
 			nil, /* nonce not assigned at this point */
 			pt.tx.To,
 			pt.tx.Data,
@@ -493,14 +482,13 @@ func (ble *pubTxManager) finalizeNonceForPersistedTX(ctx context.Context, ptx *p
 		SignerNonce: fmt.Sprintf("%s:%d", tx.From, tx.Nonce), // having a single key rather than compound key helps us simplify cross-table correlation, particularly for batch lookup
 		From:        tx.From,
 		Nonce:       tx.Nonce.Uint64(),
-		KeyHandle:   ptx.keyHandle, // TODO: Consider once we have reverse mapping in key manager whether we still need this
 		To:          tx.To,
 		Gas:         tx.Gas.Uint64(),
 		Data:        tx.Data,
 	}, nil
 }
 
-func recoverGasPriceOptions(gpoJSON tktypes.RawJSON) (ptgp ptxapi.PublicTxGasPricing) {
+func recoverGasPriceOptions(gpoJSON tktypes.RawJSON) (ptgp pldapi.PublicTxGasPricing) {
 	if gpoJSON != nil {
 		_ = json.Unmarshal(gpoJSON, &ptgp)
 	}
@@ -509,14 +497,14 @@ func recoverGasPriceOptions(gpoJSON tktypes.RawJSON) (ptgp ptxapi.PublicTxGasPri
 
 // Component interface: query public transactions, outside of the scope of a binding to a parent Paladin transaction.
 // Returns each public transaction a maximum of once
-func (ble *pubTxManager) QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*ptxapi.PublicTxWithBinding, error) {
+func (ble *pubTxManager) QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) {
 	return ble.queryPublicTxWithBinding(ctx, dbTX, nil, jq)
 }
 
 // Component interface: query the associated public transactions, for a set of parent Paladin transactions
 // Can return the same public transaction multiple times, if bound to multiple private transactions.
 // The results are grouped, so the caller can be assured to have exactly one entry in the map (even if an empty array) per supplied TX ID
-func (ble *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*ptxapi.PublicTx, error) {
+func (ble *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error) {
 	if boundToTxns == nil {
 		boundToTxns = []uuid.UUID{}
 	}
@@ -524,9 +512,9 @@ func (ble *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX 
 	if err != nil {
 		return nil, err
 	}
-	results := make(map[uuid.UUID][]*ptxapi.PublicTx)
+	results := make(map[uuid.UUID][]*pldapi.PublicTx)
 	for _, id := range boundToTxns {
-		results[id] = []*ptxapi.PublicTx{}
+		results[id] = []*pldapi.PublicTx{}
 		for _, pubTX := range boundPublicTxns {
 			if pubTX.Transaction == id {
 				results[id] = append(results[id], pubTX.PublicTx)
@@ -536,7 +524,7 @@ func (ble *pubTxManager) QueryPublicTxForTransactions(ctx context.Context, dbTX 
 	return results, nil
 }
 
-func (ble *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX *gorm.DB, scopeToTxns []uuid.UUID, jq *query.QueryJSON) ([]*ptxapi.PublicTxWithBinding, error) {
+func (ble *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX *gorm.DB, scopeToTxns []uuid.UUID, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error) {
 	q := dbTX.Table("public_txns").
 		WithContext(ctx).
 		Joins("Completed")
@@ -547,20 +535,20 @@ func (ble *pubTxManager) queryPublicTxWithBinding(ctx context.Context, dbTX *gor
 	if err != nil {
 		return nil, err
 	}
-	results := make([]*ptxapi.PublicTxWithBinding, len(ptxs))
+	results := make([]*pldapi.PublicTxWithBinding, len(ptxs))
 	for iTx, ptx := range ptxs {
 		tx := mapPersistedTransaction(ptx)
-		tx.Submissions = make([]*ptxapi.PublicTxSubmissionData, len(ptx.Submissions))
+		tx.Submissions = make([]*pldapi.PublicTxSubmissionData, len(ptx.Submissions))
 		for iSub, pSub := range ptx.Submissions {
 			tx.Submissions[iSub] = mapPersistedSubmissionData(pSub)
 		}
 		tx.Activity = ble.getActivityRecords(ptx.SignerNonce)
-		results[iTx] = &ptxapi.PublicTxWithBinding{
+		results[iTx] = &pldapi.PublicTxWithBinding{
 			PublicTx: tx,
 		}
 		// Binding will be null for autofueling transactions
 		if ptx.Binding != nil {
-			results[iTx].PublicTxBinding = ptxapi.PublicTxBinding{
+			results[iTx].PublicTxBinding = pldapi.PublicTxBinding{
 				Transaction:     ptx.Binding.Transaction,
 				TransactionType: ptx.Binding.TransactionType,
 			}
@@ -594,7 +582,7 @@ func (ble *pubTxManager) CheckTransactionCompleted(ctx context.Context, from tkt
 }
 
 // the return does NOT include submissions (only the top level TX data)
-func (ble *pubTxManager) GetPendingFuelingTransaction(ctx context.Context, sourceAddress tktypes.EthAddress, destinationAddress tktypes.EthAddress) (*ptxapi.PublicTx, error) {
+func (ble *pubTxManager) GetPendingFuelingTransaction(ctx context.Context, sourceAddress tktypes.EthAddress, destinationAddress tktypes.EthAddress) (*pldapi.PublicTx, error) {
 	var ptxs []*DBPublicTxn
 	err := ble.p.DB().
 		WithContext(ctx).
@@ -652,14 +640,14 @@ func (ble *pubTxManager) runTransactionQuery(ctx context.Context, dbTX *gorm.DB,
 	return ptxs, nil
 }
 
-func mapPersistedTransaction(ptx *DBPublicTxn) *ptxapi.PublicTx {
-	tx := &ptxapi.PublicTx{
+func mapPersistedTransaction(ptx *DBPublicTxn) *pldapi.PublicTx {
+	tx := &pldapi.PublicTx{
 		From:    ptx.From,
 		Nonce:   tktypes.HexUint64(ptx.Nonce),
 		Created: ptx.Created,
 		To:      ptx.To,
 		Data:    ptx.Data,
-		PublicTxOptions: ptxapi.PublicTxOptions{
+		PublicTxOptions: pldapi.PublicTxOptions{
 			Gas:                (*tktypes.HexUint64)(&ptx.Gas),
 			Value:              ptx.Value,
 			PublicTxGasPricing: recoverGasPriceOptions(ptx.FixedGasPricing),
@@ -679,8 +667,8 @@ func mapPersistedTransaction(ptx *DBPublicTxn) *ptxapi.PublicTx {
 	return tx
 }
 
-func mapPersistedSubmissionData(pSub *DBPubTxnSubmission) *ptxapi.PublicTxSubmissionData {
-	return &ptxapi.PublicTxSubmissionData{
+func mapPersistedSubmissionData(pSub *DBPubTxnSubmission) *pldapi.PublicTxSubmissionData {
+	return &pldapi.PublicTxSubmissionData{
 		Time:               pSub.Created,
 		TransactionHash:    tktypes.Bytes32(pSub.TransactionHash),
 		PublicTxGasPricing: recoverGasPriceOptions(pSub.GasPricing),
@@ -755,7 +743,7 @@ func (pte *pubTxManager) addActivityRecord(signerNonce string, msg string) {
 	// We add to the front of the list (newest record first) and cap the size
 	txr.lock.Lock()
 	defer txr.lock.Unlock()
-	record := &ptxapi.TransactionActivityRecord{
+	record := &pldapi.TransactionActivityRecord{
 		Time:    tktypes.TimestampNow(),
 		Message: msg,
 	}
@@ -763,13 +751,13 @@ func (pte *pubTxManager) addActivityRecord(signerNonce string, msg string) {
 	if copyLen >= pte.maxActivityRecordsPerTx {
 		copyLen = pte.maxActivityRecordsPerTx - 1
 	}
-	newActivity := make([]ptxapi.TransactionActivityRecord, copyLen+1)
+	newActivity := make([]pldapi.TransactionActivityRecord, copyLen+1)
 	copy(newActivity[1:], txr.records[0:copyLen])
 	newActivity[0] = *record
 	txr.records = newActivity
 }
 
-func (pte *pubTxManager) getActivityRecords(signerNonce string) []ptxapi.TransactionActivityRecord {
+func (pte *pubTxManager) getActivityRecords(signerNonce string) []pldapi.TransactionActivityRecord {
 	txr, _ := pte.activityRecordCache.Get(signerNonce)
 	if txr != nil {
 		// Snap the current activity array pointer in the lock and return it directly
@@ -778,12 +766,12 @@ func (pte *pubTxManager) getActivityRecords(signerNonce string) []ptxapi.Transac
 		defer txr.lock.Unlock()
 		return txr.records
 	}
-	return []ptxapi.TransactionActivityRecord{}
+	return []pldapi.TransactionActivityRecord{}
 }
 
-func (pte *pubTxManager) GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*ptxapi.PublicTxWithBinding, error) {
+func (pte *pubTxManager) GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
 	var signerNonces []string
-	var txns []*ptxapi.PublicTxWithBinding
+	var txns []*pldapi.PublicTxWithBinding
 	err := dbTX.
 		Table("public_submissions").
 		Model(DBPubTxnSubmission{}).
@@ -845,7 +833,7 @@ func (pte *pubTxManager) MatchUpdateConfirmedTransactions(ctx context.Context, d
 				completions = append(completions, &DBPublicTxnCompletion{
 					SignerNonce:     match.SignerNonce,
 					TransactionHash: txi.Hash,
-					Success:         txi.Result.V() == blockindexer.TXResult_SUCCESS,
+					Success:         txi.Result.V() == pldapi.TXResult_SUCCESS,
 					RevertData:      txi.RevertReason,
 				})
 				break

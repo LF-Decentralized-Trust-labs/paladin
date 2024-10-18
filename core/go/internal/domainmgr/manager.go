@@ -198,28 +198,25 @@ func (dm *domainManager) getDomainByName(ctx context.Context, name string) (*dom
 	return d, nil
 }
 
-func (dm *domainManager) WaitForDeploy(ctx context.Context, txID uuid.UUID) (components.DomainSmartContract, error) {
+func (dm *domainManager) ExecDeployAndWait(ctx context.Context, txID uuid.UUID, call func() error) (dc components.DomainSmartContract, err error) {
 	// Waits for the event that confirms a smart contract has been deployed (or a context timeout)
 	// using the transaction ID of the deploy transaction
 	req := dm.privateTxWaiter.AddInflight(ctx, txID)
 	defer req.Cancel()
+	log.L(ctx).Infof("Added waiter %s for private deployment TransactionID %s", req.ID(), txID)
 
-	dc, err := dm.dbGetSmartContract(ctx, dm.persistence.DB(), func(db *gorm.DB) *gorm.DB { return db.Where("deploy_tx = ?", txID) })
-	if err != nil {
-		return nil, err
+	err = call()
+	if err == nil {
+		dc, err = dm.waitForDeploy(ctx, req)
 	}
-	if dc != nil {
-		// contract was already indexed
-		return dc, nil
-	}
-	return dm.waitAndEnrich(ctx, req)
+	return dc, err
 }
 
 func (dm *domainManager) GetSigner() signerapi.InMemorySigner {
 	return dm.domainSigner
 }
 
-func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *components.ReceiptInput]) (components.DomainSmartContract, error) {
+func (dm *domainManager) waitForDeploy(ctx context.Context, req *inflight.InflightRequest[uuid.UUID, *components.ReceiptInput]) (components.DomainSmartContract, error) {
 	// wait until the event gets indexed (or the context expires)
 	receipt, err := req.Wait()
 	if err != nil {
@@ -234,12 +231,17 @@ func (dm *domainManager) waitAndEnrich(ctx context.Context, req *inflight.Inflig
 	return dm.GetSmartContractByAddress(ctx, *receipt.ContractAddress)
 }
 
-func (dm *domainManager) WaitForTransaction(ctx context.Context, txID uuid.UUID) error {
+func (dm *domainManager) ExecAndWaitTransaction(ctx context.Context, txID uuid.UUID, call func() error) error {
 	// Waits for the event that confirms a transaction has been processed (or a context timeout)
 	// using the ID of the transaction
 	req := dm.privateTxWaiter.AddInflight(ctx, txID)
 	defer req.Cancel()
-	_, err := req.Wait()
+	log.L(ctx).Infof("Added waiter %s for private TransactionID %s", req.ID(), txID)
+
+	err := call()
+	if err == nil {
+		_, err = req.Wait()
+	}
 	return err
 }
 

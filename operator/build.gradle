@@ -26,15 +26,65 @@ dependencies {
 }
 
 ext {
+    clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default' 
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
     buildOperator = project.hasProperty('buildOperator') ? project.buildOperator == 'true' : true // Default is to build the operator
 }
 
+def printClusterStatus(String namespace) {
+    def getAllCommand = ["kubectl", "get", "all", "-n", namespace]
+    def getAllProcess = getAllCommand.execute()
+    getAllProcess.waitFor()
+    println getAllProcess.in.text.trim()
+} 
+
+def verifyResourceCreated(String namespace, String resourceType, String resourceName, int timeoutSeconds = 60) {
+    
+    // Wait for resource creation
+    def existsCommand = ["kubectl", "wait", "--for=create", "${resourceType}", "${resourceName}", "-n", namespace, "--timeout=${timeoutSeconds}s"]
+    def existsProcess = existsCommand.execute()
+    existsProcess.waitFor()
+    println "Creation Output: ${existsProcess.text}"
+
+    if (existsProcess.exitValue() != 0) {
+        printClusterStatus(namespace)
+        throw new Exception("Resource ${resourceType}/${resourceName} (${namespace}) was not created within the expected time.")
+    }
+}
+
+def verifyResourceReady(String namespace, String resourceType, String resourceName, String condition, int timeoutSeconds = 60) {
+
+    // Wait for resource to meet expected condition
+    def waitCommand = ["kubectl", "wait", "--for=${condition}", "${resourceType}", "${resourceName}", "-n", namespace, "--timeout=${timeoutSeconds}s"]
+    def waitProcess = waitCommand.execute()
+    waitProcess.waitFor()
+    println "Wait Output: ${waitProcess.text}"
+
+    if (waitProcess.exitValue() != 0) {
+        printClusterStatus(namespace)
+        throw new Exception("Resource ${resourceType}/${resourceName} (${namespace}) was not ready in the expected time.")
+    }
+    printClusterStatus(namespace)
+}
+
+task registryContractDeployCRSample(type: Exec) {
+    commandLine "go", "run", "./contractpkg", "test/e2e/abis/IdentityRegistry.json", "registry"
+}
+
+task penteContractDeployCRSample(type: Exec) {
+    commandLine "go", "run", "./contractpkg", "test/e2e/abis/PenteFactory.json", "pente"
+}
+
+task notoContractDeployCRSample(type: Exec) {
+    commandLine "go", "run", "./contractpkg", "test/e2e/abis/NotoFactory.json", "noto"
+}
+
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
+        include 'contracts/registry/IdentityRegistry.sol/IdentityRegistry.json'
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/pente/PenteFactory.sol/PenteFactory.json'
     }
@@ -43,15 +93,17 @@ task copySolidity(type: Copy) {
     // Flatten all paths into the destination folder
     eachFile { path = name }
     includeEmptyDirs = false
+
+    finalizedBy [
+        registryContractDeployCRSample,
+        penteContractDeployCRSample,
+        notoContractDeployCRSample,
+    ]
 }
 
 // Task to build the Paladin image from the parent project
 task buildPaladinImage {
     dependsOn ':docker' // Builds the Paladin image in the parent project
-    
-    onlyIf {
-        buildPaladin
-    }
 }
 
 // Task to build the operator Docker image
@@ -63,26 +115,28 @@ task docker(type: Exec) {
 // Task to build the Paladin image from the parent project
 task buildOperatorImage {
     dependsOn ':operator:docker' // Builds the Paladin image in the parent project
-    
-    onlyIf {
-        buildPaladin
-    }
 }
 
 // Task to start the Kind cluster
 task startKindCluster(type: Exec) {
     executable 'make'
     args 'kind-start'
+    args "CLUSTER_NAME=${clusterName}"
 }
 
 // Task to load images into the Kind cluster
 task promoteKindImages(type: Exec, dependsOn: [
-    startKindCluster,
-    buildPaladinImage,
-    buildOperatorImage
+    startKindCluster
 ]) {
+    if (buildPaladin) {
+        dependsOn buildPaladinImage
+    }
+    if (buildOperator) {
+        dependsOn buildOperatorImage
+    }
     executable 'make'
     args 'kind-promote'
+    args "CLUSTER_NAME=${clusterName}"
 }
 
 // Task to install Helm CRDs
@@ -98,24 +152,14 @@ task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages]) {
     args "NAMESPACE=${namespace}"
 }
 
+
 // Task to verify the operator is running in the 'paladin' namespace
 task verifyOperator(dependsOn: installOperator) {
     doLast {
         println 'Waiting for operator deployment to become ready...'
-        def process = ['kubectl', 'wait', '--for=condition=available', 'deployment/paladin-operator', '-n', "${namespace}", '--timeout=60s'].execute()
-        process.waitFor()
-        def output = process.in.text.trim()
-        def errorOutput = process.err.text.trim()
-
-        if (process.exitValue() == 0) {
-            println 'Operator deployment is ready.'
-        } else {
-            println errorOutput
-            panic 'Operator deployment did not become ready in the expected time.'
-        }
+        verifyResourceReady(namespace, 'deployment', 'paladin-operator', 'condition=available')
     }
 }
-
 
 // Task to create the nodes
 task createNode(type: Exec, dependsOn: verifyOperator) {
@@ -124,32 +168,49 @@ task createNode(type: Exec, dependsOn: verifyOperator) {
     args "NAMESPACE=${namespace}"
 }
 
+// // Task to verify the besu statefulSet
+// task verifyBesu(dependsOn: createNode) {
+//     doLast {
+//         println 'Waiting for besu statefulSet to become ready...'
+
+//         verifyResourceCreated(namespace, 'statefulset', 'besu-node1', 120)
+//         verifyResourceReady(namespace, 'statefulset', 'besu-node1', 'jsonpath=.status.readyReplicas=1', 60)
+//     }
+// }
+
+// // Task to verify the paladin statefulSet
+// task verifyPaladin(dependsOn: createNode) {
+//     doLast {
+//         println 'Waiting for paladin statefulSet to become ready...'
+
+//         verifyResourceCreated(namespace, 'statefulset', 'paladin-node1', 120)
+//         verifyResourceReady(namespace, 'statefulset', 'paladin-node1', 'jsonpath=.status.readyReplicas=1', 60)
+//     }
+// }
+
 // The 'deplay' runs the whole flow
-task deploy(dependsOn: createNode) {
+task deploy(dependsOn: [copySolidity, createNode]) {
     doLast {
         println 'Deplopy setup completed. Operator is running in the paladin namespace.'
     }
 }
 
 // The 'e2e' task runs the whole flow
-task e2e(dependsOn: deploy) {
-    doLast {
-        println 'TODO: Run E2E tests'
-     }
-}
-
-// Task to run E2E tests (if needed)
-task runE2ETests(type: Exec, dependsOn: e2e) {
+task e2e(type: Exec, dependsOn: [copySolidity, deploy]) {
     executable 'make'
     args 'test-e2e'
+    args "NAMESPACE=${namespace}"
+    args "CLUSTER_NAME=${clusterName}"
 }
 
+ 
 // Task to clean up resources
 task cleanCluster(type: Exec) {
     executable 'make'
     args 'clean'
     args "NAMESPACE=${namespace}"
     args "DELETE_CLUSTER=${deleteCluster}"
+    args "CLUSTER_NAME=${clusterName}"
 }
 
 task clean {

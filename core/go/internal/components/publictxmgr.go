@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -29,7 +29,7 @@ import (
 
 type PublicTxAccepted interface {
 	Bindings() []*PaladinTXReference
-	PublicTx() *ptxapi.PublicTx // the nonce can only be read after Submit() on the batch succeeds
+	PublicTx() *pldapi.PublicTx // the nonce can only be read after Submit() on the batch succeeds
 }
 
 type PublicTxRejected interface {
@@ -57,12 +57,12 @@ var PublicTxFilterFields filters.FieldSet = filters.FieldMap{
 
 type PublicTxSubmission struct {
 	Bindings             []*PaladinTXReference
-	ptxapi.PublicTxInput // the request to create the transaction
+	pldapi.PublicTxInput // the request to create the transaction
 }
 
 type PaladinTXReference struct {
 	TransactionID   uuid.UUID
-	TransactionType tktypes.Enum[ptxapi.TransactionType]
+	TransactionType tktypes.Enum[pldapi.TransactionType]
 }
 
 type PublicTxMatch struct {
@@ -74,9 +74,9 @@ type PublicTxManager interface {
 	ManagerLifecycle
 
 	// Synchronous functions that are executed on the callers thread
-	QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*ptxapi.PublicTx, error)
-	QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*ptxapi.PublicTxWithBinding, error)
-	GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*ptxapi.PublicTxWithBinding, error)
+	QueryPublicTxForTransactions(ctx context.Context, dbTX *gorm.DB, boundToTxns []uuid.UUID, jq *query.QueryJSON) (map[uuid.UUID][]*pldapi.PublicTx, error)
+	QueryPublicTxWithBindings(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PublicTxWithBinding, error)
+	GetPublicTransactionForHash(ctx context.Context, dbTX *gorm.DB, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
 	PrepareSubmissionBatch(ctx context.Context, transactions []*PublicTxSubmission) (batch PublicTxBatch, err error)
 	MatchUpdateConfirmedTransactions(ctx context.Context, dbTX *gorm.DB, itxs []*blockindexer.IndexedTransactionNotify) ([]*PublicTxMatch, error)
 	NotifyConfirmPersisted(ctx context.Context, confirms []*PublicTxMatch)

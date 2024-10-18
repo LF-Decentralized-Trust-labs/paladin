@@ -30,7 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/sirupsen/logrus"
 )
@@ -526,7 +526,7 @@ func (it *inFlightTransactionStageController) ProduceLatestInFlightStageContext(
 	return tOut
 }
 
-func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.Context, existingGpo *ptxapi.PublicTxGasPricing, newGpo *ptxapi.PublicTxGasPricing) *ptxapi.PublicTxGasPricing {
+func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.Context, existingGpo *pldapi.PublicTxGasPricing, newGpo *pldapi.PublicTxGasPricing) *pldapi.PublicTxGasPricing {
 	if existingGpo == nil {
 		log.L(ctx).Debugf("First time assigning gas price to transaction with ID: %s, gas price object: %+v.", it.stateManager.GetSignerNonce(), newGpo)
 		return newGpo
@@ -544,7 +544,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 		if it.gasPriceIncreaseMax != nil && newGasPrice.Cmp(it.gasPriceIncreaseMax) == 1 {
 			newGasPrice.Set(it.gasPriceIncreaseMax)
 		}
-		newGpo = &ptxapi.PublicTxGasPricing{
+		newGpo = &pldapi.PublicTxGasPricing{
 			GasPrice:             (*tktypes.HexUint256)(newGasPrice),
 			MaxFeePerGas:         existingGpo.MaxFeePerGas,         // copy over unchanged (although expected to be unset)
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas, //   "
@@ -559,7 +559,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 		if it.gasPriceIncreaseMax != nil && newMaxFeePerGas.Cmp(it.gasPriceIncreaseMax) == 1 {
 			newMaxFeePerGas.Set(it.gasPriceIncreaseMax)
 		}
-		newGpo = &ptxapi.PublicTxGasPricing{
+		newGpo = &pldapi.PublicTxGasPricing{
 			GasPrice:             existingGpo.GasPrice, // copy over unchanged (although expected to be unset)
 			MaxFeePerGas:         (*tktypes.HexUint256)(newMaxFeePerGas),
 			MaxPriorityFeePerGas: existingGpo.MaxPriorityFeePerGas,
@@ -569,7 +569,7 @@ func (it *inFlightTransactionStageController) calculateNewGasPrice(ctx context.C
 	return newGpo
 }
 
-func calculateGasRequiredForTransaction(ctx context.Context, gpo *ptxapi.PublicTxGasPricing, gasLimit uint64) (gasRequired *big.Int, err error) {
+func calculateGasRequiredForTransaction(ctx context.Context, gpo *pldapi.PublicTxGasPricing, gasLimit uint64) (gasRequired *big.Int, err error) {
 	if gpo.GasPrice != nil {
 		log.L(ctx).Debugf("gas calculation using GasPrice (%+v)", gpo.GasPrice)
 		gasRequired = new(big.Int).Mul(gpo.GasPrice.Int(), new(big.Int).SetUint64(gasLimit))
@@ -625,7 +625,7 @@ func (it *inFlightTransactionStageController) TriggerStatusUpdate(ctx context.Co
 }
 func (it *inFlightTransactionStageController) TriggerSignTx(ctx context.Context) error {
 	it.executeAsync(func() {
-		signedMessage, txHash, err := it.signTx(ctx, it.stateManager.GetResolvedSigner(), it.stateManager.BuildEthTX())
+		signedMessage, txHash, err := it.signTx(ctx, it.stateManager.GetFrom(), it.stateManager.BuildEthTX())
 		log.L(ctx).Debugf("Adding signed message to output, hash %s, signedMessage not nil %t, err %+v", txHash, signedMessage != nil, err)
 		it.stateManager.AddSignOutput(ctx, signedMessage, txHash, err)
 	}, ctx, it.stateManager.GetStage(ctx), false)

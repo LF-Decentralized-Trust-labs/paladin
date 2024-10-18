@@ -23,9 +23,9 @@ import (
 	"unicode"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tkmsgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -36,7 +36,7 @@ func (s *rpcServer) rpcHandler(ctx context.Context, r io.Reader, wsc *webSocketC
 		return s.replyRPCParseError(ctx, b, err)
 	}
 
-	log.L(ctx).Tracef("RPC --> %s", b)
+	log.L(ctx).Infof("RPC[Server] --> %s", b)
 
 	if s.sniffFirstByte(b) == '[' {
 		var rpcArray []*rpcclient.RPCRequest

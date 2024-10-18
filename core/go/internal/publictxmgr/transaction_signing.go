@@ -20,17 +20,44 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/hyperledger/firefly-signer/pkg/secp256k1"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
+	"golang.org/x/crypto/sha3"
 )
 
-func (it *inFlightTransactionStageController) signTx(ctx context.Context, signer *ethclient.ResolvedSigner, ethTx *ethsigner.Transaction) ([]byte, *tktypes.Bytes32, error) {
+func (it *inFlightTransactionStageController) signTx(ctx context.Context, from tktypes.EthAddress, ethTx *ethsigner.Transaction) ([]byte, *tktypes.Bytes32, error) {
 	log.L(ctx).Debugf("signTx entry")
 	signStart := time.Now()
-	signedMessage, err := it.ethClient.BuildRawTransactionNoResolve(ctx, ethclient.EIP1559, signer, ethTx)
 
+	// Reverse resolve the key - to get to this point it will be in the key management system
+	resolvedKey, err := it.keymgr.ReverseKeyLookup(ctx, it.pubTxManager.p.DB(), algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, from.String())
 	if err != nil {
+		log.L(ctx).Errorf("signing failed to resolve key %s for signing: %s", from.String(), err)
+		it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationSign), string(GenericStatusFail), time.Since(signStart).Seconds())
+		return nil, nil, err
+	}
+	// Sign
+	sigPayload := ethTx.SignaturePayloadEIP1559(it.ethClient.ChainID())
+	sigPayloadHash := sha3.NewLegacyKeccak256()
+	_, err = sigPayloadHash.Write(sigPayload.Bytes())
+	var signatureRSV []byte
+	if err == nil {
+		signatureRSV, err = it.keymgr.Sign(ctx, resolvedKey, signpayloads.OPAQUE_TO_RSV, tktypes.HexBytes(sigPayloadHash.Sum(nil)))
+	}
+	var sig *secp256k1.SignatureData
+	if err == nil {
+		sig, err = secp256k1.DecodeCompactRSV(ctx, signatureRSV)
+	}
+	var signedMessage []byte
+	if err == nil {
+		signedMessage, err = ethTx.FinalizeEIP1559WithSignature(sigPayload, sig)
+	}
+	if err != nil {
+		log.L(ctx).Errorf("signing failed with keyHandle %s (addr=%s): %s", resolvedKey.KeyHandle, resolvedKey.Verifier.Verifier, err)
 		it.thMetrics.RecordOperationMetrics(ctx, string(InFlightTxOperationSign), string(GenericStatusFail), time.Since(signStart).Seconds())
 		return nil, nil, err
 	}

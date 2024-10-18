@@ -23,11 +23,9 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -90,29 +88,19 @@ func (tb *testbed) rpcDeployBytecode() rpcserver.RPCHandler {
 		params tktypes.RawJSON,
 	) (*ethtypes.Address0xHex, error) {
 
-		var constructor ethclient.ABIFunctionClient
-		ec := tb.c.EthClientFactory().HTTPClient()
-		abic, err := ec.ABI(ctx, abi)
-		if err == nil {
-			constructor, err = abic.Constructor(ctx, bytecode)
-		}
+		receipt, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+			Transaction: pldapi.Transaction{
+				Type: pldapi.TransactionTypePublic.Enum(),
+				From: from,
+				Data: params,
+			},
+			ABI:      abi,
+			Bytecode: tktypes.HexBytes(bytecode),
+		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to build client for constructor: %s", err)
+			return nil, err
 		}
-
-		var tx *blockindexer.IndexedTransaction
-		txHash, err := constructor.R(ctx).
-			Signer(from).
-			Input(params).
-			SignAndSend()
-		if err == nil {
-			tx, err = tb.c.BlockIndexer().WaitForTransactionSuccess(ctx, *txHash, abi)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to send transaction: %s", err)
-		}
-
-		return tx.ContractAddress.Address0xHex(), nil
+		return receipt.ContractAddress.Address0xHex(), nil
 	})
 }
 
@@ -137,17 +125,16 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		keyMgr := tb.c.KeyManager()
 		tx.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.RequiredVerifiers))
 		for i, v := range tx.RequiredVerifiers {
-			_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
+			resolvedKey, err := tb.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 			}
 			tx.Verifiers[i] = &prototk.ResolvedVerifier{
 				Lookup:       v.Lookup,
 				Algorithm:    v.Algorithm,
-				Verifier:     verifier,
+				Verifier:     resolvedKey.Verifier.Verifier,
 				VerifierType: v.VerifierType,
 			}
 		}
@@ -158,21 +145,19 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 			return nil, err
 		}
 
-		// Do the deploy - we wait for the transaction here to cover revert failures
-		if tx.DeployTransaction != nil && tx.InvokeTransaction == nil {
-			err = tb.execBaseLedgerDeployTransaction(ctx, tx.Signer, tx.DeployTransaction)
-		} else if tx.InvokeTransaction != nil && tx.DeployTransaction == nil {
-			err = tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.InvokeTransaction)
-		} else {
-			err = fmt.Errorf("must return a transaction to invoke, or a transaction to deploy")
-		}
-		if err != nil {
-			return nil, err
-		}
-
 		// Rather than just inspecting the TX - we wait for the domain to index the event, such that
 		// we know it's in the map by the time we return.
-		psc, err := tb.c.DomainManager().WaitForDeploy(ctx, tx.ID)
+		psc, err := tb.c.DomainManager().ExecDeployAndWait(ctx, tx.ID, func() error {
+			// Do the deploy - we wait for the transaction here to cover revert failures
+			if tx.DeployTransaction != nil && tx.InvokeTransaction == nil {
+				_, err = tb.execBaseLedgerDeployTransaction(ctx, tx.Signer, tx.DeployTransaction)
+			} else if tx.InvokeTransaction != nil && tx.DeployTransaction == nil {
+				_, err = tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.InvokeTransaction)
+			} else {
+				err = fmt.Errorf("must return a transaction to invoke, or a transaction to deploy")
+			}
+			return err
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +189,7 @@ func (tb *testbed) newPrivateTransaction(ctx context.Context, invocation tktypes
 func (tb *testbed) execPrivateTransaction(ctx context.Context, psc components.DomainSmartContract, tx *components.PrivateTransaction) error {
 
 	// Testbed just uses a domain context for the duration of the TX, and flushes before returning
-	dCtx := tb.c.StateManager().NewDomainContext(ctx, psc.Domain(), psc.Address())
+	dCtx := tb.c.StateManager().NewDomainContext(ctx, psc.Domain(), psc.Address(), tb.c.Persistence().DB() /* no TX */)
 	defer dCtx.Close()
 
 	// First we call init on the smart contract to:
@@ -215,17 +200,16 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, psc components.Do
 	}
 
 	// Gather the addresses - in the testbed we assume these all to be local
-	keyMgr := tb.c.KeyManager()
 	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, len(tx.PreAssembly.RequiredVerifiers))
 	for i, v := range tx.PreAssembly.RequiredVerifiers {
-		_, verifier, err := keyMgr.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
+		resolvedKey, err := tb.ResolveKey(ctx, v.Lookup, v.Algorithm, v.VerifierType)
 		if err != nil {
 			return fmt.Errorf("failed to resolve key %q: %s", v.Lookup, err)
 		}
 		tx.PreAssembly.Verifiers[i] = &prototk.ResolvedVerifier{
 			Lookup:       v.Lookup,
 			Algorithm:    v.Algorithm,
-			Verifier:     verifier,
+			Verifier:     resolvedKey.Verifier.Verifier,
 			VerifierType: v.VerifierType,
 		}
 	}
@@ -284,13 +268,16 @@ func (tb *testbed) execPrivateTransaction(ctx context.Context, psc components.Do
 		}
 		return tb.execPrivateTransaction(ctx, nextContract, mapDirectlyToInternalPrivateTX(tx.PreparedPrivateTransaction, tx.Inputs.Intent))
 	} else if tx.Inputs.Intent == prototk.TransactionSpecification_CALL {
-		return tb.execBaseLedgerCall(ctx, tx.Signer, tx.PreparedPublicTransaction)
+		var ignored any
+		err := tb.ExecBaseLedgerCall(ctx, &ignored, tx.PreparedPublicTransaction)
+		return err
 	} else {
-		return tb.execBaseLedgerTransaction(ctx, tx.Signer, tx.PreparedPublicTransaction)
+		_, err := tb.ExecTransactionSync(ctx, tx.PreparedPublicTransaction)
+		return err
 	}
 }
 
-func mapDirectlyToInternalPrivateTX(etx *ptxapi.TransactionInput, intent prototk.TransactionSpecification_Intent) *components.PrivateTransaction {
+func mapDirectlyToInternalPrivateTX(etx *pldapi.TransactionInput, intent prototk.TransactionSpecification_Intent) *components.PrivateTransaction {
 	return &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
@@ -330,17 +317,13 @@ func (tb *testbed) mapTransaction(tx *components.PrivateTransaction) (*tktypes.P
 		}
 	}
 
-	var err error
 	var functionABI *abi.Entry
 	var to tktypes.EthAddress
-	var paramsJSON []byte
+	var paramsJSON tktypes.RawJSON
 	if tx.PreparedPublicTransaction != nil {
-		functionABI = tx.PreparedPublicTransaction.FunctionABI
-		to = tx.PreparedPublicTransaction.To
-		paramsJSON, err = tx.PreparedPublicTransaction.Inputs.JSON()
-		if err != nil {
-			return nil, err
-		}
+		functionABI = tx.PreparedPublicTransaction.ABI[0]
+		to = *tx.PreparedPublicTransaction.To
+		paramsJSON = tx.PreparedPublicTransaction.Data
 	} else {
 		functionABI = tx.PreparedPrivateTransaction.ABI[0]
 		to = *tx.PreparedPrivateTransaction.To
@@ -363,25 +346,23 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 		invocation tktypes.PrivateContractInvoke,
 		waitForCompletion bool,
 	) (*tktypes.PrivateContractTransaction, error) {
-
 		psc, tx, err := tb.newPrivateTransaction(ctx, invocation, prototk.TransactionSpecification_SEND_TRANSACTION)
 		if err != nil {
 			return nil, err
 		}
-		err = tb.execPrivateTransaction(ctx, psc, tx)
+		doExec := func() error {
+			return tb.execPrivateTransaction(ctx, psc, tx)
+		}
+		if waitForCompletion {
+			err = tb.c.DomainManager().ExecAndWaitTransaction(ctx, tx.ID, doExec)
+		} else {
+			err = doExec()
+		}
 		if err != nil {
 			return nil, err
 		}
-
-		// Wait for the domain to index the transaction events
-		if waitForCompletion {
-			err = tb.c.DomainManager().WaitForTransaction(ctx, tx.ID)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 		return tb.mapTransaction(tx)
+
 	})
 }
 
@@ -408,13 +389,10 @@ func (tb *testbed) rpcResolveVerifier() rpcserver.RPCHandler {
 		algorithm string,
 		verifierType string,
 	) (verifier string, _ error) {
-		identifier, err := tktypes.PrivateIdentityLocator(lookup).Identity(ctx)
-		if err == nil {
-			_, verifier, err = tb.c.KeyManager().ResolveKey(ctx, identifier, algorithm, verifierType)
-		}
+		resolvedKey, err := tb.ResolveKey(ctx, lookup, algorithm, verifierType)
 		if err != nil {
 			return "", err
 		}
-		return verifier, err
+		return resolvedKey.Verifier.Verifier, err
 	})
 }

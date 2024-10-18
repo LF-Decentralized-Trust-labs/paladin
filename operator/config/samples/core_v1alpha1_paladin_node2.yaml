@@ -1,0 +1,62 @@
+# To convert your JSON content to base64, use the following command:
+# echo -n '<your-json>' | base64
+#
+# Example:
+# echo -n '{"nodeName":"node2","db":{"type":"sqlite","sqlite":{"uri":":memory:","autoMigrate":true,"migrationsDir":"./db/migrations/sqlite","debugQueries":true}},"grpc":{"shutdownTimeout":0},"rpcServer":{"http":{"port":0,"shutdownTimeout":0},"ws":{"disabled":true,"shutdownTimeout":0}},"blockchain":{"http":{"url":"http://localhost:8545"},"ws":{"url":"ws://localhost:8546","initialConnectAttempts":25}},"signer":{"keyDerivation":{"type":"bip32"},"keyStore":{"type":"static","static":{"keys":{"seed":{"encoding":"none","inline":"worth race crush harbor atom race scrub quit glimpse solution style adapt catalog cheese nothing"}}}}}}' | base64
+
+apiVersion: core.paladin.io/v1alpha1
+kind: Paladin
+metadata:
+  name: node2
+spec:
+  config: |
+    log:
+      level: debug
+  database:
+    mode: sidecarPostgres
+    migrationMode: auto
+  besuNode: node2
+  secretBackedSigners:
+    - name: signer-1
+      secret: node2.keys
+      type: autoHDWallet
+  domains:
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: noto
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: zeto          
+    - labelSelector:
+        matchLabels:
+          paladin.io/domain-name: pente
+  registries:
+    - labelSelector:
+        matchLabels:
+          paladin.io/registry-name: evm-registry
+  transports:
+    - name: grpc
+      plugin:
+        type: c-shared
+        library: /app/transports/libgrpc.so
+      configJSON: |
+        {
+          "port": 9000,
+          "address": "0.0.0.0"
+        }
+      ports:
+      - name: transport-grpc
+        port: 9000
+        targetPort: 9000
+      tls:
+        secretName: paladin-node2-mtls
+        certName: paladin-node2-mtls
+  service:
+    type: NodePort
+    ports:
+    - name: rpc-http
+      port: 8548
+      nodePort: 31648 # see paladin-kind.yaml
+    - name: rpc-ws
+      port: 8549
+      nodePort: 31649 # see paladin-kind.yaml

@@ -123,7 +123,7 @@ func checkNil[T any](v T, fn func(T) rpcserver.RPCHandler) rpcserver.RPCHandler 
 	})
 }
 
-func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _ *ethClientFactory, done func()) {
+func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _ *ethClientFactoryKeyManagerWrapper, done func()) {
 	ctx = context.Background()
 
 	httpRPCServer, httpServerDone := newTestServer(t, ctx, false, mEth)
@@ -143,14 +143,14 @@ func newTestClientAndServer(t *testing.T, mEth *mockEth) (ctx context.Context, _
 		},
 	}
 
-	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
+	ecf, err := NewEthClientFactoryWithKeyManager(ctx, kmgr, conf)
 	require.NoError(t, err)
 
 	err = ecf.Start()
 	require.NoError(t, err)
 	assert.Equal(t, int64(12345), ecf.ChainID())
 
-	return ctx, ecf.(*ethClientFactory), func() {
+	return ctx, ecf.(*ethClientFactoryKeyManagerWrapper), func() {
 		httpServerDone()
 		wsServerDone()
 		ecf.Stop()
@@ -163,7 +163,7 @@ func TestNewEthClientFactoryBadConfig(t *testing.T) {
 		KeyStore: pldconf.KeyStoreConfig{Type: pldconf.KeyStoreTypeStatic},
 	})
 	require.NoError(t, err)
-	_, err = NewEthClientFactory(context.Background(), kmgr, &pldconf.EthClientConfig{
+	_, err = NewEthClientFactoryWithKeyManager(context.Background(), kmgr, &pldconf.EthClientConfig{
 		HTTP: pldconf.HTTPClientConfig{
 			URL: "http://ok.example.com",
 		},
@@ -179,14 +179,14 @@ func TestNewEthClientFactoryBadConfig(t *testing.T) {
 func TestNewEthClientFactoryMissingURL(t *testing.T) {
 	kmgr, done := newTestHDWalletKeyManager(t)
 	defer done()
-	_, err := NewEthClientFactory(context.Background(), kmgr, &pldconf.EthClientConfig{})
+	_, err := NewEthClientFactoryWithKeyManager(context.Background(), kmgr, &pldconf.EthClientConfig{})
 	assert.Regexp(t, "PD011511", err)
 }
 
 func TestNewEthClientFactoryBadURL(t *testing.T) {
 	kmgr, done := newTestHDWalletKeyManager(t)
 	defer done()
-	_, err := NewEthClientFactory(context.Background(), kmgr, &pldconf.EthClientConfig{
+	_, err := NewEthClientFactoryWithKeyManager(context.Background(), kmgr, &pldconf.EthClientConfig{
 		HTTP: pldconf.HTTPClientConfig{
 			URL: "wrong://type",
 		},
@@ -203,7 +203,7 @@ func TestNewEthClientFactoryChainIDFail(t *testing.T) {
 
 	kmgr, kmDone := newTestHDWalletKeyManager(t)
 	defer kmDone()
-	ecf, err := NewEthClientFactory(context.Background(), kmgr, &pldconf.EthClientConfig{
+	ecf, err := NewEthClientFactoryWithKeyManager(context.Background(), kmgr, &pldconf.EthClientConfig{
 		HTTP: pldconf.HTTPClientConfig{
 			URL: fmt.Sprintf("http://%s", rpcServer.HTTPAddr().String()),
 		},
@@ -242,9 +242,26 @@ func TestMismatchedChainID(t *testing.T) {
 		},
 	}
 
-	ecf, err := NewEthClientFactory(ctx, kmgr, conf)
+	ecf, err := NewEthClientFactoryWithKeyManager(ctx, kmgr, conf)
 	require.NoError(t, err)
 	err = ecf.Start()
 	assert.Regexp(t, "PD011512", err)
 
+}
+
+func TestSharedWSBeforeStart(t *testing.T) {
+	assert.PanicsWithValue(t, "call to SharedWS() before Start", func() {
+		_ = (&ethClientFactory{}).SharedWS()
+	})
+
+}
+
+func TestNewECFNoWrapper(t *testing.T) {
+	ecf, err := NewEthClientFactory(context.Background(), &pldconf.EthClientConfig{
+		HTTP: pldconf.HTTPClientConfig{
+			URL: "http://localhost:8545",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, ecf)
 }

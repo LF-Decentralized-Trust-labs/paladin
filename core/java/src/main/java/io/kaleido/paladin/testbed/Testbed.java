@@ -74,7 +74,8 @@ public class Testbed implements Closeable {
 
         // Build the config
         ObjectMapper objectMapper = new ObjectMapper(YAMLFactory.builder().build());
-        Map<String, Object> configMap = objectMapper.readValue(baseConfig(), new TypeReference<>() {
+        var baseConfig = baseConfig();
+        Map<String, Object> configMap = objectMapper.readValue(baseConfig, new TypeReference<>() {
         });
         Map<String, Object> domainMap = new HashMap<>();
         for (ConfigDomain domain : domains) {
@@ -122,16 +123,19 @@ public class Testbed implements Closeable {
                     autoMigrate:   true
                     migrationsDir: %s
                     debugQueries:  false
-                signer:
-                  keyDerivation:
-                    type: bip32
-                  keyStore:
-                    type: static
-                    static:
-                      keys:
-                        seed:
-                          encoding: hex
-                          inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
+                wallets:
+                - name: wallet1
+                  keySelector: .*
+                  signer:
+                    keyDerivation:
+                      type: "bip32"
+                    keyStore:
+                      type: "static"
+                      static:
+                        keys:
+                          seed:
+                            encoding: hex
+                            inline: '%s'                    
                 rpcServer:
                   http:
                     port: %s
@@ -141,6 +145,8 @@ public class Testbed implements Closeable {
                     shutdownTimeout: 0s
                 grpc:
                     shutdownTimeout: 0s
+                blockIndexer:
+                  fromBlock: latest
                 blockchain:
                    http:
                      url: http://localhost:8545
@@ -149,8 +155,12 @@ public class Testbed implements Closeable {
                 loader:
                   debug: true
                 log:
-                  level: info
-                """.formatted(new File(testbedSetup.dbMigrationsDir).getAbsolutePath(), availableRPCPort);
+                  level: debug
+                """.formatted(
+                    new File(testbedSetup.dbMigrationsDir).getAbsolutePath(),
+                    JsonHex.randomBytes32(),
+                    availableRPCPort
+            );
     }
 
     private void start() throws Exception {

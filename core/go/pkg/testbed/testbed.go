@@ -25,7 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -35,7 +37,7 @@ func HDWalletSeedScopedToTest() *UTInitFunction {
 	seed := tktypes.RandHex(32)
 	return &UTInitFunction{
 		ModifyConfig: func(conf *pldconf.PaladinConfig) {
-			conf.Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
+			conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 				Encoding: "hex",
 				Inline:   seed,
 			}
@@ -43,10 +45,16 @@ func HDWalletSeedScopedToTest() *UTInitFunction {
 	}
 }
 
+type KeyMapping = pldapi.KeyMappingAndVerifier
+
 type Testbed interface {
 	components.AdditionalManager
 	// Use GenerateSeed to get a valid seed
-	StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error)
+	StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, conf *pldconf.PaladinConfig, done func(), err error)
+	ResolveKey(ctx context.Context, fqLookup, algorithm, verifierType string) (resolvedKey *KeyMapping, err error)
+	ExecTransactionSync(ctx context.Context, tx *pldapi.TransactionInput) (receipt *pldapi.TransactionReceipt, err error)
+	ExecBaseLedgerCall(ctx context.Context, output any, tx *pldapi.TransactionInput) error
+	EthClientKeyManagerShim() ethclient.KeyManager // CAREFUL - this will give you "nonce too low" if you clash with anything in-flight in Paladin managed TXs
 	Components() AllComponents
 }
 
@@ -128,9 +136,6 @@ func unitTestComponentManagerStart(ctx context.Context, conf *pldconf.PaladinCon
 		cm = componentmgr.NewComponentManager(ctx, socketFile, uuid.New(), conf, tb)
 		err = cm.Init()
 	}
-	if err == nil {
-		err = cm.StartComponents()
-	}
 	for _, cb := range callbacks {
 		if err == nil && cb.PreManagerStart != nil {
 			err = cb.PreManagerStart(cm)
@@ -154,12 +159,11 @@ func (tb *testbed) ReceiveTransportMessage(context.Context, *components.Transpor
 	// no-op
 }
 
-func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, done func(), err error) {
+func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDomain, initFunctions ...*UTInitFunction) (url string, conf *pldconf.PaladinConfig, done func(), err error) {
 	ctx := context.Background()
 
-	var conf *pldconf.PaladinConfig
 	if err = pldconf.ReadAndParseYAMLFile(ctx, configFile, &conf); err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	for _, init := range initFunctions {
@@ -203,10 +207,10 @@ func (tb *testbed) StartForTest(configFile string, domains map[string]*TestbedDo
 
 	cm, err := unitTestComponentManagerStart(ctx, conf, tb, initFunctions...)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
-	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), func() {
+	return fmt.Sprintf("http://%s", tb.c.RPCServer().HTTPAddr()), conf, func() {
 		cm.Stop()
 		if pl != nil {
 			pl.Stop()

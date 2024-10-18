@@ -35,7 +35,7 @@ type publisher struct {
 	contractAddress  string
 }
 
-func (p *publisher) PublishTransactionBlockedEvent(ctx context.Context, transactionId string) error {
+func (p *publisher) PublishTransactionBlockedEvent(ctx context.Context, transactionId string) {
 
 	p.privateTxManager.HandleNewEvent(ctx, &ptmgrtypes.TransactionBlockedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
@@ -43,11 +43,10 @@ func (p *publisher) PublishTransactionBlockedEvent(ctx context.Context, transact
 			TransactionID:   transactionId,
 		},
 	})
-	return nil
 
 }
 
-func (p *publisher) PublishTransactionDispatchedEvent(ctx context.Context, transactionId string, nonce uint64, signingAddress string) error {
+func (p *publisher) PublishTransactionDispatchedEvent(ctx context.Context, transactionId string, nonce uint64, signingAddress string) {
 
 	p.privateTxManager.HandleNewEvent(ctx, &ptmgrtypes.TransactionDispatchedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
@@ -62,11 +61,10 @@ func (p *publisher) PublishTransactionDispatchedEvent(ctx context.Context, trans
 		Nonce:          nonce,
 		SigningAddress: signingAddress,
 	})
-	return nil
 
 }
 
-func (p *publisher) PublishTransactionSignedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult) error {
+func (p *publisher) PublishTransactionSignedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult) {
 	event := &ptmgrtypes.TransactionSignedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
@@ -75,10 +73,9 @@ func (p *publisher) PublishTransactionSignedEvent(ctx context.Context, transacti
 		AttestationResult: attestationResult,
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
-	return nil
 }
 
-func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, endorsement *prototk.AttestationResult, revertReason *string) error {
+func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, endorsement *prototk.AttestationResult, revertReason *string) {
 	event := &ptmgrtypes.TransactionEndorsedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
@@ -88,7 +85,6 @@ func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transac
 		RevertReason: revertReason,
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
-	return nil
 }
 
 func (p *publisher) PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier, verifierType string) {
@@ -116,6 +112,28 @@ func (p *publisher) PublishResolveVerifierErrorEvent(ctx context.Context, transa
 		Lookup:       &lookup,
 		Algorithm:    &algorithm,
 		ErrorMessage: &errorMessage,
+	}
+	p.privateTxManager.HandleNewEvent(ctx, event)
+}
+
+func (p *publisher) PublishTransactionFinalizedEvent(ctx context.Context, transactionId string) {
+	event := &ptmgrtypes.TransactionFinalizedEvent{
+		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
+			ContractAddress: p.contractAddress,
+			TransactionID:   transactionId,
+		},
+	}
+	p.privateTxManager.HandleNewEvent(ctx, event)
+}
+
+func (p *publisher) PublishTransactionFinalizeError(ctx context.Context, transactionId string, revertReason string, err error) {
+	event := &ptmgrtypes.TransactionFinalizeError{
+		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
+			ContractAddress: p.contractAddress,
+			TransactionID:   transactionId,
+		},
+		RevertReason: revertReason,
+		ErrorMessage: err.Error(),
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
 }

@@ -17,7 +17,6 @@ package domainmgr
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statemgr"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
@@ -40,8 +40,8 @@ import (
 
 type mockComponents struct {
 	db               sqlmock.Sqlmock
-	ethClient        *componentmocks.EthClient
-	ethClientFactory *componentmocks.EthClientFactory
+	ethClient        *ethclientmocks.EthClient
+	ethClientFactory *ethclientmocks.EthClientFactory
 	stateStore       *componentmocks.StateManager
 	blockIndexer     *componentmocks.BlockIndexer
 	keyManager       *componentmocks.KeyManager
@@ -55,7 +55,7 @@ func newTestDomainManager(t *testing.T, realDB bool, conf *pldconf.DomainManager
 	mc := &mockComponents{
 		blockIndexer:     componentmocks.NewBlockIndexer(t),
 		stateStore:       componentmocks.NewStateManager(t),
-		ethClientFactory: componentmocks.NewEthClientFactory(t),
+		ethClientFactory: ethclientmocks.NewEthClientFactory(t),
 		keyManager:       componentmocks.NewKeyManager(t),
 		txManager:        componentmocks.NewTXManager(t),
 		privateTxManager: componentmocks.NewPrivateTxManager(t),
@@ -172,7 +172,7 @@ func TestDomainMissingRegistryAddress(t *testing.T) {
 	mc := &mockComponents{
 		blockIndexer:     componentmocks.NewBlockIndexer(t),
 		stateStore:       componentmocks.NewStateManager(t),
-		ethClientFactory: componentmocks.NewEthClientFactory(t),
+		ethClientFactory: ethclientmocks.NewEthClientFactory(t),
 		keyManager:       componentmocks.NewKeyManager(t),
 		txManager:        componentmocks.NewTXManager(t),
 		privateTxManager: componentmocks.NewPrivateTxManager(t),
@@ -251,22 +251,6 @@ func TestMustParseLoaders(t *testing.T) {
 	})
 }
 
-func TestWaitForDeployQueryError(t *testing.T) {
-	ctx, dm, _, done := newTestDomainManager(t, false, &pldconf.DomainManagerConfig{
-		Domains: map[string]*pldconf.DomainConfig{
-			"domain1": {
-				RegistryAddress: tktypes.RandHex(20),
-			},
-		},
-	}, func(mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
-	})
-	defer done()
-
-	_, err := dm.WaitForDeploy(ctx, uuid.New())
-	assert.Regexp(t, "pop", err)
-}
-
 func TestWaitForDeployDomainNotFound(t *testing.T) {
 	reqID := uuid.New()
 	domainAddr := tktypes.RandAddress()
@@ -279,9 +263,6 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 			},
 		},
 	}, func(mc *mockComponents) {
-		// Once before wait, which returns empty
-		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
-		// Once after wait, when the contract exists
 		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{
 			"deploy_tx", "domain_address", "address", "config_bytes",
 		}).AddRow(
@@ -292,7 +273,10 @@ func TestWaitForDeployDomainNotFound(t *testing.T) {
 
 	received := make(chan struct{})
 	go func() {
-		_, err := dm.WaitForDeploy(ctx, reqID)
+		_, err := dm.ExecDeployAndWait(ctx, reqID, func() error {
+			// We simulate this on the main test routine below
+			return nil
+		})
 		assert.Regexp(t, "PD011609", err)
 		close(received)
 	}()
@@ -315,8 +299,6 @@ func TestWaitForDeployNotADeploy(t *testing.T) {
 				RegistryAddress: tktypes.RandHex(20),
 			},
 		},
-	}, func(mc *mockComponents) {
-		mc.db.ExpectQuery("SELECT.*private_smart_contracts").WillReturnRows(sqlmock.NewRows([]string{}))
 	})
 	defer done()
 
@@ -324,7 +306,10 @@ func TestWaitForDeployNotADeploy(t *testing.T) {
 
 	received := make(chan struct{})
 	go func() {
-		_, err := dm.WaitForDeploy(ctx, reqID)
+		_, err := dm.ExecDeployAndWait(ctx, reqID, func() error {
+			// We simulate this on the main test routine below
+			return nil
+		})
 		assert.Regexp(t, "PD011648", err)
 		close(received)
 	}()
@@ -352,7 +337,7 @@ func TestWaitForDeployTimeout(t *testing.T) {
 
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	_, err := dm.waitAndEnrich(cancelled, dm.privateTxWaiter.AddInflight(cancelled, uuid.New()))
+	_, err := dm.waitForDeploy(cancelled, dm.privateTxWaiter.AddInflight(cancelled, uuid.New()))
 	assert.Regexp(t, "PD020100", err)
 }
 
@@ -368,6 +353,6 @@ func TestWaitForTransactionTimeout(t *testing.T) {
 
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	err := dm.WaitForTransaction(cancelled, uuid.New())
+	err := dm.ExecAndWaitTransaction(cancelled, uuid.New(), func() error { return nil })
 	assert.Regexp(t, "PD020100", err)
 }

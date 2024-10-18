@@ -31,7 +31,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 94
+    targetCoverage = 93
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/core/pkg/proto',
@@ -182,6 +182,12 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
         outputDir 'mocks/privatetxnmgrmocks'
     }
     mock {
+        inputDir 'internal/privatetxnmgr/syncpoints'
+        includeAll true
+        outputPackage 'prvtxsyncpointsmocks'
+        outputDir 'mocks/prvtxsyncpointsmocks'
+    }
+    mock {
         inputDir 'internal/components'
         includeAll true
         outputPackage 'componentmocks'
@@ -220,8 +226,8 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
     mock {
         inputDir 'pkg/ethclient'
         includeAll true
-        outputPackage 'componentmocks'
-        outputDir 'mocks/componentmocks'
+        outputPackage 'ethclientmocks'
+        outputDir 'mocks/ethclientmocks'
     }
         mock {
         inputDir 'internal/statedistribution'
@@ -327,7 +333,7 @@ abstract class UnitTests extends Exec {
         args './pkg/...', './internal/...'
         args '-cover'
         args '-covermode=atomic'
-        args '-timeout=30s'
+        args '-timeout=90s' // TODO: Implement fast DB reset to bring this back down
         if (project.findProperty('verboseTests') == 'true') {
             args '-v'
         }

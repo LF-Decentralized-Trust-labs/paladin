@@ -46,43 +46,55 @@ type BesuGenesisReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besugeneses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besugeneses/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besugeneses/finalizers,verbs=update
+// allows generic functions by giving a mapping between the types and interfaces for the CR
+var BesuGenesisCRMap = CRMap[corev1alpha1.BesuGenesis, *corev1alpha1.BesuGenesis, *corev1alpha1.BesuGenesisList]{
+	NewList:  func() *corev1alpha1.BesuGenesisList { return new(corev1alpha1.BesuGenesisList) },
+	ItemsFor: func(list *corev1alpha1.BesuGenesisList) []corev1alpha1.BesuGenesis { return list.Items },
+	AsObject: func(item *corev1alpha1.BesuGenesis) *corev1alpha1.BesuGenesis { return item },
+}
 
 // Reconcile implements the logic when a BesuGenesis resource is created, updated, or deleted
 func (r *BesuGenesisReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
-
-	// Generate a name for the Besu resources
-	name := generateBesuGenesisName(req.Name)
 
 	// Fetch the BesuGenesis instance
 	var genesis corev1alpha1.BesuGenesis
 	if err := r.Get(ctx, req.NamespacedName, &genesis); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("BesuGenesis resource deleted, deleting related resources")
-
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to get BesuGenesis resource")
 		return ctrl.Result{}, err
 	}
 
+	// Initialize status if empty
+	if genesis.Status.Phase == "" {
+		genesis.Status.Phase = corev1alpha1.StatusPhaseFailed
+	}
+
+	defer func() {
+		// Update the overall phase based on conditions
+		if err := r.Status().Update(ctx, &genesis); err != nil {
+			log.Error(err, "Failed to update Besu status")
+		}
+	}()
+
 	// Build the genesis file (depends on the creation of the identities of all the nodes)
 	_, ready, err := r.createConfigMap(ctx, &genesis)
 	if err != nil {
 		log.Error(err, "Failed to create BesuGenesis config map")
+		setCondition(&genesis.Status.Conditions, corev1alpha1.ConditionCM, metav1.ConditionFalse, corev1alpha1.ReasonCMCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	} else if !ready {
 		log.Info("Waiting for node identities before creating BesuGenesis config map")
 		return ctrl.Result{
 			// Keep polling on a short duration until we get the identities
-			RequeueAfter: time.Duration(1 * time.Second),
+			RequeueAfter: time.Duration(1),
 		}, nil
 
 	}
-	log.Info("Created BesuGenesis config secret", "Name", name)
+	genesis.Status.Phase = corev1alpha1.StatusPhaseCompleted
 
 	return ctrl.Result{}, nil
 }
@@ -91,6 +103,8 @@ func (r *BesuGenesisReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *BesuGenesisReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.BesuGenesis{}).
+		// Reconcile when any besu status changes
+		Watches(&corev1alpha1.Besu{}, reconcileAll(BesuGenesisCRMap, r.Client), reconcileEveryChange()).
 		Complete(r)
 }
 
@@ -104,12 +118,15 @@ func (r *BesuGenesisReconciler) createConfigMap(ctx context.Context, genesis *co
 		if err != nil || !ready {
 			return nil, ready, err
 		}
-		controllerutil.SetControllerReference(genesis, newMap, r.Scheme)
+		if err := controllerutil.SetControllerReference(genesis, newMap, r.Scheme); err != nil {
+			return nil, false, err
+		}
 
 		err = r.Create(ctx, newMap)
 		if err != nil {
 			return nil, false, err
 		}
+		setCondition(&genesis.Status.Conditions, corev1alpha1.ConditionCM, metav1.ConditionTrue, corev1alpha1.ReasonCMCreated, fmt.Sprintf("Name: %s", name))
 		return newMap, true, nil
 	} else if err != nil {
 		return nil, false, err
@@ -206,7 +223,8 @@ func (r *BesuGenesisReconciler) getInitialValidators(ctx context.Context, genesi
 		var secret *corev1.Secret
 		for _, possible := range secrets {
 			if possible.Labels["besu-node-id"] == validatorName {
-				secret = &possible
+				tmpPossible := possible
+				secret = &tmpPossible
 				break
 			}
 		}

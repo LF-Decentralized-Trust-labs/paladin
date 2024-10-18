@@ -26,11 +26,10 @@ type RetryConfig struct {
 
 type RetryConfigWithMax struct {
 	RetryConfig
-	MaxAttempts *int    `json:"maxAttempts"`
-	MaxTime     *string `json:"maxTime"`
+	MaxAttempts *int `json:"maxAttempts"`
 }
 
-var RetryDefaults = &RetryConfigWithMax{
+var GenericRetryDefaults = &RetryConfigWithMax{
 	RetryConfig: RetryConfig{
 		InitialDelay: confutil.P("250ms"),
 		MaxDelay:     confutil.P("30s"),

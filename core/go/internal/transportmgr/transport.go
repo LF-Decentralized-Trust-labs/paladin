@@ -215,6 +215,14 @@ func (t *transport) GetTransportDetails(ctx context.Context, req *prototk.GetTra
 	}, nil
 }
 
+func (t *transport) getLocalDetails(ctx context.Context) (string, error) {
+	res, err := t.api.GetLocalDetails(ctx, &prototk.GetLocalDetailsRequest{})
+	if err != nil {
+		return "", err
+	}
+	return res.TransportDetails, nil
+}
+
 func (t *transport) close() {
 	t.cancelCtx()
 	<-t.initDone

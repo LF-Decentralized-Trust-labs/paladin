@@ -32,6 +32,13 @@ message SendMessageRequest {
 message SendMessageResponse {
 }
 
+message GetLocalDetailsRequest {
+}
+
+message GetLocalDetailsResponse {
+  string transport_details = 1; // local transport details that can be shared via registry with other parties
+}
+
 message Message {
     string message_id = 1;
     optional string correlation_id = 2;

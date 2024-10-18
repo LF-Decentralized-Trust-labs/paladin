@@ -76,7 +76,7 @@ func (ss *stateManager) processInsertStates(ctx context.Context, dbTX *gorm.DB, 
 
 	processedStates = make([]*components.State, len(inStates))
 	for i, inState := range inStates {
-		schema, err := ss.GetSchema(ctx, d.Name(), inState.SchemaID, dbTX, true)
+		schema, err := ss.GetSchema(ctx, dbTX, d.Name(), inState.SchemaID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -139,8 +139,8 @@ func (ss *stateManager) writeStates(ctx context.Context, dbTX *gorm.DB, states [
 	return err
 }
 
-func (ss *stateManager) GetState(ctx context.Context, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*components.State, error) {
-	q := ss.p.DB().Table("states")
+func (ss *stateManager) GetState(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*components.State, error) {
+	q := dbTX.Table("states")
 	if withLabels {
 		q = q.Preload("Labels").Preload("Int64Labels")
 	}
@@ -197,13 +197,14 @@ func (ss *stateManager) labelSetFor(schema components.Schema) *trackingLabelSet 
 	return &tls
 }
 
-func (ss *stateManager) FindStates(ctx context.Context, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status StateStatusQualifier) (s []*components.State, err error) {
-	_, s, err = ss.findStates(ctx, domainName, contractAddress, schemaID, query, status)
+func (ss *stateManager) FindStates(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, query *query.QueryJSON, status StateStatusQualifier) (s []*components.State, err error) {
+	_, s, err = ss.findStates(ctx, dbTX, domainName, contractAddress, schemaID, query, status)
 	return s, err
 }
 
 func (ss *stateManager) findStates(
 	ctx context.Context,
+	dbTX *gorm.DB,
 	domainName string,
 	contractAddress tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
@@ -211,12 +212,11 @@ func (ss *stateManager) findStates(
 	status StateStatusQualifier,
 	excluded ...tktypes.HexBytes,
 ) (schema components.Schema, s []*components.State, err error) {
-	db := ss.p.DB()
-	whereClause, isPlainDB := status.whereClause(db)
+	whereClause, isPlainDB := status.whereClause(dbTX)
 	if isPlainDB {
-		return ss.findStatesCommon(ctx, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
-			q = q.Joins("Confirmed", db.Select("transaction")).
-				Joins("Spent", db.Select("transaction"))
+		return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
+			q = q.Joins("Confirmed", dbTX.Select("transaction")).
+				Joins("Spent", dbTX.Select("transaction"))
 
 			if len(excluded) > 0 {
 				q = q.Not(`"states"."id" IN(?)`, excluded)
@@ -244,6 +244,7 @@ func (ss *stateManager) findStates(
 
 func (ss *stateManager) findAvailableNullifiers(
 	ctx context.Context,
+	dbTX *gorm.DB,
 	domainName string,
 	contractAddress tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
@@ -251,13 +252,12 @@ func (ss *stateManager) findAvailableNullifiers(
 	spendingStates []tktypes.HexBytes,
 	spendingNullifiers []tktypes.HexBytes,
 ) (schema components.Schema, s []*components.State, err error) {
-	return ss.findStatesCommon(ctx, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
-		db := ss.p.DB()
-		hasNullifier := db.Where(`"Nullifier"."id" IS NOT NULL`)
+	return ss.findStatesCommon(ctx, dbTX, domainName, contractAddress, schemaID, jq, func(q *gorm.DB) *gorm.DB {
+		hasNullifier := dbTX.Where(`"Nullifier"."id" IS NOT NULL`)
 
-		q = q.Joins("Confirmed", db.Select("transaction")).
-			Joins("Nullifier", db.Select(`"Nullifier"."id"`)).
-			Joins("Nullifier.Spent", db.Select("transaction")).
+		q = q.Joins("Confirmed", dbTX.Select("transaction")).
+			Joins("Nullifier", dbTX.Select(`"Nullifier"."id"`)).
+			Joins("Nullifier.Spent", dbTX.Select("transaction")).
 			Where(hasNullifier)
 
 		if len(spendingStates) > 0 {
@@ -269,7 +269,7 @@ func (ss *stateManager) findAvailableNullifiers(
 
 		// Scope to only unspent
 		q = q.Where(`"Nullifier__Spent"."transaction" IS NULL`).
-			Where(db.
+			Where(dbTX.
 				Or(`"Confirmed"."transaction" IS NOT NULL`),
 			)
 		return q
@@ -278,6 +278,7 @@ func (ss *stateManager) findAvailableNullifiers(
 
 func (ss *stateManager) findStatesCommon(
 	ctx context.Context,
+	dbTX *gorm.DB,
 	domainName string,
 	contractAddress tktypes.EthAddress,
 	schemaID tktypes.Bytes32,
@@ -288,7 +289,7 @@ func (ss *stateManager) findStatesCommon(
 		jq.Sort = []string{".created"}
 	}
 
-	schema, err = ss.GetSchema(ctx, domainName, schemaID, nil, true)
+	schema, err = ss.GetSchema(ctx, dbTX, domainName, schemaID, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -296,8 +297,7 @@ func (ss *stateManager) findStatesCommon(
 	tracker := ss.labelSetFor(schema)
 
 	// Build the query
-	db := ss.p.DB()
-	q := filters.BuildGORM(ctx, jq, db.Table("states"), tracker)
+	q := filters.BuildGORM(ctx, jq, dbTX.Table("states"), tracker)
 	if q.Error != nil {
 		return nil, nil, q.Error
 	}

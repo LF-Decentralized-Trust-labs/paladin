@@ -27,12 +27,9 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -582,18 +579,15 @@ func TestBatchDoubleSubmit(t *testing.T) {
 	})
 	defer done()
 
-	signingKey := tktypes.EthAddress(tktypes.RandBytes(20))
-	mockKeyManager := mocks.keyManager.(*componentmocks.KeyManager)
-	mockKeyManager.On("ResolveKey", mock.Anything, "signer1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS).Return("", signingKey.String(), nil)
-
 	mocks.ethClient.On("GetTransactionCount", mock.Anything, mock.Anything).
 		Return(confutil.P(tktypes.HexUint64(1122334455)), nil).Once()
 
+	addr := tktypes.RandAddress()
 	batch, err := ble.PrepareSubmissionBatch(ctx, []*components.PublicTxSubmission{
 		{
-			PublicTxInput: ptxapi.PublicTxInput{
-				From: "signer1",
-				PublicTxOptions: ptxapi.PublicTxOptions{
+			PublicTxInput: pldapi.PublicTxInput{
+				From: addr,
+				PublicTxOptions: pldapi.PublicTxOptions{
 					Gas:   confutil.P(tktypes.HexUint64(1223451)),
 					Value: tktypes.Uint64ToUint256(100),
 				},

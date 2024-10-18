@@ -1,16 +1,16 @@
 nodeName: node1
 db:
-  # type: sqlite
-  # sqlite:
-  #   dsn: ':memory:'
-  #   autoMigrate: true
-  #   migrationsDir: '../../../../core/go/db/migrations/sqlite'
-  type: postgres
-  postgres:
-    dsn: 'postgres://postgres:my-secret@localhost:5432/postgres?sslmode=disable'
+  type: sqlite
+  sqlite:
+    dsn: ':memory:'
     autoMigrate: true
-    migrationsDir: '../../../core/go/db/migrations/postgres'
-    debugQueries: false
+    migrationsDir: '../../../core/go/db/migrations/sqlite'
+  # type: postgres
+  # postgres:
+  #   dsn: 'postgres://postgres:my-secret@localhost:5432/postgres?sslmode=disable'
+  #   autoMigrate: true
+  #   migrationsDir: '../../../core/go/db/migrations/postgres'
+  #   debugQueries: false
 rpcServer:
   http:
     port: 0
@@ -20,6 +20,8 @@ rpcServer:
     shutdownTimeout: 0s
 grpc:
   shutdownTimeout: 0s
+blockIndexer:
+  fromBlock: latest
 blockchain:
   http:
     url: http://localhost:8545
@@ -27,14 +29,17 @@ blockchain:
     url: ws://localhost:8546
     initialConnectAttempts: 25
 log:
-  level: info
-signer:
-  keyDerivation:
-    type: 'bip32'
-  keyStore:
-    type: 'static'
-    static:
-      keys:
-        seed:
-          encoding: none
-          inline: REPLACED BY GENERATED KEY IN TEST
+  level: debug
+wallets:
+- name: wallet1
+  keySelector: .*
+  signer:
+    keyDerivation:
+      type: "bip32"
+    keyStore:
+      type: "static"
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: REPLACED BY GENERATED KEY IN TEST

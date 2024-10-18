@@ -107,15 +107,15 @@ test-e2e: ## Run e2e tests with Kind.
 kind-start:	## Create a Kind cluster.
 	if ! $(KIND_CLUSTER) get clusters | grep -q "^${CLUSTER_NAME}$$"; then \
 		$(KIND_CLUSTER) create cluster --name "${CLUSTER_NAME}" --config paladin-kind.yaml; \
-	fi
-	$(KUBECTL) version
+	fi;
 
+# $(CONTAINER_TOOL) images -q postgres:latest || $(CONTAINER_TOOL) pull postgres:latest
+# $(CONTAINER_TOOL) images -q hyperledger/besu:latest || $(CONTAINER_TOOL) pull hyperledger/besu:latest
 .PHONY: kind-promote
 kind-promote: kind-start ## Load Docker images into Kind cluster.
+	echo "Loading images into Kind cluster..."
 	$(KIND_CLUSTER) load docker-image ${OPERATOR_IMG} --name "${CLUSTER_NAME}"
 	$(KIND_CLUSTER) load docker-image ${PALADIN_IMG} --name "${CLUSTER_NAME}"
-	$(KIND_CLUSTER) load docker-image postgres:latest --name "${CLUSTER_NAME}"
-	$(KIND_CLUSTER) load docker-image hyperledger/besu:latest --name "${CLUSTER_NAME}"
 
 .PHONY: kind-delete
 kind-delete:	## Delete the Kind cluster.
@@ -189,12 +189,24 @@ helm-template: ## Install operator using Helm.
 
 .PHONY: helm-install
 helm-install: ## Install operator using Helm.
-	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} -n ${NAMESPACE} --create-namespace --set operator.namespace=${NAMESPACE} --set operator.image.repository=${IMAGE_TAG_BASE} --set operator.image.tag=${VERSION}
+	$(KUBECTL) create namespace cert-manager || true
+	$(KUBECTL) create namespace prometheus || true
+	$(HELM) dependency build ${CHART_PATH_OPERATOR} || true
+	$(HELM) upgrade --install ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} \
+		-n ${NAMESPACE} --create-namespace \
+		--set operator.namespace=${NAMESPACE} \
+		--set operator.image.repository=${IMAGE_TAG_BASE} \
+		--set operator.image.tag=${VERSION} \
+		--set certManager.enabled=true \
+		--set certManager.namespace=cert-manager \
+		--set prometheus.enabled=false
 
 .PHONY: helm-uninstall
 helm-uninstall: ## Uninstall operator using Helm.
 	$(HELM) uninstall ${CHART_NAME_OPERATOR} -n ${NAMESPACE} || true
 	$(KUBECTL) delete namespace ${NAMESPACE} || true
+	$(KUBECTL) delete namespace cert-manager || true
+	$(KUBECTL) delete namespace prometheus || true
 
 .PHONY: helm-pause
 helm-pause: ## Pause the operator (set replica count to 0).
@@ -231,9 +243,6 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 	test -s $(LOCALBIN)/crd-ref-docs || GOBIN=$(LOCALBIN) go install github.com/elastic/crd-ref-docs@latest
 
 ##@ Dev Helpers
-.PHONY: update-crds
-update-crds: manifests generate ## Update CRDs in the cluster.
-	$(KUBECTL) apply -k config/crd
 
 .PHONY: generate-reference-docs
 generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
@@ -243,37 +252,14 @@ generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
 
 ##@ Paladin Operator Instances
 
-.PHONY: create-node-besu
-create-node-besu: ## Create a Besu Node instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE}
-
-.PHONY: create-genesis
-create-genesis: ## Create a Besu Genesis instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE}
-
-.PHONY: create-node-paladin
-create-node-paladin: ## Create a Paladin Node instance.
-	$(KUBECTL) apply -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE}
-
 .PHONY: create-node
-create-node: create-node-besu create-genesis create-node-paladin ## Create all instances.
-	@echo "All instances have been created."
+create-node: # TODO: more complete startup check
+	kubectl apply -n ${NAMESPACE} -k config/samples; \
+	kubectl wait paladins.core.paladin.io/node1 --for jsonpath='{.status.phase}=Completed' --namespace ${NAMESPACE} --timeout 5m
 
 .PHONY: delete-node
-delete-node-paladin: ## Delete the Paladin Node instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_paladin.yaml -n ${NAMESPACE} || true
-
-.PHONY: delete-genesis
-delete-genesis: ## Delete the Besu Genesis instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_besugenesis.yaml -n ${NAMESPACE} || true
-
-.PHONY: delete-node-besu
-delete-node-besu: ## Delete the Besu Node instance.
-	$(KUBECTL) delete -f config/samples/core_v1alpha1_besu.yaml -n ${NAMESPACE} || true
-
-.PHONY: delete-node
-delete-node: delete-node-paladin delete-genesis delete-node-besu  ## Delete all instances.
-	@echo "All instances have been deleted."
+delete-node:
+	kubectl delete -n ${NAMESPACE} -k config/samples || true
 
 ##@ Cleanup
 DELETE_CLUSTER ?= false
@@ -284,3 +270,7 @@ clean: delete-node helm-uninstall uninstall-crds ## Clean up all resources.
 	else \
 		echo "Skipping Kind cluster deletion. Use DELETE_CLUSTER=true to delete it."; \
 	fi
+
+
+
+# kubectl wait deployment.apps/cert-manager-webhook --for condition=Available --namespace cert-manager --timeout 5m

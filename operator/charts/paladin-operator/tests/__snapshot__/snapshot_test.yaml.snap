@@ -25,7 +25,7 @@ Basic snapshot test:
       - apiGroups:
           - core.paladin.io
         resources:
-          - smartcontracts
+          - smartcontractdeployments
           - besus
           - paladins
           - besugeneses
@@ -38,7 +38,7 @@ Basic snapshot test:
       - apiGroups:
           - core.paladin.io
         resources:
-          - smartcontracts/status
+          - smartcontractdeployments/status
           - besus/status
           - paladins/status
           - besugeneses/status
@@ -227,7 +227,7 @@ Change namespace:
       - apiGroups:
           - core.paladin.io
         resources:
-          - smartcontracts
+          - smartcontractdeployments
           - besus
           - paladins
           - besugeneses
@@ -240,7 +240,7 @@ Change namespace:
       - apiGroups:
           - core.paladin.io
         resources:
-          - smartcontracts/status
+          - smartcontractdeployments/status
           - besus/status
           - paladins/status
           - besugeneses/status

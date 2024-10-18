@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +36,7 @@ import (
 // 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 // 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 // 	"github.com/kaleido-io/paladin/config/pkg/confutil"
-// 	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+// 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 // 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
 // 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ func NewTestInMemoryTxState(t *testing.T) InMemoryTxStateManager {
 	imtxs := NewInMemoryTxStateManager(context.Background(), testManagedTx)
 	imtxs.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
 		NewSubmission: &DBPubTxnSubmission{TransactionHash: oldTxHash},
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: oldGasPrice,
 		},
 		FirstSubmit:  &oldTime,
@@ -104,7 +104,7 @@ func TestSettersAndGetters(t *testing.T) {
 
 	imts := NewInMemoryTxStateManager(context.Background(), testManagedTx)
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		GasPricing:      &ptxapi.PublicTxGasPricing{GasPrice: oldGasPrice},
+		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: oldGasPrice},
 		TransactionHash: &oldTxHash,
 		FlushedSubmission: &DBPubTxnSubmission{
 			TransactionHash: oldTxHash,
@@ -147,7 +147,7 @@ func TestSettersAndGetters(t *testing.T) {
 
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
 		InFlightStatus:  &confirmReceived,
-		GasPricing:      &ptxapi.PublicTxGasPricing{GasPrice: newGasPrice},
+		GasPricing:      &pldapi.PublicTxGasPricing{GasPrice: newGasPrice},
 		TransactionHash: &newTxHash,
 		NewSubmission: &DBPubTxnSubmission{
 			TransactionHash: newTxHash,
@@ -181,7 +181,7 @@ func TestSettersAndGetters(t *testing.T) {
 
 	// test switch gas price format
 	imts.ApplyInMemoryUpdates(context.Background(), &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxPriorityFeePerGas: maxPriorityFeePerGas,
 			MaxFeePerGas:         maxFeePerGas,
 		},

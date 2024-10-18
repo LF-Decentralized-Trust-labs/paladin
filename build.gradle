@@ -10,13 +10,25 @@ def domains = [
     'domains/zeto/build/libs'
 ]
 
+def registries = [
+    'registries/static/build/libs',
+    'registries/evm/build/libs',
+]
+
+def transports = [
+    'transports/grpc/build/libs',
+]
+
 def assembleSubprojects = [
     ':core:go',
     ':core:java',
     ':toolkit:go',
     ':domains:pente',
     ':domains:noto',
-    ':domains:zeto'
+    ':domains:zeto',
+    ':registries:static',
+    ':registries:evm',
+    ':transports:grpc',
 ]
 
 ext {
@@ -111,6 +123,44 @@ task copyDomains(type: Copy) {
     }
 }
 
+task copyRegistries(type: Copy) {
+    def registriesDir = file("${buildDir}/registries")
+
+    doFirst {
+        registriesDir.mkdirs()
+    }
+
+    registries.each { dir ->
+        from dir
+    }
+    into registriesDir
+
+    outputs.upToDateWhen { false }
+
+    doLast {
+        println "Copied registries to ${registriesDir}"
+    }
+}
+
+task copyTransports(type: Copy) {
+    def transportsDir = file("${buildDir}/transports")
+
+    doFirst {
+        transportsDir.mkdirs()
+    }
+
+    transports.each { dir ->
+        from dir
+    }
+    into transportsDir
+
+    outputs.upToDateWhen { false }
+
+    doLast {
+        println "Copied transports to ${transportsDir}"
+    }
+}
+
 // Root assemble task that depends on subproject's assemble tasks
 task assemble {
     assembleSubprojects.each { projectPath ->
@@ -118,7 +168,7 @@ task assemble {
     }
 }
 
-assemble.finalizedBy(copyLibraries, copyDomains)
+assemble.finalizedBy(copyLibraries, copyDomains, copyRegistries, copyTransports)
 
 defaultTasks 'build'
 

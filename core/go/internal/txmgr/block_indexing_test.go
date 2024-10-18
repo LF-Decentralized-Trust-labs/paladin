@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,7 +36,7 @@ import (
 
 func newTestConfirm(revertReason ...[]byte) *blockindexer.IndexedTransactionNotify {
 	txi := &blockindexer.IndexedTransactionNotify{
-		IndexedTransaction: blockindexer.IndexedTransaction{
+		IndexedTransaction: pldapi.IndexedTransaction{
 			Hash:             tktypes.Bytes32(tktypes.RandBytes(32)),
 			BlockNumber:      12345,
 			TransactionIndex: 0,
@@ -44,11 +44,11 @@ func newTestConfirm(revertReason ...[]byte) *blockindexer.IndexedTransactionNoti
 			Nonce:            1000,
 			To:               nil,
 			ContractAddress:  tktypes.MustEthAddress(tktypes.RandHex(20)),
-			Result:           blockindexer.TXResult_SUCCESS.Enum(),
+			Result:           pldapi.TXResult_SUCCESS.Enum(),
 		},
 	}
 	if len(revertReason) > 0 {
-		txi.Result = blockindexer.TXResult_FAILURE.Enum()
+		txi.Result = pldapi.TXResult_FAILURE.Enum()
 		txi.RevertReason = revertReason[0]
 	}
 	return txi
@@ -79,7 +79,7 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   *txID, // Transaction ID resolved by this point
-						TransactionType: ptxapi.TransactionTypePublic.Enum(),
+						TransactionType: pldapi.TransactionTypePublic.Enum(),
 					},
 					IndexedTransactionNotify: txi,
 				},
@@ -89,28 +89,32 @@ func TestPublicConfirmWithErrorDecodeRealDB(t *testing.T) {
 		mc.publicTxMgr.On("NotifyConfirmPersisted", mock.Anything, mock.MatchedBy(func(matches []*components.PublicTxMatch) bool {
 			return len(matches) == 1 && matches[0].TransactionID == *txID
 		}))
+
+		mc.keyManager.On("ResolveEthAddressBatchNewDatabaseTX", mock.Anything, []string{"sender1"}).
+			Return([]*tktypes.EthAddress{tktypes.RandAddress()}, nil)
 	})
 	defer done()
 
 	abiRef, err := txm.storeABI(ctx, testABI)
 	require.NoError(t, err)
 
-	txID, err = txm.sendTransaction(ctx, &ptxapi.TransactionInput{
-		Transaction: ptxapi.Transaction{
-			Type:         ptxapi.TransactionTypePublic.Enum(),
+	txID, err = txm.SendTransaction(ctx, &pldapi.TransactionInput{
+		Transaction: pldapi.Transaction{
+			Type:         pldapi.TransactionTypePublic.Enum(),
 			ABIReference: abiRef,
+			From:         "sender1",
 			To:           tktypes.MustEthAddress(tktypes.RandHex(20)),
 		},
 	})
 	require.NoError(t, err)
 
-	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	require.NoError(t, err)
 	postCommit()
 
 	// Check we can query the receipt
-	receipt, err := txm.getTransactionReceiptByID(ctx, *txID)
+	receipt, err := txm.GetTransactionReceiptByID(ctx, *txID)
 	require.NoError(t, err)
 	assert.False(t, receipt.Success)
 	assert.Equal(t, `PD012216: Transaction reverted ErrorNum("12345")`, receipt.FailureMessage)
@@ -128,7 +132,7 @@ func TestPublicConfirmMatch(t *testing.T) {
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   txID,
-						TransactionType: ptxapi.TransactionTypePublic.Enum(),
+						TransactionType: pldapi.TransactionTypePublic.Enum(),
 					},
 					IndexedTransactionNotify: txi,
 				},
@@ -142,7 +146,7 @@ func TestPublicConfirmMatch(t *testing.T) {
 	})
 	defer done()
 
-	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	require.NoError(t, err)
 	postCommit()
@@ -169,14 +173,14 @@ func TestPrivateConfirmMatchPrivateFailures(t *testing.T) {
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   txID1,
-						TransactionType: ptxapi.TransactionTypePrivate.Enum(),
+						TransactionType: pldapi.TransactionTypePrivate.Enum(),
 					},
 					IndexedTransactionNotify: txiOk1,
 				},
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   txID2,
-						TransactionType: ptxapi.TransactionTypePrivate.Enum(),
+						TransactionType: pldapi.TransactionTypePrivate.Enum(),
 					},
 					IndexedTransactionNotify: txiFail2,
 				},
@@ -195,7 +199,7 @@ func TestPrivateConfirmMatchPrivateFailures(t *testing.T) {
 	})
 	defer done()
 
-	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txiOk1, txiFail2})
 	require.NoError(t, err)
 	postCommit()
@@ -211,7 +215,7 @@ func TestNoConfirmMatch(t *testing.T) {
 	})
 	defer done()
 
-	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	postCommit, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	require.NoError(t, err)
 	postCommit()
@@ -227,7 +231,7 @@ func TestConfirmMatchFAil(t *testing.T) {
 	})
 	defer done()
 
-	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	assert.Regexp(t, "pop", err)
 }
@@ -243,7 +247,7 @@ func TestPrivateConfirmError(t *testing.T) {
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   txID,
-						TransactionType: ptxapi.TransactionTypePrivate.Enum(),
+						TransactionType: pldapi.TransactionTypePrivate.Enum(),
 					},
 					IndexedTransactionNotify: txi,
 				},
@@ -252,7 +256,7 @@ func TestPrivateConfirmError(t *testing.T) {
 	})
 	defer done()
 
-	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	assert.Regexp(t, "pop", err)
 }
@@ -268,7 +272,7 @@ func TestConfirmInsertError(t *testing.T) {
 				{
 					PaladinTXReference: components.PaladinTXReference{
 						TransactionID:   txID,
-						TransactionType: ptxapi.TransactionTypePublic.Enum(),
+						TransactionType: pldapi.TransactionTypePublic.Enum(),
 					},
 					IndexedTransactionNotify: txi,
 				},
@@ -278,7 +282,7 @@ func TestConfirmInsertError(t *testing.T) {
 	})
 	defer done()
 
-	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*blockindexer.IndexedBlock{},
+	_, err := txm.blockIndexerPreCommit(ctx, txm.p.DB(), []*pldapi.IndexedBlock{},
 		[]*blockindexer.IndexedTransactionNotify{txi})
 	assert.Regexp(t, "pop", err)
 }

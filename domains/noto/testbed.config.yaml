@@ -8,10 +8,14 @@ db:
 rpcServer:
   http:
     port: 0
+    shutdownTimeout: 0s
   ws:
     disabled: true
+    shutdownTimeout: 0s
 grpc:
-  shutdownTimeout: 1s
+  shutdownTimeout: 0s
+blockIndexer:
+  fromBlock: latest
 blockchain:
   http:
     url: http://localhost:8545
@@ -20,13 +24,16 @@ blockchain:
     initialConnectAttempts: 25
 log:
   level: info
-signer:
-  keyDerivation:
-    type: "bip32"
-  keyStore:
-    type: "static"
-    static:
-      keys:
-        seed:
-          encoding: none
-          inline: REPLACED BY GENERATED KEY IN TEST
+wallets:
+- name: wallet1
+  keySelector: .*
+  signer:
+    keyDerivation:
+      type: "bip32"
+    keyStore:
+      type: "static"
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: REPLACED BY GENERATED KEY IN TEST

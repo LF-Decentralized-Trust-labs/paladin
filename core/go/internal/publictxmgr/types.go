@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -46,7 +46,7 @@ import (
 type BaseTXUpdates struct {
 	InFlightStatus *InFlightStatus
 	SubStatus      *BaseTxSubStatus
-	GasPricing     *ptxapi.PublicTxGasPricing
+	GasPricing     *pldapi.PublicTxGasPricing
 	// GasLimit          *tktypes.HexUint64 // note this is required for some methods (eth_estimateGas)
 	TransactionHash   *tktypes.Bytes32
 	FirstSubmit       *tktypes.Timestamp
@@ -114,7 +114,7 @@ type TransactionHeaders struct {
 }
 
 type BalanceManager interface {
-	TopUpAccount(ctx context.Context, addAccount *AddressAccount) (mtx *ptxapi.PublicTx, err error)
+	TopUpAccount(ctx context.Context, addAccount *AddressAccount) (mtx *pldapi.PublicTx, err error)
 	IsAutoFuelingEnabled(ctx context.Context) bool
 	GetAddressBalance(ctx context.Context, address tktypes.EthAddress) (*AddressAccount, error)
 	NotifyAddressBalanceChanged(ctx context.Context, address tktypes.EthAddress)
@@ -261,9 +261,8 @@ type InMemoryTxStateReadOnly interface {
 	GetFrom() tktypes.EthAddress
 	GetTo() *tktypes.EthAddress
 	GetValue() *tktypes.HexUint256
-	GetResolvedSigner() *ethclient.ResolvedSigner
 	BuildEthTX() *ethsigner.Transaction
-	GetGasPriceObject() *ptxapi.PublicTxGasPricing
+	GetGasPriceObject() *pldapi.PublicTxGasPricing
 	GetFirstSubmit() *tktypes.Timestamp
 	GetLastSubmitTime() *tktypes.Timestamp
 	GetUnflushedSubmission() *DBPubTxnSubmission
@@ -309,7 +308,7 @@ type SignOutputs struct {
 }
 
 type GasPriceOutput struct {
-	GasPriceObject *ptxapi.PublicTxGasPricing
+	GasPriceObject *pldapi.PublicTxGasPricing
 	Err            error
 }
 
@@ -418,7 +417,7 @@ type InFlightTransactionStateManager interface {
 	AddPersistenceOutput(ctx context.Context, stage InFlightTxStage, persistenceTime time.Time, err error)
 	AddSubmitOutput(ctx context.Context, txHash *tktypes.Bytes32, submissionTime *tktypes.Timestamp, submissionOutcome SubmissionOutcome, errorReason ethclient.ErrorReason, err error)
 	AddSignOutput(ctx context.Context, signedMessage []byte, txHash *tktypes.Bytes32, err error)
-	AddGasPriceOutput(ctx context.Context, gasPriceObject *ptxapi.PublicTxGasPricing, err error)
+	AddGasPriceOutput(ctx context.Context, gasPriceObject *pldapi.PublicTxGasPricing, err error)
 	AddPanicOutput(ctx context.Context, stage InFlightTxStage)
 
 	PersistTxState(ctx context.Context) (stage InFlightTxStage, persistenceTime time.Time, err error)

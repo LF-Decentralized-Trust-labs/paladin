@@ -99,3 +99,19 @@ func TestRetryUTLimited(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 	assert.Equal(t, 5, callCount)
 }
+
+func TestDefaultsOverride(t *testing.T) {
+	r := NewRetryLimited(&pldconf.RetryConfigWithMax{}, &pldconf.RetryConfigWithMax{
+		RetryConfig: pldconf.RetryConfig{
+			InitialDelay: confutil.P("1ms"),
+			MaxDelay:     confutil.P("2ms"),
+			Factor:       confutil.P(3.14),
+		},
+		MaxAttempts: confutil.P(42),
+	})
+	assert.Equal(t, 1*time.Millisecond, r.initialDelay)
+	assert.Equal(t, 2*time.Millisecond, r.maxDelay)
+	assert.Equal(t, 3.14, r.factor)
+	assert.Equal(t, 42, r.maxAttempts)
+
+}

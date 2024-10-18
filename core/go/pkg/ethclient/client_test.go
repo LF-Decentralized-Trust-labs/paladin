@@ -394,9 +394,7 @@ func TestProtocolIDForReceipt(t *testing.T) {
 
 func TestUnconnectedRPCClient(t *testing.T) {
 	ctx := context.Background()
-	keymgr, kmDone := newTestHDWalletKeyManager(t)
-	defer kmDone()
-	ec := NewUnconnectedRPCClient(ctx, keymgr, &pldconf.EthClientConfig{}, 0)
+	ec := NewUnconnectedRPCClient(ctx, &pldconf.EthClientConfig{}, 0)
 	_, err := ec.GetTransactionReceipt(ctx, testTxHash)
 	assert.Regexp(t, "PD011517", err)
 }

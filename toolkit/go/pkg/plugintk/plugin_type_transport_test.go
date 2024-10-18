@@ -122,6 +122,23 @@ func TestTransportFunction_SendMessage(t *testing.T) {
 	})
 }
 
+func TestTransportFunction_GetLocalDetails(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupTransportTests(t)
+	defer done()
+
+	// InitTransport - paladin to transport
+	funcs.GetLocalDetails = func(ctx context.Context, cdr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
+		return &prototk.GetLocalDetailsResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
+		req.RequestToTransport = &prototk.TransportMessage_GetLocalDetails{
+			GetLocalDetails: &prototk.GetLocalDetailsRequest{},
+		}
+	}, func(res *prototk.TransportMessage) {
+		assert.IsType(t, &prototk.TransportMessage_GetLocalDetailsRes{}, res.ResponseFromTransport)
+	})
+}
+
 func TestTransportRequestError(t *testing.T) {
 	_, exerciser, _, _, _, done := setupTransportTests(t)
 	defer done()

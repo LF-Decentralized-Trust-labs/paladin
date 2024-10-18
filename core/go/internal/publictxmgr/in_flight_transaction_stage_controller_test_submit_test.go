@@ -27,7 +27,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,7 +45,7 @@ func TestProduceLatestInFlightStageContextSubmitPanic(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 	})
@@ -83,7 +83,7 @@ func TestProduceLatestInFlightStageContextSubmitComplete(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 	})
@@ -143,7 +143,7 @@ func TestProduceLatestInFlightStageContextCannotSubmit(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			MaxFeePerGas:         tktypes.Uint64ToUint256(32247127816),
 			MaxPriorityFeePerGas: tktypes.Uint64ToUint256(32146027800),
 		},
@@ -177,7 +177,7 @@ func TestProduceLatestInFlightStageContextSubmitCompleteAlreadyKnown(t *testing.
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 		FirstSubmit: confutil.P(tktypes.TimestampNow()),
@@ -259,7 +259,7 @@ func TestProduceLatestInFlightStageContextSubmitErrors(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 		FirstSubmit: confutil.P(tktypes.TimestampNow()),
@@ -375,7 +375,7 @@ func TestProduceLatestInFlightStageContextSubmitRePrepare(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 		TransactionHash: confutil.P(tktypes.Bytes32Keccak([]byte("0x000001"))),
@@ -420,7 +420,7 @@ func TestProduceLatestInFlightStageContextTriggerSubmit(t *testing.T) {
 		},
 	}
 	mTS.ApplyInMemoryUpdates(ctx, &BaseTXUpdates{
-		GasPricing: &ptxapi.PublicTxGasPricing{
+		GasPricing: &pldapi.PublicTxGasPricing{
 			GasPrice: tktypes.Uint64ToUint256(10),
 		},
 		TransactionHash: confutil.P(tktypes.Bytes32Keccak([]byte("0x000001"))),

@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -47,22 +47,22 @@ type transactionReceipt struct {
 	ContractAddress  *tktypes.EthAddress `gorm:"column:contract_address"`
 }
 
-func mapPersistedReceipt(receipt *transactionReceipt) *ptxapi.TransactionReceiptData {
-	r := &ptxapi.TransactionReceiptData{
+func mapPersistedReceipt(receipt *transactionReceipt) *pldapi.TransactionReceiptData {
+	r := &pldapi.TransactionReceiptData{
 		Success:         receipt.Success,
 		FailureMessage:  stringOrEmpty(receipt.FailureMessage),
 		RevertData:      receipt.RevertData,
 		ContractAddress: receipt.ContractAddress,
 	}
 	if receipt.TransactionHash != nil {
-		r.TransactionReceiptDataOnchain = &ptxapi.TransactionReceiptDataOnchain{
+		r.TransactionReceiptDataOnchain = &pldapi.TransactionReceiptDataOnchain{
 			TransactionHash:  receipt.TransactionHash,
 			BlockNumber:      int64OrZero(receipt.BlockNumber),
 			TransactionIndex: int64OrZero(receipt.TransactionIndex),
 		}
 	}
 	if receipt.Source != nil {
-		r.TransactionReceiptDataOnchainEvent = &ptxapi.TransactionReceiptDataOnchainEvent{
+		r.TransactionReceiptDataOnchainEvent = &pldapi.TransactionReceiptDataOnchainEvent{
 			LogIndex: int64OrZero(receipt.LogIndex),
 			Source:   *receipt.Source,
 		}
@@ -221,15 +221,15 @@ func (tm *txManager) CalculateRevertError(ctx context.Context, dbTX *gorm.DB, re
 	return i18n.NewError(ctx, msgs.MsgTxMgrRevertedDataNotDecoded)
 }
 
-func (tm *txManager) queryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*ptxapi.TransactionReceipt, error) {
-	qw := &queryWrapper[transactionReceipt, ptxapi.TransactionReceipt]{
+func (tm *txManager) QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error) {
+	qw := &queryWrapper[transactionReceipt, pldapi.TransactionReceipt]{
 		p:           tm.p,
 		table:       "transaction_receipts",
 		defaultSort: "-indexed",
 		filters:     transactionReceiptFilters,
 		query:       jq,
-		mapResult: func(pt *transactionReceipt) (*ptxapi.TransactionReceipt, error) {
-			return &ptxapi.TransactionReceipt{
+		mapResult: func(pt *transactionReceipt) (*pldapi.TransactionReceipt, error) {
+			return &pldapi.TransactionReceipt{
 				ID:                     pt.TransactionID,
 				TransactionReceiptData: *mapPersistedReceipt(pt),
 			}, nil
@@ -238,8 +238,8 @@ func (tm *txManager) queryTransactionReceipts(ctx context.Context, jq *query.Que
 	return qw.run(ctx, nil)
 }
 
-func (tm *txManager) getTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*ptxapi.TransactionReceipt, error) {
-	prs, err := tm.queryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
+func (tm *txManager) GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error) {
+	prs, err := tm.QueryTransactionReceipts(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(prs) == 0 || err != nil {
 		return nil, err
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
@@ -36,6 +37,7 @@ type domainContext struct {
 	context.Context
 
 	id                 uuid.UUID
+	dbTX               *gorm.DB
 	ss                 *stateManager
 	domainName         string
 	customHashFunction bool
@@ -57,7 +59,7 @@ type domainContext struct {
 }
 
 // Very important that callers Close domain contexts they open
-func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress tktypes.EthAddress) components.DomainContext {
+func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.Domain, contractAddress tktypes.EthAddress, dbTX *gorm.DB) components.DomainContext {
 	id := uuid.New()
 	log.L(ctx).Debugf("Domain context %s for domain %s contract %s closed", id, domain.Name(), contractAddress)
 
@@ -66,6 +68,7 @@ func (ss *stateManager) NewDomainContext(ctx context.Context, domain components.
 
 	dc := &domainContext{
 		Context:            log.WithLogField(ctx, "domain_ctx", fmt.Sprintf("%s_%s", domain.Name(), id)),
+		dbTX:               dbTX,
 		id:                 id,
 		ss:                 ss,
 		domainName:         domain.Name(),
@@ -254,7 +257,7 @@ func (dc *domainContext) FindAvailableStates(schemaID tktypes.Bytes32, query *qu
 	}
 
 	// Run the query against the DB
-	schema, states, err := dc.ss.findStates(dc, dc.domainName, dc.contractAddress, schemaID, query, StateStatusAvailable, spending...)
+	schema, states, err := dc.ss.findStates(dc, dc.dbTX, dc.domainName, dc.contractAddress, schemaID, query, StateStatusAvailable, spending...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -277,7 +280,7 @@ func (dc *domainContext) FindAvailableNullifiers(schemaID tktypes.Bytes32, query
 	}
 
 	// Run the query against the DB
-	schema, states, err := dc.ss.findAvailableNullifiers(dc, dc.domainName, dc.contractAddress, schemaID, query, spending, nullifierIDs)
+	schema, states, err := dc.ss.findAvailableNullifiers(dc, dc.dbTX, dc.domainName, dc.contractAddress, schemaID, query, spending, nullifierIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -294,7 +297,7 @@ func (dc *domainContext) UpsertStates(stateUpserts ...*components.StateUpsert) (
 	withValues := make([]*components.StateWithLabels, len(stateUpserts))
 	toMakeAvailable := make([]*components.StateWithLabels, 0, len(stateUpserts))
 	for i, ns := range stateUpserts {
-		schema, err := dc.ss.GetSchema(dc, dc.domainName, ns.SchemaID, nil, true)
+		schema, err := dc.ss.GetSchema(dc, dc.dbTX, dc.domainName, ns.SchemaID, true)
 		if err != nil {
 			return nil, err
 		}

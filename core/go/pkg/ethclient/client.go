@@ -35,42 +35,44 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"golang.org/x/crypto/sha3"
 )
 
-// Higher level client interface to the base Ethereum ledger for TX submission.
-// See blockindexer package for the events side, including WaitForTransaction()
+// Low level EthClient helpers for submission
 type EthClient interface {
 	Close()
+	ChainID() int64
+
+	GasPrice(ctx context.Context) (gasPrice *tktypes.HexUint256, err error)
+	GetBalance(ctx context.Context, address tktypes.EthAddress, block string) (balance *tktypes.HexUint256, err error)
+	GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error)
+
+	EstimateGasNoResolve(ctx context.Context, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
+	CallContractNoResolve(ctx context.Context, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
+	GetTransactionCount(ctx context.Context, fromAddr tktypes.EthAddress) (transactionCount *tktypes.HexUint64, err error)
+	SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error)
+}
+
+// Higher level client interface to the base Ethereum ledger for TX submission.
+// Not used by Paladin as we have the publicTxMgr
+type EthClientWithKeyManager interface {
+	EthClient
+
 	ABI(ctx context.Context, a abi.ABI) (ABIClient, error)
 	ABIJSON(ctx context.Context, abiJson []byte) (ABIClient, error)
 	ABIFunction(ctx context.Context, functionABI *abi.Entry) (_ ABIFunctionClient, err error)
 	ABIConstructor(ctx context.Context, constructorABI *abi.Entry, bytecode tktypes.HexBytes) (_ ABIFunctionClient, err error)
 	MustABIJSON(abiJson []byte) ABIClient
-	ChainID() int64
 
 	// Below are raw functions that the ABI() above provides wrappers for
-	GasPrice(ctx context.Context) (gasPrice *tktypes.HexUint256, err error)
-	GetBalance(ctx context.Context, address tktypes.EthAddress, block string) (balance *tktypes.HexUint256, err error)
-	EstimateGasNoResolve(ctx context.Context, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
-	EstimateGas(ctx context.Context, from *string, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
-	GetTransactionCount(ctx context.Context, fromAddr tktypes.EthAddress) (transactionCount *tktypes.HexUint64, err error)
-	GetTransactionReceipt(ctx context.Context, txHash string) (*TransactionReceiptResponse, error)
-	CallContractNoResolve(ctx context.Context, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
 	CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error)
+	EstimateGas(ctx context.Context, from *string, tx *ethsigner.Transaction, opts ...CallOption) (res EstimateGasResult, err error)
 	BuildRawTransaction(ctx context.Context, txVersion EthTXVersion, from string, tx *ethsigner.Transaction, opts ...CallOption) (tktypes.HexBytes, error)
-	BuildRawTransactionNoResolve(ctx context.Context, txVersion EthTXVersion, from *ResolvedSigner, tx *ethsigner.Transaction, opts ...CallOption) (tktypes.HexBytes, error)
-	SendRawTransaction(ctx context.Context, rawTX tktypes.HexBytes) (*tktypes.Bytes32, error)
-}
-
-type ResolvedSigner struct {
-	Address   tktypes.EthAddress
-	KeyHandle string
 }
 
 // Call options affect the behavior of gas estimate and call functions, such as by allowing you to supply
@@ -152,9 +154,8 @@ func WrapRPCClient(ctx context.Context, keymgr KeyManager, rpc rpcclient.Client,
 
 // This is useful in cases where the RPC client is used only for ABI formatting.
 // All JSON/RPC requests will fail, and there is no chain ID available
-func NewUnconnectedRPCClient(ctx context.Context, keymgr KeyManager, conf *pldconf.EthClientConfig, chainID int64) EthClient {
+func NewUnconnectedRPCClient(ctx context.Context, conf *pldconf.EthClientConfig, chainID int64) EthClient {
 	return &ethClient{
-		keymgr:            keymgr,
 		rpc:               &unconnectedRPC{},
 		gasEstimateFactor: confutil.Float64Min(conf.EstimateGasFactor, 1.0, *pldconf.EthClientDefaults.EstimateGasFactor),
 		chainID:           chainID,
@@ -205,8 +206,16 @@ func (ec *ethClient) resolveFrom(ctx context.Context, from *string, tx *ethsigne
 }
 
 func (ec *ethClient) CallContract(ctx context.Context, from *string, tx *ethsigner.Transaction, block string, opts ...CallOption) (res CallResult, err error) {
-	if _, _, err := ec.resolveFrom(ctx, from, tx); err != nil {
-		return res, err
+	if ec.keymgr == nil && from != nil && *from != "" {
+		ethAddr, err := tktypes.ParseEthAddress(*from)
+		if err != nil {
+			return res, err
+		}
+		tx.From = json.RawMessage(tktypes.JSONString(ethAddr))
+	} else {
+		if _, _, err := ec.resolveFrom(ctx, from, tx); err != nil {
+			return res, err
+		}
 	}
 	return ec.CallContractNoResolve(ctx, tx, block, opts...)
 }
@@ -360,16 +369,12 @@ func (ec *ethClient) BuildRawTransaction(ctx context.Context, txVersion EthTXVer
 	if err != nil {
 		return nil, err
 	}
-	return ec.BuildRawTransactionNoResolve(ctx, txVersion, &ResolvedSigner{Address: *fromAddr, KeyHandle: keyHandle}, tx, opts...)
-}
-
-func (ec *ethClient) BuildRawTransactionNoResolve(ctx context.Context, txVersion EthTXVersion, from *ResolvedSigner, tx *ethsigner.Transaction, opts ...CallOption) (tktypes.HexBytes, error) {
 
 	// Trivial nonce management in the client - just get the current nonce for this key, from the local node mempool, for each TX
 	if tx.Nonce == nil {
-		txNonce, err := ec.GetTransactionCount(ctx, from.Address)
+		txNonce, err := ec.GetTransactionCount(ctx, *fromAddr)
 		if err != nil {
-			log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", from.Address, err)
+			log.L(ctx).Errorf("eth_getTransactionCount(%s) failed: %+v", keyHandle, err)
 			return nil, err
 		}
 		tx.Nonce = ethtypes.NewHexInteger(big.NewInt(int64(txNonce.Uint64())))
@@ -404,7 +409,7 @@ func (ec *ethClient) BuildRawTransactionNoResolve(ctx context.Context, txVersion
 	signature, err := ec.keymgr.Sign(ctx, &signerapi.SignRequest{
 		Algorithm:   algorithms.ECDSA_SECP256K1,
 		PayloadType: signpayloads.OPAQUE_TO_RSV,
-		KeyHandle:   from.KeyHandle,
+		KeyHandle:   keyHandle,
 		Payload:     tktypes.HexBytes(hash.Sum(nil)),
 	})
 	var sig *secp256k1.SignatureData
@@ -423,7 +428,7 @@ func (ec *ethClient) BuildRawTransactionNoResolve(ctx context.Context, txVersion
 		}
 	}
 	if err != nil {
-		log.L(ctx).Errorf("signing failed with keyHandle %s (addr=%s): %s", from.KeyHandle, from.Address, err)
+		log.L(ctx).Errorf("signing failed with keyHandle %s (addr=%s): %s", keyHandle, fromAddr, err)
 		return nil, err
 	}
 	return rawTX, nil

@@ -116,6 +116,7 @@ func (tl *transportLookup) getNodeTransports(ctx context.Context, dbTX *gorm.DB,
 		if mappedName != "" {
 			transportName = mappedName
 		}
+		log.L(ctx).Infof("Property '%s' matches transport %s (mappedName=%s,regexp='%s')", k, subMatch[1], transportName, tl.propertyRegexp)
 		transports = append(transports, &components.RegistryNodeTransportEntry{
 			Node:      fullLookup,
 			Registry:  tl.regName,

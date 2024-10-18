@@ -1,0 +1,129 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: paladinregistrations.core.paladin.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.3
+  labels:
+  {{- include "paladin-operator-crd.labels" . | nindent 4 }}
+spec:
+  group: core.paladin.io
+  names:
+    kind: PaladinRegistration
+    listKind: PaladinRegistrationList
+    plural: paladinregistrations
+    shortNames:
+    - reg
+    singular: paladinregistration
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.publishCount
+      name: Published
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PaladinRegistration is the Schema for the paladinregistrations
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PaladinRegistrationSpec defines the desired state of PaladinRegistration
+            properties:
+              node:
+                description: The node to publish the registration for - owns its registration
+                  key
+                type: string
+              nodeAdminKey:
+                description: The key to use on the node to publish its endpoint information
+                type: string
+              registry:
+                description: Reference to the Registry CR - must be of type "evm" for
+                  the registration to process
+                type: string
+              registryAdminKey:
+                description: The key to use to sign the transactions
+                type: string
+              registryAdminNode:
+                description: The node to use to submit the registration with access
+                  to the admin key
+                type: string
+              transports:
+                description: The transports to publish - we'll wait for them to become
+                  available, in the order specified here
+                items:
+                  type: string
+                type: array
+            required:
+            - node
+            - nodeAdminKey
+            - registry
+            - registryAdminKey
+            - registryAdminNode
+            type: object
+          status:
+            description: PaladinRegistrationStatus defines the observed state of PaladinRegistration
+            properties:
+              publishCount:
+                type: integer
+              publishTxs:
+                additionalProperties:
+                  properties:
+                    failureMessage:
+                      type: string
+                    idempotencyKey:
+                      type: string
+                    transactionHash:
+                      type: string
+                    transactionID:
+                      type: string
+                    transactionStatus:
+                      type: string
+                  type: object
+                type: object
+              registrationTx:
+                properties:
+                  failureMessage:
+                    type: string
+                  idempotencyKey:
+                    type: string
+                  transactionHash:
+                    type: string
+                  transactionID:
+                    type: string
+                  transactionStatus:
+                    type: string
+                type: object
+            required:
+            - publishCount
+            - publishTxs
+            - registrationTx
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

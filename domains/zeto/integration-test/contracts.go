@@ -23,10 +23,10 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -140,22 +140,19 @@ func getContractSpec(contract *domainContract, deployedContracts map[string]*tkt
 
 func deployBytecode(ctx context.Context, rpc rpcbackend.Backend, deployer string, build *domain.SolidityBuild) (*tktypes.EthAddress, error) {
 	var addr string
-	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), `{}`)
+	rpcerr := rpc.CallRPC(ctx, &addr, "testbed_deployBytecode", deployer, build.ABI, build.Bytecode.String(), tktypes.RawJSON(`{}`))
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
 	}
 	return tktypes.MustEthAddress(addr), nil
 }
 
-func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi blockindexer.BlockIndexer, deployer string, domainContracts *zetoDomainContracts) error {
-	abiFunc, err := ec.ABIFunction(ctx, domainContracts.factoryAbi.Functions()["registerImplementation"])
-	if err != nil {
-		return err
-	}
+func configureFactoryContract(ctx context.Context, tb testbed.Testbed, deployer string, domainContracts *zetoDomainContracts) error {
+	abiFunc := domainContracts.factoryAbi.Functions()["registerImplementation"]
 
 	// Send the transaction
 	for contractName := range domainContracts.cloneableContracts {
-		err = registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, domainContracts.factoryAddress, bi)
+		err := registerImpl(ctx, contractName, domainContracts, abiFunc, deployer, domainContracts.factoryAddress, tb)
 		if err != nil {
 			return err
 		}
@@ -164,7 +161,7 @@ func configureFactoryContract(ctx context.Context, ec ethclient.EthClient, bi bl
 	return nil
 }
 
-func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc ethclient.ABIFunctionClient, deployer string, addr *tktypes.EthAddress, bi blockindexer.BlockIndexer) error {
+func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainContracts, abiFunc *abi.Entry, deployer string, addr *tktypes.EthAddress, tb testbed.Testbed) error {
 	log.L(ctx).Infof("Registering implementation %s", name)
 	verifierName := domainContracts.cloneableContracts[name].verifier
 	implAddr, ok := domainContracts.deployedContracts[name]
@@ -192,17 +189,15 @@ func registerImpl(ctx context.Context, name string, domainContracts *zetoDomainC
 			WithdrawVerifier: withdrawVerifierAddr.String(),
 		},
 	}
-	txHash, err := abiFunc.R(ctx).
-		Signer(deployer).
-		To(addr.Address0xHex()).
-		Input(params).
-		SignAndSend()
-	if err != nil {
-		return err
-	}
-	_, err = bi.WaitForTransactionSuccess(ctx, *txHash, abiFunc.ABI())
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
+		Transaction: pldapi.Transaction{
+			Type:     pldapi.TransactionTypePublic.Enum(),
+			From:     deployer,
+			To:       addr,
+			Data:     tktypes.JSONString(params),
+			Function: abiFunc.String(),
+		},
+		ABI: abi.ABI{abiFunc},
+	})
+	return err
 }

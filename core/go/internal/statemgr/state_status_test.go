@@ -101,7 +101,7 @@ func newTestDomainContext(t *testing.T, ctx context.Context, ss *stateManager, n
 	md.On("Name").Return(name)
 	md.On("CustomHashFunction").Return(customHashFunction)
 	contractAddress := tktypes.RandAddress()
-	dc := ss.NewDomainContext(ctx, md, *contractAddress)
+	dc := ss.NewDomainContext(ctx, md, *contractAddress, ss.p.DB())
 	return *contractAddress, dc.(*domainContext)
 }
 
@@ -130,7 +130,7 @@ func TestStateLockingQuery(t *testing.T) {
 	})
 
 	checkQuery := func(jq *query.QueryJSON, status StateStatusQualifier, expected ...int) {
-		states, err := ss.FindStates(ctx, "domain1", contractAddress, schemaID, jq, status)
+		states, err := ss.FindStates(ctx, ss.p.DB(), "domain1", contractAddress, schemaID, jq, status)
 		require.NoError(t, err)
 		assert.Len(t, states, len(expected))
 		for _, wIndex := range expected {

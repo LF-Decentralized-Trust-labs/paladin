@@ -46,6 +46,7 @@ public class PenteDomain extends DomainInstance {
 
     PenteDomain(String grpcTarget, String instanceId) {
         super(grpcTarget, instanceId);
+        init();
     }
 
     @Override

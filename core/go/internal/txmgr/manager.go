@@ -21,30 +21,36 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 
+	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 func NewTXManager(ctx context.Context, conf *pldconf.TxManagerConfig) components.TXManager {
 	return &txManager{
-		abiCache: cache.NewCache[tktypes.Bytes32, *ptxapi.StoredABI](&conf.ABI.Cache, &pldconf.TxManagerDefaults.ABI.Cache),
+		abiCache: cache.NewCache[tktypes.Bytes32, *pldapi.StoredABI](&conf.ABI.Cache, &pldconf.TxManagerDefaults.ABI.Cache),
 	}
 }
 
 type txManager struct {
 	p                persistence.Persistence
+	ethClientFactory ethclient.EthClientFactory
+	keyManager       components.KeyManager
 	publicTxMgr      components.PublicTxManager
 	privateTxMgr     components.PrivateTxManager
 	identityResolver components.IdentityResolver
-	abiCache         cache.Cache[tktypes.Bytes32, *ptxapi.StoredABI]
+	abiCache         cache.Cache[tktypes.Bytes32, *pldapi.StoredABI]
 	rpcModule        *rpcserver.RPCModule
+	debugRpcModule   *rpcserver.RPCModule
 }
 
 func (tm *txManager) PostInit(c components.AllComponents) error {
 	tm.p = c.Persistence()
+	tm.ethClientFactory = c.EthClientFactory()
+	tm.keyManager = c.KeyManager()
 	tm.publicTxMgr = c.PublicTxManager()
 	tm.privateTxMgr = c.PrivateTxManager()
 	tm.identityResolver = c.IdentityResolver()
@@ -54,7 +60,7 @@ func (tm *txManager) PostInit(c components.AllComponents) error {
 func (tm *txManager) PreInit(c components.PreInitComponents) (*components.ManagerInitResult, error) {
 	tm.buildRPCModule()
 	return &components.ManagerInitResult{
-		RPCModules:       []*rpcserver.RPCModule{tm.rpcModule},
+		RPCModules:       []*rpcserver.RPCModule{tm.rpcModule, tm.debugRpcModule},
 		PreCommitHandler: tm.blockIndexerPreCommit,
 	}, nil
 }

@@ -49,6 +49,11 @@ type TransactionSubmittedEvent struct {
 	PrivateTransactionEventBase
 }
 
+// existing Transaction has been loaded into memory
+type TransactionSwappedInEvent struct {
+	PrivateTransactionEventBase
+}
+
 type TransactionAssembledEvent struct {
 	PrivateTransactionEventBase
 	sequence.TransactionAssembledEvent
@@ -100,6 +105,16 @@ type ResolveVerifierErrorEvent struct {
 	Lookup       *string
 	Algorithm    *string
 	ErrorMessage *string
+}
+
+type TransactionFinalizedEvent struct {
+	PrivateTransactionEventBase
+}
+
+type TransactionFinalizeError struct {
+	PrivateTransactionEventBase
+	RevertReason string // reason we were trying to finalize the transaction
+	ErrorMessage string // reason the transaction could not be finalized
 }
 
 // Replies are correlated to the corresponding request and not necessarily to a specific transaction and/or contract

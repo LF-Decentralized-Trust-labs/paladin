@@ -48,10 +48,10 @@ type evmRegistry struct {
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewRegistry(evmRegistryFactory)
+	return plugintk.NewRegistry(NewEVMRegistry)
 }
 
-func evmRegistryFactory(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
+func NewEVMRegistry(callbacks plugintk.RegistryCallbacks) plugintk.RegistryAPI {
 	return &evmRegistry{
 		bgCtx:     context.Background(),
 		callbacks: callbacks,
@@ -64,6 +64,10 @@ func (r *evmRegistry) ConfigureRegistry(ctx context.Context, req *prototk.Config
 	err := json.Unmarshal([]byte(req.ConfigJson), &r.conf)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidRegistryConfig)
+	}
+
+	if r.conf.ContractAddress == nil || r.conf.ContractAddress.IsZero() {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgMissingContractAddress)
 	}
 
 	// Currently the configuration is static other than the contract address.
@@ -106,8 +110,8 @@ func (r *evmRegistry) handleIdentityRegistered(ctx context.Context, inEvent *pro
 	entryID := parsedEvent.IdentityHash.String()
 
 	parentID := ""
-	if !parsedEvent.Owner.IsZero() {
-		parentID = parsedEvent.Owner.String()
+	if !parsedEvent.ParentIdentityHash.IsZero() {
+		parentID = parsedEvent.ParentIdentityHash.String()
 	}
 
 	return &prototk.RegistryEntry{

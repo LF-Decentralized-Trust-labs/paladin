@@ -40,7 +40,7 @@ func (ss *stateManager) rpcListSchema() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
 		domain string,
 	) ([]components.Schema, error) {
-		return ss.ListSchemas(ctx, domain)
+		return ss.ListSchemas(ctx, ss.p.DB(), domain)
 	})
 }
 
@@ -74,6 +74,6 @@ func (ss *stateManager) rpcQuery() rpcserver.RPCHandler {
 		query query.QueryJSON,
 		status StateStatusQualifier,
 	) ([]*components.State, error) {
-		return ss.FindStates(ctx, domain, contractAddress, schema, &query, status)
+		return ss.FindStates(ctx, ss.p.DB(), domain, contractAddress, schema, &query, status)
 	})
 }

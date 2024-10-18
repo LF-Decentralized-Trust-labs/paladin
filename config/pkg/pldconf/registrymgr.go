@@ -19,12 +19,12 @@ import (
 )
 
 type RegistryManagerConfig struct {
-	Registries      map[string]*RegistryConfig   `yaml:"registries"`
-	RegistryManager RegistryManagerManagerConfig `yaml:"registryManager"`
+	Registries      map[string]*RegistryConfig   `json:"registries"`
+	RegistryManager RegistryManagerManagerConfig `json:"registryManager"`
 }
 
 type RegistryManagerManagerConfig struct {
-	RegistryCache CacheConfig `yaml:"registryCache"`
+	RegistryCache CacheConfig `json:"registryCache"`
 }
 
 var RegistryCacheDefaults = &CacheConfig{

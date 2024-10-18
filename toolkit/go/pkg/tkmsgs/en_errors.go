@@ -51,6 +51,21 @@ var (
 	// Inflight PD0201XX
 	MsgInflightRequestCancelled = ffe("PD020100", "Request cancelled after %s")
 
+	// PldClient module PD0202XX
+	MsgPaladinClientInvalidInput      = ffe("PD020200", "Unable to convert to ABI function input (func=%s)")
+	MsgPaladinClientMissingFrom       = ffe("PD020201", "From (signing key identifier) missing")
+	MsgPaladinClientMissingTo         = ffe("PD020202", "To missing")
+	MsgPaladinClientMissingInput      = ffe("PD020203", "Input missing")
+	MsgPaladinClientMissingOutput     = ffe("PD020204", "Output missing")
+	MsgPaladinClientBytecodeWithPriv  = ffe("PD020205", "Bytecode cannot be specified with a private contract deployment")
+	MsgPaladinClientBytecodeMissing   = ffe("PD020206", "Bytecode required to deploy a public smart contract")
+	MsgPaladinClientABIJson           = ffe("PD020207", "JSON ABI parsing failed")
+	MsgPaladinClientFunctionNotFound  = ffe("PD020208", "Function %q not found on ABI")
+	MsgPaladinClientToWithConstructor = ffe("PD020209", "To address cannot be specified for constructor")
+	MsgPaladinClientNoConnection      = ffe("PD020210", "No JSON/RPC connection is available to this client")
+	MsgPaladinClientMissingType       = ffe("PD020211", "Type missing (public or private)")
+	MsgPaladinClientNoFailureMsg      = ffe("PD020212", "No failure message available")
+
 	// Plugin PD0203XX
 	MsgPluginUnsupportedRequest   = ffe("PD020300", "Unsupported request %T")
 	MsgPluginUnexpectedResponse   = ffe("PD020301", "Unexpected response %T (expected %T)")

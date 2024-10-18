@@ -100,9 +100,7 @@ func deployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction) *ze
 	log.L(ctx).Infof("Deploy Zeto Contracts")
 
 	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
-	bi := tb.Components().BlockIndexer()
-	ec := tb.Components().EthClientFactory().HTTPClient()
+	url, _, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
@@ -114,7 +112,7 @@ func deployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction) *ze
 	deployedContracts, err := deployDomainContracts(ctx, rpc, controllerName, &config)
 	assert.NoError(t, err)
 
-	err = configureFactoryContract(ctx, ec, bi, controllerName, deployedContracts)
+	err = configureFactoryContract(ctx, tb, controllerName, deployedContracts)
 	assert.NoError(t, err)
 
 	return deployedContracts
@@ -135,7 +133,7 @@ func newZetoDomain(t *testing.T, config *types.DomainFactoryConfig) (zeto.Zeto, 
 
 func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
 	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("./testbed.config.yaml", domains, hdWalletSeed)
+	url, _, done, err := tb.StartForTest("./testbed.config.yaml", domains, hdWalletSeed)
 	assert.NoError(t, err)
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
 	return done, tb, rpc
@@ -268,7 +266,7 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string) {
 		}),
 	}, false)
 	require.NotNil(t, rpcerr)
-	assert.Regexp(t, "failed to send base ledger transaction: PD011513: Reverted: 0x118cdaa.*", rpcerr.Error())
+	assert.Regexp(t, "PD011513: Reverted: 0x118cdaa.*", rpcerr.Error())
 
 	log.L(ctx).Infof("Transfer 25 from controller to recipient1")
 	rpcerr = s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &tktypes.PrivateContractInvoke{

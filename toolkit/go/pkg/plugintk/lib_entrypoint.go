@@ -15,6 +15,7 @@
 package plugintk
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -49,6 +50,7 @@ func (ple *PluginLibraryEntrypoint) Run(grpcTarget, pluginUUID string) (rc int) 
 		}
 	}()
 
+	log.L(context.Background()).Infof("Starting plugin ID %s", pluginUUID)
 	p := ple.factory()
 	ple.addPlugin(pluginUUID, p)
 

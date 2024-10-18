@@ -114,3 +114,18 @@ func (br *TransportBridge) SendMessage(ctx context.Context, req *prototk.SendMes
 	)
 	return
 }
+
+func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (res *prototk.GetLocalDetailsResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_GetLocalDetails{GetLocalDetails: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_GetLocalDetailsRes); ok {
+				res = r.GetLocalDetailsRes
+			}
+			return res != nil
+		},
+	)
+	return
+}

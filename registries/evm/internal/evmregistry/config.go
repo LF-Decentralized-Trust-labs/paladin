@@ -20,5 +20,5 @@ import (
 )
 
 type Config struct {
-	ContractAddress tktypes.EthAddress `json:"contractAddress"`
+	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
 }

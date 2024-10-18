@@ -1,0 +1,15 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: PaladinRegistration
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: node2
+spec:
+  registry: evm-registry
+  registryAdminNode: node1 # home of the root key
+  registryAdminKey: registry.root
+  node: node2
+  nodeAdminKey: registry.node2
+  transports:
+  - grpc 

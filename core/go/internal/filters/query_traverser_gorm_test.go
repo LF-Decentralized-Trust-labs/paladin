@@ -125,6 +125,8 @@ func TestBuildQuerySingleNestedOr(t *testing.T) {
 
 	var qf query.QueryJSON
 	err := json.Unmarshal([]byte(`{
+	    "limit": 10,
+		"sort": ["tag"],
 		"or": [
 			{
 				"equal": [
@@ -148,7 +150,7 @@ func TestBuildQuerySingleNestedOr(t *testing.T) {
 		require.NoError(t, db.Error)
 		return db
 	})
-	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a'", generatedSQL)
+	assert.Equal(t, "SELECT count(*) FROM `test` WHERE tag = 'a' LIMIT 10", generatedSQL)
 }
 
 func TestBuildQuerySingleNestedWithResolverErrorTag(t *testing.T) {

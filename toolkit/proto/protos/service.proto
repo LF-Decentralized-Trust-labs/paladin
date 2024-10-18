@@ -96,11 +96,13 @@ message TransportMessage {
   oneof request_to_transport {
     ConfigureTransportRequest configure_transport =         1010;
     SendMessageRequest send_message =                       1020;
+    GetLocalDetailsRequest get_local_details =              1030;
   }
 
   oneof response_from_transport {
     ConfigureTransportResponse configure_transport_res =    1011;
     SendMessageResponse send_message_res =                  1021;
+    GetLocalDetailsResponse get_local_details_res =         1031;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node

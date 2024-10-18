@@ -29,12 +29,14 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 )
 
 type transportManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
+	rpcModule       *rpcserver.RPCModule
 	conf            *pldconf.TransportManagerConfig
 	localNodeName   string
 	registryManager components.RegistryManager
@@ -62,7 +64,10 @@ func (tm *transportManager) PreInit(pic components.PreInitComponents) (*componen
 	if tm.localNodeName == "" {
 		return nil, i18n.NewError(tm.bgCtx, msgs.MsgTransportNodeNameNotConfigured)
 	}
-	return &components.ManagerInitResult{}, nil
+	tm.initRPC()
+	return &components.ManagerInitResult{
+		RPCModules: []*rpcserver.RPCModule{tm.rpcModule},
+	}, nil
 }
 
 func (tm *transportManager) PostInit(c components.AllComponents) error {
@@ -122,6 +127,36 @@ func (tm *transportManager) ConfiguredTransports() map[string]*pldconf.PluginCon
 		pluginConf[name] = &conf.Plugin
 	}
 	return pluginConf
+}
+
+func (tm *transportManager) getTransportNames() []string {
+	tm.mux.Lock()
+	defer tm.mux.Unlock()
+
+	transportNames := make([]string, 0, len(tm.transportsByName))
+	for transportName := range tm.transportsByName {
+		transportNames = append(transportNames, transportName)
+	}
+	return transportNames
+}
+
+func (tm *transportManager) getTransportByName(ctx context.Context, transportName string) (*transport, error) {
+	tm.mux.Lock()
+	defer tm.mux.Unlock()
+
+	t := tm.transportsByName[transportName]
+	if t == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgTransportNotFound, transportName)
+	}
+	return t, nil
+}
+
+func (tm *transportManager) getLocalTransportDetails(ctx context.Context, transportName string) (string, error) {
+	t, err := tm.getTransportByName(ctx, transportName)
+	if err != nil {
+		return "", err
+	}
+	return t.getLocalDetails(ctx)
 }
 
 func (tm *transportManager) TransportRegistered(name string, id uuid.UUID, toTransport components.TransportManagerToTransport) (fromTransport plugintk.TransportCallbacks, err error) {

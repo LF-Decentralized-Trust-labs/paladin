@@ -41,7 +41,7 @@ func writeTestConfig(t *testing.T) (configFile string) {
 	conf.DB.Postgres.MigrationsDir = "../../db/migrations/postgres"
 	entropy, _ := bip39.NewEntropy(256)
 	mnemonic, _ := bip39.NewMnemonic(entropy)
-	conf.Signer.KeyStore.Static.Keys = map[string]pldconf.StaticKeyEntryConfig{
+	conf.Wallets[0].Signer.KeyStore.Static.Keys = map[string]pldconf.StaticKeyEntryConfig{
 		"seed": {
 			Encoding: "none",
 			Inline:   mnemonic,
@@ -68,14 +68,19 @@ db:
     autoMigrate:   true
     migrationsDir: any
     debugQueries:  true
-signer:
-  keyStore:
-    type: static
-    static:
-      keys:
-        seed:
-          encoding: none
-          inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
+wallets:
+- name: wallet1
+  keySelector: .*
+  signer:
+    keyDerivation:
+      type: "bip32"
+    keyStore:
+      type: "static"
+      static:
+        keys:
+          seed:
+            encoding: none
+            inline: '17250abf7976eae3c964e9704063f1457a8e1b4c0c0bd8b21ec8db5b88743c10'
 rpcServer:
   http:
     port: 1234

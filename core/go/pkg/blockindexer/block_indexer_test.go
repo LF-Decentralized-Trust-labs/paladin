@@ -34,6 +34,8 @@ import (
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/sirupsen/logrus"
@@ -167,15 +169,15 @@ func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) 
 			to = emitAddr1
 		}
 		txHash := ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32))
+		tx := &PartialTransactionInfo{
+			Hash:  txHash,
+			From:  ethtypes.MustNewAddress(tktypes.RandHex(20)),
+			Nonce: ethtypes.HexUint64(i),
+		}
 		blocks[i] = &BlockInfoJSONRPC{
-			Number: ethtypes.HexUint64(i),
-			Hash:   ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
-			Transactions: []*PartialTransactionInfo{
-				{
-					Hash:  txHash,
-					Nonce: ethtypes.HexUint64(i),
-				},
-			},
+			Number:       ethtypes.HexUint64(i),
+			Hash:         ethtypes.MustNewHexBytes0xPrefix(tktypes.RandHex(32)),
+			Transactions: []*PartialTransactionInfo{tx},
 		}
 		eventBData, err := testABI[1].Inputs.EncodeABIDataValues(map[string]interface{}{
 			"intParam1": i + 1000000,
@@ -192,7 +194,7 @@ func testBlockArray(t *testing.T, l int, knownAddress ...ethtypes.Address0xHex) 
 		receipts[blocks[i].Hash.String()] = []*TXReceiptJSONRPC{
 			{
 				TransactionHash: txHash,
-				From:            ethtypes.MustNewAddress(tktypes.RandHex(20)),
+				From:            tx.From,
 				To:              to,
 				ContractAddress: contractAddress,
 				BlockNumber:     blocks[i].Number,
@@ -302,13 +304,13 @@ func TestNewBlockIndexerRestoreCheckpointFail(t *testing.T) {
 	require.NoError(t, p.Mock.ExpectationsWereMet())
 }
 
-func checkIndexedBlockEqual(t *testing.T, expected *BlockInfoJSONRPC, indexed *IndexedBlock) {
+func checkIndexedBlockEqual(t *testing.T, expected *BlockInfoJSONRPC, indexed *pldapi.IndexedBlock) {
 	assert.Equal(t, expected.Hash.String(), indexed.Hash.String())
 	assert.Equal(t, expected.Number.Uint64(), uint64(indexed.Number))
 }
 
-func addBlockPostCommit(bi *blockIndexer, postCommit func([]*IndexedBlock)) {
-	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX *gorm.DB, blocks []*IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error) {
+func addBlockPostCommit(bi *blockIndexer, postCommit func([]*pldapi.IndexedBlock)) {
+	bi.preCommitHandlers = append(bi.preCommitHandlers, func(ctx context.Context, dbTX *gorm.DB, blocks []*pldapi.IndexedBlock, transactions []*IndexedTransactionNotify) (PostCommit, error) {
 		return func() { postCommit(blocks) }, nil
 	})
 }
@@ -322,8 +324,8 @@ func TestBlockIndexerCatchUpToHeadFromZeroNoConfirmations(t *testing.T) {
 
 	bi.requiredConfirmations = 0
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -346,8 +348,8 @@ func TestBlockIndexerBatchTimeoutOne(t *testing.T) {
 
 	bi.requiredConfirmations = 0
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -367,8 +369,8 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 
 	bi.requiredConfirmations = 5
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -382,10 +384,23 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, blocks[i].Hash.String(), indexedBlock.Hash.String())
 
+		// Query the block
+		qBlocks, err := bi.QueryIndexedBlocks(ctx, query.NewQueryBuilder().Equal("number", blocks[i].Number).Limit(1).Query())
+		require.NoError(t, err)
+		require.Len(t, qBlocks, 1)
+		require.Equal(t, blocks[i].Hash.String(), qBlocks[0].Hash.String())
+
 		// Get the transaction
-		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(receipts[blocks[i].Hash.String()][0].TransactionHash))
+		txHash := tktypes.Bytes32(receipts[blocks[i].Hash.String()][0].TransactionHash)
+		indexedTX, err := bi.GetIndexedTransactionByHash(ctx, txHash)
 		require.NoError(t, err)
 		assert.Equal(t, receipts[blocks[i].Hash.String()][0].TransactionHash.String(), indexedTX.Hash.String())
+
+		// Query the transaction
+		txs, err := bi.QueryIndexedTransactions(ctx, query.NewQueryBuilder().Equal("hash", txHash).Limit(1).Query())
+		require.NoError(t, err)
+		require.Len(t, txs, 1)
+		require.Equal(t, txHash, txs[0].Hash)
 
 		// Get by nonce
 		indexedTX, err = bi.GetIndexedTransactionByNonce(ctx, *indexedTX.From, indexedTX.Nonce)
@@ -411,6 +426,13 @@ func TestBlockIndexerCatchUpToHeadFromZeroWithConfirmations(t *testing.T) {
 		}
 		assert.NotNil(t, tx0.From)
 		assert.NotEqual(t, tktypes.EthAddress{}, *tx0.From)
+
+		// Query the events
+		events, err := bi.QueryIndexedEvents(ctx, query.NewQueryBuilder().
+			Equal("blockNumber", blocks[i].Number).Limit(3).Query())
+		require.NoError(t, err)
+		require.Len(t, events, 3)
+		require.Equal(t, blocks[i].Number.Uint64(), uint64(events[0].BlockNumber))
 
 		// Decode events
 		decodedEvents, err := bi.DecodeTransactionEvents(ctx, tktypes.Bytes32(tx0.TransactionHash), testABI)
@@ -473,8 +495,8 @@ func TestBlockIndexerListenFromCurrentBlock(t *testing.T) {
 	_, err := bi.GetConfirmedBlockHeight(ctx)
 	assert.Regexp(t, "PD011308", err)
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	// do not start block listener
 	bi.startOrReset()
@@ -529,8 +551,8 @@ func TestBatching(t *testing.T) {
 
 	bi.batchSize = 5
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -558,7 +580,7 @@ func TestBlockIndexerListenFromCurrentUsingCheckpointBlock(t *testing.T) {
 	blocks, receipts := testBlockArray(t, 15)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
-	bi.persistence.DB().Table("indexed_blocks").Create(&IndexedBlock{
+	bi.persistence.DB().Table("indexed_blocks").Create(&pldapi.IndexedBlock{
 		Number: 12345,
 		Hash:   tktypes.MustParseBytes32(tktypes.RandHex(32)),
 	})
@@ -677,8 +699,8 @@ func testBlockIndexerHandleReorgInConfirmationWindow(t *testing.T, blockLenBefor
 		}
 	})
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -723,8 +745,8 @@ func TestBlockIndexerHandleRandomConflictingBlockNotification(t *testing.T) {
 		return blocks, receipts
 	})
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -753,8 +775,8 @@ func TestBlockIndexerResetsAfterHashLookupFail(t *testing.T) {
 		return blocks, receipts
 	})
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -776,8 +798,8 @@ func TestBlockIndexerDispatcherFallsBehindHead(t *testing.T) {
 	blocks, receipts := testBlockArray(t, 30)
 	mockBlocksRPCCalls(mRPC, blocks, receipts)
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -822,16 +844,15 @@ func TestBlockIndexerStartFromBlock(t *testing.T) {
 	assert.Nil(t, bi.fromBlock)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
-	bi, err = newBlockIndexer(ctx, &pldconf.BlockIndexerConfig{
+	_, err = newBlockIndexer(ctx, &pldconf.BlockIndexerConfig{
 		FromBlock: json.RawMessage(`null`),
 	}, p.P, bl)
-	require.NoError(t, err)
-	assert.Nil(t, bi.fromBlock)
+	require.Regexp(t, "PD011300", err)
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &pldconf.BlockIndexerConfig{}, p.P, bl)
 	require.NoError(t, err)
-	assert.Nil(t, bi.fromBlock)
+	assert.Equal(t, uint64(0), bi.fromBlock.Uint64())
 
 	p.Mock.ExpectQuery("SELECT.*event_streams").WillReturnRows(sqlmock.NewRows([]string{}))
 	bi, err = newBlockIndexer(ctx, &pldconf.BlockIndexerConfig{
@@ -916,8 +937,8 @@ func TestBlockIndexerWaitForTransactionSuccess(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -931,7 +952,7 @@ func TestBlockIndexerWaitForTransactionSuccess(t *testing.T) {
 
 	tx, err := bi.WaitForTransactionAnyResult(ctx, txHash)
 	require.NoError(t, err)
-	assert.Equal(t, TXResult_SUCCESS, tx.Result.V())
+	assert.Equal(t, pldapi.TXResult_SUCCESS, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 	assert.Equal(t, txHash, tx.Hash)
 }
@@ -966,8 +987,8 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	utBatchNotify := make(chan []*IndexedBlock)
-	addBlockPostCommit(bi, func(blocks []*IndexedBlock) { utBatchNotify <- blocks })
+	utBatchNotify := make(chan []*pldapi.IndexedBlock)
+	addBlockPostCommit(bi, func(blocks []*pldapi.IndexedBlock) { utBatchNotify <- blocks })
 
 	bi.startOrReset() // do not start block listener
 
@@ -981,7 +1002,7 @@ func TestBlockIndexerWaitForTransactionRevert(t *testing.T) {
 
 	tx, err := bi.WaitForTransactionAnyResult(ctx, txHash)
 	require.NoError(t, err)
-	assert.Equal(t, TXResult_FAILURE, tx.Result.V())
+	assert.Equal(t, pldapi.TXResult_FAILURE, tx.Result.V())
 	assert.Equal(t, ethtypes.HexUint64(tx.BlockNumber), blocks[2].Number)
 	assert.Equal(t, txHash, tx.Hash)
 }
@@ -1117,4 +1138,18 @@ func TestHydrateBlockNoTransactions(t *testing.T) {
 	require.Nil(t, batch.receiptResults[0])
 	require.Len(t, batch.receipts, 1)
 	require.Empty(t, batch.receipts[0])
+}
+
+func TestQueryNoLimit(t *testing.T) {
+	ctx, bi, _, _, done := newMockBlockIndexer(t, &pldconf.BlockIndexerConfig{})
+	defer done()
+
+	_, err := bi.QueryIndexedBlocks(ctx, query.NewQueryBuilder().Query())
+	assert.Regexp(t, "PD011311", err)
+
+	_, err = bi.QueryIndexedTransactions(ctx, query.NewQueryBuilder().Query())
+	assert.Regexp(t, "PD011311", err)
+
+	_, err = bi.QueryIndexedEvents(ctx, query.NewQueryBuilder().Query())
+	assert.Regexp(t, "PD011311", err)
 }

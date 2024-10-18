@@ -24,13 +24,12 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-func NewEndorsementGatherer(psc components.DomainSmartContract, dCtx components.DomainContext, keyMgr ethclient.KeyManager) ptmgrtypes.EndorsementGatherer {
+func NewEndorsementGatherer(psc components.DomainSmartContract, dCtx components.DomainContext, keyMgr components.KeyManager) ptmgrtypes.EndorsementGatherer {
 	return &endorsementGatherer{
 		psc:    psc,
 		dCtx:   dCtx,
@@ -41,7 +40,7 @@ func NewEndorsementGatherer(psc components.DomainSmartContract, dCtx components.
 type endorsementGatherer struct {
 	psc    components.DomainSmartContract
 	dCtx   components.DomainContext
-	keyMgr ethclient.KeyManager
+	keyMgr components.KeyManager
 }
 
 func (e *endorsementGatherer) DomainContext() components.DomainContext {
@@ -49,7 +48,15 @@ func (e *endorsementGatherer) DomainContext() components.DomainContext {
 }
 
 func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*prototk.EndorsableState, readStates []*prototk.EndorsableState, outputStates []*prototk.EndorsableState, partyName string, endorsementRequest *prototk.AttestationRequest) (*prototk.AttestationResult, *string, error) {
-	keyHandle, verifier, err := e.keyMgr.ResolveKey(ctx, partyName, endorsementRequest.Algorithm, endorsementRequest.VerifierType)
+
+	unqualifiedLookup, err := tktypes.PrivateIdentityLocator(partyName).Identity(ctx)
+	if err != nil {
+		errorMessage := fmt.Sprintf("failed to parse lookup key for party %s : %s", partyName, err)
+		log.L(ctx).Error(errorMessage)
+		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+	}
+
+	resolvedSigner, err := e.keyMgr.ResolveKeyNewDatabaseTX(ctx, unqualifiedLookup, endorsementRequest.Algorithm, endorsementRequest.VerifierType)
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to resolve key for party %s (algorithm=%s,verifierType=%s): %s", partyName, endorsementRequest.Algorithm, endorsementRequest.VerifierType, err)
 		log.L(ctx).Error(errorMessage)
@@ -67,12 +74,12 @@ func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transaction
 		Endorser: &prototk.ResolvedVerifier{
 			Lookup:       partyName,
 			Algorithm:    endorsementRequest.Algorithm,
-			Verifier:     verifier,
+			Verifier:     resolvedSigner.Verifier.Verifier,
 			VerifierType: endorsementRequest.VerifierType,
 		},
 	})
 	if err != nil {
-		errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, endorsementRequest.Algorithm, err)
+		errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, resolvedSigner.Verifier.Verifier, endorsementRequest.Algorithm, err)
 		log.L(ctx).Error(errorMessage)
 		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, errorMessage)
 	}
@@ -91,18 +98,13 @@ func (e *endorsementGatherer) GatherEndorsement(ctx context.Context, transaction
 		return nil, confutil.P(revertReason), nil
 	case prototk.EndorseTransactionResponse_SIGN:
 		// Build the signature
-		signaturePayload, err := e.keyMgr.Sign(ctx, &signerapi.SignRequest{
-			KeyHandle:   keyHandle,
-			Algorithm:   endorsementRequest.Algorithm,
-			Payload:     endorseRes.Payload,
-			PayloadType: endorsementRequest.PayloadType,
-		})
+		signaturePayload, err := e.keyMgr.Sign(ctx, resolvedSigner, endorsementRequest.PayloadType, endorseRes.Payload)
 		if err != nil {
-			errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, verifier, endorsementRequest.Algorithm, err)
+			errorMessage := fmt.Sprintf("failed to endorse for party %s (verifier=%s,algorithm=%s): %s", partyName, resolvedSigner.Verifier.Verifier, endorsementRequest.Algorithm, err)
 			log.L(ctx).Error(errorMessage)
 			return nil, nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, errorMessage)
 		}
-		result.Payload = signaturePayload.Payload
+		result.Payload = signaturePayload
 	case prototk.EndorseTransactionResponse_ENDORSER_SUBMIT:
 		result.Constraints = append(result.Constraints, prototk.AttestationResult_ENDORSER_MUST_SUBMIT)
 	}

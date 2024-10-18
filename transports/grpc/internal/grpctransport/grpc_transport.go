@@ -19,9 +19,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -48,11 +50,13 @@ type grpcTransport struct {
 	bgCtx     context.Context
 	callbacks plugintk.TransportCallbacks
 
-	name         string
-	listener     net.Listener
-	grpcServer   *grpc.Server
-	serverDone   chan struct{}
-	peerVerifier *tlsVerifier
+	name             string
+	listener         net.Listener
+	grpcServer       *grpc.Server
+	serverDone       chan struct{}
+	peerVerifier     *tlsVerifier
+	externalHostname string
+	localCertificate *tls.Certificate
 
 	conf                Config
 	connLock            sync.Cond
@@ -69,10 +73,10 @@ type outboundConn struct {
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return plugintk.NewTransport(grpcTransportFactory)
+	return plugintk.NewTransport(NewGRPCTransport)
 }
 
-func grpcTransportFactory(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
+func NewGRPCTransport(callbacks plugintk.TransportCallbacks) plugintk.TransportAPI {
 	return &grpcTransport{
 		bgCtx:               context.Background(),
 		callbacks:           callbacks,
@@ -93,11 +97,13 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 		return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidTransportConfig)
 	}
 
-	listenAddr := confutil.StringOrEmpty(t.conf.Address, "")
-	if t.conf.Port == nil || listenAddr == "" {
+	listenAddrNoPort := confutil.StringOrEmpty(t.conf.Address, "")
+	if t.conf.Port == nil || listenAddrNoPort == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgListenerPortAndAddressRequired)
 	}
-	listenAddr = fmt.Sprintf("%s:%d", listenAddr, *t.conf.Port)
+	listenAddr := fmt.Sprintf("%s:%d", listenAddrNoPort, *t.conf.Port)
+
+	t.externalHostname = confutil.StringNotEmpty(t.conf.ExternalHostname, listenAddrNoPort)
 
 	var subjectMatchRegex *regexp.Regexp
 	certSubjectMatcher := confutil.StringOrEmpty(t.conf.CertSubjectMatcher, "")
@@ -110,10 +116,12 @@ func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.Con
 	// We only support mutual-TLS in this transport (with direct trust of certificates via registry, or use of a CA)
 	t.conf.TLS.Enabled = true
 	t.conf.TLS.ClientAuth = true // Note if this is unset the ClientCAs will not be configured
-	baseTLSConfig, err := tlsconf.BuildTLSConfig(ctx, &t.conf.TLS, tlsconf.ServerType)
+	tlsDetail, err := tlsconf.BuildTLSConfigExt(ctx, &t.conf.TLS, tlsconf.ServerType)
 	if err != nil {
 		return nil, err
 	}
+	baseTLSConfig := tlsDetail.TLSConfig
+	t.localCertificate = tlsDetail.Certificate
 
 	directCertVerification := confutil.Bool(t.conf.DirectCertVerification, *ConfigDefaults.DirectCertVerification)
 	baseTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
@@ -186,6 +194,9 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 			log.L(ctx).Infof("GRPC message stream from %s closing (err=%v)", ai.verifiedNodeName, err)
 			return err
 		}
+
+		log.L(ctx).Infof("GRPC received message id=%s cid=%v component=%s messageType=%s replyTo=%s from peer %s",
+			msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, ai.verifiedNodeName)
 
 		// Check the message is from the node we expect.
 		// Note the destination node is checked by Paladin - just just have to verify the sender.
@@ -299,6 +310,7 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (*ou
 	}
 
 	// Ok - try connecting
+	log.L(ctx).Infof("GRPC connecting to new peer %s (endpoint=%s)", nodeName, transportDetails.Endpoint)
 	individualNodeVerifier := t.peerVerifier.Clone().(*tlsVerifier)
 	individualNodeVerifier.expectedNode = nodeName
 	conn, err := grpc.NewClient(transportDetails.Endpoint,
@@ -312,23 +324,49 @@ func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (*ou
 }
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+	msg := req.Message
 	if req.Message.Node == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorNoTargetNode)
 	}
-	oc, err := t.getConnection(ctx, req.Message.Node)
+	oc, err := t.getConnection(ctx, msg.Node)
 	if err == nil {
+		log.L(ctx).Infof("GRPC sending message id=%s cid=%v component=%s messageType=%s replyTo=%s to peer %s",
+			msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, msg.Node)
 		err = t.send(ctx, oc, &proto.Message{
-			MessageId:     req.Message.MessageId,
-			CorrelationId: req.Message.CorrelationId,
-			Component:     req.Message.Component,
-			Node:          req.Message.Node,
-			ReplyTo:       req.Message.ReplyTo,
-			MessageType:   req.Message.MessageType,
-			Payload:       req.Message.Payload,
+			MessageId:     msg.MessageId,
+			CorrelationId: msg.CorrelationId,
+			Component:     msg.Component,
+			Node:          msg.Node,
+			ReplyTo:       msg.ReplyTo,
+			MessageType:   msg.MessageType,
+			Payload:       msg.Payload,
 		})
 	}
 	if err != nil {
 		return nil, err
 	}
 	return &prototk.SendMessageResponse{}, nil
+}
+
+func (t *grpcTransport) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
+
+	certList := t.localCertificate.Certificate
+	issuersText := new(strings.Builder)
+	for _, cert := range certList {
+		_ = pem.Encode(issuersText, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert,
+		})
+	}
+
+	localDetails := &PublishedTransportDetails{
+		Endpoint: fmt.Sprintf("dns:///%s:%d", t.externalHostname, *t.conf.Port),
+		Issuers:  issuersText.String(),
+	}
+	jsonDetails, _ := json.Marshal(&localDetails)
+
+	return &prototk.GetLocalDetailsResponse{
+		TransportDetails: string(jsonDetails),
+	}, nil
+
 }

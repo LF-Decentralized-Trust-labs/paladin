@@ -22,7 +22,7 @@ import (
 )
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
-	return staticregistry.NewPlugin(ctx)
+	return staticregistry.NewPlugin()
 }
 
 type StaticEntry staticregistry.StaticEntry

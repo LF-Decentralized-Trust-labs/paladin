@@ -17,9 +17,10 @@ package privatetxnmgr
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
-	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
@@ -41,24 +42,48 @@ type transportWriter struct {
 	contractAddress  *tktypes.EthAddress
 }
 
-func (tw *transportWriter) SendDelegateTransactionMessage(ctx context.Context, transactionId string, delegateNodeId string) error {
-	delegationMessage := &pb.DelegateTransaction{
-		TransactionId:    transactionId,
-		DelegatingNodeId: tw.nodeID,
-		DelegateNodeId:   delegateNodeId,
-	}
-	delegationMessageBytes, err := proto.Marshal(delegationMessage)
+func (tw *transportWriter) SendDelegationRequest(
+	ctx context.Context,
+	delegationId string,
+	delegateNodeId string,
+	transaction *components.PrivateTransaction,
+
+) error {
+
+	transactionBytes, err := json.Marshal(transaction)
+
 	if err != nil {
-		log.L(ctx).Errorf("Error marshalling delegate transaction message: %s", err)
+		log.L(ctx).Errorf("Error marshalling transaction message: %s", err)
+		return err
+	}
+	delegationRequest := &pb.DelegationRequest{
+		DelegationId:       delegationId,
+		TransactionId:      transaction.ID.String(),
+		DelegateNodeId:     delegateNodeId,
+		PrivateTransaction: transactionBytes,
+	}
+	delegationRequestBytes, err := proto.Marshal(delegationRequest)
+	if err != nil {
+		log.L(ctx).Errorf("Error marshalling delegationRequest  message: %s", err)
 		return err
 	}
 
 	if err = tw.transportManager.Send(ctx, &components.TransportMessage{
-		MessageType: "DelegateTransaction",
-		Payload:     delegationMessageBytes,
+		MessageType: "DelegationRequest",
+		Payload:     delegationRequestBytes,
+		Component:   PRIVATE_TX_MANAGER_DESTINATION,
+		Node:        delegateNodeId,
+		ReplyTo:     tw.nodeID,
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (tw *transportWriter) SendDelegateTransactionMessage(ctx context.Context, transactionId string, delegateNodeId string) error {
+	//This is deprecated in favour of SendDelegationRequest.  all callers of this are due to be refactored away
+	//leaving here as a no-op temporarily to avoid breaking the build
+
 	return nil
 }
 

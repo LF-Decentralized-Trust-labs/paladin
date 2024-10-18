@@ -21,7 +21,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
@@ -29,7 +29,7 @@ import (
 func (tm *txManager) blockIndexerPreCommit(
 	ctx context.Context,
 	dbTX *gorm.DB,
-	blocks []*blockindexer.IndexedBlock,
+	blocks []*pldapi.IndexedBlock,
 	transactions []*blockindexer.IndexedTransactionNotify,
 ) (blockindexer.PostCommit, error) {
 
@@ -50,13 +50,13 @@ func (tm *txManager) blockIndexerPreCommit(
 	failedForPrivateTx := make([]*components.PublicTxMatch, 0)
 	for _, match := range txMatches {
 		switch match.TransactionType.V() {
-		case ptxapi.TransactionTypePublic:
+		case pldapi.TransactionTypePublic:
 			log.L(ctx).Infof("Writing receipt for transaction %s hash=%s block=%d result=%s",
 				match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 			// Map to the common format for finalizing transactions whether the make it on chain or not
 			finalizeInfo = append(finalizeInfo, tm.mapBlockchainReceipt(match))
-		case ptxapi.TransactionTypePrivate:
-			if match.Result.V() != blockindexer.TXResult_SUCCESS {
+		case pldapi.TransactionTypePrivate:
+			if match.Result.V() != pldapi.TXResult_SUCCESS {
 				log.L(ctx).Infof("Base ledger transaction for private transaction %s FAILED hash=%s block=%d result=%s",
 					match.TransactionID, match.Hash, match.BlockNumber, match.Result)
 				failedForPrivateTx = append(failedForPrivateTx, match)
@@ -96,9 +96,10 @@ func (tm *txManager) mapBlockchainReceipt(pubTx *components.PublicTxMatch) *comp
 			BlockNumber:      pubTx.BlockNumber,
 			TransactionIndex: pubTx.TransactionIndex,
 		},
-		RevertData: pubTx.RevertReason,
+		ContractAddress: pubTx.ContractAddress,
+		RevertData:      pubTx.RevertReason,
 	}
-	if pubTx.Result.V() == blockindexer.TXResult_SUCCESS {
+	if pubTx.Result.V() == pldapi.TXResult_SUCCESS {
 		receipt.ReceiptType = components.RT_Success
 	} else {
 		receipt.ReceiptType = components.RT_FailedOnChainWithRevertData

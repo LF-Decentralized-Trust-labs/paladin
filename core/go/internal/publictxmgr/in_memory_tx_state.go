@@ -20,10 +20,8 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 )
 
 type managedTx struct {
@@ -36,7 +34,7 @@ type managedTx struct {
 	// In-memory state that we update as we process the transaction in an active orchestrator
 	// TODO: Validate that all of these fields are actively used
 	InFlightStatus  InFlightStatus             // moves to pending/confirmed to cause the inflight to exit
-	GasPricing      *ptxapi.PublicTxGasPricing // the most recently used gas pricing information
+	GasPricing      *pldapi.PublicTxGasPricing // the most recently used gas pricing information
 	TransactionHash *tktypes.Bytes32           // the most recently submitted transaction hash (not guaranteed to be the one mined)
 	FirstSubmit     *tktypes.Timestamp         // the time this runtime instance first did a submit JSON/RPC call (for success or failure)
 	LastSubmit      *tktypes.Timestamp         // the last time runtime instance first did a submit JSON/RPC call (for success or failure)
@@ -139,13 +137,6 @@ func (imtxs *inMemoryTxState) GetValue() *tktypes.HexUint256 {
 	return imtxs.mtx.ptx.Value
 }
 
-func (imtxs *inMemoryTxState) GetResolvedSigner() *ethclient.ResolvedSigner {
-	return &ethclient.ResolvedSigner{
-		Address:   imtxs.mtx.ptx.From,
-		KeyHandle: imtxs.mtx.ptx.KeyHandle,
-	}
-}
-
 func (imtxs *inMemoryTxState) BuildEthTX() *ethsigner.Transaction {
 	// Builds the ethereum TX using the latest in-memory information that must have been resolved in previous stages
 	ptx := imtxs.mtx.ptx
@@ -154,7 +145,7 @@ func (imtxs *inMemoryTxState) BuildEthTX() *ethsigner.Transaction {
 		&ptx.Nonce,
 		ptx.To,
 		ptx.Data,
-		&ptxapi.PublicTxOptions{
+		&pldapi.PublicTxOptions{
 			Gas:                (*tktypes.HexUint64)(&ptx.Gas), // fixed in persisted TX
 			Value:              ptx.Value,
 			PublicTxGasPricing: *imtxs.mtx.GasPricing, // variable and calculated in memory
@@ -166,7 +157,7 @@ func (imtxs *inMemoryTxState) GetFirstSubmit() *tktypes.Timestamp {
 	return imtxs.mtx.FirstSubmit
 }
 
-func (imtxs *inMemoryTxState) GetGasPriceObject() *ptxapi.PublicTxGasPricing {
+func (imtxs *inMemoryTxState) GetGasPriceObject() *pldapi.PublicTxGasPricing {
 	// no gas price set yet, return nil, down stream logic relies on `nil` to know a transaction has never been assigned any gas price.
 	return imtxs.mtx.GasPricing
 }

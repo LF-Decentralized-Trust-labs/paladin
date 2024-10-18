@@ -27,6 +27,7 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -289,7 +290,7 @@ func (es *eventStream) processCheckpoint() (int64, error) {
 }
 
 func (bi *blockIndexer) getHighestIndexedBlock(ctx context.Context) (*int64, error) {
-	var blocks []*IndexedBlock
+	var blocks []*pldapi.IndexedBlock
 	err := bi.retry.Do(ctx, func(attempt int) (retryable bool, err error) {
 		return true, bi.persistence.DB().
 			Table("indexed_blocks").
@@ -333,7 +334,7 @@ func (es *eventStream) detector() {
 		return
 	}
 
-	var lastCatchupEvent *IndexedEvent
+	var lastCatchupEvent *pldapi.IndexedEvent
 	var catchUpToBlock *eventStreamBlock
 	for {
 		// we wait to be told about a block from the chain, to see whether that is a block that
@@ -512,7 +513,7 @@ func (es *eventStream) runBatch(batch *eventBatch) error {
 
 }
 
-func (es *eventStream) processCatchupEventPage(lastCatchupEvent *IndexedEvent, checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, lastEvent *IndexedEvent, err error) {
+func (es *eventStream) processCatchupEventPage(lastCatchupEvent *pldapi.IndexedEvent, checkpointBlock int64, catchUpToBlockNumber int64) (caughtUp bool, lastEvent *pldapi.IndexedEvent, err error) {
 
 	// We query up to the head of the chain as currently indexed, with a limit on the events
 	// we return for enrichment/processing.
@@ -524,7 +525,7 @@ func (es *eventStream) processCatchupEventPage(lastCatchupEvent *IndexedEvent, c
 	// they match as signatures in ethereum are not precise (due to the "indexed" flag not being included)
 	// That also means we can do an efficient IN query on the sig H/L
 	pageSize := es.bi.esCatchUpQueryPageSize
-	var page []*IndexedEvent
+	var page []*pldapi.IndexedEvent
 	err = es.bi.retry.Do(es.ctx, func(attempt int) (retryable bool, err error) {
 		db := es.bi.persistence.DB()
 		q := db.

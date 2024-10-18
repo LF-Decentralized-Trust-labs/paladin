@@ -118,11 +118,9 @@ func (i *instance) run() RC {
 		err = cm.StartManagers()
 	}
 	if err == nil {
-		// Components next - meaning things like blockchain events start streaming in
-		err = cm.StartComponents()
-	}
-	if err == nil {
-		// Then finally the front door is opened
+		// Then finally the active processing is started:
+		// - The block indexer starts indexing
+		// - The JSON/RPC front door is opened
 		err = cm.CompleteStart()
 	}
 	if err != nil {

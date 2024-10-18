@@ -5,7 +5,6 @@ CREATE TABLE public_txns (
   "from"                      TEXT            NOT NULL,
   "nonce"                     BIGINT          NOT NULL,
   "created"                   BIGINT          NOT NULL,
-  "key_handle"                TEXT            NOT NULL,
   "to"                        TEXT,
   "gas"                       BIGINT          NOT NULL,
   "fixed_gas_pricing"         TEXT,

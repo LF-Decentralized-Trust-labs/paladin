@@ -36,5 +36,5 @@ var DefaultWSConfig = &WSClientConfig{
 	InitialConnectAttempts: confutil.P(0),
 	ConnectionTimeout:      confutil.P("30s"),
 	HeartbeatInterval:      confutil.P("15s"),
-	ConnectRetry:           RetryDefaults.RetryConfig,
+	ConnectRetry:           GenericRetryDefaults.RetryConfig,
 }

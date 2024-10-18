@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	_ "embed"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -40,13 +41,11 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/componentmgr"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/registries/static/pkg/static"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/kaleido-io/paladin/transports/grpc/pkg/grpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,12 +57,22 @@ var simpleStorageBuildJSON []byte // From "gradle copyTestSolidityBuild"
 func transactionReceiptCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client, isDeploy bool) func() bool {
 	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has a receipt
 	return func() bool {
-		txFull := ptxapi.TransactionFull{}
+		txFull := pldapi.TransactionFull{}
 		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransaction", txID, true)
 		require.NoError(t, err)
 		return txFull.Receipt != nil && (!isDeploy || txFull.Receipt.ContractAddress != nil)
 	}
+}
 
+func transactionRevertedCondition(t *testing.T, ctx context.Context, txID uuid.UUID, rpcClient rpcclient.Client) func() bool {
+	//for the given transaction ID, return a function that can be used in an assert.Eventually to check if the transaction has been reverted
+	return func() bool {
+		txFull := pldapi.TransactionFull{}
+		err := rpcClient.CallRPC(ctx, &txFull, "ptx_getTransaction", txID, true)
+		require.NoError(t, err)
+		return txFull.Receipt != nil &&
+			!txFull.Receipt.Success
+	}
 }
 
 func transactionLatencyThreshold(t *testing.T) time.Duration {
@@ -93,15 +102,14 @@ func transactionLatencyThreshold(t *testing.T) time.Duration {
 
 type componentTestInstance struct {
 	grpcTarget             string
-	id                     uuid.UUID
-	name                   string // useful for debugging and logging
+	name                   string
 	conf                   *pldconf.PaladinConfig
 	ctx                    context.Context
 	client                 rpcclient.Client
 	resolveEthereumAddress func(identity string) string
 }
 
-func deplyDomainRegistry(t *testing.T) *tktypes.EthAddress {
+func deployDomainRegistry(t *testing.T) *tktypes.EthAddress {
 	// We need an engine so that we can deploy the base ledger contract for the domain
 	//Actually, we only need a bare bones engine that is capable of deploying the base ledger contracts
 	// could make do with assembling some core components like key manager, eth client factory, block indexer, persistence and any other dependencies they pull in
@@ -122,9 +130,11 @@ func deplyDomainRegistry(t *testing.T) *tktypes.EthAddress {
 	cmTmp := componentmgr.NewComponentManager(context.Background(), grpcTarget, uuid.New(), &tmpConf)
 	err = cmTmp.Init()
 	require.NoError(t, err)
-	err = cmTmp.StartComponents()
+	err = cmTmp.StartManagers()
 	require.NoError(t, err)
-	domainRegistryAddress := domains.DeploySmartContract(t, cmTmp.BlockIndexer(), cmTmp.EthClientFactory())
+	err = cmTmp.CompleteStart()
+	require.NoError(t, err)
+	domainRegistryAddress := domains.DeploySmartContract(t, cmTmp.TxManager())
 
 	cmTmp.Stop()
 	return domainRegistryAddress
@@ -132,26 +142,23 @@ func deplyDomainRegistry(t *testing.T) *tktypes.EthAddress {
 }
 
 type nodeConfiguration struct {
-	identity uuid.UUID
-	address  string
-	port     int
-	cert     string
-	key      string
-	name     string
+	address string
+	port    int
+	cert    string
+	key     string
+	name    string
 }
 
 func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
-	identity := uuid.New()
 	port, err := getFreePort()
 	require.NoError(t, err)
-	cert, key := buildTestCertificate(t, pkix.Name{CommonName: identity.String()}, nil, nil)
+	cert, key := buildTestCertificate(t, pkix.Name{CommonName: nodeName}, nil, nil)
 	return &nodeConfiguration{
-		identity: identity,
-		address:  "localhost",
-		port:     port,
-		cert:     cert,
-		key:      key,
-		name:     nodeName,
+		address: "localhost",
+		port:    port,
+		cert:    cert,
+		key:     key,
+		name:    nodeName,
 	}
 }
 
@@ -173,14 +180,13 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	conf := testConfig(t)
 	i := &componentTestInstance{
 		grpcTarget: grpcTarget,
-		id:         binding.identity,
 		name:       binding.name,
 		conf:       &conf,
 	}
-	i.ctx = log.WithLogField(context.Background(), "node-id", binding.identity.String())
-	i.ctx = log.WithLogField(i.ctx, "node-name", binding.name)
+	i.ctx = log.WithLogField(context.Background(), "node-name", binding.name)
 
 	i.conf.Log.Level = confutil.P("info")
+	i.conf.BlockIndexer.FromBlock = json.RawMessage(`"latest"`)
 	i.conf.DomainManagerConfig.Domains = make(map[string]*pldconf.DomainConfig, 1)
 	i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
 		Plugin: pldconf.PluginConfig{
@@ -191,7 +197,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 		RegistryAddress: domainRegistryAddress.String(),
 	}
 
-	i.conf.NodeName = binding.identity.String()
+	i.conf.NodeName = binding.name
 	i.conf.Transports = map[string]*pldconf.TransportConfig{
 		"grpc": {
 			Plugin: pldconf.PluginConfig{
@@ -214,12 +220,12 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 
 	nodesConfig := make(map[string]*static.StaticEntry)
 	for _, peerNode := range peerNodes {
-		nodesConfig[peerNode.identity.String()] = &static.StaticEntry{
+		nodesConfig[peerNode.name] = &static.StaticEntry{
 			Properties: map[string]tktypes.RawJSON{
 				"transport.grpc": tktypes.JSONString(
 					grpc.PublishedTransportDetails{
-						Endpoint: fmt.Sprintf("dns:///%s:%d", peerNodes[0].address, peerNodes[0].port),
-						Issuers:  peerNodes[0].cert,
+						Endpoint: fmt.Sprintf("dns:///%s:%d", peerNode.address, peerNode.port),
+						Issuers:  peerNode.cert,
 					},
 				),
 			},
@@ -240,16 +246,13 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 
 	//uncomment for debugging
 	//i.conf.DB.SQLite.DSN = "./sql." + i.name + ".db"
-	//i.conf.Log.Level = confutil.P("debug")
+	i.conf.Log.Level = confutil.P("debug")
 
 	var pl plugins.UnitTestPluginLoader
 
-	cm := componentmgr.NewComponentManager(i.ctx, i.grpcTarget, i.id, i.conf)
+	cm := componentmgr.NewComponentManager(i.ctx, i.grpcTarget, uuid.New(), i.conf)
 	// Start it up
 	err = cm.Init()
-	require.NoError(t, err)
-
-	err = cm.StartComponents()
 	require.NoError(t, err)
 
 	err = cm.StartManagers()
@@ -273,14 +276,16 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 		cm.Stop()
 	})
 
-	client, err := rpcclient.NewHTTPClient(log.WithLogField(context.Background(), "client-for", binding.identity.String()), &pldconf.HTTPClientConfig{URL: "http://localhost:" + strconv.Itoa(*i.conf.RPCServer.HTTP.Port)})
+	client, err := rpcclient.NewHTTPClient(log.WithLogField(context.Background(), "client-for", binding.name), &pldconf.HTTPClientConfig{URL: "http://localhost:" + strconv.Itoa(*i.conf.RPCServer.HTTP.Port)})
 	require.NoError(t, err)
 	i.client = client
 
 	i.resolveEthereumAddress = func(identity string) string {
-		_, address, err := cm.KeyManager().ResolveKey(i.ctx, identity, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+		idPart, err := tktypes.PrivateIdentityLocator(identity).Identity(context.Background())
 		require.NoError(t, err)
-		return address
+		addr, err := cm.KeyManager().ResolveEthAddressNewDatabaseTX(i.ctx, idPart)
+		require.NoError(t, err)
+		return addr.String()
 	}
 
 	return i
@@ -300,11 +305,15 @@ func testConfig(t *testing.T) pldconf.PaladinConfig {
 
 	port, err := getFreePort()
 	require.NoError(t, err, "Error finding a free port")
+	conf.GRPC.ShutdownTimeout = confutil.P("0s")
+	conf.RPCServer.HTTP.ShutdownTimeout = confutil.P("0s")
 	conf.RPCServer.HTTP.Port = &port
 	conf.RPCServer.HTTP.Address = confutil.P("127.0.0.1")
+	conf.RPCServer.WS.ShutdownTimeout = confutil.P("0s")
+	conf.RPCServer.WS.Disabled = true
 	conf.Log.Level = confutil.P("info")
 
-	conf.Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
+	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
 		Inline:   tktypes.RandHex(32),
 	}

@@ -75,9 +75,7 @@ func deployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, con
 	log.L(ctx).Infof("Deploy Zeto Contracts")
 
 	tb := testbed.NewTestBed()
-	url, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
-	bi := tb.Components().BlockIndexer()
-	ec := tb.Components().EthClientFactory().HTTPClient()
+	url, _, done, err := tb.StartForTest("./testbed.config.yaml", map[string]*testbed.TestbedDomain{}, hdWalletSeed)
 	assert.NoError(t, err)
 	defer done()
 	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
@@ -89,7 +87,7 @@ func deployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, con
 	deployedContracts, err := deployDomainContracts(ctx, rpc, controller, &config)
 	assert.NoError(t, err)
 
-	err = configureFactoryContract(ctx, ec, bi, controller, deployedContracts)
+	err = configureFactoryContract(ctx, tb, controller, deployedContracts)
 	assert.NoError(t, err)
 
 	return deployedContracts

@@ -9,8 +9,11 @@ rules:
   resources:
   - besugeneses
   - besus
+  - paladindomains
+  - paladinregistrations
+  - paladinregistries
   - paladins
-  - smartcontracts
+  - smartcontractdeployments
   verbs:
   - create
   - delete
@@ -24,8 +27,11 @@ rules:
   resources:
   - besugeneses/finalizers
   - besus/finalizers
+  - paladindomains/finalizers
+  - paladinregistrations/finalizers
+  - paladinregistries/finalizers
   - paladins/finalizers
-  - smartcontracts/finalizers
+  - smartcontractdeployments/finalizers
   verbs:
   - update
 - apiGroups:
@@ -33,8 +39,11 @@ rules:
   resources:
   - besugeneses/status
   - besus/status
+  - paladindomains/status
+  - paladinregistrations/status
+  - paladinregistries/status
   - paladins/status
-  - smartcontracts/status
+  - smartcontractdeployments/status
   verbs:
   - get
   - patch

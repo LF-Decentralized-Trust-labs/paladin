@@ -56,9 +56,12 @@ type BesuReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besus,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besus/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=core.paladin.io,resources=besus/finalizers,verbs=update
+// allows generic functions by giving a mapping between the types and interfaces for the CR
+var BesuCRMap = CRMap[corev1alpha1.Besu, *corev1alpha1.Besu, *corev1alpha1.BesuList]{
+	NewList:  func() *corev1alpha1.BesuList { return new(corev1alpha1.BesuList) },
+	ItemsFor: func(list *corev1alpha1.BesuList) []corev1alpha1.Besu { return list.Items },
+	AsObject: func(item *corev1alpha1.Besu) *corev1alpha1.Besu { return item },
+}
 
 // Reconcile implements the logic when a Besu resource is created, updated, or deleted
 func (r *BesuReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -71,59 +74,89 @@ func (r *BesuReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	var node corev1alpha1.Besu
 	if err := r.Get(ctx, req.NamespacedName, &node); err != nil {
 		if errors.IsNotFound(err) {
+			// Resource not found; could have been deleted after reconcile request.
+			// Return and don't requeue.
 			return ctrl.Result{}, nil
 		}
+		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get Besu resource")
 		return ctrl.Result{}, err
 	}
 
-	// We create the identity of the node first, as the genesis controller requires this from
-	// the initial validators to build the genesis
-	_, err := r.createIdentitySecret(ctx, &node)
-	if err != nil {
+	// Initialize status if empty
+	if node.Status.Phase == "" {
+		node.Status.Phase = corev1alpha1.StatusPhaseFailed
+	}
+
+	defer func() {
+		// Update the overall phase based on conditions
+		if err := r.Status().Update(ctx, &node); err != nil {
+			log.Error(err, "Failed to update Besu status")
+		}
+	}()
+
+	// Create Identity Secret
+	if _, err := r.createIdentitySecret(ctx, &node); err != nil {
 		log.Error(err, "Failed to create Besu identity secret")
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSecret, metav1.ConditionFalse, corev1alpha1.ReasonSecretCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	}
-	log.Info("Created Besu config secret", "Name", name)
+	log.Info("Created Besu identity secret", "Name", name)
 
+	// Load Genesis
 	genesis, err := r.loadGenesis(ctx, &node)
 	if err != nil {
 		log.Error(err, "Failed to retrieve BesuGenesis")
+		node.Status.Phase = corev1alpha1.StatusPhasePending
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionGenesisAvailable, metav1.ConditionFalse, corev1alpha1.ReasonGenesisNotFound, err.Error())
 		return ctrl.Result{}, err
 	}
 	if genesis == nil {
 		log.Info("Waiting for genesis to become available")
-		return ctrl.Result{
-			// Short retry until we get the genesis
-			RequeueAfter: 1 * time.Second,
-		}, err
+		node.Status.Phase = corev1alpha1.StatusPhasePending
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionGenesisAvailable, metav1.ConditionFalse, corev1alpha1.ReasonGenesisNotFound, "Genesis resource not found")
+		// Requeue after a delay
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+	// Genesis is available
+	setCondition(&node.Status.Conditions, corev1alpha1.ConditionGenesisAvailable, metav1.ConditionTrue, corev1alpha1.ReasonSuccess, "Genesis resource is available")
 
+	// Create ConfigMap
 	configSum, _, err := r.createConfigMap(ctx, &node)
 	if err != nil {
 		log.Error(err, "Failed to create Besu config map")
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionCM, metav1.ConditionFalse, corev1alpha1.ReasonCMCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	}
 	log.Info("Created Besu config map", "Name", name)
 
+	// Create Service
 	if _, err := r.createService(ctx, &node, name); err != nil {
 		log.Error(err, "Failed to create Besu Service")
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSVC, metav1.ConditionFalse, corev1alpha1.ReasonSVCCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	}
 	log.Info("Created Besu Service", "Name", name)
 
+	// Create Pod Disruption Budget
 	if _, err := r.createPDB(ctx, &node, name); err != nil {
 		log.Error(err, "Failed to create Besu pod disruption budget")
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionFalse, corev1alpha1.ReasonPDBCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	}
 	log.Info("Created Besu pod disruption budget", "Name", name)
 
+	// Create StatefulSet
 	ss, err := r.createStatefulSet(ctx, &node, name, configSum)
 	if err != nil {
 		log.Error(err, "Failed to create Besu StatefulSet")
+		setCondition(&genesis.Status.Conditions, corev1alpha1.ConditionSS, metav1.ConditionFalse, corev1alpha1.ReasonSSCreationFailed, err.Error())
 		return ctrl.Result{}, err
 	}
 	log.Info("Created Besu StatefulSet", "Name", ss.Name, "Namespace", ss.Namespace)
+
+	// Update condition to Succeeded
+	node.Status.Phase = corev1alpha1.StatusPhaseCompleted
 
 	return ctrl.Result{}, nil
 }
@@ -147,7 +180,10 @@ func (r *BesuReconciler) createConfigMap(ctx context.Context, node *corev1alpha1
 	if err != nil {
 		return "", nil, err
 	}
-	controllerutil.SetControllerReference(node, configMap, r.Scheme)
+
+	if err := controllerutil.SetControllerReference(node, configMap, r.Scheme); err != nil {
+		return "", nil, err
+	}
 
 	var foundConfigMap corev1.ConfigMap
 	if err := r.Get(ctx, types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, &foundConfigMap); err != nil && errors.IsNotFound(err) {
@@ -209,6 +245,7 @@ func (r *BesuReconciler) generateBesuConfigTOML(node *corev1alpha1.Besu) (string
 			return "", fmt.Errorf("failed to parse supplied Besu config as TOML: %s", err)
 		}
 	}
+	const localhost = "0.0.0.0"
 
 	// Setup from our mounts
 	tomlConfig["node-private-key-file"] = "/nodeid/key"
@@ -218,17 +255,17 @@ func (r *BesuReconciler) generateBesuConfigTOML(node *corev1alpha1.Besu) (string
 	// Set up the networking, as that's always in our control (we wire it up to the service)
 	comprehensiveRPCSet := []string{"ETH", "NET", "QBFT", "WEB3", "ADMIN", "DEBUG"}
 	tomlConfig["rpc-http-enabled"] = true
-	tomlConfig["rpc-http-host"] = "0.0.0.0"
+	tomlConfig["rpc-http-host"] = localhost
 	tomlConfig["rpc-http-port"] = "8545"
 	setIfUnset("rpc-http-api", comprehensiveRPCSet)
 	tomlConfig["rpc-ws-enabled"] = true
-	tomlConfig["rpc-ws-host"] = "0.0.0.0"
+	tomlConfig["rpc-ws-host"] = localhost
 	tomlConfig["rpc-ws-port"] = "8546"
 	setIfUnset("rpc-ws-api", comprehensiveRPCSet)
 	tomlConfig["graphql-http-enabled"] = true
-	tomlConfig["graphql-http-host"] = "0.0.0.0"
+	tomlConfig["graphql-http-host"] = localhost
 	tomlConfig["graphql-http-port"] = "8547"
-	tomlConfig["p2p-host"] = "0.0.0.0"
+	tomlConfig["p2p-host"] = localhost
 	tomlConfig["p2p-port"] = "30303"
 	setIfUnset("host-allowlist", []string{"*"})
 
@@ -296,16 +333,17 @@ func generateBesuIDSecretName(n string) string {
 
 func (r *BesuReconciler) getLabels(node *corev1alpha1.Besu, extraLabels ...map[string]string) map[string]string {
 	l := make(map[string]string, len(r.config.Besu.Labels))
-	l["app"] = generateBesuName(node.Name)
 
 	for k, v := range r.config.Besu.Labels {
 		l[k] = v
 	}
+
 	for _, e := range extraLabels {
 		for k, v := range e {
 			l[k] = v
 		}
 	}
+	l["app.kubernetes.io/name"] = generateBesuName(node.Name)
 	return l
 }
 
@@ -325,15 +363,19 @@ func (r *BesuReconciler) createIdentitySecret(ctx context.Context, node *corev1a
 			"id":      hex.EncodeToString(nodeKey.PublicKeyBytes()),
 			"address": nodeKey.Address.String(),
 		}
-		controllerutil.SetControllerReference(node, &idSecret, r.Scheme)
+		if err := controllerutil.SetControllerReference(node, &idSecret, r.Scheme); err != nil {
+			return nil, err
+		}
 
 		err = r.Create(ctx, &idSecret)
 		if err != nil {
 			return nil, err
 		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSS, metav1.ConditionTrue, corev1alpha1.ReasonSecretCreated, fmt.Sprintf("Name: %s", name))
 	} else if err != nil {
 		return nil, err
 	}
+
 	return &idSecret, nil
 }
 
@@ -372,9 +414,12 @@ func (r *BesuReconciler) createStatefulSet(ctx context.Context, node *corev1alph
 	statefulSet := r.generateStatefulSetTemplate(node, name, configSum)
 
 	if err := r.createDataPVC(ctx, node); err != nil {
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPVC, metav1.ConditionTrue, corev1alpha1.ReasonPVCCreationFailed, err.Error())
 		return nil, err
 	}
-	controllerutil.SetControllerReference(node, statefulSet, r.Scheme)
+	if err := controllerutil.SetControllerReference(node, statefulSet, r.Scheme); err != nil {
+		return nil, err
+	}
 
 	// Check if the StatefulSet already exists, create if not
 	var foundStatefulSet appsv1.StatefulSet
@@ -383,6 +428,7 @@ func (r *BesuReconciler) createStatefulSet(ctx context.Context, node *corev1alph
 		if err != nil {
 			return statefulSet, err
 		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSS, metav1.ConditionTrue, corev1alpha1.ReasonSSCreated, fmt.Sprintf("Name: %s", statefulSet.Name))
 	} else if err != nil {
 		return statefulSet, err
 	} else {
@@ -392,10 +438,12 @@ func (r *BesuReconciler) createStatefulSet(ctx context.Context, node *corev1alph
 		foundStatefulSet.Spec.Template.Annotations = statefulSet.Spec.Template.Annotations
 		foundStatefulSet.Spec.Template.Labels = statefulSet.Spec.Template.Labels
 		// TODO: Other things that can be merged?
-		return &foundStatefulSet, r.Update(ctx, &foundStatefulSet)
+		if err := r.Update(ctx, &foundStatefulSet); err != nil {
+			return statefulSet, err
+		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSS, metav1.ConditionTrue, corev1alpha1.ReasonSSUpdated, fmt.Sprintf("Name: %s", statefulSet.Name))
 	}
 	return statefulSet, nil
-
 }
 
 func (r *BesuReconciler) createDataPVC(ctx context.Context, node *corev1alpha1.Besu) error {
@@ -407,23 +455,26 @@ func (r *BesuReconciler) createDataPVC(ctx context.Context, node *corev1alpha1.B
 		},
 		Spec: node.Spec.PVCTemplate,
 	}
-	pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
-		corev1.ReadWriteOnce,
-	}
-	if pvc.Spec.Resources.Requests == nil {
-		pvc.Spec.Resources.Requests = corev1.ResourceList{}
-	}
-	if _, resourceSet := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !resourceSet {
-		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
-	}
-	controllerutil.SetControllerReference(node, &pvc, r.Scheme)
 
 	var foundPVC corev1.PersistentVolumeClaim
 	if err := r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &foundPVC); err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, &pvc)
-		if err != nil {
+		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
+			corev1.ReadWriteOnce,
+		}
+		if pvc.Spec.Resources.Requests == nil {
+			pvc.Spec.Resources.Requests = corev1.ResourceList{}
+		}
+		if _, resourceSet := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !resourceSet {
+			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+		}
+		if err := controllerutil.SetControllerReference(node, &pvc, r.Scheme); err != nil {
 			return err
 		}
+
+		if err = r.Create(ctx, &pvc); err != nil {
+			return err
+		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPVC, metav1.ConditionTrue, corev1alpha1.ReasonPVCCreated, fmt.Sprintf("Name: %s", pvc.Name))
 	} else if err != nil {
 		return err
 	}
@@ -455,7 +506,9 @@ func (r *BesuReconciler) generatePDBTemplate(node *corev1alpha1.Besu, name strin
 
 func (r *BesuReconciler) createPDB(ctx context.Context, node *corev1alpha1.Besu, name string) (*policyv1.PodDisruptionBudget, error) {
 	pdb := r.generatePDBTemplate(node, name)
-	controllerutil.SetControllerReference(node, pdb, r.Scheme)
+	if err := controllerutil.SetControllerReference(node, pdb, r.Scheme); err != nil {
+		return nil, err
+	}
 
 	var foundPDB policyv1.PodDisruptionBudget
 	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: pdb.Namespace}, &foundPDB); err != nil && errors.IsNotFound(err) {
@@ -463,6 +516,7 @@ func (r *BesuReconciler) createPDB(ctx context.Context, node *corev1alpha1.Besu,
 		if err != nil {
 			return pdb, err
 		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionTrue, corev1alpha1.ReasonPDBCreated, fmt.Sprintf("Name: %s", name))
 	} else if err != nil {
 		return nil, err
 	}
@@ -598,7 +652,9 @@ func (r *BesuReconciler) generateStatefulSetTemplate(node *corev1alpha1.Besu, na
 
 func (r *BesuReconciler) createService(ctx context.Context, node *corev1alpha1.Besu, name string) (*corev1.Service, error) {
 	svc := r.generateServiceTemplate(node, name)
-	controllerutil.SetControllerReference(node, svc, r.Scheme)
+	if err := controllerutil.SetControllerReference(node, svc, r.Scheme); err != nil {
+		return nil, err
+	}
 
 	var foundSvc corev1.Service
 	if err := r.Get(ctx, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, &foundSvc); err != nil && errors.IsNotFound(err) {
@@ -606,6 +662,7 @@ func (r *BesuReconciler) createService(ctx context.Context, node *corev1alpha1.B
 		if err != nil {
 			return svc, err
 		}
+		setCondition(&node.Status.Conditions, corev1alpha1.ConditionSVC, metav1.ConditionTrue, corev1alpha1.ReasonSVCCreated, fmt.Sprintf("Name: %s", name))
 	} else if err != nil {
 		return svc, err
 	}
@@ -628,40 +685,38 @@ func (r *BesuReconciler) generateServiceTemplate(node *corev1alpha1.Besu, name s
 	if svc.Spec.Type == "" {
 		svc.Spec.Type = corev1.ServiceTypeClusterIP
 	}
-	// Set ports unless CR has taken ownership
-	if svc.Spec.Ports == nil {
-		mergeServicePorts(&svc.Spec, []corev1.ServicePort{
-			{
-				Name:       "rpc-http",
-				Port:       8545,
-				TargetPort: intstr.FromInt(8545),
-				Protocol:   corev1.ProtocolTCP,
-			},
-			{
-				Name:       "rpc-ws",
-				Port:       8546,
-				TargetPort: intstr.FromInt(8546),
-				Protocol:   corev1.ProtocolTCP,
-			},
-			{
-				Name:       "graphql-http",
-				Port:       8547,
-				TargetPort: intstr.FromInt(8547),
-				Protocol:   corev1.ProtocolTCP,
-			},
-			{
-				Name:       "p2p-tcp",
-				Port:       30303,
-				TargetPort: intstr.FromInt(30303),
-				Protocol:   corev1.ProtocolTCP,
-			},
-			{
-				Name:       "p2p-udp",
-				Port:       30303,
-				TargetPort: intstr.FromInt(30303),
-				Protocol:   corev1.ProtocolUDP,
-			},
-		})
-	}
+	// Merge our required ports with the overrides the user has provided
+	mergeServicePorts(&svc.Spec, []corev1.ServicePort{
+		{
+			Name:       "rpc-http",
+			Port:       8545,
+			TargetPort: intstr.FromInt(8545),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       "rpc-ws",
+			Port:       8546,
+			TargetPort: intstr.FromInt(8546),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       "graphql-http",
+			Port:       8547,
+			TargetPort: intstr.FromInt(8547),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       "p2p-tcp",
+			Port:       30303,
+			TargetPort: intstr.FromInt(30303),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       "p2p-udp",
+			Port:       30303,
+			TargetPort: intstr.FromInt(30303),
+			Protocol:   corev1.ProtocolUDP,
+		},
+	})
 	return svc
 }

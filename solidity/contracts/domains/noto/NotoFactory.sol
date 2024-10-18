@@ -44,6 +44,15 @@ contract NotoFactory is Ownable, IPaladinContractRegistry_V0 {
     }
 
     /**
+     * Query an implementation
+     */
+    function getImplementation(
+        string calldata name    
+    ) public view returns (address implementation) {
+        return implementations[name];
+    }
+
+    /**
      * Deploy an instance of Noto by cloning a specific implementation.
      */
     function deployImplementation(

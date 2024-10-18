@@ -1,0 +1,9 @@
+go 1.22.5
+
+// this just contains what's needed for the base-builder in docker
+// By running this first, we get a big head start on the pre-reqs install
+// for the build in a cached container
+use (
+	./config
+	./toolkit/go
+)

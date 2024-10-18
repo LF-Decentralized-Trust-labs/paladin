@@ -26,7 +26,7 @@ import (
 // PreInit components do not depend on any other components, they hold their
 // own interface in their package.
 type PreInitComponents interface {
-	KeyManager() ethclient.KeyManager // TODO: move to separate component
+	KeyManager() KeyManager // TODO: move to separate component
 	EthClientFactory() ethclient.EthClientFactory
 	Persistence() persistence.Persistence
 	BlockIndexer() blockindexer.BlockIndexer

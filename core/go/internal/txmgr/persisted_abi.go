@@ -24,7 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/filters"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -49,7 +49,7 @@ var abiFilters = filters.FieldMap{
 	"created": filters.TimestampField("created"),
 }
 
-func (tm *txManager) getABIByHash(ctx context.Context, hash tktypes.Bytes32) (*ptxapi.StoredABI, error) {
+func (tm *txManager) getABIByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.StoredABI, error) {
 	pa, found := tm.abiCache.Get(hash)
 	if found {
 		return pa, nil
@@ -64,7 +64,7 @@ func (tm *txManager) getABIByHash(ctx context.Context, hash tktypes.Bytes32) (*p
 	if err != nil || len(pABIs) == 0 {
 		return nil, err
 	}
-	pa = &ptxapi.StoredABI{Hash: hash}
+	pa = &pldapi.StoredABI{Hash: hash}
 	if err = json.Unmarshal(pABIs[0].ABI, &pa.ABI); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrInvalidStoredData)
 	}
@@ -80,7 +80,7 @@ func (tm *txManager) storeABI(ctx context.Context, a abi.ABI) (*tktypes.Bytes32,
 	return &pa.Hash, err
 }
 
-func (tm *txManager) upsertABI(ctx context.Context, a abi.ABI) (*ptxapi.StoredABI, error) {
+func (tm *txManager) upsertABI(ctx context.Context, a abi.ABI) (*pldapi.StoredABI, error) {
 	hash, err := tktypes.ABISolDefinitionHash(ctx, a)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrInvalidABI)
@@ -145,22 +145,22 @@ func (tm *txManager) upsertABI(ctx context.Context, a abi.ABI) (*ptxapi.StoredAB
 		return nil, err
 	}
 	// Now we can cache it
-	pa = &ptxapi.StoredABI{Hash: *hash, ABI: a}
+	pa = &pldapi.StoredABI{Hash: *hash, ABI: a}
 	tm.abiCache.Set(*hash, pa)
 	return pa, err
 }
 
-func (tm *txManager) queryABIs(ctx context.Context, jq *query.QueryJSON) ([]*ptxapi.StoredABI, error) {
-	qw := &queryWrapper[PersistedABI, ptxapi.StoredABI]{
+func (tm *txManager) queryABIs(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.StoredABI, error) {
+	qw := &queryWrapper[PersistedABI, pldapi.StoredABI]{
 		p:           tm.p,
 		table:       "abis",
 		defaultSort: "-created",
 		filters:     abiFilters,
 		query:       jq,
-		mapResult: func(pa *PersistedABI) (*ptxapi.StoredABI, error) {
+		mapResult: func(pa *PersistedABI) (*pldapi.StoredABI, error) {
 			var a abi.ABI
 			err := json.Unmarshal(pa.ABI, &a)
-			return &ptxapi.StoredABI{
+			return &pldapi.StoredABI{
 				Hash: pa.Hash,
 				ABI:  a,
 			}, err

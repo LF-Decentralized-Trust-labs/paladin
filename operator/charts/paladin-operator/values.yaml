@@ -1,8 +1,6 @@
 
 
-# installCRDs controls whether to install CRDs
-# Default is false as CRDs are installed by the paladin-operator-crds chart and should managed via that chart
-installCRDs: false
+# Default values for paladin-operator
 
 # Default values for paladin-operator
 operator:
@@ -77,3 +75,21 @@ operator:
     # Referring to the external config.yaml file
     dataFile: assets/config.json
     
+# cert-manager dependencies
+cert-manager:
+  namespace: cert-manager
+  enabled: true
+  crds:
+    enabled: true
+
+# Prometheus dependencies
+prometheus:
+  enabled: true
+  prometheus:
+    namespace: prometheus 
+  alertmanager:
+    enabled: false 
+  server:
+    enabled: false
+  pushgateway:
+    enabled: false  # Enable if you need the push gateway

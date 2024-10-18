@@ -26,7 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/blockindexer"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -250,7 +250,7 @@ func (iftxs *inFlightTransactionState) AddSignOutput(ctx context.Context, signed
 	log.L(ctx).Debugf("%s AddSignOutput took %s to write the result", iftxs.InMemoryTxStateManager.GetSignerNonce(), time.Since(start))
 }
 
-func (iftxs *inFlightTransactionState) AddGasPriceOutput(ctx context.Context, gasPriceObject *ptxapi.PublicTxGasPricing, err error) {
+func (iftxs *inFlightTransactionState) AddGasPriceOutput(ctx context.Context, gasPriceObject *pldapi.PublicTxGasPricing, err error) {
 	start := time.Now()
 	iftxs.AddStageOutputs(ctx, &StageOutput{
 		Stage: InFlightTxStageRetrieveGasPrice,
@@ -262,7 +262,7 @@ func (iftxs *inFlightTransactionState) AddGasPriceOutput(ctx context.Context, ga
 	log.L(ctx).Debugf("%s AddGasPriceOutput took %s to write the result", iftxs.InMemoryTxStateManager.GetSignerNonce(), time.Since(start))
 }
 
-func (iftxs *inFlightTransactionState) AddConfirmationsOutput(ctx context.Context, confirmedTx *blockindexer.IndexedTransaction) {
+func (iftxs *inFlightTransactionState) AddConfirmationsOutput(ctx context.Context, confirmedTx *pldapi.IndexedTransaction) {
 	panic("unused")
 	// start := time.Now()
 	// iftxs.AddStageOutputs(ctx, &StageOutput{

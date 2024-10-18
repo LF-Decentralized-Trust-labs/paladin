@@ -28,13 +28,24 @@ import (
 
 // Allows separate components to maintain separate connections/connection-pools to the
 // blockchain, all using a common set of configuration pointing at the same blockchain.
+type EthClientFactoryBase interface {
+	Start() error   // connects the shared websocket and queries the chainID
+	Stop()          // closes HTTP client and shared WS client
+	ChainID() int64 // available after start
+}
+
 type EthClientFactory interface {
-	Start() error              // connects the shared websocket and queries the chainID
-	Stop()                     // closes HTTP client and shared WS client
-	ChainID() int64            // available after start
+	EthClientFactoryBase
 	HTTPClient() EthClient     // HTTP client
 	SharedWS() EthClient       // WS client with a single long lived socket shared across multiple components
 	NewWS() (EthClient, error) // created a dedicated socket - which the caller responsible for closing
+}
+
+type EthClientFactoryWithKeyManager interface {
+	EthClientFactoryBase
+	HTTPClient() EthClientWithKeyManager     // HTTP client
+	SharedWS() EthClientWithKeyManager       // WS client with a single long lived socket shared across multiple components
+	NewWS() (EthClientWithKeyManager, error) // created a dedicated socket - which the caller responsible for closing
 }
 
 type ethClientFactory struct {
@@ -44,20 +55,36 @@ type ethClientFactory struct {
 	keymgr KeyManager
 
 	httpRPC    rpcclient.Client
-	httpClient EthClient
+	httpClient *ethClient
 
-	sharedWSClient EthClient
+	sharedWSClient *ethClient
 
 	wsConf *wsclient.WSConfig
 
 	chainID int64
 }
 
+type ethClientFactoryKeyManagerWrapper struct {
+	ecf *ethClientFactory
+}
+
 // During construction the shared WS connection is established, and the ChainID is queried
 // using that connection.
 //
 // Callers can later
-func NewEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *pldconf.EthClientConfig) (_ EthClientFactory, err error) {
+func NewEthClientFactory(bgCtx context.Context, conf *pldconf.EthClientConfig) (_ EthClientFactory, err error) {
+	return newEthClientFactory(bgCtx, nil, conf)
+}
+
+func NewEthClientFactoryWithKeyManager(bgCtx context.Context, keymgr KeyManager, conf *pldconf.EthClientConfig) (_ EthClientFactoryWithKeyManager, err error) {
+	ecf, err := newEthClientFactory(bgCtx, keymgr, conf)
+	if err != nil {
+		return nil, err
+	}
+	return &ethClientFactoryKeyManagerWrapper{ecf}, nil
+}
+
+func newEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *pldconf.EthClientConfig) (_ *ethClientFactory, err error) {
 	ecf := &ethClientFactory{
 		bgCtx:   bgCtx,
 		conf:    conf,
@@ -89,13 +116,16 @@ func NewEthClientFactory(bgCtx context.Context, keymgr KeyManager, conf *pldconf
 
 func (ecf *ethClientFactory) Start() (err error) {
 	// Connect and check the two connections are to the same network
-	ecf.httpClient, err = WrapRPCClient(ecf.bgCtx, ecf.keymgr, ecf.httpRPC, ecf.conf)
+	var sharedWSClient EthClient
+	httpClient, err := WrapRPCClient(ecf.bgCtx, ecf.keymgr, ecf.httpRPC, ecf.conf)
 	if err == nil {
-		ecf.sharedWSClient, err = ecf.NewWS()
+		sharedWSClient, err = ecf.NewWS()
 	}
 	if err != nil {
 		return err
 	}
+	ecf.httpClient = httpClient.(*ethClient)
+	ecf.sharedWSClient = sharedWSClient.(*ethClient)
 	httpChainID := ecf.httpClient.ChainID()
 	wsChainID := ecf.sharedWSClient.ChainID()
 	if wsChainID != httpChainID {
@@ -119,6 +149,9 @@ func (ecf *ethClientFactory) HTTPClient() EthClient {
 }
 
 func (ecf *ethClientFactory) SharedWS() EthClient {
+	if ecf.sharedWSClient == nil {
+		panic("call to SharedWS() before Start")
+	}
 	return ecf.sharedWSClient
 }
 
@@ -129,4 +162,34 @@ func (ecf *ethClientFactory) Stop() {
 
 func (ecf *ethClientFactory) ChainID() int64 {
 	return ecf.chainID
+}
+
+// Wrapper for key manager support in environments using this directly to access the blockchain rather than in Paladin
+
+func (w *ethClientFactoryKeyManagerWrapper) Start() error {
+	return w.ecf.Start()
+}
+
+func (w *ethClientFactoryKeyManagerWrapper) NewWS() (EthClientWithKeyManager, error) {
+	ec, err := w.ecf.NewWS()
+	if err != nil {
+		return nil, err
+	}
+	return ec.(EthClientWithKeyManager), nil
+}
+
+func (w *ethClientFactoryKeyManagerWrapper) HTTPClient() EthClientWithKeyManager {
+	return w.ecf.HTTPClient().(EthClientWithKeyManager)
+}
+
+func (w *ethClientFactoryKeyManagerWrapper) SharedWS() EthClientWithKeyManager {
+	return w.ecf.SharedWS().(EthClientWithKeyManager)
+}
+
+func (w *ethClientFactoryKeyManagerWrapper) Stop() {
+	w.ecf.Stop()
+}
+
+func (w *ethClientFactoryKeyManagerWrapper) ChainID() int64 {
+	return w.ecf.ChainID()
 }

@@ -33,6 +33,7 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 
 var (
 	// Generic PD0600XX
-	MsgInvalidRegistryConfig = ffe("PD060001", "Invalid registry configuration")
-	MsgInvalidRegistryEvent  = ffe("PD060002", "Invalid registry event %+v")
+	MsgInvalidRegistryConfig  = ffe("PD060001", "Invalid registry configuration")
+	MsgInvalidRegistryEvent   = ffe("PD060002", "Invalid registry event %+v")
+	MsgMissingContractAddress = ffe("PD060003", "contractAddress is required in registry config")
 )

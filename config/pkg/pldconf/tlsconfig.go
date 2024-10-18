@@ -25,6 +25,6 @@ type TLSConfig struct {
 	Cert                   string            `json:"cert,omitempty"`
 	KeyFile                string            `json:"keyFile,omitempty"`
 	Key                    string            `json:"key,omitempty"`
-	InsecureSkipHostVerify bool              `json:"insecureSkipHostVerify"`
+	InsecureSkipHostVerify bool              `json:"insecureSkipHostVerify,omitempty"`
 	RequiredDNAttributes   map[string]string `json:"requiredDNAttributes,omitempty"`
 }

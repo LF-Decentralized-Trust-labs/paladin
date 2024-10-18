@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
-	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"

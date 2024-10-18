@@ -26,7 +26,7 @@ resources:
   controller: true
   domain: paladin.io
   group: core
-  kind: SmartContract
+  kind: SmartContractDeployment
   path: github.com/kaleido-io/paladin/operator/api/v1alpha1
   version: v1alpha1
 - api:
@@ -45,6 +45,33 @@ resources:
   domain: paladin.io
   group: core
   kind: BesuGenesis
+  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: paladin.io
+  group: core
+  kind: PaladinRegistry
+  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: paladin.io
+  group: core
+  kind: PaladinDomain
+  path: github.com/kaleido-io/paladin/operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: paladin.io
+  group: core
+  kind: PaladinRegistration
   path: github.com/kaleido-io/paladin/operator/api/v1alpha1
   version: v1alpha1
 version: "3"

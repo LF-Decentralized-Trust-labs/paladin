@@ -1,7 +1,21 @@
 ## Append samples of your project ##
 resources:
-- core_v1alpha1_paladin.yaml
-- core_v1alpha1_smartcontract.yaml
-- core_v1alpha1_besu.yaml
+- cert_issuer_selfsigned.yaml
+- core_v1alpha1_paladin_node1.yaml
+- core_v1alpha1_paladin_node2.yaml
+- core_v1alpha1_paladin_node3.yaml
+- core_v1alpha1_besu_node1.yaml
+- core_v1alpha1_besu_node2.yaml
+- core_v1alpha1_besu_node3.yaml
 - core_v1alpha1_besugenesis.yaml
+- core_v1alpha1_smartcontractdeployment_registry.yaml
+- core_v1alpha1_smartcontractdeployment_noto.yaml
+- core_v1alpha1_smartcontractdeployment_pente.yaml
+- core_v1alpha1_paladinregistry.yaml
+- core_v1alpha1_paladindomain_noto.yaml
+- core_v1alpha1_paladindomain_pente.yaml
+# - core_v1alpha1_paladindomain_zeto.yaml
+- core_v1alpha1_paladinregistration_node1_admin.yaml
+- core_v1alpha1_paladinregistration_node2.yaml
+- core_v1alpha1_paladinregistration_node3.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

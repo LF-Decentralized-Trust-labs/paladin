@@ -19,29 +19,6 @@ package io.kaleido.paladin.kata.engine;
 option go_package = "pkg/proto/engine";
 import "google/protobuf/any.proto";
 
-//A message that pertains to a specific contract orchestrator in the engine for a given transaction
-message ContractMessage {
-    string id = 1;
-    string contract_address = 2;
-    string transaction_id = 3;
-    google.protobuf.Any data = 4;
-}
-
-//A message that pertains to a specific stage in the engine for a given transaction
-message StageMessage {
-    string id = 1;
-    string contract_address = 2;
-    string transaction_id = 3;
-    string stage = 4;
-    google.protobuf.Any data = 5;
-}
-
-//An event that should be broadcast to all nodes in the network participating in a given contract
-message ContractEvent {
-    string id = 1;
-    string contract_address = 2;
-    google.protobuf.Any data = 3;
-}
 
 message TransactionDispatched {
     string id = 1;
@@ -89,4 +66,46 @@ message ResolveVerifierError {
     string algorithm = 2;
     string verifier_type = 3;
     string error_message = 4;
+}
+
+message DelegationRequest {
+    string transaction_id = 1;
+    string delegate_node_id = 2;
+    string delegation_id = 3; //this is used to correlate the acknowledgement back to the delegation. unlike the transport message id / correlation id, this is not unique across retries
+    bytes private_transaction = 4; //json serialized copy of the in-memory private transaction object
+    
+    
+    // TODO we are using google.protobuf.Any here for TransactionSpecification which is defined in toolkit protos
+    // need to figure out the build magic to import these from toolkit protos
+    //google.protobuf.Any transaction_specification = 4; // serialized io.kaleido.paladin.toolkit.TransactionSpecification
+    //optional google.protobuf.Any assembled_transaction = 5; // serialized io.kaleido.paladin.toolkit.AssembledTransaction
+    //repeated google.protobuf.Any attestation_plan = 6; // serialized io.kaleido.paladin.toolkit.AttestationRequest
+    //repeated google.protobuf.Any verifiers = 7; // serialized io.kaleido.paladin.toolkit.ResolvedVerifier
+}
+
+message DelegationRequestAcknowledgment {
+    string transaction_id = 1;
+    string delegate_node_id = 2;
+    string delegation_id = 3;//this is used to correlate the acknowledgement back to the delegation. unlike the transport message id / correlation id, this is not unique across retries
+}
+
+//To be distrubuted to all parties mentioned in the distribution list for a state, as chosen by the domain
+message StateProducedEvent {
+    string state_id = 1;
+    string state_data_json = 2;
+    string party = 3;
+    string domain_name = 4;
+	string contract_address = 5;
+	string schema_id = 6 ;
+    string distribution_id = 7; //this is used to correlate the acknowledgement back to the distribution. unlike the transport message id / correlation id, this is not unique across retries
+}
+
+message StateAcknowledgedEvent {
+    string state_id = 1;
+    string state_data_json = 2;
+    string party = 3;
+    string domain_name = 4;
+	string contract_address = 5;
+	string schema_id = 6 ;
+    string distribution_id = 7; //this is used to correlate the acknowledgement back to the distribution. unlike the transport message id / correlation id, this is not unique across retries
 }

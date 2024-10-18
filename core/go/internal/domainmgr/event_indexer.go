@@ -105,6 +105,7 @@ func (dm *domainManager) registrationIndexer(ctx context.Context, dbTX *gorm.DB,
 func (dm *domainManager) notifyTransactions(txCompletions receiptsByOnChainOrder) {
 	for _, receipt := range txCompletions {
 		inflight := dm.privateTxWaiter.GetInflight(receipt.TransactionID)
+		log.L(dm.bgCtx).Infof("Notifying for private deployment TransactionID %s (waiter=%t)", receipt.TransactionID, inflight != nil)
 		if inflight != nil {
 			inflight.Complete(receipt)
 		}
@@ -181,6 +182,7 @@ func (d *domain) handleEventBatch(ctx context.Context, dbTX *gorm.DB, batch *blo
 			if err != nil {
 				return nil, err
 			}
+			log.L(ctx).Infof("Domain transaction completion: %s", txID)
 			txCompletions = append(txCompletions, &components.ReceiptInput{
 				TransactionID: *txID,
 				ReceiptType:   components.RT_Success,
@@ -233,7 +235,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX *gorm.DB,
 
 	// We have a domain context for queries, but we never flush it to DB - as the only updates
 	// we allow in this function are those performed within our dbTX.
-	c := d.newInFlightDomainRequest(dbTX, d.dm.stateStore.NewDomainContext(ctx, d, addr))
+	c := d.newInFlightDomainRequest(dbTX, d.dm.stateStore.NewDomainContext(ctx, d, addr, dbTX))
 	defer c.close()
 
 	batch.StateQueryContext = c.id

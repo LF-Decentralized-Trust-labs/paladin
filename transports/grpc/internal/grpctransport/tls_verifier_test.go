@@ -104,7 +104,7 @@ func newTestGRPCTransport(t *testing.T, nodeCert, nodeKey string, conf *Config) 
 
 	//  construct the plugin
 	callbacks := &testCallbacks{}
-	transport := grpcTransportFactory(callbacks).(*grpcTransport)
+	transport := NewGRPCTransport(callbacks).(*grpcTransport)
 	res, err := transport.ConfigureTransport(transport.bgCtx, &prototk.ConfigureTransportRequest{
 		Name:       "grpc",
 		ConfigJson: string(jsonConf),
@@ -207,6 +207,13 @@ func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 	if err == nil {
 		<-received
 	}
+
+	details, err := plugin1.GetLocalDetails(ctx, &prototk.GetLocalDetailsRequest{})
+	require.NoError(t, err)
+	var pubDetails PublishedTransportDetails
+	err = json.Unmarshal([]byte(details.TransportDetails), &pubDetails)
+	require.NoError(t, err)
+	require.Contains(t, pubDetails.Issuers, "CERTIFICATE")
 
 }
 

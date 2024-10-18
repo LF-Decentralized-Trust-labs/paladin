@@ -38,7 +38,20 @@ const (
 	ClientType TLSType = "client"
 )
 
+type TLSConfigDetailed struct {
+	TLSConfig   *tls.Config
+	Certificate *tls.Certificate
+}
+
 func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLSType) (*tls.Config, error) {
+	conf, err := BuildTLSConfigExt(ctx, config, tlsType)
+	if err != nil || conf == nil {
+		return nil, err
+	}
+	return conf.TLSConfig, nil
+}
+
+func BuildTLSConfigExt(ctx context.Context, config *pldconf.TLSConfig, tlsType TLSType) (*TLSConfigDetailed, error) {
 	if !config.Enabled {
 		return nil, nil
 	}
@@ -55,6 +68,7 @@ func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLST
 			return nil
 		},
 	}
+	detail := &TLSConfigDetailed{TLSConfig: tlsConfig}
 
 	var err error
 	// Support custom CA file
@@ -87,22 +101,22 @@ func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLST
 	tlsConfig.RootCAs = rootCAs
 
 	// For mTLS we need both the cert and key
-	var configuredCert *tls.Certificate
 	if config.CertFile != "" && config.KeyFile != "" {
 		// Read the key pair to create certificate
 		cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 		if err != nil {
 			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
 		}
-		configuredCert = &cert
+		detail.Certificate = &cert
 	} else if config.Cert != "" && config.Key != "" {
 		cert, err := tls.X509KeyPair([]byte(config.Cert), []byte(config.Key))
 		if err != nil {
 			return nil, i18n.WrapError(ctx, err, tkmsgs.MsgTLSInvalidKeyPairFiles)
 		}
-		configuredCert = &cert
+		detail.Certificate = &cert
 	}
-	if configuredCert != nil {
+	if detail.Certificate != nil {
+		configuredCert := detail.Certificate
 		// Rather than letting Golang pick a certificate it thinks matches from the list of one,
 		// we directly supply it the one we have in all cases.
 		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
@@ -136,7 +150,7 @@ func BuildTLSConfig(ctx context.Context, config *pldconf.TLSConfig, tlsType TLST
 
 	tlsConfig.InsecureSkipVerify = config.InsecureSkipHostVerify
 
-	return tlsConfig, nil
+	return detail, nil
 
 }
 

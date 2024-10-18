@@ -16,11 +16,40 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+    compiledContracts {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 jar {
-    archiveBaseName = 'pente'
-    archiveVersion = ''
+    dependsOn 'classes'  // Ensure the classes are compiled before creating the JAR
+    dependsOn ':solidity:compile'
+
+    if (project.hasProperty('jarVersion')) {
+        archiveVersion = project.jarVersion
+    } else {
+        archiveVersion = ''
+    }
+
+    archiveBaseName = 'pente'  // Base name of the JAR, the version will be added to this
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    from(configurations.compiledContracts) {
+        include 'contracts/domains/pente/PenteFactory.sol/PenteFactory.json'
+        include 'contracts/domains/pente/PentePrivacyGroup.sol/PentePrivacyGroup.json'
+        include 'contracts/domains/interfaces/IPente.sol/IPente.json'
+        include 'contracts/private/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json'
+    }
+
+    from sourceSets.main.output
+
+    // Exclude signature files from dependencies
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 assemble.dependsOn jar
@@ -95,4 +124,7 @@ dependencies {
     implementation 'io.tmio:tuweni-units:2.4.2'
 
     implementation project(path: ":toolkit_java")
+
+    compiledContracts project(path: ":solidity", configuration: "compiledContracts")
+
 }

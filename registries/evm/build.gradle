@@ -31,6 +31,12 @@ configurations {
         canBeConsumed = false
         canBeResolved = true
     }
+
+    // Consumable configurations
+    libevm {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
 
 dependencies {
@@ -85,9 +91,20 @@ task test(type: Exec, dependsOn: [copyContracts]) {
     dependsOn ':testinfra:startTestInfra'
 }
 
+task buildGo(type: GoLib, dependsOn: [copyContracts]) {
+    inputs.files(configurations.toolkitGo)
+    baseName "evm"
+    sources goFiles
+    mainFile 'evm.go'
+}
+
 task build {
     dependsOn lint
     dependsOn test
+}
+
+task assemble {
+    dependsOn buildGo
 }
 
 task clean(type: Delete) {

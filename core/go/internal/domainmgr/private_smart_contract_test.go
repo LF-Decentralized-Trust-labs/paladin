@@ -31,8 +31,8 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -581,8 +581,8 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	// And now prepare
 	err = psc.PrepareTransaction(dCtx, tx)
 	require.NoError(t, err)
-	assert.NotNil(t, tx.PreparedPublicTransaction.FunctionABI)
-	assert.NotNil(t, tx.PreparedPublicTransaction.Inputs)
+	assert.Len(t, tx.PreparedPublicTransaction.ABI, 1)
+	assert.NotNil(t, tx.PreparedPublicTransaction.Data)
 
 	// Confirm the remaining unspent states
 	stillAvailable, err = domain.FindAvailableStates(td.ctx, &prototk.FindAvailableStatesRequest{
@@ -830,26 +830,6 @@ func TestPrepareTransactionABIInvalid(t *testing.T) {
 	assert.Regexp(t, "PD011607", err)
 }
 
-func TestPrepareTransactionBadData(t *testing.T) {
-	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
-	defer done()
-
-	psc, tx := doDomainInitAssembleTransactionOK(t, td)
-	tx.Signer = "signer1"
-
-	td.tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-		return &prototk.PrepareTransactionResponse{
-			Transaction: &prototk.PreparedTransaction{
-				FunctionAbiJson: fakeCoinExecuteABI,
-				ParamsJson:      `{"missing": "expected"}`,
-			},
-		}, nil
-	}
-
-	err := psc.PrepareTransaction(td.mdc, tx)
-	assert.Regexp(t, "FF22040", err)
-}
-
 func TestPrepareTransactionPrivateResult(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
@@ -873,9 +853,9 @@ func TestPrepareTransactionPrivateResult(t *testing.T) {
 
 	err := psc.PrepareTransaction(td.mdc, tx)
 	require.NoError(t, err)
-	assert.Equal(t, ptxapi.Transaction{
+	assert.Equal(t, pldapi.Transaction{
 		IdempotencyKey: fmt.Sprintf("%s_doTheNextThing", tx.ID),
-		Type:           ptxapi.TransactionTypePrivate.Enum(),
+		Type:           pldapi.TransactionTypePrivate.Enum(),
 		Function:       "doTheNextThing(string)",
 		From:           tx.Signer,
 		To:             contractAddr,

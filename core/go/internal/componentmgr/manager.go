@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/domainmgr"
 	"github.com/kaleido-io/paladin/core/internal/identityresolver"
+	"github.com/kaleido-io/paladin/core/internal/keymanager"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/plugins"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr"
@@ -38,13 +39,11 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
-	"github.com/kaleido-io/paladin/toolkit/pkg/signerapi"
 )
 
 type ComponentManager interface {
 	components.AllComponents
 	Init() error
-	StartComponents() error
 	StartManagers() error
 	CompleteStart() error
 	Stop()
@@ -57,7 +56,7 @@ type componentManager struct {
 	// config
 	conf *pldconf.PaladinConfig
 	// pre-init
-	keyManager       ethclient.KeyManager
+	keyManager       components.KeyManager
 	ethClientFactory ethclient.EthClientFactory
 	persistence      persistence.Persistence
 	blockIndexer     blockindexer.BlockIndexer
@@ -111,13 +110,8 @@ func NewComponentManager(bgCtx context.Context, grpcTarget string, instanceUUID 
 }
 
 func (cm *componentManager) Init() (err error) {
-	// pre-init components
-	cm.keyManager, err = ethclient.NewSimpleTestKeyManager(cm.bgCtx, (*signerapi.ConfigNoExt)(&cm.conf.Signer))
-	err = cm.addIfOpened("key_manager", cm.keyManager, err, msgs.MsgComponentKeyManagerInitError)
-	if err == nil {
-		cm.ethClientFactory, err = ethclient.NewEthClientFactory(cm.bgCtx, cm.keyManager, &cm.conf.Blockchain)
-		err = cm.wrapIfErr(err, msgs.MsgComponentEthClientInitError)
-	}
+	cm.ethClientFactory, err = ethclient.NewEthClientFactory(cm.bgCtx, &cm.conf.Blockchain)
+	err = cm.wrapIfErr(err, msgs.MsgComponentEthClientInitError)
 	if err == nil {
 		cm.persistence, err = persistence.NewPersistence(cm.bgCtx, &cm.conf.DB)
 		err = cm.addIfOpened("database", cm.persistence, err, msgs.MsgComponentDBInitError)
@@ -132,6 +126,11 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	// pre-init managers
+	if err == nil {
+		cm.keyManager = keymanager.NewKeyManager(cm.bgCtx, &cm.conf.KeyManagerConfig)
+		cm.initResults["key_manager"], err = cm.keyManager.PreInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentKeyManagerInitError)
+	}
 	if err == nil {
 		cm.stateManager = statemgr.NewStateManager(cm.bgCtx, &cm.conf.StateStore, cm.persistence)
 		cm.initResults["state_manager"], err = cm.stateManager.PreInit(cm)
@@ -168,7 +167,7 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		cm.privateTxManager = privatetxnmgr.NewPrivateTransactionMgr(cm.bgCtx, cm.instanceUUID.String(), &cm.conf.PrivateTxManager)
+		cm.privateTxManager = privatetxnmgr.NewPrivateTransactionMgr(cm.bgCtx, &cm.conf.PrivateTxManager)
 		cm.initResults["private_tx_manager"], err = cm.privateTxManager.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentPrivateTxManagerInitError)
 	}
@@ -180,7 +179,7 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	if err == nil {
-		cm.identityResolver = identityresolver.NewIdentityResolver(cm.bgCtx, cm.instanceUUID.String())
+		cm.identityResolver = identityresolver.NewIdentityResolver(cm.bgCtx)
 		cm.initResults["identity_resolver"], err = cm.identityResolver.PreInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentIdentityResolverInitError)
 	}
@@ -194,6 +193,11 @@ func (cm *componentManager) Init() (err error) {
 	}
 
 	// post-init the managers
+	if err == nil {
+		err = cm.keyManager.PostInit(cm)
+		err = cm.wrapIfErr(err, msgs.MsgComponentKeyManagerInitError)
+	}
+
 	if err == nil {
 		err = cm.stateManager.PostInit(cm)
 		err = cm.wrapIfErr(err, msgs.MsgComponentStateManagerInitError)
@@ -249,16 +253,9 @@ func (cm *componentManager) Init() (err error) {
 	return err
 }
 
-func (cm *componentManager) StartComponents() (err error) {
-
-	// start the eth client
-	err = cm.ethClientFactory.Start()
-	err = cm.addIfStarted("eth_client", cm.ethClientFactory, err, msgs.MsgComponentEthClientStartError)
-
+func (cm *componentManager) startBlockIndexer() (err error) {
 	// start the block indexer
-	if err == nil {
-		cm.internalEventStreams, err = cm.buildInternalEventStreams()
-	}
+	cm.internalEventStreams, err = cm.buildInternalEventStreams()
 	if err == nil {
 		err = cm.blockIndexer.Start(cm.internalEventStreams...)
 		err = cm.addIfStarted("block_indexer", cm.blockIndexer, err, msgs.MsgComponentBlockIndexerStartError)
@@ -275,9 +272,20 @@ func (cm *componentManager) StartComponents() (err error) {
 
 func (cm *componentManager) StartManagers() (err error) {
 
+	// start the eth client before any managers - this connects the WebSocket, and gathers the ChainID
+	err = cm.ethClientFactory.Start()
+	err = cm.addIfStarted("eth_client", cm.ethClientFactory, err, msgs.MsgComponentEthClientStartError)
+
 	// start the managers
-	err = cm.stateManager.Start()
-	err = cm.addIfStarted("state_manager", cm.stateManager, err, msgs.MsgComponentStateManagerStartError)
+	if err == nil {
+		err = cm.keyManager.Start()
+		err = cm.addIfStarted("key_manager", cm.keyManager, err, msgs.MsgComponentKeyManagerStartError)
+	}
+
+	if err == nil {
+		err = cm.stateManager.Start()
+		err = cm.addIfStarted("state_manager", cm.stateManager, err, msgs.MsgComponentStateManagerStartError)
+	}
 
 	if err == nil {
 		err = cm.domainManager.Start()
@@ -328,6 +336,11 @@ func (cm *componentManager) CompleteStart() error {
 	// Wait for the plugins to all start
 	err := cm.pluginManager.WaitForInit(cm.bgCtx)
 	err = cm.wrapIfErr(err, msgs.MsgComponentWaitPluginStartError)
+
+	// then start the block indexer
+	if err == nil {
+		err = cm.startBlockIndexer()
+	}
 
 	// start the RPC server last
 	if err == nil {
@@ -393,6 +406,9 @@ func (cm *componentManager) registerRPCModules() {
 			cm.rpcServer.Register(rpcMod)
 		}
 	}
+	// We handle block indexer separately (doesn't fit the internal ManagerLifecycle model
+	// as it's currently a standalone re-usable component)
+	cm.rpcServer.Register(cm.BlockIndexer().RPCModule())
 }
 
 func (cm *componentManager) Stop() {
@@ -412,7 +428,7 @@ func (cm *componentManager) Stop() {
 	log.L(cm.bgCtx).Debug("Stopped")
 }
 
-func (cm *componentManager) KeyManager() ethclient.KeyManager {
+func (cm *componentManager) KeyManager() components.KeyManager {
 	return cm.keyManager
 }
 

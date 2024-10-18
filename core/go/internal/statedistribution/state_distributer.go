@@ -116,7 +116,8 @@ func (sd *stateDistributer) Start(ctx context.Context) error {
 	log.L(ctx).Infof("stateDistributer:Start loaded %d state distributions on startup", len(stateDistributions))
 
 	for _, stateDistribution := range stateDistributions {
-		state, err := sd.stateManager.GetState(ctx, stateDistribution.DomainName, *tktypes.MustEthAddress(stateDistribution.ContractAddress), tktypes.MustParseHexBytes(stateDistribution.StateID), true, false)
+		state, err := sd.stateManager.GetState(ctx, sd.persistence.DB(), /* no TX for now */
+			stateDistribution.DomainName, *tktypes.MustEthAddress(stateDistribution.ContractAddress), tktypes.MustParseHexBytes(stateDistribution.StateID), true, false)
 		if err != nil {
 			log.L(ctx).Errorf("Error getting state: %s", err)
 			continue

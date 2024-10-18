@@ -184,7 +184,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	schemaID = as.ID()
 
 	getValidate := func() {
-		as1, err := ss.GetSchema(ctx, as.Persisted().DomainName, schemaID, nil, true)
+		as1, err := ss.GetSchema(ctx, ss.p.DB(), as.Persisted().DomainName, schemaID, true)
 		require.NoError(t, err)
 		assert.NotNil(t, as1)
 		as1Sig, err := as1.(*abiSchema).FullSignature(ctx)
@@ -203,7 +203,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 	getValidate()
 
 	// Get the state back too
-	state1a, err := ss.GetState(ctx, as.Persisted().DomainName, *contractAddress, state1.ID, true, true)
+	state1a, err := ss.GetState(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, state1.ID, true, true)
 	require.NoError(t, err)
 	assert.Equal(t, state1, state1a)
 
@@ -222,7 +222,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindStates(ctx, as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 1)
 
@@ -233,7 +233,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindStates(ctx, as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 0)
 
@@ -244,7 +244,7 @@ func TestStoreRetrieveABISchema(t *testing.T) {
 		]
 	}`), &query)
 	require.NoError(t, err)
-	states, err = ss.FindStates(ctx, as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
+	states, err = ss.FindStates(ctx, ss.p.DB(), as.Persisted().DomainName, *contractAddress, schemaID, query, "all")
 	require.NoError(t, err)
 	assert.Len(t, states, 0)
 }
@@ -277,7 +277,7 @@ func TestGetSchemaInvalidJSON(t *testing.T) {
 		[]string{"type", "content"},
 	).AddRow(components.SchemaTypeABI, "!!! { bad json"))
 
-	_, err := ss.GetSchema(ctx, "domain1", tktypes.Bytes32Keccak(([]byte)("test")), nil, true)
+	_, err := ss.GetSchema(ctx, ss.p.DB(), "domain1", tktypes.Bytes32Keccak(([]byte)("test")), true)
 	assert.Regexp(t, "PD010113", err)
 }
 

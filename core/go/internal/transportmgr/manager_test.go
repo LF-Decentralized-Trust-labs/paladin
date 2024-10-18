@@ -170,3 +170,22 @@ func TestDoubleRegisterAfterStart(t *testing.T) {
 	err := tm.RegisterClient(context.Background(), receivingClient)
 	assert.Regexp(t, "PD012012", err)
 }
+
+func TestGetLocalTransportDetailsNotFound(t *testing.T) {
+	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{}).(*transportManager)
+
+	_, err := tm.getLocalTransportDetails(context.Background(), "nope")
+	assert.Regexp(t, "PD012001", err)
+}
+
+func TestGetLocalTransportDetailsNotFail(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t)
+	defer done()
+
+	tp.Functions.GetLocalDetails = func(ctx context.Context, gldr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, err := tm.getLocalTransportDetails(ctx, tp.t.name)
+	assert.Regexp(t, "pop", err)
+}

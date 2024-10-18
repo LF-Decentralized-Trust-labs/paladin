@@ -48,7 +48,7 @@ public class PenteDomainTests {
                     "deployer",
                     factoryABI,
                     factoryBytecode,
-                    "{}");
+                    new HashMap<String,String>());
             return new JsonHex.Address(contractAddr);
         }
     }

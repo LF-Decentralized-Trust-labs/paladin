@@ -21,43 +21,47 @@ import (
 
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
+	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
-func TestInFlightTxSign(t *testing.T) {
+func TestInFlightTxSignFail(t *testing.T) {
 	ctx, o, m, done := newTestOrchestrator(t)
 	defer done()
 	it, _ := newInflightTransaction(o, 1)
 
 	fromAddr := *tktypes.RandAddress()
+
+	m.ethClient.On("ChainID").Return(int64(1122334455))
+	keyMapping := &pldapi.KeyMappingAndVerifier{
+		KeyMappingWithPath: &pldapi.KeyMappingWithPath{
+			KeyMapping: &pldapi.KeyMapping{
+				Identifier: "any.key",
+			},
+		},
+		Verifier: &pldapi.KeyVerifier{
+			Verifier: fromAddr.String(),
+		},
+	}
+
+	mockKeyManager := m.keyManager.(*componentmocks.KeyManager)
+	mockKeyManager.On("ReverseKeyLookup", mock.Anything, mock.Anything, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS, fromAddr.String()).
+		Return(keyMapping, nil)
+	mockKeyManager.On("Sign", mock.Anything, keyMapping, signpayloads.OPAQUE_TO_RSV, mock.Anything).
+		Return(nil, fmt.Errorf("sign failed")).Once()
+
 	ethTx := &ethsigner.Transaction{
 		Nonce: ethtypes.NewHexInteger64(12345),
 	}
-	rs := &ethclient.ResolvedSigner{
-		Address: fromAddr,
-	}
 
-	buildRawTransactionMock := m.ethClient.On("BuildRawTransactionNoResolve", ctx, ethclient.EIP1559, rs, ethTx, mock.Anything)
-	buildRawTransactionMock.Run(func(args mock.Arguments) {
-		signer := args[2].(*ethclient.ResolvedSigner)
-		assert.Equal(t, fromAddr, signer.Address)
-		buildRawTransactionMock.Return(nil, fmt.Errorf("pop"))
-	}).Once()
-	_, txHash, err := it.signTx(ctx, rs, ethTx)
-	assert.Error(t, err)
+	_, txHash, err := it.signTx(ctx, fromAddr, ethTx)
+	assert.Regexp(t, "sign failed", err)
 	assert.Nil(t, txHash)
 
-	// signing succeeded
-	testTxData := tktypes.HexBytes(tktypes.RandBytes(32))
-	buildRawTransactionMock.Run(func(args mock.Arguments) {
-		signer := args[2].(*ethclient.ResolvedSigner)
-		assert.Equal(t, fromAddr, signer.Address)
-	}).Return(testTxData, nil).Once()
-	_, txHash, err = it.signTx(ctx, rs, ethTx)
-	require.NoError(t, err)
-	assert.Equal(t, *calculateTransactionHash(testTxData), *txHash)
 }

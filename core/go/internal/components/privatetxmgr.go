@@ -34,8 +34,10 @@ type TransactionDispatchedEvent struct {
 }
 
 type PrivateTxStatus struct {
-	TxID   string `json:"transactionId"`
-	Status string `json:"status"`
+	TxID        string `json:"transactionId"`
+	Status      string `json:"status"`
+	LatestEvent string `json:"latestEvent"`
+	LatestError string `json:"latestError"`
 }
 
 type PrivateTxManager interface {

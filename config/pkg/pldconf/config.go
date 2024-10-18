@@ -30,13 +30,13 @@ type PaladinConfig struct {
 	PluginManagerConfig    `json:",inline"`
 	TransportManagerConfig `json:",inline"`
 	RegistryManagerConfig  `json:",inline"`
+	KeyManagerConfig       `json:",inline"`
 	Log                    LogConfig              `json:"log"`
 	Blockchain             EthClientConfig        `json:"blockchain"`
 	DB                     DBConfig               `json:"db"`
 	RPCServer              RPCServerConfig        `json:"rpcServer"`
 	StateStore             StateStoreConfig       `json:"statestore"`
 	BlockIndexer           BlockIndexerConfig     `json:"blockIndexer"`
-	Signer                 SignerConfig           `json:"signer"`
 	TempDir                *string                `json:"tempDir"`
 	TxManager              TxManagerConfig        `json:"txManager"`
 	PrivateTxManager       PrivateTxManagerConfig `json:"privateTxManager"`

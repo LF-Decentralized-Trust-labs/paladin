@@ -39,8 +39,8 @@ type DomainManager interface {
 	DomainRegistered(name string, toDomain DomainManagerToDomain) (fromDomain plugintk.DomainCallbacks, err error)
 	GetDomainByName(ctx context.Context, name string) (Domain, error)
 	GetSmartContractByAddress(ctx context.Context, addr tktypes.EthAddress) (DomainSmartContract, error)
-	WaitForDeploy(ctx context.Context, txID uuid.UUID) (DomainSmartContract, error)
-	WaitForTransaction(ctx context.Context, txID uuid.UUID) error
+	ExecDeployAndWait(ctx context.Context, txID uuid.UUID, call func() error) (dc DomainSmartContract, err error)
+	ExecAndWaitTransaction(ctx context.Context, txID uuid.UUID, call func() error) error
 	GetSigner() signerapi.InMemorySigner
 }
 

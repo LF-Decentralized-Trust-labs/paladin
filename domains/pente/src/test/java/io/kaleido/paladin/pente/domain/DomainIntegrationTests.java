@@ -60,7 +60,7 @@ public class DomainIntegrationTests {
                     "deployer",
                     factoryABI,
                     factoryBytecode,
-                    "{}");
+                    new HashMap<String,String>());
             return new JsonHex.Address(contractAddr);
         }
     }
@@ -81,7 +81,7 @@ public class DomainIntegrationTests {
                     "deployer",
                     factoryABI,
                     factoryBytecode,
-                    "{}");
+                    new HashMap<String,String>());
             return new JsonHex.Address(contractAddr);
         }
     }

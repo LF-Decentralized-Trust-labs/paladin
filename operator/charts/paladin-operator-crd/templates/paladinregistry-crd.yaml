@@ -1,0 +1,170 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: paladinregistries.core.paladin.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.3
+  labels:
+  {{- include "paladin-operator-crd.labels" . | nindent 4 }}
+spec:
+  group: core.paladin.io
+  names:
+    kind: PaladinRegistry
+    listKind: PaladinRegistryList
+    plural: paladinregistries
+    shortNames:
+    - registry
+    singular: paladinregistry
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    - jsonPath: .status.status
+      name: Status
+      type: string
+    - jsonPath: .status.contractAddress
+      name: Contract
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PaladinRegistry is the Schema for the paladinregistries API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PaladinRegistrySpec defines the desired state of PaladinRegistry
+            properties:
+              configJSON:
+                description: JSON configuration specific to the individual registry
+                type: string
+              evm:
+                description: Config specific to EVM based registry
+                properties:
+                  contractAddress:
+                    description: If you have separately deployed the registry, supply
+                      the registry address directly
+                    type: string
+                  smartContractDeployment:
+                    description: Reference to a SmartContractDeployment CR that is used
+                      to deploy the registry
+                    type: string
+                type: object
+              plugin:
+                description: Details of the plugin to load for the domain
+                properties:
+                  class:
+                    description: For Java only, the name of the class to load from the
+                      Jar
+                    type: string
+                  library:
+                    description: The location of the library - do not include the "lib"
+                      prefix or the ".so" suffix for shared libraries
+                    type: string
+                  type:
+                    description: The library type to load
+                    enum:
+                    - c-shared
+                    - jar
+                    type: string
+                required:
+                - library
+                - type
+                type: object
+              transports:
+                description: Optionally adjust how the transport configuration works
+                properties:
+                  enabled:
+                    default: true
+                    description: If true, then this registry will be used for lookup
+                      of node transports
+                    type: boolean
+                  hierarchySplitter:
+                    description: |-
+                      By default the whole node name must match a root entry in the registry.
+                      If a hierarchySplitter is provided (such as ".") then the supplied node
+                      name will be split into path parts and each entry in the hierarchy
+                      will be resolved in order, from the root down to the leaf.
+                    type: string
+                  propertyRegexp:
+                    description: |-
+                      If a node is found, then each property name will be applied to this
+                      regular expression, and if it matches then the value of the property
+                      will be considered a set of transport details.
+  
+                      The transport name must be extracted as a match group.
+  
+                      For example the default is:
+                        propertyRegexp: "^transport.(.*)$"
+  
+                      This will match a property called "transport.grpc" as the transport
+                      details for the grpc transport.
+                    type: string
+                  requiredPrefix:
+                    description: |-
+                      Prefix if set that will be matched and cut from any supplied lookup
+                      node name before performing a lookup. If it does not match (or matches
+                      the whole lookup) then this registry will not be used to lookup the node.
+                      This allows multiple registries to be used safely for different
+                      private node connectivity networks without any possibility
+                      of clashing node names.
+                    type: string
+                  transportMap:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Optionally add entries here to map from the name of a transport as stored in
+                      the registry, to the name in your local configuration.
+                      This allows you to use different configurations (MTLS certs etc.)
+                      for different private node networks that all use the same logical
+                      transport name.
+                    type: object
+                type: object
+              type:
+                default: evm
+                enum:
+                - evm
+                type: string
+            required:
+            - configJSON
+            - plugin
+            - type
+            type: object
+          status:
+            description: PaladinRegistryStatus defines the observed state of PaladinRegistry
+            properties:
+              contractAddress:
+                type: string
+              status:
+                type: string
+            required:
+            - status
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

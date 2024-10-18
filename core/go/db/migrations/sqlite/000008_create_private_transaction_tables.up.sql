@@ -28,3 +28,19 @@ CREATE TABLE state_distribution_acknowledgments (
 );
 
 CREATE UNIQUE INDEX state_distribution_acknowledgments_state_distribution ON state_distribution_acknowledgments("state_distribution");
+
+CREATE TABLE transaction_delegations (
+  "id"                        UUID NOT NULL,
+  "transaction_id"            UUID NOT NULL,
+  "delegate_node_id"          TEXT NOT NULL,
+  PRIMARY KEY ("id")
+-- need to reorder the migrations before we can define a foreign key to the transactions table  FOREIGN KEY ("transaction_id") REFERENCES transactions ("id") ON DELETE CASCADE
+);
+
+CREATE TABLE transaction_delegation_acknowledgements (
+  "delegation"            UUID NOT NULL,
+  "id"                    UUID NOT NULL,
+  PRIMARY KEY ("id"),
+  FOREIGN KEY ("delegation") REFERENCES transaction_delegations ("id") ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX transaction_delegation_acknowledgements_delegation ON transaction_delegation_acknowledgements("delegation");

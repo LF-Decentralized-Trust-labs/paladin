@@ -15,7 +15,11 @@ spec:
     singular: paladin
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Paladin is the Schema for the paladin API
@@ -268,11 +272,134 @@ spec:
                         type: string
                     type: object
                 type: object
+              domains:
+                description: A list of domains to merge into the configuration, and
+                  rebuild the config of paladin when this list changes
+                items:
+                  description: |-
+                    Each domain reference can select one or more domains to include via label selectors
+                    Most common to use a simple one-reference-per-domain approach.
+                  properties:
+                    labelSelector:
+                      description: |-
+                        Label selectors provide a flexible many-to-many mapping between nodes and domains in a namespace.
+                        The domain CRs you reference must be labelled to match. For example you could use a label like "paladin.io/domain-name" to select by name.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - labelSelector
+                  type: object
+                type: array
+              registries:
+                description: A list of registries to merge into the configuration, and
+                  rebuild the config of paladin when this list changes
+                items:
+                  description: |-
+                    Each registry reference can select one or more domains to include via label selectors
+                    Most common to use a simple one-reference-per-domain approach.
+                  properties:
+                    labelSelector:
+                      description: |-
+                        Label selectors provide a flexible many-to-many mapping between nodes and domains in a namespace.
+                        The domain CRs you reference must be labelled to match. For example you could use a label like "paladin.io/domain-name" to select by name.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - labelSelector
+                  type: object
+                type: array
               secretBackedSigners:
                 description: Adds signing modules that load their key materials from
                   a k8s secret
                 items:
                   properties:
+                    keySelector:
+                      default: .*
+                      description: |-
+                        Wallets will be evaluated against new allocations of key identifiers in the order they are
+                        defined. The key selector regular expression allows wallets to sub-select, with more specific
+                        rules first on key matching and more generic rules (like the default of ".*") last.
+                      type: string
                     name:
                       pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
@@ -288,6 +415,7 @@ spec:
                       - preConfigured
                       type: string
                   required:
+                  - keySelector
                   - name
                   - secret
                   - type
@@ -627,13 +755,222 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
                     type: string
                 type: object
+              transports:
+                description: Transports are configured individually on each node, as
+                  they reference security details specific to that node
+                items:
+                  properties:
+                    configJSON:
+                      description: |-
+                        JSON configuration specific to the individual transport.
+                        The "tls" root section of the config will be automatically populated from the k8s secret.
+                        The "externalHostname" property will be automatically set to the internal k8s hostname, unless it is already set in the configJSON
+                      type: string
+                    name:
+                      type: string
+                    plugin:
+                      description: Plugin configuration for loading the transport
+                      properties:
+                        class:
+                          description: For Java only, the name of the class to load
+                            from the Jar
+                          type: string
+                        library:
+                          description: The location of the library - do not include
+                            the "lib" prefix or the ".so" suffix for shared libraries
+                          type: string
+                        type:
+                          description: The library type to load
+                          enum:
+                          - c-shared
+                          - jar
+                          type: string
+                      required:
+                      - library
+                      - type
+                      type: object
+                    ports:
+                      description: The port number to listen on this transport
+                      items:
+                        description: ServicePort contains information on service's port.
+                        properties:
+                          appProtocol:
+                            description: |-
+                              The application protocol for this port.
+                              This is used as a hint for implementations to offer richer behavior for protocols that they understand.
+                              This field follows standard Kubernetes label syntax.
+                              Valid values are either:
+  
+                              * Un-prefixed protocol names - reserved for IANA standard service names (as per
+                              RFC-6335 and https://www.iana.org/assignments/service-names).
+  
+                              * Kubernetes-defined prefixed names:
+                                * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+                                * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+                                * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  
+                              * Other protocols should use implementation-defined prefixed names such as
+                              mycompany.com/my-custom-protocol.
+                            type: string
+                          name:
+                            description: |-
+                              The name of this port within the service. This must be a DNS_LABEL.
+                              All ports within a ServiceSpec must have unique names. When considering
+                              the endpoints for a Service, this must match the 'name' field in the
+                              EndpointPort.
+                              Optional if only one ServicePort is defined on this service.
+                            type: string
+                          nodePort:
+                            description: |-
+                              The port on each node on which this service is exposed when type is
+                              NodePort or LoadBalancer.  Usually assigned by the system. If a value is
+                              specified, in-range, and not in use it will be used, otherwise the
+                              operation will fail.  If not specified, a port will be allocated if this
+                              Service requires one.  If this field is specified when creating a
+                              Service which does not need it, creation will fail. This field will be
+                              wiped when updating a Service to no longer need it (e.g. changing type
+                              from NodePort to ClusterIP).
+                              More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+                            format: int32
+                            type: integer
+                          port:
+                            description: The port that will be exposed by this service.
+                            format: int32
+                            type: integer
+                          protocol:
+                            default: TCP
+                            description: |-
+                              The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
+                              Default is TCP.
+                            type: string
+                          targetPort:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Number or name of the port to access on the pods targeted by the service.
+                              Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
+                              If this is a string, it will be looked up as a named port in the
+                              target Pod's container ports. If this is not specified, the value
+                              of the 'port' field is used (an identity map).
+                              This field is ignored for services with clusterIP=None, and should be
+                              omitted or set equal to the 'port' field.
+                              More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+                            x-kubernetes-int-or-string: true
+                        required:
+                        - port
+                        type: object
+                      type: array
+                    tls:
+                      description: TLS configuration to use for this secret
+                      properties:
+                        additionalDNSNames:
+                          description: Additional DNS names to add to the definition
+                            (for external hostnames) when using automatic cert-manager
+                          items:
+                            type: string
+                          type: array
+                        certName:
+                          description: |-
+                            If specified then a cert-manager.io/v1 Certificate will be created for the internal DNS names of the service.
+                            If you define multiple transports that share a secret, then only specify this on one.
+                          type: string
+                        certSpecTemplate:
+                          description: |-
+                            Go template for the YAML spec of the issuer CR, which will have access to the inserts when building:
+                            {{.nodeName}} {{.dnsNames}} {{.secretName}} {{.issuer}}
+                            Where .nodeName is that placed in the config
+                            This approach allows us to avoid a build-time dependency on the CertManager CRs, while letting you
+                            customize things like the algorithm.
+                          type: string
+                        issuer:
+                          default: selfsigned-issuer
+                          description: Issuer for the certificate if a certificateName
+                            is specified (note cluster issuer can be used with a custom
+                            certSpecTemplate)
+                          type: string
+                        secretName:
+                          description: Secret name is required
+                          type: string
+                      required:
+                      - certName
+                      - secretName
+                      type: object
+                  required:
+                  - configJSON
+                  - name
+                  - plugin
+                  - ports
+                  type: object
+                type: array
+            required:
+            - domains
+            - registries
+            - transports
             type: object
           status:
-            description: PaladinStatus defines the observed state of Paladin
+            description: Status defines the observed state of a given object
             properties:
-              Status:
-                description: 'Important: Run "make" to regenerate code after modifying
-                  this file'
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the Besu's state
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              phase:
+                description: Phase represents the current phase of the Besu resource
                 type: string
             type: object
         type: object

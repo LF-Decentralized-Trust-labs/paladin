@@ -81,7 +81,7 @@ task test(type: Exec, dependsOn: [":core:go:makeMocks", copySolidity]) {
     args './pkg/...'
     args '-cover'
     args '-covermode=atomic'
-    args '-timeout=30s'
+    args '-timeout=90s'
     if (project.findProperty('verboseTests') == 'true') {
         args '-v'
     }

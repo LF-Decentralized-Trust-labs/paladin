@@ -33,7 +33,7 @@ type StateManager interface {
 	ListDomainContexts() []DomainContextInfo
 
 	// Create a new domain context - caller is responsible for closing it
-	NewDomainContext(ctx context.Context, domain Domain, contractAddress tktypes.EthAddress) DomainContext
+	NewDomainContext(ctx context.Context, domain Domain, contractAddress tktypes.EthAddress, dbTX *gorm.DB) DomainContext
 
 	// Get a previously created domain context
 	GetDomainContext(ctx context.Context, id uuid.UUID) DomainContext
@@ -52,7 +52,7 @@ type StateManager interface {
 	WriteReceivedStates(ctx context.Context, dbTX *gorm.DB, domainName string, states []*StateUpsertOutsideContext) ([]*State, error)
 
 	// GetState returns a state by ID, with optional labels
-	GetState(ctx context.Context, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*State, error)
+	GetState(ctx context.Context, dbTX *gorm.DB, domainName string, contractAddress tktypes.EthAddress, stateID tktypes.HexBytes, failNotFound, withLabels bool) (*State, error)
 }
 
 type DomainContextInfo struct {

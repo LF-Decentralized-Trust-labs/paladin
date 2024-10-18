@@ -95,6 +95,7 @@ func (sf *sortField) sql() string {
 
 func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
 	jf := qt.jsonFilter
+	t = qt.BuildAndFilter(t, &jf.Statements)
 	if jf.Limit != nil && *jf.Limit > 0 {
 		t = t.Limit(*jf.Limit)
 	}
@@ -105,7 +106,7 @@ func (qt *queryTraverser[T]) traverse(t Traverser[T]) Traverser[T] {
 		}
 		t = t.Order(tSortField.sql())
 	}
-	return qt.BuildAndFilter(t, &jf.Statements)
+	return t
 }
 
 func resolveSortField(ctx context.Context, fieldSet FieldSet, fieldName string) (*sortField, error) {

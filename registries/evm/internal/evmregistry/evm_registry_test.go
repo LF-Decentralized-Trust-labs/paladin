@@ -43,7 +43,7 @@ func TestPluginLifecycle(t *testing.T) {
 func TestBadConfigJSON(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name:       "grpc",
 		ConfigJson: `{!!!!`,
@@ -52,12 +52,38 @@ func TestBadConfigJSON(t *testing.T) {
 
 }
 
+func TestMissingContractAddress(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
+	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
+		Name:       "grpc",
+		ConfigJson: `{}`,
+	})
+	require.Regexp(t, "PD060003", err)
+
+}
+
+func TestZeroContractAddress(t *testing.T) {
+
+	callbacks := &testCallbacks{}
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
+	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
+		Name: "grpc",
+		ConfigJson: `{
+		  "contractAddress": "0x0000000000000000000000000000000000000000"
+		}`,
+	})
+	require.Regexp(t, "PD060003", err)
+
+}
+
 func TestGoodConfigJSON(t *testing.T) {
 
 	addr := tktypes.RandAddress()
 
 	callbacks := &testCallbacks{}
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	res, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "grpc",
 		ConfigJson: fmt.Sprintf(`{
@@ -138,7 +164,7 @@ func TestHandleEventBatchOk(t *testing.T) {
 		},
 	}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	_, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -165,7 +191,7 @@ func TestHandleEventBadIdentityRegistered(t *testing.T) {
 	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
 	callbacks := &testCallbacks{}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	_, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -186,7 +212,7 @@ func TestHandleEventBadSetProperty(t *testing.T) {
 	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
 	callbacks := &testCallbacks{}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	_, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -206,7 +232,7 @@ func TestHandleEventBadSig(t *testing.T) {
 
 	callbacks := &testCallbacks{}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	_, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -223,7 +249,7 @@ func TestHandleEventUnknownSig(t *testing.T) {
 	txHash := tktypes.Bytes32(tktypes.RandBytes(32)).String()
 	callbacks := &testCallbacks{}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	res, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -253,7 +279,7 @@ func TestHandleEventBadEntryName(t *testing.T) {
 		Owner:              *tktypes.RandAddress(),
 	}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	res, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -283,7 +309,7 @@ func TestHandleEventBatchPropBadName(t *testing.T) {
 
 	callbacks := &testCallbacks{}
 
-	transport := evmRegistryFactory(callbacks).(*evmRegistry)
+	transport := NewEVMRegistry(callbacks).(*evmRegistry)
 	res, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
 		BatchId: uuid.New().String(),
 		Events: []*prototk.OnChainEvent{
@@ -298,5 +324,56 @@ func TestHandleEventBatchPropBadName(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, res.Entries)
 	require.Empty(t, res.Properties)
+
+}
+
+func TestHandleRoot(t *testing.T) {
+
+	rootNotification := []byte(`{
+		"identityHash": "0xdd95460c8fc565ff4c64c168efbbb8b2dc6e51526cf8ec03b2f8e94343e6328d",
+		"name": "root",
+		"owner": "0x49efa42a996ef2b747abba67e483a4e169d874ae",
+		"parentIdentityHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+	}`)
+
+	transport := NewEVMRegistry(&testCallbacks{}).(*evmRegistry)
+	res, err := transport.HandleRegistryEvents(transport.bgCtx, &prototk.HandleRegistryEventsRequest{
+		BatchId: uuid.New().String(),
+		Events: []*prototk.OnChainEvent{
+			{
+				Location:          &prototk.OnChainEventLocation{TransactionHash: "0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9", BlockNumber: 200, TransactionIndex: 20, LogIndex: 10},
+				Signature:         contractDetail.identityRegisteredSignature.String(),
+				SoliditySignature: identityRegisteredEventSolSig,
+				DataJson:          tktypes.RawJSON(rootNotification).Pretty(),
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, res.Entries, 1)
+	require.JSONEq(t, `{
+	  	"active":true,
+	  	"id":"0xdd95460c8fc565ff4c64c168efbbb8b2dc6e51526cf8ec03b2f8e94343e6328d",
+	 	"name":"root",
+		"location": {
+			"block_number":200,
+			"log_index":10,
+			"transaction_hash":"0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9",
+			"transaction_index":20
+		}
+	}`, tktypes.JSONString(res.Entries[0]).Pretty())
+	require.Len(t, res.Properties, 1)
+	require.JSONEq(t, `{
+		"active": true,
+		"entry_id": "0xdd95460c8fc565ff4c64c168efbbb8b2dc6e51526cf8ec03b2f8e94343e6328d",
+		"name":"$owner",
+		"plugin_reserved":true,
+		"value":"0x49efa42a996ef2b747abba67e483a4e169d874ae",
+		"location": {
+			"block_number":200,
+		  	"log_index":10,
+		  	"transaction_hash":"0xe61757256ff80c8f1d70380c7f9d6cb3e91f030cb68dbecb928f52aa6bf56db9",
+		  	"transaction_index":20
+		}		
+	}`, tktypes.JSONString(res.Properties[0]).Pretty())
 
 }

@@ -24,11 +24,11 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 
+	"github.com/kaleido-io/paladin/core/mocks/ethclientmocks"
 	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -66,7 +66,7 @@ func NewTestFixedPriceGasPriceClientEIP1559(t *testing.T) GasPriceClient {
 
 func NewTestNodeGasPriceClient(t *testing.T, connectorAPI ethclient.EthClient) GasPriceClient {
 	hgc := &HybridGasPriceClient{}
-	hgc.cAPI = connectorAPI
+	hgc.ethClient = connectorAPI
 	hgc.gasPriceCache = longLivedGasPriceTestCache()
 	return hgc
 }
@@ -135,7 +135,7 @@ func TestFixedGasPrice(t *testing.T) {
 
 	gpo, err := hgc.GetGasPriceObject(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, &ptxapi.PublicTxGasPricing{
+	assert.Equal(t, &pldapi.PublicTxGasPricing{
 		GasPrice: tktypes.Int64ToInt256(1020304050),
 	}, gpo)
 }
@@ -146,7 +146,7 @@ func TestGasPriceClient(t *testing.T) {
 	gasPriceClient := NewGasPriceClient(ctx, &pldconf.PublicTxManagerConfig{})
 	hgc := gasPriceClient.(*HybridGasPriceClient)
 
-	mEC := componentmocks.NewEthClient(t)
+	mEC := ethclientmocks.NewEthClient(t)
 	hgc.Init(ctx, mEC)
 	// check functions
 	assert.True(t, hgc.HasZeroGasPrice(ctx))

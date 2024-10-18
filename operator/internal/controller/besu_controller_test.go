@@ -18,9 +18,11 @@ package controller
 
 import (
 	"context"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -28,11 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
+	"github.com/kaleido-io/paladin/operator/pkg/config"
 )
 
 var _ = Describe("Besu Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "testnet"
 
 		ctx := context.Background()
 
@@ -51,7 +54,9 @@ var _ = Describe("Besu Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: corev1alpha1.BesuSpec{
+						Genesis: "testnet",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -68,9 +73,23 @@ var _ = Describe("Besu Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
+			cfg := &config.Config{
+				Paladin: struct {
+					Image       string            `json:"image"`
+					Labels      map[string]string `json:"labels"`
+					Annotations map[string]string `json:"annotations"`
+					Envs        map[string]string `json:"envs"`
+				}{
+					Labels: map[string]string{
+						"env":  "production",
+						"tier": "backend",
+					},
+				},
+			}
 			controllerReconciler := &BesuReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				config: cfg,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -82,3 +101,49 @@ var _ = Describe("Besu Controller", func() {
 		})
 	})
 })
+
+func TestBesu_GetLabels(t *testing.T) {
+	// Mock configuration
+	config := config.Config{
+		Besu: struct {
+			Image       string            `json:"image"`
+			Labels      map[string]string `json:"labels"`
+			Annotations map[string]string `json:"annotations"`
+			Envs        map[string]string `json:"envs"`
+		}{
+			Labels: map[string]string{
+				"env":  "production",
+				"tier": "backend",
+			},
+		},
+	}
+
+	// Initialize PaladinReconciler with mock config
+	r := &BesuReconciler{}
+	r.config = &config
+
+	// Mock Paladin node
+	node := &corev1alpha1.Besu{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+	}
+
+	// Extra labels
+	extraLabels := map[string]string{
+		"version": "v1",
+	}
+
+	// Call getLabels
+	labels := r.getLabels(node, extraLabels)
+
+	// Assertions
+	expectedLabels := map[string]string{
+		"app":     "besu-test-node",
+		"env":     "production",
+		"tier":    "backend",
+		"version": "v1",
+	}
+
+	assert.Equal(t, expectedLabels, labels, "labels should match expected labels")
+}

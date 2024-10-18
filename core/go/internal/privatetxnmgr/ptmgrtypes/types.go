@@ -23,61 +23,12 @@ package ptmgrtypes
 
 import (
 	"context"
-	"time"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/statedistribution"
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	pbSequence "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 )
-
-type StageProcessNextStep int
-
-const (
-	NextStepWait StageProcessNextStep = iota
-	NextStepNewStage
-	NextStepNewAction
-)
-
-type StageEvent struct {
-	ID              string      `json:"id"` // TODO: not sure how useful it is to have this ID as the process of event should be idempotent?
-	Stage           string      `json:"stage"`
-	ContractAddress string      `json:"contractAddress"`
-	TxID            string      `json:"transactionId"`
-	Data            interface{} `json:"data"` // schema decided by each stage
-}
-
-type StageChangeEvent struct {
-	ID              string      `json:"id"`
-	PreviousStage   string      `json:"previousStage"`
-	NewStage        string      `json:"newStage"`
-	ContractAddress string      `json:"contractAddress"`
-	TxID            string      `json:"transactionId"`
-	Data            interface{} `json:"data"` // schema decided by each stage
-}
-
-type TxProcessPreReq struct {
-	TxIDs []string `json:"transactionIds,omitempty"`
-}
-
-type MockIdentityResolver struct {
-}
-
-func (mti *MockIdentityResolver) IsCurrentNode(nodeID string) bool {
-	return nodeID == "current-node"
-}
-
-func (mti *MockIdentityResolver) GetDispatchAddress(preferredAddresses []string) string {
-	if len(preferredAddresses) > 0 {
-		return preferredAddresses[0]
-	}
-	return ""
-}
-
-func (mti *MockIdentityResolver) ConnectToBaseLeger() error {
-	return nil
-}
 
 type EndorsementRequest struct {
 	TransactionID string
@@ -89,20 +40,6 @@ type Transaction struct {
 	AssemblerNodeID string
 	OutputStates    []string
 	InputStates     []string
-}
-
-type StageContext struct {
-	Ctx            context.Context
-	ID             string
-	Stage          string
-	StageEntryTime time.Time
-}
-
-type StageFoundationService interface {
-	TransportManager() components.TransportManager
-	DomainAPI() components.DomainSmartContract
-	StateManager() components.StateManager // TODO: filter out to only getters so setters can be coordinated efficiently like transactions
-	KeyManager() ethclient.KeyManager
 }
 
 type Sequencer interface {
@@ -163,13 +100,14 @@ type Sequencer interface {
 
 type Publisher interface {
 	//Service for sending messages and events within the local node
-	//TODO TBD - should these functions return errors?  If so, how should the caller deal with them?
-	PublishTransactionBlockedEvent(ctx context.Context, transactionId string) error
-	PublishTransactionDispatchedEvent(ctx context.Context, transactionId string, nonce uint64, signingAddress string) error
-	PublishTransactionSignedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult) error
-	PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult, revertReason *string) error
+	PublishTransactionBlockedEvent(ctx context.Context, transactionId string)
+	PublishTransactionDispatchedEvent(ctx context.Context, transactionId string, nonce uint64, signingAddress string)
+	PublishTransactionSignedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult)
+	PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, attestationResult *prototk.AttestationResult, revertReason *string)
 	PublishResolveVerifierResponseEvent(ctx context.Context, transactionId string, lookup, algorithm, verifier, verifierType string)
 	PublishResolveVerifierErrorEvent(ctx context.Context, transactionId string, lookup, algorithm, errorMessage string)
+	PublishTransactionFinalizedEvent(ctx context.Context, transactionId string)
+	PublishTransactionFinalizeError(ctx context.Context, transactionId string, revertReason string, err error)
 }
 
 // Map of signing address to an ordered list of transaction IDs that are ready to be dispatched by that signing address
@@ -205,6 +143,7 @@ type TransportWriter interface {
 	// Provided to the sequencer to allow it to send messages to other nodes in the network
 	SendDelegateTransactionMessage(ctx context.Context, transactionId string, delegateNodeId string) error
 	SendState(ctx context.Context, stateId string, schemaId string, stateDataJson string, party string) error
+	SendDelegationRequest(ctx context.Context, delegationId string, delegateNodeId string, transaction *components.PrivateTransaction) error
 }
 
 type TxProcessorStatus int
@@ -222,6 +161,7 @@ type TxProcessor interface {
 	GetStatus(ctx context.Context) TxProcessorStatus
 
 	HandleTransactionSubmittedEvent(ctx context.Context, event *TransactionSubmittedEvent) error
+	HandleTransactionSwappedInEvent(ctx context.Context, event *TransactionSwappedInEvent) error
 	HandleTransactionAssembledEvent(ctx context.Context, event *TransactionAssembledEvent) error
 	HandleTransactionSignedEvent(ctx context.Context, event *TransactionSignedEvent) error
 	HandleTransactionEndorsedEvent(ctx context.Context, event *TransactionEndorsedEvent) error
@@ -231,6 +171,9 @@ type TxProcessor interface {
 	HandleTransactionDelegatedEvent(ctx context.Context, event *TransactionDelegatedEvent) error
 	HandleResolveVerifierResponseEvent(ctx context.Context, event *ResolveVerifierResponseEvent) error
 	HandleResolveVerifierErrorEvent(ctx context.Context, event *ResolveVerifierErrorEvent) error
+	HandleTransactionFinalizedEvent(ctx context.Context, event *TransactionFinalizedEvent) error
+	HandleTransactionFinalizeError(ctx context.Context, event *TransactionFinalizeError) error
+
 	PrepareTransaction(ctx context.Context) (*components.PrivateTransaction, error)
 	GetStateDistributions(ctx context.Context) []*statedistribution.StateDistribution
 }

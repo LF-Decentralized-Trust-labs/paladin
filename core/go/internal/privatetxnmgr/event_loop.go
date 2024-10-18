@@ -26,13 +26,12 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/privatetxnstore"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
+	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 
-	"github.com/kaleido-io/paladin/core/pkg/ethclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
-	"github.com/kaleido-io/paladin/toolkit/pkg/ptxapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -84,7 +83,7 @@ type Orchestrator struct {
 	orchestrationEvalRequestChan chan bool
 	stopProcess                  chan bool // a channel to tell the current orchestrator to stop processing all events and mark itself as to be deleted
 
-	// Metrics provided for fairness control in the controler
+	// Metrics provided for fairness control in the controller
 	totalCompleted int64 // total number of transaction completed since initiated
 	state          OrchestratorState
 	stateEntryTime time.Time // when the orchestrator entered the current state
@@ -101,8 +100,9 @@ type Orchestrator struct {
 	endorsementGatherer ptmgrtypes.EndorsementGatherer
 	publisher           ptmgrtypes.Publisher
 	identityResolver    components.IdentityResolver
-	store               privatetxnstore.Store
+	syncPoints          syncpoints.SyncPoints
 	stateDistributer    statedistribution.StateDistributer
+	transportWriter     ptmgrtypes.TransportWriter
 }
 
 func NewOrchestrator(
@@ -115,9 +115,10 @@ func NewOrchestrator(
 	sequencer ptmgrtypes.Sequencer,
 	endorsementGatherer ptmgrtypes.EndorsementGatherer,
 	publisher ptmgrtypes.Publisher,
-	store privatetxnstore.Store,
+	syncPoints syncpoints.SyncPoints,
 	identityResolver components.IdentityResolver,
 	stateDistributer statedistribution.StateDistributer,
+	transportWriter ptmgrtypes.TransportWriter,
 ) *Orchestrator {
 
 	newOrchestrator := &Orchestrator{
@@ -143,9 +144,10 @@ func NewOrchestrator(
 		components:                   allComponents,
 		endorsementGatherer:          endorsementGatherer,
 		publisher:                    publisher,
-		store:                        store,
+		syncPoints:                   syncPoints,
 		identityResolver:             identityResolver,
 		stateDistributer:             stateDistributer,
+		transportWriter:              transportWriter,
 	}
 
 	newOrchestrator.sequencer = sequencer
@@ -159,8 +161,18 @@ func NewOrchestrator(
 func (oc *Orchestrator) getTransactionProcessor(txID string) ptmgrtypes.TxProcessor {
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
-	//TODO if the transaction is not in memory, we need to load it from the database
-	return oc.incompleteTxSProcessMap[txID]
+	transactionProcessor, ok := oc.incompleteTxSProcessMap[txID]
+	if !ok {
+		log.L(oc.ctx).Errorf("Transaction processor not found for transaction ID %s", txID)
+		return nil
+	}
+	return transactionProcessor
+}
+
+func (oc *Orchestrator) removeTransactionProcessor(txID string) {
+	oc.incompleteTxProcessMapMutex.Lock()
+	defer oc.incompleteTxProcessMapMutex.Unlock()
+	delete(oc.incompleteTxSProcessMap, txID)
 }
 
 func (oc *Orchestrator) handleEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
@@ -168,29 +180,50 @@ func (oc *Orchestrator) handleEvent(ctx context.Context, event ptmgrtypes.Privat
 	// find (or create) the transaction processor for that transaction
 	// and pass the event to it
 	transactionID := event.GetTransactionID()
-	transactionProccessor := oc.getTransactionProcessor(transactionID)
+	transactionProcessor := oc.getTransactionProcessor(transactionID)
+	if transactionProcessor == nil {
+		//What has happened here is either:
+		// a) we don't know about this transaction yet, which is possible if we have just restarted
+		// and not yet completed the initialization from the database but in the interim, we have received
+		// a transport message from another node concerning this transaction
+		// b) the transaction has been completed and removed from memory
+		// in case of (a) we ignore it and rely on the fact that we will send out request for data that we need once
+		// we have completed the initialization from the database
+		// in case of (b) we ignore it because an event for a completed transaction is redundant.
+		// most likely it is a tardy response for something we timed out waiting for and failed or retried successfully
+		log.L(ctx).Warnf("Received an event for a transaction that is not in flight %s", transactionID)
+		return
+	}
 	var err error
 	switch event := event.(type) {
 	case *ptmgrtypes.TransactionSubmittedEvent:
-		err = transactionProccessor.HandleTransactionSubmittedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionSubmittedEvent(ctx, event)
+	case *ptmgrtypes.TransactionSwappedInEvent:
+		err = transactionProcessor.HandleTransactionSwappedInEvent(ctx, event)
 	case *ptmgrtypes.TransactionAssembledEvent:
-		err = transactionProccessor.HandleTransactionAssembledEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionAssembledEvent(ctx, event)
 	case *ptmgrtypes.TransactionSignedEvent:
-		err = transactionProccessor.HandleTransactionSignedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionSignedEvent(ctx, event)
 	case *ptmgrtypes.TransactionEndorsedEvent:
-		err = transactionProccessor.HandleTransactionEndorsedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionEndorsedEvent(ctx, event)
 	case *ptmgrtypes.TransactionDispatchedEvent:
-		err = transactionProccessor.HandleTransactionDispatchedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionDispatchedEvent(ctx, event)
 	case *ptmgrtypes.TransactionConfirmedEvent:
-		err = transactionProccessor.HandleTransactionConfirmedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionConfirmedEvent(ctx, event)
 	case *ptmgrtypes.TransactionRevertedEvent:
-		err = transactionProccessor.HandleTransactionRevertedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionRevertedEvent(ctx, event)
 	case *ptmgrtypes.TransactionDelegatedEvent:
-		err = transactionProccessor.HandleTransactionDelegatedEvent(ctx, event)
+		err = transactionProcessor.HandleTransactionDelegatedEvent(ctx, event)
 	case *ptmgrtypes.ResolveVerifierResponseEvent:
-		err = transactionProccessor.HandleResolveVerifierResponseEvent(ctx, event)
+		err = transactionProcessor.HandleResolveVerifierResponseEvent(ctx, event)
 	case *ptmgrtypes.ResolveVerifierErrorEvent:
-		err = transactionProccessor.HandleResolveVerifierErrorEvent(ctx, event)
+		err = transactionProcessor.HandleResolveVerifierErrorEvent(ctx, event)
+	case *ptmgrtypes.TransactionFinalizedEvent:
+		err = transactionProcessor.HandleTransactionFinalizedEvent(ctx, event)
+		oc.removeTransactionProcessor(transactionID)
+	case *ptmgrtypes.TransactionFinalizeError:
+		err = transactionProcessor.HandleTransactionFinalizeError(ctx, event)
+
 	default:
 		log.L(ctx).Warnf("Unknown event type: %T", event)
 	}
@@ -198,7 +231,7 @@ func (oc *Orchestrator) handleEvent(ctx context.Context, event ptmgrtypes.Privat
 		// Any expected errors like assembly failed or endorsement failed should have been handled by the transaction processor
 		// Any errors that get back here mean that event has not been fully applied and we rely on the
 		// event being re-sent, most likely after the transaction processor re-sends an async request
-		// because it has detected a stale transaction that has timedout waiting for a response
+		// because it has detected a stale transaction that has timed out waiting for a response
 		log.L(ctx).Errorf("Error handling %T event: %s ", event, err.Error())
 	}
 }
@@ -233,7 +266,7 @@ func (oc *Orchestrator) evaluationLoop() {
 			// TODO: trigger parent loop for removal
 			return
 		}
-		// TODO while we have woken up, iterate through all transactions in memory and check if any are stale or completed and query the database for any in flight transactions that need to be brougt into memory
+		// TODO while we have woken up, iterate through all transactions in memory and check if any are stale or completed and query the database for any in flight transactions that need to be brought into memory
 	}
 }
 
@@ -246,7 +279,7 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tx *component
 			// tx processing pool is full, queue the item
 			return true
 		} else {
-			oc.incompleteTxSProcessMap[tx.ID.String()] = NewPaladinTransactionProcessor(ctx, tx, oc.nodeID, oc.components, oc.domainAPI, oc.sequencer, oc.publisher, oc.endorsementGatherer, oc.identityResolver)
+			oc.incompleteTxSProcessMap[tx.ID.String()] = NewPaladinTransactionProcessor(ctx, tx, oc.nodeID, oc.components, oc.domainAPI, oc.sequencer, oc.publisher, oc.endorsementGatherer, oc.identityResolver, oc.syncPoints, oc.transportWriter)
 		}
 		oc.incompleteTxSProcessMap[tx.ID.String()].Init(ctx)
 		oc.pendingEvents <- &ptmgrtypes.TransactionSubmittedEvent{
@@ -256,24 +289,40 @@ func (oc *Orchestrator) ProcessNewTransaction(ctx context.Context, tx *component
 	return false
 }
 
-func (oc *Orchestrator) HandleEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
-	//TODO Better
+func (oc *Orchestrator) ProcessInFlightTransaction(ctx context.Context, tx *components.PrivateTransaction) (queued bool) {
+	log.L(ctx).Infof("Processing in flight transaction %s", tx.ID)
+	//a transaction that already has had some processing done on it
+	// currently the only case this can happen is a transaction delegated from another node
+	// but maybe in future, inflight transactions being coordinated locally could be swapped out of memory when they are blocked and/or if we are at max concurrency
 	oc.incompleteTxProcessMapMutex.Lock()
 	defer oc.incompleteTxProcessMapMutex.Unlock()
-	txProc := oc.incompleteTxSProcessMap[event.GetTransactionID()]
-	if txProc == nil {
-
-		// TODO we have an event for a transaction that we have swapped out of memory.  Need to reload the transaction from the database before we can proces this event
-		// and we need to do this in a way that doesn't exceed the maxConcurrentProcess and doesn't allow events from a runaway remote node to cause a noisy neighbor problem for events
-		// from the local node
-		panic("Transaction not found")
-
+	_, alreadyInMemory := oc.incompleteTxSProcessMap[tx.ID.String()]
+	if alreadyInMemory {
+		log.L(ctx).Warnf("Transaction %s already in memory. Ignoring", tx.ID)
+		return false
 	}
+	if oc.incompleteTxSProcessMap[tx.ID.String()] == nil {
+		if len(oc.incompleteTxSProcessMap) >= oc.maxConcurrentProcess {
+			// TODO: decide how this map is managed, it shouldn't track the entire lifecycle
+			// tx processing pool is full, queue the item
+			return true
+		} else {
+			oc.incompleteTxSProcessMap[tx.ID.String()] = NewPaladinTransactionProcessor(ctx, tx, oc.nodeID, oc.components, oc.domainAPI, oc.sequencer, oc.publisher, oc.endorsementGatherer, oc.identityResolver, oc.syncPoints, oc.transportWriter)
+		}
+		oc.incompleteTxSProcessMap[tx.ID.String()].Init(ctx)
+		oc.pendingEvents <- &ptmgrtypes.TransactionSwappedInEvent{
+			PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{TransactionID: tx.ID.String()},
+		}
+	}
+	return false
+}
+
+func (oc *Orchestrator) HandleEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
 	oc.pendingEvents <- event
 }
 
 func (oc *Orchestrator) Start(c context.Context) (done <-chan struct{}, err error) {
-	oc.store.Start()
+	oc.syncPoints.Start()
 	oc.orchestratorLoopDone = make(chan struct{})
 	go oc.evaluationLoop()
 	oc.TriggerOrchestratorEvaluation()
@@ -319,8 +368,8 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 
 	// array of sequences with space for one per signing address
 	// dispatchableTransactions is a map of signing address to transaction IDs so we can group by signing address
-	dispatchBatch := &privatetxnstore.DispatchBatch{
-		DispatchSequences: make([]*privatetxnstore.DispatchSequence, 0, len(dispatchableTransactions)),
+	dispatchBatch := &syncpoints.DispatchBatch{
+		DispatchSequences: make([]*syncpoints.DispatchSequence, 0, len(dispatchableTransactions)),
 	}
 
 	stateDistributions := make([]*statedistribution.StateDistribution, 0)
@@ -331,14 +380,14 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 
 		preparedTransactions := make([]*components.PrivateTransaction, len(transactionIDs))
 
-		sequence := &privatetxnstore.DispatchSequence{
-			PrivateTransactionDispatches: make([]*privatetxnstore.DispatchPersisted, len(transactionIDs)),
+		sequence := &syncpoints.DispatchSequence{
+			PrivateTransactionDispatches: make([]*syncpoints.DispatchPersisted, len(transactionIDs)),
 		}
 
 		for i, transactionID := range transactionIDs {
 			// prepare all transactions for the given transaction IDs
 
-			sequence.PrivateTransactionDispatches[i] = &privatetxnstore.DispatchPersisted{
+			sequence.PrivateTransactionDispatches[i] = &syncpoints.DispatchPersisted{
 				PrivateTransactionID: transactionID,
 			}
 
@@ -364,37 +413,50 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 			stateDistributions = append(stateDistributions, txProcessor.GetStateDistributions(ctx)...)
 		}
 
-		preparedTransactionPayloads := make([]*components.EthTransaction, len(preparedTransactions))
+		preparedTransactionPayloads := make([]*pldapi.TransactionInput, len(preparedTransactions))
 
 		for j, preparedTransaction := range preparedTransactions {
 			preparedTransactionPayloads[j] = preparedTransaction.PreparedPublicTransaction
 		}
 
 		//Now we have the payloads, we can prepare the submission
-		ec := oc.components.EthClientFactory().SharedWS()
 		publicTransactionEngine := oc.components.PublicTxManager()
+
+		signers := make([]string, len(preparedTransactions))
+		for i, pt := range preparedTransactions {
+			unqualifiedSigner, err := tktypes.PrivateIdentityLocator(pt.Signer).Identity(ctx)
+			if err != nil {
+				errorMessage := fmt.Sprintf("failed to parse lookup key for signer %s : %s", pt.Signer, err)
+				log.L(ctx).Error(errorMessage)
+				return i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerInternalError, errorMessage)
+			}
+
+			signers[i] = unqualifiedSigner
+		}
+		keyMgr := oc.components.KeyManager()
+		resolvedAddrs, err := keyMgr.ResolveEthAddressBatchNewDatabaseTX(ctx, signers)
+		if err != nil {
+			return err
+		}
 
 		publicTXs := make([]*components.PublicTxSubmission, len(preparedTransactions))
 		for i, pt := range preparedTransactions {
 			log.L(ctx).Debugf("DispatchTransactions: creating PublicTxSubmission from %s", pt.Signer)
 			publicTXs[i] = &components.PublicTxSubmission{
-				Bindings: []*components.PaladinTXReference{{TransactionID: pt.ID, TransactionType: ptxapi.TransactionTypePrivate.Enum()}},
-				PublicTxInput: ptxapi.PublicTxInput{
-					From:            pt.Signer,
+				Bindings: []*components.PaladinTXReference{{TransactionID: pt.ID, TransactionType: pldapi.TransactionTypePrivate.Enum()}},
+				PublicTxInput: pldapi.PublicTxInput{
+					From:            resolvedAddrs[i],
 					To:              &oc.contractAddress,
-					PublicTxOptions: ptxapi.PublicTxOptions{}, // TODO: Consider propagation from paladin transaction input
+					PublicTxOptions: pldapi.PublicTxOptions{}, // TODO: Consider propagation from paladin transaction input
 				},
 			}
-			var req ethclient.ABIFunctionRequestBuilder
-			abiFn, err := ec.ABIFunction(ctx, pt.PreparedPublicTransaction.FunctionABI)
-			if err == nil {
-				req = abiFn.R(ctx)
-				err = req.Input(pt.PreparedPublicTransaction.Inputs).BuildCallData()
-			}
+
+			// TODO: This aligning with submission in public Tx manage
+			data, err := pt.PreparedPublicTransaction.ABI[0].EncodeCallDataJSONCtx(ctx, pt.PreparedPublicTransaction.Data)
 			if err != nil {
 				return err
 			}
-			publicTXs[i].Data = tktypes.HexBytes(req.TX().Data)
+			publicTXs[i].Data = tktypes.HexBytes(data)
 		}
 		pubBatch, err := publicTransactionEngine.PrepareSubmissionBatch(ctx, publicTXs)
 		if err != nil {
@@ -413,7 +475,7 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 		dispatchBatch.DispatchSequences = append(dispatchBatch.DispatchSequences, sequence)
 	}
 
-	err := oc.store.PersistDispatchBatch(ctx, oc.contractAddress, dispatchBatch, stateDistributions)
+	err := oc.syncPoints.PersistDispatchBatch(ctx, oc.contractAddress, dispatchBatch, stateDistributions)
 	if err != nil {
 		log.L(ctx).Errorf("Error persisting batch: %s", err)
 		return err
@@ -421,12 +483,7 @@ func (oc *Orchestrator) DispatchTransactions(ctx context.Context, dispatchableTr
 	completed = true
 	for signingAddress, sequence := range dispatchableTransactions {
 		for _, privateTransactionID := range sequence {
-			err := oc.publisher.PublishTransactionDispatchedEvent(ctx, privateTransactionID, uint64(0) /*TODO*/, signingAddress)
-
-			if err != nil {
-				//TODO think about how best to handle this error
-				log.L(ctx).Errorf("Error publishing event: %s", err)
-			}
+			oc.publisher.PublishTransactionDispatchedEvent(ctx, privateTransactionID, uint64(0) /*TODO*/, signingAddress)
 		}
 	}
 	//now that the DB write has been persisted, we can trigger the in-memory state distribution

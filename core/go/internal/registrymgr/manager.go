@@ -29,7 +29,9 @@ import (
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 )
 
 type registryManager struct {
@@ -40,6 +42,7 @@ type registryManager struct {
 
 	p            persistence.Persistence
 	blockIndexer blockindexer.BlockIndexer
+	rpcModule    *rpcserver.RPCModule
 
 	// We provide a high level of customization of how the nodes are looked up in the registry
 	registryTransportLookups map[string]*transportLookup
@@ -72,10 +75,13 @@ func (rm *registryManager) PreInit(pic components.PreInitComponents) (_ *compone
 			if rm.registryTransportLookups[regName], err = newTransportLookup(rm.bgCtx, regName, &regConf.Transports); err != nil {
 				return nil, err
 			}
+			log.L(rm.bgCtx).Infof("Transport lookups enabled for registry '%s' with matcher '%s'", regName, rm.registryTransportLookups[regName].propertyRegexp)
 		}
 	}
-
-	return &components.ManagerInitResult{}, nil
+	rm.initRPC()
+	return &components.ManagerInitResult{
+		RPCModules: []*rpcserver.RPCModule{rm.rpcModule},
+	}, nil
 }
 
 func (rm *registryManager) PostInit(c components.AllComponents) error {
@@ -153,6 +159,17 @@ func (rm *registryManager) GetRegistry(ctx context.Context, name string) (compon
 	return r, nil
 }
 
+func (rm *registryManager) getRegistryNames() []string {
+	rm.mux.Lock()
+	defer rm.mux.Unlock()
+
+	registryNames := make([]string, 0, len(rm.registriesByName))
+	for registryName := range rm.registriesByName {
+		registryNames = append(registryNames, registryName)
+	}
+	return registryNames
+}
+
 func (rm *registryManager) GetNodeTransports(ctx context.Context, node string) ([]*components.RegistryNodeTransportEntry, error) {
 	// Check cache
 	transports, present := rm.transportDetailsCache.Get(node)
@@ -160,9 +177,11 @@ func (rm *registryManager) GetNodeTransports(ctx context.Context, node string) (
 		return transports, nil
 	}
 
+	regLookupsChecked := 0
 	for regName, r := range rm.registriesByName {
 		tl := rm.registryTransportLookups[regName]
 		if tl != nil {
+			regLookupsChecked++
 			regTransports, err := tl.getNodeTransports(ctx, rm.p.DB() /* no TX needed */, r, node)
 			if err != nil {
 				return nil, err
@@ -170,11 +189,13 @@ func (rm *registryManager) GetNodeTransports(ctx context.Context, node string) (
 			// we only return entries from a single registry (we do not merge transports across registries)
 			// the requiredPrefix allows node partitioning across registries.
 			if len(regTransports) > 0 {
+				log.L(ctx).Infof("Node '%s' matched to %d transports in registry '%s'", node, len(regTransports), regName)
 				rm.transportDetailsCache.Set(node, regTransports)
 				return regTransports, nil
 			}
 		}
 	}
+	log.L(ctx).Infof("No transports found for node '%s' after checking %d registries configured with transports lookups", node, regLookupsChecked)
 
 	return nil, i18n.NewError(ctx, msgs.MsgRegistryNodeEntiresNotFound, node)
 }

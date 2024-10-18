@@ -3,7 +3,6 @@ CREATE TABLE public_txns (
   "from"                      VARCHAR         NOT NULL,
   "nonce"                     BIGINT          NOT NULL,
   "created"                   BIGINT          NOT NULL,
-  "key_handle"                VARCHAR         NOT NULL,
   "to"                        VARCHAR,
   "gas"                       BIGINT          NOT NULL,
   "fixed_gas_pricing"         VARCHAR,

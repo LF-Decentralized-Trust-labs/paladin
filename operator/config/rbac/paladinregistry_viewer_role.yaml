@@ -1,0 +1,23 @@
+# permissions for end users to view paladinregistries.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: paladinregistry-viewer-role
+rules:
+- apiGroups:
+  - core.paladin.io
+  resources:
+  - paladinregistries
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - core.paladin.io
+  resources:
+  - paladinregistries/status
+  verbs:
+  - get

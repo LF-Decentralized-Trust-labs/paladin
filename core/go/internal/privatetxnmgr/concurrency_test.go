@@ -158,10 +158,6 @@ func (f *fakeTransportLayer) PublishEvent(ctx context.Context, event interface{}
 	return nil
 }
 
-func (f *fakeTransportLayer) PublishStageEvent(ctx context.Context, stageEvent *ptmgrtypes.StageEvent) error {
-	panic("unimplemented")
-}
-
 func NewFakeTransportLayer(t *testing.T) *fakeTransportLayer {
 	return &fakeTransportLayer{
 		engines: make(map[string]FakeEngine),

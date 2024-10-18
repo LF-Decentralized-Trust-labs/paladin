@@ -3,9 +3,12 @@
 # It should be run by config/default
 resources:
 - bases/core.paladin.io_paladins.yaml
-- bases/core.paladin.io_smartcontracts.yaml
+- bases/core.paladin.io_smartcontractdeployments.yaml
 - bases/core.paladin.io_besus.yaml
 - bases/core.paladin.io_besugeneses.yaml
+- bases/core.paladin.io_paladinregistries.yaml
+- bases/core.paladin.io_paladindomains.yaml
+- bases/core.paladin.io_paladinregistrations.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -16,9 +19,12 @@ patches:
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD
 #- path: patches/cainjection_in_paladins.yaml
-#- path: patches/cainjection_in_smartcontracts.yaml
+#- path: patches/cainjection_in_smartcontractdeployments.yaml
 #- path: patches/cainjection_in_besus.yaml
 #- path: patches/cainjection_in_besugeneses.yaml
+#- path: patches/cainjection_in_paladinregistries.yaml
+#- path: patches/cainjection_in_paladindomains.yaml
+#- path: patches/cainjection_in_paladinregistrations.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

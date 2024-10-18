@@ -13,4 +13,5 @@ spec:
   emptyBlockPeriod: 10s
   initialValidators:
   - node1
-
+  - node2
+  - node3

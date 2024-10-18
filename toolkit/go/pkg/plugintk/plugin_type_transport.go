@@ -27,6 +27,7 @@ import (
 type TransportAPI interface {
 	ConfigureTransport(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
 	SendMessage(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
+	GetLocalDetails(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
 }
 
 type TransportCallbacks interface {
@@ -123,6 +124,10 @@ func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 		resMsg := &prototk.TransportMessage_SendMessageRes{}
 		resMsg.SendMessageRes, err = th.api.SendMessage(ctx, input.SendMessage)
 		res.ResponseFromTransport = resMsg
+	case *prototk.TransportMessage_GetLocalDetails:
+		resMsg := &prototk.TransportMessage_GetLocalDetailsRes{}
+		resMsg.GetLocalDetailsRes, err = th.api.GetLocalDetails(ctx, input.GetLocalDetails)
+		res.ResponseFromTransport = resMsg
 	default:
 		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
 	}
@@ -154,6 +159,7 @@ func (th *transportHandler) GetTransportDetails(ctx context.Context, req *protot
 type TransportAPIFunctions struct {
 	ConfigureTransport func(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
 	SendMessage        func(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
+	GetLocalDetails    func(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
 }
 
 type TransportAPIBase struct {
@@ -166,4 +172,8 @@ func (tb *TransportAPIBase) ConfigureTransport(ctx context.Context, req *prototk
 
 func (tb *TransportAPIBase) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 	return callPluginImpl(ctx, req, tb.Functions.SendMessage)
+}
+
+func (tb *TransportAPIBase) GetLocalDetails(ctx context.Context, req *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
+	return callPluginImpl(ctx, req, tb.Functions.GetLocalDetails)
 }

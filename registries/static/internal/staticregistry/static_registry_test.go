@@ -35,14 +35,14 @@ func (tc *testCallbacks) UpsertRegistryRecords(ctx context.Context, req *prototk
 }
 
 func TestPluginLifecycle(t *testing.T) {
-	pb := NewPlugin(context.Background())
+	pb := NewPlugin()
 	assert.NotNil(t, pb)
 }
 
 func TestBadConfigJSON(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name:       "grpc",
 		ConfigJson: `{!!!!`,
@@ -66,7 +66,7 @@ func TestRegistryStringEntry(t *testing.T) {
 			return &prototk.UpsertRegistryRecordsResponse{}, nil
 		},
 	}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "registry1",
 		ConfigJson: `{
@@ -101,7 +101,7 @@ func TestRegistryHierarchicalEntry(t *testing.T) {
 			return &prototk.UpsertRegistryRecordsResponse{}, nil
 		},
 	}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "registry1",
 		ConfigJson: `{
@@ -137,7 +137,7 @@ func TestRegistryObjectEntry(t *testing.T) {
 			return &prototk.UpsertRegistryRecordsResponse{}, nil
 		},
 	}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "grpc",
 		ConfigJson: `{
@@ -164,7 +164,7 @@ func TestRegistryUpsertFail(t *testing.T) {
 			return nil, fmt.Errorf("pop")
 		},
 	}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.ConfigureRegistry(transport.bgCtx, &prototk.ConfigureRegistryRequest{
 		Name: "grpc",
 		ConfigJson: `{
@@ -184,7 +184,7 @@ func TestRegistryUpsertFail(t *testing.T) {
 func TestRegistryEventBatch(t *testing.T) {
 
 	callbacks := &testCallbacks{}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	_, err := transport.HandleRegistryEvents(context.Background(), &prototk.HandleRegistryEventsRequest{})
 	assert.Regexp(t, "PD040002", err)
 
@@ -192,7 +192,7 @@ func TestRegistryEventBatch(t *testing.T) {
 
 func TestRegistryUpsertBadData(t *testing.T) {
 	callbacks := &testCallbacks{}
-	transport := staticRegistryFactory(callbacks).(*staticRegistry)
+	transport := NewStatic(callbacks).(*staticRegistry)
 	err := transport.recurseBuildUpsert(context.Background(),
 		&prototk.UpsertRegistryRecordsRequest{},
 		nil,

@@ -33,7 +33,7 @@ CREATE TABLE transactions (
 );
 CREATE INDEX transactions_created ON transactions("created");
 CREATE INDEX transactions_domain ON transactions("domain");
-CREATE INDEX transactions_idempotency_key ON transactions("idempotency_key");
+CREATE UNIQUE INDEX transactions_idempotency_key ON transactions("idempotency_key");
 
 CREATE TABLE public_txn_bindings (
   "signer_nonce"              VARCHAR         NOT NULL,

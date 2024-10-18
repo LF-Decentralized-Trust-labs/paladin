@@ -21,12 +21,14 @@ import (
 )
 
 type Config struct {
+	// optional remote hostname to return in local transport details
+	ExternalHostname *string `json:"externalHostname"`
+	// TLS configuration details
+	TLS pldconf.TLSConfig `json:"tls"`
 	// address to listen on
 	Address *string `json:"address"`
 	// port to listen on
 	Port *int `json:"port"`
-	// Server side
-	TLS pldconf.TLSConfig `json:"tls"`
 	// If true (default) a network can be built by publishing self-signed certs to a registry without a common CA.
 	// This disables the default certificate verification chain, and instead performs a direct comparison
 	// of the certificate against the registered certificate for the extracted node name.

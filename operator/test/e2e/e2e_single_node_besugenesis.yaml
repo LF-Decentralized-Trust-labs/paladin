@@ -1,7 +1,6 @@
 apiVersion: core.paladin.io/v1alpha1
 kind: BesuGenesis
 metadata:
-  namespace: paladin-e2e
   name: testnet
 spec:
   chainID: 1337

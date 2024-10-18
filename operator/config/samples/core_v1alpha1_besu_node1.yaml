@@ -1,0 +1,21 @@
+apiVersion: core.paladin.io/v1alpha1
+kind: Besu
+metadata:
+  labels:
+    app.kubernetes.io/name: operator-go
+    app.kubernetes.io/managed-by: kustomize
+  name: node1
+spec:
+  genesis: testnet
+  service:
+    type: NodePort
+    ports:
+    - name: rpc-http
+      port: 8545
+      nodePort: 31545 # see paladin-kind.yaml
+    - name: rpc-ws
+      port: 8546
+      nodePort: 31546 # see paladin-kind.yaml
+    - name: graphql-http
+      port: 8547
+      nodePort: 31547 # see paladin-kind.yaml

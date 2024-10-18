@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/kaleido-io/paladin/core/internal/components"
-	pb "github.com/kaleido-io/paladin/core/pkg/proto/sequence"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"google.golang.org/protobuf/proto"
 )
