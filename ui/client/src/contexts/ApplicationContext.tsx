@@ -1,44 +1,42 @@
-import { useQuery } from "@tanstack/react-query";
+import { Config } from "@/config";
+import { useBidxQueries } from "@/queries/bidx";
+import { useTransportQueries } from "@/queries/transport";
 import { createContext } from "react";
-import { constants } from "../components/config";
-import { ErrorDialog } from "../dialogs/Error";
-import { fetchLatestBlockWithTxs } from "../queries/blocks";
+import { ErrorDialog } from "../components/Dialogs/ErrorDialog";
 
 interface IApplicationContext {
-  colorMode: {
-    toggleColorMode: () => void;
-  };
   lastBlockWithTransactions: number;
+  nodeName: string;
 }
 
 export const ApplicationContext = createContext({} as IApplicationContext);
 
 interface Props {
-  colorMode: {
-    toggleColorMode: () => void;
-  };
   children: JSX.Element;
 }
 
-export const ApplicationContextProvider = ({ children, colorMode }: Props) => {
-  const { data: lastBlockWithTransactions, error } = useQuery({
-    queryKey: ["lastBlockWithTransactions"],
-    queryFn: () =>
-      fetchLatestBlockWithTxs().then((res) => {
-        if (res.length > 0) {
-          return res[0].blockNumber;
-        }
-        return 0;
-      }),
-    refetchInterval: constants.UPDATE_FREQUENCY_MILLISECONDS,
-    retry: (failureCount) => {
-      return failureCount < 1;
-    },
-  });
+export const ApplicationContextProvider = ({ children }: Props) => {
+  const { useQueryIndexedTransactions } = useBidxQueries();
+  const { useNodeName } = useTransportQueries();
+  const { data: nodeName } = useNodeName();
+  const { data: lastBlockWithTransactions, error } =
+    useQueryIndexedTransactions(
+      {
+        limit: 1,
+        sort: ["blockNumber DESC", "transactionIndex DESC"],
+      },
+      Config.UPDATE_FREQUENCY_MILLISECONDS
+    );
 
   return (
     <ApplicationContext.Provider
-      value={{ lastBlockWithTransactions: lastBlockWithTransactions ?? 0, colorMode }}
+      value={{
+        lastBlockWithTransactions:
+          lastBlockWithTransactions && lastBlockWithTransactions.length > 0
+            ? lastBlockWithTransactions[0].blockNumber
+            : 0,
+        nodeName: nodeName ?? "",
+      }}
     >
       {children}
       <ErrorDialog dialogOpen={!!error} message={error?.message ?? ""} />

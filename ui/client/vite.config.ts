@@ -1,5 +1,6 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
+import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,6 +12,11 @@ export default defineConfig({
         target: "http://localhost:3555",
         secure: false,
       },
+    },
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 });

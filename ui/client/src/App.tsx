@@ -14,23 +14,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Box, CssBaseline } from "@mui/material";
-import { createTheme, PaletteMode, ThemeProvider } from "@mui/material/styles";
 import {
   MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { Header } from "./components/Header";
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from "react-router-dom";
+import { Config } from "./config";
 import { ApplicationContextProvider } from "./contexts/ApplicationContext";
-import { darkThemeOptions, lightThemeOptions } from "./themes/default";
-import { Indexer } from "./views/indexer";
-import { Registries } from "./views/Registries";
-import { Submissions } from "./views/Submissions";
-import { useEffect, useMemo, useState } from "react";
-import { constants } from "./components/config";
+import { ThemeContextProvider } from "./contexts/ThemeContext";
+import { AppLinks } from "./navigation/AppLinks";
+import AppRoot from "./navigation/AppRoot";
+import { IndexersRoute } from "./pages/Indexers/Routes";
+import { QueryBuilderRoute } from "./pages/Queries/Routes";
+import { RegistriesRoute } from "./pages/Registries/Routes";
+import { SubmissionsRoute } from "./pages/Submissions/Routes";
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({}),
@@ -38,83 +41,34 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-
-  const [systemTheme, setSystemTheme] = useState(
-    window.matchMedia &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-  );
-
-  const [storedTheme, setStoredTheme] = useState<PaletteMode>();
-
-  useEffect(() => {
-    window
-      .matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', (event) => {
-        setSystemTheme(event.matches ? 'dark' : 'light');
-      });
-  }, []);
-
-
-  const theme = useMemo(() => {
-    const modeFromStorage = localStorage.getItem(constants.COLOR_MODE_STORAGE_KEY);
-    if (modeFromStorage === null) {
-      // If color mode not previously set
-      return createTheme(
-        systemTheme === 'dark' ? darkThemeOptions : lightThemeOptions
-      );
-    } else {
-      // Create color mode based on local storage
-      return createTheme(
-        modeFromStorage === 'dark' ? darkThemeOptions : lightThemeOptions
-      );
-    }
-  }, [systemTheme, storedTheme]);
-
-  const colorMode = useMemo(
-    () => ({
-      toggleColorMode: () => {
-        const currentMode =
-          localStorage.getItem(constants.COLOR_MODE_STORAGE_KEY) ?? systemTheme;
-        const newMode = currentMode === 'light' ? 'dark' : 'light';
-        localStorage.setItem(constants.COLOR_MODE_STORAGE_KEY, newMode);
-        setStoredTheme(newMode);
-      },
-    }),
-    []
-  );
+  const router = createBrowserRouter([
+    {
+      path: "/",
+      element: <AppRoot />,
+      children: [
+        IndexersRoute,
+        RegistriesRoute,
+        SubmissionsRoute,
+        QueryBuilderRoute,
+        {
+          path: "*",
+          element: <Navigate to={AppLinks.Indexers} />,
+        },
+      ],
+    },
+  ]);
 
   return (
     <>
       <QueryClientProvider client={queryClient}>
-        <ApplicationContextProvider colorMode={colorMode}>
-          <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Box
-              sx={{
-                position: "fixed",
-                height: "100vh",
-                width: "100vw",
-                zIndex: -1,
-                backgroundImage: 'url("paladin-icon-light.svg")',
-                backgroundRepeat: "no-repeat",
-                backgroundSize: "88vh",
-                backgroundPosition: "center bottom",
-                backgroundAttachment: "fixed",
-              }}
-            />
-            <BrowserRouter>
-              <Header />
-              <Routes>
-                <Route path="/indexer" element={<Indexer />} />
-                <Route path="/submissions" element={<Submissions />} />\
-                <Route path="/registry" element={<Registries />} />
-                <Route path="*" element={<Navigate to="/indexer" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </ThemeProvider>
-        </ApplicationContextProvider>
+        <ThemeContextProvider
+          defaultTheme="light"
+          storageKey={Config.COLOR_MODE_STORAGE_KEY}
+        >
+          <ApplicationContextProvider>
+            <RouterProvider {...{ router }} />
+          </ApplicationContextProvider>
+        </ThemeContextProvider>
       </QueryClientProvider>
     </>
   );
