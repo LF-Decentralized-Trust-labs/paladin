@@ -1,0 +1,30 @@
+name: Build core and operator images
+on:
+  push:
+    branches:
+      - wf-build-image
+    paths:
+    # run only on changes of code files
+      - '**.go'
+      - '**.java'
+      - '**/build.gradle'
+      - '**/Dockerfile'
+      - '.github/workflows/build-image*.yaml' 
+jobs:
+    core:
+        uses: ./.github/workflows/build-image-job.yaml
+        with:
+            dockerfile: ./Dockerfile
+            registry: docker.io
+            image: paladin
+            image_tag: ${{ github.ref_name }}
+            push: false
+    operator:
+        uses: ./.github/workflows/build-image-job.yaml
+        with:
+            dockerfile: ./operator/Dockerfile
+            registry: docker.io
+            image: paladin-operator
+            image_tag: ${{ github.ref_name }}
+            push: false
+
