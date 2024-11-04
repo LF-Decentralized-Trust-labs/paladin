@@ -52,6 +52,15 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Print inputs
+        run: |
+          echo "dockerfile: ${{ inputs.dockerfile }}"
+          echo "registry: ${{ inputs.registry }}"
+          echo "image: ${{ inputs.image }}"
+          echo "image_tag: ${{ inputs.image_tag }}"
+          echo "push: ${{ inputs.push }}"
+          echo "platforms: ${{ inputs.platforms }}"
+          
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -89,10 +98,10 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ inputs.push }}
           platforms: ${{ inputs.platforms }}
-          tags: ${{ inputs.registry }}/${{ inputs.image }}:${{ inputs.image_tag }}
+          tags: ${{ inputs.image }}:${{ inputs.image_tag }}
           labels: |
             commit=${{ github.sha }}
             build_date=${{ steps.build_tag_generator.outputs.BUILD_DATE }}
             tag=${{ steps.build_tag_generator.outputs.BUILD_TAG }}
-          cache-from: type=registry,ref=${{ inputs.registry }}/${{ inputs.image }}:buildcache
-          cache-to: type=registry,ref=${{ inputs.registry }}/${{ inputs.image }}:buildcache,mode=max
+          # cache-from: type=registry,ref=${{ inputs.image }}:buildcache
+          # cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max

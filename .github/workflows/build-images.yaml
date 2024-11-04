@@ -16,7 +16,7 @@ jobs:
         with:
             dockerfile: ./Dockerfile
             registry: docker.io
-            image: paladin
+            image: ${{ github.repository_owner }}/paladin
             image_tag: ${{ github.ref_name }}
             push: false
     operator:
@@ -24,7 +24,7 @@ jobs:
         with:
             dockerfile: ./operator/Dockerfile
             registry: docker.io
-            image: paladin-operator
+            image: ${{ github.repository_owner }}/paladin-operator
             image_tag: ${{ github.ref_name }}
             push: false
 
