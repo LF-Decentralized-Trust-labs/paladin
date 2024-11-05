@@ -4,28 +4,33 @@ import (
 	"fmt"
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/spf13/viper"
 )
 
 // Config represents the structure of the configuration
 type Config struct {
 	Paladin struct {
-		Image       string            `json:"image"`
-		Labels      map[string]string `json:"labels"`
-		Annotations map[string]string `json:"annotations"`
-		Envs        map[string]string `json:"envs"`
+		Image           string            `json:"image"`
+		ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+		Labels          map[string]string `json:"labels"`
+		Annotations     map[string]string `json:"annotations"`
+		Envs            map[string]string `json:"envs"`
 		// TODO: Add more fields
 	} `json:"paladin"`
 	Besu struct {
-		Image       string            `json:"image"`
-		Labels      map[string]string `json:"labels"`
-		Annotations map[string]string `json:"annotations"`
-		Envs        map[string]string `json:"envs"`
+		Image           string            `json:"image"`
+		ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+		Labels          map[string]string `json:"labels"`
+		Annotations     map[string]string `json:"annotations"`
+		Envs            map[string]string `json:"envs"`
 		// TODO: Add more fields
 	} `json:"besu"`
 	Postgres struct {
-		Image string            `json:"image"`
-		Envs  map[string]string `json:"envs"`
+		Image           string            `json:"image"`
+		ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+		Envs            map[string]string `json:"envs"`
 		// TODO: Add more fields
 	} `json:"postgres"`
 }

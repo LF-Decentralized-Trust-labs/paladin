@@ -138,7 +138,7 @@ task copyZetoSolidity(type: Copy) {
 }
 
 task buildContractSamples(type: Exec, dependsOn: [copySolidity, copyZetoSolidity]) {
-    commandLine "go", "run", "./contractpkg", "./contractpkg/contract_map.json", "true"
+    commandLine "go", "run", "./contractpkg", "./contractpkg/contract_map.json", "false"
 }
 
 // Task to build the Paladin image from the parent project
@@ -196,7 +196,7 @@ task prepareOperatorChart(type: Exec, dependsOn: [buildContractSamples]) {
 }
 
 // Task to install the operator using Helm
-task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, prepareOperatorChart]) {
+task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages]) {
     executable 'make'
     args 'helm-install'
     args "NAMESPACE=${namespace}"
@@ -211,12 +211,12 @@ task verifyOperator(dependsOn: installOperator) {
     }
 }
 
-// // Task to create the nodes
-// task createNode(type: Exec, dependsOn: verifyOperator) {
-//     executable 'make'
-//     args 'create-node'
-//     args "NAMESPACE=${namespace}"
-// }
+// Task to create the nodes
+task createNode(type: Exec, dependsOn: [buildContractSamples, verifyOperator]) {
+    executable 'make'
+    args 'create-node'
+    args "NAMESPACE=${namespace}"
+}
 
 // // Task to verify the besu statefulSet
 // task verifyBesu(dependsOn: createNode) {
@@ -239,14 +239,14 @@ task verifyOperator(dependsOn: installOperator) {
 // }
 
 // The 'deplay' runs the whole flow
-task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyOperator]) {
+task deploy(dependsOn: [createNode]) {
     doLast {
         println 'Deplopy setup completed. Operator is running in the paladin namespace.'
     }
 }
 
 // The 'e2e' task runs the whole flow
-task e2e(type: Exec, dependsOn: [buildContractSamples, deploy]) {
+task e2e(type: Exec, dependsOn: [deploy]) {
     executable 'make'
     args 'test-e2e'
     args "NAMESPACE=${namespace}"

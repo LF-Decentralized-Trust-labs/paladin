@@ -551,7 +551,7 @@ func (r *BesuReconciler) generateStatefulSetTemplate(node *corev1alpha1.Besu, na
 						{
 							Name:            "besu",
 							Image:           r.config.Besu.Image, // Use the image from the config
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: r.config.Besu.ImagePullPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config",

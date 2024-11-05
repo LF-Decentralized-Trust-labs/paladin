@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -75,10 +76,11 @@ var _ = Describe("Besu Controller", func() {
 			By("Reconciling the created resource")
 			cfg := &config.Config{
 				Paladin: struct {
-					Image       string            `json:"image"`
-					Labels      map[string]string `json:"labels"`
-					Annotations map[string]string `json:"annotations"`
-					Envs        map[string]string `json:"envs"`
+					Image           string            `json:"image"`
+					ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+					Labels          map[string]string `json:"labels"`
+					Annotations     map[string]string `json:"annotations"`
+					Envs            map[string]string `json:"envs"`
 				}{
 					Labels: map[string]string{
 						"env":  "production",
@@ -106,10 +108,11 @@ func TestBesu_GetLabels(t *testing.T) {
 	// Mock configuration
 	config := config.Config{
 		Besu: struct {
-			Image       string            `json:"image"`
-			Labels      map[string]string `json:"labels"`
-			Annotations map[string]string `json:"annotations"`
-			Envs        map[string]string `json:"envs"`
+			Image           string            `json:"image"`
+			ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+			Labels          map[string]string `json:"labels"`
+			Annotations     map[string]string `json:"annotations"`
+			Envs            map[string]string `json:"envs"`
 		}{
 			Labels: map[string]string{
 				"env":  "production",

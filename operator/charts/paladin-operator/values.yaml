@@ -80,7 +80,7 @@ operator:
 # cert-manager dependencies
 cert-manager:
   namespace: cert-manager
-  enabled: true
+  enabled: false
   crds:
     enabled: true
 
@@ -95,3 +95,19 @@ prometheus:
     enabled: false
   pushgateway:
     enabled: false  # Enable if you need the push gateway
+
+paladin:
+  image:
+    repository: kaleidoinc/paladin
+    tag: release
+    pullPolicy: Always
+besu:
+  image:
+    repository: hyperledger/besu
+    tag: latest
+    pullPolicy: Always
+postgres:
+  image:
+    repository: postgres
+    tag: latest
+    pullPolicy: Always

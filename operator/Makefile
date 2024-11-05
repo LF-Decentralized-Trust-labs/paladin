@@ -5,7 +5,7 @@ CLUSTER_NAME ?= paladin
 NAMESPACE ?= default
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-IMAGE_TAG_BASE ?= paladin.io/paladin-operator
+IMAGE_TAG_BASE ?= paladin-operator
 OPERATOR_IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 BUNDLE_OPERATOR_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 PALADIN_IMG ?= paladin:test 
@@ -202,9 +202,13 @@ helm-install: ## Install operator using Helm.
 		-n ${NAMESPACE} --create-namespace \
 		--set operator.namespace=${NAMESPACE} \
 		--set operator.image.repository=${IMAGE_TAG_BASE} \
+		--set operator.image.pullPolicy=IfNotPresent \
 		--set operator.image.tag=${VERSION} \
-		--set certManager.enabled=true \
-		--set certManager.namespace=cert-manager \
+		--set paladin.image.repository=paladin \
+		--set paladin.image.tag=test \
+		--set paladin.image.pullPolicy=IfNotPresent \
+		--set cert-manager.enabled=true \
+		--set cert-manager.namespace=cert-manager \
 		--set prometheus.enabled=false
 
 .PHONY: helm-uninstall
@@ -260,17 +264,17 @@ generate-reference-docs: crd-ref-docs ## Generate API reference documentation.
 
 .PHONY: create-node
 create-node: # TODO: more complete startup check
-	kubectl apply -n ${NAMESPACE} -k config/samples; \
+	kubectl apply -n ${NAMESPACE} -f config/samples; \
 	kubectl wait paladins.core.paladin.io/node1 --for jsonpath='{.status.phase}=Completed' --namespace ${NAMESPACE} --timeout 5m
 
 .PHONY: delete-node
 delete-node:
-	kubectl delete -n ${NAMESPACE} -k config/samples || true
+	kubectl delete -n ${NAMESPACE} -f config/samples || true
 
 ##@ Cleanup
 DELETE_CLUSTER ?= false
 .PHONY: clean
-clean: helm-uninstall uninstall-crds ## Clean up all resources.
+clean: delete-node helm-uninstall uninstall-crds ## Clean up all resources.
 	@if [ "$(DELETE_CLUSTER)" = "true" ]; then \
 		$(MAKE) kind-delete; \
 	else \

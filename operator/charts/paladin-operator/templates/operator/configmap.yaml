@@ -13,5 +13,5 @@ metadata:
   {{- end }}
 data:
   config.json: |
-{{ .Files.Get (.Values.operator.configMap.dataFile) | indent 4 }}
+{{ tpl (.Files.Get .Values.operator.configMap.dataFile) . | indent 4 }}
 

@@ -54,9 +54,14 @@ helm install cert-manager --namespace cert-manager --version v1.16.1 jetstack/ce
 Install the Paladin operator chart:
 
 ```bash
-helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace \
-    --set paladin.namespace=paladin \
-    --set cert-manager.enabled=false
+helm upgrade --install paladin paladin/paladin-operator -n paladin --create-namespace
+```
+
+### Step 4: Deploy the CRs
+```
+curl -s https://api.github.com/repos/LF-Decentralized-Trust-labs/paladin/operator/config/samples   | \
+jq -r '.[] | select(.name | endswith(".yaml")) | .download_url' | \
+xargs -n 1 kubectl apply -n paladin -f
 ```
 
 ### Outcome

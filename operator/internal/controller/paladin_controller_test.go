@@ -131,10 +131,11 @@ var _ = Describe("Paladin Controller", func() {
 			By("Reconciling the created resource")
 			cfg := &config.Config{
 				Paladin: struct {
-					Image       string            `json:"image"`
-					Labels      map[string]string `json:"labels"`
-					Annotations map[string]string `json:"annotations"`
-					Envs        map[string]string `json:"envs"`
+					Image           string            `json:"image"`
+					ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+					Labels          map[string]string `json:"labels"`
+					Annotations     map[string]string `json:"annotations"`
+					Envs            map[string]string `json:"envs"`
 				}{
 					Labels: map[string]string{
 						"env":  "production",
@@ -162,10 +163,11 @@ func TestPaladin_GetLabels(t *testing.T) {
 	// Mock configuration
 	config := config.Config{
 		Paladin: struct {
-			Image       string            `json:"image"`
-			Labels      map[string]string `json:"labels"`
-			Annotations map[string]string `json:"annotations"`
-			Envs        map[string]string `json:"envs"`
+			Image           string            `json:"image"`
+			ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy"`
+			Labels          map[string]string `json:"labels"`
+			Annotations     map[string]string `json:"annotations"`
+			Envs            map[string]string `json:"envs"`
 		}{
 			Labels: map[string]string{
 				"env":  "production",

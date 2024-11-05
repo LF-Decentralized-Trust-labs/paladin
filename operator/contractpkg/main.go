@@ -73,7 +73,7 @@ func run() error {
 
 	// See https://github.com/kubernetes-sigs/kustomize/issues/119 for this bit of stupidity
 	var kustomizeMap map[string]any
-	kustomizeFileData, err := os.ReadFile("config/samples/kustomization.yaml")
+	kustomizeFileData, err := os.ReadFile("config/kustomization.yaml")
 	if err == nil {
 		err = yaml.Unmarshal(kustomizeFileData, &kustomizeMap)
 	}
@@ -90,7 +90,7 @@ func run() error {
 			}
 		}
 		if !found {
-			return fmt.Errorf("you need to manually add %s to config/samples/kustomization.yaml", expectedEntry)
+			return fmt.Errorf("you need to manually add %s to config/kustomization.yaml", expectedEntry)
 		}
 	}
 
@@ -135,7 +135,7 @@ func (m *ContractMap) process(name string, b *ContractMapBuild, helmCompatible b
 		for libName, link := range b.LinkedLibs {
 			link = strings.ReplaceAll(link, "_", "-")
 			requiredBuilds = append(requiredBuilds, link)
-			l := fmt.Sprintf(`{{index .status.resolvedContractAddresses "%s"}}`, link)
+			l := fmt.Sprintf(`{{ index .status.resolvedContractAddresses "%s"}}`, link)
 			if helmCompatible {
 				l = fmt.Sprintf("{{`%s`}}", l)
 			}

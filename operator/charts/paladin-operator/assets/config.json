@@ -1,17 +1,20 @@
 {
   "paladin": {
-    "image": "kaleidoinc/paladin:release",
+    "image": "{{ .Values.paladin.image.repository }}:{{ .Values.paladin.image.tag }}",
+    "imagePullPolicy": "{{ .Values.paladin.image.pullPolicy }}",
     "labels": {
       "app": "paladin"
     }
   },
   "besu": {
-    "image": "hyperledger/besu:latest",
+    "image": "{{ .Values.besu.image.repository }}:{{ .Values.besu.image.tag }}",
+    "imagePullPolicy": "{{ .Values.besu.image.pullPolicy }}",
     "labels": {
       "app": "besu"
     }
   },
   "postgres": {
-    "image": "postgres:latest"
+    "image": "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}",
+    "imagePullPolicy": "{{ .Values.postgres.image.pullPolicy }}"
   }
 }
