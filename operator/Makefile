@@ -179,24 +179,15 @@ prepare-crd-chart: manifests kustomize helmify ## Build CRDs using helmify.
 .PHONY: install-crds
 install-crds: prepare-crd-chart ## Install CRDs using Helm.
 	$(HELM) upgrade --install ${CHART_NAME_CRD} ${CHART_PATH_CRD}
-	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.crds.yaml || true
 
 
 .PHONY: uninstall-crds
 uninstall-crds: ## Uninstall CRDs.
 	$(HELM) uninstall ${CHART_NAME_CRD} || true
-	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.crds.yaml || true
 
 .PHONY: helm-template
 helm-template: ## Install operator using Helm.
 	$(HELM) template ${CHART_NAME_OPERATOR} ${CHART_PATH_OPERATOR} --set operator.namespace=${NAMESPACE} 
-
-.PHONY: prepare-operator-chart
-prepare-operator-chart: ## Copy samples to the Helm chart.
-	mkdir -p charts/paladin-operator/templates/samples
-	cp config/samples/core_v1* charts/paladin-operator/templates/samples/
-	cp config/samples/cert* charts/paladin-operator/templates/samples/
-	ls -la charts/paladin-operator/templates/samples
 
 .PHONY: helm-install
 helm-install: ## Install operator using Helm.
@@ -209,6 +200,7 @@ helm-install: ## Install operator using Helm.
 		--set certManager.enabled=true \
 		--set certManager.namespace=cert-manager \
 		--set prometheus.enabled=false
+	kubectl kustomize ./config/samples | kubectl apply -f -
 
 .PHONY: helm-uninstall
 helm-uninstall: ## Uninstall operator using Helm.

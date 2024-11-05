@@ -9,7 +9,7 @@ spec:
   node: node1
   from: zeto.operator
   txType: public
-  toTemplate: '{{`{{ index .status.resolvedContractAddresses "zeto-factory" }}`}}'
+  toTemplate: '{{ index .status.resolvedContractAddresses "zeto-factory" }}'
   requiredContractDeployments:
   - "zeto-factory"
   - "zeto-impl-anon-enc"
@@ -23,12 +23,12 @@ spec:
     {
       "name": "Zeto_AnonEnc",
       "implementation": {
-        "implementation":        '{{`{{ index .status.resolvedContractAddresses "zeto-impl-anon-enc" }}`}}',
-        "depositVerifier":       '{{`{{ index .status.resolvedContractAddresses "zeto-g16-check-hashes-value" }}`}}',
-        "withdrawVerifier":      '{{`{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs" }}`}}',
-        "batchWithdrawVerifier": '{{`{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs-batch" }}`}}',
-        "verifier":              '{{`{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc" }}`}}',
-        "batchVerifier":         '{{`{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc-batch" }}`}}'
+        "implementation":        '{{ index .status.resolvedContractAddresses "zeto-impl-anon-enc" }}',
+        "depositVerifier":       '{{ index .status.resolvedContractAddresses "zeto-g16-check-hashes-value" }}',
+        "withdrawVerifier":      '{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs" }}',
+        "batchWithdrawVerifier": '{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs-batch" }}',
+        "verifier":              '{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc" }}',
+        "batchVerifier":         '{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-enc-batch" }}'
       }
     }
   abiJSON: |
