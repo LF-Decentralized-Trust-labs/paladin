@@ -179,10 +179,13 @@ prepare-crd-chart: manifests kustomize helmify ## Build CRDs using helmify.
 .PHONY: install-crds
 install-crds: prepare-crd-chart ## Install CRDs using Helm.
 	$(HELM) upgrade --install ${CHART_NAME_CRD} ${CHART_PATH_CRD}
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.crds.yaml || true
+
 
 .PHONY: uninstall-crds
 uninstall-crds: ## Uninstall CRDs.
 	$(HELM) uninstall ${CHART_NAME_CRD} || true
+	kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.crds.yaml || true
 
 .PHONY: helm-template
 helm-template: ## Install operator using Helm.
