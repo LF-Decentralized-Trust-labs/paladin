@@ -5,7 +5,7 @@
   "main": "build/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "npx ts-node ./src/index.ts",
+    "start": "ts-node ./src/index.ts",
     "start:prod": "node ./build/index.js",
     "abi": "node scripts/abi.mjs"
   },
