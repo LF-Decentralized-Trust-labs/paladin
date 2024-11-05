@@ -176,7 +176,7 @@ task installCrds(type: Exec, dependsOn: [startKindCluster, prepareCRDsChart]){
 }
 
 // Task to install the operator using Helm
-task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages]) {
+task installOperator(type: Exec, dependsOn: [installCrds, promoteKindImages, buildContractSamples]) {
     executable 'make'
     args 'helm-install'
     args "NAMESPACE=${namespace}"
