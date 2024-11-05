@@ -5,7 +5,7 @@ CLUSTER_NAME ?= paladin
 NAMESPACE ?= default
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-IMAGE_TAG_BASE ?= paladin.io/paladin-operator
+IMAGE_TAG_BASE ?= paladin-operator
 OPERATOR_IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 BUNDLE_OPERATOR_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 PALADIN_IMG ?= paladin:test 
@@ -197,6 +197,7 @@ helm-install: ## Install operator using Helm.
 		--set operator.namespace=${NAMESPACE} \
 		--set operator.image.repository=${IMAGE_TAG_BASE} \
 		--set operator.image.tag=${VERSION} \
+		--set operator.image.pullPolicy=IfNotPresent \
 		--set certManager.enabled=true \
 		--set certManager.namespace=cert-manager \
 		--set prometheus.enabled=false
