@@ -15,6 +15,14 @@ npm install
 npm run compile
 ```
 
+Build the [typescript sdk](../../sdk/typescript) which is a dependency:
+
+```shell
+cd ../../sdk/typescript
+npm install
+npm run build
+```
+
 Run example:
 
 ```shell
