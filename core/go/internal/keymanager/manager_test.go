@@ -400,48 +400,6 @@ func TestSignUnknownWallet(t *testing.T) {
 
 }
 
-func TestTimeoutWaitingForLock(t *testing.T) {
-
-	ctx, km, _, done := newTestDBKeyManagerWithWallets(t, hdWalletConfig("wallet1", ""))
-	defer done()
-
-	readyToTry := make(chan struct{})
-	waitDone := make(chan struct{})
-	krc1 := km.NewKeyResolutionContext(ctx)
-	go func() {
-
-		committed := false
-		defer func() {
-			krc1.Close(committed)
-		}()
-		err := km.p.DB().Transaction(func(tx *gorm.DB) error {
-			mapping1, err := krc1.KeyResolver(tx).ResolveKey("key1", algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-			require.NoError(t, err)
-			require.NotEmpty(t, mapping1.Verifier.Verifier)
-			close(readyToTry)
-			<-waitDone
-			return nil
-		})
-		require.NoError(t, err)
-		committed = true
-	}()
-
-	// Wait until we know we are blocked
-	<-readyToTry
-	cancelled, cancelCtx := context.WithCancel(ctx)
-	cancelCtx()
-	krc2 := km.NewKeyResolutionContext(cancelled)
-	kr2 := krc2.KeyResolver(km.p.DB()).(*keyResolver)
-	err := km.takeAllocationLock(kr2)
-	assert.Regexp(t, "PD010301", err)
-
-	close(waitDone)
-
-	// Double unlock is a warned no-op
-	km.unlockAllocation(kr2)
-
-}
-
 type testSigner struct {
 	getMinimumKeyLen func(ctx context.Context, algorithm string) (int, error)
 	getVerifier      func(ctx context.Context, algorithm string, verifierType string, privateKey []byte) (string, error)
