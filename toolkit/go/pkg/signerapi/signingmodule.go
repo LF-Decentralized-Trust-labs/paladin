@@ -45,7 +45,7 @@ type ResolveKeyResponse struct {
 }
 
 type SignRequest struct {
-	// the key handle as returned by a previoius Resolve call (potentially a very long time ago)
+	// the key handle as returned by a previous Resolve call (potentially a very long time ago)
 	KeyHandle string `json:"keyHandle,omitempty"`
 
 	// identifier for the signing engine and algorithm to use in signing. Examples: "ecdsa:secp256k1" or "domain:zeto:circuit1"
