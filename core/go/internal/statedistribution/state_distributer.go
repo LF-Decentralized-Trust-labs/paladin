@@ -24,6 +24,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -82,6 +83,8 @@ type StateDistributer interface {
 	Stop(ctx context.Context)
 	BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistribution) ([]*components.NullifierUpsert, error)
 	DistributeStates(ctx context.Context, stateDistributions []*components.StateDistribution)
+	HandleStateProducedEvent(ctx context.Context, stateProducedEvent *pb.StateProducedEvent, distributingNode string)
+	HandleStateAcknowledgedEvent(ctx context.Context, messagePayload []byte)
 }
 
 type stateDistributer struct {
@@ -105,12 +108,6 @@ func (sd *stateDistributer) Start(bgCtx context.Context) error {
 	sd.runCtx, sd.stopRunCtx = context.WithCancel(bgCtx)
 	ctx := sd.runCtx
 	log.L(ctx).Info("stateDistributer:Start")
-
-	err := sd.transportManager.RegisterClient(ctx, sd)
-	if err != nil {
-		log.L(ctx).Errorf("Error registering transport client: %s", err)
-		return err
-	}
 
 	sd.acknowledgementWriter.Start()
 	sd.receivedStateWriter.Start()

@@ -676,6 +676,15 @@ func TestDomainContextFlushErrorCapture(t *testing.T) {
 	err = dc.AddStateLocks(&pldapi.StateLock{})
 	assert.Regexp(t, "PD010119.*pop", err) // needs reset
 
+	_, err = dc.ExportStateLocks()
+	assert.Regexp(t, "PD010119.*pop", err) // needs reset
+
+	err = dc.ImportStateLocks([]byte("{}"))
+	assert.Regexp(t, "PD010119.*pop", err) // needs reset
+
+	err = dc.AddStateLocks(&pldapi.StateLock{})
+	assert.Regexp(t, "PD010119.*pop", err) // needs reset
+
 	_, err = dc.Flush(ss.p.DB())
 	assert.Regexp(t, "pop", err) // the original error as it's a flush
 
@@ -1074,5 +1083,219 @@ func TestCheckEvalGTTimestamp(t *testing.T) {
 	match, err = filters.EvalQuery(ctx, jq, labelSet, ls)
 	assert.NoError(t, err)
 	assert.False(t, match)
+
+}
+
+func TestExportStateLocks(t *testing.T) {
+
+	ctx, ss, _, _, done := newDBMockStateManager(t)
+	defer done()
+
+	schema1, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	require.NoError(t, err)
+	ss.abiSchemaCache.Set(schemaCacheKey("domain1", schema1.ID()), schema1)
+
+	schema2, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI2))
+	require.NoError(t, err)
+	ss.abiSchemaCache.Set(schemaCacheKey("domain1", schema2.ID()), schema2)
+
+	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
+	defer dc.Close()
+
+	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	s2, err := schema2.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"tokenUri": "%s", "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32), tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	transactionID1 := uuid.New()
+	transactionID2 := uuid.New()
+	transactionID3 := uuid.New()
+
+	_, err = dc.UpsertStates(
+		ss.p.DB(),
+		&components.StateUpsert{
+			ID:        s1.ID,
+			SchemaID:  schema1.ID(),
+			Data:      s1.Data,
+			CreatedBy: &transactionID1,
+		},
+		&components.StateUpsert{
+			ID:        s2.ID,
+			SchemaID:  schema2.ID(),
+			Data:      s2.Data,
+			CreatedBy: &transactionID2,
+		},
+	)
+	require.NoError(t, err)
+
+	err = dc.AddStateLocks(
+		&pldapi.StateLock{
+			Type:        pldapi.StateLockTypeSpend.Enum(),
+			State:       s2.ID,
+			Transaction: transactionID3,
+		},
+	)
+	assert.NoError(t, err)
+
+	json, err := dc.ExportStateLocks()
+	require.NoError(t, err)
+	assert.JSONEq(t, `
+		[
+			{
+				"stateID":"`+s1.ID.String()+`",
+				"transaction":"`+transactionID1.String()+`",
+				"type":"create"
+			},
+			{
+				"stateID":"`+s2.ID.String()+`",
+				"transaction":"`+transactionID2.String()+`",
+				"type":"create"
+			},
+			{
+				"stateID":"`+s2.ID.String()+`",
+				"transaction":"`+transactionID3.String()+`",
+				"type":"spend"
+			}
+		]`,
+		string(json),
+	)
+}
+
+func TestImportStateLocks(t *testing.T) {
+
+	ctx, ss, _, done := newDBTestStateManager(t)
+	defer done()
+
+	schema1, err := newABISchema(ctx, "domain1", testABIParam(t, fakeCoinABI))
+	require.NoError(t, err)
+	ss.abiSchemaCache.Set(schemaCacheKey("domain1", schema1.ID()), schema1)
+
+	contractAddress, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
+	defer dc.Close()
+
+	s1, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	s2, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	s3ID := tktypes.RandHex(32)
+
+	s4, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	s5, err := schema1.ProcessState(ctx, contractAddress, tktypes.RawJSON(fmt.Sprintf(
+		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
+		tktypes.RandHex(32))), nil, dc.customHashFunction)
+	require.NoError(t, err)
+
+	transactionID1 := uuid.New()
+	transactionID2 := uuid.New()
+	transactionID3 := uuid.New()
+
+	_, err = dc.UpsertStates(ss.p.DB(),
+		&components.StateUpsert{
+			ID:       s1.ID,
+			SchemaID: schema1.ID(),
+			Data:     s1.Data,
+		},
+		&components.StateUpsert{
+			ID:       s2.ID,
+			SchemaID: schema1.ID(),
+			Data:     s2.Data,
+		},
+		&components.StateUpsert{
+			ID:       s4.ID,
+			SchemaID: schema1.ID(),
+			Data:     s4.Data,
+		},
+		&components.StateUpsert{
+			ID:       s5.ID,
+			SchemaID: schema1.ID(),
+			Data:     s5.Data,
+		},
+	)
+	require.NoError(t, err)
+
+	//imported locks include
+	// - state1 created by transaction1 for which we have the data
+	// - state2 created by transaction2 for which we have the data but has been spent by transaction3
+	// - state3 created by transaction3 for which we do not have the data
+	// - state4 created by transaction3 for which we do have the data
+	// and does not include state5 even though we do have the data for that
+	// so after all that, the only available states should be state1 and state 4
+	jsonToImport := fmt.Sprintf(`
+		[
+			{
+				"stateID":"%s",
+				"transaction":"%s",
+				"type":"create"
+			},
+			{
+				"stateID":"%s",
+				"transaction":"%s",
+				"type":"create"
+			},
+			{
+				"stateID":"%s",
+				"transaction":"%s",
+				"type":"create"
+			},
+			{
+				"stateID":"%s",
+				"transaction":"%s",
+				"type":"create"
+			},
+			{
+				"stateID":"%s",
+				"transaction":"%s",
+				"type":"spend"
+			}
+		]`,
+		s1.ID.String(), transactionID1.String(),
+		s2.ID.String(), transactionID2.String(),
+		s3ID, transactionID3.String(),
+		s4.ID.String(), transactionID3.String(),
+		s2.ID.String(), transactionID3.String(),
+	)
+
+	err = dc.ImportStateLocks([]byte(jsonToImport))
+	require.NoError(t, err)
+	_, states, err := dc.FindAvailableStates(ss.p.DB(), schema1.ID(), query.NewQueryBuilder().Query())
+	require.NoError(t, err)
+	require.Len(t, states, 2)
+	assert.Equal(t, s1.ID, states[0].ID)
+	assert.Equal(t, s4.ID, states[1].ID)
+
+}
+
+func TestImportStateLocksJSONError(t *testing.T) {
+
+	ctx, ss, _, _, done := newDBMockStateManager(t)
+	defer done()
+	_, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
+	defer dc.Close()
+	//valid JSON but wrong type for stateID
+	jsonToImport := `
+		[
+			{
+				"stateID":true
+			}
+		]`
+
+	err := dc.ImportStateLocks([]byte(jsonToImport))
+	assert.Error(t, err)
+	assert.Regexp(t, "PD010132", err)
 
 }

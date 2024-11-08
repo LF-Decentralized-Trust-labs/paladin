@@ -18,6 +18,7 @@ package statemgr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -133,6 +134,7 @@ func (dc *domainContext) getUnFlushedSpends() (spending []tktypes.HexBytes, null
 }
 
 func (dc *domainContext) mergeUnFlushedApplyLocks(schema components.Schema, dbStates []*pldapi.State, query *query.QueryJSON, requireNullifier bool) (_ []*pldapi.State, err error) {
+	log.L(dc).Debugf("domainContext:mergeUnFlushedApplyLocks dc.txLocks: %d creatingStates: %d", len(dc.txLocks), len(dc.creatingStates))
 	dc.stateLock.Lock()
 	defer dc.stateLock.Unlock()
 	if flushErr := dc.checkResetInitUnFlushed(); flushErr != nil {
@@ -248,7 +250,7 @@ func (dc *domainContext) mergeInMemoryMatches(schema components.Schema, states [
 }
 
 func (dc *domainContext) FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, query *query.QueryJSON) (components.Schema, []*pldapi.State, error) {
-
+	log.L(dc.Context).Debug("domainContext:FindAvailableStates")
 	// Build a list of spending states
 	spending, _, _, err := dc.getUnFlushedSpends()
 	if err != nil {
@@ -260,9 +262,12 @@ func (dc *domainContext) FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Byt
 	if err != nil {
 		return nil, nil, err
 	}
+	log.L(dc.Context).Debugf("domainContext:FindAvailableStates read %d states from DB", len(states))
 
 	// Merge in un-flushed states to results
 	states, err = dc.mergeUnFlushedApplyLocks(schema, states, query, false)
+	log.L(dc.Context).Debugf("domainContext:FindAvailableStates mergeUnFlushedApplyLocks %d", len(states))
+
 	return schema, states, err
 }
 
@@ -570,5 +575,76 @@ func (dc *domainContext) checkResetInitUnFlushed() error {
 	if dc.unFlushed == nil {
 		dc.unFlushed = dc.newPendingStateWrites()
 	}
+	return nil
+}
+
+// pldapi.StateLocks do not include the stateID in the serialized JSON so we need to define a new struct to include it
+type exportableStateLock struct {
+	State       tktypes.HexBytes                   `json:"stateID"`
+	Transaction uuid.UUID                          `json:"transaction"`
+	Type        tktypes.Enum[pldapi.StateLockType] `json:"type"`
+}
+
+// Return a snapshot of all currently known state locks as serialized JSON
+func (dc *domainContext) ExportStateLocks() ([]byte, error) {
+	dc.stateLock.Lock()
+	defer dc.stateLock.Unlock()
+	if flushErr := dc.checkResetInitUnFlushed(); flushErr != nil {
+		return nil, flushErr
+	}
+	locks := make([]*exportableStateLock, 0, len(dc.txLocks))
+	for _, l := range dc.txLocks {
+		locks = append(locks, &exportableStateLock{
+			State:       l.State,
+			Transaction: l.Transaction,
+			Type:        l.Type,
+		})
+	}
+	return json.Marshal(locks)
+}
+
+// ImportStateLocks is used to restore the state of the domain context, by adding a set of locks
+func (dc *domainContext) ImportStateLocks(stateLocksJSON []byte) error {
+	dc.stateLock.Lock()
+	defer dc.stateLock.Unlock()
+	if flushErr := dc.checkResetInitUnFlushed(); flushErr != nil {
+		return flushErr
+	}
+	locks := make([]*exportableStateLock, 0)
+	err := json.Unmarshal(stateLocksJSON, &locks)
+	if err != nil {
+		return i18n.WrapError(dc, err, msgs.MsgDomainContextImportInvalidJSON)
+	}
+	dc.creatingStates = make(map[string]*components.StateWithLabels)
+	dc.txLocks = make([]*pldapi.StateLock, 0, len(locks))
+	for _, l := range locks {
+		dc.txLocks = append(dc.txLocks, &pldapi.StateLock{
+			DomainName:  dc.domainName,
+			State:       l.State,
+			Transaction: l.Transaction,
+			Type:        l.Type,
+		})
+		//if it transpires that any of the states we already know about are created by these transactions,
+		// then we need to add them to the creatingStates map otherwise they will not be returned in queries
+		if l.Type == pldapi.StateLockTypeCreate.Enum() {
+			foundInUnflushed := false
+			for _, state := range dc.unFlushed.states {
+				if state.ID.String() == l.State.String() {
+					dc.creatingStates[state.ID.String()] = state
+					foundInUnflushed = true
+				}
+			}
+			if !foundInUnflushed {
+				// assuming this function is being used to copy a coordinators context to a delegate assembler's context
+				// this this if branch could mean one of two things:
+				// 1. the state distribution message hasn't' arrived yet but will arrive soon
+				// 2. the state distribution message is never going to arrive because we are not on the distribution list
+				// We can't tell the difference between these two cases so can't really fail here
+				// It is up to the domain to ensure that they ask for the transaction to be `Park`ed temporarily if they suspect `1`
+				log.L(dc).Infof("ImportStateLocks: state %s not found in unflushed states", l.State)
+			}
+		}
+	}
+
 	return nil
 }

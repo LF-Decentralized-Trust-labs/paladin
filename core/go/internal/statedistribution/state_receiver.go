@@ -25,7 +25,7 @@ import (
 )
 
 func (sd *stateDistributer) sendStateAcknowledgement(ctx context.Context, domainName string, contractAddress string, stateId string, receivingParty string, distributingNode string, distributionID string) error {
-	log.L(ctx).Debugf("stateDistributer:sendStateAcknowledgement %s %s %s %s %s %s", domainName, contractAddress, stateId, receivingParty, distributingNode, distributionID)
+	log.L(ctx).Debugf("stateDistributer:sendStateAcknowledgement domainName=%s contractAddress=%s stateId=%s receivingParty=%s distributingNode=%s distributionID=%s", domainName, contractAddress, stateId, receivingParty, distributingNode, distributionID)
 	stateAcknowledgedEvent := &pb.StateAcknowledgedEvent{
 		DomainName:      domainName,
 		ContractAddress: contractAddress,
@@ -43,7 +43,7 @@ func (sd *stateDistributer) sendStateAcknowledgement(ctx context.Context, domain
 		MessageType: "StateAcknowledgedEvent",
 		Payload:     stateAcknowledgedEventBytes,
 		Node:        distributingNode,
-		Component:   STATE_DISTRIBUTER_DESTINATION,
+		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
 		ReplyTo:     sd.localNodeName,
 	})
 	if err != nil {

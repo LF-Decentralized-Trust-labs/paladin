@@ -96,6 +96,12 @@ type DomainContext interface {
 	// The dbTX is passed in to allow re-use of a connection during read operations.
 	FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
 
+	// Return a snapshot of all currently known state locks
+	ExportStateLocks() ([]byte, error)
+
+	// ImportStateLocks is used to restore the state of the domain context, by adding a set of locks
+	ImportStateLocks([]byte) error
+
 	// FindAvailableNullifiers is similar to FindAvailableStates, but for domains that leverage
 	// nullifiers to record spending.
 	//

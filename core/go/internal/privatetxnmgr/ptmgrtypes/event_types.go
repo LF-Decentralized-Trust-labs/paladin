@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -65,11 +66,14 @@ type TransactionSwappedInEvent struct {
 
 type TransactionAssembledEvent struct {
 	PrivateTransactionEventBase
+	PostAssembly      *components.TransactionPostAssembly
+	AssembleRequestID string
 }
 
 type TransactionAssembleFailedEvent struct {
 	PrivateTransactionEventBase
-	Error string
+	AssembleRequestID string
+	Error             string
 }
 
 type TransactionSignedEvent struct {
@@ -79,8 +83,11 @@ type TransactionSignedEvent struct {
 
 type TransactionEndorsedEvent struct {
 	PrivateTransactionEventBase
-	RevertReason *string
-	Endorsement  *prototk.AttestationResult
+	RevertReason           *string
+	Endorsement            *prototk.AttestationResult
+	Party                  string // In case Endorsement is nil, this is need to correlate with the attestation request
+	AttestationRequestName string // In case Endorsement is nil, this is need to correlate with the attestation request
+	IdempotencyKey         string
 }
 
 type TransactionDispatchedEvent struct {

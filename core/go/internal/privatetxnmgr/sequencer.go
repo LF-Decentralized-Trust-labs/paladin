@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 	"github.com/kaleido-io/paladin/core/internal/statedistribution"
+	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -70,6 +71,14 @@ var AllSequencerStates = []string{
 	string(SequencerStateStopped),
 }
 
+type sequencerEnvironment struct {
+	blockHeight int64
+}
+
+func (e *sequencerEnvironment) GetBlockHeight() int64 {
+	return e.blockHeight
+}
+
 type Sequencer struct {
 	ctx              context.Context
 	privateTxManager components.PrivateTxManager
@@ -98,12 +107,14 @@ type Sequencer struct {
 
 	staleTimeout time.Duration
 
-	pendingEvents chan ptmgrtypes.PrivateTransactionEvent
+	pendingTransactionEvents chan ptmgrtypes.PrivateTransactionEvent
 
 	contractAddress                tktypes.EthAddress // the contract address managed by the current sequencer
 	defaultSigner                  string
-	nodeID                         string
+	nodeName                       string
 	domainAPI                      components.DomainSmartContract
+	coordinatorDomainContext       components.DomainContext
+	delegateDomainContext          components.DomainContext
 	components                     components.AllComponents
 	endorsementGatherer            ptmgrtypes.EndorsementGatherer
 	publisher                      ptmgrtypes.Publisher
@@ -114,12 +125,16 @@ type Sequencer struct {
 	transportWriter                ptmgrtypes.TransportWriter
 	graph                          Graph
 	requestTimeout                 time.Duration
+	coordinatorSelector            ptmgrtypes.CoordinatorSelector
+	newBlockEvents                 chan int64
+	assembleCoordinator            ptmgrtypes.AssembleCoordinator
+	environment                    *sequencerEnvironment
 }
 
 func NewSequencer(
 	ctx context.Context,
 	privateTxManager components.PrivateTxManager,
-	nodeID string,
+	nodeName string,
 	contractAddress tktypes.EthAddress,
 	sequencerConfig *pldconf.PrivateTxManagerSequencerConfig,
 	allComponents components.AllComponents,
@@ -132,7 +147,9 @@ func NewSequencer(
 	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer,
 	transportWriter ptmgrtypes.TransportWriter,
 	requestTimeout time.Duration,
-) *Sequencer {
+	blockHeight int64,
+
+) (*Sequencer, error) {
 
 	newSequencer := &Sequencer{
 		ctx:                  log.WithLogField(ctx, "role", fmt.Sprintf("sequencer-%s", contractAddress)),
@@ -151,8 +168,8 @@ func NewSequencer(
 		processedTxIDs:                 make(map[string]bool),
 		orchestrationEvalRequestChan:   make(chan bool, 1),
 		stopProcess:                    make(chan bool, 1),
-		pendingEvents:                  make(chan ptmgrtypes.PrivateTransactionEvent, *pldconf.PrivateTxManagerDefaults.Sequencer.MaxPendingEvents),
-		nodeID:                         nodeID,
+		pendingTransactionEvents:       make(chan ptmgrtypes.PrivateTransactionEvent, *pldconf.PrivateTxManagerDefaults.Sequencer.MaxPendingEvents),
+		nodeName:                       nodeName,
 		domainAPI:                      domainAPI,
 		components:                     allComponents,
 		endorsementGatherer:            endorsementGatherer,
@@ -164,15 +181,55 @@ func NewSequencer(
 		transportWriter:                transportWriter,
 		graph:                          NewGraph(),
 		requestTimeout:                 requestTimeout,
+		environment: &sequencerEnvironment{
+			blockHeight: blockHeight,
+		},
 
 		// Randomly allocate a signer.
 		// TODO: rotation
-		defaultSigner: fmt.Sprintf("domains.%s.submit.%s", contractAddress, uuid.New()),
+		defaultSigner:  fmt.Sprintf("domains.%s.submit.%s", contractAddress, uuid.New()),
+		newBlockEvents: make(chan int64, 10), //TODO do we want to make the buffer size configurable? Or should we put in non blocking mode? Does it matter if we miss a block?
+
 	}
 
 	log.L(ctx).Debugf("NewSequencer for contract address %s created: %+v", newSequencer.contractAddress, newSequencer)
 
-	return newSequencer
+	coordinatorSelector, err := NewCoordinatorSelector(ctx, nodeName, domainAPI.ContractConfig(), *sequencerConfig)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to create coordinator selector: %s", err)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerNewSequencerError, domainAPI.ContractConfig().GetCoordinatorSelection())
+	}
+	newSequencer.coordinatorSelector = coordinatorSelector
+
+	//TODO consolidate the initialization of the endorsement gatherer and the assemble coordinator.  Both need the same domain context - but maybe the assemble coordinator should provide the domain context to the endorsement gatherer on a per request basis
+	//
+	domainSmartContract, err := allComponents.DomainManager().GetSmartContractByAddress(ctx, contractAddress)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to get domain smart contract for contract address %s: %s", contractAddress, err)
+
+		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxManagerNewSequencerError, contractAddress)
+	}
+
+	// create 2 domain contexts. One to keep track of all transactions that we are coordinating and one for assembling transactions on behalf of a remote coordinator
+	newSequencer.coordinatorDomainContext = allComponents.StateManager().NewDomainContext(newSequencer.ctx /* background context */, domainSmartContract.Domain(), contractAddress)
+	newSequencer.delegateDomainContext = allComponents.StateManager().NewDomainContext(newSequencer.ctx /* background context */, domainSmartContract.Domain(), contractAddress)
+
+	newSequencer.assembleCoordinator = NewAssembleCoordinator(
+		ctx,
+		nodeName,
+		confutil.Int(sequencerConfig.MaxInflightTransactions, *pldconf.PrivateTxManagerDefaults.Sequencer.MaxInflightTransactions)+1, // make sure the coordinator has more slots that we do so that we don't get stuck waiting for it
+		allComponents,
+		domainAPI,
+		newSequencer.coordinatorDomainContext,
+		transportWriter,
+		contractAddress,
+		newSequencer.environment,
+		confutil.DurationMin(sequencerConfig.AssembleRequestTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.AssembleRequestTimeout),
+		stateDistributer,
+		newSequencer,
+	)
+
+	return newSequencer, nil
 }
 
 func (s *Sequencer) abort(err error) {
@@ -185,7 +242,7 @@ func (s *Sequencer) getTransactionProcessor(txID string) ptmgrtypes.TransactionF
 	defer s.incompleteTxProcessMapMutex.Unlock()
 	transactionProcessor, ok := s.incompleteTxSProcessMap[txID]
 	if !ok {
-		log.L(s.ctx).Errorf("Transaction processor not found for transaction ID %s", txID)
+		log.L(s.ctx).Debugf("Transaction processor not found for transaction ID %s", txID)
 		return nil
 	}
 	return transactionProcessor
@@ -197,6 +254,12 @@ func (s *Sequencer) removeTransactionProcessor(txID string) {
 	delete(s.incompleteTxSProcessMap, txID)
 }
 
+func (s *Sequencer) OnNewBlockHeight(ctx context.Context, blockHeight int64) {
+	log.L(ctx).Debugf("Sequencer OnNewBlockHeight %d", blockHeight)
+	s.environment.blockHeight = blockHeight
+
+}
+
 func (s *Sequencer) ProcessNewTransaction(ctx context.Context, tx *components.PrivateTransaction) (queued bool) {
 	s.incompleteTxProcessMapMutex.Lock()
 	defer s.incompleteTxProcessMapMutex.Unlock()
@@ -206,9 +269,9 @@ func (s *Sequencer) ProcessNewTransaction(ctx context.Context, tx *components.Pr
 			// tx processing pool is full, queue the item
 			return true
 		} else {
-			s.incompleteTxSProcessMap[tx.ID.String()] = NewTransactionFlow(ctx, tx, s.nodeID, s.components, s.domainAPI, s.publisher, s.endorsementGatherer, s.identityResolver, s.syncPoints, s.transportWriter, s.requestTimeout)
+			s.incompleteTxSProcessMap[tx.ID.String()] = NewTransactionFlow(ctx, tx, s.nodeName, s.components, s.domainAPI, s.coordinatorDomainContext, s.publisher, s.endorsementGatherer, s.identityResolver, s.syncPoints, s.transportWriter, s.requestTimeout, s.coordinatorSelector, s.assembleCoordinator, s.environment)
 		}
-		s.pendingEvents <- &ptmgrtypes.TransactionSubmittedEvent{
+		s.pendingTransactionEvents <- &ptmgrtypes.TransactionSubmittedEvent{
 			PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{TransactionID: tx.ID.String()},
 		}
 	}
@@ -233,9 +296,9 @@ func (s *Sequencer) ProcessInFlightTransaction(ctx context.Context, tx *componen
 			// tx processing pool is full, queue the item
 			return true
 		} else {
-			s.incompleteTxSProcessMap[tx.ID.String()] = NewTransactionFlow(ctx, tx, s.nodeID, s.components, s.domainAPI, s.publisher, s.endorsementGatherer, s.identityResolver, s.syncPoints, s.transportWriter, s.requestTimeout)
+			s.incompleteTxSProcessMap[tx.ID.String()] = NewTransactionFlow(ctx, tx, s.nodeName, s.components, s.domainAPI, s.coordinatorDomainContext, s.publisher, s.endorsementGatherer, s.identityResolver, s.syncPoints, s.transportWriter, s.requestTimeout, s.coordinatorSelector, s.assembleCoordinator, s.environment)
 		}
-		s.pendingEvents <- &ptmgrtypes.TransactionSwappedInEvent{
+		s.pendingTransactionEvents <- &ptmgrtypes.TransactionSwappedInEvent{
 			PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{TransactionID: tx.ID.String()},
 		}
 	}
@@ -243,12 +306,14 @@ func (s *Sequencer) ProcessInFlightTransaction(ctx context.Context, tx *componen
 }
 
 func (s *Sequencer) HandleEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
-	s.pendingEvents <- event
+	s.pendingTransactionEvents <- event
 }
 
-func (s *Sequencer) Start(c context.Context) (done <-chan struct{}, err error) {
+func (s *Sequencer) Start(ctx context.Context) (done <-chan struct{}, err error) {
+	log.L(ctx).Info("Starting Sequencer")
 	s.syncPoints.Start()
 	s.sequencerLoopDone = make(chan struct{})
+	s.assembleCoordinator.Start()
 	go s.evaluationLoop()
 	s.TriggerSequencerEvaluation()
 	return s.sequencerLoopDone, nil
@@ -258,6 +323,7 @@ func (s *Sequencer) Start(c context.Context) (done <-chan struct{}, err error) {
 func (s *Sequencer) Stop() {
 	// try to send an item in `stopProcess` channel, which has a buffer of 1
 	// if it already has an item in the channel, this function does nothing
+	s.assembleCoordinator.Stop()
 	select {
 	case s.stopProcess <- true:
 	default:
@@ -284,4 +350,19 @@ func (s *Sequencer) GetTxStatus(ctx context.Context, txID string) (status compon
 	}
 	//TODO should be possible to query the status of a transaction that is not inflight
 	return components.PrivateTxStatus{}, i18n.NewError(ctx, msgs.MsgPrivateTxManagerInternalError, "Transaction not found")
+}
+
+func (s *Sequencer) HandleStateProducedEvent(ctx context.Context, stateProducedEvent *pbEngine.StateProducedEvent) {
+	readTX := s.components.Persistence().DB() // no DB transaction required here for the reads from the DB
+	log.L(ctx).Debug("Sequencer:HandleStateProducedEvent Upserting state to delegateDomainContext")
+
+	states, err := s.delegateDomainContext.UpsertStates(readTX, &components.StateUpsert{
+		SchemaID: tktypes.MustParseBytes32(stateProducedEvent.SchemaId),
+		Data:     tktypes.RawJSON(stateProducedEvent.StateDataJson),
+	})
+	if err != nil {
+		log.L(ctx).Errorf("Error upserting states: %s", err)
+		return
+	}
+	log.L(ctx).Debugf("Upserted states: %v", states)
 }

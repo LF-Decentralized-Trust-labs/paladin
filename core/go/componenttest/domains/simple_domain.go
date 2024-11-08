@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -69,6 +70,7 @@ const (
 	NotaryEndorsement = "NotaryEndorsement"
 
 	//PrivacyGroupEndorsement is kinda like pente.
+	//But pente is not a token based domain so we tend to use simpleStorageDomain to emulate pente like behavior
 	//An endorsement set is provided in the constructor and every member of that group must endorse every transaction.
 	PrivacyGroupEndorsement = "PrivacyGroupEndorsement"
 )
@@ -309,6 +311,23 @@ type SimpleDomainConfig struct {
 	SubmitMode string `json:"submitMode"`
 }
 
+// ABI for the config field in the PaladinRegisterSmartContract_V0 event
+// this must match the type and order of arguments passed to the abi.encode function call in the solidity contract
+var contractDataABI = &abi.ParameterArray{
+	{Name: "endorsementMode", Type: "string"},
+	{Name: "notaryLocator", Type: "string"},
+	{Name: "endorsementSetLocators", Type: "string[]"},
+}
+
+// golang struct to parse and serialize the data received from the block indexer when the base ledger factor contract
+// emits a PaladinRegisterSmartContract_V0 event
+// this must match the ABI above
+type simpleTokenConfigParser struct {
+	EndorsementMode string   `json:"endorsementMode"`
+	NotaryLocator   string   `json:"notaryLocator"`
+	EndorsementSet  []string `json:"endorsementSetLocators"`
+}
+
 func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 	simpleDomainABI := mustParseBuildABI(simpleDomainBuild)
 	simpleTokenABI := mustParseBuildABI(simpleTokenBuild)
@@ -338,28 +357,11 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 		]
 	}`
 
-	// ABI for the config field in the PaladinRegisterSmartContract_V0 event
-	// this must match the type and order of arguments passed to the abi.encode function call in the solidity contract
-	contractDataABI := &abi.ParameterArray{
-		{Name: "endorsementMode", Type: "string"},
-		{Name: "notaryLocator", Type: "string"},
-		{Name: "endorsementSetLocators", Type: "string[]"},
-	}
-
-	// golang struct to parse and serialize the data received from the block indexer when the base ledger factor contract
-	//emits a PaladinRegisterSmartContract_V0 event
-	// this must match the ABI above
-	type simpleTokenConfigParser struct {
-		EndorsementMode string   `json:"endorsementMode"`
-		NotaryLocator   string   `json:"notaryLocator"`
-		EndorsementSet  []string `json:"endorsementSetLocators"`
-	}
-
 	return plugintk.NewDomain(func(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 
 		var simpleTokenSchemaID string
 		var chainID int64
-		simpleTokenSelection := func(ctx context.Context, stateQueryContext string, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]*simpleTokenParser, []*prototk.StateRef, *big.Int, error) {
+		simpleTokenSelection := func(ctx context.Context, stateQueryContext string, fromAddr *ethtypes.Address0xHex, amount *big.Int) ([]*simpleTokenParser, []*prototk.StateRef, *big.Int, string, error) {
 			var lastStateTimestamp int64
 			total := big.NewInt(0)
 			coins := []*simpleTokenParser{}
@@ -388,18 +390,18 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					QueryJson:         tktypes.JSONString(jq).String(),
 				})
 				if err != nil {
-					return nil, nil, nil, err
+					return nil, nil, nil, "", err
 				}
 				states := res.States
 				if len(states) == 0 {
-					return nil, nil, nil, fmt.Errorf("%s: insufficient funds (available=%s)", SimpleDomainInsufficientFundsError, total.Text(10))
+					return nil, nil, nil, fmt.Sprintf("%s: insufficient funds (available=%s)", SimpleDomainInsufficientFundsError, total.Text(10)), nil
 				}
 				for _, state := range states {
 					lastStateTimestamp = state.CreatedAt
 					// Note: More sophisticated coin selection might prefer states that aren't locked to a sequence
 					var coin simpleTokenParser
 					if err := json.Unmarshal([]byte(state.DataJson), &coin); err != nil {
-						return nil, nil, nil, fmt.Errorf("coin %s is invalid: %s", state.Id, err)
+						return nil, nil, nil, "", fmt.Errorf("coin %s is invalid: %s", state.Id, err)
 					}
 					total = total.Add(total, coin.Amount.BigInt())
 					stateRefs = append(stateRefs, &prototk.StateRef{
@@ -409,7 +411,7 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					coins = append(coins, &coin)
 					if total.Cmp(amount) >= 0 {
 						// We've got what we need - return how much over we are
-						return coins, stateRefs, new(big.Int).Sub(total, amount), nil
+						return coins, stateRefs, new(big.Int).Sub(total, amount), "", nil
 					}
 				}
 			}
@@ -655,10 +657,11 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_SENDER
 					contractConfig.SubmitterSelection = prototk.ContractConfig_SUBMITTER_SENDER
 				} else if constructorParameters.EndorsementMode == NotaryEndorsement {
-					// TODO: Use static option?
-					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_ENDORSER
+					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_STATIC
+					contractConfig.StaticCoordinator = &constructorParameters.NotaryLocator
 					contractConfig.SubmitterSelection = prototk.ContractConfig_SUBMITTER_COORDINATOR
 				} else if constructorParameters.EndorsementMode == PrivacyGroupEndorsement {
+					//This combination is less common on a token based domain but may use it in some tests
 					contractConfig.CoordinatorSelection = prototk.ContractConfig_COORDINATOR_ENDORSER
 					contractConfig.SubmitterSelection = prototk.ContractConfig_SUBMITTER_COORDINATOR
 				} else {
@@ -734,12 +737,24 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				toKeep := new(big.Int)
 				coinsToSpend := []*simpleTokenParser{}
 				stateRefsToSpend := []*prototk.StateRef{}
+				revertMessage := ""
 				if txInputs.From != "" {
-					coinsToSpend, stateRefsToSpend, toKeep, err = simpleTokenSelection(ctx, req.StateQueryContext, fromAddr, amount)
+					coinsToSpend, stateRefsToSpend, toKeep, revertMessage, err = simpleTokenSelection(ctx, req.StateQueryContext, fromAddr, amount)
 					if err != nil {
 						return nil, err
 					}
+					for _, state := range stateRefsToSpend {
+						log.L(ctx).Infof("Spend coin %s", state.Id)
+					}
 				}
+				if revertMessage != "" {
+					return &prototk.AssembleTransactionResponse{
+						AssembledTransaction: &prototk.AssembledTransaction{},
+						AssemblyResult:       prototk.AssembleTransactionResponse_REVERT,
+						RevertReason:         &revertMessage,
+					}, nil
+				}
+
 				newStates := []*prototk.NewState{}
 				newCoins := []*simpleTokenParser{}
 				if fromAddr != nil && toKeep.Sign() > 0 {
@@ -954,7 +969,8 @@ func SimpleTokenDomain(t *testing.T, ctx context.Context) plugintk.PluginBase {
 				switch config.EndorsementMode {
 				case SelfEndorsement:
 					return &prototk.EndorseTransactionResponse{
-						EndorsementResult: prototk.EndorseTransactionResponse_ENDORSER_SUBMIT,
+						EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
+						Payload:           []byte("i-hereby-endorse-this-transaction"),
 					}, nil
 				case NotaryEndorsement:
 					return &prototk.EndorseTransactionResponse{

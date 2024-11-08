@@ -104,6 +104,7 @@ var (
 	MsgStateHashMismatch              = ffe("PD010129", "The supplied state ID '%s' does not match the state hash '%s'")
 	MsgStateIDMissing                 = ffe("PD010130", "The state id must be supplied for this domain")
 	MsgStateFlushInProgress           = ffe("PD010131", "A flush is already in progress for this domain context")
+	MsgDomainContextImportInvalidJSON = ffe("PD010132", "Attempted to import state locks but the JSON could not be parsed")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
@@ -272,9 +273,10 @@ var (
 	MsgDomainABIEncodingInlineSigningFailed   = ffe("PD011656", "ABI encoding and signing failed with transaction type '%s' and key identifier '%s'")
 	MsgDomainDomainReceiptNotAvailable        = ffe("PD011657", "A domain receipt is not yet available for transaction %s as no state confirmations have been indexed for that transaction")
 	MsgDomainDomainReceiptNoStatesAvailable   = ffe("PD011658", "A domain receipt is not yet available for transaction %s as none of the private state data is available on the local node")
-	MsgDomainSingingKeyMustBeLocalEthSign     = ffe("PD011659", "Singing key must be local for ethereum transaction signing")
+	MsgDomainSingingKeyMustBeLocalEthSign     = ffe("PD011659", "Signing key must be local for ethereum transaction signing")
 	MsgDomainNullifierForPartyOutsideDistro   = ffe("PD011660", "A nullifier was requested for a party that is not in the distribution list")
 	MsgDomainInvalidFromAddress               = ffe("PD011661", "Invalid from identity in transaction")
+	MsgDomainInvalidCoordinatorSelection      = ffe("PD011662", "Invalid coordinator selection of '%s' configured. valid options are: COORDINATOR_SENDER, COORDINATOR_STATIC, COORDINATOR_ENDORSER")
 
 	// Entrypoint PD0117XX
 	MsgEntrypointUnknownRunMode = ffe("PD011700", "Unknown run mode '%s'")
@@ -294,7 +296,7 @@ var (
 	MsgContractAddressNotProvided                = ffe("PD011811", "Contract address (To) not found in the transaction input")
 	MsgPrivTxMgrPublicTxFail                     = ffe("PD011812", "Public transaction rejected")
 	MsgResolveVerifierRemoteFailed               = ffe("PD011813", "Failed to resolve verifier on remote node with lookup %s algorithm %s: Error %s")
-	MsgPrivateTxManagerAssembleRevert            = ffe("PD011814", "Domain reverted transaction on assemble")
+	MsgPrivateTxManagerAssembleRevert            = ffe("PD011814", "Domain reverted transaction on assemble: %s")
 	MsgPrivateTxManagerResolveError              = ffe("PD011815", "Failed to resolve local signer for party %s (verifier=%s,algorithm=%s): %s")
 	MsgPrivateTxManagerSignError                 = ffe("PD011816", "Failed to sign for party %s (verifier=%s,algorithm=%s): %s")
 	MsgPrivateTxManagerEndorsementRequestError   = ffe("PD011817", "Failed to request endorsement from %s: %s")
@@ -314,6 +316,8 @@ var (
 	MsgPrivateTxMgrInvalidTxStateStateDistro     = ffe("PD011831", "Invalid transaction state for state distribution")
 	MsgPrivateTxMgrDistributionNotFullyQualified = ffe("PD011832", "State distribution from domain is not fully qualified: %s")
 	MsgPrivateTxMgrInvalidNullifierSpecInDistro  = ffe("PD011833", "Invalid nullifier specification in new state instruction from domain")
+	MsgPrivateTxManagerNewSequencerError         = ffe("PD011834", "Failed to create new sequencer")
+	MsgPrivateTxManagerInvalidStaticCoordinator  = ffe("PD011835", "Contract was configured with invalid static coordinator '%s'.  Must be of the form 'identity@node'")
 
 	// Public Transaction Manager PD0119XX
 	MsgInsufficientBalance             = ffe("PD011900", "Balance %s of fueling source address %s is below the required amount %s")

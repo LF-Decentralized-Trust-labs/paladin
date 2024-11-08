@@ -25,36 +25,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const STATE_DISTRIBUTER_DESTINATION = "state-distributer"
-
-func (sd *stateDistributer) Destination() string {
-	return STATE_DISTRIBUTER_DESTINATION
-}
-
-func (sd *stateDistributer) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
-	log.L(ctx).Debugf("stateDistributer:ReceiveTransportMessage")
-	messagePayload := message.Payload
-
-	switch message.MessageType {
-	case "StateProducedEvent":
-		distributingNode := message.ReplyTo
-		go sd.handleStateProducedEvent(ctx, messagePayload, distributingNode)
-	case "StateAcknowledgedEvent":
-		go sd.handleStateAcknowledgedEvent(ctx, message.Payload)
-	default:
-		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
-	}
-}
-
-func (sd *stateDistributer) handleStateProducedEvent(ctx context.Context, messagePayload []byte, distributingNode string) {
+func (sd *stateDistributer) HandleStateProducedEvent(ctx context.Context, stateProducedEvent *pb.StateProducedEvent, distributingNode string) {
 	log.L(ctx).Debugf("stateDistributer:handleStateProducedEvent")
-	stateProducedEvent := &pb.StateProducedEvent{}
-	err := proto.Unmarshal(messagePayload, stateProducedEvent)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal StateProducedEvent: %s", err)
-		return
-	}
 
+	var err error
 	s := &components.StateDistribution{
 		ID:                    stateProducedEvent.DistributionId,
 		StateID:               stateProducedEvent.StateId,
@@ -109,7 +83,7 @@ func (sd *stateDistributer) handleStateProducedEvent(ctx context.Context, messag
 	}
 }
 
-func (sd *stateDistributer) handleStateAcknowledgedEvent(ctx context.Context, messagePayload []byte) {
+func (sd *stateDistributer) HandleStateAcknowledgedEvent(ctx context.Context, messagePayload []byte) {
 	log.L(ctx).Debugf("stateDistributer:handleStateAcknowledgedEvent")
 	stateAcknowledgedEvent := &pb.StateAcknowledgedEvent{}
 	err := proto.Unmarshal(messagePayload, stateAcknowledgedEvent)

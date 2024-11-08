@@ -30,11 +30,11 @@ import (
 
 func NewMockTransactionProcessorForTesting(t *testing.T, transactionID uuid.UUID, inputStateIDs []string, outputStateIDs []string, endorsed bool, signer string) *privatetxnmgrmocks.TransactionFlow {
 	mockTransactionProcessor := privatetxnmgrmocks.NewTransactionFlow(t)
-	mockTransactionProcessor.On("ID").Return(transactionID).Maybe()
-	mockTransactionProcessor.On("InputStateIDs").Return(inputStateIDs).Maybe()
-	mockTransactionProcessor.On("OutputStateIDs").Return(outputStateIDs).Maybe()
-	mockTransactionProcessor.On("IsEndorsed", mock.Anything).Return(endorsed).Maybe()
-	mockTransactionProcessor.On("Signer").Return(signer).Maybe()
+	mockTransactionProcessor.On("ID", mock.Anything).Return(transactionID).Maybe()
+	mockTransactionProcessor.On("InputStateIDs", mock.Anything).Return(inputStateIDs).Maybe()
+	mockTransactionProcessor.On("OutputStateIDs", mock.Anything).Return(outputStateIDs).Maybe()
+	mockTransactionProcessor.On("IsEndorsed", mock.Anything, mock.Anything).Return(endorsed).Maybe()
+	mockTransactionProcessor.On("Signer", mock.Anything).Return(signer).Maybe()
 	return mockTransactionProcessor
 }
 

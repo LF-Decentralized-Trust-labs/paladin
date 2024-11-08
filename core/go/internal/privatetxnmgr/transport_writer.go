@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	engineProto "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 	pb "github.com/kaleido-io/paladin/core/pkg/proto/engine"
@@ -74,7 +75,7 @@ func (tw *transportWriter) SendDelegationRequest(
 	if err = tw.transportManager.Send(ctx, &components.TransportMessage{
 		MessageType: "DelegationRequest",
 		Payload:     delegationRequestBytes,
-		Component:   PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
 		Node:        delegateNodeId,
 		ReplyTo:     tw.nodeID,
 	}); err != nil {
@@ -84,7 +85,7 @@ func (tw *transportWriter) SendDelegationRequest(
 }
 
 // TODO do we have duplication here?  contractAddress and transactionID are in the transactionSpecification
-func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error {
+func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempotencyKey string, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error {
 	attRequestAny, err := anypb.New(attRequest)
 	if err != nil {
 		log.L(ctx).Error("Error marshalling attestation request", err)
@@ -149,6 +150,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, party str
 	}
 
 	endorsementRequest := &engineProto.EndorsementRequest{
+		IdempotencyKey:           idempotencyKey,
 		ContractAddress:          contractAddress,
 		TransactionId:            transactionID,
 		AttestationRequest:       attRequestAny,
@@ -169,9 +171,47 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, party str
 	err = tw.transportManager.Send(ctx, &components.TransportMessage{
 		MessageType: "EndorsementRequest",
 		Node:        targetNode,
-		Component:   PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
 		ReplyTo:     tw.nodeID,
 		Payload:     endorsementRequestBytes,
+	})
+	return err
+}
+
+func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
+
+	transactionInputsBytes, err := json.Marshal(transactionInputs)
+	if err != nil {
+		log.L(ctx).Error("Error marshalling transaction inputs", err)
+		return err
+	}
+
+	preAssemblyBytes, err := json.Marshal(preAssembly)
+	if err != nil {
+		log.L(ctx).Error("Error marshalling preassembly", err)
+		return err
+	}
+
+	assembleRequest := &engineProto.AssembleRequest{
+		TransactionId:     txID.String(),
+		AssembleRequestId: assembleRequestID,
+		ContractAddress:   contractAddress,
+		TransactionInputs: transactionInputsBytes,
+		PreAssembly:       preAssemblyBytes,
+		StateLocks:        stateLocksJSON,
+		BlockHeight:       blockHeight,
+	}
+	assembleRequestBytes, err := proto.Marshal(assembleRequest)
+	if err != nil {
+		log.L(ctx).Error("Error marshalling assemble request", err)
+		return err
+	}
+	err = tw.transportManager.Send(ctx, &components.TransportMessage{
+		MessageType: "AssembleRequest",
+		Node:        assemblingNode,
+		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		ReplyTo:     tw.nodeID,
+		Payload:     assembleRequestBytes,
 	})
 	return err
 }

@@ -81,6 +81,10 @@ type outstandingEndorsementRequest struct {
 
 func (tf *transactionFlow) outstandingEndorsementRequests(ctx context.Context) []*outstandingEndorsementRequest {
 	outstandingEndorsementRequests := make([]*outstandingEndorsementRequest, 0)
+	if tf.transaction.PostAssembly == nil {
+		log.L(ctx).Debugf("PostAssembly is nil so there are no outstanding endorsement requests")
+		return outstandingEndorsementRequests
+	}
 	for _, attRequest := range tf.transaction.PostAssembly.AttestationPlan {
 		if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
 			for _, party := range attRequest.Parties {

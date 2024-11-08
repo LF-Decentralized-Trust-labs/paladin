@@ -49,7 +49,6 @@ type inflightRequest struct {
 	failed   func(ctx context.Context, err error)
 }
 
-// As a LateBoundComponent, the identity resolver is created and initialised in a single function call
 func NewIdentityResolver(ctx context.Context, conf *pldconf.IdentityResolverConfig) components.IdentityResolver {
 	return &identityResolver{
 		bgCtx:                 ctx,

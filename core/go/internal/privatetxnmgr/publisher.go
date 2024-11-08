@@ -64,23 +64,26 @@ func (p *publisher) PublishTransactionDispatchedEvent(ctx context.Context, trans
 
 }
 
-func (p *publisher) PublishTransactionAssembledEvent(ctx context.Context, transactionId string) {
+func (p *publisher) PublishTransactionAssembledEvent(ctx context.Context, transactionId string, postAssembly *components.TransactionPostAssembly, requestID string) {
 	event := &ptmgrtypes.TransactionAssembledEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
 			TransactionID:   transactionId,
 		},
+		PostAssembly:      postAssembly,
+		AssembleRequestID: requestID,
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
 }
 
-func (p *publisher) PublishTransactionAssembleFailedEvent(ctx context.Context, transactionId string, errorMessage string) {
+func (p *publisher) PublishTransactionAssembleFailedEvent(ctx context.Context, transactionId string, errorMessage string, requestID string) {
 	event := &ptmgrtypes.TransactionAssembleFailedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
 			TransactionID:   transactionId,
 		},
-		Error: errorMessage,
+		Error:             errorMessage,
+		AssembleRequestID: requestID,
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
 }
@@ -96,14 +99,17 @@ func (p *publisher) PublishTransactionSignedEvent(ctx context.Context, transacti
 	p.privateTxManager.HandleNewEvent(ctx, event)
 }
 
-func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, endorsement *prototk.AttestationResult, revertReason *string) {
+func (p *publisher) PublishTransactionEndorsedEvent(ctx context.Context, transactionId string, idempotencyKey string, party string, attestationRequestName string, endorsement *prototk.AttestationResult, revertReason *string) {
 	event := &ptmgrtypes.TransactionEndorsedEvent{
 		PrivateTransactionEventBase: ptmgrtypes.PrivateTransactionEventBase{
 			ContractAddress: p.contractAddress,
 			TransactionID:   transactionId,
 		},
-		Endorsement:  endorsement,
-		RevertReason: revertReason,
+		Endorsement:            endorsement,
+		RevertReason:           revertReason,
+		Party:                  party,
+		AttestationRequestName: attestationRequestName,
+		IdempotencyKey:         idempotencyKey,
 	}
 	p.privateTxManager.HandleNewEvent(ctx, event)
 }

@@ -84,7 +84,7 @@ func transactionLatencyThreshold(t *testing.T) time.Duration {
 
 	deadline, ok := t.Deadline()
 	if !ok {
-		//there was no -timeout flag, default to a long time becuase this is most likely a debug session
+		//there was no -timeout flag, default to a long time because this is most likely a debug session
 		threshold = time.Hour
 	} else {
 		timeRemaining := time.Until(deadline)
@@ -165,34 +165,7 @@ func newNodeConfiguration(t *testing.T, nodeName string) *nodeConfiguration {
 	}
 }
 
-func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()) {
-	dbDSN := func(dbname string) string {
-		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
-	}
-	componentTestdbName := "ct_" + uuid.New().String()
-	log.L(ctx).Infof("Component test Postgres DB: %s", componentTestdbName)
-
-	// First create the database - using the super user
-
-	adminDB, err := sql.Open("postgres", dbDSN("postgres"))
-	if err == nil {
-		_, err = adminDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s";`, componentTestdbName))
-	}
-	if err == nil {
-		err = adminDB.Close()
-	}
-	require.NoError(t, err)
-
-	return dbDSN(componentTestdbName), func() {
-		adminDB, err := sql.Open("postgres", dbDSN("postgres"))
-		if err == nil {
-			_, _ = adminDB.Exec(fmt.Sprintf(`DROP DATABASE "%s" WITH(FORCE);`, componentTestdbName))
-			adminDB.Close()
-		}
-	}
-}
-
-func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig *domains.SimpleDomainConfig) *componentTestInstance {
+func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes.EthAddress, binding *nodeConfiguration, peerNodes []*nodeConfiguration, domainConfig interface{}) *componentTestInstance {
 	if binding == nil {
 		binding = newNodeConfiguration(t, "default")
 	}
@@ -223,14 +196,36 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 			SubmitMode: domains.ENDORSER_SUBMISSION,
 		}
 	}
-	i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
-		AllowSigning: true,
-		Plugin: pldconf.PluginConfig{
-			Type:    string(tktypes.LibraryTypeCShared),
-			Library: "loaded/via/unit/test/loader",
-		},
-		Config:          map[string]any{"submitMode": domainConfig.SubmitMode},
-		RegistryAddress: domainRegistryAddress.String(),
+	switch domainConfig := domainConfig.(type) {
+	case *domains.SimpleDomainConfig:
+		i.conf.DomainManagerConfig.Domains["domain1"] = &pldconf.DomainConfig{
+			AllowSigning: true,
+			Plugin: pldconf.PluginConfig{
+				Type:    string(tktypes.LibraryTypeCShared),
+				Library: "loaded/via/unit/test/loader",
+			},
+			Config:          map[string]any{"submitMode": domainConfig.SubmitMode},
+			RegistryAddress: domainRegistryAddress.String(),
+		}
+	case *domains.SimpleStorageDomainConfig:
+		endorsementSet := make([]string, 1+len(peerNodes))
+		endorsementSet[0] = binding.name
+		for i, peerNode := range peerNodes {
+			endorsementSet[i+1] = peerNode.name
+		}
+		i.conf.DomainManagerConfig.Domains["simpleStorageDomain"] = &pldconf.DomainConfig{
+			AllowSigning: true,
+			Plugin: pldconf.PluginConfig{
+				Type:    string(tktypes.LibraryTypeCShared),
+				Library: "loaded/via/unit/test/loader",
+			},
+			Config: map[string]any{
+				"submitMode":     domainConfig.SubmitMode,
+				"endorsementSet": endorsementSet,
+			},
+			RegistryAddress: domainRegistryAddress.String(),
+		}
+
 	}
 
 	i.conf.NodeName = binding.name
@@ -297,6 +292,7 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 		dns, cleanUp := initPostgres(t, context.Background())
 		i.conf.DB.Postgres.DSN = dns
 		t.Cleanup(cleanUp)
+
 	}
 
 	var pl plugins.UnitTestPluginLoader
@@ -310,9 +306,10 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 	require.NoError(t, err)
 
 	loaderMap := map[string]plugintk.Plugin{
-		"domain1":   domains.SimpleTokenDomain(t, i.ctx),
-		"grpc":      grpc.NewPlugin(i.ctx),
-		"registry1": static.NewPlugin(i.ctx),
+		"domain1":             domains.SimpleTokenDomain(t, i.ctx),
+		"simpleStorageDomain": domains.SimpleStorageDomain(t, i.ctx),
+		"grpc":                grpc.NewPlugin(i.ctx),
+		"registry1":           static.NewPlugin(i.ctx),
 	}
 	pc := i.cm.PluginManager()
 	pl, err = plugins.NewUnitTestPluginLoader(pc.GRPCTargetURL(), pc.LoaderID().String(), loaderMap)
@@ -341,6 +338,33 @@ func newInstanceForComponentTesting(t *testing.T, domainRegistryAddress *tktypes
 
 	return i
 
+}
+
+func initPostgres(t *testing.T, ctx context.Context) (dns string, cleanup func()) {
+	dbDSN := func(dbname string) string {
+		return fmt.Sprintf("postgres://postgres:my-secret@localhost:5432/%s?sslmode=disable", dbname)
+	}
+	componentTestdbName := "ct_" + uuid.New().String()
+	log.L(ctx).Infof("Component test Postgres DB: %s", componentTestdbName)
+
+	// First create the database - using the super user
+
+	adminDB, err := sql.Open("postgres", dbDSN("postgres"))
+	if err == nil {
+		_, err = adminDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s";`, componentTestdbName))
+	}
+	if err == nil {
+		err = adminDB.Close()
+	}
+	require.NoError(t, err)
+
+	return dbDSN(componentTestdbName), func() {
+		adminDB, err := sql.Open("postgres", dbDSN("postgres"))
+		if err == nil {
+			_, _ = adminDB.Exec(fmt.Sprintf(`DROP DATABASE "%s" WITH(FORCE);`, componentTestdbName))
+			adminDB.Close()
+		}
+	}
 }
 
 func testConfig(t *testing.T) pldconf.PaladinConfig {
@@ -448,8 +472,8 @@ func (p *partyForTesting) peer(peers ...*nodeConfiguration) {
 	p.peers = append(p.peers, peers...)
 }
 
-func (p *partyForTesting) start(t *testing.T, domainConfig domains.SimpleDomainConfig) {
-	p.instance = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, &domainConfig)
+func (p *partyForTesting) start(t *testing.T, domainConfig interface{}) {
+	p.instance = newInstanceForComponentTesting(t, p.domainRegistryAddress, p.nodeConfig, p.peers, domainConfig)
 	p.client = p.instance.client
 
 }
@@ -463,6 +487,36 @@ func (p *partyForTesting) deploySimpleDomainInstanceContract(t *testing.T, endor
 		TransactionBase: pldapi.TransactionBase{
 			Type:   pldapi.TransactionTypePrivate.Enum(),
 			Domain: "domain1",
+			From:   p.identity,
+			Data:   tktypes.JSONString(constructorParameters),
+		},
+	})
+	require.NoError(t, err)
+	assert.Eventually(t,
+		transactionReceiptCondition(t, context.Background(), dplyTxID, p.client, true),
+		transactionLatencyThreshold(t)+5*time.Second, //TODO deploy transaction seems to take longer than expected
+		100*time.Millisecond,
+		"Deploy transaction did not receive a receipt",
+	)
+
+	var dplyTxFull pldapi.TransactionFull
+	err = p.client.CallRPC(context.Background(), &dplyTxFull, "ptx_getTransactionFull", dplyTxID)
+	require.NoError(t, err)
+	require.NotNil(t, dplyTxFull.Receipt)
+	require.True(t, dplyTxFull.Receipt.Success)
+	require.NotNil(t, dplyTxFull.Receipt.ContractAddress)
+	return dplyTxFull.Receipt.ContractAddress
+}
+
+func (p *partyForTesting) deploySimpleStorageDomainInstanceContract(t *testing.T, endorsementMode string, constructorParameters *domains.SimpleStorageConstructorParameters) *tktypes.EthAddress {
+
+	var dplyTxID uuid.UUID
+
+	err := p.client.CallRPC(context.Background(), &dplyTxID, "ptx_sendTransaction", &pldapi.TransactionInput{
+		ABI: *domains.SimpleStorageConstructorABI(endorsementMode),
+		TransactionBase: pldapi.TransactionBase{
+			Type:   pldapi.TransactionTypePrivate.Enum(),
+			Domain: "simpleStorageDomain",
 			From:   p.identity,
 			Data:   tktypes.JSONString(constructorParameters),
 		},

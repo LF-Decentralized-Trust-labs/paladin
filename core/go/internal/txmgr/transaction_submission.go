@@ -478,6 +478,8 @@ func (tm *txManager) checkIdempotencyKeys(ctx context.Context, origErr error, in
 
 func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX *gorm.DB, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (*components.ValidatedTransaction, error) {
 	txID := uuid.New()
+	// Useful to have a correlation from transactionID to idempotencyKey in the logs
+	log.L(ctx).Debugf("Resolving new transaction TransactionID: %s, idempotencyKey: %s ", txID, tx.IdempotencyKey)
 
 	switch tx.Type.V() {
 	case pldapi.TransactionTypePrivate:

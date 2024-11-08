@@ -80,7 +80,7 @@ type TransactionBase struct {
 	// TODO: PublicTransactions string list
 }
 
-// The full transaction you query, with input an doutput
+// The full transaction you query, with input and output
 type Transaction struct {
 	ID         *uuid.UUID               `docstruct:"Transaction" json:"id,omitempty"`         // server generated UUID for this transaction (query only)
 	Created    tktypes.Timestamp        `docstruct:"Transaction" json:"created,omitempty"`    // server generated creation timestamp for this transaction (query only)

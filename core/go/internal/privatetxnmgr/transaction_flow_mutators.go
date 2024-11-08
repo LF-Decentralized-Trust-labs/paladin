@@ -77,24 +77,52 @@ func (tf *transactionFlow) applyTransactionSwappedInEvent(ctx context.Context, _
 
 }
 
-func (tf *transactionFlow) applyTransactionAssembledEvent(ctx context.Context, _ *ptmgrtypes.TransactionAssembledEvent) {
+func (tf *transactionFlow) applyTransactionAssembledEvent(ctx context.Context, event *ptmgrtypes.TransactionAssembledEvent) {
+	log.L(ctx).Debug("transactionFlow:applyTransactionAssembledEvent")
+
 	tf.latestEvent = "TransactionAssembledEvent"
+	tf.transaction.PostAssembly = event.PostAssembly
+	tf.assemblePending = false
 	if tf.transaction.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_REVERT {
 		// Not sure if any domains actually use this but it is a valid response to indicate failure
 		log.L(ctx).Errorf("AssemblyResult is AssembleTransactionResponse_REVERT")
-		tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleRevert)))
+		revertReason := ""
+		if event.PostAssembly.RevertReason != nil {
+			revertReason = *event.PostAssembly.RevertReason
+		}
+		tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleRevert), revertReason))
+		return
+	}
+	if tf.transaction.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_PARK {
+
+		log.L(ctx).Infof("AssemblyResult is AssembleTransactionResponse_PARK")
+		tf.status = "parked"
+		tf.assemblePending = false
 		return
 	}
 	tf.status = "assembled"
+	tf.writeAndLockStates(ctx)
+	//allow assembly thread to proceed
+	sds, err := tf.GetStateDistributions(ctx)
+	if err != nil {
+		log.L(ctx).Errorf("Error getting state distributions: %s", err)
+		// we need to proceed with unblocking the assembleCoordinator.  It wont have a chance to distribute the states to the remote assembler nodes
+		// so they may fail to assemble or may assemble a transaction that does not get endorsed but that is always a possibility anyway and the
+		// engine's retry strategy and the eventually consistent distribution of states will mean we will eventually process
+		// all transactions if they are valid
+
+	}
+	tf.assembleCoordinator.Complete(event.AssembleRequestID, sds.Remote)
 
 }
 
 func (tf *transactionFlow) applyTransactionAssembleFailedEvent(ctx context.Context, event *ptmgrtypes.TransactionAssembleFailedEvent) {
-	log.L(ctx).Debugf("transactionFlow:applyTransactionAssembleFailedEvent: %s", event.Error)
+	log.L(ctx).Debugf("transactionFlow:applyTransactionAssembleFailedEvent: RequestID: '%s' Error: %s ", event.AssembleRequestID, event.Error)
 	tf.latestEvent = "TransactionAssembleFailedEvent"
 	tf.latestError = event.Error
-	tf.finalizeRequired = true
-	tf.finalizeRevertReason = event.Error
+	// set assemblePending to false so that the transaction can be re-assembled
+	tf.assemblePending = false
+	tf.assembleCoordinator.Complete(event.AssembleRequestID, nil)
 }
 
 func (tf *transactionFlow) applyTransactionSignedEvent(ctx context.Context, event *ptmgrtypes.TransactionSignedEvent) {
@@ -106,6 +134,27 @@ func (tf *transactionFlow) applyTransactionSignedEvent(ctx context.Context, even
 
 func (tf *transactionFlow) applyTransactionEndorsedEvent(ctx context.Context, event *ptmgrtypes.TransactionEndorsedEvent) {
 	tf.latestEvent = "TransactionEndorsedEvent"
+	log.L(ctx).Debugf("transactionFlow:applyTransactionEndorsedEvent: TransactionID: '%s' IdempotencyKey: '%s' Party: %s ", event.TransactionID, event.IdempotencyKey, event.Party)
+
+	//if this response does not match a pending request, then we ignore it
+	pendingRequestsForAttRequestName, ok := tf.pendingEndorsementRequests[event.AttestationRequestName]
+	if !ok {
+		log.L(ctx).Warnf("Received endorsement for unknown request name %s", event.AttestationRequestName)
+		return
+	}
+	pendingRequest, ok := pendingRequestsForAttRequestName[event.Party]
+	if !ok {
+		log.L(ctx).Warnf("Received endorsement for unknown party %s", event.Party)
+		return
+	}
+
+	if pendingRequest.idempotencyKey != event.IdempotencyKey {
+		log.L(ctx).Debugf("Pending request idempotencyKey %s does not match endorsement idempotencyKey %s, assuming response from obsolete request", pendingRequest.idempotencyKey, event.IdempotencyKey)
+		return
+	}
+	//we have (had) a pending request for this endorsement but it is no longer pending because we now have a response
+	delete(pendingRequestsForAttRequestName, event.Party)
+
 	if event.RevertReason != nil {
 		log.L(ctx).Infof("Endorsement for transaction %s was rejected: %s", tf.transaction.ID.String(), *event.RevertReason)
 		// endorsement errors trigger a re-assemble
@@ -116,6 +165,8 @@ func (tf *transactionFlow) applyTransactionEndorsedEvent(ctx context.Context, ev
 		// we discard them when they do return.
 		//only apply at this stage, action will be taken later
 		tf.transaction.PostAssembly = nil
+		// remove all pending endorsement request records because they are no longer valid
+		tf.pendingEndorsementRequests = make(map[string]map[string]*pendingEndorsementRequest)
 
 	} else {
 		log.L(ctx).Infof("Adding endorsement from %s to transaction %s", event.Endorsement.Verifier.Lookup, tf.transaction.ID.String())

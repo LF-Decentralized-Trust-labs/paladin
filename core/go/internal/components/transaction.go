@@ -85,6 +85,7 @@ type TransactionPostAssembly struct {
 	Signatures            []*prototk.AttestationResult               `json:"signatures"`
 	Endorsements          []*prototk.AttestationResult               `json:"endorsements"`
 	ExtraData             *string                                    `json:"extra_data"`
+	RevertReason          *string                                    `json:"revert_reason"`
 }
 
 // PrivateTransaction is the critical exchange object between the engine and the domain manager,

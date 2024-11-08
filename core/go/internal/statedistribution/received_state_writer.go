@@ -113,7 +113,7 @@ func (rsw *receivedStateWriter) Stop() {
 }
 
 func (rsw *receivedStateWriter) QueueAndWait(ctx context.Context, domainName string, contractAddress tktypes.EthAddress, schemaID tktypes.Bytes32, stateDataJson tktypes.RawJSON, nullifier *components.NullifierUpsert) error {
-	log.L(ctx).Debugf("receivedStateWriter:QueueAndWait %s %s %s", domainName, contractAddress, schemaID)
+	log.L(ctx).Debugf("receivedStateWriter:QueueAndWait domainName=%s contractAddress=%s schemaID=%s", domainName, contractAddress, schemaID)
 	op := rsw.flushWriter.Queue(ctx, &receivedStateWriteOperation{
 		DomainName:      domainName,
 		ContractAddress: contractAddress,

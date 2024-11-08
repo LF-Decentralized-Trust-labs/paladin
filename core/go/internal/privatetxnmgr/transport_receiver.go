@@ -22,12 +22,8 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-// If we had lots of these we would probably want to centralize the assignment of the constants to avoid duplication
-// but currently there is only 2 ( the other being IDENTITY_RESOLVER_DESTINATION )
-const PRIVATE_TX_MANAGER_DESTINATION = "private-tx-manager"
-
 func (p *privateTxManager) Destination() string {
-	return PRIVATE_TX_MANAGER_DESTINATION
+	return components.PRIVATE_TX_MANAGER_DESTINATION
 }
 
 func (p *privateTxManager) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
@@ -40,11 +36,21 @@ func (p *privateTxManager) ReceiveTransportMessage(ctx context.Context, message 
 
 	switch message.MessageType {
 	case "EndorsementRequest":
-		go p.handleEndorsementRequest(ctx, messagePayload, replyToDestination)
+		go p.handleEndorsementRequest(p.ctx, messagePayload, replyToDestination)
 	case "EndorsementResponse":
-		go p.handleEndorsementResponse(ctx, messagePayload)
+		go p.handleEndorsementResponse(p.ctx, messagePayload)
 	case "DelegationRequest":
-		go p.handleDelegationRequest(ctx, messagePayload)
+		go p.handleDelegationRequest(p.ctx, messagePayload)
+	case "AssembleRequest":
+		go p.handleAssembleRequest(p.ctx, messagePayload, replyToDestination)
+	case "AssembleResponse":
+		go p.handleAssembleResponse(p.ctx, messagePayload)
+	case "AssembleError":
+		go p.handleAssembleError(p.ctx, messagePayload)
+	case "StateProducedEvent":
+		go p.handleStateProducedEvent(p.ctx, messagePayload, replyToDestination)
+	case "StateAcknowledgedEvent":
+		go p.stateDistributer.HandleStateAcknowledgedEvent(p.ctx, message.Payload)
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}

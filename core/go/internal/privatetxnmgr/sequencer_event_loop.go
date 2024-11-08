@@ -41,8 +41,11 @@ func (s *Sequencer) evaluationLoop() {
 	for {
 		// an InFlight
 		select {
-		case pendingEvent := <-s.pendingEvents:
-			s.handleEvent(ctx, pendingEvent)
+		case blockHeight := <-s.newBlockEvents:
+			//TODO should we use this is as the metronome to periodically trigger any inflight transactions to re-evaluate their state?
+			s.environment.blockHeight = blockHeight
+		case pendingEvent := <-s.pendingTransactionEvents:
+			s.handleTransactionEvent(ctx, pendingEvent)
 		case <-s.orchestrationEvalRequestChan:
 		case <-ticker.C:
 		case <-ctx.Done():
@@ -59,7 +62,7 @@ func (s *Sequencer) evaluationLoop() {
 	}
 }
 
-func (s *Sequencer) handleEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
+func (s *Sequencer) handleTransactionEvent(ctx context.Context, event ptmgrtypes.PrivateTransactionEvent) {
 	//For any event that is specific to a single transaction,
 	// find (or create) the transaction processor for that transaction
 	// and pass the event to it
@@ -102,7 +105,7 @@ func (s *Sequencer) handleEvent(ctx context.Context, event ptmgrtypes.PrivateTra
 		 	After applying the event to the transaction, we can either a) clean up that transaction ( if we have just learned, from the event that the transaction is complete and needs no further actions)
 			or b) perform any necessary actions (e.g. sending requests for signatures, endorsements etc.)
 	*/
-	if transactionProcessor.IsComplete() {
+	if transactionProcessor.IsComplete(ctx) {
 
 		s.graph.RemoveTransaction(ctx, transactionID)
 		s.removeTransactionProcessor(transactionID)
@@ -116,10 +119,18 @@ func (s *Sequencer) handleEvent(ctx context.Context, event ptmgrtypes.PrivateTra
 		transactionProcessor.Action(ctx)
 	}
 
-	if transactionProcessor.CoordinatingLocally() && transactionProcessor.ReadyForSequencing() && !transactionProcessor.Dispatched() {
+	if transactionProcessor.CoordinatingLocally(ctx) && transactionProcessor.ReadyForSequencing(ctx) && !transactionProcessor.Dispatched(ctx) {
 		// we are responsible for coordinating the endorsement flow for this transaction, ensure that it has been added it to the graph
 		// NOTE: AddTransaction is idempotent so we don't need to check whether we have already added it
 		s.graph.AddTransaction(ctx, transactionProcessor)
+	} else {
+		// incase the transaction was previously added to the graph but is no longer coordinating locally or is no longer ready for sequencing
+		// then we need to remove it from the graph
+		// this is a no-op if the transaction was not previously added to the graph
+
+		//TODO - this should really be a method on the graph itself ( similar to GetDispatchableTransactions) to find all transactions ( and there dependents)
+		// that are no longer ready for sequencing and remove them from the graph
+		s.graph.RemoveTransaction(ctx, transactionID)
 	}
 
 	//analyze the graph to see if we can dispatch any transactions

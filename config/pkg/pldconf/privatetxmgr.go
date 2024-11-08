@@ -37,19 +37,25 @@ var DistributerWriterConfigDefaults = FlushWriterConfig{
 
 var PrivateTxManagerDefaults = &PrivateTxManagerConfig{
 	Sequencer: PrivateTxManagerSequencerConfig{
-		MaxConcurrentProcess:    confutil.P(500),
-		EvaluationInterval:      confutil.P("5m"),
-		PersistenceRetryTimeout: confutil.P("5s"),
-		StaleTimeout:            confutil.P("10m"),
-		MaxPendingEvents:        confutil.P(500),
+		MaxConcurrentProcess:                confutil.P(500),
+		MaxInflightTransactions:             confutil.P(500),
+		EvaluationInterval:                  confutil.P("5m"),
+		PersistenceRetryTimeout:             confutil.P("5s"),
+		StaleTimeout:                        confutil.P("10m"),
+		MaxPendingEvents:                    confutil.P(500),
+		RoundRobinCoordinatorBlockRangeSize: confutil.P(100),
+		AssembleRequestTimeout:              confutil.P("1s"),
 	},
 	RequestTimeout: confutil.P("15s"),
 }
 
 type PrivateTxManagerSequencerConfig struct {
-	MaxConcurrentProcess    *int    `json:"maxConcurrentProcess,omitempty"`
-	MaxPendingEvents        *int    `json:"maxPendingEvents,omitempty"`
-	EvaluationInterval      *string `json:"evalInterval,omitempty"`
-	PersistenceRetryTimeout *string `json:"persistenceRetryTimeout,omitempty"`
-	StaleTimeout            *string `json:"staleTimeout,omitempty"`
+	MaxConcurrentProcess                *int    `json:"maxConcurrentProcess,omitempty"`
+	MaxInflightTransactions             *int    `json:"maxInflightTransactions,omitempty"`
+	MaxPendingEvents                    *int    `json:"maxPendingEvents,omitempty"`
+	EvaluationInterval                  *string `json:"evalInterval,omitempty"`
+	PersistenceRetryTimeout             *string `json:"persistenceRetryTimeout,omitempty"`
+	StaleTimeout                        *string `json:"staleTimeout,omitempty"`
+	RoundRobinCoordinatorBlockRangeSize *int    `json:"roundRobinCoordinatorBlockRangeSize,omitempty"`
+	AssembleRequestTimeout              *string `json:"assembleRequestTimeout,omitempty"`
 }

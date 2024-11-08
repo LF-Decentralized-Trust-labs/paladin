@@ -189,8 +189,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		dispatchBatch.PublicDispatches = append(dispatchBatch.PublicDispatches, sequence)
 	}
 
-	// TODO: per notes in endorsementGatherer determine if that's the right place to hold the domain context
-	dCtx := s.endorsementGatherer.DomainContext()
+	dCtx := s.coordinatorDomainContext
 
 	// Determine if there are any local nullifiers that need to be built and put into the domain context
 	// before we persist the dispatch batch
@@ -202,7 +201,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		return err
 	}
 
-	err = s.syncPoints.PersistDispatchBatch(s.endorsementGatherer.DomainContext(), s.contractAddress, dispatchBatch, stateDistributions, preparedTxnDistributions)
+	err = s.syncPoints.PersistDispatchBatch(dCtx, s.contractAddress, dispatchBatch, stateDistributions, preparedTxnDistributions)
 	if err != nil {
 		log.L(ctx).Errorf("Error persisting batch: %s", err)
 		return err

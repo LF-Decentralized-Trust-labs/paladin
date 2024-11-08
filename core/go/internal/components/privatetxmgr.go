@@ -41,6 +41,10 @@ type PrivateTxStatus struct {
 	LatestError string `json:"latestError"`
 }
 
+// If we had lots of these we would probably want to centralize the assignment of the constants to avoid duplication
+// but currently there is only 2 ( the other being IDENTITY_RESOLVER_DESTINATION )
+const PRIVATE_TX_MANAGER_DESTINATION = "private-tx-manager"
+
 type StateDistributionSet struct {
 	LocalNode  string
 	SenderNode string

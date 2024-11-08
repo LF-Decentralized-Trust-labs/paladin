@@ -29,10 +29,32 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+func (tf *transactionFlow) logActionDebug(ctx context.Context, msg string) {
+	//centralize the debug logging to force a consistent format and make it easier to analyze the logs
+	log.L(ctx).Debugf("transactionFlow:Action TransactionID='%s' Status='%s' LatestEvent='%s' LatestError='%s' : %s", tf.transaction.ID, tf.status, tf.latestEvent, tf.latestError, msg)
+}
+
+func (tf *transactionFlow) logActionDebugf(ctx context.Context, msg string, args ...interface{}) {
+	//centralize the debug logging to force a consistent format and make it easier to analyze the logs
+	log.L(ctx).Debugf("transactionFlow:Action TransactionID='%s' Status='%s' LatestEvent='%s' LatestError='%s' : %s", tf.transaction.ID, tf.status, tf.latestEvent, tf.latestError, fmt.Sprintf(msg, args...))
+}
+
+func (tf *transactionFlow) logActionInfo(ctx context.Context, msg string) {
+	//centralize the info logging to force a consistent format and make it easier to analyze the logs
+	log.L(ctx).Infof("transactionFlow:Action TransactionID='%s' Status='%s' LatestEvent='%s' LatestError='%s' : %s", tf.transaction.ID, tf.status, tf.latestEvent, tf.latestError, msg)
+}
+
+func (tf *transactionFlow) logActionError(ctx context.Context, msg string, err error) {
+	//centralize the info logging to force a consistent format and make it easier to analyze the logs
+	log.L(ctx).Errorf("transactionFlow:Action TransactionID='%s' Status='%s' LatestEvent='%s' LatestError='%s' : %s.  %s", tf.transaction.ID, tf.status, tf.latestEvent, tf.latestError, msg, err.Error())
+}
+
 func (tf *transactionFlow) Action(ctx context.Context) {
-	log.L(ctx).Debug("transactionFlow:Action")
+	log.L(ctx).Debugf("transactionFlow:Action TransactionID='%s' Status='%s' LatestEvent='%s' LatestError='%s'", tf.transaction.ID, tf.status, tf.latestEvent, tf.latestError)
+
+	tf.logActionDebug(ctx, ">>")
 	if tf.complete {
-		log.L(ctx).Infof("Transaction %s is complete", tf.transaction.ID.String())
+		tf.logActionInfo(ctx, "Transaction is complete")
 		return
 	}
 
@@ -40,7 +62,7 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 	// if the event handler has marked the transaction as failed, then we initiate the finalize sync point
 	if tf.finalizeRequired {
 		if tf.finalizePending {
-			log.L(ctx).Infof("Transaction %s finalize already pending", tf.transaction.ID.String())
+			tf.logActionInfo(ctx, "finalize already pending")
 			return
 		}
 		//we know we need to finalize but we are not currently waiting for a finalize to complete
@@ -49,30 +71,37 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 	}
 
 	if tf.dispatched {
-		log.L(ctx).Infof("Transaction %s is dispatched", tf.transaction.ID.String())
+		tf.logActionInfo(ctx, "Transaction is dispatched")
 		return
 	}
 
 	if tf.transaction.PreAssembly == nil {
+		tf.logActionDebug(ctx, "PreAssembly is nil")
 		panic("PreAssembly is nil.")
 		//This should never happen unless there is a serious programming error or the memory has been corrupted
 		// PreAssembly is checked for nil after InitTransaction which is during the synchronous transaction request
 		// and before it is added to the transaction processor / dispatched to the event loop
 	}
 
-	if tf.transaction.PostAssembly == nil {
-		log.L(ctx).Debug("not assembled yet - or was assembled and reverted")
+	//depending on the delegation policy, we may be able to decide to delegate before we have assembled the transaction
+	if !tf.delegateIfRequired(ctx) {
+		tf.logActionDebug(ctx, "no continue after pre assembly delegate check")
+		return
+	}
 
-		//if we have not sent a request, or if the request has timed out or been invalided by a re-assembly, then send the request
+	if tf.transaction.PostAssembly == nil {
+		tf.logActionDebug(ctx, "PostAssembly is nil")
+
+		//if we have not sent a request, or if the request has timed out or been invalidated by a re-assembly, then send the request
 		tf.requestVerifierResolution(ctx)
 		if tf.hasOutstandingVerifierRequests(ctx) {
-			log.L(ctx).Infof("Transaction %s not ready to assemble. Waiting for verifiers to be resolved", tf.transaction.ID.String())
+			tf.logActionInfo(ctx, "Transaction not ready to assemble. Waiting for verifiers to be resolved")
 			return
 		}
 
 		tf.requestAssemble(ctx)
 		if tf.transaction.PostAssembly == nil {
-			log.L(ctx).Infof("Transaction %s not assembled. Waiting for assembler to return", tf.transaction.ID.String())
+			tf.logActionInfo(ctx, "Transaction not assembled. Waiting for assembler to return")
 			return
 		}
 		if tf.transaction.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_REVERT {
@@ -88,38 +117,14 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 	}
 	tf.status = "signed"
 
-	tf.delegateIfRequired(ctx)
-	if tf.status == "delegating" {
-		log.L(ctx).Infof("Transaction %s is delegating", tf.transaction.ID.String())
+	//depending on the delegation policy, we may not be able to decide to delegate until after we have assembled the transaction
+	if !tf.delegateIfRequired(ctx) {
+		tf.logActionDebug(ctx, "no continue after post assembly delegate check")
 		return
 	}
 
-	if tf.status == "delegated" {
-		// probably should not get here because the sequencer should have removed the transaction processor
-		log.L(ctx).Infof("Transaction %s has been delegated", tf.transaction.ID.String())
-		return
-	}
-
-	if tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil {
-		// We need to write the potential states to the domain before we can sign or endorse the transaction
-		// but there is no point in doing that until we are sure that the transaction is going to be coordinated locally
-		// so this is the earliest, and latest, point in the flow that we can do this
-		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
-		err := tf.domainAPI.WritePotentialStates(tf.endorsementGatherer.DomainContext(), readTX, tf.transaction)
-		if err != nil {
-			//Any error from WritePotentialStates is likely to be caused by an invalid init or assemble of the transaction
-			// which is most likely a programming error in the domain or the domain manager or privateTxManager
-			// not much we can do other than revert the transaction with an internal error
-			errorMessage := fmt.Sprintf("Failed to write potential states: %s", err)
-			log.L(ctx).Error(errorMessage)
-			//TODO publish an event that will cause the transaction to be reverted
-			//tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), errorMessage))
-			return
-		}
-	}
-	log.L(ctx).Debugf("Transaction %s is ready (outputStatesPotential=%d outputStates=%d)",
+	log.L(ctx).Debugf("transactionFlow:Action TransactionID='%s' is ready for sequencing (outputStatesPotential=%d outputStates=%d)",
 		tf.transaction.ID.String(), len(tf.transaction.PostAssembly.OutputStatesPotential), len(tf.transaction.PostAssembly.OutputStates))
-	tf.readyForSequencing = true
 
 	//If we get here, we have an assembled transaction and have no intention of delegating it
 	// so we are responsible for coordinating the endorsement flow
@@ -127,6 +132,7 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 
 	tf.requestEndorsements(ctx)
 	if tf.hasOutstandingEndorsementRequests(ctx) {
+		tf.logActionDebug(ctx, "Transaction not ready to dispatch. Waiting for endorsements to be resolved")
 		return
 	}
 	tf.status = "endorsed"
@@ -146,6 +152,8 @@ func (tf *transactionFlow) Action(ctx context.Context) {
 		// TODO: We should re-delegate in this scenario
 		tf.latestError = i18n.NewError(ctx, msgs.MsgPrivateReDelegationRequired).Error()
 	}
+	tf.logActionDebug(ctx, "<<")
+
 }
 
 func (tf *transactionFlow) setTransactionSigner(ctx context.Context) (reDelegate bool, err error) {
@@ -212,7 +220,7 @@ func (tf *transactionFlow) setTransactionSigner(ctx context.Context) (reDelegate
 		return false, i18n.WrapError(ctx, err, msgs.MsgDomainEndorserSubmitConfigClash,
 			endorserSubmitSigner, contractConf.CoordinatorSelection, contractConf.SubmitterSelection)
 	}
-	if node != tf.nodeID {
+	if node != tf.nodeName {
 		log.L(ctx).Warnf("For transaction %s to be submitted, the coordinator must move to the node ENDORSER_MUST_SUBMIT constraint %s",
 			tx.ID, endorserSubmitSigner)
 		return true, nil
@@ -234,7 +242,12 @@ func (tf *transactionFlow) revertTransaction(ctx context.Context, revertReason s
 }
 
 func (tf *transactionFlow) finalize(ctx context.Context) {
-	log.L(ctx).Errorf("finalize transaction %s: %s", tf.transaction.ID.String(), tf.finalizeRevertReason)
+	if tf.finalizeRevertReason == "" {
+		log.L(ctx).Debugf("finalize transaction %s", tf.transaction.ID.String())
+
+	} else {
+		log.L(ctx).Errorf("finalize transaction %s: %s", tf.transaction.ID.String(), tf.finalizeRevertReason)
+	}
 	//flush that to the txmgr database
 	// so that the user can see that it is reverted and so that we stop retrying to assemble and endorse it
 
@@ -250,7 +263,7 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 			log.L(ctx).Infof("Transaction %s finalize committed", tf.transaction.ID.String())
 
 			// Remove this transaction from our domain context on success - all changes are flushed to DB at this point
-			tf.endorsementGatherer.DomainContext().ResetTransactions(tf.transaction.ID)
+			tf.domainContext.ResetTransactions(tf.transaction.ID)
 
 			go tf.publisher.PublishTransactionFinalizedEvent(ctx, tf.transaction.ID.String())
 		},
@@ -260,88 +273,132 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 			log.L(ctx).Errorf("Transaction %s finalize rolled back: %s", tf.transaction.ID.String(), rollbackErr)
 
 			// Reset the whole domain context on failure
-			tf.endorsementGatherer.DomainContext().Reset()
+			tf.domainContext.Reset()
 
 			go tf.publisher.PublishTransactionFinalizeError(ctx, tf.transaction.ID.String(), tf.finalizeRevertReason, rollbackErr)
 		},
 	)
 }
 
-func (tf *transactionFlow) delegateIfRequired(ctx context.Context) {
-	log.L(ctx).Debug("transactionFlow:delegateIfRequired")
-	contractConfig := tf.domainAPI.ContractConfig()
-
-	// Calculate if we know a coordinator that must be the correct node
-	var knownCoordinator = ""
-	if contractConfig.CoordinatorSelection == prototk.ContractConfig_COORDINATOR_STATIC {
-
-		// Simple decision here. The static coordinator is where the coordinator is located
-		if contractConfig.StaticCoordinator != nil {
-			knownCoordinator = *contractConfig.StaticCoordinator
-		}
-
-	} else if tf.transaction.PostAssembly.AttestationPlan != nil {
-
-		numEndorsers := 0
-		endorser := "" // will only be used if there is only one
-		for _, attRequest := range tf.transaction.PostAssembly.AttestationPlan {
-			if attRequest.AttestationType == prototk.AttestationType_ENDORSE {
-				numEndorsers = numEndorsers + len(attRequest.Parties)
-				endorser = attRequest.Parties[0]
-			}
-		}
-		//in the special case of a single endorsers in a domain with a submit mode of ENDORSER_SUBMISSION we delegate to that endorser
-		// It is most likely that this means we are in the noto domain and
-		// that single endorser is the notary and all transactions will be delegated there for endorsement
-		// and dispatch to base ledger so we might as well delegate the coordination to it so that
-		// it can maximize the optimistic spending of pending states
-
-		if contractConfig.CoordinatorSelection == prototk.ContractConfig_COORDINATOR_ENDORSER && numEndorsers == 1 {
-			knownCoordinator = endorser
-		}
-
+func (tf *transactionFlow) delegateIfRequired(ctx context.Context) (doContinue bool) {
+	//TODO there may be a potential optimization we can add where, in certain domain configurations, we can optimistically proceed without delegation and only delegate once we detect
+	// potential contention with other active nodes.  For now, we keep it simple and strictly abide by the configuration of the domain
+	if tf.status == "delegating" {
+		tf.logActionInfo(ctx, "Transaction is delegating")
+		return false
 	}
 
-	// If we have one, check we're on that node
-	if knownCoordinator != "" {
-		coordinatorNode, err := tktypes.PrivateIdentityLocator(knownCoordinator).Node(ctx, true)
-		if err != nil {
-			log.L(ctx).Errorf("Failed to get node name from locator %s: %s", knownCoordinator, err)
-			tf.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), err.Error())
-			return
-		}
-		if coordinatorNode != tf.nodeID && coordinatorNode != "" {
-			tf.localCoordinator = false
-			// TODO persist the delegation and send the request on the callback
-			tf.status = "delegating"
-			// TODO update to "delegated" once the ack has been received
-			err := tf.transportWriter.SendDelegationRequest(
-				ctx,
-				uuid.New().String(),
-				coordinatorNode,
-				tf.transaction,
-			)
-			if err != nil {
-				tf.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), err.Error())
-			}
-			return
-		}
+	if tf.status == "delegated" {
+		// probably should not get here because the sequencer should have removed the transaction processor
+		tf.logActionInfo(ctx, "Transaction is delegated")
+		return false
 	}
+	coordinatorNode, err := tf.selectCoordinator.SelectCoordinatorNode(ctx, tf.transaction, tf.environment)
+	if err != nil {
+		// errors from here are most likely a problem resolving the node name from the parties in the attestation plan
+		// so there is no point retrying although if we redo the assemble stage, we may get a different result
+		//TODO should we make the error action ( revert, reassemble, retry) an explicit property of the error so that this assessment can be made closer
+		// to the source of the error?
+		tf.latestError = err.Error()
+		tf.transaction.PostAssembly = nil
+		tf.logActionError(ctx, "Failed to select coordinator node", err)
+		return false
+	}
+
+	// TODO persist the delegation and send the request on the callback
+	if coordinatorNode == tf.nodeName || coordinatorNode == "" {
+		// we are the coordinator so we should continue
+		tf.logActionDebug(ctx, "Local coordinator")
+		return true
+	}
+	tf.localCoordinator = false
+
+	//TODO if already `delegating` check how long we have been waiting for the ack and send again.
+	//Should probably do that earlier in the flow because if we have just decided not to delegate or if we have just selected a different delegate, \
+	//then we need to either claw back that delegation or wait until the delegate has realized that they are no longer the coordinator and returns / forwards the responsibility for this transaction
+	tf.status = "delegating"
+	// ensure that the From field is fully qualified before sending to the delegate so that they can send assemble requests to the correct place
+	fullQualifiedFrom, err := tktypes.PrivateIdentityLocator(tf.transaction.Inputs.From).FullyQualified(ctx, tf.nodeName)
+	if err != nil {
+		//this can only mean that the From field is an invalid identity locator and we should never have got this far
+		// unless there is a serious programming error or the memory has been corrupted
+		panic("Failed to fully qualify the coordinator node")
+	}
+	tf.transaction.Inputs.From = fullQualifiedFrom.String()
+
+	// TODO update to "delegated" once the ack has been received
+	err = tf.transportWriter.SendDelegationRequest(
+		ctx,
+		uuid.New().String(),
+		coordinatorNode,
+		tf.transaction,
+	)
+	if err != nil {
+		tf.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), err.Error())
+		tf.logActionError(ctx, "Failed to send delegation request", err)
+		//TODO implement retry so that it is ok to just carry on in case of this error
+	}
+	//we have initiated a delegation so we should not continue any further with the flow on this node
+	tf.logActionInfo(ctx, fmt.Sprintf("Delegating transaction to %s", coordinatorNode))
+	return false
 
 }
 
+func (tf *transactionFlow) writeAndLockStates(ctx context.Context) {
+	//this needs to be carefully coordinated with the assemble requester thread and the sequencer event loop thread
+	// we are accessing the transactionFlow's PrivateTransaction object which is only safe to do on the sequencer thread
+	// but we need to make sure that these writes/locks are complete before the assemble requester thread can proceed to assemble
+	// the next transaction
+	if tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil {
+		// We need to write the potential states to the domain before we can sign or endorse the transaction
+		// but there is no point in doing that until we are sure that the transaction is going to be coordinated locally
+		// so this is the earliest, and latest, point in the flow that we can do this
+		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+		err := tf.domainAPI.WritePotentialStates(tf.domainContext, readTX, tf.transaction)
+		if err != nil {
+			//Any error from WritePotentialStates is likely to be caused by an invalid init or assemble of the transaction
+			// which is most likely a programming error in the domain or the domain manager or privateTxManager
+			// not much we can do other than revert the transaction with an internal error
+			errorMessage := fmt.Sprintf("Failed to write potential states: %s", err)
+			log.L(ctx).Error(errorMessage)
+			//TODO publish an event that will cause the transaction to be reverted
+			tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), errorMessage))
+			return
+		} else {
+			tf.logActionDebugf(ctx, "Potential states written %s", tf.domainContext.Info().ID)
+		}
+	}
+	if len(tf.transaction.PostAssembly.InputStates) > 0 {
+		readTX := tf.components.Persistence().DB() // no DB transaction required here for the reads from the DB (writes happen on syncpoint flusher)
+
+		err := tf.domainAPI.LockStates(tf.domainContext, readTX, tf.transaction)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Failed to lock states: %s", err)
+			log.L(ctx).Error(errorMessage)
+			tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), errorMessage))
+			return
+		} else {
+			tf.logActionDebugf(ctx, "Input states locked %s: %s", tf.domainContext.Info().ID, tf.transaction.PostAssembly.InputStates[0].ID)
+		}
+	}
+}
 func (tf *transactionFlow) requestAssemble(ctx context.Context) {
 	//Assemble may require a call to another node ( in the case we have been delegated to coordinate transaction for other nodes)
 	//Usually, they will get sent to us already assembled but there may be cases where we need to re-assemble
 	// so this needs to be an async step
 	// however, there must be only one assemble in progress at a time or else there is a risk that 2 transactions could chose to spend the same state
-	//   (TODO - maybe in future, we could further optimise this and allow multiple assembles to be in progress if we can assert that they are not presented with the same available states)
+	//   (TODO - maybe in future, we could further optimize this and allow multiple assembles to be in progress if we can assert that they are not presented with the same available states)
 	//   However, before we do that, we really need to sort out the separation of concerns between the domain manager, state store and private transaction manager and where the responsibility to single thread the assembly stream(s) lies
 
 	log.L(ctx).Debug("transactionFlow:requestAssemble")
 
 	if tf.transaction.PostAssembly != nil {
-		log.L(ctx).Debug("already assembled")
+		tf.logActionDebug(ctx, "Already assembled")
+		return
+	}
+
+	if tf.assemblePending {
+		tf.logActionDebug(ctx, "Assemble already pending")
 		return
 	}
 
@@ -353,70 +410,24 @@ func (tf *transactionFlow) requestAssemble(ctx context.Context) {
 			ctx,
 			tf.transaction.ID.String(),
 			i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), "Failed to get node name from locator"),
+			"",
 		)
 		return
 	}
 
-	if assemblingNode == tf.nodeID || assemblingNode == "" {
-		//we are the node that is responsible for assembling this transaction
-		readTX := tf.components.Persistence().DB() // no DB transaction required here
-		err = tf.domainAPI.AssembleTransaction(tf.endorsementGatherer.DomainContext(), readTX, tf.transaction)
-		if err != nil {
-			log.L(ctx).Errorf("AssembleTransaction failed: %s", err)
-			tf.publisher.PublishTransactionAssembleFailedEvent(ctx,
-				tf.transaction.ID.String(),
-				i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleError), err.Error()),
-			)
-			return
-		}
-		if tf.transaction.PostAssembly == nil {
-			// This is most likely a programming error in the domain
-			log.L(ctx).Errorf("PostAssembly is nil.")
-			tf.publisher.PublishTransactionAssembleFailedEvent(
-				ctx,
-				tf.transaction.ID.String(),
-				i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), "AssembleTransaction returned nil PostAssembly"),
-			)
-			return
-		}
+	//TODO is this safe or do we need a deep copy?
+	transactionInputsCopy := *tf.transaction.Inputs
+	preAssemblyCopy := *tf.transaction.PreAssembly
 
-		// Some validation that we are confident we can execute the given attestation plan
-		for _, attRequest := range tf.transaction.PostAssembly.AttestationPlan {
-			switch attRequest.AttestationType {
-			case prototk.AttestationType_ENDORSE:
-			case prototk.AttestationType_SIGN:
-			case prototk.AttestationType_GENERATE_PROOF:
-				errorMessage := "AttestationType_GENERATE_PROOF is not implemented yet"
-				log.L(ctx).Error(errorMessage)
-				tf.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), errorMessage)
-				tf.publisher.PublishTransactionAssembleFailedEvent(ctx,
-					tf.transaction.ID.String(),
-					i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleError), errorMessage),
-				)
-			default:
-				errorMessage := fmt.Sprintf("Unsupported attestation type: %s", attRequest.AttestationType)
-				log.L(ctx).Error(errorMessage)
-				tf.latestError = i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerInternalError), errorMessage)
-				tf.publisher.PublishTransactionAssembleFailedEvent(ctx,
-					tf.transaction.ID.String(),
-					i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleError), errorMessage),
-				)
-			}
-		}
+	tf.assembleCoordinator.QueueAssemble(
+		ctx,
+		assemblingNode,
+		tf.transaction.ID,
+		&transactionInputsCopy,
+		&preAssemblyCopy,
+	)
+	tf.assemblePending = true
 
-		//TODO should probably include the assemble output in the event
-		// for now that is not necessary because this is a local assemble and the domain manager updates the transaction that we passed by reference
-		// need to decide if we want to continue with that style of interface to the domain manager and if so,
-		// we need to do something different when the assembling node is remote
-		tf.publisher.PublishTransactionAssembledEvent(ctx,
-			tf.transaction.ID.String(),
-		)
-		return
-
-	} else {
-		log.L(ctx).Debugf("Assembling transaction %s on node %s", tf.transaction.ID.String(), assemblingNode)
-		//TODO send a request to the node that is responsible for assembling this transaction
-	}
 }
 
 func (tf *transactionFlow) requestSignature(ctx context.Context, attRequest *prototk.AttestationRequest, partyName string) {
@@ -425,7 +436,7 @@ func (tf *transactionFlow) requestSignature(ctx context.Context, attRequest *pro
 
 	unqualifiedLookup := partyName
 	signerNode, err := tktypes.PrivateIdentityLocator(partyName).Node(ctx, true)
-	if signerNode != "" && signerNode != tf.nodeID {
+	if signerNode != "" && signerNode != tf.nodeName {
 		log.L(ctx).Debugf("Requesting signature from a remote identity %s for %s", partyName, attRequest.Name)
 		err = i18n.NewError(ctx, msgs.MsgPrivateTxManagerSignRemoteError, partyName)
 	}
@@ -499,7 +510,7 @@ func (tf *transactionFlow) requestSignatures(ctx context.Context) {
 	tf.requestedSignatures = true
 }
 
-func (tf *transactionFlow) requestEndorsement(ctx context.Context, party string, attRequest *prototk.AttestationRequest) {
+func (tf *transactionFlow) requestEndorsement(ctx context.Context, idempotencyKey string, party string, attRequest *prototk.AttestationRequest) {
 
 	partyLocator := tktypes.PrivateIdentityLocator(party)
 	partyNode, err := partyLocator.Node(ctx, true)
@@ -509,7 +520,7 @@ func (tf *transactionFlow) requestEndorsement(ctx context.Context, party string,
 		return
 	}
 
-	if partyNode == tf.nodeID || partyNode == "" {
+	if partyNode == tf.nodeName || partyNode == "" {
 		// This is a local party, so we can endorse it directly
 		endorsement, revertReason, err := tf.endorsementGatherer.GatherEndorsement(
 			ctx,
@@ -530,6 +541,9 @@ func (tf *transactionFlow) requestEndorsement(ctx context.Context, party string,
 		}
 		tf.publisher.PublishTransactionEndorsedEvent(ctx,
 			tf.transaction.ID.String(),
+			idempotencyKey,
+			party,
+			attRequest.Name,
 			endorsement,
 			revertReason,
 		)
@@ -539,6 +553,7 @@ func (tf *transactionFlow) requestEndorsement(ctx context.Context, party string,
 
 		err = tf.transportWriter.SendEndorsementRequest(
 			ctx,
+			idempotencyKey,
 			party,
 			partyNode,
 			tf.transaction.Inputs.To.String(),
@@ -563,12 +578,15 @@ func (tf *transactionFlow) requestEndorsements(ctx context.Context) {
 		// there is a request in the attestation plan and we do not have a response to match it
 		// first lets see if we have recently sent a request for this endorsement and just need to be patient
 		previousRequestTime := time.Time{}
-		if timesForAttRequest, ok := tf.requestedEndorsementTimes[outstandingEndorsementRequest.attRequest.Name]; ok {
-			if t, ok := timesForAttRequest[outstandingEndorsementRequest.party]; ok {
-				previousRequestTime = t
+		idempotencyKey := uuid.New().String()
+		previousIdempotencyKey := ""
+		if pendingRequestsForAttRequest, ok := tf.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name]; ok {
+			if r, ok := pendingRequestsForAttRequest[outstandingEndorsementRequest.party]; ok {
+				previousRequestTime = r.requestTime
+				previousIdempotencyKey = r.idempotencyKey
 			}
 		} else {
-			tf.requestedEndorsementTimes[outstandingEndorsementRequest.attRequest.Name] = make(map[string]time.Time)
+			tf.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name] = make(map[string]*pendingEndorsementRequest)
 		}
 
 		if !previousRequestTime.IsZero() && tf.clock.Now().Before(previousRequestTime.Add(tf.requestTimeout)) {
@@ -581,8 +599,17 @@ func (tf *transactionFlow) requestEndorsements(ctx context.Context) {
 		} else {
 			log.L(ctx).Infof("Previous endorsement request for transaction:%s, attestation request:%s, party:%s sent at %v has timed out", tf.transaction.ID.String(), outstandingEndorsementRequest.attRequest.Name, outstandingEndorsementRequest.party, previousRequestTime)
 		}
-		tf.requestEndorsement(ctx, outstandingEndorsementRequest.party, outstandingEndorsementRequest.attRequest)
-		tf.requestedEndorsementTimes[outstandingEndorsementRequest.attRequest.Name][outstandingEndorsementRequest.party] = tf.clock.Now()
+		if previousIdempotencyKey != "" {
+			tf.logActionDebug(ctx, fmt.Sprintf("Previous endorsement request timed out. Sending new request with same idempotency key %s", previousIdempotencyKey))
+			idempotencyKey = previousIdempotencyKey
+		}
+
+		tf.requestEndorsement(ctx, idempotencyKey, outstandingEndorsementRequest.party, outstandingEndorsementRequest.attRequest)
+		tf.pendingEndorsementRequests[outstandingEndorsementRequest.attRequest.Name][outstandingEndorsementRequest.party] =
+			&pendingEndorsementRequest{
+				requestTime:    tf.clock.Now(),
+				idempotencyKey: idempotencyKey,
+			}
 
 	}
 }
@@ -599,6 +626,7 @@ func (tf *transactionFlow) requestVerifierResolution(ctx context.Context) {
 		tf.transaction.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0, len(tf.transaction.PreAssembly.RequiredVerifiers))
 	}
 	for _, v := range tf.transaction.PreAssembly.RequiredVerifiers {
+		tf.logActionDebugf(ctx, "Resolving verifier %s", v.Lookup)
 		tf.identityResolver.ResolveVerifierAsync(
 			ctx,
 			v.Lookup,
