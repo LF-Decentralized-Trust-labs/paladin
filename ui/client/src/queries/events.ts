@@ -20,8 +20,8 @@ import { IEvent } from "../interfaces";
 import { generatePostReq, returnResponse } from "./common";
 import { RpcEndpoint, RpcMethods } from "./rpcMethods";
 
-export const fetchEvents = async (): Promise<IEvent[]> => {
-  const requestPayload = {
+export const fetchEvents = async (pageParam?: IEvent): Promise<IEvent[]> => {
+  let requestPayload: any = {
     jsonrpc: "2.0",
     id: Date.now(),
     method: RpcMethods.bidx_QueryIndexedEvents,
@@ -29,9 +29,46 @@ export const fetchEvents = async (): Promise<IEvent[]> => {
       {
         limit: constants.EVENT_QUERY_LIMIT,
         sort: ["blockNumber DESC", "transactionIndex DESC", "logIndex DESC"],
-      },
-    ],
+      }
+    ]
   };
+
+  if (pageParam !== undefined) {
+    requestPayload.params[0].or = [
+      {
+        "lessThan": [
+          {
+            "field": "blockNumber",
+            "value": pageParam.blockNumber
+          }
+        ]
+      },
+      {
+        "equal": [{
+          "field": "blockNumber",
+          "value": pageParam.blockNumber
+        }],
+        "or": [
+          {
+            "lessThan": [{
+              "field": "transactionIndex",
+              "value": pageParam.transactionIndex
+            }]
+          },
+          {
+            "equal": [{
+              "field": "transactionIndex",
+              "value": pageParam.transactionIndex
+            }],
+            "lessThan": [{
+              "field": "logIndex",
+              "value": pageParam.logIndex
+            }]
+          }
+        ]
+      }
+    ];
+  }
 
   return <Promise<IEvent[]>>(
     returnResponse(

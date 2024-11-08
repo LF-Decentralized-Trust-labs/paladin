@@ -14,32 +14,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Alert, Box, Typography, useTheme } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { Alert, Box, LinearProgress, Typography, useTheme } from "@mui/material";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { t } from "i18next";
 import { fetchEvents } from "../queries/events";
 import { Event } from "./Event";
 import { useContext } from "react";
 import { ApplicationContext } from "../contexts/ApplicationContext";
 import { altDarkModeScrollbarStyle, altLightModeScrollbarStyle } from "../themes/default";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { IEvent } from "../interfaces";
 
 export const Events: React.FC = () => {
 
   const { lastBlockWithTransactions } = useContext(ApplicationContext);
-  const theme = useTheme();
-  const addedStyle = theme.palette.mode === 'light'? altLightModeScrollbarStyle : altDarkModeScrollbarStyle;
 
-  const { data: events, error, isFetching } = useQuery({
+  const { data: events, fetchNextPage, hasNextPage, error } = useInfiniteQuery({
     queryKey: ["events", lastBlockWithTransactions],
-    queryFn: () => fetchEvents(),
+    queryFn: ({ pageParam }) => fetchEvents(pageParam),
+    initialPageParam: undefined as IEvent | undefined,
+    getNextPageParam: (lastPage) => {return lastPage[lastPage.length - 1]}
   });
 
-  if(isFetching) {
-    return <></>;
-  }
+  const theme = useTheme();
+  const addedStyle = theme.palette.mode === 'light' ? altLightModeScrollbarStyle : altDarkModeScrollbarStyle;
 
   if (error) {
     return <Alert sx={{ margin: '30px' }} severity="error" variant="filled">{error.message}</Alert>
+  }
+
+  if (events?.pages === undefined) {
+    return <></>;
   }
 
   return (
@@ -48,15 +53,28 @@ export const Events: React.FC = () => {
         {t("events")}
       </Typography>
       <Box
+        id="scrollableDivEvents"
         sx={{
           height: "calc(100vh - 170px)",
           paddingRight: "15px",
           ...addedStyle
         }}
       >
-        {events?.map((event) => (
-          <Event key={`${event.blockNumber}-${event.logIndex}`} event={event} />
-        ))}
+        <InfiniteScroll
+          scrollableTarget="scrollableDivEvents"
+          dataLength={events.pages.length}
+          next={() => fetchNextPage()}
+          hasMore={hasNextPage}
+          loader={<LinearProgress />}
+        >
+          {
+            events.pages.map(eventArray => eventArray.map(
+              (event) => (
+                <Event key={`${event.blockNumber}-${event.logIndex}`} event={event} />
+              )
+            ))
+          }
+        </InfiniteScroll>
       </Box>
     </>
   );

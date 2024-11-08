@@ -17,6 +17,7 @@
 import i18next from "i18next";
 import { constants } from "../components/config";
 import {
+  IEnrichedTransaction,
   IPaladinTransaction,
   ITransaction,
   ITransactionReceipt,
@@ -24,8 +25,8 @@ import {
 import { generatePostReq, returnResponse } from "./common";
 import { RpcEndpoint, RpcMethods } from "./rpcMethods";
 
-export const fetchIndexedTransactions = async (): Promise<ITransaction[]> => {
-  const payload = {
+export const fetchIndexedTransactions = async (pageParam?: ITransaction): Promise<IEnrichedTransaction[]> => {
+  let requestPayload: any = {
     jsonrpc: "2.0",
     id: Date.now(),
     method: RpcMethods.bidx_QueryIndexedTransactions,
@@ -37,23 +38,76 @@ export const fetchIndexedTransactions = async (): Promise<ITransaction[]> => {
     ],
   };
 
-  return <Promise<ITransaction[]>>(
-    returnResponse(
-      () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(payload))),
-      i18next.t("errorFetchingTransactions")
-    )
-  );
+  if (pageParam !== undefined) {
+    requestPayload.params[0].or = [
+      {
+        "lessThan": [
+          {
+            "field": "blockNumber",
+            "value": pageParam.blockNumber
+          }
+        ]
+      },
+      {
+        "equal": [{
+          "field": "blockNumber",
+          "value": pageParam.blockNumber
+        }],
+        "lessThan": [{
+          "field": "transactionIndex",
+          "value": pageParam.transactionIndex
+        }]
+      }
+    ];
+  }
+
+  const transactions: ITransaction[] = await returnResponse(
+    () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
+    i18next.t("errorFetchingTransactions")
+  )
+
+  const receiptsResult = await fetchTransactionReceipts(transactions);
+  const paladinTransactionsResult = await fetchPaladinTransactions(receiptsResult);
+
+  let enrichedTransactions: IEnrichedTransaction[] = [];
+
+  for (const transaction of transactions) {
+    enrichedTransactions.push({
+      ...transaction,
+      receipts: receiptsResult.filter(receiptResult => receiptResult.transactionHash === transaction.hash),
+      paladinTransactions: paladinTransactionsResult.filter(
+        (paladinTransaction) =>
+          receiptsResult?.filter(
+            (transactionReceipt) =>
+              transactionReceipt.transactionHash === transaction.hash
+          ).map(transactionReceipt => (transactionReceipt.id)).includes(paladinTransaction.id)
+      )
+    })
+  }
+
+  return enrichedTransactions;
 };
 
 export const fetchSubmissions = async (
-  type: "all" | "pending"
+  type: "all" | "pending",
+  pageParam?: IPaladinTransaction
 ): Promise<IPaladinTransaction[]> => {
-  const allParams = [
+  let allParams: any = [
     {
-      limit: constants.PENDING_TRANSACTIONS_QUERY_LIMIT,
+      limit: constants.SUBMISSIONS_QUERY_LIMIT,
       sort: ["created DESC"],
     },
   ];
+
+  if(pageParam !== undefined) {
+    allParams[0].lessThan = [
+      {
+        "field": "created",
+        "value": pageParam.created
+      }
+    ];
+  }
+
   const pendingParams = [...allParams, true];
   const payload = {
     jsonrpc: "2.0",
@@ -64,6 +118,8 @@ export const fetchSubmissions = async (
         : RpcMethods.ptx_QueryPendingTransactions,
     params: type === "all" ? allParams : pendingParams,
   };
+
+  console.log(JSON.stringify(payload))
 
   return <Promise<IPaladinTransaction[]>>(
     returnResponse(

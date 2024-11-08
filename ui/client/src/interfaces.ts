@@ -31,6 +31,11 @@ export interface ITransaction {
   block: IBlock;
 }
 
+export interface IEnrichedTransaction extends ITransaction {
+  receipts: ITransactionReceipt[]
+  paladinTransactions: IPaladinTransaction[]
+}
+
 export interface IEvent {
   blockNumber: number;
   transactionIndex: number;

@@ -14,49 +14,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Alert, Box, Typography, useTheme } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { Alert, Box, LinearProgress, Typography, useTheme } from "@mui/material";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { t } from "i18next";
 import { useContext } from "react";
 import { ApplicationContext } from "../contexts/ApplicationContext";
 import {
   fetchIndexedTransactions,
-  fetchPaladinTransactions,
-  fetchTransactionReceipts,
 } from "../queries/transactions";
 import { Transaction } from "./Transaction";
 import { altLightModeScrollbarStyle, altDarkModeScrollbarStyle } from "../themes/default";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { ITransaction } from "../interfaces";
 
 
 export const Transactions: React.FC = () => {
   const { lastBlockWithTransactions } = useContext(ApplicationContext);
-  
+
   const theme = useTheme();
-  const addedStyle = theme.palette.mode === 'light'? altLightModeScrollbarStyle : altDarkModeScrollbarStyle;
+  const addedStyle = theme.palette.mode === 'light' ? altLightModeScrollbarStyle : altDarkModeScrollbarStyle;
 
-  const { data: transactions, error: transactionError, isRefetching: transactionFetching } = useQuery({
+  const { data: transactions, fetchNextPage, hasNextPage, error } = useInfiniteQuery({
     queryKey: ["transactions", lastBlockWithTransactions],
-    queryFn: () => fetchIndexedTransactions(),
+    queryFn: ({ pageParam }) => fetchIndexedTransactions(pageParam),
+    initialPageParam: undefined as ITransaction | undefined,
+    getNextPageParam: (lastPage) => { return lastPage[lastPage.length - 1] }
   });
 
-  const { data: transactionReceipts, error: receiptError, isFetching: receiptFetching } = useQuery({
-    queryKey: ["transactionReceipts", transactions],
-    queryFn: () => fetchTransactionReceipts(transactions ?? []),
-    enabled: transactions !== undefined,
-  });
-
-  const { data: paladinTransactions, error: paladinTransactionError, isFetching: paladinTransactionFetching } = useQuery({
-    queryKey: ["paladinTransactions", transactionReceipts],
-    queryFn: () => fetchPaladinTransactions(transactionReceipts ?? []),
-    enabled: transactionReceipts !== undefined,
-  });
-
-  if(transactionFetching || receiptFetching || paladinTransactionFetching) {
-    return <></>;
+  if (error) {
+    return <Alert sx={{ margin: '30px' }} severity="error" variant="filled">{error.message}</Alert>
   }
 
-  if (transactionError || receiptError || paladinTransactionError) {
-    return <Alert sx={{ margin: '30px' }} severity="error" variant="filled">{transactionError?.message ?? receiptError?.message ?? paladinTransactionError?.message}</Alert>
+  if (transactions?.pages === undefined) {
+    return <></>;
   }
 
   return (
@@ -65,29 +55,29 @@ export const Transactions: React.FC = () => {
         {t("transactions")}
       </Typography>
       <Box
+        id="scrollableDivEventsTransactions"
         sx={{
           height: "calc(100vh - 170px)",
           paddingRight: "15px",
           ...addedStyle
         }}
       >
-        {transactions?.map((transaction) => (
-          <Transaction
-            key={transaction.hash}
-            transaction={transaction}
-            transactionReceipts={transactionReceipts?.filter(
-              (transactionReceipt) =>
-                transactionReceipt.transactionHash === transaction.hash
-            )}
-            paladinTransactions={paladinTransactions?.filter(
-              (paladinTransaction) =>
-                transactionReceipts?.filter(
-                  (transactionReceipt) =>
-                    transactionReceipt.transactionHash === transaction.hash
-                ).map(transactionReceipt => (transactionReceipt.id)).includes(paladinTransaction.id)
-            )}
-          />
-        ))}
+        <InfiniteScroll
+          scrollableTarget="scrollableDivEventsTransactions"
+          dataLength={transactions.pages.length}
+          next={() => fetchNextPage()}
+          hasMore={hasNextPage}
+          loader={<LinearProgress />}
+        >
+          {transactions.pages.map(transactionArrat => transactionArrat?.map((transaction) => (
+            <Transaction
+              key={transaction.hash}
+              transaction={transaction}
+              transactionReceipts={transaction.receipts}
+              paladinTransactions={transaction.paladinTransactions}
+            />
+          )))}
+        </InfiniteScroll>
       </Box>
     </>
   );
