@@ -86,7 +86,6 @@ func (s *zetoDomainTestSuite) TestZeto_Anon() {
 }
 
 func (s *zetoDomainTestSuite) TestZeto_AnonBatch() {
-	s.T().Skip()
 	s.testZetoFungible(s.T(), constants.TOKEN_ANON, true, false)
 }
 
