@@ -1,76 +1,74 @@
-name: Release
+name: Image Release
 
 permissions:
-  actions: read
-  checks: read
   contents: write
-  deployments: read
-  discussions: read
-  id-token: write
-  issues: read
   packages: write
-  pages: read
-  pull-requests: read
-  repository-projects: read
-  statuses: read
-  security-events: read
-  
+  id-token: write
+
 on:
-  release:
-    types: [released, prereleased]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: 'The tag to release the images with'
+      latest:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to also tag the images with "latest"'
+    secrets:
+      DOCKERHUB_USERNAME:
+        description: 'DockerHub username'
+        required: true
+      DOCKERHUB_TOKEN:
+        description: 'DockerHub token'
+        required: true
 
 jobs:
   image-tags:
     runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.determine-tags.outputs.tags }}
     env:
-      LATEST_TAG: ""
-      TAGS: ${{ github.ref_name }}
+      TAG: ${{ inputs.tag }}
+      LATEST: ${{ inputs.latest }}
     steps:
-    - name: Get the latest tag
-      run: |
-        git fetch --tags
-        latest_tag=$(git tag -l | sort -V | tail -n 1)
-        echo "latest tag: $latest_tag"
-        echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set latest tag
-      if: github.event.action == 'released' && github.ref_name == env.LATEST_TAG
-      run: |
-        echo "TAGS=${{ env.TAGS }},latest" >> $GITHUB_ENV
+      - name: Determine tags
+        id: determine-tags
+        shell: bash
+        run: |
+          set -e
+          TAGS="${TAG}"
 
-    - name: Set alpha tag
-      if: github.event.action == 'prereleased' && contains(github.ref, 'alpha')
-      run: |
-        echo "TAGS=${{ env.TAGS }},alpha" >> $GITHUB_ENV
+          if [[ "${LATEST}" == 'true' ]]; then
+            echo "Appending 'latest' tag"
+            TAGS="${TAGS},latest"
+          fi
 
-    - name: Set beta tag
-      if: github.event.action == 'prereleased' && contains(github.ref, 'beta')
-      run: |
-        echo "TAGS=${{ env.TAGS }},beta" >> $GITHUB_ENV
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
-    - name: Set rc tag
-      if: github.event.action == 'prereleased' && contains(github.ref, 'rc')
-      run: |
-        echo "TAGS=${{ env.TAGS }},rc" >> $GITHUB_ENV
   push-to-dockerhub:
-    uses: ./.github/workflows/cross-build-images.yaml
     needs: image-tags
+    uses: ./.github/workflows/cross-build-images.yaml
     with:
       registry: docker.io
       repository: ${{ github.repository_owner }}
-      image_tag: ${{ github.ref_name }} 
-      # image_tag: ${{ needs.image-tags.env.TAGS }} # TODO: Support multiple tags
+      image_tags: ${{ needs.image-tags.outputs.tags }}
     secrets:
       username: ${{ secrets.DOCKERHUB_USERNAME }}
       password: ${{ secrets.DOCKERHUB_TOKEN }}
+
   push-to-ghcr:
-    uses: ./.github/workflows/cross-build-images.yaml
     needs: image-tags
+    uses: ./.github/workflows/cross-build-images.yaml
     with:
       registry: ghcr.io
       repository: ${{ github.repository_owner }}
-      image_tag: ${{ github.ref_name }}
-      # image_tag: ${{ needs.image-tags.env.TAGS }} # TODO: Support multiple tags
+      image_tags: ${{ needs.image-tags.outputs.tags }}
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}

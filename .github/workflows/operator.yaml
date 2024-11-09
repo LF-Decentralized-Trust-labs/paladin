@@ -1,15 +1,15 @@
 name: Paladin Operator Build
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'operator/**'
   pull_request:
     paths:
       - 'operator/**'
   workflow_dispatch:
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   operator-build:
@@ -65,6 +65,9 @@ jobs:
         with:
           install_only: true # only install kind, the cluster creation is managed by the deploy step
           ignore_failed_clean: true
+      
+      # The makefile uses kustomize
+      - uses: imranismail/setup-kustomize@v2
 
       - name: Deploy Operator
         run: ./gradlew deploy -PclusterName=${{ env.CLUSTER_NAME }} -Pnamespace=${{ env.NAMESPACE }} 

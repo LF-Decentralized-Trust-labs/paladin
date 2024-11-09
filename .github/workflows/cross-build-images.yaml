@@ -1,18 +1,8 @@
 name: Paladin Buildx
 permissions:
-  actions: read
-  checks: read
   contents: write
-  deployments: read
-  discussions: read
-  id-token: write
-  issues: read
   packages: write
-  pages: read
-  pull-requests: read
-  repository-projects: read
-  statuses: read
-  security-events: read
+  id-token: write
   
 on:
   workflow_call:
@@ -23,9 +13,10 @@ on:
       repository:
         required: true
         type: string
-      image_tag:
+      image_tags:
         required: true
         type: string
+        description: 'List of image tags separated by comma'
       push:
         required: false
         type: boolean
@@ -43,7 +34,7 @@ jobs:
       dockerfile: ./Dockerfile
       registry: ${{ inputs.registry }}
       image: ${{ inputs.repository }}/paladin
-      image_tag: "${{ inputs.image_tag }}-arm64"
+      image_tag: "${{ github.sha }}-arm64"
       push: ${{ inputs.push }}
       platforms: linux/arm64
       runs-on: ubuntu-latest
@@ -56,7 +47,7 @@ jobs:
       dockerfile: ./Dockerfile
       registry: ${{ inputs.registry }}
       image: ${{ inputs.repository }}/paladin
-      image_tag: "${{ inputs.image_tag }}-amd64"
+      image_tag: "${{ github.sha }}-amd64"
       push: ${{ inputs.push }}
       platforms: linux/amd64
       runs-on: ubuntu-latest
@@ -70,7 +61,7 @@ jobs:
       dockerfile: ./operator/Dockerfile
       registry: ${{ inputs.registry }}
       image: ${{ inputs.repository }}/paladin-operator
-      image_tag: ${{ inputs.image_tag }}-amd64
+      image_tag: ${{ github.sha }}-amd64
       push: ${{ inputs.push }}
       platforms: linux/amd64
       runs-on: ubuntu-latest
@@ -83,7 +74,7 @@ jobs:
       dockerfile: ./operator/Dockerfile
       registry: ${{ inputs.registry }}
       image: ${{ inputs.repository }}/paladin-operator
-      image_tag: ${{ inputs.image_tag }}-arm64
+      image_tag: ${{ github.sha }}-arm64
       push: ${{ inputs.push }}
       platforms: linux/arm64
       runs-on: ubuntu-latest
@@ -96,12 +87,18 @@ jobs:
     needs: [core-macos, core-ubuntu]
     runs-on: ubuntu-latest
     env:
-      IMAGE: ${{ inputs.registry }}/${{ inputs.repository }}/paladin:${{ inputs.image_tag }}
+      IMAGE: ${{ inputs.registry }}/${{ inputs.repository }}/paladin
     steps:
       - uses: actions/checkout@v4
+
       - name: Set lower case image name
         run: |
-          echo "IMAGE=${IMAGE,,}" >>${GITHUB_ENV}
+          LOWER_IMAGE=${IMAGE,,}
+          echo "IMAGE=$LOWER_IMAGE" >> $GITHUB_ENV
+          echo "TEMP_IMAGE=$LOWER_IMAGE:$GITHUB_SHA" >> $GITHUB_ENV
+          echo "Image: $LOWER_IMAGE"
+          echo "Temp image: $LOWER_IMAGE:$GITHUB_SHA"
+
       - name: Docker registry login
         uses: docker/login-action@v3
         with:
@@ -109,24 +106,41 @@ jobs:
           username: ${{ secrets.username }}
           password: ${{ secrets.password }}
 
-      - name: Create and push Paladin core Docker manifest
+      - name: Create and push core manifest
         run: |
-          docker manifest create ${{ env.IMAGE }} \
-            --amend ${{ env.IMAGE }}-arm64 \
-            --amend ${{ env.IMAGE }}-amd64
-          docker manifest push ${{ env.IMAGE }}
+          docker manifest create $TEMP_IMAGE \
+            --amend $TEMP_IMAGE-arm64 \
+            --amend $TEMP_IMAGE-amd64
+          docker manifest push $TEMP_IMAGE
+
+      - name: Retag and push core image
+        env:
+          IMAGE_TAGS: ${{ inputs.image_tags }}
+        run: |
+          docker pull $TEMP_IMAGE
+          IFS=',' read -ra TAG_ARRAY <<< "$IMAGE_TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            docker tag $TEMP_IMAGE $IMAGE:$tag
+            docker push $IMAGE:$tag
+          done
 
   operator-docker-manifest:
     if: ${{ inputs.push }}
     needs: [operator-macos, operator-ubuntu]
     runs-on: ubuntu-latest
     env:
-      IMAGE: ${{ inputs.registry }}/${{ inputs.repository }}/paladin-operator:${{ inputs.image_tag }}
+      IMAGE: ${{ inputs.registry }}/${{ inputs.repository }}/paladin-operator
     steps:
       - uses: actions/checkout@v4
+
       - name: Set lower case image name
         run: |
-          echo "IMAGE=${IMAGE,,}" >>${GITHUB_ENV}
+          LOWER_IMAGE=${IMAGE,,}
+          echo "IMAGE=$LOWER_IMAGE" >> $GITHUB_ENV
+          echo "TEMP_IMAGE=$LOWER_IMAGE:$GITHUB_SHA" >> $GITHUB_ENV
+          echo "Image: $LOWER_IMAGE"
+          echo "Temp image: $LOWER_IMAGE:$GITHUB_SHA"
+
       - name: Docker registry login
         uses: docker/login-action@v3
         with:
@@ -134,9 +148,20 @@ jobs:
           username: ${{ secrets.username }}
           password: ${{ secrets.password }}
 
-      - name: Create and push Operaotr Docker manifest
+      - name: Create and push operator manifest
         run: |
-          docker manifest create ${{ env.IMAGE }} \
-            --amend ${{ env.IMAGE }}-arm64 \
-            --amend ${{ env.IMAGE }}-amd64
-          docker manifest push ${{ env.IMAGE }}
+          docker manifest create $TEMP_IMAGE \
+            --amend $TEMP_IMAGE-arm64 \
+            --amend $TEMP_IMAGE-amd64
+          docker manifest push $TEMP_IMAGE
+
+      - name: Retag and push operator image
+        env:
+          IMAGE_TAGS: ${{ inputs.image_tags }}
+        run: |
+          docker pull $TEMP_IMAGE
+          IFS=',' read -ra TAG_ARRAY <<< "$IMAGE_TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            docker tag $TEMP_IMAGE $IMAGE:$tag
+            docker push $IMAGE:$tag
+          done

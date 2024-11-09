@@ -7,10 +7,25 @@ on:
         required: false
         type: boolean
         default: false
-
+      tag:
+        required: true
+        type: string
+        description: 'The tag to release the chart and images with'
+  
 jobs:
+  build-images:
+    # build and release images
+    uses: ./.github/workflows/release-images.yaml
+    with:
+      tag: ${{ inputs.tag }}
+      latest: ${{ inputs.latest }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
   helm-chart-release:
     runs-on: ubuntu-latest
+    needs: build-images
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -54,12 +69,57 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
       
+      # The makefile uses kustomize
+      - uses: imranismail/setup-kustomize@v2
+
       - name: Prepare CRD chart
-        working-directory: operator
-        run: gradle prepareCRDsChart
+        run: ./gradlew prepareCRDsChart
 
       - name: Prepare operator chart
         run: ./gradlew prepareOperatorChart
+
+      - name: Set Lowercase Repository Owner
+        run: echo "LOWER_REPOSITORY_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+      
+      # Override the image tags in the values.yaml file 
+      - name: Override image tags
+        uses: ./.github/actions/update-yaml
+        with:
+          file: 'operator/charts/paladin-operator/values.yaml'
+          updates: |
+            operator:
+              image:
+                repository: docker.io/${{ env.LOWER_REPOSITORY_OWNER }}/paladin-operator
+                tag: ${{ inputs.tag }}
+            paladin:
+              image:
+                repository: docker.io/${{ env.LOWER_REPOSITORY_OWNER }}/paladin
+                tag: ${{ inputs.tag }}
+      
+      # Remove 'v' prefix from the tag
+      - name: Process Tag
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag }}"
+          PROCESSED_TAG="${TAG#v}"
+          echo "PROCESSED_TAG=${PROCESSED_TAG}" >> $GITHUB_ENV
+
+      # Override the chart version in the Chart.yaml file
+      - name: Override chart version
+        uses: ./.github/actions/update-yaml
+        with:
+          file: 'operator/charts/paladin-operator/Chart.yaml'
+          updates: |
+            version: ${{ env.PROCESSED_TAG }}
+            appVersion: ${{ inputs.tag }}
+
+      - name: Confirm Helm temapltes
+        working-directory: operator/charts/paladin-operator
+        run: |
+          helm dependency build
+          helm template .
+          rm -rf charts
+          rm Chart.lock
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0

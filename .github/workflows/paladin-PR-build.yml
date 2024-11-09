@@ -1,24 +1,25 @@
 name: Paladin Build
 permissions:
-  actions: read
-  checks: read
   contents: write
-  deployments: read
-  discussions: read
-  id-token: write
-  issues: read
   packages: write
-  pages: read
-  pull-requests: read
-  repository-projects: read
-  statuses: read
-  security-events: read
+  id-token: write
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'operator/charts/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'operator/charts/**'
   workflow_dispatch:
+
+# Ensure this workflow only runs for the most recent commit of a pull-request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -104,7 +105,7 @@ jobs:
     with:
       registry: ghcr.io
       repository: ${{ github.repository_owner }}
-      image_tag: ${{ github.ref_name }}
+      image_tags: ${{ github.ref_name }}
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}
