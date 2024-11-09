@@ -26,7 +26,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 
 /**
  * Serialization and de-serialization for ABIs
@@ -105,6 +105,14 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
         }
     }
 
+    public JsonABI() {
+        super();
+    }
+
+    public JsonABI(Collection<Entry> existing) {
+        super(existing);
+    }
+
     public String toString() {
         return toJSON(false);
     }
@@ -164,7 +172,6 @@ public class JsonABI extends ArrayList<JsonABI.Entry> {
     private static String toJSONString(Object any, boolean pretty) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
-            StringWriter out = new StringWriter();
             if (pretty) {
                 return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(any);
             }

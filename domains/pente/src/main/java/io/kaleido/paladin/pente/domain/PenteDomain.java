@@ -226,9 +226,9 @@ public class PenteDomain extends DomainInstance {
         return externalCalls;
     }
 
-    private String buildExtraData(PenteEVMTransaction.EVMExecutionResult execResult) throws Exception {
+    private String buildDomainData(PenteEVMTransaction.EVMExecutionResult execResult) throws Exception {
         return new ObjectMapper().writeValueAsString(
-                new PenteConfiguration.TransactionExtraData(
+                new PenteConfiguration.DomainData(
                         new Address(execResult.contractAddress().toArray()),
                         parseExternalCalls(execResult.logs())));
     }
@@ -250,7 +250,7 @@ public class PenteDomain extends DomainInstance {
             // available for selection as an input to a transaction. It exists only to be emitted as part of the
             // event from the transaction where it is used.
             var encodedTxn = tx.getSignedRawTransaction(ethTxn);
-            var assembledTransaction = tx.buildAssembledTransaction(execResult.evm(), accountLoader, ethTxn, encodedTxn, buildExtraData(execResult));
+            var assembledTransaction = tx.buildAssembledTransaction(execResult.evm(), accountLoader, ethTxn, encodedTxn, buildDomainData(execResult));
 
             // We now have the assembly result
             result.setAssemblyResult(ToDomain.AssembleTransactionResponse.Result.OK);
@@ -380,11 +380,11 @@ public class PenteDomain extends DomainInstance {
                     filter(r -> r.getAttestationType() == ToDomain.AttestationType.ENDORSE).
                     toList();
             List<PenteConfiguration.TransactionExternalCall> externalCalls;
-            if (request.getExtraData().isEmpty()) {
+            if (request.getDomainData().isEmpty()) {
                 externalCalls = Collections.emptyList();
             } else {
-                var extraData = new ObjectMapper().readValue(request.getExtraData(), PenteConfiguration.TransactionExtraData.class);
-                externalCalls = extraData.externalCalls();
+                var domainData = new ObjectMapper().readValue(request.getDomainData(), PenteConfiguration.DomainData.class);
+                externalCalls = domainData.externalCalls();
             }
 
             var params = new HashMap<String, Object>() {{

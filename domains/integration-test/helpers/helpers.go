@@ -44,7 +44,7 @@ type DomainTransactionHelper struct {
 	ctx context.Context
 	t   *testing.T
 	rpc rpcbackend.Backend
-	tx  *testbed.TransactionInput
+	tx  *pldapi.TransactionInput
 }
 
 type SentDomainTransaction struct {
@@ -99,10 +99,12 @@ func NewDomainTransactionHelper(ctx context.Context, t *testing.T, rpc rpcbacken
 		ctx: ctx,
 		t:   t,
 		rpc: rpc,
-		tx: &testbed.TransactionInput{
-			To:       *to,
-			Function: *fn,
-			Inputs:   inputs,
+		tx: &pldapi.TransactionInput{
+			TransactionBase: pldapi.TransactionBase{
+				To:   to,
+				Data: inputs,
+			},
+			ABI: abi.ABI{fn},
 		},
 	}
 }

@@ -23,9 +23,7 @@ import io.kaleido.paladin.toolkit.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -57,20 +55,36 @@ public class PenteDomainTests {
         }
     }
 
-    static final JsonABI.Entry simpleStorageDeployABI = JsonABI.newFunction(
-            "deploy",
-            JsonABI.newParameters(
-                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                            JsonABI.newParameter("salt", "bytes32"),
-                            JsonABI.newParameter("members", "string[]")
-                    )),
-                    JsonABI.newParameter("bytecode", "bytes"),
-                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                            JsonABI.newParameter("x", "uint256")
-                    ))
+    static final JsonABI simpleStorageABI = new JsonABI(Arrays.asList(
+            JsonABI.newFunction(
+                    "deploy",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("bytecode", "bytes"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                    JsonABI.newParameter("x", "uint256")
+                            ))
+                    ),
+                    JsonABI.newParameters()
             ),
-            JsonABI.newParameters()
-    );
+            JsonABI.newFunction(
+                    "set",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("to", "address"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                    JsonABI.newParameter("x", "uint256")
+                            ))
+                    ),
+                    JsonABI.newParameters()
+            )
+    ));
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static final record SimpleStorageConstructorJSON(
@@ -79,35 +93,22 @@ public class PenteDomainTests {
     ) {
     }
 
-    static final JsonABI.Entry simpleStorageSetABI = JsonABI.newFunction(
-            "set",
-            JsonABI.newParameters(
-                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                            JsonABI.newParameter("salt", "bytes32"),
-                            JsonABI.newParameter("members", "string[]")
-                    )),
-                    JsonABI.newParameter("to", "address"),
-                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                            JsonABI.newParameter("x", "uint256")
-                    ))
-            ),
-            JsonABI.newParameters()
-    );
-
-    static final JsonABI.Entry simpleStorageLinkedDeployABI = JsonABI.newFunction(
-            "deploy",
-            JsonABI.newParameters(
-                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                            JsonABI.newParameter("salt", "bytes32"),
-                            JsonABI.newParameter("members", "string[]")
-                    )),
-                    JsonABI.newParameter("bytecode", "bytes"),
-                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                            JsonABI.newParameter("linked", "address")
-                    ))
-            ),
-            JsonABI.newParameters()
-    );
+    static final JsonABI simpleStorageLinkedABI = new JsonABI(List.of(
+            JsonABI.newFunction(
+                    "deploy",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("bytecode", "bytes"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                    JsonABI.newParameter("linked", "address")
+                            ))
+                    ),
+                    JsonABI.newParameters()
+            )
+    ));
 
     Testbed.TransactionResult getTransactionInfo(LinkedHashMap<String, Object> res) {
         return new ObjectMapper().convertValue(res, Testbed.TransactionResult.class);
@@ -162,16 +163,20 @@ public class PenteDomainTests {
                     put("x", "1122334455");
                 }});
             }};
+            var mapper = new ObjectMapper();
             var tx = getTransactionInfo(
                     testbed.getRpcClient().request("testbed_invoke",
                             new Testbed.TransactionInput(
+                                    "private",
+                                    "",
                                     "simpleStorageDeployer",
                                     JsonHex.addressFrom(contractAddr),
-                                    simpleStorageDeployABI,
-                                    deployValues
+                                    deployValues,
+                                    simpleStorageABI,
+                                    "deploy"
                             ), true));
-            var extraData = new ObjectMapper().convertValue(tx.assembleExtraData(), PenteConfiguration.TransactionExtraData.class);
-            var expectedContractAddress = extraData.contractAddress();
+            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
+            var expectedContractAddress = domainData.contractAddress();
 
             // Invoke set on Simple Storage
             Map<String, Object> setValues = new HashMap<>() {{
@@ -183,10 +188,13 @@ public class PenteDomainTests {
             }};
             testbed.getRpcClient().request("testbed_invoke",
                     new Testbed.TransactionInput(
+                            "private",
+                            "",
                             "simpleStorageDeployer",
                             JsonHex.addressFrom(contractAddr),
-                            simpleStorageSetABI,
-                            setValues
+                            setValues,
+                            simpleStorageABI,
+                            "set"
                     ), true);
 
             // Set again
@@ -199,10 +207,13 @@ public class PenteDomainTests {
             }};
             testbed.getRpcClient().request("testbed_invoke",
                     new Testbed.TransactionInput(
+                            "private",
+                            "",
                             "simpleStorageDeployer",
                             JsonHex.addressFrom(contractAddr),
-                            simpleStorageSetABI,
-                            setValues
+                            setValues,
+                            simpleStorageABI,
+                            "set"
                     ), true);
 
         }
@@ -248,13 +259,16 @@ public class PenteDomainTests {
             var tx = getTransactionInfo(
                     testbed.getRpcClient().request("testbed_invoke",
                             new Testbed.TransactionInput(
+                                    "private",
+                                    "",
                                     "simpleStorageDeployer",
                                     JsonHex.addressFrom(contractAddr),
-                                    simpleStorageDeployABI,
-                                    deployValues
+                                    deployValues,
+                                    simpleStorageABI,
+                                    "deploy"
                             ), true));
-            var extraData = mapper.convertValue(tx.assembleExtraData(), PenteConfiguration.TransactionExtraData.class);
-            var expectedContractAddress = extraData.contractAddress();
+            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
+            var expectedContractAddress = domainData.contractAddress();
 
             // Prepare a "set" on Simple Storage
             Map<String, Object> setValues = new HashMap<>() {{
@@ -267,10 +281,13 @@ public class PenteDomainTests {
             var preparedSet = mapper.convertValue(
                     testbed.getRpcClient().request("testbed_prepare",
                             new Testbed.TransactionInput(
+                                    "private",
+                                    "",
                                     "simpleStorageDeployer",
                                     JsonHex.addressFrom(contractAddr),
-                                    simpleStorageSetABI,
-                                    setValues)),
+                                    setValues,
+                                    simpleStorageABI,
+                                    "set")),
                     Testbed.TransactionResult.class);
             var metadata = mapper.convertValue(preparedSet.preparedMetadata(), PenteConfiguration.PenteTransitionMetadata.class);
             var transitionParams = mapper.convertValue(preparedSet.preparedTransaction().data(), PenteConfiguration.PenteTransitionParams.class);
@@ -363,35 +380,42 @@ public class PenteDomainTests {
                     "contracts/testcontracts/SimpleStorageLinked.sol/SimpleStorageLinked.json",
                     "bytecode"
             );
+            var mapper = new ObjectMapper();
             var tx = getTransactionInfo(
                     testbed.getRpcClient().request("testbed_invoke",
                             new Testbed.TransactionInput(
+                                    "private",
+                                    "",
                                     "simpleStorageDeployer",
                                     JsonHex.addressFrom(penteAddr),
-                                    simpleStorageLinkedDeployABI,
                                     new HashMap<>() {{
                                         put("group", groupInfo);
                                         put("bytecode", ssLinkedBytecode);
                                         put("inputs", new HashMap<>() {{
                                             put("linked", ssAddr);
                                         }});
-                                    }}
+                                    }},
+                                    simpleStorageLinkedABI,
+                                    "deploy"
                             ), true));
-            var extraData = new ObjectMapper().convertValue(tx.assembleExtraData(), PenteConfiguration.TransactionExtraData.class);
-            var ssLinkedAddr = extraData.contractAddress();
+            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
+            var ssLinkedAddr = domainData.contractAddress();
 
             testbed.getRpcClient().request("testbed_invoke",
                     new Testbed.TransactionInput(
+                            "private",
+                            "",
                             "simpleStorageDeployer",
                             JsonHex.addressFrom(penteAddr),
-                            simpleStorageSetABI,
                             new HashMap<>() {{
                                 put("group", groupInfo);
                                 put("to", ssLinkedAddr.toString());
                                 put("inputs", new HashMap<>() {{
                                     put("x", 100);
                                 }});
-                            }}
+                            }},
+                            simpleStorageABI,
+                            "set"
                     ), true);
         }
     }

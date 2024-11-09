@@ -158,7 +158,7 @@ message PrepareTransactionRequest {
   repeated EndorsableState info_states = 6; // The list of states that are important information in/out of the business transaction, but are never recorded in an on-chain map, or returned from FindAvailableStates
   repeated AttestationResult attestation_result = 7; // The results of any proofs/attestations that came out of the endorsement phase
   repeated ResolvedVerifier resolved_verifiers = 8; // A list of transaction signatures/proofs that have been resolved
-  optional string extra_data = 9; // Any extra data that was included in the transaction assembly
+  optional string domain_data = 9; // Any extra domain data that was included in the transaction assembly
 }
 
 message PrepareTransactionResponse {
@@ -291,7 +291,7 @@ message AssembledTransaction {
   repeated StateRef read_states = 2; // A list of state IDs that the execution of the transaction depends on being unspent on the chain (but will not spend). Also could be being minted on other sequences.
   repeated NewState output_states = 3; // A list of new states the domain will create as an output from this transaction, if it is executed and confirmed
   repeated NewState info_states = 4; // A list of states recorded as meaningful to the transaction, but do not need to exist on-chain before the transaction, and are not stored on-chain in any map afterwards
-  optional string extra_data = 5; // Any extra data to be propagated to prepare the transaction (this is not recorded directly as states, so primary use is for data that results in direct EVM transaction function in the base ledger contract)
+  optional string domain_data = 5; // Domain-specific data to be propagated with the transaction (this is not recorded as states, but will be available for use by later domain steps)
 }
 
 message StateRef {

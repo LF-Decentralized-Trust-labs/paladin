@@ -17,17 +17,9 @@
 package testbed
 
 import (
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
-
-type TransactionInput struct {
-	From     string             `json:"from"`
-	To       tktypes.EthAddress `json:"to"`
-	Function abi.Entry          `json:"function,omitempty"`
-	Inputs   tktypes.RawJSON    `json:"inputs,omitempty"`
-}
 
 type TransactionResult struct {
 	EncodedCall         tktypes.HexBytes         `json:"encodedCall"`
@@ -37,5 +29,5 @@ type TransactionResult struct {
 	OutputStates        []*pldapi.StateEncoded   `json:"outputStates"`
 	ReadStates          []*pldapi.StateEncoded   `json:"readStates"`
 	InfoStates          []*pldapi.StateEncoded   `json:"infoStates"`
-	AssembleExtraData   tktypes.RawJSON          `json:"assembleExtraData"` // TODO: remove (only used for finding Pente contract address)
+	DomainData          tktypes.RawJSON          `json:"domainData"` // TODO: remove (only used for finding Pente contract address)
 }

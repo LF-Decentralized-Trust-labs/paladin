@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zeto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -217,11 +218,14 @@ func (s *zetoDomainTestSuite) mint(ctx context.Context, zetoAddress tktypes.EthA
 	if err != nil {
 		return nil, err
 	}
-	rpcerr := s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &testbed.TransactionInput{
-		From:     minter,
-		To:       tktypes.EthAddress(zetoAddress),
-		Function: *types.ZetoABI.Functions()["mint"],
-		Inputs:   paramsJson,
+	rpcerr := s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     minter,
+			To:       &zetoAddress,
+			Function: "mint",
+			Data:     paramsJson,
+		},
+		ABI: types.ZetoABI,
 	}, true)
 	if rpcerr != nil {
 		return nil, rpcerr.Error()
@@ -245,11 +249,14 @@ func (s *zetoDomainTestSuite) transfer(ctx context.Context, zetoAddress tktypes.
 	if err != nil {
 		return nil, err
 	}
-	rpcerr := s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &testbed.TransactionInput{
-		From:     sender,
-		To:       tktypes.EthAddress(zetoAddress),
-		Function: *types.ZetoABI.Functions()["transfer"],
-		Inputs:   paramsJson,
+	rpcerr := s.rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     sender,
+			To:       &zetoAddress,
+			Function: "transfer",
+			Data:     paramsJson,
+		},
+		ABI: types.ZetoABI,
 	}, true)
 	if rpcerr != nil {
 		return nil, rpcerr.Error()

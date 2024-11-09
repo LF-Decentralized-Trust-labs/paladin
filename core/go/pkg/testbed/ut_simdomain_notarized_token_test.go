@@ -148,6 +148,11 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 		]
 	}`
 
+	fakeCoinABI := abi.ABI{
+		mustParseABIEntry(fakeCoinTransferABI),
+		mustParseABIEntry(fakeCoinGetBalanceABI),
+	}
+
 	fakeDeployPayload := `{
 		"notary": "domain1.contract1.notary",
 		"name": "FakeToken1",
@@ -723,7 +728,7 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 
 	tbRPC := rpcclient.WrapRestyClient(resty.New().SetBaseURL(url))
 
-	var contractAddr ethtypes.Address0xHex
+	var contractAddr tktypes.EthAddress
 	rpcErr := tbRPC.CallRPC(ctx, &contractAddr, "testbed_deploy", "domain1", "me", tktypes.RawJSON(`{
 		"notary": "domain1.contract1.notary",
 		"name": "FakeToken1",
@@ -731,37 +736,46 @@ func TestDemoNotarizedCoinSelection(t *testing.T) {
 	}`))
 	assert.NoError(t, rpcErr)
 
-	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &TransactionInput{
-		From:     "wallets.org1.aaaaaa",
-		To:       tktypes.EthAddress(contractAddr),
-		Function: *mustParseABIEntry(fakeCoinTransferABI),
-		Inputs: tktypes.RawJSON(`{
-			"from": "",
-			"to": "wallets.org1.aaaaaa",
-			"amount": "123000000000000000000"
-		}`),
+	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     "wallets.org1.aaaaaa",
+			To:       &contractAddr,
+			Function: "transfer",
+			Data: tktypes.RawJSON(`{
+				"from": "",
+				"to": "wallets.org1.aaaaaa",
+				"amount": "123000000000000000000"
+			}`),
+		},
+		ABI: fakeCoinABI,
 	}, true)
 	assert.NoError(t, rpcErr)
 
-	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &TransactionInput{
-		From:     "wallets.org1.aaaaaa",
-		To:       tktypes.EthAddress(contractAddr),
-		Function: *mustParseABIEntry(fakeCoinTransferABI),
-		Inputs: tktypes.RawJSON(`{
-			"from": "wallets.org1.aaaaaa",
-			"to": "wallets.org2.bbbbbb",
-			"amount": "23000000000000000000"
-		}`),
+	rpcErr = tbRPC.CallRPC(ctx, tktypes.RawJSON{}, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     "wallets.org1.aaaaaa",
+			To:       &contractAddr,
+			Function: "transfer",
+			Data: tktypes.RawJSON(`{
+				"from": "wallets.org1.aaaaaa",
+				"to": "wallets.org2.bbbbbb",
+				"amount": "23000000000000000000"
+			}`),
+		},
+		ABI: fakeCoinABI,
 	}, true)
 	assert.NoError(t, rpcErr)
 
 	var balance *getBalanceResult
-	rpcErr = tbRPC.CallRPC(ctx, &balance, "testbed_call", &TransactionInput{
-		To:       tktypes.EthAddress(contractAddr),
-		Function: *mustParseABIEntry(fakeCoinGetBalanceABI),
-		Inputs: tktypes.RawJSON(`{
-			"account": "wallets.org1.aaaaaa"
-		}`),
+	rpcErr = tbRPC.CallRPC(ctx, &balance, "testbed_call", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			To:       &contractAddr,
+			Function: "getBalance",
+			Data: tktypes.RawJSON(`{
+				"account": "wallets.org1.aaaaaa"
+			}`),
+		},
+		ABI: fakeCoinABI,
 	}, tktypes.DefaultJSONFormatOptions)
 	assert.NoError(t, rpcErr)
 	assert.Equal(t, "100000000000000000000", balance.Amount.Int().String())

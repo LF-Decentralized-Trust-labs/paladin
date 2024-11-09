@@ -238,7 +238,7 @@ func (dc *domainContract) AssembleTransaction(dCtx components.DomainContext, rea
 		// abandon this attempt and just re-assemble later.
 		postAssembly.OutputStatesPotential = res.AssembledTransaction.OutputStates
 		postAssembly.InfoStatesPotential = res.AssembledTransaction.InfoStates
-		postAssembly.ExtraData = res.AssembledTransaction.ExtraData
+		postAssembly.DomainData = res.AssembledTransaction.DomainData
 	}
 
 	// We need to pass the assembly result back - it needs to be assigned to a sequence
@@ -486,7 +486,7 @@ func (dc *domainContract) PrepareTransaction(dCtx components.DomainContext, read
 		InfoStates:        dc.d.toEndorsableList(postAssembly.InfoStates),
 		AttestationResult: dc.allAttestations(tx),
 		ResolvedVerifiers: preAssembly.Verifiers,
-		ExtraData:         postAssembly.ExtraData,
+		DomainData:        postAssembly.DomainData,
 	})
 	if err != nil {
 		return err

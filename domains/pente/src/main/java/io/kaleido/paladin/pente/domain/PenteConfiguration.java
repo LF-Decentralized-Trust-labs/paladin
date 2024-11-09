@@ -18,14 +18,13 @@ package io.kaleido.paladin.pente.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
-import io.kaleido.paladin.toolkit.ToDomain;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
 import io.kaleido.paladin.toolkit.JsonHex.Bytes32;
+import io.kaleido.paladin.toolkit.ToDomain;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.tuweni.bytes.Bytes;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeEncoder;
 import org.web3j.abi.TypeReference;
@@ -36,9 +35,9 @@ import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.abi.datatypes.reflection.Parameterized;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Provides thread safe access to the configuration of the domain from the functions that are called
@@ -56,8 +55,6 @@ public class PenteConfiguration {
 
     private final JsonABI eventsABI;
 
-    private final JsonABI externalCallABI;
-
     private final JsonABI.Entry externalCallEventABI;
 
     // Topic generated from event "PenteExternalCall(address,bytes)"
@@ -69,11 +66,6 @@ public class PenteConfiguration {
     private String schemaId_AccountState_v24_10_0;
 
     private String schemaId_TransactionInfoState_v24_10_0;
-
-    record Schema(String id, String signature, JsonABI.Parameter def) {
-    }
-
-    private final Map<String, Schema> schemasByID = new HashMap<>();
 
     PenteConfiguration() {
         try {
@@ -91,7 +83,7 @@ public class PenteConfiguration {
                     e.type().equals("error") ||
                             (e.type().equals("event") && (e.name().equals("PenteApproved") || e.name().equals("PenteTransition")))
             ).toList());
-            externalCallABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
+            var externalCallABI = JsonABI.fromJSONResourceEntry(getClass().getClassLoader(),
                     "contracts/private/interfaces/IPenteExternalCall.sol/IPenteExternalCall.json",
                     "abi");
             externalCallEventABI = externalCallABI.getABIEntry("event", "PenteExternalCall");
@@ -212,7 +204,7 @@ public class PenteConfiguration {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TransactionExtraData(
+    public record DomainData(
             @JsonProperty
             Address contractAddress,
             @JsonProperty
@@ -305,13 +297,9 @@ public class PenteConfiguration {
 
     synchronized JsonABI getEventsABI() { return eventsABI; }
 
-    synchronized JsonABI getExternalCallABI() { return externalCallABI; }
-
     synchronized JsonABI.Entry getExternalCallEventABI() { return externalCallEventABI; }
 
     synchronized JsonHex.Bytes32 getExternalCallTopic() { return externalCallTopic; }
-
-    synchronized String getTransferSignature() { return transferSignature; }
 
     synchronized long getChainId() {
         return chainId;
@@ -340,18 +328,8 @@ public class PenteConfiguration {
         }
         var schema = schemas.getFirst();
         schemaId_AccountState_v24_10_0 = schema.getId();
-        schemasByID.put(schemaId_AccountState_v24_10_0, new Schema(
-                schema.getId(),
-                schema.getSignature(),
-                abiTuple_AccountState_v24_10_0()
-        ));
         schema = schemas.get(1);
         schemaId_TransactionInfoState_v24_10_0 = schema.getId();
-        schemasByID.put(schemaId_TransactionInfoState_v24_10_0, new Schema(
-                schema.getId(),
-                schema.getSignature(),
-                abiTuple_TransactionInfoState_v24_10_0()
-        ));
     }
 
     synchronized String schemaId_AccountStateLatest() {

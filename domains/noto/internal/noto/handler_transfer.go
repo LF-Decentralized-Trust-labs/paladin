@@ -348,7 +348,7 @@ func (h *transferHandler) hookTransfer(ctx context.Context, tx *types.ParsedTran
 	}, nil
 }
 
-func (h *transferHandler) makeExtraData(ctx context.Context, withApprovalTX *TransactionWrapper, req *prototk.PrepareTransactionRequest) ([]byte, error) {
+func (h *transferHandler) makeDomainData(ctx context.Context, withApprovalTX *TransactionWrapper, req *prototk.PrepareTransactionRequest) ([]byte, error) {
 	data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.InfoStates)
 	if err != nil {
 		return nil, err
@@ -357,7 +357,7 @@ func (h *transferHandler) makeExtraData(ctx context.Context, withApprovalTX *Tra
 	if err != nil {
 		return nil, err
 	}
-	extraData := &types.NotoTransferMetadata{
+	domainData := &types.NotoTransferMetadata{
 		ApprovalParams: types.ApproveExtraParams{
 			Data: data,
 		},
@@ -367,7 +367,7 @@ func (h *transferHandler) makeExtraData(ctx context.Context, withApprovalTX *Tra
 			EncodedCall: encodedCall,
 		},
 	}
-	return json.Marshal(extraData)
+	return json.Marshal(domainData)
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
@@ -376,9 +376,9 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	var withApprovalTransaction *TransactionWrapper
 	var hookTransaction *TransactionWrapper
 	var withApprovalHookTransaction *TransactionWrapper
-	var extraData []byte
+	var metadata []byte
 
-	// If preparing a transaction for later use, return extra data allowing it to be delegated to an approved party
+	// If preparing a transaction for later use, return metadata allowing it to be delegated to an approved party
 	prepareApprovals := req.Transaction.Intent == prototk.TransactionSpecification_PREPARE_TRANSACTION
 
 	baseTransaction, err = h.baseLedgerTransfer(ctx, tx, req, false)
@@ -402,19 +402,19 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 			if err != nil {
 				return nil, err
 			}
-			extraData, err = h.makeExtraData(ctx, withApprovalHookTransaction, req)
+			metadata, err = h.makeDomainData(ctx, withApprovalHookTransaction, req)
 			if err != nil {
 				return nil, err
 			}
 		}
-		return hookTransaction.prepare(extraData)
+		return hookTransaction.prepare(metadata)
 	}
 
 	if prepareApprovals {
-		extraData, err = h.makeExtraData(ctx, withApprovalTransaction, req)
+		metadata, err = h.makeDomainData(ctx, withApprovalTransaction, req)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return baseTransaction.prepare(extraData)
+	return baseTransaction.prepare(metadata)
 }

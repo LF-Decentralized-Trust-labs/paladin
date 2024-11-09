@@ -12,7 +12,6 @@ export function newTransactionId() {
 export const encodeStates = (states: IStateBase[]): IStateEncoded[] => {
   return states.map((state) => ({
     id: state.id,
-    created: state.created,
     domain: state.domain,
     schema: state.schema,
     contractAddress: state.contractAddress,

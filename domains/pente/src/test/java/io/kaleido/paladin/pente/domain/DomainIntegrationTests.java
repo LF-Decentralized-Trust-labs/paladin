@@ -19,24 +19,20 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.kaleido.paladin.pente.domain.PenteConfiguration.GroupTupleJSON;
 import io.kaleido.paladin.testbed.Testbed;
 import io.kaleido.paladin.toolkit.*;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class DomainIntegrationTests {
-
-    private static final Logger LOGGER = LogManager.getLogger(DomainIntegrationTests.class);
 
     private final Testbed.Setup testbedSetup = new Testbed.Setup(
             "../../core/go/db/migrations/sqlite",
@@ -105,48 +101,51 @@ public class DomainIntegrationTests {
     ) {
     }
 
-    static final JsonABI.Entry notoMintABI = JsonABI.newFunction(
-            "mint",
-            JsonABI.newParameters(
-                    JsonABI.newParameter("to", "string"),
-                    JsonABI.newParameter("amount", "uint256"),
-                    JsonABI.newParameter("data", "bytes")
-            ),
-            JsonABI.newParameters()
-    );
-
-    static final JsonABI.Entry notoTrackerDeployABI = JsonABI.newFunction(
-            "deploy",
-            JsonABI.newParameters(
-                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                            JsonABI.newParameter("salt", "bytes32"),
-                            JsonABI.newParameter("members", "string[]")
-                    )),
-                    JsonABI.newParameter("bytecode", "bytes"),
-                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                            JsonABI.newParameter("name", "string"),
-                            JsonABI.newParameter("symbol", "string")
-                    ))
-            ),
-            JsonABI.newParameters()
-    );
-
-    static final JsonABI.Entry notoTrackerBalanceABI = JsonABI.newFunction(
-            "balanceOf",
-            JsonABI.newParameters(
-                    JsonABI.newTuple("group", "Group", JsonABI.newParameters(
-                            JsonABI.newParameter("salt", "bytes32"),
-                            JsonABI.newParameter("members", "string[]")
-                    )),
-                    JsonABI.newParameter("to", "address"),
-                    JsonABI.newTuple("inputs", "", JsonABI.newParameters(
-                            JsonABI.newParameter("account", "address")
-                    ))
-            ),
-            JsonABI.newParameters(
-                    JsonABI.newParameter("output", "uint256")
+    static final JsonABI notoABI = new JsonABI(List.of(
+            JsonABI.newFunction(
+                    "mint",
+                    JsonABI.newParameters(
+                            JsonABI.newParameter("to", "string"),
+                            JsonABI.newParameter("amount", "uint256"),
+                            JsonABI.newParameter("data", "bytes")
+                    ),
+                    JsonABI.newParameters()
             )
-    );
+    ));
+
+    static final JsonABI notoTrackerABI = new JsonABI(Arrays.asList(
+            JsonABI.newFunction(
+                    "deploy",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("bytecode", "bytes"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                    JsonABI.newParameter("name", "string"),
+                                    JsonABI.newParameter("symbol", "string")
+                            ))
+                    ),
+                    JsonABI.newParameters()
+            ),
+            JsonABI.newFunction(
+                    "balanceOf",
+                    JsonABI.newParameters(
+                            JsonABI.newTuple("group", "Group", JsonABI.newParameters(
+                                    JsonABI.newParameter("salt", "bytes32"),
+                                    JsonABI.newParameter("members", "string[]")
+                            )),
+                            JsonABI.newParameter("to", "address"),
+                            JsonABI.newTuple("inputs", "", JsonABI.newParameters(
+                                    JsonABI.newParameter("account", "address")
+                            ))
+                    ),
+                    JsonABI.newParameters(
+                            JsonABI.newParameter("output", "uint256")
+                    )
+            )
+    ));
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record PenteCallOutputJSON(
@@ -237,9 +236,10 @@ public class DomainIntegrationTests {
             var tx = getTransactionInfo(
                     testbed.getRpcClient().request("testbed_invoke",
                             new Testbed.TransactionInput(
+                                    "private",
+                                    "",
                                     "notary",
                                     JsonHex.addressFrom(penteInstanceAddress),
-                                    notoTrackerDeployABI,
                                     new HashMap<>() {{
                                         put("group", groupInfo);
                                         put("bytecode", notoTrackerBytecode);
@@ -247,10 +247,12 @@ public class DomainIntegrationTests {
                                             put("name", "NOTO");
                                             put("symbol", "NOTO");
                                         }});
-                                    }}
+                                    }},
+                                    notoTrackerABI,
+                                    "deploy"
                             ), true));
-            var extraData = new ObjectMapper().convertValue(tx.assembleExtraData(), PenteConfiguration.TransactionExtraData.class);
-            var notoTrackerAddress = extraData.contractAddress();
+            var domainData = mapper.convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
+            var notoTrackerAddress = domainData.contractAddress();
 
             // Create Noto token
             String notoInstanceAddress = testbed.getRpcClient().request("testbed_deploy",
@@ -266,14 +268,17 @@ public class DomainIntegrationTests {
             // Perform Noto mint
             testbed.getRpcClient().request("testbed_invoke",
                     new Testbed.TransactionInput(
+                            "private",
+                            "",
                             "notary",
                             JsonHex.addressFrom(notoInstanceAddress),
-                            notoMintABI,
                             new HashMap<>() {{
                                 put("to", "alice");
                                 put("amount", 1000000);
                                 put("data", "0x");
-                            }}
+                            }},
+                            notoABI,
+                            "mint"
                     ), true);
 
             // Validate minted coin
@@ -294,16 +299,19 @@ public class DomainIntegrationTests {
             // Validate ERC20 balance
             LinkedHashMap<String, Object> balanceResult = testbed.getRpcClient().request("testbed_call",
                     new Testbed.TransactionInput(
+                            "private",
+                            "",
                             "notary",
                             JsonHex.addressFrom(penteInstanceAddress),
-                            notoTrackerBalanceABI,
                             new HashMap<>() {{
                                 put("group", groupInfo);
                                 put("to", notoTrackerAddress.toString());
                                 put("inputs", new HashMap<>() {{
                                     put("account", aliceAddress);
                                 }});
-                            }}
+                            }},
+                            notoTrackerABI,
+                            "balanceOf"
                     ), "");
 
             var aliceBalance = mapper.convertValue(balanceResult, PenteCallOutputJSON.class);

@@ -315,7 +315,7 @@ class PenteTransaction {
             PenteDomain.AssemblyAccountLoader accountLoader,
             PenteEVMTransaction evmTxn,
             byte[] encodedTxn,
-            String extraData) throws IOException, ExecutionException, InterruptedException {
+            String domainData) throws IOException, ExecutionException, InterruptedException {
 
         var latestAccountSchemaId = domain.getConfig().schemaId_AccountStateLatest();
         var latestTransactionInputSchemaId = domain.getConfig().schemaId_TransactionInputStateLatest();
@@ -374,8 +374,8 @@ class PenteTransaction {
         result.addAllReadStates(readStates);
         result.addAllOutputStates(outputStates);
         result.addInfoStates(txInputState);
-        if (extraData != null) {
-            result.setExtraData(extraData);
+        if (domainData != null) {
+            result.setDomainData(domainData);
         }
         return result.build();
     }

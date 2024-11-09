@@ -132,7 +132,7 @@ var (
 	PreparedTransactionDomain                     = ffm("PreparedTransaction.domain", "The domain of the original transaction that prepared this transaction submission")
 	PreparedTransactionTo                         = ffm("PreparedTransaction.to", "The to address or the original transaction that prepared this transaction submission")
 	PreparedTransactionTransaction                = ffm("PreparedTransaction.transaction", "The Paladin transaction definition that has been prepared for submission, with the ABI and function details resolved")
-	PreparedTransactionExtraData                  = ffm("PreparedTransaction.metadata", "Domain specific additional information generated during prepare in addition to the states. Used particularly in atomic multi-party transactions to separate data that can be disclosed, away from the full transaction submission payload")
+	PreparedTransactionMetadata                   = ffm("PreparedTransaction.metadata", "Domain specific additional information generated during prepare in addition to the states. Used particularly in atomic multi-party transactions to separate data that can be disclosed, away from the full transaction submission payload")
 	PreparedTransactionStates                     = ffm("PreparedTransaction.states", "Details of all states of the original transaction that prepared this transaction submission")
 	DecodedErrorData                              = ffm("ABIDecodedData.data", "The decoded JSON data using the matched ABI definition")
 	DecodedSummary                                = ffm("ABIDecodedData.summary", "A string formatted summary - errors only")

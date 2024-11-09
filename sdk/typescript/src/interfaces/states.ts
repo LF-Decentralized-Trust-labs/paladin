@@ -21,7 +21,6 @@ export interface IStateBase {
 
 export interface IStateEncoded {
   id: string;
-  created: string;
   domain: string;
   schema: string;
   contractAddress: string;

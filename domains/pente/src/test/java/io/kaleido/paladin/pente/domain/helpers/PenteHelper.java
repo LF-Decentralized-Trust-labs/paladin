@@ -26,6 +26,8 @@ import io.kaleido.paladin.toolkit.JsonHex;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PenteHelper {
 
@@ -84,17 +86,20 @@ public class PenteHelper {
 
         var tx = getTransactionInfo(
                 testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
+                        "private",
+                        "",
                         sender,
                         JsonHex.addressFrom(address),
-                        deployABI,
                         new HashMap<>() {{
                             put("group", groupInfo);
                             put("bytecode", bytecode);
                             put("inputs", inputValues);
-                        }}
+                        }},
+                        new JsonABI(List.of(deployABI)),
+                        ""
                 ), true));
-        var extraData = new ObjectMapper().convertValue(tx.assembleExtraData(), PenteConfiguration.TransactionExtraData.class);
-        return extraData.contractAddress();
+        var domainData = new ObjectMapper().convertValue(tx.domainData(), PenteConfiguration.DomainData.class);
+        return domainData.contractAddress();
     }
 
     public void invoke(String methodName, JsonABI.Parameters inputParams, String sender, JsonHex.Address privateAddress, Object inputValues) throws IOException {
@@ -113,14 +118,17 @@ public class PenteHelper {
 
         testbed.getRpcClient().request("testbed_invoke",
                 new Testbed.TransactionInput(
+                        "private",
+                        "",
                         sender,
                         JsonHex.addressFrom(address),
-                        invokeABI,
                         new HashMap<>() {{
                             put("group", groupInfo);
                             put("to", privateAddress);
                             put("inputs", inputValues);
-                        }}
+                        }},
+                        new JsonABI(List.of(invokeABI)),
+                        ""
                 ), true);
     }
 
@@ -140,24 +148,30 @@ public class PenteHelper {
 
         var queryResult = testbed.getRpcClient().request("testbed_call",
                 new Testbed.TransactionInput(
+                        "private",
+                        "",
                         sender,
                         JsonHex.addressFrom(address),
-                        callABI,
                         new HashMap<>() {{
                             put("group", groupInfo);
                             put("to", privateAddress);
                             put("inputs", inputValues);
-                        }}
+                        }},
+                        new JsonABI(List.of(callABI)),
+                        ""
                 ), "");
         return new ObjectMapper().convertValue(queryResult, PenteCallOutputJSON.class);
     }
 
-    public Testbed.TransactionResult prepare(String sender, JsonABI.Entry fn, Object inputs) throws IOException {
+    public Testbed.TransactionResult prepare(String sender, JsonABI.Entry fn, Map<String, Object> inputs) throws IOException {
         return getTransactionInfo(
                 testbed.getRpcClient().request("testbed_prepare", new Testbed.TransactionInput(
+                        "private",
+                        "",
                         sender,
                         JsonHex.addressFrom(address),
-                        fn,
-                        inputs)));
+                        inputs,
+                        new JsonABI(List.of(fn)),
+                        "")));
     }
 }

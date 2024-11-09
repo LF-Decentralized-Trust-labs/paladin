@@ -179,8 +179,13 @@ func (tb *testbed) rpcTestbedDeploy() rpcserver.RPCHandler {
 	})
 }
 
-func (tb *testbed) newPrivateTransaction(ctx context.Context, invocation TransactionInput, intent prototk.TransactionSpecification_Intent) (components.DomainSmartContract, *components.PrivateTransaction, error) {
-	psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, invocation.To)
+func (tb *testbed) newPrivateTransaction(ctx context.Context, invocation *pldapi.TransactionInput, intent prototk.TransactionSpecification_Intent) (components.DomainSmartContract, *components.PrivateTransaction, error) {
+	psc, err := tb.c.DomainManager().GetSmartContractByAddress(ctx, *invocation.To)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fn, err := tb.resolveFunction(invocation)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,15 +193,34 @@ func (tb *testbed) newPrivateTransaction(ctx context.Context, invocation Transac
 	tx := &components.PrivateTransaction{
 		ID: uuid.New(),
 		Inputs: &components.TransactionInputs{
-			Function: &invocation.Function,
+			Function: fn,
 			Domain:   psc.Domain().Name(),
 			From:     invocation.From,
 			To:       psc.Address(),
-			Inputs:   invocation.Inputs,
+			Inputs:   invocation.Data,
 			Intent:   intent,
 		},
 	}
 	return psc, tx, err
+}
+
+// Very simplified version of the real logic in TX manager
+func (tb *testbed) resolveFunction(invocation *pldapi.TransactionInput) (*abi.Entry, error) {
+	if invocation.ABIReference != nil {
+		return nil, fmt.Errorf("Testbed does not support ABIReference")
+	}
+	if invocation.ABI == nil {
+		return nil, fmt.Errorf("Testbed requires ABI to be passed in on each call")
+	}
+	for _, entry := range invocation.ABI {
+		if entry.Name == invocation.Function {
+			return entry, nil
+		}
+	}
+	if invocation.Function == "" && len(invocation.ABI) == 1 {
+		return invocation.ABI[0], nil
+	}
+	return nil, fmt.Errorf("Could not find function '%s' in provided ABI", invocation.Function)
 }
 
 func (tb *testbed) resolveTXSigner(tx *components.PrivateTransaction) error {
@@ -388,9 +412,9 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *components.PrivateTra
 		return nil, err
 	}
 
-	var assembleExtraData []byte
-	if tx.PostAssembly.ExtraData != nil {
-		assembleExtraData = []byte(*tx.PostAssembly.ExtraData)
+	var domainData []byte
+	if tx.PostAssembly.DomainData != nil {
+		domainData = []byte(*tx.PostAssembly.DomainData)
 	}
 
 	return &TransactionResult{
@@ -401,16 +425,16 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *components.PrivateTra
 		OutputStates:        outputStates,
 		ReadStates:          readStates,
 		InfoStates:          infoStates,
-		AssembleExtraData:   assembleExtraData,
+		DomainData:          domainData,
 	}, nil
 }
 
 func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		invocation TransactionInput,
+		invocation pldapi.TransactionInput,
 		waitForCompletion bool,
 	) (*TransactionResult, error) {
-		psc, tx, err := tb.newPrivateTransaction(ctx, invocation, prototk.TransactionSpecification_SEND_TRANSACTION)
+		psc, tx, err := tb.newPrivateTransaction(ctx, &invocation, prototk.TransactionSpecification_SEND_TRANSACTION)
 		if err != nil {
 			return nil, err
 		}
@@ -432,10 +456,10 @@ func (tb *testbed) rpcTestbedInvoke() rpcserver.RPCHandler {
 
 func (tb *testbed) rpcTestbedPrepare() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod1(func(ctx context.Context,
-		invocation TransactionInput,
+		invocation pldapi.TransactionInput,
 	) (*TransactionResult, error) {
 
-		psc, tx, err := tb.newPrivateTransaction(ctx, invocation, prototk.TransactionSpecification_PREPARE_TRANSACTION)
+		psc, tx, err := tb.newPrivateTransaction(ctx, &invocation, prototk.TransactionSpecification_PREPARE_TRANSACTION)
 		if err != nil {
 			return nil, err
 		}
@@ -463,7 +487,7 @@ func (tb *testbed) rpcResolveVerifier() rpcserver.RPCHandler {
 
 func (tb *testbed) rpcTestbedCall() rpcserver.RPCHandler {
 	return rpcserver.RPCMethod2(func(ctx context.Context,
-		invocation TransactionInput,
+		invocation *pldapi.TransactionInput,
 		dataFormat tktypes.JSONFormatOptions,
 	) (tktypes.RawJSON, error) {
 		psc, tx, err := tb.newPrivateTransaction(ctx, invocation, prototk.TransactionSpecification_CALL)
