@@ -237,6 +237,8 @@ public class BondTest {
                     bondTransfer.preparedTransaction().abi().getFirst(),
                     bondTransfer.preparedTransaction().data()
             );
+            assertEquals("public", bondTransfer2.preparedTransaction().type());
+            var bondTransferMetadata = mapper.convertValue(bondTransfer2.preparedMetadata(), PenteHelper.PenteTransitionMetadata.class);
 
             // Prepare the payment transfer
             var paymentTransfer = notoCash.prepareTransfer(alice, bondCustodian, 1000);
@@ -244,7 +246,7 @@ public class BondTest {
             var paymentMetadata = mapper.convertValue(paymentTransfer.preparedMetadata(), NotoHelper.NotoTransferMetadata.class);
 
             // Pass the prepared transfers to the subscription contract
-            bondSubscription.prepareBond(bondCustodian, bondTransfer2.preparedTransaction().to(), bondTransfer2.encodedCall());
+            bondSubscription.prepareBond(bondCustodian, bondTransfer2.preparedTransaction().to(), bondTransferMetadata.transitionWithApproval().encodedCall());
             bondSubscription.preparePayment(alice, paymentTransfer.preparedTransaction().to(), paymentMetadata.transferWithApproval().encodedCall());
 
             // Alice approves payment transfer
@@ -255,11 +257,14 @@ public class BondTest {
                     paymentMetadata.approvalParams().data(),
                     aliceCustodianInstance.address());
 
-            // TODO: custodian should need to approve either Noto or Pente for the bond transfer
-            // Currently the encoded call that is returned is a fully endorsed Pente/BondTracker onTransfer(),
-            // which will in turn call Noto with a fully endorsed transfer().
-            // Either the Pente call needs to require approval, or the Noto call needs to be transferWithApproval()
-            // so that it requires approval.
+            // Custodian approves bond transfer
+            issuerCustodianInstance.approveTransition(
+                    bondCustodian,
+                    JsonHex.randomBytes32(),
+                    aliceCustodianInstance.address(),
+                    bondTransferMetadata.approvalParams().transitionHash(),
+                    bondTransferMetadata.approvalParams().signatures());
+            Thread.sleep(3000); // TODO: wait for transaction receipt
 
             // Alice receives full bond distribution
             bondSubscription.distribute(bondCustodian, 1000);

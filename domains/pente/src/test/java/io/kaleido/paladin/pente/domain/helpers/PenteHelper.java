@@ -17,6 +17,7 @@ package io.kaleido.paladin.pente.domain.helpers;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaleido.paladin.pente.domain.PenteConfiguration;
 import io.kaleido.paladin.testbed.Testbed;
@@ -43,9 +44,38 @@ public class PenteHelper {
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ApproveExtraParams(
+            @JsonProperty
+            JsonHex.Bytes32 transitionHash,
+            @JsonProperty
+            List<JsonHex.Bytes> signatures
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PublicTransaction(
+            @JsonProperty
+            JsonABI.Entry functionABI,
+            @JsonProperty
+            JsonNode paramsJSON,
+            @JsonProperty
+            JsonHex.Bytes encodedCall
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PenteTransitionMetadata(
+            @JsonProperty
+            ApproveExtraParams approvalParams,
+            @JsonProperty
+            PublicTransaction transitionWithApproval
+    ) {
+    }
+
     public static PenteHelper newPrivacyGroup(String domainName, String from, Testbed testbed, PenteConfiguration.GroupTupleJSON groupInfo, boolean externalCallsEnabled) throws IOException {
         String address = testbed.getRpcClient().request("testbed_deploy",
-                domainName, from, 
+                domainName, from,
                 new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
                         groupInfo,
                         "shanghai",
@@ -173,5 +203,33 @@ public class PenteHelper {
                         inputs,
                         new JsonABI(List.of(fn)),
                         "")));
+    }
+
+    public void approveTransition(String sender, JsonHex.Bytes32 txID, String delegate, JsonHex.Bytes32 transitionHash, List<JsonHex.Bytes> signatures) throws IOException {
+        JsonABI.Entry fn = JsonABI.newFunction(
+                "approveTransition",
+                JsonABI.newParameters(
+                        JsonABI.newParameter("txId", "bytes32"),
+                        JsonABI.newParameter("delegate", "address"),
+                        JsonABI.newParameter("transitionHash", "bytes32"),
+                        JsonABI.newParameter("signatures", "bytes[]")
+                ),
+                JsonABI.newParameters()
+        );
+
+        testbed.getRpcClient().request("ptx_sendTransaction",
+                new Testbed.TransactionInput(
+                        "public",
+                        "",
+                        sender,
+                        JsonHex.addressFrom(address),
+                        new HashMap<>() {{
+                            put("txId", txID);
+                            put("delegate", delegate);
+                            put("transitionHash", transitionHash);
+                            put("signatures", signatures);
+                        }},
+                        new JsonABI(List.of(fn)),
+                        ""));
     }
 }
