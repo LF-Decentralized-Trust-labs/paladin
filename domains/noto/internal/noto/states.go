@@ -106,7 +106,8 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
 			Sort(".created").
-			Equal("owner", owner.String())
+			Equal("owner", owner.String()).
+			Equal("locked", false)
 
 		if lastStateTimestamp > 0 {
 			queryBuilder.GreaterThan(".created", lastStateTimestamp)

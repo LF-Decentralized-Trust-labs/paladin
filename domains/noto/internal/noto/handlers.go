@@ -42,6 +42,8 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &burnHandler{noto: n}
 	case "approveTransfer":
 		return &approveHandler{noto: n}
+	case "lockTransfer":
+		return &lockTransferHandler{noto: n}
 	default:
 		return nil
 	}
