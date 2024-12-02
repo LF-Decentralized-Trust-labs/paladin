@@ -205,7 +205,7 @@ public class PenteHelper {
                         "")));
     }
 
-    public void approveTransition(String sender, JsonHex.Bytes32 txID, String delegate, JsonHex.Bytes32 transitionHash, List<JsonHex.Bytes> signatures) throws IOException {
+    public void approveTransition(String sender, JsonHex.Bytes32 txID, JsonHex.Address delegate, JsonHex.Bytes32 transitionHash, List<JsonHex.Bytes> signatures) throws IOException {
         JsonABI.Entry fn = JsonABI.newFunction(
                 "approveTransition",
                 JsonABI.newParameters(

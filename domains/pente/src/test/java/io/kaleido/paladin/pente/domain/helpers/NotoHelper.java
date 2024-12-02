@@ -81,7 +81,7 @@ public class NotoHelper {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record NotoPublicTransaction(
+    public record PublicTransaction(
             @JsonProperty
             JsonABI.Entry functionABI,
             @JsonProperty
@@ -96,7 +96,7 @@ public class NotoHelper {
             @JsonProperty
             ApproveExtraParams approvalParams,
             @JsonProperty
-            NotoPublicTransaction transferWithApproval
+            PublicTransaction transferWithApproval
     ) {
     }
 

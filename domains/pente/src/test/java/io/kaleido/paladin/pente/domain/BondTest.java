@@ -138,6 +138,21 @@ public class BondTest {
                     "contracts/shared/BondTrackerPublic.sol/BondTrackerPublic.json",
                     "abi"
             );
+            String atomFactoryBytecode = ResourceLoader.jsonResourceEntryText(
+                    this.getClass().getClassLoader(),
+                    "contracts/shared/Atom.sol/AtomFactory.json",
+                    "bytecode"
+            );
+            JsonABI atomFactoryABI = JsonABI.fromJSONResourceEntry(
+                    this.getClass().getClassLoader(),
+                    "contracts/shared/Atom.sol/AtomFactory.json",
+                    "abi"
+            );
+            JsonABI atomABI = JsonABI.fromJSONResourceEntry(
+                    this.getClass().getClassLoader(),
+                    "contracts/shared/Atom.sol/Atom.json",
+                    "abi"
+            );
 
             GroupTupleJSON issuerCustodianGroup = new GroupTupleJSON(
                     JsonHex.randomBytes32(), new String[]{bondIssuer, bondCustodian});
@@ -218,12 +233,20 @@ public class BondTest {
             var investorRegistry = bondTracker.investorRegistry(bondCustodian);
             investorRegistry.addInvestor(bondCustodian, aliceAddress);
 
+            // Create the atom factory on the base ledger
+            String atomFactoryAddress = testbed.getRpcClient().request("testbed_deployBytecode",
+                    "issuer",
+                    atomFactoryABI,
+                    atomFactoryBytecode,
+                    new HashMap<String, String>());
+
             // Alice deploys BondSubscription to the alice/custodian privacy group, to request subscription
             // TODO: if Alice deploys, how can custodian trust it's the correct logic?
             var bondSubscription = BondSubscriptionHelper.deploy(aliceCustodianInstance, alice, new HashMap<>() {{
                 put("bondAddress_", notoBond.address());
                 put("units_", 1000);
                 put("custodian_", custodianAddress);
+                put("atomFactory_", atomFactoryAddress);
             }});
 
             // Prepare the bond transfer (requires 2 calls to prepare, as the Noto transaction spawns a Pente transaction to wrap it)
@@ -249,25 +272,51 @@ public class BondTest {
             bondSubscription.prepareBond(bondCustodian, bondTransfer2.preparedTransaction().to(), bondTransferMetadata.transitionWithApproval().encodedCall());
             bondSubscription.preparePayment(alice, paymentTransfer.preparedTransaction().to(), paymentMetadata.transferWithApproval().encodedCall());
 
+            // Alice receives full bond distribution
+            bondSubscription.distribute(bondCustodian, 1000);
+
+            // Look up the deployed Atom
+            // TODO: use the AtomDeployed event instead of this method
+            HashMap<String, Object> queryResult = testbed.getRpcClient().request("ptx_call",
+                    new Testbed.TransactionInput(
+                            "public",
+                            "",
+                            bondCustodian,
+                            JsonHex.addressFrom(atomFactoryAddress),
+                            new HashMap<>(),
+                            atomFactoryABI,
+                            "lastDeploy"));
+            var atomAddress = JsonHex.addressFrom(queryResult.get("0").toString());
+
             // Alice approves payment transfer
             notoCash.approveTransfer(
                     "alice",
                     paymentTransfer.inputStates(),
                     paymentTransfer.outputStates(),
                     paymentMetadata.approvalParams().data(),
-                    aliceCustodianInstance.address());
+                    atomAddress.toString());
 
             // Custodian approves bond transfer
             issuerCustodianInstance.approveTransition(
                     bondCustodian,
                     JsonHex.randomBytes32(),
-                    aliceCustodianInstance.address(),
+                    atomAddress,
                     bondTransferMetadata.approvalParams().transitionHash(),
                     bondTransferMetadata.approvalParams().signatures());
             Thread.sleep(3000); // TODO: wait for transaction receipt
 
-            // Alice receives full bond distribution
-            bondSubscription.distribute(bondCustodian, 1000);
+            // Execute the Atom
+            testbed.getRpcClient().request("ptx_sendTransaction",
+                    new Testbed.TransactionInput(
+                            "public",
+                            "",
+                            bondCustodian,
+                            atomAddress,
+                            new HashMap<>(),
+                            atomABI,
+                            "execute"
+                    ));
+            Thread.sleep(3000); // TODO: wait for transaction receipt
 
             // TODO: figure out how to test negative cases (such as when Pente reverts due to a non-allowed investor)
 

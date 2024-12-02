@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../domains/interfaces/INoto.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {INoto} from "../domains/interfaces/INoto.sol";
 
 contract Atom is Initializable {
     uint256 private _operationCount;
@@ -66,6 +66,7 @@ contract Atom is Initializable {
 
 contract AtomFactory {
     address public immutable logic;
+    address public lastDeploy; // TODO: remove and listen to AtomDeployed
 
     event AtomDeployed(address addr);
 
@@ -84,6 +85,7 @@ contract AtomFactory {
         address addr = address(
             new ERC1967Proxy(logic, _initializationCalldata)
         );
+        lastDeploy = addr;
         emit AtomDeployed(addr);
     }
 }
