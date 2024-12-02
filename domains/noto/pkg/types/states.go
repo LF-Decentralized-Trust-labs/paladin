@@ -31,6 +31,7 @@ type NotoCoin struct {
 	Salt   string              `json:"salt"`
 	Owner  *tktypes.EthAddress `json:"owner"`
 	Amount *tktypes.HexUint256 `json:"amount"`
+	Locked bool                `json:"locked"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -40,6 +41,7 @@ var NotoCoinABI = &abi.Parameter{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "owner", Type: "string", Indexed: true},
 		{Name: "amount", Type: "uint256", Indexed: true},
+		{Name: "locked", Type: "bool", Indexed: true},
 	},
 }
 

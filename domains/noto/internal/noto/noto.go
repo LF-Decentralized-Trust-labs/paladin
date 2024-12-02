@@ -62,6 +62,8 @@ type Noto struct {
 	contractABI       abi.ABI
 	transferSignature string
 	approvedSignature string
+	lockSignature     string
+	unlockSignature   string
 }
 
 type NotoDeployParams struct {
@@ -91,6 +93,21 @@ type NotoApproveTransferParams struct {
 	Data      tktypes.HexBytes    `json:"data"`
 }
 
+type LockInput struct {
+	ReleaseOutput string `json:"releaseOutput"`
+	RevertOutput  string `json:"revertOutput"`
+	Delegate      string `json:"delegate"`
+}
+
+type NotoTransferAndLockParams struct {
+	Inputs          []string         `json:"inputs"`
+	UnlockedOutputs []string         `json:"unlockedOutputs"`
+	LockedOutput    string           `json:"lockedOutput"`
+	Lock            LockInput        `json:"lock"`
+	Signature       tktypes.HexBytes `json:"signature"`
+	Data            tktypes.HexBytes `json:"data"`
+}
+
 type NotoTransfer_Event struct {
 	Inputs    []tktypes.Bytes32 `json:"inputs"`
 	Outputs   []tktypes.Bytes32 `json:"outputs"`
@@ -103,6 +120,19 @@ type NotoApproved_Event struct {
 	TXHash    tktypes.Bytes32    `json:"txhash"`
 	Signature tktypes.HexBytes   `json:"signature"`
 	Data      tktypes.HexBytes   `json:"data"`
+}
+
+type NotoLock_Event struct {
+	Locked    tktypes.Bytes32  `json:"locked"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
+}
+
+type NotoUnlock_Event struct {
+	Locked    tktypes.Bytes32  `json:"locked"`
+	Output    tktypes.Bytes32  `json:"output"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
 }
 
 type gatheredCoins struct {
@@ -149,6 +179,14 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 		return nil, err
 	}
 	n.approvedSignature, err = getEventSignature(ctx, contract.ABI, "NotoApproved")
+	if err != nil {
+		return nil, err
+	}
+	n.lockSignature, err = getEventSignature(ctx, contract.ABI, "NotoLock")
+	if err != nil {
+		return nil, err
+	}
+	n.unlockSignature, err = getEventSignature(ctx, contract.ABI, "NotoUnlock")
 	if err != nil {
 		return nil, err
 	}
@@ -538,6 +576,19 @@ func (n *Noto) parseStatesFromEvent(txID tktypes.Bytes32, states []tktypes.Bytes
 	return refs
 }
 
+func (n *Noto) recordTransactionInfo(ev *prototk.OnChainEvent, txData *types.NotoTransactionData_V0, res *prototk.HandleEventBatchResponse) {
+	res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
+		TransactionId: txData.TransactionID.String(),
+		Location:      ev.Location,
+	})
+	for _, state := range txData.InfoStates {
+		res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
+			Id:            state.String(),
+			TransactionId: txData.TransactionID.String(),
+		})
+	}
+}
+
 func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
 	var res prototk.HandleEventBatchResponse
 	for _, ev := range req.Events {
@@ -549,18 +600,9 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				if err != nil {
 					return nil, err
 				}
-				res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-					TransactionId: txData.TransactionID.String(),
-					Location:      ev.Location,
-				})
+				n.recordTransactionInfo(ev, txData, &res)
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Inputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
-				for _, state := range txData.InfoStates {
-					res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
-						Id:            state.String(),
-						TransactionId: txData.TransactionID.String(),
-					})
-				}
 			}
 
 		case n.approvedSignature:
@@ -570,16 +612,30 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				if err != nil {
 					return nil, err
 				}
-				res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
-					TransactionId: txData.TransactionID.String(),
-					Location:      ev.Location,
-				})
-				for _, state := range txData.InfoStates {
-					res.InfoStates = append(res.InfoStates, &prototk.StateUpdate{
-						Id:            state.String(),
-						TransactionId: txData.TransactionID.String(),
-					})
+				n.recordTransactionInfo(ev, txData, &res)
+			}
+
+		case n.lockSignature:
+			var lock NotoLock_Event
+			if err := json.Unmarshal([]byte(ev.DataJson), &lock); err == nil {
+				txData, err := n.decodeTransactionData(ctx, lock.Data)
+				if err != nil {
+					return nil, err
 				}
+				n.recordTransactionInfo(ev, txData, &res)
+				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{lock.Locked})...)
+			}
+
+		case n.unlockSignature:
+			var unlock NotoUnlock_Event
+			if err := json.Unmarshal([]byte(ev.DataJson), &unlock); err == nil {
+				txData, err := n.decodeTransactionData(ctx, unlock.Data)
+				if err != nil {
+					return nil, err
+				}
+				n.recordTransactionInfo(ev, txData, &res)
+				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Locked})...)
+				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Output})...)
 			}
 		}
 	}

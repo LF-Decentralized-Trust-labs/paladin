@@ -410,3 +410,122 @@ func TestNotoApprove(t *testing.T) {
 	assert.NoError(t, err)
 	log.L(ctx).Infof("Claimed with transaction: %s", receipt.TransactionHash)
 }
+
+func TestNotoLock(t *testing.T) {
+	ctx := context.Background()
+	log.L(ctx).Infof("TestNoto")
+	domainName := "noto_" + tktypes.RandHex(8)
+	log.L(ctx).Infof("Domain name = %s", domainName)
+
+	hdWalletSeed := testbed.HDWalletSeedScopedToTest()
+
+	log.L(ctx).Infof("Deploying Noto factory")
+	contractSource := map[string][]byte{
+		"factory": notoFactoryJSON,
+	}
+	contracts := deployContracts(ctx, t, hdWalletSeed, contractSource)
+	for name, address := range contracts {
+		log.L(ctx).Infof("%s deployed to %s", name, address)
+	}
+
+	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
+		FactoryAddress: contracts["factory"],
+	})
+	done, tb, rpc := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
+		domainName: notoTestbed,
+	})
+	defer done()
+
+	notaryKey, err := tb.ResolveKey(ctx, notaryName, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.NoError(t, err)
+	// recipient1Key, err := tb.ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	// require.NoError(t, err)
+	recipient2Key, err := tb.ResolveKey(ctx, recipient2Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
+	require.NoError(t, err)
+
+	log.L(ctx).Infof("Deploying an instance of Noto")
+	var notoAddress tktypes.EthAddress
+	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+		domainName, "me", &types.ConstructorParams{
+			Notary: notaryName,
+		})
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
+
+	log.L(ctx).Infof("Mint 100 from notary to notary")
+	var invokeResult testbed.TransactionResult
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     notaryName,
+			To:       &notoAddress,
+			Function: "mint",
+			Data: toJSON(t, &types.MintParams{
+				To:     notaryName,
+				Amount: tktypes.Int64ToInt256(100),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	coins := findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
+	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
+
+	log.L(ctx).Infof("Lock a transfer of 50 from notary to recipient1")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     notaryName,
+			To:       &notoAddress,
+			Function: "lockTransfer",
+			Data: toJSON(t, &types.LockTransferParams{
+				To:     recipient1Name,
+				Amount: tktypes.Int64ToInt256(50),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 2)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
+	assert.True(t, coins[0].Data.Locked)
+	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
+	assert.Equal(t, notaryKey.Verifier.Verifier, coins[1].Data.Owner.String())
+	assert.False(t, coins[1].Data.Locked)
+
+	log.L(ctx).Infof("Transfer 50 from notary to recipient2 (succeeds but does not use locked state)")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     notaryName,
+			To:       &notoAddress,
+			Function: "transfer",
+			Data: toJSON(t, &types.TransferParams{
+				To:     recipient2Name,
+				Amount: tktypes.Int64ToInt256(50),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 2)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
+	assert.True(t, coins[0].Data.Locked)
+	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
+	assert.False(t, coins[1].Data.Locked)
+}

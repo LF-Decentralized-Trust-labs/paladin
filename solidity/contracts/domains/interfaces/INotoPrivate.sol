@@ -31,6 +31,12 @@ interface INotoPrivate {
         address delegate
     ) external;
 
+    function lockTransfer(
+        string calldata to,
+        uint256 amount,
+        bytes calldata data
+    ) external;
+
     struct StateEncoded {
         bytes id;
         string domain;

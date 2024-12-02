@@ -26,12 +26,27 @@ import {INoto} from "../interfaces/INoto.sol";
 contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     address _notary;
     mapping(bytes32 => bool) private _unspent;
+    mapping(bytes32 => LockDetail) private _locks;
     mapping(bytes32 => address) private _approvals;
 
     error NotoInvalidInput(bytes32 id);
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
+
+    struct LockDetail {
+        bytes32 releaseOutput;
+        bytes32 revertOutput;
+        address delegate;
+        LockStatus status;
+    }
+
+    enum LockStatus {
+        UNINITIALIZED,
+        INITIALIZED,
+        RELEASED,
+        REVERTED
+    }
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V0 = 0x00010000;
@@ -70,11 +85,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         __EIP712_init("noto", "0.0.1");
         _notary = notaryAddress;
 
-        return _encodeConfig(NotoConfig_V0({
-            notaryAddress: notaryAddress,
-            data: data,
-            variant: NotoVariantDefault
-        }));
+        return
+            _encodeConfig(
+                NotoConfig_V0({
+                    notaryAddress: notaryAddress,
+                    data: data,
+                    variant: NotoVariantDefault
+                })
+            );
     }
 
     function _encodeConfig(
@@ -97,6 +115,15 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      */
     function isUnspent(bytes32 id) public view returns (bool unspent) {
         return _unspent[id];
+    }
+
+    /**
+     * @dev query whether a TXO is currently in the locked list
+     * @param id the UTXO identifier
+     * @return unspent true or false depending on whether the identifier is in the unspent map
+     */
+    function isLocked(bytes32 id) public view returns (bool unspent) {
+        return _locks[id].status != LockStatus.UNINITIALIZED;
     }
 
     /**
@@ -252,5 +279,74 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
             )
         );
         return _hashTypedDataV4(structHash);
+    }
+
+    function createLock(
+        bytes32 lockedOutput,
+        LockInput calldata lock,
+        bytes calldata signature,
+        bytes calldata data
+    ) public virtual override onlyNotary {
+        _locks[lockedOutput] = LockDetail({
+            releaseOutput: lock.releaseOutput,
+            revertOutput: lock.revertOutput,
+            delegate: lock.delegate,
+            status: LockStatus.INITIALIZED
+        });
+        emit NotoLock(lockedOutput, signature, data);
+    }
+
+    function releaseLock(bytes32 locked) external virtual override {
+        LockDetail memory lock = _locks[locked];
+        require(lock.delegate == msg.sender, "Caller is not lock delegate");
+        lock.status = LockStatus.RELEASED;
+    }
+
+    function revertLock(bytes32 locked) external virtual override {
+        LockDetail memory lock = _locks[locked];
+        require(lock.delegate == msg.sender, "Caller is not lock delegate");
+        lock.status = LockStatus.REVERTED;
+    }
+
+    function delegateLock(
+        bytes32 locked,
+        address delegate
+    ) external virtual override {
+        LockDetail memory lock = _locks[locked];
+        require(lock.delegate == msg.sender, "Caller is not lock delegate");
+        lock.delegate = delegate;
+    }
+
+    function unlock(
+        bytes32 locked,
+        bytes calldata signature,
+        bytes calldata data
+    ) external virtual override onlyNotary {
+        LockDetail memory lock = _locks[locked];
+        bytes32[] memory outputs = new bytes32[](1);
+
+        if (lock.status == LockStatus.RELEASED) {
+            outputs[0] = lock.releaseOutput;
+        } else if (lock.status == LockStatus.REVERTED) {
+            outputs[0] = lock.revertOutput;
+        } else {
+            revert("Cannot unlock");
+        }
+
+        _checkOutputs(outputs);
+        delete _locks[locked];
+        emit NotoUnlock(locked, outputs[0], signature, data);
+    }
+
+    function transferAndLock(
+        bytes32[] calldata inputs,
+        bytes32[] calldata unlockedOutputs,
+        bytes32 lockedOutput,
+        LockInput calldata lock,
+        bytes calldata signature,
+        bytes calldata data
+    ) external virtual override onlyNotary {
+        _transfer(inputs, unlockedOutputs, signature, data);
+        createLock(lockedOutput, lock, signature, data);
     }
 }
