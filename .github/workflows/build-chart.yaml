@@ -73,19 +73,19 @@ jobs:
           path: /tmp # download all docker images to /tmp
           pattern: paladin-*
           merge-multiple: true
-      
+
       - name: Load image
         run: |
           docker load --input /tmp/paladin-operator-${{ github.sha }}.tar
           docker load --input /tmp/paladin-${{ github.sha }}.tar
           docker image ls -a  
-      
+        
       # The makefile uses kustomize
       - uses: imranismail/setup-kustomize@v2
 
-      - name: Deploy Operator
+      - name: E2E Test
         run: |
-          ./gradlew deploy \
+          ./gradlew --no-daemon --parallel e2e \
             -PclusterName=${{ env.CLUSTER_NAME }} \
             -Pnamespace=${{ env.NAMESPACE }} \
             -PbuildOperator=${{ inputs.build-operator }} \
@@ -93,11 +93,63 @@ jobs:
             -PoperatorImageName=${{ inputs.operator-image }} \
             -PoperatorImageTag=${{ inputs.operator-image-tag }} \
             -PpaladinImageName=${{ inputs.paladin-image }} \
-            -PpaladinImageTag=${{ inputs.paladin-image-tag }} 
+            -PpaladinImageTag=${{ inputs.paladin-image-tag }} \
+            -PdeleteCluster=false
 
-      - name: Uninstall Operator
+      - name: Save logs
+        if: failure()
         run: |
-          ./gradlew clean \
-            -PclusterName=${{ env.CLUSTER_NAME }} \
-            -Pnamespace=${{ env.NAMESPACE }} \
-            -PdeleteCluster=true
+          kubectl logs deployment/paladin-operator -n ${{ env.NAMESPACE }} > operator.log
+          kubectl logs statefulset/paladin-node1 -n ${{ env.NAMESPACE }} > sfs-paladin-1.log
+          kubectl logs statefulset/paladin-node2 -n ${{ env.NAMESPACE }} > sfs-paladin-2.log
+          kubectl logs statefulset/paladin-node3 -n ${{ env.NAMESPACE }} > sfs-paladin-3.log
+          kubectl logs statefulset/besu-node1 -n ${{ env.NAMESPACE }} > sfs-besu-1.log
+          kubectl logs statefulset/besu-node2 -n ${{ env.NAMESPACE }} > sfs-besu-2.log
+          kubectl logs statefulset/besu-node3 -n ${{ env.NAMESPACE }} > sfs-besu-3.log
+          kubectl get paladin node1 -n ${{ env.NAMESPACE }} -o json > crd-paladin-1.json
+          kubectl get paladin node2 -n ${{ env.NAMESPACE }} -o json > crd-paladin-2.json
+          kubectl get paladin node3 -n ${{ env.NAMESPACE }} -o json > crd-paladin-3.json
+          kubectl get cm paladin-node1 -n ${{ env.NAMESPACE }} -o json > cm-1.json
+          kubectl get cm paladin-node2 -n ${{ env.NAMESPACE }} -o json > cm-2.json
+          kubectl get cm paladin-node3 -n ${{ env.NAMESPACE }} -o json > cm-3.json
+
+
+      - name: Port-forward pprof endpoints
+        if: failure()
+        run: |
+          for i in 1 2 3; do
+            POD_NAME="paladin-node$i-0"
+            echo "Port-forwarding $POD_NAME on port $((6060 + i))"
+            kubectl port-forward pod/$POD_NAME $((6060 + i)):6060 -n ${{ env.NAMESPACE }} &
+          done
+          
+          sleep 10
+
+          for i in 1 2 3; do
+            POD_NAME="paladin-node$i-0"
+            curl "http://localhost:$((6060 + i))/debug/pprof/goroutine?debug=2" > goroutine_dump_node$i.txt
+          done
+ 
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paladin-logs
+          path: |
+            operator.log
+            sfs-paladin-1.log
+            sfs-paladin-2.log
+            sfs-paladin-3.log
+            sfs-besu-1.log
+            sfs-besu-2.log
+            sfs-besu-3.log
+            crd-paladin-1.json
+            crd-paladin-2.json
+            crd-paladin-3.json
+            cm-1.json
+            cm-2.json
+            cm-3.json
+            goroutine_dump_node1.txt
+            goroutine_dump_node2.txt
+            goroutine_dump_node3.txt
+            

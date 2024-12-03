@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -73,10 +74,12 @@ func ParseHTTPConfig(ctx context.Context, config *pldconf.HTTPClientConfig) (*re
 	restyConf := ffresty.Config{
 		URL: u.String(),
 		HTTPConfig: ffresty.HTTPConfig{
-			HTTPHeaders:     config.HTTPHeaders,
-			AuthUsername:    config.Auth.Username,
-			AuthPassword:    config.Auth.Password,
-			TLSClientConfig: tlsConfig,
+			HTTPHeaders:           config.HTTPHeaders,
+			AuthUsername:          config.Auth.Username,
+			AuthPassword:          config.Auth.Password,
+			TLSClientConfig:       tlsConfig,
+			HTTPRequestTimeout:    fftypes.FFDuration(confutil.DurationMin(config.RequestTimeout, 0, *pldconf.DefaultHTTPConfig.RequestTimeout)),
+			HTTPConnectionTimeout: fftypes.FFDuration(confutil.DurationMin(config.ConnectionTimeout, 0, *pldconf.DefaultHTTPConfig.ConnectionTimeout)),
 		},
 	}
 	return ffresty.NewWithConfig(ctx, restyConf), nil

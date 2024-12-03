@@ -25,6 +25,7 @@ import (
 
 // The gRPC stream connected to by domain plugins
 func (pm *pluginManager) ConnectDomain(stream prototk.PluginController_ConnectDomainServer) error {
+	pm.initMux.Lock()
 	handler := newPluginHandler(pm, prototk.PluginInfo_DOMAIN, pm.domainPlugins, stream,
 		&plugintk.DomainMessageWrapper{},
 		func(plugin *plugin[prototk.DomainMessage], toPlugin managerToPlugin[prototk.DomainMessage]) (pluginToManager pluginToManager[prototk.DomainMessage], err error) {
@@ -41,6 +42,8 @@ func (pm *pluginManager) ConnectDomain(stream prototk.PluginController_ConnectDo
 			}
 			return br, nil
 		})
+	pm.initMux.Unlock()
+
 	return handler.serve()
 }
 

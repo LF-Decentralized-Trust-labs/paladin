@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -53,6 +54,8 @@ func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ *rpcSer
 		rpcModules:    make(map[string]*RPCModule),
 	}
 
+	s.setNotReady()
+
 	// Add the HTTP server
 	if !conf.HTTP.Disabled {
 		r, err := router.NewRouter(s.bgCtx, "JSON/RPC (HTTP)", &conf.HTTP.HTTPServerConfig)
@@ -68,6 +71,9 @@ func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ *rpcSer
 			server := staticserver.NewStaticServer(s)
 			r.PathPrefixHandleFunc(s.URLPath, server.HTTPHandler)
 		}
+
+		// Add the readiness handler
+		r.HandleFunc("/readiness", s.readinessHandler)
 
 		// Add the JSON RPC main handler to the root path
 		r.HandleFunc("/", s.httpHandler)
@@ -94,6 +100,7 @@ func NewRPCServer(ctx context.Context, conf *pldconf.RPCServerConfig) (_ *rpcSer
 var _ RPCServer = &rpcServer{}
 
 type rpcServer struct {
+	isReady       int32
 	bgCtx         context.Context
 	httpServer    httpserver.Server
 	wsServer      httpserver.Server
@@ -161,10 +168,14 @@ func (s *rpcServer) Start() (err error) {
 	if err == nil && s.wsServer != nil {
 		err = s.wsServer.Start()
 	}
+	if err == nil {
+		s.setReady()
+	}
 	return err
 }
 
 func (s *rpcServer) Stop() {
+	s.setNotReady()
 	wg := new(sync.WaitGroup)
 	if s.httpServer != nil {
 		wg.Add(1)
@@ -181,4 +192,23 @@ func (s *rpcServer) Stop() {
 		}()
 	}
 	wg.Wait()
+}
+
+func (s *rpcServer) readinessHandler(w http.ResponseWriter, r *http.Request) {
+	if atomic.LoadInt32(&s.isReady) == 1 {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+		return
+	}
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte("Not Ready"))
+
+}
+
+func (s *rpcServer) setReady() {
+	atomic.StoreInt32(&s.isReady, 1)
+}
+
+func (s *rpcServer) setNotReady() {
+	atomic.StoreInt32(&s.isReady, 0)
 }

@@ -82,12 +82,42 @@ func (r *PaladinRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
+func (r *PaladinRegistryReconciler) reconcileSmartContractDeployment(ctx context.Context, obj client.Object) []ctrl.Request {
+	scd, ok := obj.(*corev1alpha1.SmartContractDeployment)
+	if !ok {
+		log.FromContext(ctx).Error(fmt.Errorf("unexpected object type"), "expected SmartContractDeployment")
+		return nil
+	}
+
+	if scd.Status.TransactionStatus != corev1alpha1.TransactionStatusSuccess {
+		return nil
+	}
+
+	regs := &corev1alpha1.PaladinRegistryList{}
+	r.Client.List(ctx, regs, client.InNamespace(scd.Namespace))
+	reqs := make([]ctrl.Request, 0, len(regs.Items))
+
+	for _, reg := range regs.Items {
+		if reg.Spec.EVM.ContractAddress != "" {
+			if reg.Spec.EVM.ContractAddress != scd.Status.ContractAddress {
+				continue
+			}
+		} else {
+			if reg.Spec.EVM.SmartContractDeployment != scd.Name {
+				continue
+			}
+		}
+		reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&reg)})
+	}
+	return reqs
+}
+
 func (r *PaladinRegistryReconciler) updateStatusAndRequeue(ctx context.Context, reg *corev1alpha1.PaladinRegistry) (ctrl.Result, error) {
-	if err := r.Status().Update(ctx, reg); err != nil {
+	if err := r.Status().Update(ctx, reg); err != nil && !errors.IsConflict(err) {
 		log.FromContext(ctx).Error(err, "Failed to update Paladin registry status")
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{Requeue: true}, nil // Run again immediately to submit
+	return ctrl.Result{RequeueAfter: 50 * time.Millisecond}, nil // Run again immediately to submit
 }
 
 func (r *PaladinRegistryReconciler) trackContractDeploymentAndRequeue(ctx context.Context, reg *corev1alpha1.PaladinRegistry) (ctrl.Result, error) {
@@ -102,7 +132,7 @@ func (r *PaladinRegistryReconciler) trackContractDeploymentAndRequeue(ctx contex
 		return ctrl.Result{}, err
 	}
 	if scd.Status.ContractAddress == "" {
-		log.FromContext(ctx).Info(fmt.Sprintf("Waiting for successful deployment of smart contract deployment '%s'", scd.Name))
+		log.FromContext(ctx).Info(fmt.Sprintf("Registry: '%s'. Waiting for successful deployment of smart contract deployment '%s'", reg.Name, scd.Name))
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -116,9 +146,11 @@ func (r *PaladinRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.PaladinRegistry{}).
 		// Reconcile when any contract deployment changes status
+		// Watches(&corev1alpha1.SmartContractDeployment{}, handler.EnqueueRequestsFromMapFunc(r.reconcileSmartContractDeployment), reconcileEveryChange()).
 		Watches(&corev1alpha1.SmartContractDeployment{}, reconcileAll(PaladinRegistryCRMap, r.Client), reconcileEveryChange()).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 2,
+			MaxConcurrentReconciles: 3,
 		}).
+		// Watches(&corev1alpha1.SmartContractDeployment{}, handler.EnqueueRequestsFromMapFunc(r.reconcileSmartContractDeployment), reconcileEveryChange()).
 		Complete(r)
 }

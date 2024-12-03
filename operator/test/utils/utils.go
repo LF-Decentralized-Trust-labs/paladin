@@ -180,12 +180,12 @@ func (td *TestDeployer) DeploySmartContractDeploymentBytecode(ctx context.Contex
 
 	startTime := time.Now()
 	var txID uuid.UUID
-	if err = td.RPC.CallRPC(ctx, &txID, "ptx_sendTransaction", txIn); err != nil {
+	if err = td.RPC.CallRPC(context.Background(), &txID, "ptx_sendTransaction", txIn); err != nil {
 		return nil, err
 	}
 
 	for {
-		if err = td.RPC.CallRPC(ctx, &receipt, "ptx_getTransactionReceipt", txID); err != nil {
+		if err = td.RPC.CallRPC(context.Background(), &receipt, "ptx_getTransactionReceipt", txID); err != nil {
 			return nil, err
 		}
 		if receipt != nil {

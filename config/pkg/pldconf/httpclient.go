@@ -16,14 +16,25 @@
 
 package pldconf
 
+import (
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
+)
+
 type HTTPBasicAuthConfig struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 type HTTPClientConfig struct {
-	URL         string                 `json:"url"`
-	HTTPHeaders map[string]interface{} `json:"httpHeaders"`
-	Auth        HTTPBasicAuthConfig    `json:"auth"`
-	TLS         TLSConfig              `json:"tls"`
+	URL               string                 `json:"url"`
+	HTTPHeaders       map[string]interface{} `json:"httpHeaders"`
+	Auth              HTTPBasicAuthConfig    `json:"auth"`
+	TLS               TLSConfig              `json:"tls"`
+	RequestTimeout    *string                `json:"requestTimeout,omitempty"`
+	ConnectionTimeout *string                `json:"connectionTimeout,omitempty"`
+}
+
+var DefaultHTTPConfig = &HTTPClientConfig{
+	ConnectionTimeout: confutil.P("30s"),
+	RequestTimeout:    confutil.P("30s"),
 }

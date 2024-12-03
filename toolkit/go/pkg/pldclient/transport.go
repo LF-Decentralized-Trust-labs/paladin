@@ -24,6 +24,7 @@ type Transport interface {
 
 	NodeName(ctx context.Context) (nodeName string, err error)
 	LocalTransports(ctx context.Context) (transportNames []string, err error)
+	LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -44,6 +45,8 @@ var transportInfo = &rpcModuleInfo{
 		},
 	},
 }
+
+var _ Transport = &transport{}
 
 type transport struct {
 	*rpcModuleInfo
