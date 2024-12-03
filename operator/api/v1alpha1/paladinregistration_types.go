@@ -38,7 +38,7 @@ type PaladinRegistrationSpec struct {
 
 // PaladinRegistrationStatus defines the observed state of PaladinRegistration
 type PaladinRegistrationStatus struct {
-	PublishCount   int                              `json:"publishCount"`
+	PublishCount   int                              `json:"publishCount"` // Number of successfully published and registered transactions
 	RegistrationTx TransactionSubmission            `json:"registrationTx"`
 	PublishTxs     map[string]TransactionSubmission `json:"publishTxs"`
 }

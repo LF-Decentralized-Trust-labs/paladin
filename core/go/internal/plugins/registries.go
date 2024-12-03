@@ -25,6 +25,8 @@ import (
 
 // The gRPC stream connected to by Registry plugins
 func (pm *pluginManager) ConnectRegistry(stream prototk.PluginController_ConnectRegistryServer) error {
+	pm.initMux.Lock()
+
 	handler := newPluginHandler(pm, prototk.PluginInfo_REGISTRY, pm.registryPlugins, stream,
 		&plugintk.RegistryMessageWrapper{},
 		func(plugin *plugin[prototk.RegistryMessage], toPlugin managerToPlugin[prototk.RegistryMessage]) (pluginToManager pluginToManager[prototk.RegistryMessage], err error) {
@@ -41,6 +43,7 @@ func (pm *pluginManager) ConnectRegistry(stream prototk.PluginController_Connect
 			}
 			return br, nil
 		})
+	pm.initMux.Unlock()
 	return handler.serve()
 }
 

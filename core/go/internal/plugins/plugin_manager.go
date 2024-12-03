@@ -45,7 +45,8 @@ func MapLibraryTypeToProto(t tktypes.Enum[tktypes.LibraryType]) (prototk.PluginL
 type pluginManager struct {
 	prototk.UnimplementedPluginControllerServer
 	bgCtx    context.Context
-	mux      sync.Mutex
+	mux      *sync.Mutex
+	initMux  *sync.Mutex
 	listener net.Listener
 	server   *grpc.Server
 
@@ -83,14 +84,16 @@ func NewPluginManager(bgCtx context.Context,
 		loaderID:        loaderID,
 		shutdownTimeout: confutil.DurationMin(conf.GRPC.ShutdownTimeout, 0, *pldconf.DefaultGRPCConfig.ShutdownTimeout),
 
-		domainPlugins:    make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
-		transportPlugins: make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
-		registryPlugins:  make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
-
+		domainPlugins:        make(map[uuid.UUID]*plugin[prototk.DomainMessage]),
+		transportPlugins:     make(map[uuid.UUID]*plugin[prototk.TransportMessage]),
+		registryPlugins:      make(map[uuid.UUID]*plugin[prototk.RegistryMessage]),
 		serverDone:           make(chan error),
 		notifyPluginsUpdated: make(chan bool, 1),
 		notifySystemCommand:  make(chan prototk.PluginLoad_SysCommand, 1),
 		loadingProgressed:    make(chan *prototk.PluginLoadFailed, 1),
+
+		mux:     &sync.Mutex{},
+		initMux: &sync.Mutex{},
 	}
 	return pc
 }

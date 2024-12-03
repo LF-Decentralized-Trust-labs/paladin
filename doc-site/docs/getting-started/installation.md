@@ -155,9 +155,9 @@ kubectl get reg
 
 ```bash
 NAME    PUBLISHED
-node1   1
-node2   1
-node3   1
+node1   2
+node2   2
+node3   2
 ```
 
 </details>

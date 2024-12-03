@@ -54,6 +54,7 @@ ext {
     clusterName = project.hasProperty('clusterName') ? project.clusterName : 'paladin' 
     namespace = project.hasProperty('namespace') ? project.namespace : 'default' // Default namespace is 'default' 
     deleteCluster = project.hasProperty('deleteCluster') ? project.deleteCluster.toBoolean() : false // By default, do not delete the cluster
+    loadImages = project.hasProperty('loadImages') ? project.loadImages == 'true' : true // Default is to load images
     buildPaladin = project.hasProperty('buildPaladin') ? project.buildPaladin == 'true' : true // Default is to build Paladin
     buildOperator = project.hasProperty('buildOperator') ? project.buildOperator == 'true' : true // Default is to build the operator
 
@@ -66,10 +67,22 @@ ext {
 }
 
 def printClusterStatus(String namespace) {
-    def getAllCommand = ["kubectl", "get", "all", "-n", namespace]
+    def getAllCommand = ["kubectl", "get", "all,reg,scd,txn", "-n", namespace, "-o", "wide"]
     def getAllProcess = getAllCommand.execute()
     getAllProcess.waitFor()
     println getAllProcess.in.text.trim()
+
+    // Get the paladin-operator pod name by label
+    def getOperatorPodCommand = ["kubectl", "get", "pods", "-n", namespace, "-l", "app.kubernetes.io/name=paladin-operator", "-o", "jsonpath={.items[0].metadata.name}"]
+    def getOperatorPodProcess = getOperatorPodCommand.execute()
+    getOperatorPodProcess.waitFor()
+} 
+
+
+def restartOperator(String namespace) {
+    def restartCommand = ["kubectl", "rollout", "restart", "deployment", "paladin-operator", "-n", namespace]
+    def restart = restartCommand.execute()
+    restart.waitFor()
 } 
 
 def verifyResourceCreated(String namespace, String resourceType, String resourceName, String desiredReplicas = "1", int timeoutSeconds = 60) {
@@ -82,7 +95,6 @@ def verifyResourceCreated(String namespace, String resourceType, String resource
         def process = command.execute()
         process.waitFor()
         def readyReplicas = process.text.trim()
-        println "Current Ready Replicas: ${readyReplicas}"
 
         if (process.exitValue() == 0 && readyReplicas == desiredReplicas) {
             resourceReady = true
@@ -95,24 +107,104 @@ def verifyResourceCreated(String namespace, String resourceType, String resource
         printClusterStatus(namespace)
         throw new Exception("${resourceType} ${resourceName} in namespace ${namespace} did not become ready within ${timeoutSeconds} seconds.")
     } else {
-        println "${resourceType} ${resourceName} in namespace ${namespace} is ready with ${desiredReplicas} replicas."
+        println "${resourceType} ${resourceName} in namespace ${namespace} is ready with ${desiredReplicas} replicas. Time: ${((System.currentTimeMillis() - startTime) / 1000.0)} seconds."
     }
 }
+ 
+def waitForAllRegistriesPublished(String namespace, int timeoutSeconds = 240) {
+    def startTime = System.currentTimeMillis()
+    def endTime = startTime + (timeoutSeconds * 1000)
+    def allPublished = false
 
-def verifyResourceReady(String namespace, String resourceType, String resourceName, String condition, int timeoutSeconds = 60) {
+    while (System.currentTimeMillis() < endTime) {
+        def command = ["kubectl", "get", "reg", "-n", namespace]
+        def process = command.execute()
+        def output = new StringWriter()
+        process.consumeProcessOutput(output, System.err)
+        process.waitFor()
+        if (process.exitValue() != 0) {
+            println "Error executing kubectl get reg"
+            Thread.sleep(2000)
+            continue
+        }
 
-    // Wait for resource to meet expected condition
-    def waitCommand = ["kubectl", "wait", "--for=${condition}", "${resourceType}", "${resourceName}", "-n", namespace, "--timeout=${timeoutSeconds}s"]
-    def waitProcess = waitCommand.execute()
-    waitProcess.waitFor()
-    println "Wait Output: ${waitProcess.text}"
+        def lines = output.toString().split("\n")
+        if (lines.size() < 2) {
+            Thread.sleep(2000)
+            continue
+        }
 
-    if (waitProcess.exitValue() != 0) {
-        printClusterStatus(namespace)
-        throw new Exception("Resource ${resourceType}/${resourceName} (${namespace}) was not ready in the expected time.")
+        allPublished = true
+        lines.drop(1).each { line ->
+            def columns = line.trim().split(/\s+/)
+            if (columns.size() >= 2) {
+                def name = columns[0]
+                def published = columns[1]
+                if (published != "2") {
+                    allPublished = false
+                }
+            } else {
+                allPublished = false
+            }
+        }
+
+        if (allPublished) {
+            println "All nodes are published. Time: ${((System.currentTimeMillis() - startTime) / 1000.0)} seconds."
+            return
+        }
+        Thread.sleep(2000)
     }
     printClusterStatus(namespace)
+    throw new Exception("Not all nodes are published within ${timeoutSeconds} seconds.")
 }
+
+
+def waitForAllSuccess(String namespace, String kind, int timeoutSeconds = 180) {
+    def startTime = System.currentTimeMillis()
+    def endTime = startTime + (timeoutSeconds * 1000)
+    def allSuccess = false
+
+    while (System.currentTimeMillis() < endTime) {
+        def command = ["kubectl", "get", kind, "-n", namespace]
+        def process = command.execute()
+        def output = new StringWriter()
+        process.consumeProcessOutput(output, System.err)
+        process.waitFor()
+        if (process.exitValue() != 0) {
+            Thread.sleep(2000)
+            continue
+        }
+
+        def lines = output.toString().split("\n")
+        if (lines.size() < 2) {
+            Thread.sleep(2000)
+            continue
+        }
+
+        allSuccess = true
+        lines.drop(1).each { line ->
+            def columns = line.trim().split(/\s+/)
+            if (columns.size() >= 2) {
+                def name = columns[0]
+                def status = columns[1]
+                if (status != "Success") {
+                    allSuccess = false
+                }  
+            } else {
+                allSuccess = false
+            }
+        }
+
+        if (allSuccess) {
+            println "All ${kind} resources have status 'Success'. Time: ${((System.currentTimeMillis() - startTime) / 1000.0)} seconds."
+            return
+        }
+        Thread.sleep(2000)
+    }
+    printClusterStatus(namespace)
+    throw new Exception("Not all scd resources have status 'Success' within ${timeoutSeconds} seconds.")
+}
+
 
 task copySolidity(type: Copy) {
     inputs.files(configurations.contractCompile)
@@ -172,6 +264,8 @@ task buildPaladinImage {
 task docker(type: Exec) {
     executable 'make'
     args 'docker-build'
+    args "OPERATOR_IMAGE_NAME=${operatorImageName}"
+    args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
 }
 
 // Task to build the Paladin image from the parent project
@@ -187,22 +281,29 @@ task startKindCluster(type: Exec) {
 }
 
 // Task to load images into the Kind cluster
-task promoteKindImages(type: Exec, dependsOn: [
-    startKindCluster
-]) {
+task loadImages(type: Exec) {
+    executable 'make'
+        args 'kind-promote'
+        args "CLUSTER_NAME=${clusterName}"
+        args "OPERATOR_IMAGE_NAME=${operatorImageName}"
+        args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
+        args "PALADIN_IMAGE_NAME=${paladinImageName}"
+        args "PALADIN_IMAGE_TAG=${paladinImageTag}"
+}
+
+// Task to load images into the Kind cluster
+task promoteKindImages {
+    dependsOn startKindCluster
+
     if (buildPaladin) {
-        dependsOn buildPaladinImage
+        dependsOn 'buildPaladinImage'
     }
     if (buildOperator) {
-        dependsOn buildOperatorImage
+        dependsOn 'buildOperatorImage'
     }
-    executable 'make'
-    args 'kind-promote'
-    args "CLUSTER_NAME=${clusterName}"
-    args "OPERATOR_IMAGE_NAME=${operatorImageName}"
-    args "OPERATOR_IMAGE_TAG=${operatorImageTag}"
-    args "PALADIN_IMAGE_NAME=${paladinImageName}"
-    args "PALADIN_IMAGE_TAG=${paladinImageTag}"
+    if (loadImages) {
+        dependsOn 'loadImages'
+    }
 }
 
 task prepareCRDsChart(type: Exec) {
@@ -266,8 +367,38 @@ task verifyPaladin(dependsOn: verifyBesu) {
     }
 }
 
-// The 'deploy' runs the whole flow
-task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyPaladin]) {
+
+
+// Task to verify all scd resources have status 'Success'
+task verifyAllScdSuccess(dependsOn: verifyPaladin ) {
+    doLast {
+        println 'Verifying all scd resources have status "Success"...'
+        waitForAllSuccess(namespace, "scd", 240)
+    }
+}
+
+// Task to verify all txn resources have status 'Success'
+task verifyAllTxnSuccess(dependsOn: verifyAllScdSuccess ) {
+    doLast {
+        println 'Verifying all txn resources have status "Success"...'
+        waitForAllSuccess(namespace, "txn", 60)
+    }
+} 
+
+// Task to verify all nodes are published
+task verifyAllRegistriesPublished(dependsOn: verifyAllTxnSuccess) {
+    doLast {
+        // println 'Restarting the Operator...'
+        // restartOperator(namespace)
+
+        println 'Verifying all registries are published...'
+        waitForAllRegistriesPublished(namespace, 240)
+    }
+}
+
+
+// The 'deplay' runs the whole flow
+task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyAllRegistriesPublished]) {
     doLast {
         println 'Deploy setup completed. Operator is running in the paladin namespace.'
     }
@@ -297,6 +428,19 @@ task cleanCluster(type: Exec) {
 
 task clean {
     dependsOn cleanCluster
+}
+
+// The 'e2e' task runs the whole flow
+task e2e(type: Exec, dependsOn: [deploy]) {
+    executable 'make'
+    args 'test-e2e'
+    args "NAMESPACE=${namespace}"
+    args "CLUSTER_NAME=${clusterName}"
+
+    // if deleteCluster is true, clean up the cluster after the tests
+    if (deleteCluster) {
+        finalizedBy cleanCluster
+    }
 }
 
 // Existing 'make' task

@@ -20,6 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -27,9 +28,6 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
-      - name: Install pre-requisites
-        uses: ./.github/actions/setup
 
       # Build with Gradle
       # This does not build any docker images, and does not run any dockerized tests.
@@ -51,6 +49,14 @@ jobs:
           name: docker-compose-logs
           path: '**/docker-compose.log'
 
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()      
+        with:
+          name: testbed-logs
+          path: |
+            **/testbed.*.log
+
   core-image-build:
     # run only on PRs
     if: github.event_name == 'pull_request'
@@ -59,25 +65,25 @@ jobs:
       dockerfile: ./Dockerfile
       registry: paladin.io
       image: paladin
-      image_tag: test
+      image_tag: ${{ github.sha }}
       push: false
       upload-artifact: true
       platforms: linux/amd64
       runs-on: ubuntu-latest
 
   operator-image-build:
-      # run only on PRs
-      if: github.event_name == 'pull_request'
-      uses: ./.github/workflows/build-image.yaml
-      with:
-        dockerfile: ./operator/Dockerfile
-        registry: paladin.io
-        image: paladin-operator
-        image_tag: test
-        push: false
-        upload-artifact: true
-        platforms: linux/amd64
-        runs-on: ubuntu-latest
+    # run only on PRs
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      dockerfile: ./operator/Dockerfile
+      registry: paladin.io
+      image: paladin-operator
+      image_tag: ${{ github.sha }}
+      push: false
+      upload-artifact: true
+      platforms: linux/amd64
+      runs-on: ubuntu-latest
 
   chart-build:
     # run only if pull_request and the path operator/** was changed
@@ -86,9 +92,9 @@ jobs:
     uses: ./.github/workflows/build-chart.yaml
     with:
       paladin-image: paladin.io/paladin
-      paladin-image-tag: test
+      paladin-image-tag: ${{ github.sha }}
       operator-image: paladin.io/paladin-operator
-      operator-image-tag: test
+      operator-image-tag: ${{ github.sha }}
 
   image-release:
     # run only on pushes to main or manual triggers
