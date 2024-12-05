@@ -17,6 +17,7 @@ package zeto
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/iden3/go-iden3-crypto/babyjub"
@@ -26,6 +27,11 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
+
+// due to the ZKP circuit needing to check if the amount is positive,
+// the maximum transfer amount is (2^100 - 1)
+// Reference: https://github.com/hyperledger-labs/zeto/blob/main/zkp/circuits/lib/check-positive.circom
+var MAX_TRANSFER_AMOUNT = big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil)
 
 func isNullifiersCircuit(circuitId string) bool {
 	return circuitId == constants.CIRCUIT_ANON_NULLIFIER || circuitId == constants.CIRCUIT_ANON_NULLIFIER_BATCH
@@ -61,6 +67,7 @@ func validateTransferParams(ctx context.Context, params []*types.TransferParamEn
 	if len(params) == 0 {
 		return i18n.NewError(ctx, msgs.MsgNoTransferParams)
 	}
+	total := big.NewInt(0)
 	for i, param := range params {
 		if param.To == "" {
 			return i18n.NewError(ctx, msgs.MsgNoParamTo, i)
@@ -69,9 +76,14 @@ func validateTransferParams(ctx context.Context, params []*types.TransferParamEn
 			return i18n.NewError(ctx, msgs.MsgNoParamAmount, i)
 		}
 		if param.Amount.Int().Sign() != 1 {
-			return i18n.NewError(ctx, msgs.MsgParamAmountGtZero, i)
+			return i18n.NewError(ctx, msgs.MsgParamAmountInRange, i)
 		}
+		total.Add(total, param.Amount.Int())
 	}
+	if total.Cmp(MAX_TRANSFER_AMOUNT) >= 0 {
+		return i18n.NewError(ctx, msgs.MsgParamTotalAmountInRange)
+	}
+
 	return nil
 }
 
