@@ -22,34 +22,30 @@ import io.kaleido.paladin.toolkit.ResourceLoader;
 import java.io.IOException;
 import java.util.HashMap;
 
-public class InvestorListHelper {
+public class CSDBondTrackerHelper {
     final PenteHelper pente;
     final JsonABI abi;
     final JsonHex.Address address;
 
-    public static InvestorListHelper deploy(PenteHelper pente, String sender, Object inputs) throws IOException {
+    public static CSDBondTrackerHelper deploy(PenteHelper pente, String sender, Object inputs) throws IOException {
         String bytecode = ResourceLoader.jsonResourceEntryText(
                 CSDBondTrackerHelper.class.getClassLoader(),
-                "contracts/private/InvestorList.sol/InvestorList.json",
+                "contracts/private/CSDBondTracker.sol/CSDBondTracker.json",
                 "bytecode"
         );
         JsonABI abi = JsonABI.fromJSONResourceEntry(
                 CSDBondTrackerHelper.class.getClassLoader(),
-                "contracts/private/InvestorList.sol/InvestorList.json",
+                "contracts/private/CSDBondTracker.sol/CSDBondTracker.json",
                 "abi"
         );
         var constructor = abi.getABIEntry("constructor", null);
         var address = pente.deploy(sender, bytecode, constructor.inputs(), inputs);
-        return new InvestorListHelper(pente, address);
+        return new CSDBondTrackerHelper(pente, abi, address);
     }
 
-    InvestorListHelper(PenteHelper pente, JsonHex.Address address) throws IOException {
+    private CSDBondTrackerHelper(PenteHelper pente, JsonABI abi, JsonHex.Address address) {
         this.pente = pente;
-        this.abi = JsonABI.fromJSONResourceEntry(
-                CSDBondTrackerHelper.class.getClassLoader(),
-                "contracts/private/InvestorList.sol/InvestorList.json",
-                "abi"
-        );
+        this.abi = abi;
         this.address = address;
     }
 
@@ -57,16 +53,20 @@ public class InvestorListHelper {
         return address;
     }
 
-    public void addInvestor(String sender, String addr) throws IOException {
+    public String balanceOf(String sender, String account) throws IOException {
         var method = abi.getABIEntry("function", "balanceOf");
-        pente.invoke(
+        var output = pente.call(
                 method.name(),
                 method.inputs(),
+                JsonABI.newParameters(
+                        JsonABI.newParameter("output", "uint256")
+                ),
                 sender,
                 address,
                 new HashMap<>() {{
-                    put("addr", addr);
+                    put("account", account);
                 }}
         );
+        return output.output();
     }
 }
