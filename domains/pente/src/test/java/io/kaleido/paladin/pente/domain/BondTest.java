@@ -230,8 +230,8 @@ public class BondTest {
             bondTracker.beginDistribution(bondCustodian, 1, 1);
 
             // Add Alice as an allowed investor
-            var investorRegistry = bondTracker.investorRegistry(bondCustodian);
-            investorRegistry.addInvestor(bondCustodian, aliceAddress);
+            var investorList = bondTracker.investorList(bondCustodian);
+            investorList.addInvestor(bondCustodian, aliceAddress);
 
             // Create the atom factory on the base ledger
             String atomFactoryAddress = testbed.getRpcClient().request("testbed_deployBytecode",

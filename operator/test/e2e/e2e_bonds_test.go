@@ -168,17 +168,17 @@ var _ = Describe("controller", Ordered, func() {
 				},
 			},
 		}
-		investorRegistryPenteABI := abi.ABI{
+		investorListPenteABI := abi.ABI{
 			{
 				Type: abi.Function,
-				Name: "investorRegistry",
+				Name: "investorList",
 				Inputs: abi.ParameterArray{
 					penteGroupABI,
 					{Name: "to", Type: "address"},
 					{Name: "inputs", Type: "tuple",
-						Components: bondTrackerPrivateBuild.ABI.Functions()["investorRegistry"].Inputs},
+						Components: bondTrackerPrivateBuild.ABI.Functions()["investorList"].Inputs},
 				},
-				Outputs: bondTrackerPrivateBuild.ABI.Functions()["investorRegistry"].Outputs,
+				Outputs: bondTrackerPrivateBuild.ABI.Functions()["investorList"].Outputs,
 			},
 			{
 				Type: abi.Function,
@@ -450,15 +450,15 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(tx.Error()).To(BeNil())
 		})
 
-		var investorRegistryAddress *tktypes.EthAddress
+		var investorListAddress *tktypes.EthAddress
 		It("gets the investor registry", func() {
 			var out tktypes.RawJSON
-			err := rpc[bondIssuer.node].ForABI(ctx, investorRegistryPenteABI).
+			err := rpc[bondIssuer.node].ForABI(ctx, investorListPenteABI).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
 				From(bondIssuer.identity).
-				Function("investorRegistry").
+				Function("investorList").
 				Inputs(map[string]any{
 					"group":  privacyGroups["issuerCustodian"].PentePrivateGroup,
 					"to":     privateBondTrackerContract,
@@ -467,13 +467,13 @@ var _ = Describe("controller", Ordered, func() {
 				Outputs(&out).
 				Call()
 			Expect(err).To(BeNil())
-			testLog("Bond tracker Private EVM contract investorRegistry() call: %s", out)
-			getJSONPropertyAs(out, "0", &investorRegistryAddress)
-			Expect(investorRegistryAddress).ToNot(BeNil())
+			testLog("Bond tracker Private EVM contract investorList() call: %s", out)
+			getJSONPropertyAs(out, "0", &investorListAddress)
+			Expect(investorListAddress).ToNot(BeNil())
 		})
 
 		It("adds alice as an investor", func() {
-			tx := rpc[bondCustodian.node].ForABI(ctx, investorRegistryPenteABI).
+			tx := rpc[bondCustodian.node].ForABI(ctx, investorListPenteABI).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
@@ -481,7 +481,7 @@ var _ = Describe("controller", Ordered, func() {
 				Function("addInvestor").
 				Inputs(map[string]any{
 					"group": privacyGroups["issuerCustodian"].PentePrivateGroup,
-					"to":    investorRegistryAddress,
+					"to":    investorListAddress,
 					"inputs": map[string]any{
 						"addr": alice.addr,
 					},

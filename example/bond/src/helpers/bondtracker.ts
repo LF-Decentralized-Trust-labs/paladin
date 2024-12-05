@@ -3,7 +3,7 @@ import PaladinClient, {
   PentePrivateContract,
 } from "paladin-sdk";
 import bondTracker from "../abis/BondTracker.json";
-import { InvestorRegistry } from "./investorregistry";
+import { InvestorList } from "./investorlist";
 
 export interface BondTrackerConstructorParams {
   name: string;
@@ -47,8 +47,8 @@ export class BondTracker extends PentePrivateContract<BondTrackerConstructorPara
     return this.invoke(from, "beginDistribution", params);
   }
 
-  async investorRegistry(from: string) {
-    const result = await this.call(from, "investorRegistry", []);
-    return new InvestorRegistry(this.evm, result[0]);
+  async investorList(from: string) {
+    const result = await this.call(from, "investorList", []);
+    return new InvestorList(this.evm, result[0]);
   }
 }
