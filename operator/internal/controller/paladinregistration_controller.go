@@ -108,14 +108,14 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 	if err != nil {
 		// There's nothing to notify us when the world changes other than polling, so we keep re-trying
 		return ctrl.Result{}, err
-	} else if regTx.statusChanged {
+	} else if regTx.isStatusChanged() {
 		if reg.Status.PublishTxs == nil {
 			reg.Status.PublishTxs = map[string]corev1alpha1.TransactionSubmission{}
 		}
 		return r.updateStatusAndRequeue(ctx, &reg, publishCount)
-	} else if regTx.failed {
+	} else if regTx.isFailed() {
 		return ctrl.Result{}, nil // don't go any further
-	} else if !regTx.succeeded {
+	} else if !regTx.isSucceeded() {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil // we're waiting
 	}
 	publishCount++
@@ -135,12 +135,12 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 		if err != nil {
 			// There's nothing to notify us when the world changes other than polling, so we keep re-trying
 			return ctrl.Result{}, err
-		} else if regTx.statusChanged {
+		} else if regTx.isStatusChanged() {
 			reg.Status.PublishTxs[transportName] = transportPublishStatus
 			return r.updateStatusAndRequeue(ctx, &reg, publishCount)
-		} else if regTx.failed {
+		} else if regTx.isFailed() {
 			return ctrl.Result{}, nil // don't go any further
-		} else if !regTx.succeeded {
+		} else if !regTx.isSucceeded() {
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil // we're waiting
 		}
 		publishCount++
