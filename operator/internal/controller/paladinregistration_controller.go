@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -120,6 +121,9 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 	publishCount++
 
+	changed := false
+	requeueAfter := 0 * time.Second
+
 	// Now we need to run a TX for each transport (we'll check availability for each before we submit)
 	for _, transportName := range reg.Spec.Transports {
 		transportPublishStatus := reg.Status.PublishTxs[transportName]
@@ -133,21 +137,55 @@ func (r *PaladinRegistrationReconciler) Reconcile(ctx context.Context, req ctrl.
 		)
 		err := regTx.reconcile(ctx)
 		if err != nil {
-			// There's nothing to notify us when the world changes other than polling, so we keep re-trying
-			return ctrl.Result{}, err
+			// There is nothing we can do, try the next transport
+			log.Error(err, "Failed to reconcile transport transaction", "transport", transportName)
+			continue
 		} else if regTx.statusChanged {
 			reg.Status.PublishTxs[transportName] = transportPublishStatus
-			return r.updateStatusAndRequeue(ctx, &reg, publishCount)
+			if transportPublishStatus.TransactionStatus == corev1alpha1.TransactionStatusSuccess {
+				publishCount++
+			}
+			changed = true
 		} else if regTx.failed {
-			return ctrl.Result{}, nil // don't go any further
+			// what if one transaction failed and the other succeeded?
+			// continue to try the other transactions
+			log.Error(fmt.Errorf("transaction failed"), "Failed to reconcile transport transaction", "transport", transportName)
+			continue
 		} else if !regTx.succeeded {
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil // we're waiting
+			// wait before requeueing
+			requeueAfter = time.Second
 		}
-		publishCount++
+	}
+
+	if changed {
+		// at least one transport has changed
+		return r.updateStatusAndRequeue(ctx, &reg, publishCount)
 	}
 
 	// Nothing left to do
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+func (r *PaladinRegistrationReconciler) reconcileRegistry(ctx context.Context, obj client.Object) []ctrl.Request {
+	registry, ok := obj.(*corev1alpha1.PaladinRegistry)
+	if !ok {
+		log.FromContext(ctx).Error(fmt.Errorf("unexpected object type"), "expected Paladin")
+		return nil
+	}
+
+	if registry.Status.Status != corev1alpha1.RegistryStatusAvailable {
+		return nil
+	}
+
+	regs := &corev1alpha1.PaladinRegistrationList{}
+	r.Client.List(ctx, regs, client.InNamespace(registry.Namespace))
+	reqs := make([]ctrl.Request, 0, len(regs.Items))
+
+	for _, reg := range regs.Items {
+		if reg.Spec.Node == registry.Name {
+			reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(&reg)})
+		}
+	}
+	return reqs
 }
 
 func (r *PaladinRegistrationReconciler) updateStatusAndRequeue(ctx context.Context, reg *corev1alpha1.PaladinRegistration, publishCount int) (ctrl.Result, error) {
@@ -277,7 +315,7 @@ func (r *PaladinRegistrationReconciler) SetupWithManager(mgr ctrl.Manager) error
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.PaladinRegistration{}).
 		// Reconcile when any node status changes
-		Watches(&corev1alpha1.Paladin{}, reconcileAll(PaladinRegistrationCRMap, r.Client), reconcileEveryChange()).
+		Watches(&corev1alpha1.PaladinRegistry{}, handler.EnqueueRequestsFromMapFunc(r.reconcileRegistry), reconcileEveryChange()).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 2,
 		}).
