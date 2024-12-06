@@ -110,11 +110,11 @@ public class CSDBondTest {
 
             String cashIssuer = "cashIssuer";
             String bondIssuer = "bondIssuer";
-            String bondCustodian = "bondCustodian";
+            String bondChecker = "bondChecker";
             String alice = "alice";
 
-            String custodianAddress = testbed.getRpcClient().request("testbed_resolveVerifier",
-                    bondCustodian, Algorithms.ECDSA_SECP256K1, Verifiers.ETH_ADDRESS);
+            String issuerAddress = testbed.getRpcClient().request("testbed_resolveVerifier",
+                    bondIssuer, Algorithms.ECDSA_SECP256K1, Verifiers.ETH_ADDRESS);
             String aliceAddress = testbed.getRpcClient().request("testbed_resolveVerifier",
                     alice, Algorithms.ECDSA_SECP256K1, Verifiers.ETH_ADDRESS);
 
@@ -126,13 +126,13 @@ public class CSDBondTest {
             assertEquals("type=NotoCoin(bytes32 salt,string owner,uint256 amount),labels=[owner,amount]",
                     notoSchema.signature());
 
-            GroupTupleJSON issuerCustodianGroup = new GroupTupleJSON(
-                    JsonHex.randomBytes32(), new String[]{bondIssuer, bondCustodian});
+            GroupTupleJSON issuerGroup = new GroupTupleJSON(
+                    JsonHex.randomBytes32(), new String[]{bondIssuer});
 
             // Create the privacy groups
-            var issuerCustodianInstance = PenteHelper.newPrivacyGroup(
-                    "pente", alice, testbed, issuerCustodianGroup, true);
-            assertFalse(issuerCustodianInstance.address().isBlank());
+            var issuerInstance = PenteHelper.newPrivacyGroup(
+                    "pente", alice, testbed, issuerGroup, true);
+            assertFalse(issuerInstance.address().isBlank());
 
             // Create Noto cash token
             var notoCash = NotoHelper.deploy("noto", cashIssuer, testbed,
@@ -142,36 +142,40 @@ public class CSDBondTest {
                             true));
             assertFalse(notoCash.address().isBlank());
 
-            // Deploy private investor list to the issuer/custodian privacy group
-            var investorList = InvestorListHelper.deploy(issuerCustodianInstance, bondIssuer, new HashMap<>() {{
-                put("initialOwner", custodianAddress);
+            // Deploy private investor list to the issuer privacy group
+            var investorList = InvestorListHelper.deploy(issuerInstance, bondIssuer, new HashMap<>() {{
+                put("initialOwner", issuerAddress);
             }});
 
-            // Deploy private bond tracker to the issuer/custodian privacy group
-            var bondTracker = CSDBondTrackerHelper.deploy(issuerCustodianInstance, bondIssuer, new HashMap<>() {{
+            // Deploy private bond tracker to the issuer privacy group
+            var bondTracker = CSDBondTrackerHelper.deploy(issuerInstance, bondIssuer, new HashMap<>() {{
                 put("name", "BOND");
                 put("symbol", "BOND");
                 put("transferPolicy_", investorList.address());
             }});
 
-            // TODO: perform bond pre-issuance workflow
+            // Perform bond pre-issuance workflow
+            bondTracker.approveRequest(bondChecker);
+            bondTracker.setISIN(bondIssuer, "ZZ0123456AB0");
+            bondTracker.approveISIN(bondChecker);
 
             // Create Noto bond token
-            var notoBond = NotoHelper.deploy("noto", bondCustodian, testbed,
+            var notoBond = NotoHelper.deploy("noto", bondIssuer, testbed,
                     new NotoHelper.ConstructorParams(
-                            bondCustodian + "@node1",
+                            bondIssuer + "@node1",
                             new NotoHelper.HookParams(
-                                    issuerCustodianInstance.address(),
+                                    issuerInstance.address(),
                                     bondTracker.address(),
-                                    issuerCustodianGroup),
+                                    issuerGroup),
                             false));
             assertFalse(notoBond.address().isBlank());
 
             // Issue cash to investors
             notoCash.mint(cashIssuer, alice, 100000);
 
-            // Issue bond to custodian
-            notoBond.mint(bondIssuer, bondCustodian, 1000);
+            // Issue bond to issuer
+            bondTracker.prepareIssuance(bondIssuer);
+            notoBond.mint(bondChecker, bondIssuer, 1000);
 
             // Validate Noto balances
             var notoCashStates = notoCash.queryStates(notoSchema.id, null);
@@ -181,10 +185,10 @@ public class CSDBondTest {
             var notoBondStates = notoBond.queryStates(notoSchema.id, null);
             assertEquals(1, notoBondStates.size());
             assertEquals("1000", notoBondStates.getFirst().data().amount());
-            assertEquals(custodianAddress, notoBondStates.getFirst().data().owner());
+            assertEquals(issuerAddress, notoBondStates.getFirst().data().owner());
 
             // Validate bond tracker balance
-            assertEquals("1000", bondTracker.balanceOf(bondIssuer, custodianAddress));
+            assertEquals("1000", bondTracker.balanceOf(bondIssuer, issuerAddress));
         }
     }
 }

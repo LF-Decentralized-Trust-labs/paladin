@@ -58,7 +58,7 @@ public class InvestorListHelper {
     }
 
     public void addInvestor(String sender, String addr) throws IOException {
-        var method = abi.getABIEntry("function", "balanceOf");
+        var method = abi.getABIEntry("function", "addInvestor");
         pente.invoke(
                 method.name(),
                 method.inputs(),

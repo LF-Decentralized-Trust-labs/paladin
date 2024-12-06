@@ -109,9 +109,13 @@ contract CSDBondTracker is INotoHooks, ERC20, Ownable {
         uint256 amount,
         PreparedTransaction calldata prepared
     ) external onlyOwner {
-        require(sender == owner(), "Bond must be issued by issuer to themself");
-        require(to == owner(), "Bond must be issued by issuer to themself");
+        require(to == owner(), "Bond must be issued to issuer");
         require(status == Status.READY, "Bond is not ready to be issued");
+        require(
+            sender != maker[LifecycleStep.BOND_ISSUANCE],
+            "Maker and checker cannot be the same"
+        );
+        checker[LifecycleStep.BOND_ISSUANCE] = sender;
         _mint(to, amount);
         status = Status.ISSUED;
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);

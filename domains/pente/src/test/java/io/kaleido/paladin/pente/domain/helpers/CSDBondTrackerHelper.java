@@ -69,4 +69,50 @@ public class CSDBondTrackerHelper {
         );
         return output.output();
     }
+
+    public void approveRequest(String sender) throws IOException {
+        var method = abi.getABIEntry("function", "approveRequest");
+        pente.invoke(
+                method.name(),
+                method.inputs(),
+                sender,
+                address,
+                new HashMap<>()
+        );
+    }
+
+    public void setISIN(String sender, String isin) throws IOException {
+        var method = abi.getABIEntry("function", "setISIN");
+        pente.invoke(
+                method.name(),
+                method.inputs(),
+                sender,
+                address,
+                new HashMap<>() {{
+                    put("isin_", isin);
+                }}
+        );
+    }
+
+    public void approveISIN(String sender) throws IOException {
+        var method = abi.getABIEntry("function", "approveISIN");
+        pente.invoke(
+                method.name(),
+                method.inputs(),
+                sender,
+                address,
+                new HashMap<>()
+        );
+    }
+
+    public void prepareIssuance(String sender) throws IOException {
+        var method = abi.getABIEntry("function", "prepareIssuance");
+        pente.invoke(
+                method.name(),
+                method.inputs(),
+                sender,
+                address,
+                new HashMap<>()
+        );
+    }
 }
