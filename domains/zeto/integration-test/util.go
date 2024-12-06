@@ -41,13 +41,16 @@ type domainContracts struct {
 }
 
 type domainContract struct {
-	Name           string         `yaml:"name"`
-	Verifier       string         `yaml:"verifier"`
-	BatchVerifier  string         `yaml:"batchVerifier"`
-	CircuitId      string         `yaml:"circuitId"`
-	AbiAndBytecode abiAndBytecode `yaml:"abiAndBytecode"`
-	Libraries      []string       `yaml:"libraries"`
-	Cloneable      bool           `yaml:"cloneable"`
+	Name                  string         `yaml:"name"`
+	Verifier              string         `yaml:"verifier"`
+	BatchVerifier         string         `yaml:"batchVerifier"`
+	DepositVerifier       string         `yaml:"depositVerifier"`
+	WithdrawVerifier      string         `yaml:"withdrawVerifier"`
+	BatchWithdrawVerifier string         `yaml:"batchWithdrawVerifier"`
+	CircuitId             string         `yaml:"circuitId"`
+	AbiAndBytecode        abiAndBytecode `yaml:"abiAndBytecode"`
+	Libraries             []string       `yaml:"libraries"`
+	Cloneable             bool           `yaml:"cloneable"`
 }
 
 type abiAndBytecode struct {

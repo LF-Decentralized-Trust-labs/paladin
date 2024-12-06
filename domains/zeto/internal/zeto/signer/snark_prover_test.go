@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
+	"github.com/hyperledger-labs/zeto/go-sdk/pkg/key-manager/core"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/witness/v2"
@@ -263,42 +264,6 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 		Common:    &pb.ProvingRequestCommon{},
 	}
 	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "input commitments are required")
-
-	req = pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
-		Common: &pb.ProvingRequestCommon{
-			InputCommitments: []string{"input1", "input2"},
-		},
-	}
-	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "input values are required")
-
-	req = pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
-		Common: &pb.ProvingRequestCommon{
-			InputCommitments: []string{"input1", "input2"},
-			InputValues:      []uint64{30, 40},
-		},
-	}
-	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "input salts are required")
-
-	req = pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
-		Common: &pb.ProvingRequestCommon{
-			InputCommitments: []string{"input1", "input2"},
-			InputValues:      []uint64{30, 40},
-			InputSalts:       []string{"salt1", "salt2"},
-		},
-	}
-	payload, err = proto.Marshal(&req)
 	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "output values are required")
@@ -558,6 +523,19 @@ func TestSerializeProofResponse(t *testing.T) {
 	bytes, err = serializeProofResponse(constants.CIRCUIT_ANON_NULLIFIER_BATCH, &snark)
 	assert.NoError(t, err)
 	assert.Equal(t, 84, len(bytes))
+
+	bytes, err = serializeProofResponse(constants.CIRCUIT_WITHDRAW_NULLIFIER, &snark)
+	assert.NoError(t, err)
+	assert.Equal(t, 66, len(bytes))
+
+	snark.PubSignals = []string{
+		"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+		"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+		"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+		"1", "2", "3"}
+	bytes, err = serializeProofResponse(constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH, &snark)
+	assert.NoError(t, err)
+	assert.Equal(t, 85, len(bytes))
 }
 
 func TestZKPProverInvalidAlgos(t *testing.T) {
@@ -605,4 +583,66 @@ func TestGetCircuitId(t *testing.T) {
 	inputs.Common.InputCommitments = []string{"input1", "input2", "input3"}
 	circuitId = getCircuitId(inputs)
 	assert.Equal(t, constants.CIRCUIT_ANON_ENC_BATCH, circuitId)
+}
+
+func TestCalculateWitness(t *testing.T) {
+	extras1 := &pb.ProvingRequestExtras_Encryption{
+		EncryptionNonce: "bad number",
+	}
+	inputs := &pb.ProvingRequestCommon{
+		InputCommitments: []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		InputValues:      []uint64{10, 20},
+		InputSalts:       []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		InputOwner:       "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
+		OutputValues:     []uint64{30, 0},
+		OutputSalts:      []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		OutputOwners:     []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
+	}
+	ctx := context.Background()
+	_, err := calculateWitness(ctx, constants.CIRCUIT_ANON_ENC, inputs, extras1, nil, nil)
+	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210077: Failed to parse encryption nonce")
+
+	extras2 := &pb.ProvingRequestExtras_Nullifiers{
+		Root: "123456",
+		MerkleProofs: []*pb.MerkleProof{
+			{
+				Nodes: []string{"1", "2", "3"},
+			},
+			{
+				Nodes: []string{"0", "0", "0"},
+			},
+		},
+		Enabled: []bool{true, false},
+	}
+	privKey, ok := new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	require.True(t, ok)
+	keyEntry := &core.KeyEntry{
+		PrivateKeyForZkp: privKey,
+	}
+	_, err = calculateWitness(ctx, constants.CIRCUIT_ANON_NULLIFIER, inputs, extras2, keyEntry, nil)
+	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210079: Failed to calculate nullifier. inputs values not inside Finite Field")
+
+	inputs = &pb.ProvingRequestCommon{
+		OutputValues: []uint64{30, 0},
+		OutputSalts:  []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		OutputOwners: []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
+	}
+	circuit, _ := loadTestCircuit(t)
+	_, err = calculateWitness(ctx, constants.CIRCUIT_DEPOSIT, inputs, nil, keyEntry, circuit)
+	assert.ErrorContains(t, err, "PD210100: failed to calculate the witness")
+
+	inputs = &pb.ProvingRequestCommon{
+		InputCommitments: []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		InputValues:      []uint64{10, 20},
+		InputSalts:       []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		InputOwner:       "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
+		OutputValues:     []uint64{30, 0},
+		OutputSalts:      []string{"1234567890123456789012345678901234567890123456789012345678901234", "1234567890123456789012345678901234567890123456789012345678901234"},
+		OutputOwners:     []string{"7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"},
+	}
+	_, err = calculateWitness(ctx, constants.CIRCUIT_WITHDRAW, inputs, nil, keyEntry, circuit)
+	assert.ErrorContains(t, err, "PD210100: failed to calculate the witness")
+
+	_, err = calculateWitness(ctx, constants.CIRCUIT_WITHDRAW_NULLIFIER, inputs, extras2, keyEntry, circuit)
+	assert.EqualError(t, err, "PD210099: failed to assemble private inputs for witness calculation. PD210079: Failed to calculate nullifier. inputs values not inside Finite Field")
 }

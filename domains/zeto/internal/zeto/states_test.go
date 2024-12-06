@@ -54,13 +54,13 @@ func TestPrepareInputs(t *testing.T) {
 
 	stateQueryContext := "test"
 	ctx := context.Background()
-	_, _, _, _, err := zeto.prepareInputs(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, _, err := zeto.prepareInputsForTransfer(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210032: Failed to query the state store for available coins. test error")
 
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{}, nil
 	}
-	_, _, _, _, err = zeto.prepareInputs(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, _, err = zeto.prepareInputsForTransfer(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210033: Insufficient funds (available=0)")
 
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -73,7 +73,7 @@ func TestPrepareInputs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, _, _, err = zeto.prepareInputs(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
+	_, _, _, _, err = zeto.prepareInputsForTransfer(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(100)}})
 	assert.EqualError(t, err, "PD210034: Coin state-1 is invalid: invalid character 'b' looking for beginning of value")
 
 	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
@@ -92,6 +92,47 @@ func TestPrepareInputs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, _, _, err = zeto.prepareInputs(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(200)}})
+	_, _, _, _, err = zeto.prepareInputsForTransfer(ctx, false, stateQueryContext, "Alice", []*types.TransferParamEntry{{Amount: tktypes.Uint64ToUint256(200)}})
 	assert.EqualError(t, err, "PD210035: Need more than maximum number (10) of coins to fulfill the transfer amount total")
+
+	_, _, _, _, err = zeto.prepareInputsForWithdraw(ctx, false, stateQueryContext, "Alice", tktypes.Uint64ToUint256(100))
+	assert.NoError(t, err)
+}
+
+func TestPrepareOutputs(t *testing.T) {
+	testCallbacks := &testDomainCallbacks{
+		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+			return nil, errors.New("test error")
+		},
+	}
+	zeto := &Zeto{
+		name:      "test1",
+		Callbacks: testCallbacks,
+		coinSchema: &prototk.StateSchema{
+			Id: "coin",
+		},
+		merkleTreeRootSchema: &prototk.StateSchema{
+			Id: "merkle_tree_root",
+		},
+		merkleTreeNodeSchema: &prototk.StateSchema{
+			Id: "merkle_tree_node",
+		},
+	}
+
+	ctx := context.Background()
+	sender := &prototk.ResolvedVerifier{
+		Lookup:   "Alice",
+		Verifier: "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025",
+	}
+
+	_, _, err := zeto.prepareOutputsForDeposit(ctx, false, tktypes.Uint64ToUint256(100), sender)
+	assert.NoError(t, err)
+
+	sender.Verifier = "bad key"
+	_, _, err = zeto.prepareOutputForWithdraw(ctx, tktypes.Uint64ToUint256(100), sender)
+	assert.ErrorContains(t, err, "PD210037: Failed load owner public key.")
+
+	sender.Verifier = "7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025"
+	_, _, err = zeto.prepareOutputForWithdraw(ctx, tktypes.Uint64ToUint256(100), sender)
+	assert.NoError(t, err)
 }

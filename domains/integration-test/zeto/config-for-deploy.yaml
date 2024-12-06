@@ -23,6 +23,9 @@ contracts:
     - name: Zeto_Anon
       verifier: Groth16Verifier_Anon
       batchVerifier: Groth16Verifier_AnonBatch
+      depositVerifier: Groth16Verifier_CheckHashesValue
+      withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
+      batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
       circuitId: anon
       cloneable: true
       abiAndBytecode:

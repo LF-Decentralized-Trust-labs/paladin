@@ -40,9 +40,12 @@ type ZetoDomainContracts struct {
 }
 
 type cloneableContract struct {
-	circuitId     string
-	verifier      string
-	batchVerifier string
+	circuitId             string
+	verifier              string
+	batchVerifier         string
+	depositVerifier       string
+	withdrawVerifier      string
+	batchWithdrawVerifier string
 }
 
 func newZetoDomainContracts() *ZetoDomainContracts {
@@ -88,9 +91,12 @@ func findCloneableContracts(config *domainConfig) map[string]cloneableContract {
 	for _, contract := range config.DomainContracts.Implementations {
 		if contract.Cloneable {
 			cloneableContracts[contract.Name] = cloneableContract{
-				circuitId:     contract.CircuitId,
-				verifier:      contract.Verifier,
-				batchVerifier: contract.BatchVerifier,
+				circuitId:             contract.CircuitId,
+				verifier:              contract.Verifier,
+				batchVerifier:         contract.BatchVerifier,
+				depositVerifier:       contract.DepositVerifier,
+				withdrawVerifier:      contract.WithdrawVerifier,
+				batchWithdrawVerifier: contract.BatchWithdrawVerifier,
 			}
 		}
 	}
@@ -165,6 +171,9 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 	log.L(ctx).Infof("Registering implementation %s", name)
 	verifierName := domainContracts.cloneableContracts[name].verifier
 	batchVerifierName := domainContracts.cloneableContracts[name].batchVerifier
+	depositVerifierName := domainContracts.cloneableContracts[name].depositVerifier
+	withdrawVerifierName := domainContracts.cloneableContracts[name].withdrawVerifier
+	batchWithdrawVerifierName := domainContracts.cloneableContracts[name].batchWithdrawVerifier
 	implAddr, ok := domainContracts.deployedContracts[name]
 	if !ok {
 		return fmt.Errorf("implementation contract %s not found among the deployed contracts", name)
@@ -177,15 +186,15 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 	if !ok {
 		return fmt.Errorf("batch verifier contract %s not found among the deployed contracts", batchVerifierName)
 	}
-	depositVerifierAddr, ok := domainContracts.deployedContracts["Groth16Verifier_CheckHashesValue"]
+	depositVerifierAddr, ok := domainContracts.deployedContracts[depositVerifierName]
 	if !ok {
 		return fmt.Errorf("deposit verifier contract not found among the deployed contracts")
 	}
-	withdrawVerifierAddr, ok := domainContracts.deployedContracts["Groth16Verifier_CheckInputsOutputsValue"]
+	withdrawVerifierAddr, ok := domainContracts.deployedContracts[withdrawVerifierName]
 	if !ok {
 		return fmt.Errorf("withdraw verifier contract not found among the deployed contracts")
 	}
-	batchWithdrawVerifierAddr, ok := domainContracts.deployedContracts["Groth16Verifier_CheckInputsOutputsValueBatch"]
+	batchWithdrawVerifierAddr, ok := domainContracts.deployedContracts[batchWithdrawVerifierName]
 	if !ok {
 		return fmt.Errorf("batch withdraw verifier contract not found among the deployed contracts")
 	}
