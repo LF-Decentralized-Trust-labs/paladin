@@ -51,8 +51,8 @@ public class BondTrackerHelper {
         return address;
     }
 
-    public InvestorRegistryHelper investorRegistry(String sender) throws IOException {
-        var method = abi.getABIEntry("function", "investorRegistry");
+    public InvestorListHelper investorList(String sender) throws IOException {
+        var method = abi.getABIEntry("function", "investorList");
         var output = pente.call(
                 method.name(),
                 method.inputs(),
@@ -63,7 +63,7 @@ public class BondTrackerHelper {
                 address,
                 new HashMap<>()
         );
-        return new InvestorRegistryHelper(pente, JsonHex.addressFrom(output.output()));
+        return new InvestorListHelper(pente, JsonHex.addressFrom(output.output()));
     }
 
     public String balanceOf(String sender, String account) throws IOException {

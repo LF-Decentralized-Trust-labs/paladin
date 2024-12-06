@@ -81,16 +81,14 @@ public class BondSubscriptionHelper {
         );
     }
 
-    public void distribute(String sender, int units) throws IOException {
+    public void distribute(String sender) throws IOException {
         var method = abi.getABIEntry("function", "distribute");
         pente.invoke(
                 method.name(),
                 method.inputs(),
                 sender,
                 address,
-                new HashMap<>() {{
-                    put("units_", units);
-                }}
+                new HashMap<>()
         );
     }
 }

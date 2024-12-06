@@ -46,8 +46,43 @@ var BondTrackerPublicBuildJSON []byte
 //go:embed abis/BondTracker.json
 var BondTrackerPrivateBuildJSON []byte
 
+//go:embed abis/InvestorList.json
+var InvestorListPrivateBuildJSON []byte
+
 //go:embed abis/BondSubscription.json
 var BondSubscriptionPrivateBuildJSON []byte
+
+//go:embed abis/AtomFactory.json
+var AtomFactoryBuildJSON []byte
+
+func penteDeployABI(constructor *abi.Entry) abi.ABI {
+	return abi.ABI{
+		{
+			Type: abi.Function,
+			Name: "deploy",
+			Inputs: abi.ParameterArray{
+				penteGroupABI,
+				{Name: "bytecode", Type: "bytes"},
+				{Name: "inputs", Type: "tuple", Components: constructor.Inputs},
+			},
+		},
+	}
+}
+
+func penteMethodABI(method *abi.Entry) abi.ABI {
+	return abi.ABI{
+		{
+			Type: abi.Function,
+			Name: method.Name,
+			Inputs: abi.ParameterArray{
+				penteGroupABI,
+				{Name: "to", Type: "address"},
+				{Name: "inputs", Type: "tuple", Components: method.Inputs},
+			},
+			Outputs: method.Outputs,
+		},
+	}
+}
 
 var _ = Describe("controller", Ordered, func() {
 	defer GinkgoRecover()
@@ -143,68 +178,9 @@ var _ = Describe("controller", Ordered, func() {
 
 		bondTrackerPublicBuild := solutils.MustLoadBuild(BondTrackerPublicBuildJSON)
 		bondTrackerPrivateBuild := solutils.MustLoadBuild(BondTrackerPrivateBuildJSON)
+		investorListPrivateBuild := solutils.MustLoadBuild(InvestorListPrivateBuildJSON)
 		bondSubscriptionPrivateBuild := solutils.MustLoadBuild(BondSubscriptionPrivateBuildJSON)
-
-		// TODO: This could be a convert-to-pente function for all functions on the the ABIs
-		bondTrackerPenteABI := abi.ABI{
-			{
-				Type: abi.Function,
-				Name: "deploy",
-				Inputs: abi.ParameterArray{
-					penteGroupABI,
-					{Name: "bytecode", Type: "bytes"},
-					{Name: "inputs", Type: "tuple",
-						Components: bondTrackerPrivateBuild.ABI.Constructor().Inputs},
-				},
-			},
-			{
-				Type: abi.Function,
-				Name: "beginDistribution",
-				Inputs: abi.ParameterArray{
-					penteGroupABI,
-					{Name: "to", Type: "address"},
-					{Name: "inputs", Type: "tuple",
-						Components: bondTrackerPrivateBuild.ABI.Functions()["beginDistribution"].Inputs},
-				},
-			},
-		}
-		investorRegistryPenteABI := abi.ABI{
-			{
-				Type: abi.Function,
-				Name: "investorRegistry",
-				Inputs: abi.ParameterArray{
-					penteGroupABI,
-					{Name: "to", Type: "address"},
-					{Name: "inputs", Type: "tuple",
-						Components: bondTrackerPrivateBuild.ABI.Functions()["investorRegistry"].Inputs},
-				},
-				Outputs: bondTrackerPrivateBuild.ABI.Functions()["investorRegistry"].Outputs,
-			},
-			{
-				Type: abi.Function,
-				Name: "addInvestor",
-				Inputs: abi.ParameterArray{
-					penteGroupABI,
-					{Name: "to", Type: "address"},
-					{Name: "inputs", Type: "tuple",
-						Components: abi.ParameterArray{
-							{Name: "addr", Type: "address"},
-						}},
-				},
-			},
-		}
-		bondSubscriptionPenteABI := abi.ABI{
-			{
-				Type: abi.Function,
-				Name: "deploy",
-				Inputs: abi.ParameterArray{
-					penteGroupABI,
-					{Name: "bytecode", Type: "bytes"},
-					{Name: "inputs", Type: "tuple",
-						Components: bondSubscriptionPrivateBuild.ABI.Constructor().Inputs},
-				},
-			},
-		}
+		atomFactoryBuild := solutils.MustLoadBuild(AtomFactoryBuildJSON)
 
 		var cashIssuer, bondIssuer, bondCustodian, alice *participant
 
@@ -297,7 +273,6 @@ var _ = Describe("controller", Ordered, func() {
 
 		var publicBondTrackerContract *tktypes.EthAddress
 		It("deploys the public bond tracker on the base ledger (controlled by the privacy group)", func() {
-
 			tx := rpc[bondIssuer.node].ForABI(ctx, bondTrackerPublicBuild.ABI).
 				Public().
 				Constructor().
@@ -321,8 +296,8 @@ var _ = Describe("controller", Ordered, func() {
 
 		var privateBondTrackerDeployID uuid.UUID
 		It("deploy private bond tracker to the issuer/custodian privacy group", func() {
-
-			tx := rpc[bondIssuer.node].ForABI(ctx, bondTrackerPenteABI).
+			method := bondTrackerPrivateBuild.ABI.Constructor()
+			tx := rpc[bondIssuer.node].ForABI(ctx, penteDeployABI(method)).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
@@ -347,15 +322,13 @@ var _ = Describe("controller", Ordered, func() {
 
 		var privateBondTrackerContract *tktypes.EthAddress
 		It("requests the receipt from pente to get the contract address", func() {
-
-			domainReceiptJSON, err := rpc["node1"].PTX().GetDomainReceipt(ctx, "pente", privateBondTrackerDeployID)
+			domainReceiptJSON, err := rpc[bondIssuer.node].PTX().GetDomainReceipt(ctx, "pente", privateBondTrackerDeployID)
 			Expect(err).To(BeNil())
 			var pr penteReceipt
 			err = json.Unmarshal(domainReceiptJSON, &pr)
 			Expect(err).To(BeNil())
 			privateBondTrackerContract = pr.Receipt.ContractAddress
 			testLog("Bond tracker Private EVM contract: %s", privateBondTrackerContract)
-
 		})
 
 		var bondTokenContract *tktypes.EthAddress
@@ -430,12 +403,13 @@ var _ = Describe("controller", Ordered, func() {
 		})
 
 		It("begins distribution", func() {
-			tx := rpc[bondIssuer.node].ForABI(ctx, bondTrackerPenteABI).
+			method := bondTrackerPrivateBuild.ABI.Functions()["beginDistribution"]
+			tx := rpc[bondIssuer.node].ForABI(ctx, penteMethodABI(method)).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
 				From(bondIssuer.identity).
-				Function("beginDistribution").
+				Function(method.Name).
 				Inputs(map[string]any{
 					"group": privacyGroups["issuerCustodian"].PentePrivateGroup,
 					"to":    privateBondTrackerContract,
@@ -450,15 +424,16 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(tx.Error()).To(BeNil())
 		})
 
-		var investorRegistryAddress *tktypes.EthAddress
+		var investorListAddress *tktypes.EthAddress
 		It("gets the investor registry", func() {
 			var out tktypes.RawJSON
-			err := rpc[bondIssuer.node].ForABI(ctx, investorRegistryPenteABI).
+			method := bondTrackerPrivateBuild.ABI.Functions()["investorList"]
+			err := rpc[bondIssuer.node].ForABI(ctx, penteMethodABI(method)).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
 				From(bondIssuer.identity).
-				Function("investorRegistry").
+				Function(method.Name).
 				Inputs(map[string]any{
 					"group":  privacyGroups["issuerCustodian"].PentePrivateGroup,
 					"to":     privateBondTrackerContract,
@@ -467,21 +442,22 @@ var _ = Describe("controller", Ordered, func() {
 				Outputs(&out).
 				Call()
 			Expect(err).To(BeNil())
-			testLog("Bond tracker Private EVM contract investorRegistry() call: %s", out)
-			getJSONPropertyAs(out, "0", &investorRegistryAddress)
-			Expect(investorRegistryAddress).ToNot(BeNil())
+			testLog("Bond tracker Private EVM contract investorList() call: %s", out)
+			getJSONPropertyAs(out, "0", &investorListAddress)
+			Expect(investorListAddress).ToNot(BeNil())
 		})
 
 		It("adds alice as an investor", func() {
-			tx := rpc[bondCustodian.node].ForABI(ctx, investorRegistryPenteABI).
+			method := investorListPrivateBuild.ABI.Functions()["addInvestor"]
+			tx := rpc[bondCustodian.node].ForABI(ctx, penteMethodABI(method)).
 				Private().
 				Domain("pente").
 				To(privacyGroups["issuerCustodian"].contractAddress).
 				From(bondCustodian.id).
-				Function("addInvestor").
+				Function(method.Name).
 				Inputs(map[string]any{
 					"group": privacyGroups["issuerCustodian"].PentePrivateGroup,
-					"to":    investorRegistryAddress,
+					"to":    investorListAddress,
 					"inputs": map[string]any{
 						"addr": alice.addr,
 					},
@@ -492,10 +468,27 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(tx.Error()).To(BeNil())
 		})
 
+		var atomFactoryContract *tktypes.EthAddress
+		It("deploys the atom factory on the base ledger", func() {
+			tx := rpc[bondIssuer.node].ForABI(ctx, atomFactoryBuild.ABI).
+				Public().
+				Constructor().
+				Bytecode(atomFactoryBuild.Bytecode).
+				From(bondIssuer.identity).
+				Inputs(map[string]any{}).
+				Send().
+				Wait(5 * time.Second)
+			testLog("Atom factory contract deployment transaction: %s", tx.ID())
+			Expect(tx.Error()).To(BeNil())
+			Expect(tx.Receipt().ContractAddress).ToNot(BeNil())
+			atomFactoryContract = tx.Receipt().ContractAddress
+			testLog("Atom factory (public base ledger): %s", atomFactoryContract)
+		})
+
 		var privateBondSubscriptionDeployID uuid.UUID
 		It("deploy private bond subscription to the alice/custodian privacy group", func() {
-
-			tx := rpc[alice.node].ForABI(ctx, bondSubscriptionPenteABI).
+			method := bondSubscriptionPrivateBuild.ABI.Constructor()
+			tx := rpc[alice.node].ForABI(ctx, penteDeployABI(method)).
 				Private().
 				Domain("pente").
 				To(privacyGroups["aliceCustodian"].contractAddress).
@@ -508,6 +501,7 @@ var _ = Describe("controller", Ordered, func() {
 						"bondAddress_": bondTokenContract,
 						"units_":       1000,
 						"custodian_":   bondCustodian.addr,
+						"atomFactory_": atomFactoryContract,
 					},
 				}).
 				Send().
@@ -515,6 +509,17 @@ var _ = Describe("controller", Ordered, func() {
 			privateBondSubscriptionDeployID = tx.ID()
 			testLog("Bond subscription Private EVM contract deployment transaction: %s", privateBondSubscriptionDeployID)
 			Expect(tx.Error()).To(BeNil())
+		})
+
+		var privateBondSubscriptionContract *tktypes.EthAddress
+		It("requests the receipt from pente to get the contract address", func() {
+			domainReceiptJSON, err := rpc[alice.node].PTX().GetDomainReceipt(ctx, "pente", privateBondSubscriptionDeployID)
+			Expect(err).To(BeNil())
+			var pr penteReceipt
+			err = json.Unmarshal(domainReceiptJSON, &pr)
+			Expect(err).To(BeNil())
+			privateBondSubscriptionContract = pr.Receipt.ContractAddress
+			testLog("Bond subscription Private EVM contract: %s", privateBondSubscriptionContract)
 		})
 
 		var preparedBondTransfer *pldapi.PreparedTransaction
@@ -541,7 +546,6 @@ var _ = Describe("controller", Ordered, func() {
 
 		var preparedPaymentTransfer *pldapi.PreparedTransaction
 		It("prepare transfer of cash from alice to custodian", func() {
-
 			tx := rpc[alice.node].ForABI(ctx, nototypes.NotoABI).
 				Private().
 				Domain("noto").
@@ -559,7 +563,7 @@ var _ = Describe("controller", Ordered, func() {
 			Expect(tx.Error()).To(BeNil())
 			preparedPaymentTransfer = tx.PreparedTransaction()
 			Expect(preparedPaymentTransfer).ToNot(BeNil())
-			Expect(preparedPaymentTransfer.Transaction.Domain).To(BeEmpty( /* e.g. pubic */ ))
+			Expect(preparedPaymentTransfer.Transaction.Domain).To(BeEmpty( /* e.g. public */ ))
 		})
 	})
 })

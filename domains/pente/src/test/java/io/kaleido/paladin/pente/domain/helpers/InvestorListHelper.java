@@ -21,11 +21,11 @@ import io.kaleido.paladin.toolkit.JsonHex;
 import java.io.IOException;
 import java.util.HashMap;
 
-public class InvestorRegistryHelper {
+public class InvestorListHelper {
     final PenteHelper pente;
     final JsonHex.Address address;
 
-    InvestorRegistryHelper(PenteHelper pente, JsonHex.Address address) {
+    InvestorListHelper(PenteHelper pente, JsonHex.Address address) {
         this.pente = pente;
         this.address = address;
     }

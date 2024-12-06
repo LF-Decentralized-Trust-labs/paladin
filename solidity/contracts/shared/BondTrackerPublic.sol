@@ -14,7 +14,9 @@ contract BondTrackerPublic is Ownable {
         INITIALIZED,
         ISSUED,
         DISTRIBUTION_STARTED,
-        DISTRIBUTION_COMPLETE
+        DISTRIBUTION_COMPLETE,
+        DISTRIBUTION_CLOSED,
+        ACTIVE
     }
 
     event StatusChanged(Status newStatus);
@@ -98,5 +100,23 @@ contract BondTrackerPublic is Ownable {
             _status = Status.DISTRIBUTION_COMPLETE;
             emit StatusChanged(_status);
         }
+    }
+
+    function closeDistribution() external onlyOwner {
+        require(
+            _status == Status.DISTRIBUTION_COMPLETE,
+            "Distribution is not complete"
+        );
+        _status = Status.DISTRIBUTION_CLOSED;
+        emit StatusChanged(_status);
+    }
+
+    function setActive() external onlyOwner {
+        require(
+            _status == Status.DISTRIBUTION_CLOSED,
+            "Bond is not ready to be activated"
+        );
+        _status = Status.ACTIVE;
+        emit StatusChanged(_status);
     }
 }

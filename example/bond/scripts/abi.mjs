@@ -11,11 +11,21 @@ await copyFile(
 );
 
 await copyFile(
-  "../../solidity/artifacts/contracts/private/InvestorRegistry.sol/InvestorRegistry.json",
-  "src/abis/InvestorRegistry.json"
+  "../../solidity/artifacts/contracts/private/InvestorList.sol/InvestorList.json",
+  "src/abis/InvestorList.json"
 );
 
 await copyFile(
   "../../solidity/artifacts/contracts/shared/BondTrackerPublic.sol/BondTrackerPublic.json",
   "src/abis/BondTrackerPublic.json"
+);
+
+await copyFile(
+  "../../solidity/artifacts/contracts/shared/Atom.sol/AtomFactory.json",
+  "src/abis/AtomFactory.json"
+);
+
+await copyFile(
+  "../../solidity/artifacts/contracts/shared/Atom.sol/Atom.json",
+  "src/abis/Atom.json"
 );

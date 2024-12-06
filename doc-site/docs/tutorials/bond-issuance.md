@@ -141,6 +141,26 @@ The "hooks" configuration points it to the private hooks contract that was deplo
 
 For this token, "restrictMinting" is disabled, because the hooks can enforce more flexible rules on both mint and transfer.
 
+#### Create factory for atomic transactions
+
+```typescript
+await paladin1.sendTransaction({
+  type: TransactionType.PUBLIC,
+  abi: atomFactoryJson.abi,
+  bytecode: atomFactoryJson.bytecode,
+  function: "",
+  from: bondIssuerUnqualified,
+  data: {},
+});
+```
+
+Many programming patterns in Paladin will require a contract on the shared ledger that
+can prepare and execute atomic transactions. This is provided by the
+[Atom and AtomFactory](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/solidity/contracts/shared/Atom.sol) contracts.
+
+At least one instance of `AtomFactory` must be deployed to run this example. Once in place,
+note that this same factory contract can be reused for atomic transactions of any composition.
+
 ### Bond issuance
 
 #### Issue bond to custodian
@@ -166,8 +186,8 @@ await bondTracker.using(paladin2).beginDistribution(bondCustodian, {
   discountPrice: 1,
   minimumDenomination: 1,
 });
-const investorRegistry = await bondTracker.investorRegistry(bondIssuer);
-await investorRegistry
+const investorList = await bondTracker.investorList(bondIssuer);
+await investorList
   .using(paladin2)
   .addInvestor(bondCustodian, { addr: investorAddress });
 ```
@@ -208,6 +228,7 @@ const bondSubscription = await newBondSubscription(
     bondAddress_: notoBond.address,
     units_: 100,
     custodian_: bondCustodianAddress,
+    atomFactory_: atomFactoryAddress,
   }
 );
 ```
@@ -264,6 +285,20 @@ The `preparePayment` and `prepareBond` methods on the bond subscription contract
 respective parties to encode their prepared transactions, in preparation for triggering an
 atomic DvP (delivery vs. payment).
 
+#### Prepare the atomic transaction for the swap
+
+```typescript
+await bondSubscription.using(paladin2).distribute(bondCustodian);
+```
+
+When both parties have prepared their individual transactions, they can be combined into a
+single base ledger transaction. The `distribute()` method below is a private method on
+the `BondSubscription` contract, but it triggers creation of a new `Atom` contract on the
+base ledger which contains the encoded transactions prepared above.
+
+Once an `Atom` is deployed, it can be used to execute all or none of the transactions it
+contains. It can never be changed, executed partially, or executed more than once.
+
 #### Approve delegation via the private contract
 
 ```typescript
@@ -271,7 +306,7 @@ await notoCash.using(paladin3).approveTransfer(investor, {
   inputs: encodeStates(paymentTransfer.states.spent ?? []),
   outputs: encodeStates(paymentTransfer.states.confirmed ?? []),
   data: paymentTransfer.metadata.approvalParams.data,
-  delegate: investorCustodianGroup.address,
+  delegate: atomAddress,
 });
 
 await issuerCustodianGroup.approveTransition(
@@ -280,14 +315,15 @@ await issuerCustodianGroup.approveTransition(
     txId: newTransactionId(),
     transitionHash: bondTransfer2.metadata.approvalParams.transitionHash,
     signatures: bondTransfer2.metadata.approvalParams.signatures,
-    delegate: investorCustodianGroup.address,
+    delegate: atomAddress,
   }
 );
 ```
 
-In order for the private subscription contract to be able to facilitate the token exchange,
-the base ledger address of the investor+custodian group must be designated as the approved
-delegate for both the payment transfer and the bond transfer.
+Once the `Atom` is deployed, it must be designated as the approved delegate for both
+the payment transfer and the bond transfer. Because this binds a specific set of atomic
+operations to a unique contract address, both parties can be assured that by approving
+this address as a delegate, the only transaction that can take place is the agreed swap.
 
 In the case of the payment, we use the `approveTransfer` method of Noto. For the bond,
 which uses Pente custom logic to wrap the Noto token, we use the `approveTransition` method
@@ -296,15 +332,19 @@ of Pente.
 #### Distribute the bond units by performing swap
 
 ```typescript
-await bondSubscription.using(paladin2).distribute(bondCustodian, {
-  units_: 100,
+await paladin2.sendTransaction({
+  type: TransactionType.PUBLIC,
+  abi: atomJson.abi,
+  function: "execute",
+  from: bondCustodianUnqualified,
+  to: atomAddress,
+  data: {},
 });
 ```
 
-Finally, the custodian uses the `distribute` method on the bond subscription contract to
-trigger the exchange of the bond and payment.
+Finally, the custodian executes the `Atom` to trigger the exchange of the bond and payment.
 
-This private transaction will trigger the previously-prepared transactions for the cash
+This will trigger the previously-prepared transactions for the cash
 transfer and the bond transfer, and it will also trigger an external call to the public
 bond tracker to decrease the advertised available supply of the bond.
 

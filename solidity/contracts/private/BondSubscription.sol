@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IPenteExternalCall} from "./interfaces/IPenteExternalCall.sol";
+import {Atom, AtomFactory} from "../shared/Atom.sol";
 
 /**
  * @title BondSubscription
@@ -12,7 +13,7 @@ contract BondSubscription is Ownable, IPenteExternalCall {
     address public bondAddress;
     address public custodian;
     uint256 public requestedUnits;
-    uint256 public receivedUnits;
+    address public atomFactory;
 
     address internal distributeBondAddress;
     bytes internal distributeBondCall;
@@ -27,11 +28,13 @@ contract BondSubscription is Ownable, IPenteExternalCall {
     constructor(
         address bondAddress_,
         uint256 units_,
-        address custodian_
+        address custodian_,
+        address atomFactory_
     ) Ownable(_msgSender()) {
         bondAddress = bondAddress_;
         requestedUnits = units_;
         custodian = custodian_;
+        atomFactory = atomFactory_;
     }
 
     function preparePayment(
@@ -50,12 +53,7 @@ contract BondSubscription is Ownable, IPenteExternalCall {
         distributeBondCall = encodedCall;
     }
 
-    function distribute(uint256 units_) external onlyCustodian {
-        require(
-            units_ <= requestedUnits &&
-                receivedUnits <= requestedUnits - units_,
-            "Cannot receive more units than were requested"
-        );
+    function distribute() external onlyCustodian {
         require(
             distributeBondCall.length > 0,
             "Bond transfer has not been prepared"
@@ -64,8 +62,19 @@ contract BondSubscription is Ownable, IPenteExternalCall {
             distributePaymentCall.length > 0,
             "Payment transfer has not been prepared"
         );
-        receivedUnits += units_;
-        emit PenteExternalCall(distributeBondAddress, distributeBondCall);
-        emit PenteExternalCall(distributePaymentAddress, distributePaymentCall);
+
+        Atom.Operation[] memory operations = new Atom.Operation[](2);
+        operations[0] = Atom.Operation(
+            distributeBondAddress,
+            distributeBondCall
+        );
+        operations[1] = Atom.Operation(
+            distributePaymentAddress,
+            distributePaymentCall
+        );
+        emit PenteExternalCall(
+            atomFactory,
+            abi.encodeCall(AtomFactory.create, operations)
+        );
     }
 }

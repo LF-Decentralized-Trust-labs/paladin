@@ -2,22 +2,22 @@ import PaladinClient, {
   PentePrivacyGroup,
   PentePrivateContract,
 } from "paladin-sdk";
-import investorRegistry from "../abis/InvestorRegistry.json";
+import investorList from "../abis/InvestorList.json";
 
 export interface AddInvestorParams {
   addr: string;
 }
 
-export class InvestorRegistry extends PentePrivateContract<{}> {
+export class InvestorList extends PentePrivateContract<{}> {
   constructor(
     protected evm: PentePrivacyGroup,
     public readonly address: string
   ) {
-    super(evm, investorRegistry.abi, address);
+    super(evm, investorList.abi, address);
   }
 
   using(paladin: PaladinClient) {
-    return new InvestorRegistry(this.evm.using(paladin), this.address);
+    return new InvestorList(this.evm.using(paladin), this.address);
   }
 
   addInvestor(from: string, params: AddInvestorParams) {
