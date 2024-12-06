@@ -166,8 +166,8 @@ await bondTracker.using(paladin2).beginDistribution(bondCustodian, {
   discountPrice: 1,
   minimumDenomination: 1,
 });
-const investorRegistry = await bondTracker.investorRegistry(bondIssuer);
-await investorRegistry
+const investorList = await bondTracker.investorList(bondIssuer);
+await investorList
   .using(paladin2)
   .addInvestor(bondCustodian, { addr: investorAddress });
 ```

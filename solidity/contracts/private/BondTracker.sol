@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {INotoHooks} from "../private/interfaces/INotoHooks.sol";
-import {InvestorRegistry} from "./InvestorRegistry.sol";
+import {InvestorList} from "./InvestorList.sol";
 
 /**
  * @title BondTracker
@@ -20,7 +20,7 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
     Status internal _status;
     address internal _publicTracker;
     address internal _issuer;
-    InvestorRegistry public investorRegistry;
+    InvestorList public investorList;
 
     constructor(
         string memory name,
@@ -31,7 +31,7 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         _status = Status.INITIALIZED;
         _publicTracker = publicTracker;
         _issuer = _msgSender();
-        investorRegistry = new InvestorRegistry(custodian);
+        investorList = new InvestorList(custodian);
     }
 
     function onMint(
@@ -75,10 +75,7 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         uint256 amount,
         PreparedTransaction calldata prepared
     ) external onlyOwner {
-        require(
-            investorRegistry.isRegistered(to),
-            "Investor is not registered"
-        );
+        investorList.checkTransfer(sender, from, to, amount);
         _transfer(from, to, amount);
 
         if (from == owner()) {

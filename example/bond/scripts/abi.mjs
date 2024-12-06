@@ -11,8 +11,8 @@ await copyFile(
 );
 
 await copyFile(
-  "../../solidity/artifacts/contracts/private/InvestorRegistry.sol/InvestorRegistry.json",
-  "src/abis/InvestorRegistry.json"
+  "../../solidity/artifacts/contracts/private/InvestorList.sol/InvestorList.json",
+  "src/abis/InvestorList.json"
 );
 
 await copyFile(

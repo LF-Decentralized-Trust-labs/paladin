@@ -170,8 +170,8 @@ async function main() {
   logger.log("Success!");
 
   // Add allowed investors
-  const investorRegistry = await bondTracker.investorRegistry(bondIssuer);
-  await investorRegistry
+  const investorList = await bondTracker.investorList(bondIssuer);
+  await investorList
     .using(paladin2)
     .addInvestor(bondCustodian, { addr: investorAddress });
 
