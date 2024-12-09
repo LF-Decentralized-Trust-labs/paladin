@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Bond example: run",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "start"
+            ],
+            "runtimeExecutable": "npm",
+            "type": "node",
+            "cwd": "${workspaceFolder}/example/bond"
+        },
+        {
             "name": "Run Controller",
             "type": "go",
             "preLaunchTask": "check-running-on-kind",

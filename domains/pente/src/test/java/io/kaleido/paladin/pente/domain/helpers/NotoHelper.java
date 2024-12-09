@@ -26,7 +26,6 @@ import io.kaleido.paladin.toolkit.*;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 public class NotoHelper {
@@ -81,7 +80,7 @@ public class NotoHelper {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record NotoPublicTransaction(
+    public record PublicTransaction(
             @JsonProperty
             JsonABI.Entry functionABI,
             @JsonProperty
@@ -96,7 +95,7 @@ public class NotoHelper {
             @JsonProperty
             ApproveExtraParams approvalParams,
             @JsonProperty
-            NotoPublicTransaction transferWithApproval
+            PublicTransaction transferWithApproval
     ) {
     }
 
@@ -119,10 +118,6 @@ public class NotoHelper {
 
     public String address() {
         return address;
-    }
-
-    private static Testbed.TransactionResult getTransactionInfo(LinkedHashMap<String, Object> res) {
-        return new ObjectMapper().convertValue(res, Testbed.TransactionResult.class);
     }
 
     public List<NotoCoin> queryStates(JsonHex.Bytes32 schemaID, JsonQuery.Query query) throws IOException {
@@ -165,7 +160,7 @@ public class NotoHelper {
     }
 
     public Testbed.TransactionResult prepareTransfer(String sender, String to, int amount) throws IOException {
-        return getTransactionInfo(
+        return TestbedHelper.getTransactionResult(
                 testbed.getRpcClient().request("testbed_prepare", new Testbed.TransactionInput(
                         "private",
                         "",

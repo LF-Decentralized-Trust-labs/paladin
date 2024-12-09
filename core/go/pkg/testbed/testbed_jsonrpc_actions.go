@@ -418,6 +418,7 @@ func (tb *testbed) mapTransaction(ctx context.Context, tx *components.PrivateTra
 	}
 
 	return &TransactionResult{
+		ID:                  tx.ID,
 		EncodedCall:         encodedCall,
 		PreparedTransaction: preparedTransaction,
 		PreparedMetadata:    tx.PreparedMetadata,

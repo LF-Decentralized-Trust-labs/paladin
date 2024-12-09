@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -99,6 +100,8 @@ public class Testbed implements Closeable {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TransactionResult(
+            @JsonProperty
+            String id,
             @JsonProperty
             JsonHex.Bytes encodedCall,
             @JsonProperty

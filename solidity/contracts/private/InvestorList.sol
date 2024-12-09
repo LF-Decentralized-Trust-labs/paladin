@@ -2,12 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ITransferPolicy} from "./interfaces/ITransferPolicy.sol";
 
 /**
- * @title InvestorRegistry
+ * @title InvestorList
  * @dev Simple allow/deny list for tracking registered investors.
  */
-contract InvestorRegistry is Ownable {
+contract InvestorList is Ownable, ITransferPolicy {
     event InvestorAdded(address indexed investor);
     event InvestorRemoved(address indexed investor);
 
@@ -37,7 +38,7 @@ contract InvestorRegistry is Ownable {
         emit InvestorRemoved(addr);
     }
 
-    function isRegistered(address addr) external view returns (bool) {
+    function isRegistered(address addr) public view returns (bool) {
         return _investorIndex[addr] != 0;
     }
 
@@ -48,5 +49,14 @@ contract InvestorRegistry is Ownable {
         }
 
         return _investors;
+    }
+
+    function checkTransfer(
+        address sender,
+        address from,
+        address to,
+        uint256 amount
+    ) external view {
+        require(isRegistered(to), "Investor is not registered");
     }
 }

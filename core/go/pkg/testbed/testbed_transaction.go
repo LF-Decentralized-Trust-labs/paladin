@@ -17,11 +17,13 @@
 package testbed
 
 import (
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type TransactionResult struct {
+	ID                  uuid.UUID                `json:"id"`
 	EncodedCall         tktypes.HexBytes         `json:"encodedCall"`
 	PreparedTransaction *pldapi.TransactionInput `json:"preparedTransaction"`
 	PreparedMetadata    tktypes.RawJSON          `json:"preparedMetadata"`

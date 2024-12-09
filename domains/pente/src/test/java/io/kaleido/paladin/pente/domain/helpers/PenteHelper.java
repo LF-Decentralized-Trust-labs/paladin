@@ -17,6 +17,7 @@ package io.kaleido.paladin.pente.domain.helpers;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kaleido.paladin.pente.domain.PenteConfiguration;
 import io.kaleido.paladin.testbed.Testbed;
@@ -25,7 +26,6 @@ import io.kaleido.paladin.toolkit.JsonHex;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,9 +43,38 @@ public class PenteHelper {
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ApproveExtraParams(
+            @JsonProperty
+            JsonHex.Bytes32 transitionHash,
+            @JsonProperty
+            List<JsonHex.Bytes> signatures
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PublicTransaction(
+            @JsonProperty
+            JsonABI.Entry functionABI,
+            @JsonProperty
+            JsonNode paramsJSON,
+            @JsonProperty
+            JsonHex.Bytes encodedCall
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PenteTransitionMetadata(
+            @JsonProperty
+            ApproveExtraParams approvalParams,
+            @JsonProperty
+            PublicTransaction transitionWithApproval
+    ) {
+    }
+
     public static PenteHelper newPrivacyGroup(String domainName, String from, Testbed testbed, PenteConfiguration.GroupTupleJSON groupInfo, boolean externalCallsEnabled) throws IOException {
         String address = testbed.getRpcClient().request("testbed_deploy",
-                domainName, from, 
+                domainName, from,
                 new PenteConfiguration.PrivacyGroupConstructorParamsJSON(
                         groupInfo,
                         "shanghai",
@@ -66,10 +95,6 @@ public class PenteHelper {
         return address;
     }
 
-    private static Testbed.TransactionResult getTransactionInfo(LinkedHashMap<String, Object> res) {
-        return new ObjectMapper().convertValue(res, Testbed.TransactionResult.class);
-    }
-
     public JsonHex.Address deploy(String sender, String bytecode, JsonABI.Parameters inputABI, Object inputValues) throws IOException {
         JsonABI.Entry deployABI = JsonABI.newFunction(
                 "deploy",
@@ -84,7 +109,7 @@ public class PenteHelper {
                 JsonABI.newParameters()
         );
 
-        var tx = getTransactionInfo(
+        var tx = TestbedHelper.getTransactionResult(
                 testbed.getRpcClient().request("testbed_invoke", new Testbed.TransactionInput(
                         "private",
                         "",
@@ -102,7 +127,7 @@ public class PenteHelper {
         return domainData.contractAddress();
     }
 
-    public void invoke(String methodName, JsonABI.Parameters inputParams, String sender, JsonHex.Address privateAddress, Object inputValues) throws IOException {
+    public Testbed.TransactionResult invoke(String methodName, JsonABI.Parameters inputParams, String sender, JsonHex.Address privateAddress, Object inputValues) throws IOException {
         JsonABI.Entry invokeABI = JsonABI.newFunction(
                 methodName,
                 JsonABI.newParameters(
@@ -116,20 +141,21 @@ public class PenteHelper {
                 JsonABI.newParameters()
         );
 
-        testbed.getRpcClient().request("testbed_invoke",
-                new Testbed.TransactionInput(
-                        "private",
-                        "",
-                        sender,
-                        JsonHex.addressFrom(address),
-                        new HashMap<>() {{
-                            put("group", groupInfo);
-                            put("to", privateAddress);
-                            put("inputs", inputValues);
-                        }},
-                        new JsonABI(List.of(invokeABI)),
-                        ""
-                ), true);
+        return TestbedHelper.getTransactionResult(
+                testbed.getRpcClient().request("testbed_invoke",
+                        new Testbed.TransactionInput(
+                                "private",
+                                "",
+                                sender,
+                                JsonHex.addressFrom(address),
+                                new HashMap<>() {{
+                                    put("group", groupInfo);
+                                    put("to", privateAddress);
+                                    put("inputs", inputValues);
+                                }},
+                                new JsonABI(List.of(invokeABI)),
+                                ""
+                        ), true));
     }
 
     public PenteCallOutputJSON call(String methodName, JsonABI.Parameters inputParams, JsonABI.Parameters outputParams, String sender, JsonHex.Address privateAddress, Object inputValues) throws IOException {
@@ -164,7 +190,7 @@ public class PenteHelper {
     }
 
     public Testbed.TransactionResult prepare(String sender, JsonABI.Entry fn, Map<String, Object> inputs) throws IOException {
-        return getTransactionInfo(
+        return TestbedHelper.getTransactionResult(
                 testbed.getRpcClient().request("testbed_prepare", new Testbed.TransactionInput(
                         "private",
                         "",
@@ -173,5 +199,33 @@ public class PenteHelper {
                         inputs,
                         new JsonABI(List.of(fn)),
                         "")));
+    }
+
+    public String approveTransition(String sender, JsonHex.Bytes32 txID, JsonHex.Address delegate, JsonHex.Bytes32 transitionHash, List<JsonHex.Bytes> signatures) throws IOException {
+        JsonABI.Entry fn = JsonABI.newFunction(
+                "approveTransition",
+                JsonABI.newParameters(
+                        JsonABI.newParameter("txId", "bytes32"),
+                        JsonABI.newParameter("delegate", "address"),
+                        JsonABI.newParameter("transitionHash", "bytes32"),
+                        JsonABI.newParameter("signatures", "bytes[]")
+                ),
+                JsonABI.newParameters()
+        );
+
+        return TestbedHelper.sendTransaction(testbed,
+                new Testbed.TransactionInput(
+                        "public",
+                        "",
+                        sender,
+                        JsonHex.addressFrom(address),
+                        new HashMap<>() {{
+                            put("txId", txID);
+                            put("delegate", delegate);
+                            put("transitionHash", transitionHash);
+                            put("signatures", signatures);
+                        }},
+                        new JsonABI(List.of(fn)),
+                        ""));
     }
 }

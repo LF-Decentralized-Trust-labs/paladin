@@ -15,6 +15,7 @@
 
 package io.kaleido.paladin.pente.domain.helpers;
 
+import io.kaleido.paladin.testbed.Testbed;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.ResourceLoader;
@@ -81,16 +82,13 @@ public class BondSubscriptionHelper {
         );
     }
 
-    public void distribute(String sender, int units) throws IOException {
+    public Testbed.TransactionResult distribute(String sender) throws IOException {
         var method = abi.getABIEntry("function", "distribute");
-        pente.invoke(
+        return pente.invoke(
                 method.name(),
                 method.inputs(),
                 sender,
                 address,
-                new HashMap<>() {{
-                    put("units_", units);
-                }}
-        );
+                new HashMap<>());
     }
 }

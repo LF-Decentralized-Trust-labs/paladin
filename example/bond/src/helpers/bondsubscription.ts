@@ -12,6 +12,7 @@ export interface BondSubscriptionConstructorParams {
   bondAddress_: string;
   units_: string | number;
   custodian_: string;
+  atomFactory_: string;
 }
 
 export interface PreparePaymentParams {
@@ -22,10 +23,6 @@ export interface PreparePaymentParams {
 export interface PrepareBondParams {
   to: string;
   encodedCall: string;
-}
-
-export interface DistributeParams {
-  units_: string | number;
 }
 
 export const newBondSubscription = async (
@@ -65,7 +62,7 @@ export class BondSubscription extends PentePrivateContract<BondSubscriptionConst
     return this.invoke(from, "prepareBond", params);
   }
 
-  async distribute(from: string, params: DistributeParams) {
-    return this.invoke(from, "distribute", params);
+  async distribute(from: string) {
+    return this.invoke(from, "distribute", {});
   }
 }

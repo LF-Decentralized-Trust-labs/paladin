@@ -9,6 +9,8 @@ import PaladinClient, {
   Verifiers,
 } from "paladin-sdk";
 import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
+import atomFactoryJson from "./abis/AtomFactory.json";
+import atomJson from "./abis/Atom.json";
 import { newBondSubscription } from "./helpers/bondsubscription";
 import { newBondTracker } from "./helpers/bondtracker";
 
@@ -144,6 +146,24 @@ async function main() {
   }
   logger.log(`Success! address: ${notoBond.address}`);
 
+  // Deploy the atom factory on the base ledger
+  logger.log("Creating atom factory...");
+  txID = await paladin1.sendTransaction({
+    type: TransactionType.PUBLIC,
+    abi: atomFactoryJson.abi,
+    bytecode: atomFactoryJson.bytecode,
+    function: "",
+    from: bondIssuerUnqualified,
+    data: {},
+  });
+  receipt = await paladin1.pollForReceipt(txID, 10000);
+  if (receipt?.contractAddress === undefined) {
+    logger.error("Failed!");
+    return;
+  }
+  logger.log(`Success! address: ${receipt.contractAddress}`);
+  const atomFactoryAddress = receipt.contractAddress;
+
   // Issue the bond to the custodian
   logger.log("Issuing bond...");
   receipt = await notoBond.mint(bondIssuer, {
@@ -170,8 +190,8 @@ async function main() {
   logger.log("Success!");
 
   // Add allowed investors
-  const investorRegistry = await bondTracker.investorRegistry(bondIssuer);
-  await investorRegistry
+  const investorList = await bondTracker.investorList(bondIssuer);
+  await investorList
     .using(paladin2)
     .addInvestor(bondCustodian, { addr: investorAddress });
 
@@ -203,6 +223,7 @@ async function main() {
       bondAddress_: notoBond.address,
       units_: 100,
       custodian_: bondCustodianAddress,
+      atomFactory_: atomFactoryAddress,
     }
   );
   if (bondSubscription === undefined) {
@@ -298,13 +319,33 @@ async function main() {
   }
   logger.log("Success!");
 
+  // Prepare bond distribution (initializes atomic swap of payment and bond units)
+  logger.log("Generating atom for bond distribution...");
+  receipt = await bondSubscription.using(paladin2).distribute(bondCustodian);
+  if (receipt === undefined) {
+    logger.error("Failed!");
+    return;
+  }
+
+  // TODO: use the AtomDeployed event instead of this lookup method
+  const atomAddressResult = await paladin2.call({
+    type: TransactionType.PUBLIC,
+    abi: atomFactoryJson.abi,
+    function: "lastDeploy",
+    from: bondIssuerUnqualified,
+    to: atomFactoryAddress,
+    data: {},
+  });
+  const atomAddress = atomAddressResult["0"];
+  logger.log("Success!");
+
   // Approve the payment transfer
   logger.log("Approving payment transfer...");
   receipt = await notoCash.using(paladin3).approveTransfer(investor, {
     inputs: encodeStates(paymentTransfer.states.spent ?? []),
     outputs: encodeStates(paymentTransfer.states.confirmed ?? []),
     data: paymentTransfer.metadata.approvalParams.data,
-    delegate: investorCustodianGroup.address,
+    delegate: atomAddress,
   });
   if (receipt === undefined) {
     logger.error("Failed!");
@@ -320,7 +361,7 @@ async function main() {
       txId: newTransactionId(),
       transitionHash: bondTransfer2.metadata.approvalParams.transitionHash,
       signatures: bondTransfer2.metadata.approvalParams.signatures,
-      delegate: investorCustodianGroup.address,
+      delegate: atomAddress,
     }
   );
   if (receipt === undefined) {
@@ -329,11 +370,17 @@ async function main() {
   }
   logger.log("Success!");
 
-  // Distribute the bond (performs atomic swap of payment and bond units)
+  // Execute the atomic transfer
   logger.log("Distributing bond...");
-  receipt = await bondSubscription.using(paladin2).distribute(bondCustodian, {
-    units_: 100,
+  txID = await paladin2.sendTransaction({
+    type: TransactionType.PUBLIC,
+    abi: atomJson.abi,
+    function: "execute",
+    from: bondCustodianUnqualified,
+    to: atomAddress,
+    data: {},
   });
+  receipt = await paladin2.pollForReceipt(txID, 10000);
   if (receipt === undefined) {
     logger.error("Failed!");
     return;
