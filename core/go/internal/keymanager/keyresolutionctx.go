@@ -156,7 +156,7 @@ func (km *keyManager) newKeyResolver(krc *keyResolutionContext) *keyResolver {
 		krc:           krc,
 		id:            tktypes.ShortID(),
 		rootPath:      &resolvedDBPath{},
-		resolvedPaths: make(map[string]*resolvedDBPath),
+		resolvedPaths: map[string]*resolvedDBPath{},
 		done:          make(chan struct{}),
 	}
 }
@@ -226,7 +226,7 @@ func (kr *keyResolver) resolvePathSegment(dbTX *gorm.DB, parent *resolvedDBPath,
 		var dbPath *DBKeyPath
 
 		nextIndex := int64(0)
-		if parent.nextIndex == nil {
+		if parent.nextIndex == nil && path != "" /* root is singleton */ {
 			// Get the highest index on the parent so far written to the DB
 			err = dbTX.WithContext(kr.ctx).
 				Where("parent = ?", parent.path).
@@ -260,7 +260,7 @@ func (kr *keyResolver) resolvePathSegment(dbTX *gorm.DB, parent *resolvedDBPath,
 		if result.RowsAffected == 0 {
 			// note this is not an optimized path - lots of thread clashing to create the same
 			// key concurrently. Separate re-use of lots of keys is the more optimized path.
-			log.L(kr.ctx).Infof("re-checking with lock after losing optimistic race: %s", err)
+			log.L(kr.ctx).Infof("re-checking with lock after losing optimistic race (rowsAffected=%d)", result.RowsAffected)
 			parent.nextIndex = nil
 			continue
 		}
