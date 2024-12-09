@@ -45,10 +45,12 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
   }
 
   const formatProperty = (value: any) => {
-    try {
-      const parsed = JSON.stringify(value);
-      return parsed.substring(1, parsed.length - 1);
-    } catch (err) { }
+    if (typeof value === 'object') {
+      try {
+        const parsed = JSON.stringify(value);
+        return parsed.substring(1, parsed.length - 1);
+      } catch (err) { }
+    }
     return value;
   };
 
@@ -114,7 +116,7 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
               .map((property) => (
                 <TextField
                   key={property}
-                  label={property}
+                  label={t(property)}
                   maxRows={8}
                   multiline
                   fullWidth

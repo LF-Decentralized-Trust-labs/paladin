@@ -23,6 +23,8 @@ import { ApplicationContext } from "../contexts/ApplicationContext";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import UploadIcon from '@mui/icons-material/Upload';
+import { ABIUploadDialog } from "../dialogs/ABIUpload";
 
 export const Header: React.FC = () => {
 
@@ -32,6 +34,7 @@ export const Header: React.FC = () => {
   const pathname = useLocation().pathname.toLowerCase();
   const theme = useTheme();
   const lessThanMedium = useMediaQuery(theme.breakpoints.down("md"));
+  const [abiUploadDialogOpen, setAbiUploadDialogOpen] = useState(false);
 
   const getTabFromPath = (path: string) => {
     if (path.startsWith('/ui/indexer')) {
@@ -86,12 +89,12 @@ export const Header: React.FC = () => {
                 <Grid2 container justifyContent={lessThanMedium ? 'center' : 'right'} spacing={1} alignItems="center"
                   sx={{ padding: lessThanMedium ? '20px' : undefined }}>
                   {refreshRequired &&
-                  <Grid2>
-                    <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ textTransform: 'none', borderRadius: '20px'}}
-                    onClick={() => refresh()}>
-                      {t('newData')}
-                    </Button>
-                  </Grid2>}
+                    <Grid2>
+                      <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ textTransform: 'none', borderRadius: '20px' }}
+                        onClick={() => refresh()}>
+                        {t('newData')}
+                      </Button>
+                    </Grid2>}
                   <Grid2>
                     <ToggleButtonGroup exclusive onChange={(_event, value) => handleAutoRefreshChange(value)} value={autoRefreshEnabled ? 'play' : 'pause'}>
                       <Tooltip arrow title={t('autoRefreshOn')}
@@ -111,6 +114,13 @@ export const Header: React.FC = () => {
                     </ToggleButtonGroup>
                   </Grid2>
                   <Grid2>
+                    <Tooltip arrow title={t('uploadABI')}
+                      slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -4] }, }] } }}
+                    >
+                      <IconButton onClick={() => setAbiUploadDialogOpen(true)}>
+                        <UploadIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip arrow title={t('switchThemeMode')}
                       slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -4] }, }] } }}
                     >
@@ -129,6 +139,10 @@ export const Header: React.FC = () => {
         height: theme => lessThanMedium ? '190px' :
           theme.mixins.toolbar
       }} />
+    <ABIUploadDialog
+      dialogOpen={abiUploadDialogOpen}
+      setDialogOpen={setAbiUploadDialogOpen}
+    />
     </>
   );
 
