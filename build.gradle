@@ -196,17 +196,45 @@ task copyZetoZKPFiles(type: Copy) {
     // Likely if the range of circuits grows, a separate docker tag will be required for builds
     // of Paladin that have a wider range of pre-built circuits included.
     from fileTree('domains/zeto/zkp') {
+        // anon
         include 'anon.zkey'
         include 'anon-vkey.json'
         include 'anon_js/anon.wasm'
+        include 'anon_batch.zkey'
+        include 'anon_batch-vkey.json'
+        include 'anon_batch_js/anon_batch.wasm'
         // anon_enc
         include 'anon_enc.zkey'
         include 'anon_enc-vkey.json'
         include 'anon_enc_js/anon_enc.wasm'
+        include 'anon_enc_batch.zkey'
+        include 'anon_enc_batch-vkey.json'
+        include 'anon_enc_batch_js/anon_enc_batch.wasm'
         // anon_nullifier
         include 'anon_nullifier.zkey'
         include 'anon_nullifier-vkey.json'
         include 'anon_nullifier_js/anon_nullifier.wasm'
+        include 'anon_nullifier_batch.zkey'
+        include 'anon_nullifier_batch-vkey.json'
+        include 'anon_nullifier_batch_js/anon_nullifier_batch.wasm'
+        // deposit
+        include 'check_hashes_value.zkey'
+        include 'check_hashes_value-vkey.json'
+        include 'check_hashes_value_js/check_hashes_value.wasm'
+        // withdraw
+        include 'check_inputs_outputs_value.zkey'
+        include 'check_inputs_outputs_value-vkey.json'
+        include 'check_inputs_outputs_value_js/check_inputs_outputs_value.wasm'
+        include 'check_inputs_outputs_value_batch.zkey'
+        include 'check_inputs_outputs_value_batch-vkey.json'
+        include 'check_inputs_outputs_value_batch_js/check_inputs_outputs_value_batch.wasm'
+        // withdraw_nullifier
+        include 'check_nullifier_value.zkey'
+        include 'check_nullifier_value-vkey.json'
+        include 'check_nullifier_value_js/check_nullifier_value.wasm'
+        include 'check_nullifier_value_batch.zkey'
+        include 'check_nullifier_value_batch-vkey.json'
+        include 'check_nullifier_value_batch_js/check_nullifier_value_batch.wasm'
     }
     into zetoZkpDir
 

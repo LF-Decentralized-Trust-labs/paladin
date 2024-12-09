@@ -29,9 +29,10 @@ message ProvingRequestCommon {
   repeated uint64 inputValues = 2;
   repeated string inputSalts = 3;
   string inputOwner = 4;
-  repeated uint64 outputValues = 5;
-  repeated string outputSalts = 6;
-  repeated string outputOwners = 7;
+  repeated string outputCommitments = 5;
+  repeated uint64 outputValues = 6;
+  repeated string outputSalts = 7;
+  repeated string outputOwners = 8;
 }
 
 message ProvingRequestExtras_Encryption {

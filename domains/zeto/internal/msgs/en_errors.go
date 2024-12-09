@@ -144,4 +144,6 @@ var (
 	MsgNoDomainReceipt                     = ffe("PD210102", "Not implemented. See state receipt for coin transfers")
 	MsgUnknownSignPayload                  = ffe("PD210103", "Sign payload type '%s' not recognized")
 	MsgNullifierGenerationFailed           = ffe("PD210104", "Failed to generate nullifier for coin")
+	MsgErrorDecodeDepositCall              = ffe("PD210105", "Failed to decode the deposit call. %s")
+	MsgErrorDecodeWithdrawCall             = ffe("PD210106", "Failed to decode the withdraw call. %s")
 )
