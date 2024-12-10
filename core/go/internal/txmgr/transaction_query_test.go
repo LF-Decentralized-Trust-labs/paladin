@@ -22,9 +22,12 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 
+	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,4 +72,52 @@ func TestGetTransactionDependenciesFail(t *testing.T) {
 
 	_, err := txm.GetTransactionDependencies(ctx, uuid.New())
 	assert.Regexp(t, "pop", err)
+}
+
+func TestGetResolvedTransactionByIDFail(t *testing.T) {
+	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*transactions").WillReturnError(fmt.Errorf("pop"))
+	})
+	defer done()
+
+	_, err := txm.GetResolvedTransactionByID(ctx, uuid.New())
+	assert.Regexp(t, "pop", err)
+}
+
+func TestResolveABIReferencesAndCacheFail(t *testing.T) {
+	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*abis").WillReturnError(fmt.Errorf("pop"))
+	})
+	defer done()
+
+	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.DB(), []*components.ResolvedTransaction{
+		{Transaction: &pldapi.Transaction{
+			TransactionBase: pldapi.TransactionBase{
+				ABIReference: confutil.P((tktypes.Bytes32)(tktypes.RandBytes(32))),
+			},
+		}},
+	})
+	assert.Regexp(t, "pop", err)
+}
+
+func TestResolveABIReferencesAndCacheBadFunc(t *testing.T) {
+	var abiHash = (tktypes.Bytes32)(tktypes.RandBytes(32))
+	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*abis").WillReturnRows(mc.db.NewRows([]string{"hash", "abi"}).AddRow(
+			abiHash.String(), `[]`,
+		))
+	})
+	defer done()
+
+	_, err := txm.resolveABIReferencesAndCache(ctx, txm.p.DB(), []*components.ResolvedTransaction{
+		{Transaction: &pldapi.Transaction{
+			ID: confutil.P(uuid.New()),
+			TransactionBase: pldapi.TransactionBase{
+				Function:     "doStuff()",
+				To:           tktypes.RandAddress(),
+				ABIReference: confutil.P(abiHash),
+			},
+		}},
+	})
+	assert.Regexp(t, "PD012206", err)
 }

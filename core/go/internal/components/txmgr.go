@@ -52,14 +52,17 @@ type TxCompletion struct {
 	PSC DomainSmartContract
 }
 
+type ResolvedTransaction struct {
+	Transaction *pldapi.Transaction
+	DependsOn   []uuid.UUID
+	Function    *ResolvedFunction
+}
+
 // This is a transaction read for insertion into the Paladin database with all pre-verification completed.
 type ValidatedTransaction struct {
+	ResolvedTransaction
 	LocalFrom    string
-	Transaction  *pldapi.Transaction
-	DependsOn    []uuid.UUID
-	Function     *ResolvedFunction
 	PublicTxData []byte
-	Inputs       tktypes.RawJSON
 }
 
 // A resolved function on the ABI
@@ -85,11 +88,13 @@ type TXManager interface {
 	PrepareTransaction(ctx context.Context, tx *pldapi.TransactionInput) (*uuid.UUID, error)
 	PrepareTransactions(ctx context.Context, txs []*pldapi.TransactionInput) (txIDs []uuid.UUID, err error)
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error)
+	GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*ResolvedTransaction, error) // cache optimized
 	GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error)
 	GetTransactionDependencies(ctx context.Context, id uuid.UUID) (*pldapi.TransactionDependencies, error)
 	GetPublicTransactionByNonce(ctx context.Context, from tktypes.EthAddress, nonce tktypes.HexUint64) (*pldapi.PublicTxWithBinding, error)
 	GetPublicTransactionByHash(ctx context.Context, hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error)
 	QueryTransactions(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*pldapi.Transaction, error)
+	QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*ResolvedTransaction, error)
 	QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) (results []*pldapi.TransactionFull, err error)
 	QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*pldapi.TransactionFull, error)
 	QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error)
@@ -102,6 +107,6 @@ type TXManager interface {
 	// These functions for use of the private TX manager for chaining private transactions.
 
 	PrepareInternalPrivateTransaction(ctx context.Context, dbTX *gorm.DB, tx *pldapi.TransactionInput, submitMode pldapi.SubmitMode) (func(), *ValidatedTransaction, error)
-	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*ValidatedTransaction) error
+	UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*ValidatedTransaction) (postCommit func(), err error)
 	WritePreparedTransactions(ctx context.Context, dbTX *gorm.DB, prepared []*PrepareTransactionWithRefs) (postCommit func(), err error)
 }

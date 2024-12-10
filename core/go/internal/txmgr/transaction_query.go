@@ -19,7 +19,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/filters"
+	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -38,7 +41,7 @@ var transactionFilters = filters.FieldMap{
 	"to":             filters.HexBytesField("to"),
 }
 
-func mapPersistedTXBase(pt *persistedTransaction) *pldapi.Transaction {
+func (tm *txManager) mapPersistedTXBase(pt *persistedTransaction) *pldapi.Transaction {
 	res := &pldapi.Transaction{
 		ID:         &pt.ID,
 		Created:    pt.Created,
@@ -59,7 +62,7 @@ func mapPersistedTXBase(pt *persistedTransaction) *pldapi.Transaction {
 
 func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *pldapi.TransactionFull {
 	res := &pldapi.TransactionFull{
-		Transaction: mapPersistedTXBase(pt),
+		Transaction: tm.mapPersistedTXBase(pt),
 	}
 	receipt := pt.TransactionReceipt
 	if receipt != nil {
@@ -69,6 +72,16 @@ func (tm *txManager) mapPersistedTXFull(pt *persistedTransaction) *pldapi.Transa
 		res.DependsOn = append(res.DependsOn, dep.DependsOn)
 	}
 
+	return res
+}
+
+func (tm *txManager) mapPersistedTXResolved(pt *persistedTransaction) *components.ResolvedTransaction {
+	res := &components.ResolvedTransaction{
+		Transaction: tm.mapPersistedTXBase(pt),
+	}
+	for _, dep := range pt.TransactionDeps {
+		res.DependsOn = append(res.DependsOn, dep.DependsOn)
+	}
 	return res
 }
 
@@ -87,7 +100,7 @@ func (tm *txManager) QueryTransactions(ctx context.Context, jq *query.QueryJSON,
 			return q
 		},
 		mapResult: func(pt *persistedTransaction) (*pldapi.Transaction, error) {
-			return mapPersistedTXBase(pt), nil
+			return tm.mapPersistedTXBase(pt), nil
 		},
 	}
 	return qw.run(ctx, dbTX)
@@ -95,6 +108,34 @@ func (tm *txManager) QueryTransactions(ctx context.Context, jq *query.QueryJSON,
 
 func (tm *txManager) QueryTransactionsFull(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) (results []*pldapi.TransactionFull, err error) {
 	return tm.QueryTransactionsFullTx(ctx, jq, dbTX, pending)
+}
+
+func (tm *txManager) QueryTransactionsResolved(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*components.ResolvedTransaction, error) {
+	qw := &queryWrapper[persistedTransaction, components.ResolvedTransaction]{
+		p:           tm.p,
+		table:       "transactions",
+		defaultSort: "-created",
+		filters:     transactionFilters,
+		query:       jq,
+		finalize: func(q *gorm.DB) *gorm.DB {
+			q = q.
+				Preload("TransactionDeps").
+				Joins("TransactionReceipt")
+			if pending {
+				q = q.Joins("TransactionReceipt").
+					Where(`"TransactionReceipt"."transaction" IS NULL`)
+			}
+			return q
+		},
+		mapResult: func(pt *persistedTransaction) (*components.ResolvedTransaction, error) {
+			return tm.mapPersistedTXResolved(pt), nil
+		},
+	}
+	ptxs, err := qw.run(ctx, dbTX)
+	if err != nil {
+		return nil, err
+	}
+	return tm.resolveABIReferencesAndCache(ctx, dbTX, ptxs)
 }
 
 func (tm *txManager) QueryTransactionsFullTx(ctx context.Context, jq *query.QueryJSON, dbTX *gorm.DB, pending bool) ([]*pldapi.TransactionFull, error) {
@@ -141,12 +182,50 @@ func (tm *txManager) mergePublicTransactions(ctx context.Context, dbTX *gorm.DB,
 
 }
 
+func (tm *txManager) resolveABIReferencesAndCache(ctx context.Context, dbTX *gorm.DB, txs []*components.ResolvedTransaction) (_ []*components.ResolvedTransaction, err error) {
+	abis := make(map[tktypes.Bytes32]*pldapi.StoredABI, len(txs))
+	for _, tx := range txs {
+		a := abis[*tx.Transaction.ABIReference]
+		if a == nil {
+			if a, err = tm.getABIByHash(ctx, dbTX, *tx.Transaction.ABIReference); a == nil || err != nil {
+				return nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrABIReferenceLookupFailed, tx.Transaction.ABIReference)
+			}
+		}
+		resolvedFunction, err := tm.pickFunction(ctx, a, tx.Transaction.Function, tx.Transaction.To)
+		if err != nil {
+			return nil, err
+		}
+		tx.Function = resolvedFunction
+
+		// We can cache this transaction for ID lookup at this point
+		tm.txCache.Set(*tx.Transaction.ID, tx)
+	}
+	return txs, nil
+}
+
 func (tm *txManager) GetTransactionByIDFull(ctx context.Context, id uuid.UUID) (result *pldapi.TransactionFull, err error) {
 	ptxs, err := tm.QueryTransactionsFull(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), tm.p.DB(), false)
 	if len(ptxs) == 0 || err != nil {
 		return nil, err
 	}
 	return ptxs[0], nil
+}
+
+func (tm *txManager) GetResolvedTransactionByID(ctx context.Context, id uuid.UUID) (*components.ResolvedTransaction, error) {
+	// This is cache optimized, because domains rely on the sender node's transaction store as
+	// the only place to read transaction data from for init and assembly.
+	// So we maintain a cache to make that lookup efficient.
+	rtx, _ := tm.txCache.Get(id)
+	if rtx != nil {
+		return rtx, nil
+	}
+
+	// Do the query - this function also does the caching (so individual TXs get cached from paginated queries)
+	rtxs, err := tm.QueryTransactionsResolved(ctx, query.NewQueryBuilder().Limit(1).Equal("id", id).Query(), tm.p.DB(), false)
+	if len(rtxs) == 0 || err != nil {
+		return nil, err
+	}
+	return rtxs[0], nil
 }
 
 func (tm *txManager) GetTransactionByID(ctx context.Context, id uuid.UUID) (*pldapi.Transaction, error) {

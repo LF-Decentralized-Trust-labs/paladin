@@ -853,6 +853,10 @@ func TestInternalPrivateTXInsertWithIdempotencyKeys(t *testing.T) {
 	err := txm.p.DB().Transaction(func(dbTX *gorm.DB) (err error) {
 		for i := range fifteenTxns {
 			tx := newTestInternalTransaction(fmt.Sprintf("tx_%.3d", i))
+			// We do a dep chain
+			if i > 0 {
+				tx.DependsOn = []uuid.UUID{*fifteenTxns[i-1].Transaction.ID}
+			}
 			fifteenPostCommits[i], fifteenTxns[i], err = txm.PrepareInternalPrivateTransaction(ctx, dbTX, tx, pldapi.SubmitModeAuto)
 			require.NoError(t, err)
 		}
@@ -864,22 +868,46 @@ func TestInternalPrivateTXInsertWithIdempotencyKeys(t *testing.T) {
 	}
 
 	// Insert first 10 in a Txn
+	var postCommit func()
 	err = txm.p.DB().Transaction(func(dbTX *gorm.DB) (err error) {
-		return txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, fifteenTxns[0:10])
+		postCommit, err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, fifteenTxns[0:10])
+		return err
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	// Insert 5-15 in the second txn so with an overlap
 	err = txm.p.DB().Transaction(func(dbTX *gorm.DB) (err error) {
-		return txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, fifteenTxns[5:15])
+		postCommit, err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, fifteenTxns[5:15])
+		return err
 	})
 	require.NoError(t, err)
+	postCommit()
 
 	// Check we can get each back
+	idemQueryKeys := make([]any, len(fifteenTxns))
 	for _, expected := range fifteenTxns {
 		tx, err := txm.GetTransactionByID(ctx, *expected.Transaction.ID)
 		require.NoError(t, err)
 		require.Equal(t, expected.Transaction.IdempotencyKey, tx.IdempotencyKey)
+
+		rtx, err := txm.GetResolvedTransactionByID(ctx, *expected.Transaction.ID)
+		require.NoError(t, err)
+		require.Equal(t, tx, rtx.Transaction)
+		require.NotNil(t, rtx.Function)
+
+		idemQueryKeys = append(idemQueryKeys, expected.Transaction.IdempotencyKey)
+	}
+
+	// Check we can query them in bulk (as we would to poll the DB to perform TX management)
+	rtxs, err := txm.QueryTransactionsResolved(ctx, query.NewQueryBuilder().Limit(15).In("idempotencyKey", idemQueryKeys).Sort("created").Query(), txm.p.DB(), true)
+	require.NoError(t, err)
+	require.Len(t, rtxs, 15)
+	for i, rtx := range rtxs {
+		if i > 0 {
+			require.Equal(t, []uuid.UUID{*rtxs[i-1].Transaction.ID}, rtx.DependsOn)
+		}
+		require.NotNil(t, rtx.Function)
 	}
 
 }
@@ -905,7 +933,7 @@ func TestUpsertInternalPrivateTxsFinalizeIDsInsertFail(t *testing.T) {
 	require.NoError(t, err)
 	postCommit()
 
-	err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
+	_, err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
 	assert.Regexp(t, "pop", err)
 
 }
@@ -923,7 +951,7 @@ func TestUpsertInternalPrivateTxsIdempotencyKeyFail(t *testing.T) {
 	require.NoError(t, err)
 	postCommit()
 
-	err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
+	_, err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
 	assert.Regexp(t, "pop", err)
 
 }
@@ -941,7 +969,7 @@ func TestUpsertInternalPrivateTxsIdempotencyMisMatch(t *testing.T) {
 	require.NoError(t, err)
 	postCommit()
 
-	err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
+	_, err = txm.UpsertInternalPrivateTxsFinalizeIDs(ctx, txm.p.DB(), []*components.ValidatedTransaction{tx})
 	assert.Regexp(t, "PD012224", err)
 
 }

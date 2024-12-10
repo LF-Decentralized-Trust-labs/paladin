@@ -47,7 +47,7 @@ type persistedTransaction struct {
 	IdempotencyKey     *string                              `gorm:"column:idempotency_key"`
 	SubmitMode         tktypes.Enum[pldapi.SubmitMode]      `gorm:"column:submit_mode"`
 	Type               tktypes.Enum[pldapi.TransactionType] `gorm:"column:type"`
-	Created            tktypes.Timestamp                    `gorm:"column:created;autoCreateTime:nano"`
+	Created            tktypes.Timestamp                    `gorm:"column:created;autoCreateTime:false"` // set by code before insert
 	ABIReference       *tktypes.Bytes32                     `gorm:"column:abi_ref"`
 	Function           *string                              `gorm:"column:function"`
 	Domain             *string                              `gorm:"column:domain"`
@@ -101,9 +101,20 @@ func (tm *txManager) resolveFunction(ctx context.Context, dbTX *gorm.DB, inputAB
 		return postCommit, nil, i18n.WrapError(ctx, err, msgs.MsgTxMgrABIReferenceLookupFailed, inputABIRef)
 	}
 
+	resolvedFunction, err := tm.pickFunction(ctx, pa, requiredFunction, to)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.L(ctx).Debugf("Function selected: %s", resolvedFunction.Definition.SolString())
+	return postCommit, resolvedFunction, nil
+}
+
+func (tm *txManager) pickFunction(ctx context.Context, pa *pldapi.StoredABI, requiredFunction string, to *tktypes.EthAddress) (_ *components.ResolvedFunction, err error) {
+
 	// If a function is specified, we cannot be invoking the constructor
 	if requiredFunction != "" && to == nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionWithoutTo)
+		return nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionWithoutTo)
 	}
 
 	// Find the function in the ABI that we're invoking
@@ -131,7 +142,7 @@ func (tm *txManager) resolveFunction(ctx context.Context, dbTX *gorm.DB, inputAB
 			oldSelector := functionSignature
 			functionSignature, _ = e.Signature()
 			if oldSelector != "" {
-				return nil, nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionMultiMatch, oldSelector, functionSignature)
+				return nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionMultiMatch, oldSelector, functionSignature)
 			}
 			selectedFunction = e
 		}
@@ -142,11 +153,10 @@ func (tm *txManager) resolveFunction(ctx context.Context, dbTX *gorm.DB, inputAB
 			selectedFunction = defaultConstructor
 			functionSignature = defaultConstructorSignature
 		} else {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionNoMatch)
+			return nil, i18n.NewError(ctx, msgs.MsgTxMgrFunctionNoMatch)
 		}
 	}
-	log.L(ctx).Debugf("Function selected: %s", selectedFunction.SolString())
-	return postCommit, &components.ResolvedFunction{
+	return &components.ResolvedFunction{
 		ABI:          pa.ABI,
 		ABIReference: &pa.Hash,
 		Definition:   selectedFunction,
@@ -260,7 +270,7 @@ func (tm *txManager) CallTransaction(ctx context.Context, result any, call *plda
 		From:     call.From,
 		To:       *call.To,
 		Function: txi.Function.Definition,
-		Inputs:   txi.Inputs,
+		Inputs:   txi.Transaction.Data,
 		Intent:   prototk.TransactionSpecification_CALL,
 	})
 	if err != nil {
@@ -313,11 +323,11 @@ func (tm *txManager) PrepareInternalPrivateTransaction(ctx context.Context, dbTX
 	return tm.resolveNewTransaction(ctx, dbTX, tx, submitMode)
 }
 
-func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*components.ValidatedTransaction) error {
+func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, dbTX *gorm.DB, txis []*components.ValidatedTransaction) (func(), error) {
 	// On this path we handle the idempotency key matching - noting that we validate the existence of an idempotency key in PrepareInternalPrivateTransaction
-	insertCount, err := tm.insertTransactions(ctx, dbTX, txis, true /* on conflict do nothing */)
+	txiPostCommit, insertCount, err := tm.insertTransactions(ctx, dbTX, txis, true /* on conflict do nothing */)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// if the insert count is not the same as the transaction found we have to reconcile the IDs
@@ -330,12 +340,12 @@ func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, db
 		var txsInDB []*persistedTransaction
 		err := dbTX.
 			WithContext(ctx).
-			Select("id", "idempotency_key").
+			Select("id", "created", "idempotency_key").
 			Where("idempotency_key in (?)", idempotencyKeys).
 			Find(&txsInDB).
 			Error
 		if err != nil {
-			return err
+			return nil, err
 		}
 		matchCount := 0
 		for _, tx := range txis {
@@ -343,20 +353,21 @@ func (tm *txManager) UpsertInternalPrivateTxsFinalizeIDs(ctx context.Context, db
 				if txInDB.IdempotencyKey != nil && tx.Transaction.IdempotencyKey == *txInDB.IdempotencyKey {
 					txID := txInDB.ID
 					tx.Transaction.ID = &txID
+					tx.Transaction.Created = txInDB.Created
 					log.L(ctx).Infof("matched insert idempotencyKey=%s txID=%s", tx.Transaction.IdempotencyKey, txID)
 					matchCount++
 				}
 			}
 		}
 		if matchCount != len(txis) {
-			return i18n.NewError(ctx, msgs.MsgTxMgrPrivateInsertErrorMismatch, len(txsInDB), matchCount, len(txis))
+			return nil, i18n.NewError(ctx, msgs.MsgTxMgrPrivateInsertErrorMismatch, len(txsInDB), matchCount, len(txis))
 		}
 	}
 
 	// Note deliberately no notification to private TX manager here, as this function is for it to call us.
 	// So when it's flushed its internal transaction, it notifies itself.
 
-	return nil
+	return txiPostCommit, nil
 }
 
 func (tm *txManager) runWithDBTxnKeyResolver(ctx context.Context, fn func(dbTX *gorm.DB, kr components.KeyResolver) error) (err error) {
@@ -411,12 +422,16 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX *gorm.DB, 
 
 	var abiPostCommits []func()
 	var writeTxPostCommit func()
+	var txiPostCommit func()
 	postCommit = func() {
 		for _, fn := range abiPostCommits {
 			fn()
 		}
 		if writeTxPostCommit != nil {
 			writeTxPostCommit()
+		}
+		if txiPostCommit != nil {
+			txiPostCommit()
 		}
 	}
 	for i, tx := range txs {
@@ -459,7 +474,7 @@ func (tm *txManager) processNewTransactions(ctx context.Context, dbTX *gorm.DB, 
 	}
 
 	// Now we're ready to insert into the database
-	_, err = tm.insertTransactions(ctx, dbTX, txis, false /* all must succeed on this path - we map idempotency errors below */)
+	txiPostCommit, _, err = tm.insertTransactions(ctx, dbTX, txis, false /* all must succeed on this path - we map idempotency errors below */)
 	if err != nil {
 		_ = dbTX.Rollback() // so we can start a new TX in SQLite
 		return nil, nil, tm.checkIdempotencyKeys(ctx, err, txs)
@@ -542,6 +557,8 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX *gorm.DB, t
 	if err != nil {
 		return nil, nil, err
 	}
+	// Update to normalized JSON in what we store
+	tx.TransactionBase.Data = normalizedJSON
 
 	var localFrom string
 	bypassFromCheck := submitMode == pldapi.SubmitModePrepare || /* no checking on from for prepare */
@@ -558,15 +575,16 @@ func (tm *txManager) resolveNewTransaction(ctx context.Context, dbTX *gorm.DB, t
 
 	return postCommit, &components.ValidatedTransaction{
 		LocalFrom: localFrom,
-		Transaction: &pldapi.Transaction{
-			TransactionBase: tx.TransactionBase,
-			ID:              &txID,
-			SubmitMode:      submitMode.Enum(),
+		ResolvedTransaction: components.ResolvedTransaction{
+			Transaction: &pldapi.Transaction{
+				TransactionBase: tx.TransactionBase,
+				ID:              &txID,
+				SubmitMode:      submitMode.Enum(),
+			},
+			DependsOn: tx.DependsOn,
+			Function:  fn,
 		},
-		DependsOn:    tx.DependsOn,
-		Function:     fn,
 		PublicTxData: publicTxData,
-		Inputs:       normalizedJSON,
 	}, nil
 }
 
@@ -595,23 +613,28 @@ func (tm *txManager) getPublicTxData(ctx context.Context, fnDef *abi.Entry, byte
 	}
 }
 
-func (tm *txManager) insertTransactions(ctx context.Context, dbTX *gorm.DB, txis []*components.ValidatedTransaction, ignoreConflicts bool) (int64, error) {
+func (tm *txManager) insertTransactions(ctx context.Context, dbTX *gorm.DB, txis []*components.ValidatedTransaction, ignoreConflicts bool) (func(), int64, error) {
 	ptxs := make([]*persistedTransaction, len(txis))
 	var transactionDeps []*transactionDep
 	for i, txi := range txis {
+		// Resolve the finalized fields on the input object for return
 		tx := txi.Transaction
-
+		tx.Created = tktypes.TimestampNow()
+		tx.ABIReference = txi.Function.ABIReference
+		tx.Function = txi.Function.Signature
+		// Build the object to insert
 		ptxs[i] = &persistedTransaction{
 			ID:             *tx.ID,
 			SubmitMode:     tx.SubmitMode,
+			Created:        tx.Created,
 			IdempotencyKey: notEmptyOrNull(tx.IdempotencyKey),
 			Type:           tx.Type,
-			ABIReference:   txi.Function.ABIReference,
+			ABIReference:   tx.ABIReference,
 			Function:       notEmptyOrNull(txi.Function.Signature),
 			Domain:         notEmptyOrNull(tx.Domain),
 			From:           tx.From,
 			To:             tx.To,
-			Data:           txi.Inputs,
+			Data:           tx.Data,
 		}
 		for _, d := range txi.DependsOn {
 			transactionDeps = append(transactionDeps, &transactionDep{
@@ -628,16 +651,29 @@ func (tm *txManager) insertTransactions(ctx context.Context, dbTX *gorm.DB, txis
 	if ignoreConflicts {
 		insert = insert.Clauses(clause.OnConflict{DoNothing: true})
 	}
-	res := insert.Create(ptxs)
-	err := res.Error
+	txInsertResult := insert.Create(ptxs)
+	err := txInsertResult.Error
 	if err == nil && len(transactionDeps) > 0 {
 		err = dbTX.
 			Table("transaction_deps").
+			Clauses(clause.OnConflict{DoNothing: true}). // for idempotency retry
 			Create(transactionDeps).
 			Error
 	}
 	if err != nil {
-		return -1, err
+		return nil, -1, err
 	}
-	return res.RowsAffected, nil
+	rowsAffected := txInsertResult.RowsAffected
+	return func() {
+		// Only update the cache if there were no conflicts
+		if rowsAffected == int64(len(txis)) {
+			for _, tx := range txis {
+				tm.txCache.Set(*tx.Transaction.ID, &components.ResolvedTransaction{
+					Transaction: tx.Transaction,
+					DependsOn:   tx.DependsOn,
+					Function:    tx.Function,
+				})
+			}
+		}
+	}, rowsAffected, nil
 }
