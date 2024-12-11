@@ -141,7 +141,6 @@ message AssembleRequest {
     string transaction_id = 1;
     string assemble_request_id = 2;
     string contract_address = 3;
-    bytes transaction_inputs = 4;
     bytes pre_assembly = 5;
     bytes state_locks = 6;
     int64 block_height = 7;

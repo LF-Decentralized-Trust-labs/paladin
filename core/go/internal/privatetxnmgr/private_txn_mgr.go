@@ -242,7 +242,7 @@ func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX *gorm.DB, txi *
 			ID:     *tx.ID,
 			Domain: tx.Domain,
 			From:   tx.From,
-			Inputs: txi.Inputs,
+			Inputs: tx.Data,
 		})
 	}
 	intent := prototk.TransactionSpecification_SEND_TRANSACTION
@@ -253,17 +253,11 @@ func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX *gorm.DB, txi *
 		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrFunctionNotProvided)
 	}
 	return p.handleNewTx(ctx, dbTX, &components.PrivateTransaction{
-		ID: *tx.ID,
-		Inputs: &components.TransactionInputs{
-			Domain:          tx.Domain,
-			From:            tx.From,
-			To:              *tx.To,
-			Function:        txi.Function.Definition,
-			Inputs:          txi.Inputs,
-			Intent:          intent,
-			PublicTxOptions: txi.Transaction.PublicTxOptions,
-		},
-	})
+		ID:      *tx.ID,
+		Domain:  tx.Domain,
+		Address: *tx.To,
+		Intent:  intent,
+	}, &txi.ResolvedTransaction)
 }
 
 // HandleNewTx synchronously receives a new transaction submission
@@ -274,27 +268,27 @@ func (p *privateTxManager) HandleNewTx(ctx context.Context, dbTX *gorm.DB, txi *
 //
 // We are currently proving out this pattern on the boundary of the private transaction manager and the public transaction manager and once that has settled, we will implement the same pattern here.
 // In the meantime, we a single function to submit a transaction and there is currently no persistence of the submission record.  It is all held in memory only
-func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX *gorm.DB, tx *components.PrivateTransaction) error {
+func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX *gorm.DB, tx *components.PrivateTransaction, localTx *components.ResolvedTransaction) error {
 	log.L(ctx).Debugf("Handling new transaction: %v", tx)
 
+	contractAddr := *localTx.Transaction.To
 	emptyAddress := tktypes.EthAddress{}
-	if tx.Inputs.To == emptyAddress {
+	if contractAddr == emptyAddress {
 		return i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
 	}
 
-	contractAddr := tx.Inputs.To
 	domainAPI, err := p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
 	if err != nil {
 		return err
 	}
 
 	domainName := domainAPI.Domain().Name()
-	if tx.Inputs.Domain != "" && domainName != tx.Inputs.Domain {
-		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, tx.Inputs.Domain, domainName, domainAPI.Address())
+	if localTx.Transaction.Domain != "" && domainName != localTx.Transaction.Domain {
+		return i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, localTx.Transaction.Domain, domainName, domainAPI.Address())
 	}
-	tx.Inputs.Domain = domainName
+	localTx.Transaction.Domain = domainName
 
-	err = domainAPI.InitTransaction(ctx, tx)
+	err = domainAPI.InitTransaction(ctx, tx, localTx)
 	if err != nil {
 		return err
 	}
@@ -316,12 +310,12 @@ func (p *privateTxManager) handleNewTx(ctx context.Context, dbTX *gorm.DB, tx *c
 
 func (p *privateTxManager) validateDelegatedTransaction(ctx context.Context, tx *components.PrivateTransaction) error {
 	log.L(ctx).Debugf("Validating delegated transaction: %v", tx)
-	if tx.Inputs == nil || tx.Inputs.Domain == "" {
+	if tx.Domain == "" {
 		return i18n.NewError(ctx, msgs.MsgDomainNotProvided)
 	}
 
 	emptyAddress := tktypes.EthAddress{}
-	if tx.Inputs.To == emptyAddress {
+	if tx.Address == emptyAddress {
 		return i18n.NewError(ctx, msgs.MsgContractAddressNotProvided)
 	}
 
@@ -335,13 +329,12 @@ func (p *privateTxManager) validateDelegatedTransaction(ctx context.Context, tx 
 func (p *privateTxManager) handleDelegatedTransaction(ctx context.Context, dbTX *gorm.DB, delegationBlockHeight int64, delegatingNodeName string, delegationId string, tx *components.PrivateTransaction) error {
 	log.L(ctx).Debugf("Handling delegated transaction: %v", tx)
 
-	contractAddr := tx.Inputs.To
-	domainAPI, err := p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, contractAddr)
+	domainAPI, err := p.components.DomainManager().GetSmartContractByAddress(ctx, dbTX, tx.Address)
 	if err != nil {
-		log.L(ctx).Errorf("handleDelegatedTransaction: Failed to get domain smart contract for contract address %s: %s", contractAddr, err)
+		log.L(ctx).Errorf("handleDelegatedTransaction: Failed to get domain smart contract for contract address %s: %s", tx.Address, err)
 		return err
 	}
-	sequencer, err := p.getSequencerForContract(ctx, dbTX, contractAddr, domainAPI)
+	sequencer, err := p.getSequencerForContract(ctx, dbTX, tx.Address, domainAPI)
 	if err != nil {
 		return err
 	}
@@ -851,14 +844,6 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 	// but until this point any errors result in a silent failure and we assume the coordinator will eventually timeout
 	// and retry the request
 
-	transactionInputs := &components.TransactionInputs{}
-	err = json.Unmarshal(assembleRequest.TransactionInputs, transactionInputs)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal transaction inputs: %s", err)
-		p.sendAssembleError(ctx, replyTo, assembleRequest.AssembleRequestId, assembleRequest.ContractAddress, assembleRequest.TransactionId, err)
-		return
-	}
-
 	preAssembly := &components.TransactionPreAssembly{}
 	err = json.Unmarshal(assembleRequest.PreAssembly, preAssembly)
 	if err != nil {
@@ -874,7 +859,7 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 		return
 	}
 
-	postAssembly, err := sequencer.assembleForRemoteCoordinator(ctx, transactionID, transactionInputs, preAssembly, assembleRequest.StateLocks, assembleRequest.BlockHeight)
+	postAssembly, err := sequencer.assembleForRemoteCoordinator(ctx, transactionID, preAssembly, assembleRequest.StateLocks, assembleRequest.BlockHeight)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to assemble for coordinator: %s", err)
 		p.sendAssembleError(ctx, replyTo, assembleRequest.AssembleRequestId, assembleRequest.ContractAddress, assembleRequest.TransactionId, err)
@@ -1064,18 +1049,19 @@ func (p *privateTxManager) handleStateProducedEvent(ctx context.Context, message
 
 }
 
-func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *components.TransactionInputs) (*abi.ComponentValue, error) {
+func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *components.ResolvedTransaction) (*abi.ComponentValue, error) {
 
-	psc, err := p.components.DomainManager().GetSmartContractByAddress(ctx, p.components.Persistence().DB(), call.To)
+	callTx := call.Transaction
+	psc, err := p.components.DomainManager().GetSmartContractByAddress(ctx, p.components.Persistence().DB(), *callTx.To)
 	if err != nil {
 		return nil, err
 	}
 
 	domainName := psc.Domain().Name()
-	if call.Domain != "" && domainName != call.Domain {
-		return nil, i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, call.Domain, domainName, psc.Address())
+	if callTx.Domain != "" && domainName != callTx.Domain {
+		return nil, i18n.NewError(ctx, msgs.MsgPrivateTxMgrDomainMismatch, callTx.Domain, domainName, psc.Address())
 	}
-	call.Domain = domainName
+	callTx.Domain = domainName
 
 	// Initialize the call, returning at list of required verifiers
 	requiredVerifiers, err := psc.InitCall(ctx, call)

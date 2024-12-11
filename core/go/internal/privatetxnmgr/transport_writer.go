@@ -212,13 +212,7 @@ func (tw *transportWriter) SendEndorsementRequest(ctx context.Context, idempoten
 	return err
 }
 
-func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
-
-	transactionInputsBytes, err := json.Marshal(transactionInputs)
-	if err != nil {
-		log.L(ctx).Error("Error marshalling transaction inputs", err)
-		return err
-	}
+func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error {
 
 	preAssemblyBytes, err := json.Marshal(preAssembly)
 	if err != nil {
@@ -230,7 +224,6 @@ func (tw *transportWriter) SendAssembleRequest(ctx context.Context, assemblingNo
 		TransactionId:     txID.String(),
 		AssembleRequestId: assembleRequestID,
 		ContractAddress:   contractAddress,
-		TransactionInputs: transactionInputsBytes,
 		PreAssembly:       preAssemblyBytes,
 		StateLocks:        stateLocksJSON,
 		BlockHeight:       blockHeight,

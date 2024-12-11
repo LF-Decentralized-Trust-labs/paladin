@@ -18,6 +18,7 @@ package txmgr
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 
@@ -32,6 +33,7 @@ import (
 func NewTXManager(ctx context.Context, conf *pldconf.TxManagerConfig) components.TXManager {
 	return &txManager{
 		abiCache: cache.NewCache[tktypes.Bytes32, *pldapi.StoredABI](&conf.ABI.Cache, &pldconf.TxManagerDefaults.ABI.Cache),
+		txCache:  cache.NewCache[uuid.UUID, *components.ResolvedTransaction](&conf.Transactions.Cache, &pldconf.TxManagerDefaults.Transactions.Cache),
 	}
 }
 
@@ -45,6 +47,7 @@ type txManager struct {
 	domainMgr        components.DomainManager
 	stateMgr         components.StateManager
 	identityResolver components.IdentityResolver
+	txCache          cache.Cache[uuid.UUID, *components.ResolvedTransaction]
 	abiCache         cache.Cache[tktypes.Bytes32, *pldapi.StoredABI]
 	rpcModule        *rpcserver.RPCModule
 	debugRpcModule   *rpcserver.RPCModule

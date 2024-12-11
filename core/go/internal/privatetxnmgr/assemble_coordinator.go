@@ -48,7 +48,6 @@ type assembleRequest struct {
 	assemblingNode         string
 	assembleCoordinator    *assembleCoordinator
 	transactionID          uuid.UUID
-	transactionInputs      *components.TransactionInputs
 	transactionPreassembly *components.TransactionPreAssembly
 }
 
@@ -155,13 +154,12 @@ func (ac *assembleCoordinator) Stop() {
 // to allow us to do the assemble on a separate thread and without worrying about locking the PrivateTransaction objects
 // we copy the pertinent structures out of the PrivateTransaction and pass them to the assemble thread
 // and then use them to create another private transaction object that is passed to the domain manager which then just unpicks it again
-func (ac *assembleCoordinator) QueueAssemble(ctx context.Context, assemblingNode string, transactionID uuid.UUID, transactionInputs *components.TransactionInputs, transactionPreAssembly *components.TransactionPreAssembly) {
+func (ac *assembleCoordinator) QueueAssemble(ctx context.Context, assemblingNode string, transactionID uuid.UUID, transactionPreAssembly *components.TransactionPreAssembly) {
 
 	ac.requests <- &assembleRequest{
 		assemblingNode:         assemblingNode,
 		assembleCoordinator:    ac,
 		transactionID:          transactionID,
-		transactionInputs:      transactionInputs,
 		transactionPreassembly: transactionPreAssembly,
 	}
 	log.L(ctx).Debugf("QueueAssemble: assemble request for %s queued", transactionID)
@@ -171,7 +169,7 @@ func (ac *assembleCoordinator) QueueAssemble(ctx context.Context, assemblingNode
 func (req *assembleRequest) processLocal(ctx context.Context, requestID string) {
 	log.L(ctx).Debug("assembleRequest:processLocal")
 
-	req.assembleCoordinator.localAssembler.AssembleLocal(ctx, requestID, req.transactionID, req.transactionInputs, req.transactionPreassembly)
+	req.assembleCoordinator.localAssembler.AssembleLocal(ctx, requestID, req.transactionID, req.transactionPreassembly)
 
 	log.L(ctx).Debug("assembleRequest:processLocal complete")
 
@@ -198,7 +196,7 @@ func (req *assembleRequest) processRemote(ctx context.Context, assemblingNode st
 	log.L(ctx).Debugf("assembleRequest:processRemote Assembling transaction %s on node %s", req.transactionID.String(), assemblingNode)
 
 	//send a request to the node that is responsible for assembling this transaction
-	err = req.assembleCoordinator.transportWriter.SendAssembleRequest(ctx, assemblingNode, requestID, req.transactionID, contractAddressString, req.transactionInputs, req.transactionPreassembly, stateLocksJSON, blockHeight)
+	err = req.assembleCoordinator.transportWriter.SendAssembleRequest(ctx, assemblingNode, requestID, req.transactionID, contractAddressString, req.transactionPreassembly, stateLocksJSON, blockHeight)
 	if err != nil {
 		log.L(ctx).Errorf("assembleRequest:processRemote error from sendAssembleRequest: %s", err)
 		return err

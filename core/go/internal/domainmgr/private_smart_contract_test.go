@@ -95,13 +95,23 @@ func goodPSC(t *testing.T, td *testDomainContext) *domainContract {
 	return psc
 }
 
-func goodPrivateTXWithInputs(psc *domainContract) *components.PrivateTransaction {
-	return &components.PrivateTransaction{
-		ID: uuid.New(),
-		Inputs: &components.TransactionInputs{
-			From: "txSigner",
-			To:   psc.info.Address,
-			Function: &abi.Entry{
+func goodPrivateTXWithInputs(psc *domainContract) *components.ResolvedTransaction {
+	return &components.ResolvedTransaction{
+		Transaction: &pldapi.Transaction{
+			ID: confutil.P(uuid.New()),
+			TransactionBase: pldapi.TransactionBase{
+				Domain: psc.d.name,
+				From:   "txSigner",
+				To:     &psc.info.Address,
+				Data: tktypes.RawJSON(`{
+				   "from": "sender",
+				   "to": "receiver",
+				   "amount": "123000000000000000000"
+				}`),
+			},
+		},
+		Function: &components.ResolvedFunction{
+			Definition: &abi.Entry{
 				Type: abi.Function,
 				Inputs: abi.ParameterArray{
 					{Name: "from", Type: "string"},
@@ -109,29 +119,21 @@ func goodPrivateTXWithInputs(psc *domainContract) *components.PrivateTransaction
 					{Name: "amount", Type: "uint256"},
 				},
 			},
-			Inputs: tktypes.RawJSON(`{
-			   "from": "sender",
-			   "to": "receiver",
-			   "amount": "123000000000000000000"
-			}`),
 		},
 	}
 }
 
-func doDomainInitTransactionOK(t *testing.T, td *testDomainContext, resFn ...func(*prototk.InitTransactionResponse)) (*domainContract, *components.PrivateTransaction) {
+func doDomainInitTransactionOK(t *testing.T, td *testDomainContext, resFn ...func(*prototk.InitTransactionResponse)) (*domainContract, *components.PrivateTransaction, *components.ResolvedTransaction) {
 	psc := goodPSC(t, td)
-	tx := goodPrivateTXWithInputs(psc)
-	tx.PreAssembly = &components.TransactionPreAssembly{
-		TransactionSpecification: &prototk.TransactionSpecification{},
-	}
+	localTx := goodPrivateTXWithInputs(psc)
 
 	td.tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-		assert.Equal(t, tktypes.Bytes32UUIDFirst16(tx.ID).String(), itr.Transaction.TransactionId)
+		assert.Equal(t, tktypes.Bytes32UUIDFirst16(*localTx.Transaction.ID).String(), itr.Transaction.TransactionId)
 		assert.Equal(t, int64(12345), itr.Transaction.BaseBlock)
 		res := &prototk.InitTransactionResponse{
 			RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 				{
-					Lookup:       tx.Signer,
+					Lookup:       localTx.Transaction.From,
 					Algorithm:    algorithms.ECDSA_SECP256K1,
 					VerifierType: verifiers.ETH_ADDRESS,
 				},
@@ -143,14 +145,19 @@ func doDomainInitTransactionOK(t *testing.T, td *testDomainContext, resFn ...fun
 		return res, nil
 	}
 
-	err := psc.InitTransaction(td.ctx, tx)
+	ptx := &components.PrivateTransaction{
+		ID:      *localTx.Transaction.ID,
+		Domain:  localTx.Transaction.Domain,
+		Address: *localTx.Transaction.To,
+	}
+	err := psc.InitTransaction(td.ctx, ptx, localTx)
 	require.NoError(t, err)
-	assert.Len(t, tx.PreAssembly.RequiredVerifiers, 1)
-	return psc, tx
+	assert.Len(t, ptx.PreAssembly.RequiredVerifiers, 1)
+	return psc, ptx, localTx
 }
 
 func doDomainInitAssembleTransactionOK(t *testing.T, td *testDomainContext) (*domainContract, *components.PrivateTransaction) {
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, tx, localTx := doDomainInitTransactionOK(t, td)
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, atr *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 		return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
@@ -189,7 +196,7 @@ func doDomainInitAssembleTransactionOK(t *testing.T, td *testDomainContext) (*do
 			},
 		}, nil
 	}
-	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx, localTx)
 	require.NoError(t, err)
 	tx.PreAssembly.Verifiers = []*prototk.ResolvedVerifier{}
 	tx.PostAssembly.Signatures = []*prototk.AttestationResult{}
@@ -211,7 +218,7 @@ func TestDomainInitTransactionOK(t *testing.T) {
 	defer done()
 	assert.Nil(t, td.d.initError.Load())
 
-	_, _ = doDomainInitTransactionOK(t, td)
+	_, _, _ = doDomainInitTransactionOK(t, td)
 }
 
 func TestEncodeDecodeABIData(t *testing.T) {
@@ -523,7 +530,7 @@ func TestDomainInitTransactionMissingInput(t *testing.T) {
 	psc := goodPSC(t, td)
 
 	tx := &components.PrivateTransaction{}
-	err := psc.InitTransaction(td.ctx, tx)
+	err := psc.InitTransaction(td.ctx, tx, &components.ResolvedTransaction{})
 	assert.Regexp(t, "PD011626", err)
 	assert.Nil(t, tx.PreAssembly)
 
@@ -537,11 +544,12 @@ func TestDomainInitTransactionConfirmedBlockFail(t *testing.T) {
 	assert.Nil(t, td.d.initError.Load())
 
 	psc := goodPSC(t, td)
-	tx := goodPrivateTXWithInputs(psc)
+	localTx := goodPrivateTXWithInputs(psc)
 
-	err := psc.InitTransaction(td.ctx, tx)
+	ptx := &components.PrivateTransaction{}
+	err := psc.InitTransaction(td.ctx, ptx, localTx)
 	assert.Regexp(t, "pop", err)
-	assert.Nil(t, tx.PreAssembly)
+	assert.Nil(t, ptx.PreAssembly)
 
 }
 
@@ -551,15 +559,18 @@ func TestDomainInitTransactionError(t *testing.T) {
 	assert.Nil(t, td.d.initError.Load())
 
 	psc := goodPSC(t, td)
-	tx := goodPrivateTXWithInputs(psc)
+	localTx := goodPrivateTXWithInputs(psc)
 
 	td.tp.Functions.InitTransaction = func(ctx context.Context, itr *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	err := psc.InitTransaction(td.ctx, tx)
+	ptx := &components.PrivateTransaction{
+		ID: *localTx.Transaction.ID,
+	}
+	err := psc.InitTransaction(td.ctx, ptx, localTx)
 	assert.Regexp(t, "pop", err)
-	assert.Nil(t, tx.PreAssembly)
+	assert.Nil(t, ptx.PreAssembly)
 
 }
 
@@ -569,12 +580,15 @@ func TestDomainInitTransactionBadInputs(t *testing.T) {
 	assert.Nil(t, td.d.initError.Load())
 
 	psc := goodPSC(t, td)
-	tx := goodPrivateTXWithInputs(psc)
-	tx.Inputs.Inputs = tktypes.RawJSON(`{"missing": "parameters}`)
+	localTx := goodPrivateTXWithInputs(psc)
+	localTx.Transaction.Data = tktypes.RawJSON(`{"missing": "parameters}`)
 
-	err := psc.InitTransaction(td.ctx, tx)
+	ptx := &components.PrivateTransaction{
+		ID: *localTx.Transaction.ID,
+	}
+	err := psc.InitTransaction(td.ctx, ptx, localTx)
 	assert.Regexp(t, "PD011612", err)
-	assert.Nil(t, tx.PreAssembly)
+	assert.Nil(t, ptx.PreAssembly)
 
 }
 
@@ -582,14 +596,14 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	td, done := newTestDomain(t, true /* real DB */, goodDomainConf(), mockBlockHeight)
 	defer done()
 
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
 	domain := td.d
 	dCtx := td.c.dCtx
 
-	state1 := storeTestState(t, td, tx.ID, ethtypes.NewHexInteger64(1111111))
-	state2 := storeTestState(t, td, tx.ID, ethtypes.NewHexInteger64(2222222))
-	state3 := storeTestState(t, td, tx.ID, ethtypes.NewHexInteger64(3333333))
-	state4 := storeTestState(t, td, tx.ID, ethtypes.NewHexInteger64(4444444))
+	state1 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(1111111))
+	state2 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(2222222))
+	state3 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(3333333))
+	state4 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
 		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
@@ -604,7 +618,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	}
 
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
-		assert.Same(t, req.Transaction, tx.PreAssembly.TransactionSpecification)
+		assert.Same(t, req.Transaction, ptx.PreAssembly.TransactionSpecification)
 
 		stateRes, err := domain.FindAvailableStates(ctx, &prototk.FindAvailableStatesRequest{
 			StateQueryContext: req.StateQueryContext,
@@ -659,27 +673,27 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 			},
 		}, nil
 	}
-	err := psc.AssembleTransaction(dCtx, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(dCtx, td.c.dbTX, ptx, localTx)
 	require.NoError(t, err)
 
-	assert.Len(t, tx.PostAssembly.InputStates, 2)
-	assert.Len(t, tx.PostAssembly.ReadStates, 1)
-	assert.Len(t, tx.PostAssembly.OutputStatesPotential, 1)
-	assert.Len(t, tx.PostAssembly.InfoStatesPotential, 1)
-	assert.Equal(t, prototk.AssembleTransactionResponse_OK, tx.PostAssembly.AssemblyResult)
-	assert.Len(t, tx.PostAssembly.AttestationPlan, 1)
+	assert.Len(t, ptx.PostAssembly.InputStates, 2)
+	assert.Len(t, ptx.PostAssembly.ReadStates, 1)
+	assert.Len(t, ptx.PostAssembly.OutputStatesPotential, 1)
+	assert.Len(t, ptx.PostAssembly.InfoStatesPotential, 1)
+	assert.Equal(t, prototk.AssembleTransactionResponse_OK, ptx.PostAssembly.AssemblyResult)
+	assert.Len(t, ptx.PostAssembly.AttestationPlan, 1)
 
 	// This would be the engine's job
-	tx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0)
-	tx.PostAssembly.Signatures = make([]*prototk.AttestationResult, 0)
+	ptx.PreAssembly.Verifiers = make([]*prototk.ResolvedVerifier, 0)
+	ptx.PostAssembly.Signatures = make([]*prototk.AttestationResult, 0)
 
 	// Write the output states
-	err = psc.WritePotentialStates(dCtx, td.c.dbTX, tx)
+	err = psc.WritePotentialStates(dCtx, td.c.dbTX, ptx)
 	require.NoError(t, err)
 
 	stateRes, err := domain.FindAvailableStates(td.ctx, &prototk.FindAvailableStatesRequest{
 		StateQueryContext: td.c.id,
-		SchemaId:          tx.PostAssembly.OutputStatesPotential[0].SchemaId,
+		SchemaId:          ptx.PostAssembly.OutputStatesPotential[0].SchemaId,
 		QueryJson: `{
 			"or": [
 				{
@@ -692,12 +706,12 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Len(t, stateRes.States, 1)
 
 	// Lock all the states
-	err = psc.LockStates(dCtx, td.c.dbTX, tx)
+	err = psc.LockStates(dCtx, td.c.dbTX, ptx)
 	require.NoError(t, err)
 
 	stillAvailable, err := domain.FindAvailableStates(td.ctx, &prototk.FindAvailableStatesRequest{
 		StateQueryContext: td.c.id,
-		SchemaId:          tx.PostAssembly.OutputStatesPotential[0].SchemaId,
+		SchemaId:          ptx.PostAssembly.OutputStatesPotential[0].SchemaId,
 		QueryJson:         `{}`,
 	})
 	require.NoError(t, err)
@@ -712,17 +726,17 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Contains(t, stillAvailable.States[2].DataJson, state5.Salt.String())
 
 	td.tp.Functions.EndorseTransaction = func(ctx context.Context, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-		assert.Same(t, tx.PreAssembly.TransactionSpecification, req.Transaction)
-		assert.Same(t, tx.PostAssembly.AttestationPlan[0], req.EndorsementRequest)
+		assert.Same(t, ptx.PreAssembly.TransactionSpecification, req.Transaction)
+		assert.Same(t, ptx.PostAssembly.AttestationPlan[0], req.EndorsementRequest)
 		assert.Equal(t, "endorser1", req.EndorsementVerifier.Lookup)
-		assert.Same(t, tx.PreAssembly.TransactionSpecification, req.Transaction)
-		assert.Len(t, tx.PostAssembly.InputStates, 2)
-		assert.Contains(t, string(tx.PostAssembly.InputStates[0].Data), state1.Salt.String())
-		assert.Contains(t, string(tx.PostAssembly.InputStates[1].Data), state3.Salt.String())
-		assert.Len(t, tx.PostAssembly.OutputStates, 1)
-		assert.Contains(t, string(tx.PostAssembly.OutputStates[0].Data), state5.Salt.String())
-		assert.Len(t, tx.PostAssembly.InfoStates, 1)
-		assert.Contains(t, string(tx.PostAssembly.InfoStates[0].Data), state6.Salt.String())
+		assert.Same(t, ptx.PreAssembly.TransactionSpecification, req.Transaction)
+		assert.Len(t, ptx.PostAssembly.InputStates, 2)
+		assert.Contains(t, string(ptx.PostAssembly.InputStates[0].Data), state1.Salt.String())
+		assert.Contains(t, string(ptx.PostAssembly.InputStates[1].Data), state3.Salt.String())
+		assert.Len(t, ptx.PostAssembly.OutputStates, 1)
+		assert.Contains(t, string(ptx.PostAssembly.OutputStates[0].Data), state5.Salt.String())
+		assert.Len(t, ptx.PostAssembly.InfoStates, 1)
+		assert.Contains(t, string(ptx.PostAssembly.InfoStates[0].Data), state6.Salt.String())
 		return &prototk.EndorseTransactionResponse{
 			EndorsementResult: prototk.EndorseTransactionResponse_ENDORSER_SUBMIT,
 			Payload:           []byte(`some result`),
@@ -730,7 +744,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	}
 
 	// Run an endorsement
-	endorsementRequest := tx.PostAssembly.AttestationPlan[0]
+	endorsementRequest := ptx.PostAssembly.AttestationPlan[0]
 	endorserAddr := tktypes.EthAddress(tktypes.RandBytes(20))
 	endorser := &prototk.ResolvedVerifier{
 		Lookup:       "endorser1",
@@ -739,13 +753,13 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 		Verifier:     endorserAddr.String(),
 	}
 	endorsement, err := psc.EndorseTransaction(dCtx, td.c.dbTX, &components.PrivateTransactionEndorseRequest{
-		TransactionSpecification: tx.PreAssembly.TransactionSpecification,
-		Verifiers:                tx.PreAssembly.Verifiers,
-		Signatures:               tx.PostAssembly.Signatures,
-		InputStates:              psc.d.toEndorsableList(tx.PostAssembly.InputStates),
-		ReadStates:               psc.d.toEndorsableList(tx.PostAssembly.ReadStates),
-		OutputStates:             psc.d.toEndorsableList(tx.PostAssembly.OutputStates),
-		InfoStates:               psc.d.toEndorsableList(tx.PostAssembly.InfoStates),
+		TransactionSpecification: ptx.PreAssembly.TransactionSpecification,
+		Verifiers:                ptx.PreAssembly.Verifiers,
+		Signatures:               ptx.PostAssembly.Signatures,
+		InputStates:              psc.d.toEndorsableList(ptx.PostAssembly.InputStates),
+		ReadStates:               psc.d.toEndorsableList(ptx.PostAssembly.ReadStates),
+		OutputStates:             psc.d.toEndorsableList(ptx.PostAssembly.OutputStates),
+		InfoStates:               psc.d.toEndorsableList(ptx.PostAssembly.InfoStates),
 		Endorsement:              endorsementRequest,
 		Endorser:                 endorser,
 	})
@@ -753,7 +767,7 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, endorsement.Result)
 
 	// Processing of endorsement faked up here
-	tx.PostAssembly.Endorsements = append(tx.PostAssembly.Endorsements, &prototk.AttestationResult{
+	ptx.PostAssembly.Endorsements = append(ptx.PostAssembly.Endorsements, &prototk.AttestationResult{
 		Name:            endorsementRequest.Name,
 		AttestationType: endorsementRequest.AttestationType,
 		Verifier:        endorser,
@@ -763,27 +777,27 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 
 	// Prepare the transaction for submission to the blockchain
 	td.tp.Functions.PrepareTransaction = func(ctx context.Context, ptr *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-		assert.Same(t, tx.PreAssembly.TransactionSpecification, ptr.Transaction)
-		assert.Len(t, tx.PostAssembly.InputStates, 2)
-		assert.Contains(t, string(tx.PostAssembly.InputStates[0].Data), state1.Salt.String())
-		assert.Contains(t, string(tx.PostAssembly.InputStates[1].Data), state3.Salt.String())
-		assert.Len(t, tx.PostAssembly.OutputStates, 1)
-		assert.Contains(t, string(tx.PostAssembly.OutputStates[0].Data), state5.Salt.String())
-		assert.Len(t, tx.PostAssembly.InfoStates, 1)
-		assert.Contains(t, string(tx.PostAssembly.InfoStates[0].Data), state6.Salt.String())
+		assert.Same(t, ptx.PreAssembly.TransactionSpecification, ptr.Transaction)
+		assert.Len(t, ptx.PostAssembly.InputStates, 2)
+		assert.Contains(t, string(ptx.PostAssembly.InputStates[0].Data), state1.Salt.String())
+		assert.Contains(t, string(ptx.PostAssembly.InputStates[1].Data), state3.Salt.String())
+		assert.Len(t, ptx.PostAssembly.OutputStates, 1)
+		assert.Contains(t, string(ptx.PostAssembly.OutputStates[0].Data), state5.Salt.String())
+		assert.Len(t, ptx.PostAssembly.InfoStates, 1)
+		assert.Contains(t, string(ptx.PostAssembly.InfoStates[0].Data), state6.Salt.String())
 		// Check endorsement
-		assert.Len(t, tx.PostAssembly.Endorsements, 1)
-		endorsement := tx.PostAssembly.Endorsements[0]
+		assert.Len(t, ptx.PostAssembly.Endorsements, 1)
+		endorsement := ptx.PostAssembly.Endorsements[0]
 		assert.Equal(t, prototk.AttestationResult_ENDORSER_MUST_SUBMIT, endorsement.Constraints[0])
 		assert.Equal(t, "endorser1", endorsement.Verifier.Lookup)
 		assert.Equal(t, endorserAddr.String(), endorsement.Verifier.Verifier)
 		onChain := &fakeExecute{
 			Data: endorsement.Payload,
 		}
-		for _, inState := range tx.PostAssembly.InputStates {
+		for _, inState := range ptx.PostAssembly.InputStates {
 			onChain.Inputs = append(onChain.Inputs, inState.ID)
 		}
-		for _, inState := range tx.PostAssembly.InputStates {
+		for _, inState := range ptx.PostAssembly.InputStates {
 			onChain.Outputs = append(onChain.Outputs, inState.ID)
 		}
 		params, err := json.Marshal(onChain)
@@ -792,26 +806,26 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 			Transaction: &prototk.PreparedTransaction{
 				FunctionAbiJson: fakeCoinExecuteABI,
 				ParamsJson:      string(params),
-				RequiredSigner:  &tx.Inputs.From,
+				RequiredSigner:  &localTx.Transaction.From,
 			},
 			Metadata: confutil.P(`{"some":"data"}`),
 		}, nil
 	}
 
 	// Pass in a random signer - which will be overridden in this case
-	tx.Signer = tktypes.RandAddress().String()
+	ptx.Signer = tktypes.RandAddress().String()
 
 	// And now prepare
-	err = psc.PrepareTransaction(dCtx, td.c.dbTX, tx)
+	err = psc.PrepareTransaction(dCtx, td.c.dbTX, ptx)
 	require.NoError(t, err)
-	assert.Len(t, tx.PreparedPublicTransaction.ABI, 1)
-	assert.NotNil(t, tx.PreparedPublicTransaction.Data)
-	assert.Equal(t, "txSigner", tx.Signer)
+	assert.Len(t, ptx.PreparedPublicTransaction.ABI, 1)
+	assert.NotNil(t, ptx.PreparedPublicTransaction.Data)
+	assert.Equal(t, "txSigner", ptx.Signer)
 
 	// Confirm the remaining unspent states
 	stillAvailable, err = domain.FindAvailableStates(td.ctx, &prototk.FindAvailableStatesRequest{
 		StateQueryContext: td.c.id,
-		SchemaId:          tx.PostAssembly.OutputStatesPotential[0].SchemaId,
+		SchemaId:          ptx.PostAssembly.OutputStatesPotential[0].SchemaId,
 		QueryJson:         `{}`,
 	})
 	require.NoError(t, err)
@@ -820,28 +834,43 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	assert.Contains(t, stillAvailable.States[1].DataJson, state4.Salt.String())
 	assert.Contains(t, stillAvailable.States[2].DataJson, state5.Salt.String())
 
-	assert.JSONEq(t, `{"some":"data"}`, string(tx.PreparedMetadata))
+	assert.JSONEq(t, `{"some":"data"}`, string(ptx.PreparedMetadata))
+}
+
+func TestDomainAssembleTransactionInvalidTxn(t *testing.T) {
+	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
+	defer done()
+
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, &components.ResolvedTransaction{
+		Transaction: &pldapi.Transaction{
+			ID: localTx.Transaction.ID,
+		},
+	})
+	assert.Regexp(t, "PD011626", err)
+
+	assert.Nil(t, ptx.PostAssembly)
 }
 
 func TestDomainAssembleTransactionError(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
 
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 		return nil, fmt.Errorf("pop")
 	}
-	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, localTx)
 	assert.Regexp(t, "pop", err)
 
-	assert.Nil(t, tx.PostAssembly)
+	assert.Nil(t, ptx.PostAssembly)
 }
 
 func TestDomainAssembleTransactionLoadInputError(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
 
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 		return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
@@ -860,36 +889,36 @@ func TestDomainAssembleTransactionLoadInputError(t *testing.T) {
 			},
 		}, nil
 	}
-	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, localTx)
 	assert.Regexp(t, "PD011614.*badid", err)
 
-	assert.Nil(t, tx.PostAssembly)
+	assert.Nil(t, ptx.PostAssembly)
 }
 
 func TestDomainAssembleTransactionRevert(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
 
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 		return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
 			RevertReason:   confutil.P("failed with error"),
 		}, nil
 	}
-	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, localTx)
 	require.NoError(t, err)
 
-	assert.NotNil(t, tx.PostAssembly)
-	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, tx.PostAssembly.AssemblyResult)
-	assert.Equal(t, "failed with error", *tx.PostAssembly.RevertReason)
+	assert.NotNil(t, ptx.PostAssembly)
+	assert.Equal(t, prototk.AssembleTransactionResponse_REVERT, ptx.PostAssembly.AssemblyResult)
+	assert.Equal(t, "failed with error", *ptx.PostAssembly.RevertReason)
 }
 
 func TestDomainAssembleTransactionLoadReadError(t *testing.T) {
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(), mockBlockHeight)
 	defer done()
 
-	psc, tx := doDomainInitTransactionOK(t, td)
+	psc, ptx, localTx := doDomainInitTransactionOK(t, td)
 	td.tp.Functions.AssembleTransaction = func(ctx context.Context, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 		return &prototk.AssembleTransactionResponse{
 			AssemblyResult: prototk.AssembleTransactionResponse_OK,
@@ -908,10 +937,10 @@ func TestDomainAssembleTransactionLoadReadError(t *testing.T) {
 			},
 		}, nil
 	}
-	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err := psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, localTx)
 	assert.Regexp(t, "PD011614.*badid", err)
 
-	assert.Nil(t, tx.PostAssembly)
+	assert.Nil(t, ptx.PostAssembly)
 }
 
 func TestDomainWritePotentialStatesBadSchema(t *testing.T) {
@@ -1159,44 +1188,52 @@ func TestIncompleteStages(t *testing.T) {
 	defer done()
 
 	psc := goodPSC(t, td)
-	tx := &components.PrivateTransaction{}
+	ptx := &components.PrivateTransaction{}
+	localTx := &components.ResolvedTransaction{}
 
-	err := psc.InitTransaction(td.ctx, tx)
+	err := psc.InitTransaction(td.ctx, ptx, localTx)
 	assert.Regexp(t, "PD011626", err)
 
-	err = psc.AssembleTransaction(td.mdc, td.c.dbTX, tx)
+	err = psc.AssembleTransaction(td.mdc, td.c.dbTX, ptx, localTx)
 	assert.Regexp(t, "PD011627", err)
 
-	err = psc.WritePotentialStates(td.mdc, td.c.dbTX, tx)
+	err = psc.WritePotentialStates(td.mdc, td.c.dbTX, ptx)
 	assert.Regexp(t, "PD011628", err)
 
-	err = psc.LockStates(td.mdc, td.c.dbTX, tx)
+	err = psc.LockStates(td.mdc, td.c.dbTX, ptx)
 	assert.Regexp(t, "PD011629", err)
 
 	_, err = psc.EndorseTransaction(td.mdc, td.c.dbTX, nil)
 	assert.Regexp(t, "PD011630", err)
 
-	err = psc.PrepareTransaction(td.mdc, td.c.dbTX, tx)
+	err = psc.PrepareTransaction(td.mdc, td.c.dbTX, ptx)
 	assert.Regexp(t, "PD011632", err)
 }
 
-func goodPrivateCallWithInputsAndOutputs(psc *domainContract) *components.TransactionInputs {
-	return &components.TransactionInputs{
-		From: "me",
-		To:   psc.info.Address,
-		Function: &abi.Entry{
-			Type: abi.Function,
-			Name: "getBalance",
-			Inputs: abi.ParameterArray{
-				{Name: "address", Type: "address"},
-			},
-			Outputs: abi.ParameterArray{
-				{Name: "amount", Type: "uint256"},
+func goodPrivateCallWithInputsAndOutputs(psc *domainContract) *components.ResolvedTransaction {
+	return &components.ResolvedTransaction{
+		Transaction: &pldapi.Transaction{
+			TransactionBase: pldapi.TransactionBase{
+				Domain: psc.d.name,
+				From:   "me",
+				To:     &psc.info.Address,
+				Data: tktypes.RawJSON(`{
+					"address": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
+				}`),
 			},
 		},
-		Inputs: tktypes.RawJSON(`{
-			"address": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
-		}`),
+		Function: &components.ResolvedFunction{
+			Definition: &abi.Entry{
+				Type: abi.Function,
+				Name: "getBalance",
+				Inputs: abi.ParameterArray{
+					{Name: "address", Type: "address"},
+				},
+				Outputs: abi.ParameterArray{
+					{Name: "amount", Type: "uint256"},
+				},
+			},
+		},
 	}
 }
 
@@ -1238,18 +1275,25 @@ func TestInitCallBadInput(t *testing.T) {
 
 	psc := goodPSC(t, td)
 
-	_, err := psc.InitCall(td.ctx, &components.TransactionInputs{
-		To: psc.info.Address,
-		Function: &abi.Entry{
-			Type: abi.Function,
-			Name: "getBalance",
-			Inputs: abi.ParameterArray{
-				{Name: "address", Type: "address"},
+	_, err := psc.InitCall(td.ctx, &components.ResolvedTransaction{
+		Transaction: &pldapi.Transaction{
+			TransactionBase: pldapi.TransactionBase{
+				Domain: psc.d.name,
+				To:     &psc.info.Address,
+				Data: tktypes.RawJSON(`{
+					"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
+				}`),
 			},
 		},
-		Inputs: tktypes.RawJSON(`{
-			"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
-		}`),
+		Function: &components.ResolvedFunction{
+			Definition: &abi.Entry{
+				Type: abi.Function,
+				Name: "getBalance",
+				Inputs: abi.ParameterArray{
+					{Name: "address", Type: "address"},
+				},
+			},
+		},
 	})
 	assert.Regexp(t, "PD011612", err)
 }
@@ -1314,18 +1358,24 @@ func TestExecCallBadInput(t *testing.T) {
 
 	psc := goodPSC(t, td)
 
-	_, err := psc.ExecCall(td.c.dCtx, td.c.dbTX, &components.TransactionInputs{
-		To: psc.info.Address,
-		Function: &abi.Entry{
-			Type: abi.Function,
-			Name: "getBalance",
-			Inputs: abi.ParameterArray{
-				{Name: "address", Type: "address"},
+	_, err := psc.ExecCall(td.c.dCtx, td.c.dbTX, &components.ResolvedTransaction{
+		Transaction: &pldapi.Transaction{
+			TransactionBase: pldapi.TransactionBase{
+				Domain: psc.d.name,
+				To:     &psc.info.Address,
+				Data: tktypes.RawJSON(`{
+					"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
+				}`)},
+		},
+		Function: &components.ResolvedFunction{
+			Definition: &abi.Entry{
+				Type: abi.Function,
+				Name: "getBalance",
+				Inputs: abi.ParameterArray{
+					{Name: "address", Type: "address"},
+				},
 			},
 		},
-		Inputs: tktypes.RawJSON(`{
-			"wrong": "0xf2C41ae275A9acE65e1Fb78B97270a61D86Aa0Ed"
-		}`),
 	}, []*prototk.ResolvedVerifier{})
 	assert.Regexp(t, "PD011612", err)
 }
@@ -1364,10 +1414,10 @@ func TestExecCallNilOutputOk(t *testing.T) {
 		return &prototk.ExecCallResponse{}, nil
 	}
 
-	txi := goodPrivateCallWithInputsAndOutputs(psc)
-	txi.Function.Outputs = nil
+	localTx := goodPrivateCallWithInputsAndOutputs(psc)
+	localTx.Function.Definition.Outputs = nil
 
-	_, err := psc.ExecCall(td.c.dCtx, td.c.dbTX, txi, []*prototk.ResolvedVerifier{})
+	_, err := psc.ExecCall(td.c.dCtx, td.c.dbTX, localTx, []*prototk.ResolvedVerifier{})
 	require.NoError(t, err)
 }
 

@@ -31,7 +31,7 @@ import (
 // assemble a transaction that we are not coordinating, using the provided state locks
 // all errors are assumed to be transient and the request should be retried
 // if the domain as deemed the request as invalid then it will communicate the `revert` directive via the AssembleTransactionResponse_REVERT result without any error
-func (s *Sequencer) assembleForRemoteCoordinator(ctx context.Context, transactionID uuid.UUID, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
+func (s *Sequencer) assembleForRemoteCoordinator(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) (*components.TransactionPostAssembly, error) {
 
 	log.L(ctx).Debugf("assembleForRemoteCoordinator: Assembling transaction %s ", transactionID)
 
@@ -46,7 +46,7 @@ func (s *Sequencer) assembleForRemoteCoordinator(ctx context.Context, transactio
 		return nil, err
 	}
 
-	postAssembly, err := s.assembleAndSign(ctx, transactionID, transactionInputs, preAssembly, s.delegateDomainContext)
+	postAssembly, err := s.assembleAndSign(ctx, transactionID, preAssembly, s.delegateDomainContext)
 
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error assembling and signing transaction: %s", err)
@@ -56,11 +56,11 @@ func (s *Sequencer) assembleForRemoteCoordinator(ctx context.Context, transactio
 	return postAssembly, nil
 }
 
-func (s *Sequencer) AssembleLocal(ctx context.Context, requestID string, transactionID uuid.UUID, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly) {
+func (s *Sequencer) AssembleLocal(ctx context.Context, requestID string, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly) {
 
 	log.L(ctx).Debugf("assembleForLocalCoordinator: Assembling transaction %s ", transactionID)
 
-	postAssembly, err := s.assembleAndSign(ctx, transactionID, transactionInputs, preAssembly, s.coordinatorDomainContext)
+	postAssembly, err := s.assembleAndSign(ctx, transactionID, preAssembly, s.coordinatorDomainContext)
 
 	if err != nil {
 		log.L(ctx).Errorf("assembleForLocalCoordinator: Error assembling and signing transaction: %s", err)
@@ -79,16 +79,35 @@ func (s *Sequencer) AssembleLocal(ctx context.Context, requestID string, transac
 	)
 }
 
-func (s *Sequencer) assembleAndSign(ctx context.Context, transactionID uuid.UUID, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly, domainContext components.DomainContext) (*components.TransactionPostAssembly, error) {
+func (s *Sequencer) resolveLocalTransaction(ctx context.Context, transactionID uuid.UUID) (*components.ResolvedTransaction, error) {
+	locallyResolvedTx, err := s.components.TxManager().GetResolvedTransactionByID(ctx, transactionID)
+	if err == nil && locallyResolvedTx == nil {
+		err = i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleTxnNotFound, transactionID)
+	}
+	return locallyResolvedTx, err
+}
+
+func (s *Sequencer) assembleAndSign(ctx context.Context, transactionID uuid.UUID, preAssembly *components.TransactionPreAssembly, domainContext components.DomainContext) (*components.TransactionPostAssembly, error) {
 	//Assembles the transaction and synchronously fulfills any local signature attestation requests
 	// Given that the coordinator is single threading calls to assemble, there may be benefits to performance if we were to fulfill the signature request async
 	// but that would introduce levels of complexity that may not be justified so this is open as a potential for future optimization where we would need to think about
 	// whether a lost/late signature would trigger a re-assembly of the transaction ( and any transaction that come after it in the sequencer) or whether we could safely ask the assembly
 	// to post hoc sign an assembly
 
+	// The transaction input data that is the senders intent to perform the transaction for this ID,
+	// MUST be retrieved from the local database. We cannot process it from the data that is received
+	// over the wire from another node (otherwise that node could "tell us" to do something that no
+	// application locally instructed us to do).
+	localTx, err := s.resolveLocalTransaction(ctx, transactionID)
+	if err != nil || localTx.Transaction.Domain == s.domainAPI.Domain().Name() || localTx.Transaction.To == nil || *localTx.Transaction.To != s.domainAPI.Address() {
+		log.L(ctx).Errorf("assembleAndSign: transaction %s for invalid domain/address", transactionID)
+		err := i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrAssembleRequestInvalid, transactionID)
+		return nil, err
+	}
 	transaction := &components.PrivateTransaction{
 		ID:          transactionID,
-		Inputs:      transactionInputs,
+		Domain:      localTx.Transaction.Domain,
+		Address:     *localTx.Transaction.To,
 		PreAssembly: preAssembly,
 	}
 
@@ -96,7 +115,7 @@ func (s *Sequencer) assembleAndSign(ctx context.Context, transactionID uuid.UUID
 	 * Assemble
 	 */
 	readTX := s.components.Persistence().DB()
-	err := s.domainAPI.AssembleTransaction(domainContext, readTX, transaction)
+	err = s.domainAPI.AssembleTransaction(domainContext, readTX, transaction)
 	if err != nil {
 		log.L(ctx).Errorf("assembleAndSign: Error assembling transaction: %s", err)
 		return nil, err

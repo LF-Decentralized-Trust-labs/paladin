@@ -115,8 +115,9 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	}, pldapi.SubmitModeAuto)
 	require.NoError(t, err)
 	postCommit()
-	_, err = txm.insertTransactions(ctx, txm.p.DB(), []*components.ValidatedTransaction{parentTx}, false)
+	postCommit, _, err = txm.insertTransactions(ctx, txm.p.DB(), []*components.ValidatedTransaction{parentTx}, false)
 	require.NoError(t, err)
+	postCommit()
 
 	// Mimic some states that it produced
 	spent, spentIDs := writeStates(t, txm, testSchemaID, contractAddressDomain1, 3)
@@ -173,8 +174,9 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 				Type:           pldapi.TransactionTypePrivate.Enum(),
 				Domain:         "domain2",
 				To:             contractAddressDomain2,
-				Function:       "doThing2()",    // now fully qualified
-				ABIReference:   &storedABI.Hash, // now resolved
+				Function:       "doThing2()",          // now fully qualified
+				ABIReference:   &storedABI.Hash,       // now resolved
+				Data:           tktypes.RawJSON(`{}`), // normalized
 			},
 		},
 		States: pldapi.TransactionStates{

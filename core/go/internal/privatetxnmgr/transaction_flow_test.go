@@ -676,11 +676,8 @@ func TestRequestRemoteEndorsements(t *testing.T) {
 	// - signed it
 	// so next step is to request endorsements
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: aliceIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          aliceIdentityLocator,
@@ -803,11 +800,8 @@ func TestRequestLocalEndorsements(t *testing.T) {
 	// - signed it
 	// so next step is to request endorsements
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: aliceIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          aliceIdentityLocator,
@@ -962,11 +956,8 @@ func TestTimedOutEndorsementRequest(t *testing.T) {
 	// - signed it
 	// so next step is to request endorsements
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: aliceIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          aliceIdentityLocator,
@@ -1127,11 +1118,8 @@ func TestEndorsementResponseAfterRevert(t *testing.T) {
 	// - signed it
 	// so next step is to request endorsements
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: aliceIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          aliceIdentityLocator,
@@ -1275,11 +1263,8 @@ func TestEndorsementResponseAfterReassemble(t *testing.T) {
 	// so next step is to request endorsements
 	payloadFromAssemble1 := tktypes.RandBytes(32)
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: aliceIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          aliceIdentityLocator,
@@ -1448,11 +1433,8 @@ func TestDuplicateEndorsementResponse(t *testing.T) {
 	// - signed it
 	// so next step is to request endorsements
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: senderIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          senderIdentityLocator,
@@ -1647,11 +1629,8 @@ func TestGetTxStatusPendingEndorsements(t *testing.T) {
 
 	testContractAddress := *tktypes.RandAddress()
 	testTx := &components.PrivateTransaction{
-		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			To:   testContractAddress,
-			From: senderIdentityLocator,
-		},
+		ID:      newTxID,
+		Address: testContractAddress,
 		PreAssembly: &components.TransactionPreAssembly{
 			TransactionSpecification: &prototk.TransactionSpecification{
 				From:          senderIdentityLocator,

@@ -72,15 +72,15 @@ type DomainSmartContract interface {
 	Address() tktypes.EthAddress
 	ContractConfig() *prototk.ContractConfig
 
-	InitTransaction(ctx context.Context, tx *PrivateTransaction) error
-	AssembleTransaction(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
+	InitTransaction(ctx context.Context, ptx *PrivateTransaction, localTx *ResolvedTransaction) error
+	AssembleTransaction(dCtx DomainContext, readTX *gorm.DB, ptx *PrivateTransaction) error
 	WritePotentialStates(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
 	LockStates(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
 	EndorseTransaction(dCtx DomainContext, readTX *gorm.DB, req *PrivateTransactionEndorseRequest) (*EndorsementResult, error)
 	PrepareTransaction(dCtx DomainContext, readTX *gorm.DB, tx *PrivateTransaction) error
 
-	InitCall(ctx context.Context, tx *TransactionInputs) ([]*prototk.ResolveVerifierRequest, error)
-	ExecCall(dCtx DomainContext, readTX *gorm.DB, tx *TransactionInputs, verifiers []*prototk.ResolvedVerifier) (*abi.ComponentValue, error)
+	InitCall(ctx context.Context, tx *ResolvedTransaction) ([]*prototk.ResolveVerifierRequest, error)
+	ExecCall(dCtx DomainContext, readTX *gorm.DB, tx *ResolvedTransaction, verifiers []*prototk.ResolvedVerifier) (*abi.ComponentValue, error)
 }
 
 type EndorsementResult struct {

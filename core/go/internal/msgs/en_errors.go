@@ -241,7 +241,7 @@ var (
 	MsgDomainMultipleEndorsersSubmit          = ffe("PD011623", "Multiple endorsers of the transaction specified a submission constraint")
 	MsgDomainNoEndorserSubmit                 = ffe("PD011624", "Domain is configured for endorser submission, and no endorser specified a submission constraint")
 	MsgDomainInvalidSubmissionConfig          = ffe("PD011625", "Domain specified an unexpected base ledger submission config: %s")
-	MsgDomainTXIncompleteInitTransaction      = ffe("PD011626", "Transaction is incomplete for phase InitTransaction")
+	MsgDomainTxnInputDefinitionInvalid        = ffe("PD011626", "Transaction input definition is invalid")
 	MsgDomainTXIncompleteAssembleTransaction  = ffe("PD011627", "Transaction is incomplete for phase AssembleTransaction")
 	MsgDomainTXIncompleteWritePotentialStates = ffe("PD011628", "Transaction is incomplete for phase WritePotentialStates")
 	MsgDomainTXIncompleteLockStates           = ffe("PD011629", "Transaction is incomplete for phase LockStates")
@@ -320,6 +320,8 @@ var (
 	MsgPrivateTxManagerNewSequencerError         = ffe("PD011834", "Failed to create new sequencer")
 	MsgPrivateTxManagerInvalidStaticCoordinator  = ffe("PD011835", "Contract was configured with invalid static coordinator '%s'.  Must be of the form 'identity@node'")
 	MsgPrivateTxMgrFunctionNotProvided           = ffe("PD011836", "Function abi not provided in transaction input")
+	MsgPrivateTxMgrAssembleRequestInvalid        = ffe("PD011837", "Assemble request is invalid for transaction %s")
+	MsgPrivateTxMgrAssembleTxnNotFound           = ffe("PD011838", "Transaction %s not found in local node")
 
 	// Public Transaction Manager PD0119XX
 	MsgInsufficientBalance             = ffe("PD011900", "Balance %s of fueling source address %s is below the required amount %s")

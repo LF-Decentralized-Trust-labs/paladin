@@ -70,13 +70,13 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 			hasPublicTransaction := preparedTransaction.PreparedPublicTransaction != nil
 			hasPrivateTransaction := preparedTransaction.PreparedPrivateTransaction != nil
 			switch {
-			case preparedTransaction.Inputs.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPublicTransaction && !hasPrivateTransaction:
+			case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPublicTransaction && !hasPrivateTransaction:
 				log.L(ctx).Infof("Result of transaction %s is a public transaction (gas=%d)", preparedTransaction.ID, *preparedTransaction.PreparedPublicTransaction.PublicTxOptions.Gas)
 				publicTransactionsToSend = append(publicTransactionsToSend, preparedTransaction)
 				sequence.PrivateTransactionDispatches = append(sequence.PrivateTransactionDispatches, &syncpoints.DispatchPersisted{
 					PrivateTransactionID: transactionFlow.ID(ctx).String(),
 				})
-			case preparedTransaction.Inputs.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPrivateTransaction && !hasPublicTransaction:
+			case preparedTransaction.Intent == prototk.TransactionSpecification_SEND_TRANSACTION && hasPrivateTransaction && !hasPublicTransaction:
 				log.L(ctx).Infof("Result of transaction %s is a chained private transaction", preparedTransaction.ID)
 				preparePostCommit, validatedPrivateTx, err := s.components.TxManager().PrepareInternalPrivateTransaction(ctx, s.components.Persistence().DB(), preparedTransaction.PreparedPrivateTransaction, pldapi.SubmitModeAuto)
 				if err != nil {
@@ -86,7 +86,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				}
 				preparePostCommit() // we didn't use a coordinated TX to call immediately
 				dispatchBatch.PrivateDispatches = append(dispatchBatch.PrivateDispatches, validatedPrivateTx)
-			case preparedTransaction.Inputs.Intent == prototk.TransactionSpecification_PREPARE_TRANSACTION && (hasPublicTransaction || hasPrivateTransaction):
+			case preparedTransaction.Intent == prototk.TransactionSpecification_PREPARE_TRANSACTION && (hasPublicTransaction || hasPrivateTransaction):
 				log.L(ctx).Infof("Result of transaction %s is a prepared transaction public=%t private=%t", preparedTransaction.ID, hasPublicTransaction, hasPrivateTransaction)
 				preparedTransactionWithRefs := mapPreparedTransaction(preparedTransaction)
 				dispatchBatch.PreparedTransactions = append(dispatchBatch.PreparedTransactions, preparedTransactionWithRefs)
@@ -106,7 +106,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				})
 
 			default:
-				err = i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidPrepareOutcome, preparedTransaction.ID, preparedTransaction.Inputs.Intent, hasPublicTransaction, hasPrivateTransaction)
+				err = i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidPrepareOutcome, preparedTransaction.ID, preparedTransaction.Intent, hasPublicTransaction, hasPrivateTransaction)
 				log.L(ctx).Errorf("Error preparing transaction %s: %s", preparedTransaction.ID, err)
 				// TODO: this is just an error situation for one transaction - this function is a batch function
 				return err
@@ -219,10 +219,10 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PrepareTransactionWithRefs {
 	pt := &components.PrepareTransactionWithRefs{
 		ID:       tx.ID,
-		Domain:   tx.Inputs.Domain,
-		To:       &tx.Inputs.To,
+		Domain:   tx.Domain,
+		To:       &tx.Address,
 		Metadata: tx.PreparedMetadata,
-		Sender:   tx.Inputs.From,
+		Sender:   tx.PreAssembly.TransactionSpecification.From,
 	}
 	for _, s := range tx.PostAssembly.InputStates {
 		pt.States.Spent = append(pt.States.Spent, s.ID)

@@ -143,9 +143,9 @@ func TestNewSequencerProcessNewTransactionAssemblyFailed(t *testing.T) {
 	newTxID := uuid.New()
 	testTx := &components.PrivateTransaction{
 		ID: newTxID,
-		Inputs: &components.TransactionInputs{
-			From: "alice",
-		},
+		// Inputs: &components.TransactionInputs{
+		// 	From: "alice",
+		// },
 		PreAssembly: &components.TransactionPreAssembly{},
 	}
 

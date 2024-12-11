@@ -47,15 +47,16 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 	tx := sd.tx
 
 	// We enforce that the sender gets a distribution
+	senderLocator := tx.PreAssembly.TransactionSpecification.From
 	senderIncludedByDomain := false
 	for _, recipient := range instruction.DistributionList {
-		if recipient == tx.Inputs.From {
+		if recipient == senderLocator {
 			senderIncludedByDomain = true
 			break
 		}
 	}
 	if !senderIncludedByDomain {
-		instruction.DistributionList = append(instruction.DistributionList, tx.Inputs.From)
+		instruction.DistributionList = append(instruction.DistributionList, senderLocator)
 	}
 
 	remainingNullifiers := instruction.NullifierSpecs
@@ -80,8 +81,8 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 		distribution := &components.StateDistribution{
 			ID:              uuid.New().String(),
 			IdentityLocator: recipient,
-			Domain:          tx.Inputs.Domain,
-			ContractAddress: tx.Inputs.To.String(),
+			Domain:          tx.Domain,
+			ContractAddress: tx.Address.String(),
 			// the state data json is available on both but we take it
 			// from the outputState to make sure it is the same json that was used to generate the hash
 			StateID:       fullState.ID.String(),
@@ -130,7 +131,7 @@ func (sd *stateDistributionBuilder) Build(ctx context.Context) (sds *components.
 
 	// This code depends on the fact we ensure this gets fully qualified as the transaction comes into the system,
 	// on the sending node. So as the transaction flows around everyone knows who the originating node is.
-	sd.SenderNode, err = tktypes.PrivateIdentityLocator(tx.Inputs.From).Node(ctx, false)
+	sd.SenderNode, err = tktypes.PrivateIdentityLocator(tx.PreAssembly.TransactionSpecification.From).Node(ctx, false)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgPrivateTxMgrFromNotResolvedDistroTime)
 	}

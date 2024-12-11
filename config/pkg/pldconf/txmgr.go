@@ -20,15 +20,25 @@ import (
 )
 
 type TxManagerConfig struct {
-	ABI ABIConfig `json:"abi"`
+	ABI          ABIConfig          `json:"abi"`
+	Transactions TransactionsConfig `json:"transactions"`
 }
 
 type ABIConfig struct {
 	Cache CacheConfig `json:"cache"`
 }
 
+type TransactionsConfig struct {
+	Cache CacheConfig `json:"cache"`
+}
+
 var TxManagerDefaults = &TxManagerConfig{
 	ABI: ABIConfig{
+		Cache: CacheConfig{
+			Capacity: confutil.P(100),
+		},
+	},
+	Transactions: TransactionsConfig{
 		Cache: CacheConfig{
 			Capacity: confutil.P(100),
 		},

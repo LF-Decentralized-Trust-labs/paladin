@@ -174,10 +174,12 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 		}
 
 		if len(op.privateDispatches) > 0 {
-			if err := s.txMgr.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, op.privateDispatches); err != nil {
+			txPostCommit, err := s.txMgr.UpsertInternalPrivateTxsFinalizeIDs(ctx, dbTX, op.privateDispatches)
+			if err != nil {
 				log.L(ctx).Errorf("Error persisting private dispatches: %s", err)
 				return nil, err
 			}
+			postCommits = append(postCommits, txPostCommit)
 		}
 
 		if len(op.preparedTransactions) > 0 {

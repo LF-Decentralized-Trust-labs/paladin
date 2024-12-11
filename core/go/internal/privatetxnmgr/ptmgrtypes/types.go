@@ -103,7 +103,7 @@ type TransportWriter interface {
 	SendDelegationRequest(ctx context.Context, delegationId string, delegateNodeName string, transaction *components.PrivateTransaction, blockHeight int64) error
 	SendDelegationRequestAcknowledgment(ctx context.Context, delegatingNodeName string, delegationId string, delegateNodeName string, transactionID string) error
 	SendEndorsementRequest(ctx context.Context, idempotencyKey string, party string, targetNode string, contractAddress string, transactionID string, attRequest *prototk.AttestationRequest, transactionSpecification *prototk.TransactionSpecification, verifiers []*prototk.ResolvedVerifier, signatures []*prototk.AttestationResult, inputStates []*components.FullState, outputStates []*components.FullState, infoStates []*components.FullState) error
-	SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, transactionInputs *components.TransactionInputs, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
+	SendAssembleRequest(ctx context.Context, assemblingNode string, assembleRequestID string, txID uuid.UUID, contractAddress string, preAssembly *components.TransactionPreAssembly, stateLocksJSON []byte, blockHeight int64) error
 }
 
 type TransactionFlowStatus int
@@ -161,7 +161,7 @@ type SequencerEnvironment interface {
 type AssembleCoordinator interface {
 	Start()
 	Stop()
-	QueueAssemble(ctx context.Context, assemblingNode string, transactionID uuid.UUID, transactionInputs *components.TransactionInputs, transactionPreAssembly *components.TransactionPreAssembly)
+	QueueAssemble(ctx context.Context, assemblingNode string, transactionID uuid.UUID, transactionPreAssembly *components.TransactionPreAssembly)
 	Complete(requestID string, stateDistributions []*components.StateDistribution)
 }
 
@@ -170,7 +170,6 @@ type LocalAssembler interface {
 		ctx context.Context,
 		requestID string,
 		transactionID uuid.UUID,
-		transactionInputs *components.TransactionInputs,
 		preAssembly *components.TransactionPreAssembly,
 	)
 }

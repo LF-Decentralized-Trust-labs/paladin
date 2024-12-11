@@ -23,16 +23,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type TransactionInputs struct {
-	Domain          string                                  `json:"domain"`
-	From            string                                  `json:"from"`
-	To              tktypes.EthAddress                      `json:"to"`
-	Function        *abi.Entry                              `json:"function"`
-	Inputs          tktypes.RawJSON                         `json:"inputs"`
-	Intent          prototk.TransactionSpecification_Intent `json:"intent"`
-	PublicTxOptions pldapi.PublicTxOptions                  `json:"publicTxOptions"`
-}
-
 type TransactionStateRefs struct {
 	Confirmed []tktypes.HexBytes
 	Read      []tktypes.HexBytes
@@ -54,6 +44,7 @@ type TransactionPreAssembly struct {
 	TransactionSpecification *prototk.TransactionSpecification `json:"transaction_specification"`
 	RequiredVerifiers        []*prototk.ResolveVerifierRequest `json:"required_verifiers"`
 	Verifiers                []*prototk.ResolvedVerifier       `json:"verifiers"`
+	PublicTxOptions          pldapi.PublicTxOptions            `json:"public_tx_options"`
 }
 
 type FullState struct {
@@ -93,10 +84,14 @@ type TransactionPostAssembly struct {
 // as it hops between the states in the state machine (on multiple paladin nodes) to reach
 // a state that it can successfully (and anonymously) submitted it to the blockchain.
 type PrivateTransaction struct {
-	ID uuid.UUID `json:"id"`
 
-	// INPUTS: Items that come in from the submitter of the transaction
-	Inputs *TransactionInputs `json:"inputs"`
+	// The identifier for the transaction
+	ID      uuid.UUID          `json:"id"`
+	Domain  string             `json:"domain"`
+	Address tktypes.EthAddress `json:"address"`
+
+	// This enum describes the point in the private transaction flow where processing of the transaction should stop
+	Intent prototk.TransactionSpecification_Intent `json:"intent"`
 
 	// ASSEMBLY PHASE: Items that get added to the transaction as it goes on its journey through
 	// assembly, signing and endorsement (possibly going back through the journey many times)

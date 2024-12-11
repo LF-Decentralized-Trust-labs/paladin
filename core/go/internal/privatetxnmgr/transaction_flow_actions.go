@@ -259,7 +259,7 @@ func (tf *transactionFlow) finalize(ctx context.Context) {
 
 	tf.syncPoints.QueueTransactionFinalize(
 		ctx,
-		tf.transaction.Inputs.Domain,
+		tf.transaction.Domain,
 		tf.domainAPI.Address(),
 		tf.transaction.ID,
 		tf.finalizeRevertReason,
@@ -331,13 +331,13 @@ func (tf *transactionFlow) delegateIfRequired(ctx context.Context) (doContinue b
 	//then we need to either claw back that delegation or wait until the delegate has realized that they are no longer the coordinator and returns / forwards the responsibility for this transaction
 	tf.status = "delegating"
 	// ensure that the From field is fully qualified before sending to the delegate so that they can send assemble requests to the correct place
-	fullQualifiedFrom, err := tktypes.PrivateIdentityLocator(tf.transaction.Inputs.From).FullyQualified(ctx, tf.nodeName)
+	fullQualifiedFrom, err := tktypes.PrivateIdentityLocator(tf.transaction.PreAssembly.TransactionSpecification.From).FullyQualified(ctx, tf.nodeName)
 	if err != nil {
 		//this can only mean that the From field is an invalid identity locator and we should never have got this far
 		// unless there is a serious programming error or the memory has been corrupted
 		panic("Failed to fully qualify the coordinator node")
 	}
-	tf.transaction.Inputs.From = fullQualifiedFrom.String()
+	tf.transaction.PreAssembly.TransactionSpecification.From = fullQualifiedFrom.String()
 
 	delegationRequestID := uuid.New().String()
 
@@ -423,10 +423,10 @@ func (tf *transactionFlow) requestAssemble(ctx context.Context) {
 		return
 	}
 
-	assemblingNode, err := tktypes.PrivateIdentityLocator(tf.transaction.Inputs.From).Node(ctx, true)
+	assemblingNode, err := tktypes.PrivateIdentityLocator(tf.transaction.PreAssembly.TransactionSpecification.From).Node(ctx, true)
 	if err != nil {
 
-		log.L(ctx).Errorf("Failed to get node name from locator %s: %s", tf.transaction.Inputs.From, err)
+		log.L(ctx).Errorf("Failed to get node name from locator %s: %s", tf.transaction.PreAssembly.TransactionSpecification.From, err)
 		tf.publisher.PublishTransactionAssembleFailedEvent(
 			ctx,
 			tf.transaction.ID.String(),
@@ -436,15 +436,11 @@ func (tf *transactionFlow) requestAssemble(ctx context.Context) {
 		return
 	}
 
-	//TODO is this safe or do we need a deep copy?
-	transactionInputsCopy := *tf.transaction.Inputs
 	preAssemblyCopy := *tf.transaction.PreAssembly
-
 	tf.assembleCoordinator.QueueAssemble(
 		ctx,
 		assemblingNode,
 		tf.transaction.ID,
-		&transactionInputsCopy,
 		&preAssemblyCopy,
 	)
 	tf.assemblePending = true
@@ -577,7 +573,7 @@ func (tf *transactionFlow) requestEndorsement(ctx context.Context, idempotencyKe
 			idempotencyKey,
 			party,
 			partyNode,
-			tf.transaction.Inputs.To.String(),
+			tf.transaction.Address.String(),
 			tf.transaction.ID.String(),
 			attRequest,
 			tf.transaction.PreAssembly.TransactionSpecification,
