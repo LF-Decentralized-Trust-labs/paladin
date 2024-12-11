@@ -14,8 +14,8 @@ spec:
   - "zeto-factory"
   - "zeto-impl-anon-nullifier"
   - "zeto-g16-check-hashes-value"
-  - "zeto-g16-check-inputs-outputs"
-  - "zeto-g16-check-inputs-outputs-batch"
+  - "zeto-g16-check-nullifier"
+  - "zeto-g16-check-nullifier-batch"
   - "zeto-g16-verifier-anon-nullifier"
   - "zeto-g16-verifier-anon-nullifier-batch"
   function: registerImplementation
@@ -25,8 +25,8 @@ spec:
       "implementation": {
         "implementation":        "{{ index .status.resolvedContractAddresses "zeto-impl-anon-nullifier" }}",
         "depositVerifier":       "{{ index .status.resolvedContractAddresses "zeto-g16-check-hashes-value" }}",
-        "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs" }}",
-        "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs-batch" }}",
+        "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-check-nullifier" }}",
+        "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-check-nullifier-batch" }}",
         "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-nullifier" }}",
         "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-nullifier-batch" }}"
       }

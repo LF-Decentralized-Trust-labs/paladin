@@ -35,6 +35,12 @@
     "zeto_g16_check_inputs_outputs_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckInputsOutputsValueBatch.json"
     },
+    "zeto_g16_check_nullifier": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifierValue.json"
+    },
+    "zeto_g16_check_nullifier_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifierValueBatch.json"
+    },
     "zeto_poseidon_unit2l": {
         "filename": "test/e2e/abis/zeto/Poseidon2.json"
     },
