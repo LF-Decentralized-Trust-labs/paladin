@@ -83,9 +83,9 @@ jobs:
       # The makefile uses kustomize
       - uses: imranismail/setup-kustomize@v2
 
-      - name: Deploy Operator
+      - name: E2E Test
         run: |
-          ./gradlew deploy \
+          ./gradlew e2e \
             -PclusterName=${{ env.CLUSTER_NAME }} \
             -Pnamespace=${{ env.NAMESPACE }} \
             -PbuildOperator=${{ inputs.build-operator }} \
@@ -93,11 +93,5 @@ jobs:
             -PoperatorImageName=${{ inputs.operator-image }} \
             -PoperatorImageTag=${{ inputs.operator-image-tag }} \
             -PpaladinImageName=${{ inputs.paladin-image }} \
-            -PpaladinImageTag=${{ inputs.paladin-image-tag }} 
-
-      - name: Uninstall Operator
-        run: |
-          ./gradlew clean \
-            -PclusterName=${{ env.CLUSTER_NAME }} \
-            -Pnamespace=${{ env.NAMESPACE }} \
+            -PpaladinImageTag=${{ inputs.paladin-image-tag }} \
             -PdeleteCluster=true
