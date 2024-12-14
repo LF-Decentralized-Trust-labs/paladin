@@ -60,7 +60,6 @@ task copyInternalSolidity(type: Copy) {
         include 'contracts/domains/interfaces/INoto.sol/INoto.json'
         include 'contracts/domains/noto/NotoFactory.sol/NotoFactory.json'
         include 'contracts/domains/noto/Noto.sol/Noto.json'
-        include 'contracts/domains/noto/NotoSelfSubmit.sol/NotoSelfSubmit.json'
         include 'contracts/private/interfaces/INotoHooks.sol/INotoHooks.json'
     }
 

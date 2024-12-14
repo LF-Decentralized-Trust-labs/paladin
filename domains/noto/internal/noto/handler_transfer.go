@@ -142,26 +142,6 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Parties:         []string{notary},
 			},
 		}
-	case types.NotoVariantSelfSubmit:
-		attestation = []*prototk.AttestationRequest{
-			// Notary will endorse the assembled transaction (by providing a signature)
-			{
-				Name:            "notary",
-				AttestationType: prototk.AttestationType_ENDORSE,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
-				PayloadType:     signpayloads.OPAQUE_TO_RSV,
-				Parties:         []string{notary},
-			},
-			// Sender will endorse the assembled transaction (by submitting to the ledger)
-			{
-				Name:            "sender",
-				AttestationType: prototk.AttestationType_ENDORSE,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
-				Parties:         []string{req.Transaction.From},
-			},
-		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgUnknownDomainVariant, tx.DomainConfig.Variant)
 	}
@@ -200,37 +180,6 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 				EndorsementResult: prototk.EndorseTransactionResponse_ENDORSER_SUBMIT,
 			}, nil
 		}
-	case types.NotoVariantSelfSubmit:
-		if req.EndorsementRequest.Name == "notary" {
-			// Notary provides a signature for the assembled payload (to be verified on base ledger)
-			inputIDs := make([]interface{}, len(req.Inputs))
-			outputIDs := make([]interface{}, len(req.Outputs))
-			for i, state := range req.Inputs {
-				inputIDs[i] = state.Id
-			}
-			for i, state := range req.Outputs {
-				outputIDs[i] = state.Id
-			}
-			data, err := h.noto.encodeTransactionData(ctx, req.Transaction, req.Info)
-			if err != nil {
-				return nil, err
-			}
-			encodedTransfer, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inputIDs, outputIDs, data)
-			if err != nil {
-				return nil, err
-			}
-			return &prototk.EndorseTransactionResponse{
-				EndorsementResult: prototk.EndorseTransactionResponse_SIGN,
-				Payload:           encodedTransfer,
-			}, nil
-		} else if req.EndorsementRequest.Name == "sender" {
-			if req.EndorsementVerifier.Lookup == tx.Transaction.From {
-				// Sender submits the transaction
-				return &prototk.EndorseTransactionResponse{
-					EndorsementResult: prototk.EndorseTransactionResponse_ENDORSER_SUBMIT,
-				}, nil
-			}
-		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgUnknownDomainVariant, tx.DomainConfig.Variant)
 	}
@@ -256,12 +205,6 @@ func (h *transferHandler) baseLedgerTransfer(ctx context.Context, tx *types.Pars
 		signature = domain.FindAttestation("sender", req.AttestationResult)
 		if signature == nil {
 			return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
-		}
-	case types.NotoVariantSelfSubmit:
-		// Include the signature from the notary (will be verified on base ledger)
-		signature = domain.FindAttestation("notary", req.AttestationResult)
-		if signature == nil {
-			return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "notary")
 		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgUnknownDomainVariant, tx.DomainConfig.Variant)
