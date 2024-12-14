@@ -86,4 +86,3 @@ var NotaryTypeSigner tktypes.HexUint64 = 0x0000
 var NotaryTypePente tktypes.HexUint64 = 0x0001
 
 var NotoVariantDefault tktypes.HexUint64 = 0x0000
-var NotoVariantSelfSubmit tktypes.HexUint64 = 0x0001
