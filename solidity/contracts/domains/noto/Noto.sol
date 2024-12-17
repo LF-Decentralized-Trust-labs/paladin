@@ -33,19 +33,18 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
+    error NotoInvalidLockDelegate(
+        bytes32 locked,
+        address delegate,
+        address sender
+    );
+    error NotoInvalidLockOutcome(bytes32 locked, uint64 outcome);
 
     struct LockDetail {
-        bytes32 releaseOutput;
-        bytes32 revertOutput;
+        bool initialized;
         address delegate;
-        LockStatus status;
-    }
-
-    enum LockStatus {
-        UNINITIALIZED,
-        INITIALIZED,
-        RELEASED,
-        REVERTED
+        mapping(uint64 => bytes32) outcomes;
+        bytes data;
     }
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
@@ -123,7 +122,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      * @return unspent true or false depending on whether the identifier is in the unspent map
      */
     function isLocked(bytes32 id) public view returns (bool unspent) {
-        return _locks[id].status != LockStatus.UNINITIALIZED;
+        return _locks[id].initialized;
     }
 
     /**
@@ -287,55 +286,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         bytes calldata signature,
         bytes calldata data
     ) public virtual override onlyNotary {
-        _locks[lockedOutput] = LockDetail({
-            releaseOutput: lock.releaseOutput,
-            revertOutput: lock.revertOutput,
-            delegate: lock.delegate,
-            status: LockStatus.INITIALIZED
-        });
+        LockDetail storage stored = _locks[lockedOutput];
+        stored.outcomes[0] = lock.revertOutput;
+        stored.delegate = lock.delegate;
+        stored.initialized = true;
+        stored.data = data;
         emit NotoLock(lockedOutput, signature, data);
-    }
-
-    function releaseLock(bytes32 locked) external virtual override {
-        LockDetail memory lock = _locks[locked];
-        require(lock.delegate == msg.sender, "Caller is not lock delegate");
-        lock.status = LockStatus.RELEASED;
-    }
-
-    function revertLock(bytes32 locked) external virtual override {
-        LockDetail memory lock = _locks[locked];
-        require(lock.delegate == msg.sender, "Caller is not lock delegate");
-        lock.status = LockStatus.REVERTED;
-    }
-
-    function delegateLock(
-        bytes32 locked,
-        address delegate
-    ) external virtual override {
-        LockDetail memory lock = _locks[locked];
-        require(lock.delegate == msg.sender, "Caller is not lock delegate");
-        lock.delegate = delegate;
-    }
-
-    function unlock(
-        bytes32 locked,
-        bytes calldata signature,
-        bytes calldata data
-    ) external virtual override onlyNotary {
-        LockDetail memory lock = _locks[locked];
-        bytes32[] memory outputs = new bytes32[](1);
-
-        if (lock.status == LockStatus.RELEASED) {
-            outputs[0] = lock.releaseOutput;
-        } else if (lock.status == LockStatus.REVERTED) {
-            outputs[0] = lock.revertOutput;
-        } else {
-            revert("Cannot unlock");
-        }
-
-        _checkOutputs(outputs);
-        delete _locks[locked];
-        emit NotoUnlock(locked, outputs[0], signature, data);
     }
 
     function transferAndLock(
@@ -348,5 +304,50 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     ) external virtual override onlyNotary {
         _transfer(inputs, unlockedOutputs, signature, data);
         createLock(lockedOutput, lock, signature, data);
+    }
+
+    function addLockOutcome(
+        bytes32 locked,
+        uint64 ref,
+        bytes32 outcome
+    ) external virtual override onlyNotary {
+        LockDetail storage lock = _locks[locked];
+        lock.outcomes[ref] = outcome;
+    }
+
+    function removeLockOutcome(
+        bytes32 locked,
+        uint64 ref
+    ) external virtual override onlyNotary {
+        LockDetail storage lock = _locks[locked];
+        delete lock.outcomes[ref];
+    }
+
+    function delegateLock(
+        bytes32 locked,
+        address delegate
+    ) external virtual override {
+        LockDetail storage lock = _locks[locked];
+        if (lock.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(locked, lock.delegate, msg.sender);
+        }
+        lock.delegate = delegate;
+    }
+
+    function unlock(bytes32 locked, uint64 outcome) external virtual override {
+        LockDetail storage lock = _locks[locked];
+        if (lock.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(locked, lock.delegate, msg.sender);
+        }
+        if (lock.outcomes[outcome] == 0) {
+            revert NotoInvalidLockOutcome(locked, outcome);
+        }
+
+        bytes32[] memory outputs = new bytes32[](1);
+        outputs[0] = lock.outcomes[outcome];
+        _checkOutputs(outputs);
+
+        emit NotoUnlock(locked, lock.outcomes[outcome], lock.data);
+        delete _locks[locked];
     }
 }

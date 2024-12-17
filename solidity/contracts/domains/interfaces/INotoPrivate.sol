@@ -31,9 +31,9 @@ interface INotoPrivate {
         address delegate
     ) external;
 
-    function lockTransfer(
-        string calldata to,
+    function lock(
         uint256 amount,
+        address delegate,
         bytes calldata data
     ) external;
 
