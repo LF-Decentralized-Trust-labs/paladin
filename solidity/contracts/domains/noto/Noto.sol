@@ -141,10 +141,11 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      *      transaction. The inputs and outputs are all opaque to this on-chain function.
      *      Provides ordering and double-spend protection.
      *
-     * @param inputs Array of zero or more outputs of a previous function call against this
-     *      contract that have not yet been spent, and the signer is authorized to spend.
-     * @param outputs Array of zero or more new outputs to generate, for future transactions to spend.
-     * @param data Any additional transaction data (opaque to the blockchain)
+     * @param inputs array of zero or more outputs of a previous function call against this
+     *      contract that have not yet been spent, and the signer is authorized to spend
+     * @param outputs array of zero or more new outputs to generate, for future transactions to spend
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
      *
      * Emits a {UTXOTransfer} event.
      */
@@ -217,6 +218,8 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      *
      * @param delegate the address that is authorized to submit the transaction
      * @param txhash the pre-calculated hash of the transaction that is delegated
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
      *
      * Emits a {NotoApproved} event.
      */
@@ -244,6 +247,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      *
      * @param inputs as per transfer()
      * @param outputs as per transfer()
+     * @param signature as per transfer()
      * @param data as per transfer()
      *
      * Emits a {NotoTransfer} event.
@@ -280,6 +284,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         return _hashTypedDataV4(structHash);
     }
 
+    /**
+     * @dev Create a new locked state that can only be unlocked by a specific delegate.
+     *
+     * @param locked new output state to generate, representing locked value
+     * @param lock details on the lock and any possible outcomes
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
+     */
     function createLock(
         bytes32 locked,
         LockInput calldata lock,
@@ -296,6 +308,16 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         emit NotoLock(locked, signature, data);
     }
 
+    /**
+     * @dev Perform a transfer and a lock simultaneously.
+     *
+     * @param inputs as per transfer()
+     * @param unlockedOutputs as per transfer()
+     * @param lockedOutput as per createLock()
+     * @param lock as per createLock()
+     * @param signature as per createLock()
+     * @param data as per createLock()
+     */
     function transferAndLock(
         bytes32[] calldata inputs,
         bytes32[] calldata unlockedOutputs,
@@ -308,6 +330,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         createLock(lockedOutput, lock, signature, data);
     }
 
+    /**
+     * @dev Update the possible outcomes of a lock.
+     *
+     * @param locked locked state identifier
+     * @param outcomes outcomes to create or update
+     */
     function updateLock(
         bytes32 locked,
         LockOutcome[] calldata outcomes
@@ -318,6 +346,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         }
     }
 
+    /**
+     * @dev Delegate ownership of the lock to a new party.
+     *
+     * @param locked locked state identifier
+     * @param delegate the address that is authorized to unlock the lock
+     */
     function delegateLock(
         bytes32 locked,
         address delegate
@@ -329,6 +363,12 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         lock.delegate = delegate;
     }
 
+    /**
+     * @dev Unlock a locked state and choose from one of the pre-approved outcomes.
+     *
+     * @param locked locked state identifier
+     * @param outcome reference to the chosen lock outcome
+     */
     function unlock(bytes32 locked, uint64 outcome) external virtual override {
         LockDetail storage lock = _locks[locked];
         if (lock.delegate != msg.sender) {
