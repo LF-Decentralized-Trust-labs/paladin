@@ -42,7 +42,7 @@ var (
 	MsgUnexpectedConfigType        = ffe("PD200000", "Unexpected config type: %s")
 	MsgUnknownFunction             = ffe("PD200001", "Unknown function: %s")
 	MsgUnexpectedFunctionSignature = ffe("PD200002", "Unexpected signature for function '%s': expected=%s actual=%s")
-	MsgUnknownSchema               = ffe("PD200003", "Unknown schema: %s")
+	MsgUnexpectedSchema            = ffe("PD200003", "Unexpected schema: %s")
 	MsgInvalidListInput            = ffe("PD200004", "Invalid item in list %s[%d] (%s): %s")
 	MsgInsufficientFunds           = ffe("PD200005", "Insufficient funds (available=%s)")
 	MsgInvalidStateData            = ffe("PD200006", "State data %s is invalid: %s")

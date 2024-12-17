@@ -118,16 +118,13 @@ public class BondTest {
                     alice, Algorithms.ECDSA_SECP256K1, Verifiers.ETH_ADDRESS);
 
             var mapper = new ObjectMapper();
-            List<JsonNode> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas",
-                    "noto");
-            assertEquals(2, notoSchemas.size());
+
+            List<HashMap<String, Object>> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas", "noto");
             StateSchema notoSchema = null;
-            for (var i = 0; i < 2; i++) {
-                var schema = mapper.convertValue(notoSchemas.get(i), StateSchema.class);
-                if (schema.signature().equals("type=NotoCoin(bytes32 salt,string owner,uint256 amount),labels=[owner,amount]")) {
+            for (var schemaJson : notoSchemas) {
+                var schema = mapper.convertValue(schemaJson, StateSchema.class);
+                if (schema.signature().startsWith("type=NotoCoin")) {
                     notoSchema = schema;
-                } else {
-                    assertEquals("type=TransactionData(bytes32 salt,bytes data),labels=[]", schema.signature());
                 }
             }
             assertNotNull(notoSchema);

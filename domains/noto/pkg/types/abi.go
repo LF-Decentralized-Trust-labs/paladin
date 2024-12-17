@@ -68,10 +68,10 @@ type ApproveParams struct {
 	Delegate *tktypes.EthAddress    `json:"delegate"`
 }
 
-type LockTransferParams struct {
-	To     string              `json:"to"`
-	Amount *tktypes.HexUint256 `json:"amount"`
-	Data   tktypes.HexBytes    `json:"data"`
+type LockParams struct {
+	Amount   *tktypes.HexUint256 `json:"amount"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+	Data     tktypes.HexBytes    `json:"data"`
 }
 
 type ApproveExtraParams struct {

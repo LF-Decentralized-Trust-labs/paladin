@@ -32,17 +32,17 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
-type lockTransferHandler struct {
+type lockHandler struct {
 	noto *Noto
 }
 
-func (h *lockTransferHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
-	var transferParams types.LockTransferParams
+func (h *lockHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
+	var transferParams types.LockParams
 	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
 		return nil, err
 	}
-	if transferParams.To == "" {
-		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
+	if transferParams.Delegate.IsZero() {
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "delegate")
 	}
 	if transferParams.Amount == nil || transferParams.Amount.Int().Sign() != 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterGreaterThanZero, "amount")
@@ -50,8 +50,7 @@ func (h *lockTransferHandler) ValidateParams(ctx context.Context, config *types.
 	return &transferParams, nil
 }
 
-func (h *lockTransferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
-	params := tx.Params.(*types.LockTransferParams)
+func (h *lockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
 	return &prototk.InitTransactionResponse{
@@ -66,17 +65,12 @@ func (h *lockTransferHandler) Init(ctx context.Context, tx *types.ParsedTransact
 				Algorithm:    algorithms.ECDSA_SECP256K1,
 				VerifierType: verifiers.ETH_ADDRESS,
 			},
-			{
-				Lookup:       params.To,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
-			},
 		},
 	}, nil
 }
 
-func (h *lockTransferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
-	params := tx.Params.(*types.LockTransferParams)
+func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.LockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
 	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
@@ -87,58 +81,41 @@ func (h *lockTransferHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 	if err != nil {
 		return nil, err
 	}
-	toAddress, err := h.noto.findEthAddressVerifier(ctx, "to", params.To, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
 
 	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
 	if err != nil {
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From, params.To})
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
 
 	// A single locked coin, owned by the submitter and with a value equal to the transfer amount
-	lockedCoin := &types.NotoCoin{
-		Salt:   tktypes.RandHex(32),
+	lockedCoin := &types.NotoLockedCoin{
+		ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
 		Owner:  fromAddress,
 		Amount: params.Amount,
-		Locked: true,
 	}
-	// Output coin, unlocked, with original owner
-	revertedCoin := &types.NotoCoin{
-		Salt:   tktypes.RandHex(32),
+	// A single output coin, unlocked, with original owner
+	// TODO: make this configurable
+	revertCoin := &types.NotoCoin{
+		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
 		Owner:  fromAddress,
 		Amount: params.Amount,
-		Locked: false,
-	}
-	// Output coin, unlocked, with new owner
-	recipientCoin := &types.NotoCoin{
-		Salt:   tktypes.RandHex(32),
-		Owner:  toAddress,
-		Amount: params.Amount,
-		Locked: false,
 	}
 
-	distributionList := []string{notary, tx.Transaction.From, params.To} // TODO: is this right for all states?
-	lockedCoinState, err := h.noto.makeNewCoinState(lockedCoin, distributionList)
+	lockedCoinState, err := h.noto.makeNewLockedCoinState(lockedCoin, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
-	revertedCoinState, err := h.noto.makeNewCoinState(revertedCoin, distributionList)
-	if err != nil {
-		return nil, err
-	}
-	recipientCoinState, err := h.noto.makeNewCoinState(recipientCoin, distributionList)
+	revertState, err := h.noto.makeNewCoinState(revertCoin, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
 
-	outputCoins := []*types.NotoCoin{lockedCoin, revertedCoin, recipientCoin}
-	outputStates := []*prototk.NewState{lockedCoinState, revertedCoinState, recipientCoinState}
+	outputCoins := []*types.NotoCoin{}
+	outputStates := []*prototk.NewState{lockedCoinState, revertState}
 
 	if total.Cmp(params.Amount.Int()) == 1 {
 		remainder := big.NewInt(0).Sub(total, params.Amount.Int())
@@ -150,10 +127,11 @@ func (h *lockTransferHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 		outputStates = append(outputStates, returnedStates...)
 	}
 
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
+	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputCoins, outputCoins, lockedCoin, revertCoin)
 	if err != nil {
 		return nil, err
 	}
+
 	attestation := []*prototk.AttestationRequest{
 		// Sender confirms the initial request with a signature
 		{
@@ -161,7 +139,7 @@ func (h *lockTransferHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 			AttestationType: prototk.AttestationType_SIGN,
 			Algorithm:       algorithms.ECDSA_SECP256K1,
 			VerifierType:    verifiers.ETH_ADDRESS,
-			Payload:         encodedTransfer,
+			Payload:         encodedLock,
 			PayloadType:     signpayloads.OPAQUE_TO_RSV,
 			Parties:         []string{req.Transaction.From},
 		},
@@ -186,22 +164,52 @@ func (h *lockTransferHandler) Assemble(ctx context.Context, tx *types.ParsedTran
 	}, nil
 }
 
-func (h *lockTransferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	lockedState := req.Outputs[0]
+	revertState := req.Outputs[1]
+	remainderStates := req.Outputs[2:]
+
+	if lockedState.SchemaId != h.noto.LockedCoinSchemaID() {
+		return nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, lockedState.SchemaId)
+	}
+	lockedCoin, err := h.noto.unmarshalLockedCoin(lockedState.StateDataJson)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: figure out the correct checks
-	// if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
-	// 	return nil, err
-	// }
+
+	if revertState.SchemaId != h.noto.CoinSchemaID() {
+		return nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, revertState.SchemaId)
+	}
+	revertCoin, err := h.noto.unmarshalCoin(revertState.StateDataJson)
+	if err != nil {
+		return nil, err
+	}
+
+	coins, err := h.noto.gatherCoins(ctx, req.Inputs, remainderStates)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateLockAmounts(ctx, coins, lockedCoin, revertCoin); err != nil {
+		return nil, err
+	}
 	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
 		return nil, err
 	}
 
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
+	if !lockedCoin.Owner.Equals(fromAddress) {
+		return nil, i18n.NewError(ctx, msgs.MsgStateWrongOwner, lockedState.Id, tx.Transaction.From)
+	}
+	if !revertCoin.Owner.Equals(fromAddress) {
+		return nil, i18n.NewError(ctx, msgs.MsgStateWrongOwner, revertState.Id, tx.Transaction.From)
+	}
+
 	if req.EndorsementRequest.Name == "notary" {
 		// Notary checks the signature from the sender, then submits the transaction
-		if err := h.noto.validateTransferSignature(ctx, tx, req, coins); err != nil {
+		if err := h.noto.validateLockSignature(ctx, tx, req, coins, lockedCoin, revertCoin); err != nil {
 			return nil, err
 		}
 		return &prototk.EndorseTransactionResponse{
@@ -212,17 +220,18 @@ func (h *lockTransferHandler) Endorse(ctx context.Context, tx *types.ParsedTrans
 	return nil, i18n.NewError(ctx, msgs.MsgUnrecognizedEndorsement, req.EndorsementRequest.Name)
 }
 
-func (h *lockTransferHandler) baseLedgerTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inputParams := tx.Params.(*types.LockParams)
+
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
 	}
 
 	lockedOutput := req.OutputStates[0].Id
-	revertedOutput := req.OutputStates[1].Id
-	recipientOutput := req.OutputStates[2].Id
-	remainderOutputs := make([]string, len(req.OutputStates)-3)
-	for i, state := range req.OutputStates[3:] {
+	revertOutput := req.OutputStates[1].Id
+	remainderOutputs := make([]string, len(req.OutputStates)-2)
+	for i, state := range req.OutputStates[2:] {
 		remainderOutputs[i] = state.Id
 	}
 
@@ -242,9 +251,8 @@ func (h *lockTransferHandler) baseLedgerTransfer(ctx context.Context, tx *types.
 		UnlockedOutputs: remainderOutputs,
 		LockedOutput:    lockedOutput,
 		Lock: LockInput{
-			ReleaseOutput: recipientOutput,
-			RevertOutput:  revertedOutput,
-			Delegate:      signature.Verifier.Verifier,
+			RevertOutput: revertOutput,
+			Delegate:     inputParams.Delegate,
 		},
 		Signature: signature.Payload,
 		Data:      data,
@@ -259,10 +267,9 @@ func (h *lockTransferHandler) baseLedgerTransfer(ctx context.Context, tx *types.
 	}, nil
 }
 
-func (h *lockTransferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 	var err error
 	var baseTransaction *TransactionWrapper
-	var metadata []byte
 
 	baseTransaction, err = h.baseLedgerTransfer(ctx, tx, req)
 	if err != nil {
@@ -273,5 +280,5 @@ func (h *lockTransferHandler) Prepare(ctx context.Context, tx *types.ParsedTrans
 		return nil, fmt.Errorf("not supported") // TODO
 	}
 
-	return baseTransaction.prepare(metadata)
+	return baseTransaction.prepare(nil)
 }

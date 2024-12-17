@@ -28,10 +28,9 @@ type NotoCoinState struct {
 }
 
 type NotoCoin struct {
-	Salt   string              `json:"salt"`
+	Salt   tktypes.Bytes32     `json:"salt"`
 	Owner  *tktypes.EthAddress `json:"owner"`
 	Amount *tktypes.HexUint256 `json:"amount"`
-	Locked bool                `json:"locked"`
 }
 
 var NotoCoinABI = &abi.Parameter{
@@ -41,7 +40,22 @@ var NotoCoinABI = &abi.Parameter{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "owner", Type: "string", Indexed: true},
 		{Name: "amount", Type: "uint256", Indexed: true},
-		{Name: "locked", Type: "bool", Indexed: true},
+	},
+}
+
+type NotoLockedCoin struct {
+	ID     tktypes.Bytes32     `json:"id"`
+	Owner  *tktypes.EthAddress `json:"owner"`
+	Amount *tktypes.HexUint256 `json:"amount"`
+}
+
+var NotoLockedCoinABI = &abi.Parameter{
+	Type:         "tuple",
+	InternalType: "struct NotoLockedCoin",
+	Components: abi.ParameterArray{
+		{Name: "id", Type: "bytes32", Indexed: true},
+		{Name: "owner", Type: "string"},
+		{Name: "amount", Type: "uint256"},
 	},
 }
 

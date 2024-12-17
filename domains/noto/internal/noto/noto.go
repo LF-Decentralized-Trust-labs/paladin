@@ -57,6 +57,7 @@ type Noto struct {
 	config            types.DomainConfig
 	chainID           int64
 	coinSchema        *prototk.StateSchema
+	lockedCoinSchema  *prototk.StateSchema
 	dataSchema        *prototk.StateSchema
 	factoryABI        abi.ABI
 	contractABI       abi.ABI
@@ -94,9 +95,8 @@ type NotoApproveTransferParams struct {
 }
 
 type LockInput struct {
-	ReleaseOutput string `json:"releaseOutput"`
-	RevertOutput  string `json:"revertOutput"`
-	Delegate      string `json:"delegate"`
+	RevertOutput string              `json:"revertOutput"`
+	Delegate     *tktypes.EthAddress `json:"delegate"`
 }
 
 type NotoTransferAndLockParams struct {
@@ -106,6 +106,16 @@ type NotoTransferAndLockParams struct {
 	Lock            LockInput        `json:"lock"`
 	Signature       tktypes.HexBytes `json:"signature"`
 	Data            tktypes.HexBytes `json:"data"`
+}
+
+type NotoDelegateLockParams struct {
+	Locked   tktypes.Bytes32     `json:"locked"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+}
+
+type NotoUnlockParams struct {
+	Locked  tktypes.Bytes32   `json:"locked"`
+	Outcome tktypes.HexUint64 `json:"outcome"`
 }
 
 type NotoTransfer_Event struct {
@@ -129,10 +139,9 @@ type NotoLock_Event struct {
 }
 
 type NotoUnlock_Event struct {
-	Locked    tktypes.Bytes32  `json:"locked"`
-	Output    tktypes.Bytes32  `json:"output"`
-	Signature tktypes.HexBytes `json:"signature"`
-	Data      tktypes.HexBytes `json:"data"`
+	Locked tktypes.Bytes32  `json:"locked"`
+	Output tktypes.Bytes32  `json:"output"`
+	Data   tktypes.HexBytes `json:"data"`
 }
 
 type gatheredCoins struct {
@@ -158,6 +167,10 @@ func (n *Noto) Name() string {
 
 func (n *Noto) CoinSchemaID() string {
 	return n.coinSchema.Id
+}
+
+func (n *Noto) LockedCoinSchemaID() string {
+	return n.lockedCoinSchema.Id
 }
 
 func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomainRequest) (*prototk.ConfigureDomainResponse, error) {
@@ -195,6 +208,10 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 	if err != nil {
 		return nil, err
 	}
+	lockedCoinSchemaJSON, err := json.Marshal(types.NotoLockedCoinABI)
+	if err != nil {
+		return nil, err
+	}
 	infoSchemaJSON, err := json.Marshal(types.TransactionDataABI)
 	if err != nil {
 		return nil, err
@@ -213,15 +230,20 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 
 	return &prototk.ConfigureDomainResponse{
 		DomainConfig: &prototk.DomainConfig{
-			AbiStateSchemasJson: []string{string(coinSchemaJSON), string(infoSchemaJSON)},
-			AbiEventsJson:       string(eventsJSON),
+			AbiStateSchemasJson: []string{
+				string(coinSchemaJSON),
+				string(lockedCoinSchemaJSON),
+				string(infoSchemaJSON),
+			},
+			AbiEventsJson: string(eventsJSON),
 		},
 	}, nil
 }
 
 func (n *Noto) InitDomain(ctx context.Context, req *prototk.InitDomainRequest) (*prototk.InitDomainResponse, error) {
 	n.coinSchema = req.AbiStateSchemas[0]
-	n.dataSchema = req.AbiStateSchemas[1]
+	n.lockedCoinSchema = req.AbiStateSchemas[1]
+	n.dataSchema = req.AbiStateSchemas[2]
 	return &prototk.InitDomainResponse{}, nil
 }
 
@@ -467,27 +489,28 @@ func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0x
 }
 
 func (n *Noto) parseCoinList(ctx context.Context, label string, states []*prototk.EndorsableState) ([]*types.NotoCoin, []*prototk.StateRef, *big.Int, error) {
-	var err error
 	statesUsed := make(map[string]bool)
-	coins := make([]*types.NotoCoin, len(states))
-	refs := make([]*prototk.StateRef, len(states))
+	coins := make([]*types.NotoCoin, 0, len(states))
+	refs := make([]*prototk.StateRef, 0, len(states))
 	total := big.NewInt(0)
 	for i, state := range states {
 		if state.SchemaId != n.coinSchema.Id {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgUnknownSchema, state.SchemaId)
+			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedSchema, state.SchemaId)
 		}
 		if statesUsed[state.Id] {
 			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgDuplicateStateInList, label, i, state.Id)
 		}
 		statesUsed[state.Id] = true
-		if coins[i], err = n.unmarshalCoin(state.StateDataJson); err != nil {
+		coin, err := n.unmarshalCoin(state.StateDataJson)
+		if err != nil {
 			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInvalidListInput, label, i, state.Id, err)
 		}
-		refs[i] = &prototk.StateRef{
+		coins = append(coins, coin)
+		refs = append(refs, &prototk.StateRef{
 			SchemaId: state.SchemaId,
 			Id:       state.Id,
-		}
-		total = total.Add(total, coins[i].Amount.Int())
+		})
+		total = total.Add(total, coin.Amount.Int())
 	}
 	return coins, refs, total, nil
 }
@@ -633,7 +656,6 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				if err != nil {
 					return nil, err
 				}
-				n.recordTransactionInfo(ev, txData, &res)
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Locked})...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Output})...)
 			}
