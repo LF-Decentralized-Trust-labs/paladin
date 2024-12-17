@@ -95,8 +95,13 @@ type NotoApproveTransferParams struct {
 }
 
 type LockInput struct {
-	RevertOutput string              `json:"revertOutput"`
-	Delegate     *tktypes.EthAddress `json:"delegate"`
+	Outcomes []LockOutcome       `json:"outcomes"`
+	Delegate *tktypes.EthAddress `json:"delegate"`
+}
+
+type LockOutcome struct {
+	Ref   tktypes.HexUint64 `json:"ref"`
+	State string            `json:"state"`
 }
 
 type NotoTransferAndLockParams struct {

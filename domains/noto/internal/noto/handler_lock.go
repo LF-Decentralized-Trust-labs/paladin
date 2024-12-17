@@ -251,8 +251,10 @@ func (h *lockHandler) baseLedgerTransfer(ctx context.Context, tx *types.ParsedTr
 		UnlockedOutputs: remainderOutputs,
 		LockedOutput:    lockedOutput,
 		Lock: LockInput{
-			RevertOutput: revertOutput,
-			Delegate:     inputParams.Delegate,
+			Outcomes: []LockOutcome{
+				{Ref: 0, State: revertOutput},
+			},
+			Delegate: inputParams.Delegate,
 		},
 		Signature: signature.Payload,
 		Data:      data,

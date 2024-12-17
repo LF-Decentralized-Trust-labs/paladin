@@ -281,17 +281,19 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     function createLock(
-        bytes32 lockedOutput,
+        bytes32 locked,
         LockInput calldata lock,
         bytes calldata signature,
         bytes calldata data
     ) public virtual override onlyNotary {
-        LockDetail storage stored = _locks[lockedOutput];
-        stored.outcomes[0] = lock.revertOutput;
+        LockDetail storage stored = _locks[locked];
+        for (uint256 i = 0; i < lock.outcomes.length; i++) {
+            stored.outcomes[lock.outcomes[i].ref] = lock.outcomes[i].state;
+        }
         stored.delegate = lock.delegate;
         stored.initialized = true;
         stored.data = data;
-        emit NotoLock(lockedOutput, signature, data);
+        emit NotoLock(locked, signature, data);
     }
 
     function transferAndLock(
@@ -306,21 +308,14 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         createLock(lockedOutput, lock, signature, data);
     }
 
-    function addLockOutcome(
+    function updateLock(
         bytes32 locked,
-        uint64 ref,
-        bytes32 outcome
+        LockOutcome[] calldata outcomes
     ) external virtual override onlyNotary {
         LockDetail storage lock = _locks[locked];
-        lock.outcomes[ref] = outcome;
-    }
-
-    function removeLockOutcome(
-        bytes32 locked,
-        uint64 ref
-    ) external virtual override onlyNotary {
-        LockDetail storage lock = _locks[locked];
-        delete lock.outcomes[ref];
+        for (uint256 i = 0; i < outcomes.length; i++) {
+            lock.outcomes[outcomes[i].ref] = outcomes[i].state;
+        }
     }
 
     function delegateLock(
