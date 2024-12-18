@@ -140,6 +140,11 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
+
+	if !tx.DomainConfig.AllowBurning {
+		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
+	}
+
 	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
