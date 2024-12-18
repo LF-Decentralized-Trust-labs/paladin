@@ -135,6 +135,12 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
+	notary := tx.DomainConfig.NotaryLookup
+
+	if tx.DomainConfig.RestrictMinting && req.Transaction.From != notary {
+		return nil, i18n.NewError(ctx, msgs.MsgMintOnlyNotary, notary, req.Transaction.From)
+	}
+
 	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
