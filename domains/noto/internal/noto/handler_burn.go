@@ -50,7 +50,7 @@ func (h *burnHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
-	if !tx.DomainConfig.AllowBurning {
+	if !tx.DomainConfig.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
 	return &prototk.InitTransactionResponse{
@@ -141,7 +141,7 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
 
-	if !tx.DomainConfig.AllowBurning {
+	if !tx.DomainConfig.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
 

@@ -284,16 +284,16 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	}
 
 	deployData := &types.NotoConfigData_V0{
-		NotaryLookup:    params.Notary,
-		NotaryType:      types.NotaryTypeSigner,
-		RestrictMinting: true,
-		AllowBurning:    true,
+		NotaryLookup: params.Notary,
+		NotaryType:   types.NotaryTypeSigner,
+		RestrictMint: true,
+		AllowBurn:    true,
 	}
-	if params.RestrictMinting != nil {
-		deployData.RestrictMinting = *params.RestrictMinting
+	if params.RestrictMint != nil {
+		deployData.RestrictMint = *params.RestrictMint
 	}
-	if params.AllowBurning != nil {
-		deployData.AllowBurning = *params.AllowBurning
+	if params.AllowBurn != nil {
+		deployData.AllowBurn = *params.AllowBurn
 	}
 
 	if params.Hooks != nil && !params.Hooks.PublicAddress.IsZero() {
@@ -343,14 +343,14 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
 	if err == nil {
 		parsedConfig := &types.NotoParsedConfig{
-			NotaryType:      decodedData.NotaryType,
-			NotaryAddress:   domainConfig.NotaryAddress,
-			Variant:         domainConfig.Variant,
-			NotaryLookup:    decodedData.NotaryLookup,
-			PrivateAddress:  decodedData.PrivateAddress,
-			PrivateGroup:    decodedData.PrivateGroup,
-			RestrictMinting: decodedData.RestrictMinting,
-			AllowBurning:    decodedData.AllowBurning,
+			NotaryType:     decodedData.NotaryType,
+			NotaryAddress:  domainConfig.NotaryAddress,
+			Variant:        domainConfig.Variant,
+			NotaryLookup:   decodedData.NotaryLookup,
+			PrivateAddress: decodedData.PrivateAddress,
+			PrivateGroup:   decodedData.PrivateGroup,
+			RestrictMint:   decodedData.RestrictMint,
+			AllowBurn:      decodedData.AllowBurn,
 		}
 		notoContractConfigJSON, err = json.Marshal(parsedConfig)
 	}

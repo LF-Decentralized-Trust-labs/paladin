@@ -24,7 +24,7 @@ Below is a walkthrough of each step in the example, with an explanation of what 
 const notoFactory = new NotoFactory(paladin1, "noto");
 const notoCash = await notoFactory.newNoto(cashIssuer, {
   notary: cashIssuer,
-  restrictMinting: true,
+  restrictMint: true,
 });
 ```
 
@@ -132,14 +132,14 @@ const notoBond = await notoFactory.newNoto(bondIssuer, {
     publicAddress: issuerCustodianGroup.address,
     privateAddress: bondTracker.address,
   },
-  restrictMinting: false,
+  restrictMint: false,
 });
 ```
 
 Now that the public and private tracking contracts have been deployed, the actual Noto token for the bond can be created.
 The "hooks" configuration points it to the private hooks contract that was deployed in the previous step.
 
-For this token, "restrictMinting" is disabled, because the hooks can enforce more flexible rules on both mint and transfer.
+For this token, "restrictMint" is disabled, because the hooks can enforce more flexible rules on both mint and transfer.
 
 #### Create factory for atomic transactions
 
