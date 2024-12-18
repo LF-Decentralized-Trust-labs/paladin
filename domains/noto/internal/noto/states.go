@@ -225,6 +225,19 @@ func (n *Noto) eip712Domain(contract *ethtypes.Address0xHex) map[string]interfac
 	}
 }
 
+func (n *Noto) findLockedStates(ctx context.Context, stateQueryContext, query string) ([]*prototk.StoredState, error) {
+	req := &prototk.FindAvailableStatesRequest{
+		StateQueryContext: stateQueryContext,
+		SchemaId:          n.lockedCoinSchema.Id,
+		QueryJson:         query,
+	}
+	res, err := n.Callbacks.FindAvailableStates(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return res.States, nil
+}
+
 func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	messageInputs := make([]interface{}, len(inputs))
 	for i, input := range inputs {

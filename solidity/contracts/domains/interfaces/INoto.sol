@@ -21,7 +21,7 @@ interface INoto {
     );
 
     event NotoLock(bytes32 locked, bytes signature, bytes data);
-
+    event NotoUpdateLock(bytes32 locked, bytes signature, bytes data);
     event NotoUnlock(bytes32 locked, bytes32 output, bytes data);
 
     struct LockOutcome {
@@ -90,7 +90,9 @@ interface INoto {
 
     function updateLock(
         bytes32 locked,
-        LockOutcome[] calldata outcomes
+        LockOutcome[] calldata outcomes,
+        bytes calldata signature,
+        bytes calldata data
     ) external;
 
     function delegateLock(bytes32 locked, address delegate) external;

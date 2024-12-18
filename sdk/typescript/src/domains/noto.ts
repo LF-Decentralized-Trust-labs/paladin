@@ -19,6 +19,7 @@ export const notoConstructorABI = (
     { name: "notary", type: "string" },
     { name: "restrictMint", type: "bool" },
     { name: "allowBurn", type: "bool" },
+    { name: "allowUpdateLock", type: "bool" },
     ...(withHooks
       ? [
           {
@@ -48,6 +49,7 @@ export interface NotoConstructorParams {
   };
   restrictMint?: boolean;
   allowBurn?: boolean;
+  allowUpdateLock?: boolean;
 }
 
 export interface NotoMintParams {

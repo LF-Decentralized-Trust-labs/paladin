@@ -53,6 +53,7 @@ func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 	if !tx.DomainConfig.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
+
 	return &prototk.InitTransactionResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
