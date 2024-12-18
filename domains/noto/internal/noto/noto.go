@@ -340,22 +340,22 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 	var notoContractConfigJSON []byte
 	var staticCoordinator string
-	domainConfig, err := n.decodeConfig(ctx, req.ContractConfig)
+	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
 	if err == nil {
 		parsedConfig := &types.NotoParsedConfig{
-			NotaryType:      domainConfig.DecodedData.NotaryType,
+			NotaryType:      decodedData.NotaryType,
 			NotaryAddress:   domainConfig.NotaryAddress,
 			Variant:         domainConfig.Variant,
-			NotaryLookup:    domainConfig.DecodedData.NotaryLookup,
-			PrivateAddress:  domainConfig.DecodedData.PrivateAddress,
-			PrivateGroup:    domainConfig.DecodedData.PrivateGroup,
-			RestrictMinting: domainConfig.DecodedData.RestrictMinting,
-			AllowBurning:    domainConfig.DecodedData.AllowBurning,
+			NotaryLookup:    decodedData.NotaryLookup,
+			PrivateAddress:  decodedData.PrivateAddress,
+			PrivateGroup:    decodedData.PrivateGroup,
+			RestrictMinting: decodedData.RestrictMinting,
+			AllowBurning:    decodedData.AllowBurning,
 		}
 		notoContractConfigJSON, err = json.Marshal(parsedConfig)
 	}
 	if err == nil {
-		staticCoordinator = domainConfig.DecodedData.NotaryLookup
+		staticCoordinator = decodedData.NotaryLookup
 	}
 	if err != nil {
 		// This on-chain contract has invalid configuration - not an error in our process
@@ -405,26 +405,27 @@ func (n *Noto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTrans
 	return handler.Prepare(ctx, tx, req)
 }
 
-func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, error) {
+func (n *Noto) decodeConfig(ctx context.Context, domainConfig []byte) (*types.NotoConfig_V0, *types.NotoConfigData_V0, error) {
 	configSelector := ethtypes.HexBytes0xPrefix(domainConfig[0:4])
 	if configSelector.String() != types.NotoConfigID_V0.String() {
-		return nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnexpectedConfigType, configSelector)
 	}
 	configValues, err := types.NotoConfigABI_V0.DecodeABIDataCtx(ctx, domainConfig[4:], 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	configJSON, err := tktypes.StandardABISerializer().SerializeJSON(configValues)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var config types.NotoConfig_V0
 	err = json.Unmarshal(configJSON, &config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = json.Unmarshal(config.Data, &config.DecodedData)
-	return &config, err
+	var decodedData types.NotoConfigData_V0
+	err = json.Unmarshal(config.Data, &decodedData)
+	return &config, &decodedData, err
 }
 
 func (n *Noto) validateDeploy(tx *prototk.DeployTransactionSpecification) (*types.ConstructorParams, error) {

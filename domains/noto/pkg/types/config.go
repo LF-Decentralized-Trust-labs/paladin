@@ -31,7 +31,6 @@ type NotoConfig_V0 struct {
 	NotaryAddress tktypes.EthAddress `json:"notaryAddress"`
 	Variant       tktypes.HexUint64  `json:"variant"`
 	Data          tktypes.HexBytes   `json:"data"`
-	DecodedData   *NotoConfigData_V0 `json:"-"`
 }
 
 type NotoConfigData_V0 struct {
