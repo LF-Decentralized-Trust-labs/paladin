@@ -24,14 +24,22 @@ interface INoto {
 
     event NotoUnlock(bytes32 locked, bytes32 output, bytes data);
 
-    struct LockInput {
-        LockOutcome[] outcomes;
-        address delegate;
-    }
-
     struct LockOutcome {
         uint64 ref;
         bytes32 state;
+    }
+
+    struct TransferParams {
+        bytes32[] inputs;
+        bytes32[] outputs;
+        bytes signature;
+    }
+
+    struct LockParams {
+        bytes32 locked;
+        LockOutcome[] outcomes;
+        address delegate;
+        bytes signature;
     }
 
     function initialize(
@@ -68,8 +76,15 @@ interface INoto {
 
     function createLock(
         bytes32 locked,
-        LockInput calldata lock,
+        LockOutcome[] calldata outcomes,
+        address delegate,
         bytes calldata signature,
+        bytes calldata data
+    ) external;
+
+    function transferAndLock(
+        TransferParams calldata transfer,
+        LockParams calldata lock,
         bytes calldata data
     ) external;
 
@@ -81,13 +96,4 @@ interface INoto {
     function delegateLock(bytes32 locked, address delegate) external;
 
     function unlock(bytes32 locked, uint64 outcome) external;
-
-    function transferAndLock(
-        bytes32[] calldata inputs,
-        bytes32[] calldata unlockedOutputs,
-        bytes32 lockedOutput,
-        LockInput calldata lock,
-        bytes calldata signature,
-        bytes calldata data
-    ) external;
 }

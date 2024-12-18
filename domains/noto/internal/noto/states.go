@@ -68,10 +68,8 @@ var NotoTransferMaskedTypeSet = eip712.TypeSet{
 
 var NotoLockTypeSet = eip712.TypeSet{
 	"Lock": {
-		{Name: "inputs", Type: "Coin[]"},
-		{Name: "outputs", Type: "Coin[]"},
 		{Name: "lockedCoin", Type: "LockedCoin"},
-		{Name: "revertCoin", Type: "Coin"},
+		{Name: "recipientCoins", Type: "Coin[]"},
 	},
 	"LockedCoin": {
 		{Name: "id", Type: "bytes32"},
@@ -268,42 +266,27 @@ func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Addr
 	})
 }
 
-func (n *Noto) encodeLock(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin, lockedCoin *types.NotoLockedCoin, revertCoin *types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
-	messageInputs := make([]any, len(inputs))
-	for i, input := range inputs {
-		messageInputs[i] = map[string]any{
-			"salt":   input.Salt,
-			"owner":  input.Owner,
-			"amount": input.Amount.String(),
-		}
-	}
-	messageOutputs := make([]any, len(outputs))
-	for i, output := range outputs {
-		messageOutputs[i] = map[string]any{
-			"salt":   output.Salt,
-			"owner":  output.Owner,
-			"amount": output.Amount.String(),
-		}
-	}
+func (n *Noto) encodeLock(ctx context.Context, contract *ethtypes.Address0xHex, lockedCoin *types.NotoLockedCoin, recipientCoins []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	lockedCoinOutput := map[string]any{
 		"id":     lockedCoin.ID,
 		"owner":  lockedCoin.Owner,
 		"amount": lockedCoin.Amount,
 	}
-	revertCoinOutput := map[string]any{
-		"salt":   revertCoin.Salt,
-		"owner":  revertCoin.Owner,
-		"amount": revertCoin.Amount,
+	recipientOutputs := make([]any, len(recipientCoins))
+	for i, coin := range recipientCoins {
+		recipientOutputs[i] = map[string]any{
+			"salt":   coin.Salt,
+			"owner":  coin.Owner,
+			"amount": coin.Amount,
+		}
 	}
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoLockTypeSet,
 		PrimaryType: "Lock",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]interface{}{
-			"inputs":     messageInputs,
-			"outputs":    messageOutputs,
-			"lockedCoin": lockedCoinOutput,
-			"revertCoin": revertCoinOutput,
+			"lockedCoin":     lockedCoinOutput,
+			"recipientCoins": recipientOutputs,
 		},
 	})
 }

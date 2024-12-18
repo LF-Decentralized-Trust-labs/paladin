@@ -87,6 +87,12 @@ type NotoTransferParams struct {
 	Data      tktypes.HexBytes `json:"data"`
 }
 
+type NotoTransferParamsNoData struct {
+	Inputs    []string         `json:"inputs"`
+	Outputs   []string         `json:"outputs"`
+	Signature tktypes.HexBytes `json:"signature"`
+}
+
 type NotoApproveTransferParams struct {
 	Delegate  *tktypes.EthAddress `json:"delegate"`
 	TXHash    tktypes.HexBytes    `json:"txhash"`
@@ -94,23 +100,22 @@ type NotoApproveTransferParams struct {
 	Data      tktypes.HexBytes    `json:"data"`
 }
 
-type LockInput struct {
-	Outcomes []LockOutcome       `json:"outcomes"`
-	Delegate *tktypes.EthAddress `json:"delegate"`
+type NotoLockParamsNoData struct {
+	Locked    tktypes.Bytes32     `json:"locked"`
+	Outcomes  []*LockOutcome      `json:"outcomes"`
+	Delegate  *tktypes.EthAddress `json:"delegate"`
+	Signature tktypes.HexBytes    `json:"signature"`
 }
 
 type LockOutcome struct {
 	Ref   tktypes.HexUint64 `json:"ref"`
-	State string            `json:"state"`
+	State tktypes.Bytes32   `json:"state"`
 }
 
 type NotoTransferAndLockParams struct {
-	Inputs          []string         `json:"inputs"`
-	UnlockedOutputs []string         `json:"unlockedOutputs"`
-	LockedOutput    string           `json:"lockedOutput"`
-	Lock            LockInput        `json:"lock"`
-	Signature       tktypes.HexBytes `json:"signature"`
-	Data            tktypes.HexBytes `json:"data"`
+	Transfer NotoTransferParamsNoData `json:"transfer"`
+	Lock     NotoLockParamsNoData     `json:"lock"`
+	Data     tktypes.HexBytes         `json:"data"`
 }
 
 type NotoDelegateLockParams struct {
