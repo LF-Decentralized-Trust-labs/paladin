@@ -511,7 +511,11 @@ func TestNotoLock(t *testing.T) {
 			To:       &notoAddress,
 			Function: "lock",
 			Data: toJSON(t, &types.LockParams{
-				Amount:   tktypes.Int64ToInt256(50),
+				ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+				Amount: tktypes.Int64ToInt256(50),
+				Recipients: []types.LockRecipient{
+					{Ref: 0, Recipient: recipient1Name},
+				},
 				Delegate: tktypes.MustEthAddress(unlockerDelegate1Key.Verifier.Verifier),
 			}),
 		},
@@ -591,6 +595,55 @@ func TestNotoLock(t *testing.T) {
 	require.Len(t, coins, 2)
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
+	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
+
+	log.L(ctx).Infof("Lock 50 from recipient1 (again)")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       &notoAddress,
+			Function: "lock",
+			Data: toJSON(t, &types.LockParams{
+				ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+				Amount: tktypes.Int64ToInt256(50),
+				Recipients: []types.LockRecipient{
+					{Ref: 0, Recipient: recipient1Name},
+					{Ref: 1, Recipient: recipient2Name},
+				},
+				Delegate: tktypes.MustEthAddress(unlockerDelegate1Key.Verifier.Verifier),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
+	lockedCoin = coins[0]
+
+	log.L(ctx).Infof("Unlock from recipient1 (send 50 to recipient2)")
+	tx = client.ForABI(ctx, noto.contractABI).
+		Public().
+		From(unlockerDelegate1).
+		To(&notoAddress).
+		Function("unlock").
+		Inputs(&NotoUnlockParams{
+			Locked:  lockedCoin.ID,
+			Outcome: 1,
+		}).
+		Send().
+		Wait(3 * time.Second)
+	require.NoError(t, tx.Error())
+
+	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 0)
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 2)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[0].Data.Owner.String())
 	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
 }

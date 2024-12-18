@@ -286,23 +286,27 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     /**
      * @dev Create a new locked state that can only be unlocked by a specific delegate.
+     *      When the locked state is unlocked, it will be spent and replaced by exactly one new state from
+     *      a set of pre-approved outcomes.
      *
      * @param locked new output state to generate, representing locked value
-     * @param lock details on the lock and any possible outcomes
+     * @param outcomes possible outcomes of the lock
+     * @param delegate the address that is authorized to unlock the lock
      * @param signature EIP-712 signature on the original request that spawned this transaction
      * @param data any additional transaction data (opaque to the blockchain)
      */
     function createLock(
         bytes32 locked,
-        LockInput calldata lock,
+        LockOutcome[] calldata outcomes,
+        address delegate,
         bytes calldata signature,
         bytes calldata data
     ) public virtual override onlyNotary {
         LockDetail storage stored = _locks[locked];
-        for (uint256 i = 0; i < lock.outcomes.length; i++) {
-            stored.outcomes[lock.outcomes[i].ref] = lock.outcomes[i].state;
+        for (uint256 i = 0; i < outcomes.length; i++) {
+            stored.outcomes[outcomes[i].ref] = outcomes[i].state;
         }
-        stored.delegate = lock.delegate;
+        stored.delegate = delegate;
         stored.initialized = true;
         stored.data = data;
         emit NotoLock(locked, signature, data);
@@ -310,24 +314,25 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     /**
      * @dev Perform a transfer and a lock simultaneously.
-     *
-     * @param inputs as per transfer()
-     * @param unlockedOutputs as per transfer()
-     * @param lockedOutput as per createLock()
-     * @param lock as per createLock()
-     * @param signature as per createLock()
-     * @param data as per createLock()
      */
     function transferAndLock(
-        bytes32[] calldata inputs,
-        bytes32[] calldata unlockedOutputs,
-        bytes32 lockedOutput,
-        LockInput calldata lock,
-        bytes calldata signature,
+        TransferParams calldata transfer_,
+        LockParams calldata lock,
         bytes calldata data
     ) external virtual override onlyNotary {
-        _transfer(inputs, unlockedOutputs, signature, data);
-        createLock(lockedOutput, lock, signature, data);
+        _transfer(
+            transfer_.inputs,
+            transfer_.outputs,
+            transfer_.signature,
+            data
+        );
+        createLock(
+            lock.locked,
+            lock.outcomes,
+            lock.delegate,
+            lock.signature,
+            data
+        );
     }
 
     /**

@@ -173,7 +173,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
-			if err := h.noto.validateTransferSignature(ctx, tx, req, coins); err != nil {
+			if err := h.noto.validateTransferSignature(ctx, tx, "sender", req, coins); err != nil {
 				return nil, err
 			}
 			return &prototk.EndorseTransactionResponse{
