@@ -40,7 +40,7 @@ async function main(): Promise<boolean> {
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
-    restrictMinting: true,
+    restrictMint: true,
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -112,7 +112,7 @@ async function main(): Promise<boolean> {
       publicAddress: issuerCustodianGroup.address,
       privateAddress: bondTracker.address,
     },
-    restrictMinting: false,
+    restrictMint: false,
   });
   if (!checkDeploy(notoBond)) return false;
 

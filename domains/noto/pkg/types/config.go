@@ -31,29 +31,28 @@ type NotoConfig_V0 struct {
 	NotaryAddress tktypes.EthAddress `json:"notaryAddress"`
 	Variant       tktypes.HexUint64  `json:"variant"`
 	Data          tktypes.HexBytes   `json:"data"`
-	DecodedData   *NotoConfigData_V0 `json:"-"`
 }
 
 type NotoConfigData_V0 struct {
-	NotaryLookup    string              `json:"notaryLookup"`
-	NotaryType      tktypes.HexUint64   `json:"notaryType"`
-	PrivateAddress  *tktypes.EthAddress `json:"privateAddress"`
-	PrivateGroup    *PentePrivateGroup  `json:"privateGroup"`
-	RestrictMinting bool                `json:"restrictMinting"`
-	AllowBurning    bool                `json:"allowBurning"`
+	NotaryLookup   string              `json:"notaryLookup"`
+	NotaryType     tktypes.HexUint64   `json:"notaryType"`
+	PrivateAddress *tktypes.EthAddress `json:"privateAddress"`
+	PrivateGroup   *PentePrivateGroup  `json:"privateGroup"`
+	RestrictMint   bool                `json:"restrictMint"`
+	AllowBurn      bool                `json:"allowBurn"`
 }
 
 // This is the structure we parse the config into in InitConfig and gets passed back to us on every call
 type NotoParsedConfig struct {
-	NotaryLookup    string              `json:"notaryLookup"`
-	NotaryType      tktypes.HexUint64   `json:"notaryType"`
-	NotaryAddress   tktypes.EthAddress  `json:"notaryAddress"`
-	Variant         tktypes.HexUint64   `json:"variant"`
-	PrivateAddress  *tktypes.EthAddress `json:"privateAddress,omitempty"`
-	PrivateGroup    *PentePrivateGroup  `json:"privateGroup,omitempty"`
-	RestrictMinting bool                `json:"restrictMinting"`
-	AllowBurning    bool                `json:"allowBurning"`
-	IsNotary        bool                `json:"isNotary"`
+	NotaryLookup   string              `json:"notaryLookup"`
+	NotaryType     tktypes.HexUint64   `json:"notaryType"`
+	NotaryAddress  tktypes.EthAddress  `json:"notaryAddress"`
+	Variant        tktypes.HexUint64   `json:"variant"`
+	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"`
+	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`
+	RestrictMint   bool                `json:"restrictMint"`
+	AllowBurn      bool                `json:"allowBurn"`
+	IsNotary       bool                `json:"isNotary"`
 }
 
 type PentePrivateGroup struct {

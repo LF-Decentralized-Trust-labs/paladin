@@ -30,11 +30,11 @@ var notoPrivateJSON []byte
 var NotoABI = solutils.MustParseBuildABI(notoPrivateJSON)
 
 type ConstructorParams struct {
-	Notary          string      `json:"notary"`                    // Lookup string for the notary identity
-	Implementation  string      `json:"implementation,omitempty"`  // Use a specific implementation of Noto that was registered to the factory (blank to use default)
-	Hooks           *HookParams `json:"hooks,omitempty"`           // Configure hooks for programmable logic around Noto operations
-	RestrictMinting *bool       `json:"restrictMinting,omitempty"` // Only allow notary to mint (default: true)
-	AllowBurning    *bool       `json:"allowBurning,omitempty"`    // Allow token holders to burn their tokens (default: true)
+	Notary         string      `json:"notary"`                   // Lookup string for the notary identity
+	Implementation string      `json:"implementation,omitempty"` // Use a specific implementation of Noto that was registered to the factory (blank to use default)
+	Hooks          *HookParams `json:"hooks,omitempty"`          // Configure hooks for programmable logic around Noto operations
+	RestrictMint   *bool       `json:"restrictMint,omitempty"`   // Only allow notary to mint (default: true)
+	AllowBurn      *bool       `json:"allowBurn,omitempty"`      // Allow token holders to burn their tokens (default: true)
 }
 
 // Currently the only supported hooks are provided via a Pente private smart contract

@@ -41,7 +41,7 @@ public class NotoHelper {
             @JsonProperty
             HookParams hooks,
             @JsonProperty
-            boolean restrictMinting
+            boolean restrictMint
     ) {
     }
 
