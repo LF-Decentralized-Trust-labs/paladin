@@ -340,15 +340,20 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      *
      * @param locked locked state identifier
      * @param outcomes outcomes to create or update
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
      */
     function updateLock(
         bytes32 locked,
-        LockOutcome[] calldata outcomes
+        LockOutcome[] calldata outcomes,
+        bytes calldata signature,
+        bytes calldata data
     ) external virtual override onlyNotary {
         LockDetail storage lock = _locks[locked];
         for (uint256 i = 0; i < outcomes.length; i++) {
             lock.outcomes[outcomes[i].ref] = outcomes[i].state;
         }
+        emit NotoUpdateLock(locked, signature, data);
     }
 
     /**

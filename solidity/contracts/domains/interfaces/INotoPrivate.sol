@@ -38,7 +38,8 @@ interface INotoPrivate {
 
     function updateLock(
         bytes32 id,
-        LockRecipient[] calldata recipients
+        LockRecipient[] calldata recipients,
+        bytes calldata data
     ) external;
 
     struct LockRecipient {

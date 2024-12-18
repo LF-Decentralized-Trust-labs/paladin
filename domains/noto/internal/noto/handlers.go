@@ -44,6 +44,8 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &approveHandler{noto: n}
 	case "lock":
 		return &lockHandler{noto: n}
+	case "updateLock":
+		return &updateLockHandler{noto: n}
 	default:
 		return nil
 	}
@@ -83,7 +85,7 @@ func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams
 	return nil
 }
 
-// Check that a lock produces a locked coin and a revert coin, both matching the difference between the inputs and outputs
+// Check that a lock produces a locked coin matching the difference between the inputs and outputs, and recipient coins matching the locked coin
 func (n *Noto) validateLockAmounts(ctx context.Context, coins *gatheredCoins, lockedCoin *types.NotoLockedCoin, recipientCoins []*types.NotoCoin) error {
 	if len(coins.inCoins) == 0 {
 		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "lock", coins.inCoins)
@@ -92,6 +94,11 @@ func (n *Noto) validateLockAmounts(ctx context.Context, coins *gatheredCoins, lo
 	if amount.Cmp(lockedCoin.Amount.Int()) != 0 {
 		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", lockedCoin.Amount.Int().Text(10), amount.Text(10))
 	}
+	return n.validateUpdateLockAmounts(ctx, lockedCoin, recipientCoins)
+}
+
+// Check that a lock update produces only recipient coins matching the value of the locked coin
+func (n *Noto) validateUpdateLockAmounts(ctx context.Context, lockedCoin *types.NotoLockedCoin, recipientCoins []*types.NotoCoin) error {
 	for _, coin := range recipientCoins {
 		if lockedCoin.Amount.Int().Cmp(coin.Amount.Int()) != 0 {
 			return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", lockedCoin.Amount.Int().Text(10), coin.Amount.Int().Text(10))

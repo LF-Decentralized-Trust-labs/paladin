@@ -599,17 +599,17 @@ func TestNotoLock(t *testing.T) {
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
 
 	log.L(ctx).Infof("Lock 50 from recipient1 (again)")
+	lockID := tktypes.Bytes32(tktypes.RandBytes(32))
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     recipient1Name,
 			To:       &notoAddress,
 			Function: "lock",
 			Data: toJSON(t, &types.LockParams{
-				ID:     tktypes.Bytes32(tktypes.RandBytes(32)),
+				ID:     lockID,
 				Amount: tktypes.Int64ToInt256(50),
 				Recipients: []types.LockRecipient{
 					{Ref: 0, Recipient: recipient1Name},
-					{Ref: 1, Recipient: recipient2Name},
 				},
 				Delegate: tktypes.MustEthAddress(unlockerDelegate1Key.Verifier.Verifier),
 			}),
@@ -623,6 +623,25 @@ func TestNotoLock(t *testing.T) {
 	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
 	require.Len(t, coins, 1)
 	lockedCoin = coins[0]
+
+	log.L(ctx).Infof("Update lock to add outcome for recipient2")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       &notoAddress,
+			Function: "updateLock",
+			Data: toJSON(t, &types.UpdateLockParams{
+				ID: lockID,
+				Recipients: []types.LockRecipient{
+					{Ref: 1, Recipient: recipient2Name},
+				},
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
 
 	log.L(ctx).Infof("Unlock from recipient1 (send 50 to recipient2)")
 	tx = client.ForABI(ctx, noto.contractABI).

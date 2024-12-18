@@ -53,18 +53,19 @@ func NewNoto(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	name              string
-	config            types.DomainConfig
-	chainID           int64
-	coinSchema        *prototk.StateSchema
-	lockedCoinSchema  *prototk.StateSchema
-	dataSchema        *prototk.StateSchema
-	factoryABI        abi.ABI
-	contractABI       abi.ABI
-	transferSignature string
-	approvedSignature string
-	lockSignature     string
-	unlockSignature   string
+	name                string
+	config              types.DomainConfig
+	chainID             int64
+	coinSchema          *prototk.StateSchema
+	lockedCoinSchema    *prototk.StateSchema
+	dataSchema          *prototk.StateSchema
+	factoryABI          abi.ABI
+	contractABI         abi.ABI
+	transferSignature   string
+	approvedSignature   string
+	lockSignature       string
+	updateLockSignature string
+	unlockSignature     string
 }
 
 type NotoDeployParams struct {
@@ -118,6 +119,13 @@ type NotoTransferAndLockParams struct {
 	Data     tktypes.HexBytes         `json:"data"`
 }
 
+type NotoUpdateLockParams struct {
+	Locked    tktypes.Bytes32  `json:"locked"`
+	Outcomes  []*LockOutcome   `json:"outcomes"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
+}
+
 type NotoDelegateLockParams struct {
 	Locked   tktypes.Bytes32     `json:"locked"`
 	Delegate *tktypes.EthAddress `json:"delegate"`
@@ -143,6 +151,12 @@ type NotoApproved_Event struct {
 }
 
 type NotoLock_Event struct {
+	Locked    tktypes.Bytes32  `json:"locked"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
+}
+
+type NotoUpdateLock_Event struct {
 	Locked    tktypes.Bytes32  `json:"locked"`
 	Signature tktypes.HexBytes `json:"signature"`
 	Data      tktypes.HexBytes `json:"data"`
@@ -206,6 +220,10 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 		return nil, err
 	}
 	n.lockSignature, err = getEventSignature(ctx, contract.ABI, "NotoLock")
+	if err != nil {
+		return nil, err
+	}
+	n.updateLockSignature, err = getEventSignature(ctx, contract.ABI, "NotoUpdateLock")
 	if err != nil {
 		return nil, err
 	}
@@ -289,16 +307,20 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	}
 
 	deployData := &types.NotoConfigData_V0{
-		NotaryLookup: notaryQualified.String(),
-		NotaryType:   types.NotaryTypeSigner,
-		RestrictMint: true,
-		AllowBurn:    true,
+		NotaryLookup:    notaryQualified.String(),
+		NotaryType:      types.NotaryTypeSigner,
+		RestrictMint:    true,
+		AllowBurn:       true,
+		AllowUpdateLock: true,
 	}
 	if params.RestrictMint != nil {
 		deployData.RestrictMint = *params.RestrictMint
 	}
 	if params.AllowBurn != nil {
 		deployData.AllowBurn = *params.AllowBurn
+	}
+	if params.AllowUpdateLock != nil {
+		deployData.AllowUpdateLock = *params.AllowUpdateLock
 	}
 
 	if params.Hooks != nil && !params.Hooks.PublicAddress.IsZero() {
@@ -358,15 +380,16 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	parsedConfig := &types.NotoParsedConfig{
-		NotaryType:     decodedData.NotaryType,
-		NotaryAddress:  domainConfig.NotaryAddress,
-		Variant:        domainConfig.Variant,
-		NotaryLookup:   decodedData.NotaryLookup,
-		IsNotary:       notaryNodeName == localNodeName.Name,
-		PrivateAddress: decodedData.PrivateAddress,
-		PrivateGroup:   decodedData.PrivateGroup,
-		RestrictMint:   decodedData.RestrictMint,
-		AllowBurn:      decodedData.AllowBurn,
+		NotaryType:      decodedData.NotaryType,
+		NotaryAddress:   domainConfig.NotaryAddress,
+		Variant:         domainConfig.Variant,
+		NotaryLookup:    decodedData.NotaryLookup,
+		IsNotary:        notaryNodeName == localNodeName.Name,
+		PrivateAddress:  decodedData.PrivateAddress,
+		PrivateGroup:    decodedData.PrivateGroup,
+		RestrictMint:    decodedData.RestrictMint,
+		AllowBurn:       decodedData.AllowBurn,
+		AllowUpdateLock: decodedData.AllowUpdateLock,
 	}
 	notoContractConfigJSON, err = json.Marshal(parsedConfig)
 	if err != nil {
@@ -657,6 +680,16 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				}
 				n.recordTransactionInfo(ev, txData, &res)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{lock.Locked})...)
+			}
+
+		case n.updateLockSignature:
+			var lock NotoUpdateLock_Event
+			if err := json.Unmarshal([]byte(ev.DataJson), &lock); err == nil {
+				txData, err := n.decodeTransactionData(ctx, lock.Data)
+				if err != nil {
+					return nil, err
+				}
+				n.recordTransactionInfo(ev, txData, &res)
 			}
 
 		case n.unlockSignature:
