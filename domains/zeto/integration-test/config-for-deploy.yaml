@@ -17,6 +17,14 @@ contracts:
     - name: Groth16Verifier_CheckInputsOutputsValueBatch
       abiAndBytecode:
         path: ./abis/Groth16Verifier_CheckInputsOutputsValueBatch.json
+    # for the withdraw transaction with nullifiers
+    - name: Groth16Verifier_CheckNullifierValue
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckNullifierValue.json
+    # for the withdraw transaction with batch inputs and nullifiers
+    - name: Groth16Verifier_CheckNullifierValueBatch
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckNullifierValueBatch.json
     # for the Zeto_Anon token
     - name: Groth16Verifier_Anon
       abiAndBytecode:
@@ -27,6 +35,9 @@ contracts:
     - name: Zeto_Anon
       verifier: Groth16Verifier_Anon
       batchVerifier: Groth16Verifier_AnonBatch
+      depositVerifier: Groth16Verifier_CheckHashesValue
+      withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
+      batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
       circuitId: anon
       cloneable: true
       abiAndBytecode:
@@ -41,6 +52,9 @@ contracts:
     - name: Zeto_AnonEnc
       verifier: Groth16Verifier_AnonEnc
       batchVerifier: Groth16Verifier_AnonEncBatch
+      depositVerifier: Groth16Verifier_CheckHashesValue
+      withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
+      batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
       circuitId: anon_enc
       cloneable: true
       abiAndBytecode:
@@ -64,6 +78,9 @@ contracts:
     - name: Zeto_AnonNullifier
       verifier: Groth16Verifier_AnonNullifier
       batchVerifier: Groth16Verifier_AnonNullifierBatch
+      depositVerifier: Groth16Verifier_CheckHashesValue
+      withdrawVerifier: Groth16Verifier_CheckNullifierValue
+      batchWithdrawVerifier: Groth16Verifier_CheckNullifierValueBatch
       circuitId: anon_nullifier
       cloneable: true
       abiAndBytecode:

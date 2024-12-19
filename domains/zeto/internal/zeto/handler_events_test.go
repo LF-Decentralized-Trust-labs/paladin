@@ -168,3 +168,33 @@ func TestUpdateMerkleTree(t *testing.T) {
 	err = z.updateMerkleTree(ctx, merkleTree, storage, tktypes.HexBytes("0x1234"), []tktypes.HexUint256{*tktypes.MustParseHexUint256("0x1234"), *tktypes.MustParseHexUint256("0x0")})
 	assert.NoError(t, err)
 }
+
+func TestHandleWithdrawEvent(t *testing.T) {
+	z, testCallbacks := newTestZeto()
+	storage := smt.NewStatesStorage(testCallbacks, "testToken1", "context1", "merkle_tree_root", "merkle_tree_node")
+	merkleTree, err := smt.NewSmt(storage)
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	ev := &prototk.OnChainEvent{
+		DataJson:          "bad json",
+		SoliditySignature: "event UTXOWithdraw(uint256 amount, uint256[] inputs, uint256 output, address indexed submitter, bytes data)",
+	}
+	res := &prototk.HandleEventBatchResponse{}
+
+	// bad data for the withdraw event - should be logged and move on
+	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001\",\"inputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001ffff\",\"inputs\":[\"7980718117603030807695495350922077879582656644717071592146865497574198464253\"],\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_Anon", res)
+	assert.NoError(t, err)
+
+	ev.DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"output\":\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
+	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOWithdraw event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+}

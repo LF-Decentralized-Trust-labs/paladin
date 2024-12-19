@@ -17,30 +17,17 @@ package types
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 //go:embed abis/INotoPrivate.json
 var notoPrivateJSON []byte
 
-func mustParseBuildABI(buildJSON []byte) abi.ABI {
-	var buildParsed map[string]tktypes.RawJSON
-	var buildABI abi.ABI
-	err := json.Unmarshal(buildJSON, &buildParsed)
-	if err == nil {
-		err = json.Unmarshal(buildParsed["abi"], &buildABI)
-	}
-	if err != nil {
-		panic(err)
-	}
-	return buildABI
-}
-
-var NotoABI = mustParseBuildABI(notoPrivateJSON)
+var NotoABI = solutils.MustParseBuildABI(notoPrivateJSON)
 
 type ConstructorParams struct {
 	Notary          string      `json:"notary"`                    // Lookup string for the notary identity

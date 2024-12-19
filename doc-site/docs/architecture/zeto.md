@@ -111,6 +111,58 @@ Inputs:
   - **to** - lookup string for the identity that will receive transferred value
   - **amount** - amount of value to transfer
 
+### deposit
+
+The Zeto token implementations support interaction with an ERC20 token, to control the value supply publicly. With this paradigm, the token issuer, such as a central bank for digital currencies, can control the total supply in the ERC20 contract. This makes the supply of the tokens public.
+
+The Zeto token contract can be configured to allow balances from a designated ERC20 contract to be "swapped" for Zeto tokens, by calling the `deposit` API. This allows any accounts that have a balance in the ERC20 contract to swap them for Zeto tokens. The exchange rate between the ERC20 and Zeto tokens is 1:1. On successful deposit, the ERC20 balance is transferred to the Zeto contract.
+
+Typically in this paradigm, the `mint` API on the Zeto domain should be locked down (disabled) so that the only way to mint Zeto tokens is by depositing.
+
+```json
+{
+  "type": "function",
+  "name": "deposit",
+  "inputs": [
+    {
+      "name": "amount",
+      "type": "uint256",
+      "internalType": "uint256"
+    }
+  ],
+  "outputs": null
+}
+```
+
+Inputs:
+
+- **amount** - amount of value to deposit
+
+### withdraw
+
+Opposite to the "deposit" operation, users can swap Zeto tokens back to ERC20 balances.
+
+On successful withdrawal, the ERC20 balance is released by the Zeto contract and transferred back to the user account.
+
+```json
+{
+  "type": "function",
+  "name": "withdraw",
+  "inputs": [
+    {
+      "name": "amount",
+      "type": "uint256",
+      "internalType": "uint256"
+    }
+  ],
+  "outputs": null
+}
+```
+
+Inputs:
+
+- **amount** - amount of value to withdraw
+
 ### lockProof
 
 This is a special purpose function used in coordinating multi-party transactions, such as [Delivery-vs-Payment (DvP) contracts](https://github.com/hyperledger-labs/zeto/blob/main/solidity/contracts/zkDvP.sol). When a party commits to the trade first by uploading the ZK proof to the orchestration contract, they must be protected from a malicious party seeing the proof and using it to unilaterally execute the token transfer. The `lockProof()` function allows an account, which can be a smart contract address, to designate the finaly submitter of the proof, thus protecting anybody else from abusing the proof outside of the atomic settlement of the multi-leg trade.
