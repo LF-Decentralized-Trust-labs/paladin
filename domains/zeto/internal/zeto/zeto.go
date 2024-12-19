@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/signer"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
@@ -53,6 +54,7 @@ type Zeto struct {
 	mintSignature            string
 	transferSignature        string
 	transferWithEncSignature string
+	withdrawSignature        string
 	snarkProver              signerapi.InMemorySigner
 }
 
@@ -73,6 +75,13 @@ type TransferWithEncryptedValuesEvent struct {
 	Data            tktypes.HexBytes     `json:"data"`
 	EncryptionNonce tktypes.HexUint256   `json:"encryptionNonce"`
 	EncryptedValues []tktypes.HexUint256 `json:"encryptedValues"`
+}
+
+type WithdrawEvent struct {
+	Amount tktypes.HexUint256   `json:"amount"`
+	Inputs []tktypes.HexUint256 `json:"inputs"`
+	Output tktypes.HexUint256   `json:"output"`
+	Data   tktypes.HexBytes     `json:"data"`
 }
 
 var factoryDeployABI = &abi.Entry{
@@ -274,6 +283,23 @@ func (z *Zeto) PrepareTransaction(ctx context.Context, req *prototk.PrepareTrans
 	return handler.Prepare(ctx, tx, req)
 }
 
+func (z *Zeto) GetHandler(method string) types.DomainHandler {
+	switch method {
+	case "mint":
+		return &mintHandler{zeto: z}
+	case "transfer":
+		return &transferHandler{zeto: z}
+	case "lockProof":
+		return &lockHandler{zeto: z}
+	case "deposit":
+		return &depositHandler{zeto: z}
+	case "withdraw":
+		return &withdrawHandler{zeto: z}
+	default:
+		return nil
+	}
+}
+
 func (z *Zeto) decodeDomainConfig(ctx context.Context, domainConfig []byte) (*types.DomainInstanceConfig, error) {
 	configValues, err := types.DomainInstanceConfigABI.DecodeABIDataCtx(ctx, domainConfig, 0)
 	if err != nil {
@@ -345,6 +371,8 @@ func (z *Zeto) registerEventSignatures(eventAbis abi.ABI) {
 			z.transferSignature = event.SolString()
 		case "UTXOTransferWithEncryptedValues":
 			z.transferWithEncSignature = event.SolString()
+		case "UTXOWithdraw":
+			z.withdrawSignature = event.SolString()
 		}
 	}
 }
@@ -366,7 +394,7 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 	var smtName string
 	var storage smt.StatesStorage
 	var tree core.SparseMerkleTree
-	if isNullifiersCircuit(domainConfig.CircuitId) {
+	if common.IsNullifiersToken(domainConfig.TokenName) {
 		smtName = smt.MerkleTreeName(domainConfig.TokenName, contractAddress)
 		storage = smt.NewStatesStorage(z.Callbacks, smtName, req.StateQueryContext, z.merkleTreeRootSchema.Id, z.merkleTreeNodeSchema.Id)
 		tree, err = smt.NewSmt(storage)
@@ -383,6 +411,8 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 			err = z.handleTransferEvent(ctx, tree, storage, ev, domainConfig.TokenName, &res)
 		case z.transferWithEncSignature:
 			err = z.handleTransferWithEncryptionEvent(ctx, tree, storage, ev, domainConfig.TokenName, &res)
+		case z.withdrawSignature:
+			err = z.handleWithdrawEvent(ctx, tree, storage, ev, domainConfig.TokenName, &res)
 		}
 		if err != nil {
 			errors = append(errors, err.Error())
@@ -391,7 +421,7 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 	if len(errors) > 0 {
 		return &res, i18n.NewError(ctx, msgs.MsgErrorHandleEvents, formatErrors(errors))
 	}
-	if isNullifiersCircuit(domainConfig.CircuitId) {
+	if common.IsNullifiersToken(domainConfig.TokenName) {
 		newStatesForSMT, err := storage.GetNewStates()
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorGetNewSmtStates, smtName, err)

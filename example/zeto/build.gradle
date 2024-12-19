@@ -25,6 +25,17 @@ dependencies {
     buildSDK project(path: ':sdk:typescript', configuration: 'buildSDK')
 }
 
+task copyContracts(type: Copy, dependsOn: [":domains:zeto:extractZetoArtifacts"]) {
+    from fileTree("../../domains/zeto/zkp/artifacts/contracts") {
+        include '**/SampleERC20.json'
+    }
+    into './src/abis'
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
 task install(type: Exec) {
     executable 'npm'
     args 'install'
@@ -35,7 +46,7 @@ task install(type: Exec) {
     outputs.dir('node_modules')
 }
 
-task build(type: Exec, dependsOn: [install]) {
+task build(type: Exec, dependsOn: [install, copyContracts]) {
     executable 'npm'
     args 'run'
     args 'build'

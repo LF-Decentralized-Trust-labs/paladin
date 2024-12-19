@@ -104,3 +104,16 @@ func (unlinked *SolidityBuildWithLinks) ResolveLinks(ctx context.Context, librar
 	}
 	return hex.DecodeString(strings.TrimPrefix(bytecode, "0x"))
 }
+
+func MustParseBuildABI(buildJSON []byte) abi.ABI {
+	var buildParsed map[string]tktypes.RawJSON
+	var buildABI abi.ABI
+	err := json.Unmarshal(buildJSON, &buildParsed)
+	if err == nil {
+		err = json.Unmarshal(buildParsed["abi"], &buildABI)
+	}
+	if err != nil {
+		panic(err)
+	}
+	return buildABI
+}

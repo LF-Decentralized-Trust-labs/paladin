@@ -122,3 +122,44 @@ func TestAssembleInputsAnonNullifier_fail(t *testing.T) {
 	_, err = assembleInputs_anon_nullifier(ctx, &inputs, &extras, &key)
 	assert.EqualError(t, err, "PD210079: Failed to calculate nullifier. inputs values not inside Finite Field")
 }
+
+func TestAssembleInputsDeposit(t *testing.T) {
+	inputs := commonWitnessInputs{outputCommitments: []*big.Int{big.NewInt(100)}}
+	result := assembleInputs_deposit(&inputs)
+	assert.Equal(t, "100", result["outputCommitments"].([]*big.Int)[0].Text(10))
+}
+
+func TestAssembleInputsWithdrawNullifier(t *testing.T) {
+	inputs := commonWitnessInputs{
+		inputCommitments:  []*big.Int{big.NewInt(100)},
+		inputValues:       []*big.Int{big.NewInt(100)},
+		inputSalts:        []*big.Int{big.NewInt(200)},
+		outputCommitments: []*big.Int{big.NewInt(100)},
+		outputValues:      []*big.Int{big.NewInt(200)},
+		outputSalts:       []*big.Int{big.NewInt(300)},
+	}
+	privKey, pubKey, zkpKey := newKeypair()
+	key := core.KeyEntry{
+		PrivateKey:       privKey,
+		PublicKey:        pubKey,
+		PrivateKeyForZkp: zkpKey,
+	}
+	extras := proto.ProvingRequestExtras_Nullifiers{
+		Root: "123",
+		MerkleProofs: []*proto.MerkleProof{
+			{
+				Nodes: []string{"1", "2", "3"},
+			},
+			{
+				Nodes: []string{"0", "0", "0"},
+			},
+		},
+		Enabled: []bool{true, false},
+	}
+	ctx := context.Background()
+	privateInputs, err := assembleInputs_withdraw_nullifier(ctx, &inputs, &extras, &key)
+	assert.NoError(t, err)
+	assert.Equal(t, "123", privateInputs["root"].(*big.Int).Text(16))
+	assert.Len(t, privateInputs["nullifiers"], 1)
+	assert.NotEqual(t, "0", privateInputs["nullifiers"].([]*big.Int)[0].Text(10))
+}

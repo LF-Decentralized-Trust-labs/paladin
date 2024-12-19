@@ -22,6 +22,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/iden3/go-rapidsnark/witness/v2"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,24 @@ func mockWASMModule() []byte {
     local.get $lhs)
   (export "init" (func $add))
 )`)
+}
+
+func loadTestCircuit(t *testing.T) (witness.Calculator, []byte) {
+	tmpDir := t.TempDir()
+	err := os.Mkdir(path.Join(tmpDir, "test_js"), 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), testWasm, 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(path.Join(tmpDir, "test.zkey"), []byte("test"), 0644)
+	require.NoError(t, err)
+
+	config := &zetosignerapi.SnarkProverConfig{}
+	config.CircuitsDir = tmpDir
+	config.ProvingKeysDir = tmpDir
+
+	circuit, provingKey, err := loadCircuit(context.Background(), "test", config)
+	require.NoError(t, err)
+	return circuit, provingKey
 }
 
 func TestLoadCircuit(t *testing.T) {
@@ -57,10 +76,7 @@ func TestLoadCircuit(t *testing.T) {
 	assert.Nil(t, circuit)
 	assert.Equal(t, []byte{}, provingKey)
 
-	err = os.WriteFile(path.Join(tmpDir, "test_js", "test.wasm"), testWasm, 0644)
-	require.NoError(t, err)
-	circuit, provingKey, err = loadCircuit(ctx, "test", config)
-	require.NoError(t, err)
+	circuit, provingKey = loadTestCircuit(t)
 	assert.NotNil(t, circuit)
 	assert.Equal(t, []byte("test"), provingKey)
 }

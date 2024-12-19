@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
@@ -36,84 +37,49 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type transferHandler struct {
+type withdrawHandler struct {
 	zeto *Zeto
 }
 
-var proofComponents = abi.ParameterArray{
-	{Name: "pA", Type: "uint256[2]"},
-	{Name: "pB", Type: "uint256[2][2]"},
-	{Name: "pC", Type: "uint256[2]"},
-}
-
-var transferABI = &abi.Entry{
+var withdrawABI = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: "withdraw",
 	Inputs: abi.ParameterArray{
+		{Name: "amount", Type: "uint256"},
 		{Name: "inputs", Type: "uint256[]"},
-		{Name: "outputs", Type: "uint256[]"},
+		{Name: "output", Type: "uint256"},
 		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: proofComponents},
 		{Name: "data", Type: "bytes"},
 	},
 }
 
-var transferABI_nullifiers = &abi.Entry{
+var withdrawABI_nullifiers = &abi.Entry{
 	Type: abi.Function,
-	Name: "transfer",
+	Name: "withdraw",
 	Inputs: abi.ParameterArray{
+		{Name: "amount", Type: "uint256"},
 		{Name: "nullifiers", Type: "uint256[]"},
-		{Name: "outputs", Type: "uint256[]"},
+		{Name: "output", Type: "uint256"},
 		{Name: "root", Type: "uint256"},
 		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: proofComponents},
 		{Name: "data", Type: "bytes"},
 	},
 }
 
-var transferABI_withEncryption = &abi.Entry{
-	Type: abi.Function,
-	Name: "transfer",
-	Inputs: abi.ParameterArray{
-		{Name: "inputs", Type: "uint256[]"},
-		{Name: "outputs", Type: "uint256[]"},
-		{Name: "encryptionNonce", Type: "uint256"},
-		{Name: "ecdhPublicKey", Type: "uint256[2]"},
-		{Name: "encryptedValues", Type: "uint256[]"},
-		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: proofComponents},
-		{Name: "data", Type: "bytes"},
-	},
-}
+func (h *withdrawHandler) ValidateParams(ctx context.Context, config *types.DomainInstanceConfig, params string) (interface{}, error) {
+	var withdrawParams types.WithdrawParams
+	if err := json.Unmarshal([]byte(params), &withdrawParams); err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeWithdrawCall, err)
+	}
 
-var transferABI_withEncryption_nullifiers = &abi.Entry{
-	Type: abi.Function,
-	Name: "transfer",
-	Inputs: abi.ParameterArray{
-		{Name: "nullifiers", Type: "uint256[]"},
-		{Name: "outputs", Type: "uint256[]"},
-		{Name: "root", Type: "uint256"},
-		{Name: "encryptionNonce", Type: "uint256"},
-		{Name: "ecdhPublicKey", Type: "uint256[2]"},
-		{Name: "encryptedValues", Type: "uint256[]"},
-		{Name: "proof", Type: "tuple", InternalType: "struct Commonlib.Proof", Components: proofComponents},
-		{Name: "data", Type: "bytes"},
-	},
-}
-
-func (h *transferHandler) ValidateParams(ctx context.Context, config *types.DomainInstanceConfig, params string) (interface{}, error) {
-	var transferParams types.TransferParams
-	if err := json.Unmarshal([]byte(params), &transferParams); err != nil {
+	if err := validateAmountParam(ctx, withdrawParams.Amount, 0); err != nil {
 		return nil, err
 	}
 
-	if err := validateTransferParams(ctx, transferParams.Transfers); err != nil {
-		return nil, err
-	}
-
-	return transferParams.Transfers, nil
+	return withdrawParams.Amount, nil
 }
 
-func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
-	params := tx.Params.([]*types.TransferParamEntry)
-
+func (h *withdrawHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *pb.InitTransactionRequest) (*pb.InitTransactionResponse, error) {
 	res := &pb.InitTransactionResponse{
 		RequiredVerifiers: []*pb.ResolveVerifierRequest{
 			{
@@ -123,19 +89,11 @@ func (h *transferHandler) Init(ctx context.Context, tx *types.ParsedTransaction,
 			},
 		},
 	}
-	for _, param := range params {
-		res.RequiredVerifiers = append(res.RequiredVerifiers, &pb.ResolveVerifierRequest{
-			Lookup:       param.To,
-			Algorithm:    h.zeto.getAlgoZetoSnarkBJJ(),
-			VerifierType: zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
-		})
-	}
-
 	return res, nil
 }
 
-func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
-	params := tx.Params.([]*types.TransferParamEntry)
+func (h *withdrawHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
+	amount := tx.Params.(*tktypes.HexUint256)
 
 	resolvedSender := domain.FindVerifier(tx.Transaction.From, h.zeto.getAlgoZetoSnarkBJJ(), zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X, req.ResolvedVerifiers)
 	if resolvedSender == nil {
@@ -143,45 +101,32 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}
 
 	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
-	inputCoins, inputStates, _, remainder, err := h.zeto.prepareInputsForTransfer(ctx, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params)
+	inputCoins, inputStates, _, remainder, err := h.zeto.prepareInputsForWithdraw(ctx, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, amount)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxInputs, err)
 	}
-	outputCoins, outputStates, err := h.zeto.prepareOutputsForTransfer(ctx, useNullifiers, params, req.ResolvedVerifiers)
+
+	outputCoin, outputState, err := h.zeto.prepareOutputForWithdraw(ctx, tktypes.MustParseHexUint256(remainder.Text(10)), resolvedSender)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
-	}
-	if remainder.Sign() > 0 {
-		// add the remainder as an output to the sender themselves
-		remainderHex := tktypes.HexUint256(*remainder)
-		remainderParams := []*types.TransferParamEntry{
-			{
-				To:     tx.Transaction.From,
-				Amount: &remainderHex,
-			},
-		}
-		returnedCoins, returnedStates, err := h.zeto.prepareOutputsForTransfer(ctx, useNullifiers, remainderParams, req.ResolvedVerifiers)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxChange, err)
-		}
-		outputCoins = append(outputCoins, returnedCoins...)
-		outputStates = append(outputStates, returnedStates...)
 	}
 
 	contractAddress, err := tktypes.ParseEthAddress(req.Transaction.ContractInfo.ContractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeContractAddress, err)
 	}
-	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, outputCoins, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
+	payloadBytes, err := h.formatProvingRequest(ctx, inputCoins, outputCoin, tx.DomainConfig.CircuitId, tx.DomainConfig.TokenName, req.StateQueryContext, contractAddress)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorFormatProvingReq, err)
 	}
 
+	amountStr := amount.Int().Text(10)
 	return &pb.AssembleTransactionResponse{
 		AssemblyResult: pb.AssembleTransactionResponse_OK,
 		AssembledTransaction: &pb.AssembledTransaction{
 			InputStates:  inputStates,
-			OutputStates: outputStates,
+			OutputStates: []*pb.NewState{outputState},
+			DomainData:   &amountStr,
 		},
 		AttestationPlan: []*pb.AttestationRequest{
 			{
@@ -204,13 +149,13 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 	}, nil
 }
 
-func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
+func (h *withdrawHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
 	return &pb.EndorseTransactionResponse{
 		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
 	}, nil
 }
 
-func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
+func (h *withdrawHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	var proofRes corepb.ProvingResponse
 	result := domain.FindAttestation("sender", req.AttestationResult)
 	if result == nil {
@@ -238,50 +183,40 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 			inputs[i] = "0"
 		}
 	}
-	outputs := make([]string, inputSize)
-	for i := 0; i < inputSize; i++ {
-		if i < len(req.OutputStates) {
-			state := req.OutputStates[i]
-			coin, err := h.zeto.makeCoin(state.StateDataJson)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorParseOutputStates, err)
-			}
-			hash, err := coin.Hash(ctx)
-			if err != nil {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorHashOutputState, err)
-			}
-			outputs[i] = hash.String()
-		} else {
-			outputs[i] = "0"
-		}
+
+	outputCoin, err := h.zeto.makeCoin(req.OutputStates[0].StateDataJson)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorParseOutputStates, err)
 	}
+	hash, err := outputCoin.Hash(ctx)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorHashOutputState, err)
+	}
+	output := hash.String()
 
 	data, err := encodeTransactionData(ctx, req.Transaction)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorEncodeTxData, err)
 	}
+	amount := tktypes.MustParseHexUint256(*req.DomainData)
 	params := map[string]any{
-		"inputs":  inputs,
-		"outputs": outputs,
-		"proof":   encodeProof(proofRes.Proof),
-		"data":    data,
-	}
-	transferFunction := getTransferABI(tx.DomainConfig.TokenName)
-	if common.IsEncryptionToken(tx.DomainConfig.TokenName) {
-		params["ecdhPublicKey"] = strings.Split(proofRes.PublicInputs["ecdhPublicKey"], ",")
-		params["encryptionNonce"] = proofRes.PublicInputs["encryptionNonce"]
-		params["encryptedValues"] = strings.Split(proofRes.PublicInputs["encryptedValues"], ",")
+		"amount": amount.Int().Text(10),
+		"inputs": inputs,
+		"output": output,
+		"proof":  encodeProof(proofRes.Proof),
+		"data":   data,
 	}
 	if common.IsNullifiersToken(tx.DomainConfig.TokenName) {
 		delete(params, "inputs")
 		params["nullifiers"] = strings.Split(proofRes.PublicInputs["nullifiers"], ",")
 		params["root"] = proofRes.PublicInputs["root"]
 	}
+	withdrawFunction := getWithdrawABI(tx.DomainConfig.TokenName)
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorMarshalPrepedParams, err)
 	}
-	functionJSON, err := json.Marshal(transferFunction)
+	functionJSON, err := json.Marshal(withdrawFunction)
 	if err != nil {
 		return nil, err
 	}
@@ -290,11 +225,12 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		Transaction: &pb.PreparedTransaction{
 			FunctionAbiJson: string(functionJSON),
 			ParamsJson:      string(paramsJSON),
+			RequiredSigner:  &req.Transaction.From, // must be signed by the original sender
 		},
 	}, nil
 }
 
-func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, outputCoins []*types.ZetoCoin, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
+func (h *withdrawHandler) formatProvingRequest(ctx context.Context, inputCoins []*types.ZetoCoin, outputCoin *types.ZetoCoin, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
 	inputSize := common.GetInputSize(len(inputCoins))
 	inputCommitments := make([]string, inputSize)
 	inputValueInts := make([]uint64, inputSize)
@@ -316,19 +252,14 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, 
 		}
 	}
 
-	outputValueInts := make([]uint64, inputSize)
-	outputSalts := make([]string, inputSize)
-	outputOwners := make([]string, inputSize)
-	for i := 0; i < inputSize; i++ {
-		if i < len(outputCoins) {
-			coin := outputCoins[i]
-			outputValueInts[i] = coin.Amount.Int().Uint64()
-			outputSalts[i] = coin.Salt.Int().Text(16)
-			outputOwners[i] = coin.Owner.String()
-		} else {
-			outputSalts[i] = "0"
-		}
+	hash, err := outputCoin.Hash(ctx)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgErrorHashOutputState, err)
 	}
+	outputCommitment := hash.Int().Text(16)
+	outputValueInt := outputCoin.Amount.Int().Uint64()
+	outputSalt := outputCoin.Salt.Int().Text(16)
+	outputOwner := outputCoin.Owner.String()
 
 	var extras []byte
 	if common.IsNullifiersCircuit(circuitId) {
@@ -348,32 +279,40 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, 
 	}
 
 	payload := &corepb.ProvingRequest{
-		CircuitId: circuitId,
+		CircuitId: getCircuitId(tokenName),
 		Common: &corepb.ProvingRequestCommon{
-			InputCommitments: inputCommitments,
-			InputValues:      inputValueInts,
-			InputSalts:       inputSalts,
-			InputOwner:       inputOwner,
-			OutputValues:     outputValueInts,
-			OutputSalts:      outputSalts,
-			OutputOwners:     outputOwners,
+			InputCommitments:  inputCommitments,
+			InputValues:       inputValueInts,
+			InputSalts:        inputSalts,
+			InputOwner:        inputOwner,
+			OutputCommitments: []string{outputCommitment},
+			OutputValues:      []uint64{outputValueInt},
+			OutputSalts:       []string{outputSalt},
+			OutputOwners:      []string{outputOwner},
 		},
 	}
+
 	if extras != nil {
 		payload.Extras = extras
 	}
+
 	return proto.Marshal(payload)
 }
 
-func getTransferABI(tokenName string) *abi.Entry {
-	transferFunction := transferABI
-	if common.IsEncryptionToken(tokenName) {
-		transferFunction = transferABI_withEncryption
-		if common.IsNullifiersToken(tokenName) {
-			transferFunction = transferABI_withEncryption_nullifiers
-		}
-	} else if common.IsNullifiersToken(tokenName) {
-		transferFunction = transferABI_nullifiers
+func getCircuitId(tokenName string) string {
+	isNullifier := common.IsNullifiersToken(tokenName)
+
+	if isNullifier {
+		return constants.CIRCUIT_WITHDRAW_NULLIFIER
+	} else {
+		return constants.CIRCUIT_WITHDRAW
 	}
-	return transferFunction
+}
+
+func getWithdrawABI(tokenName string) *abi.Entry {
+	withdrawFunction := withdrawABI
+	if common.IsNullifiersToken(tokenName) {
+		withdrawFunction = withdrawABI_nullifiers
+	}
+	return withdrawFunction
 }

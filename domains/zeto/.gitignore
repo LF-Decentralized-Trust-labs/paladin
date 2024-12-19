@@ -1,4 +1,5 @@
 internal/zeto/abis/
+pkg/types/abis/
 integration-test/abis/
 zkp/
 tools/

@@ -246,9 +246,9 @@ func TestInitTransaction(t *testing.T) {
 
 	req.Transaction.FunctionParamsJson = "{\"mints\":[{\"to\":\"Alice\",\"amount\":\"10\"}]}"
 	_, err = z.InitTransaction(context.Background(), req)
-	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210016: Unexpected signature for function 'mint': expected='function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }', actual=''")
+	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210016: Unexpected signature for function 'mint': expected='function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }', actual=''")
 
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210017: Failed to decode contract address. bad address - must be 20 bytes (len=0)")
 
@@ -290,7 +290,7 @@ func TestAssembleTransaction(t *testing.T) {
 	_, err := z.AssembleTransaction(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210009")
 
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -316,7 +316,7 @@ func TestEndorseTransaction(t *testing.T) {
 	assert.EqualError(t, err, "PD210010: Failed to validate endorse transaction spec. PD210012: Failed to unmarshal function abi json. unexpected end of JSON input")
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -357,7 +357,7 @@ func TestPrepareTransaction(t *testing.T) {
 	assert.EqualError(t, err, "PD210011: Failed to validate prepare transaction spec. PD210012: Failed to unmarshal function abi json. unexpected end of JSON input")
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -479,6 +479,11 @@ func TestHandleEventBatch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, res4.TransactionsComplete, 1)
 	assert.Len(t, res4.NewStates, 2)
+
+	req.Events[0].SoliditySignature = "event UTXOWithdraw(uint256 amount, uint256[] inputs, uint256 output, address indexed submitter, bytes data)"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
 }
 
 func TestGetVerifier(t *testing.T) {
@@ -641,4 +646,28 @@ func findCoins(ctx context.Context, z *Zeto, useNullifiers bool, contractAddress
 		}
 	}
 	return coins, err
+}
+
+func TestGetHandler(t *testing.T) {
+	z := &Zeto{
+		name: "test1",
+	}
+	assert.NotNil(t, z.GetHandler("mint"))
+	assert.NotNil(t, z.GetHandler("transfer"))
+	assert.NotNil(t, z.GetHandler("lockProof"))
+	assert.NotNil(t, z.GetHandler("deposit"))
+	assert.NotNil(t, z.GetHandler("withdraw"))
+	assert.Nil(t, z.GetHandler("bad"))
+}
+
+func TestUnimplementedMethods(t *testing.T) {
+	z := &Zeto{}
+	_, err := z.InitCall(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210085: Not implemented")
+
+	_, err = z.ExecCall(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210085: Not implemented")
+
+	_, err = z.BuildReceipt(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210102: Not implemented")
 }

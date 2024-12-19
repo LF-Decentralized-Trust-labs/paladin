@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"math/rand/v2"
 
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/crypto"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -94,17 +95,25 @@ func (z *Zeto) makeNewState(ctx context.Context, useNullifiers bool, coin *types
 	return newState, nil
 }
 
-func (z *Zeto) prepareInputs(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, params []*types.TransferParamEntry) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
-	var lastStateTimestamp int64
-	total := big.NewInt(0)
-	stateRefs := []*pb.StateRef{}
-	coins := []*types.ZetoCoin{}
-
+func (z *Zeto) prepareInputsForTransfer(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, params []*types.TransferParamEntry) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
 	expectedTotal := big.NewInt(0)
 	for _, param := range params {
 		expectedTotal = expectedTotal.Add(expectedTotal, param.Amount.Int())
 	}
 
+	return z.buildInputsForExpectedTotal(ctx, useNullifiers, stateQueryContext, senderKey, expectedTotal)
+}
+
+func (z *Zeto) prepareInputsForWithdraw(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, amount *tktypes.HexUint256) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
+	expectedTotal := amount.Int()
+	return z.buildInputsForExpectedTotal(ctx, useNullifiers, stateQueryContext, senderKey, expectedTotal)
+}
+
+func (z *Zeto) buildInputsForExpectedTotal(ctx context.Context, useNullifiers bool, stateQueryContext, senderKey string, expectedTotal *big.Int) ([]*types.ZetoCoin, []*pb.StateRef, *big.Int, *big.Int, error) {
+	var lastStateTimestamp int64
+	total := big.NewInt(0)
+	stateRefs := []*pb.StateRef{}
+	coins := []*types.ZetoCoin{}
 	for {
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
@@ -144,7 +153,7 @@ func (z *Zeto) prepareInputs(ctx context.Context, useNullifiers bool, stateQuery
 	}
 }
 
-func (z *Zeto) prepareOutputs(ctx context.Context, useNullifiers bool, params []*types.TransferParamEntry, resolvedVerifiers []*pb.ResolvedVerifier) ([]*types.ZetoCoin, []*pb.NewState, error) {
+func (z *Zeto) prepareOutputsForTransfer(ctx context.Context, useNullifiers bool, params []*types.TransferParamEntry, resolvedVerifiers []*pb.ResolvedVerifier) ([]*types.ZetoCoin, []*pb.NewState, error) {
 	var coins []*types.ZetoCoin
 	var newStates []*pb.NewState
 	for _, param := range params {
@@ -175,6 +184,63 @@ func (z *Zeto) prepareOutputs(ctx context.Context, useNullifiers bool, params []
 	return coins, newStates, nil
 }
 
+func (z *Zeto) prepareOutputsForDeposit(ctx context.Context, useNullifiers bool, amount *tktypes.HexUint256, resolvedSender *pb.ResolvedVerifier) ([]*types.ZetoCoin, []*pb.NewState, error) {
+	var coins []*types.ZetoCoin
+	// the token implementation allows up to 2 output states, we will use one of them
+	// to bear the deposit amount, and set the other to value of 0. we randomize
+	// which one to use and which one to set to 0
+	var newStates []*pb.NewState
+	amounts := make([]*tktypes.HexUint256, 2)
+	size := 2
+	randomIdx := randomSlot(size)
+	amounts[randomIdx] = amount
+	amounts[size-randomIdx-1] = tktypes.MustParseHexUint256("0x0")
+	for _, amt := range amounts {
+		resolvedRecipient := resolvedSender
+		recipientKey, err := loadBabyJubKey([]byte(resolvedRecipient.Verifier))
+		if err != nil {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorLoadOwnerPubKey, err)
+		}
+
+		salt := crypto.NewSalt()
+		compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
+		newCoin := &types.ZetoCoin{
+			Salt:   (*tktypes.HexUint256)(salt),
+			Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+			Amount: amt,
+		}
+
+		newState, err := z.makeNewState(ctx, useNullifiers, newCoin, resolvedRecipient.Lookup)
+		if err != nil {
+			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorCreateNewState, err)
+		}
+		coins = append(coins, newCoin)
+		newStates = append(newStates, newState)
+	}
+	return coins, newStates, nil
+}
+
+func (z *Zeto) prepareOutputForWithdraw(ctx context.Context, amount *tktypes.HexUint256, resolvedRecipient *pb.ResolvedVerifier) (*types.ZetoCoin, *pb.NewState, error) {
+	recipientKey, err := loadBabyJubKey([]byte(resolvedRecipient.Verifier))
+	if err != nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorLoadOwnerPubKey, err)
+	}
+
+	salt := crypto.NewSalt()
+	compressedKeyStr := zetosigner.EncodeBabyJubJubPublicKey(recipientKey)
+	newCoin := &types.ZetoCoin{
+		Salt:   (*tktypes.HexUint256)(salt),
+		Owner:  tktypes.MustParseHexBytes(compressedKeyStr),
+		Amount: amount,
+	}
+
+	newState, err := z.makeNewState(ctx, false, newCoin, resolvedRecipient.Lookup)
+	if err != nil {
+		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorCreateNewState, err)
+	}
+	return newCoin, newState, nil
+}
+
 func (z *Zeto) findAvailableStates(ctx context.Context, useNullifiers bool, stateQueryContext, query string) ([]*pb.StoredState, error) {
 	req := &pb.FindAvailableStatesRequest{
 		StateQueryContext: stateQueryContext,
@@ -187,4 +253,8 @@ func (z *Zeto) findAvailableStates(ctx context.Context, useNullifiers bool, stat
 		return nil, err
 	}
 	return res.States, nil
+}
+
+func randomSlot(size int) int {
+	return rand.IntN(size)
 }

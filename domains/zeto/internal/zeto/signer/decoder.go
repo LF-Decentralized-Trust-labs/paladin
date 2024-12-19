@@ -20,7 +20,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	pb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,7 +32,7 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 	if err != nil {
 		return nil, nil, err
 	}
-	if inputs.CircuitId == constants.CIRCUIT_ANON_ENC {
+	if common.IsEncryptionCircuit(inputs.CircuitId) {
 		encExtras := pb.ProvingRequestExtras_Encryption{
 			EncryptionNonce: "",
 		}
@@ -43,7 +43,7 @@ func decodeProvingRequest(ctx context.Context, payload []byte) (*pb.ProvingReque
 			}
 		}
 		return &inputs, &encExtras, nil
-	} else if inputs.CircuitId == constants.CIRCUIT_ANON_NULLIFIER {
+	} else if common.IsNullifiersCircuit(inputs.CircuitId) {
 		var nullifierExtras pb.ProvingRequestExtras_Nullifiers
 		err := proto.Unmarshal(inputs.Extras, &nullifierExtras)
 		if err != nil {

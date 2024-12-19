@@ -24,7 +24,7 @@ ext {
     goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
-    targetCoverage = 93.5
+    targetCoverage = 94.5
     maxCoverageBarGap = 1
     coveragePackages = [
         "github.com/kaleido-io/paladin/domains/zeto/internal/...",
@@ -32,7 +32,7 @@ ext {
         "github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner",
     ]
 
-    zetoVersion = "v0.0.7"
+    zetoVersion = "v0.0.10"
     zetoHost = "hyperledger-labs"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"
@@ -74,7 +74,7 @@ dependencies {
     coreGo project(path: ":core:go", configuration: "goSource")
 }
 
-task downloadZetoProver {
+task downloadZetoProver() {
     def outname = "zeto-wasm-${zetoVersion}.tar.gz"
     def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
@@ -85,7 +85,7 @@ task downloadZetoProver {
     outputs.file(f)
 }
 
-task downloadZetoTestProvingKeys {
+task downloadZetoTestProvingKeys() {
     def outname = "zeto-test-proving-keys-${zetoVersion}.tar.gz"
     def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
@@ -96,7 +96,7 @@ task downloadZetoTestProvingKeys {
     outputs.file(f)
 }
 
-task downloadZetoCompiledContracts {
+task downloadZetoCompiledContracts() {
     def outname = "zeto-contracts-${zetoVersion}.tar.gz"
     def url = "https://github.com/${zetoHost}/zeto/releases/download/${zetoVersion}/${outname}"
     def f = new File(toolsOut, outname)
@@ -173,6 +173,19 @@ task copySolidity(type: Copy, dependsOn: [protoc, ":solidity:compile", extractZe
     includeEmptyDirs = false
 }
 
+task copyPkgSolidity(type: Copy) {
+    inputs.files(configurations.contractCompile)
+
+    into 'pkg/types/abis'
+    from fileTree(configurations.contractCompile.asPath) {
+        include 'contracts/domains/interfaces/IZetoPrivate.sol/IZetoPrivate.json'
+    }
+
+    // Flatten all paths into the destination folder
+    eachFile { path = name }
+    includeEmptyDirs = false
+}
+
 task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, generatePoseidonArtifacts, ":solidity:compile"]) {
     inputs.files(configurations.contractCompile)
     from fileTree(configurations.contractCompile.asPath) {
@@ -197,7 +210,7 @@ task copySolidityForTest(type: Copy, dependsOn: [extractZetoArtifacts, generateP
     includeEmptyDirs = false
 }
 
-task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copySolidityForTest, ':testinfra:startTestInfra', ":core:go:makeMocks"]) {
+task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copyPkgSolidity, copySolidityForTest, ':testinfra:startTestInfra', ":core:go:makeMocks"]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
@@ -217,7 +230,7 @@ task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copySolidityForTest, 
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
-task unitTests(type: Exec, dependsOn: [protoc, ":core:go:makeMocks"]) {
+task unitTests(type: Exec, dependsOn: [protoc, ":core:go:makeMocks", ":testinfra:startTestInfra", downloadZetoCompiledContracts, copySolidity, copyPkgSolidity]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)
@@ -238,9 +251,6 @@ task unitTests(type: Exec, dependsOn: [protoc, ":core:go:makeMocks"]) {
     if (project.findProperty('verboseTests') == 'true') {
         args '-v'
     }
-
-    dependsOn copySolidity
-    dependsOn ':testinfra:startTestInfra'
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
@@ -254,7 +264,7 @@ task test {
     finalizedBy checkCoverage
 }
 
-task buildGo(type: GoLib, dependsOn: [":toolkit:go:protoc", copySolidity]) {
+task buildGo(type: GoLib, dependsOn: [":toolkit:go:protoc", copySolidity, copyPkgSolidity]) {
     inputs.files(configurations.coreGo)
     inputs.files(configurations.toolkitGo)
     baseName "zeto"
@@ -270,6 +280,7 @@ task build {
 task clean(type: Delete) {
     delete 'coverage'
     delete 'internal/zeto/abis'
+    delete 'pkg/types/abis'
     delete 'integration-test/abis'
     delete zkpOut
     delete toolsOut
@@ -280,7 +291,7 @@ task assemble {
 }
 
 dependencies {
-    goSource files(goFiles, copySolidity)
+    goSource files(goFiles, copySolidity, copyPkgSolidity)
     zetoArtifacts files(extractZetoArtifacts)
     poseidonArtifacts files(generatePoseidonArtifacts)
 }

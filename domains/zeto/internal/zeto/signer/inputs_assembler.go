@@ -78,43 +78,9 @@ func assembleInputs_anon_enc(ctx context.Context, inputs *commonWitnessInputs, e
 }
 
 func assembleInputs_anon_nullifier(ctx context.Context, inputs *commonWitnessInputs, extras *pb.ProvingRequestExtras_Nullifiers, keyEntry *core.KeyEntry) (map[string]any, error) {
-	// calculate the nullifiers for the input UTXOs
-	nullifiers := make([]*big.Int, len(inputs.inputCommitments))
-	for i := 0; i < len(inputs.inputCommitments); i++ {
-		// if the input commitment is 0, as a filler, the nullifier is 0
-		if inputs.inputCommitments[i].Cmp(big.NewInt(0)) == 0 {
-			nullifiers[i] = big.NewInt(0)
-			continue
-		}
-		nullifier, err := CalculateNullifier(inputs.inputValues[i], inputs.inputSalts[i], keyEntry.PrivateKeyForZkp)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgErrorCalcNullifier, err)
-		}
-		nullifiers[i] = nullifier
-	}
-	root, ok := new(big.Int).SetString(extras.Root, 16)
-	if !ok {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeRootExtras)
-	}
-	var proofs [][]*big.Int
-	for _, proof := range extras.MerkleProofs {
-		var mp []*big.Int
-		for _, node := range proof.Nodes {
-			n, ok := new(big.Int).SetString(node, 16)
-			if !ok {
-				return nil, i18n.NewError(ctx, msgs.MsgErrorDecodeMTPNodeExtras)
-			}
-			mp = append(mp, n)
-		}
-		proofs = append(proofs, mp)
-	}
-	enabled := make([]*big.Int, len(extras.Enabled))
-	for i, e := range extras.Enabled {
-		if e {
-			enabled[i] = big.NewInt(1)
-		} else {
-			enabled[i] = big.NewInt(0)
-		}
+	nullifiers, root, proofs, enabled, err := prepareInputsForNullifiers(ctx, inputs, extras, keyEntry)
+	if err != nil {
+		return nil, err
 	}
 
 	witnessInputs := map[string]interface{}{
@@ -132,4 +98,94 @@ func assembleInputs_anon_nullifier(ctx context.Context, inputs *commonWitnessInp
 		"outputOwnerPublicKeys": inputs.outputOwnerPublicKeys,
 	}
 	return witnessInputs, nil
+}
+
+func assembleInputs_deposit(inputs *commonWitnessInputs) map[string]interface{} {
+	witnessInputs := map[string]interface{}{
+		"outputCommitments":     inputs.outputCommitments,
+		"outputValues":          inputs.outputValues,
+		"outputSalts":           inputs.outputSalts,
+		"outputOwnerPublicKeys": inputs.outputOwnerPublicKeys,
+	}
+	return witnessInputs
+}
+
+func assembleInputs_withdraw(inputs *commonWitnessInputs, keyEntry *core.KeyEntry) map[string]interface{} {
+	witnessInputs := map[string]interface{}{
+		"inputCommitments":      inputs.inputCommitments,
+		"inputValues":           inputs.inputValues,
+		"inputSalts":            inputs.inputSalts,
+		"inputOwnerPrivateKey":  keyEntry.PrivateKeyForZkp,
+		"outputCommitments":     inputs.outputCommitments,
+		"outputValues":          inputs.outputValues,
+		"outputSalts":           inputs.outputSalts,
+		"outputOwnerPublicKeys": inputs.outputOwnerPublicKeys,
+	}
+	return witnessInputs
+}
+
+func assembleInputs_withdraw_nullifier(ctx context.Context, inputs *commonWitnessInputs, extras *pb.ProvingRequestExtras_Nullifiers, keyEntry *core.KeyEntry) (map[string]interface{}, error) {
+	nullifiers, root, proofs, enabled, err := prepareInputsForNullifiers(ctx, inputs, extras, keyEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	witnessInputs := map[string]interface{}{
+		"nullifiers":            nullifiers,
+		"root":                  root,
+		"merkleProof":           proofs,
+		"enabled":               enabled,
+		"inputCommitments":      inputs.inputCommitments,
+		"inputValues":           inputs.inputValues,
+		"inputSalts":            inputs.inputSalts,
+		"inputOwnerPrivateKey":  keyEntry.PrivateKeyForZkp,
+		"outputCommitments":     inputs.outputCommitments,
+		"outputValues":          inputs.outputValues,
+		"outputSalts":           inputs.outputSalts,
+		"outputOwnerPublicKeys": inputs.outputOwnerPublicKeys,
+	}
+	return witnessInputs, nil
+}
+
+func prepareInputsForNullifiers(ctx context.Context, inputs *commonWitnessInputs, extras *pb.ProvingRequestExtras_Nullifiers, keyEntry *core.KeyEntry) ([]*big.Int, *big.Int, [][]*big.Int, []*big.Int, error) {
+	// calculate the nullifiers for the input UTXOs
+	nullifiers := make([]*big.Int, len(inputs.inputCommitments))
+	for i := 0; i < len(inputs.inputCommitments); i++ {
+		// if the input commitment is 0, as a filler, the nullifier is 0
+		if inputs.inputCommitments[i].Cmp(big.NewInt(0)) == 0 {
+			nullifiers[i] = big.NewInt(0)
+			continue
+		}
+		nullifier, err := CalculateNullifier(inputs.inputValues[i], inputs.inputSalts[i], keyEntry.PrivateKeyForZkp)
+		if err != nil {
+			return nil, nil, nil, nil, i18n.NewError(ctx, msgs.MsgErrorCalcNullifier, err)
+		}
+		nullifiers[i] = nullifier
+	}
+	root, ok := new(big.Int).SetString(extras.Root, 16)
+	if !ok {
+		return nil, nil, nil, nil, i18n.NewError(ctx, msgs.MsgErrorDecodeRootExtras)
+	}
+	var proofs [][]*big.Int
+	for _, proof := range extras.MerkleProofs {
+		var mp []*big.Int
+		for _, node := range proof.Nodes {
+			n, ok := new(big.Int).SetString(node, 16)
+			if !ok {
+				return nil, nil, nil, nil, i18n.NewError(ctx, msgs.MsgErrorDecodeMTPNodeExtras)
+			}
+			mp = append(mp, n)
+		}
+		proofs = append(proofs, mp)
+	}
+	enabled := make([]*big.Int, len(extras.Enabled))
+	for i, e := range extras.Enabled {
+		if e {
+			enabled[i] = big.NewInt(1)
+		} else {
+			enabled[i] = big.NewInt(0)
+		}
+	}
+
+	return nullifiers, root, proofs, enabled, nil
 }
