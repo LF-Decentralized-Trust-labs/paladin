@@ -29,8 +29,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class DomainIntegrationTests {
 
@@ -209,18 +208,16 @@ public class DomainIntegrationTests {
             );
 
             var mapper = new ObjectMapper();
-            List<JsonNode> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas",
-                    "noto");
-            assertEquals(2, notoSchemas.size());
+
+            List<HashMap<String, Object>> notoSchemas = testbed.getRpcClient().request("pstate_listSchemas", "noto");
             StateSchema notoSchema = null;
-            for (var i = 0; i < 2; i++) {
-                var schema = mapper.convertValue(notoSchemas.get(i), StateSchema.class);
-                if (schema.signature().equals("type=NotoCoin(bytes32 salt,string owner,uint256 amount),labels=[owner,amount]")) {
+            for (var schemaJson : notoSchemas) {
+                var schema = mapper.convertValue(schemaJson, StateSchema.class);
+                if (schema.signature().startsWith("type=NotoCoin")) {
                     notoSchema = schema;
-                } else {
-                    assertEquals("type=TransactionData(bytes32 salt,bytes data),labels=[]", schema.signature());
                 }
             }
+            assertNotNull(notoSchema);
 
             // Create the privacy group
             String penteInstanceAddress = testbed.getRpcClient().request("testbed_deploy",

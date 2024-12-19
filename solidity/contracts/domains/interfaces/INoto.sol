@@ -20,6 +20,28 @@ interface INoto {
         bytes data
     );
 
+    event NotoLock(bytes32 locked, bytes signature, bytes data);
+
+    event NotoUnlock(bytes32 locked, bytes32 output, bytes data);
+
+    struct LockOutcome {
+        uint64 ref;
+        bytes32 state;
+    }
+
+    struct TransferParams {
+        bytes32[] inputs;
+        bytes32[] outputs;
+        bytes signature;
+    }
+
+    struct LockParams {
+        bytes32 locked;
+        LockOutcome[] outcomes;
+        address delegate;
+        bytes signature;
+    }
+
     function initialize(
         address notaryAddress,
         bytes calldata data
@@ -51,4 +73,27 @@ interface INoto {
         bytes memory signature,
         bytes memory data
     ) external;
+
+    function createLock(
+        bytes32 locked,
+        LockOutcome[] calldata outcomes,
+        address delegate,
+        bytes calldata signature,
+        bytes calldata data
+    ) external;
+
+    function transferAndLock(
+        TransferParams calldata transfer,
+        LockParams calldata lock,
+        bytes calldata data
+    ) external;
+
+    function updateLock(
+        bytes32 locked,
+        LockOutcome[] calldata outcomes
+    ) external;
+
+    function delegateLock(bytes32 locked, address delegate) external;
+
+    function unlock(bytes32 locked, uint64 outcome) external;
 }
