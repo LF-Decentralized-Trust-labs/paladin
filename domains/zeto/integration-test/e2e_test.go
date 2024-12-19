@@ -20,7 +20,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -43,6 +42,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+//go:embed abis/SampleERC20.json
+var erc20ABI []byte
 
 var (
 	controllerName = "controller"
@@ -208,6 +210,11 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string, u
 	expectedCoins := 2
 	if useBatch {
 		expectedCoins = 3
+	}
+	if len(coins) != expectedCoins {
+		for i, coin := range coins {
+			fmt.Printf("==> Coin %d: %+v\n", i, coin)
+		}
 	}
 	require.Len(t, coins, expectedCoins)
 
@@ -462,11 +469,7 @@ func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[
 }
 
 func getERC20Spec() (*solutils.SolidityBuild, error) {
-	bytes, err := os.ReadFile("./abis/SampleERC20.json")
-	if err != nil {
-		return nil, err
-	}
-	build := solutils.MustLoadBuild(bytes)
+	build := solutils.MustLoadBuild(erc20ABI)
 	return build, nil
 }
 

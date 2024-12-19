@@ -25,6 +25,7 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
+	"github.com/kaleido-io/paladin/domains/zeto/pkg/constants"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
@@ -32,10 +33,38 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+// due to the ZKP circuit needing to check if the amount is positive,
+// the maximum transfer amount is (2^100 - 1)
+// Reference: https://github.com/hyperledger-labs/zeto/blob/main/zkp/circuits/lib/check-positive.circom
+var MAX_TRANSFER_AMOUNT = big.NewInt(0).Exp(big.NewInt(2), big.NewInt(100), nil)
+
+func isNullifiersCircuit(circuitId string) bool {
+	return circuitId == constants.CIRCUIT_ANON_NULLIFIER || circuitId == constants.CIRCUIT_ANON_NULLIFIER_BATCH
+}
+
+func isNullifiersToken(tokenName string) bool {
+	return tokenName == constants.TOKEN_ANON_NULLIFIER
+}
+
+func isEncryptionToken(tokenName string) bool {
+	return tokenName == constants.TOKEN_ANON_ENC
+}
+
+// the Zeto implementations support two input/output sizes for the circuits: 2 and 10,
+// if the input or output size is larger than 2, then the batch circuit is used with
+// input/output size 10
+func getInputSize(sizeOfEndorsableStates int) int {
+	if sizeOfEndorsableStates <= 2 {
+		return 2
+	}
+	return 10
+}
+
 func validateTransferParams(ctx context.Context, params []*types.TransferParamEntry) error {
 	if len(params) == 0 {
 		return i18n.NewError(ctx, msgs.MsgNoTransferParams)
 	}
+	total := big.NewInt(0)
 	for i, param := range params {
 		if param.To == "" {
 			return i18n.NewError(ctx, msgs.MsgNoParamTo, i)
@@ -43,7 +72,12 @@ func validateTransferParams(ctx context.Context, params []*types.TransferParamEn
 		if err := validateAmountParam(ctx, param.Amount, i); err != nil {
 			return err
 		}
+		total.Add(total, param.Amount.Int())
 	}
+	if total.Cmp(MAX_TRANSFER_AMOUNT) >= 0 {
+		return i18n.NewError(ctx, msgs.MsgParamTotalAmountInRange)
+	}
+
 	return nil
 }
 
@@ -52,7 +86,7 @@ func validateAmountParam(ctx context.Context, amount *tktypes.HexUint256, i int)
 		return i18n.NewError(ctx, msgs.MsgNoParamAmount, i)
 	}
 	if amount.Int().Sign() != 1 {
-		return i18n.NewError(ctx, msgs.MsgParamAmountGtZero, i)
+		return i18n.NewError(ctx, msgs.MsgParamAmountInRange, i)
 	}
 	return nil
 }
