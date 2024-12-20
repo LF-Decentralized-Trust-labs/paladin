@@ -70,6 +70,13 @@ message RecoverSignerResponse {
   string verifier = 1;
 }
 
+message SendTransactionRequest {
+  TransactionInput transaction = 1;
+}
+
+message SendTransactionResponse {
+  string id = 1;
+}
 
 message StoredState {
   string id = 1;
@@ -87,4 +94,16 @@ message StateLock {
   }
   StateLockType type = 1;
   string transaction = 2;
+}
+
+message TransactionInput {
+  enum TransactionType {
+    PUBLIC = 0;
+    PRIVATE = 1;
+  }
+  TransactionType type = 1;
+  string from = 2;
+  string contract_address = 3;
+  string function_abi_json = 4;
+  string params_json = 5;
 }

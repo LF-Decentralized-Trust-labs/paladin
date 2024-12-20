@@ -87,6 +87,7 @@ message DomainMessage {
     EncodeDataRequest           encode_data =               2020;
     DecodeDataRequest           decode_data =               2030;
     RecoverSignerRequest        recover_signer =            2040;
+    SendTransactionRequest      send_transaction =          2050;
   }
 
   oneof response_to_domain {
@@ -94,6 +95,7 @@ message DomainMessage {
     EncodeDataResponse          encode_data_res =           2021;
     DecodeDataResponse          decode_data_res =           2031;
     RecoverSignerResponse       recover_signer_res =        2041;
+    SendTransactionResponse     send_transaction_res =      2051;
   }
     
 }

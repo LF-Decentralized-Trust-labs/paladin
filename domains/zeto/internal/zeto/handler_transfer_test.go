@@ -526,3 +526,7 @@ func (dc *testDomainCallbacks) RecoverSigner(ctx context.Context, req *prototk.R
 func (dc *testDomainCallbacks) DecodeData(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error) {
 	return nil, nil
 }
+
+func (dc *testDomainCallbacks) SendTransaction(context.Context, *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	return nil, nil
+}

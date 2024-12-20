@@ -98,6 +98,15 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 				}
 			},
 		)
+	case *prototk.DomainMessage_SendTransaction:
+		return callManagerImpl(ctx, req.SendTransaction,
+			br.manager.SendTransaction,
+			func(resMsg *prototk.DomainMessage, res *prototk.SendTransactionResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_SendTransactionRes{
+					SendTransactionRes: res,
+				}
+			},
+		)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
 	}

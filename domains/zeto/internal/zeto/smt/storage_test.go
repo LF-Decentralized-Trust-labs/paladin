@@ -48,6 +48,10 @@ func (dc *testDomainCallbacks) DecodeData(context.Context, *prototk.DecodeDataRe
 	return nil, nil
 }
 
+func (dc *testDomainCallbacks) SendTransaction(context.Context, *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	return nil, nil
+}
+
 func returnCustomError() (*prototk.FindAvailableStatesResponse, error) {
 	return nil, errors.New("test error")
 }

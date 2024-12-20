@@ -48,6 +48,7 @@ type DomainCallbacks interface {
 	EncodeData(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
 	DecodeData(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error)
 	RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
+	SendTransaction(ctx context.Context, tx *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error)
 }
 
 type DomainFactory func(callbacks DomainCallbacks) DomainAPI
@@ -242,6 +243,17 @@ func (dp *domainHandler) RecoverSigner(ctx context.Context, req *prototk.Recover
 	}))
 	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_RecoverSignerRes) *prototk.RecoverSignerResponse {
 		return msg.RecoverSignerRes
+	})
+}
+
+func (dp *domainHandler) SendTransaction(ctx context.Context, req *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_SendTransaction{
+			SendTransaction: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_SendTransactionRes) *prototk.SendTransactionResponse {
+		return msg.SendTransactionRes
 	})
 }
 

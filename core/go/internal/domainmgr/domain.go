@@ -771,3 +771,32 @@ func (d *domain) BuildDomainReceipt(ctx context.Context, dbTX *gorm.DB, txID uui
 	}
 	return tktypes.RawJSON(res.ReceiptJson), nil
 }
+
+func (d *domain) SendTransaction(ctx context.Context, tx *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	txType := pldapi.TransactionTypePrivate
+	if tx.Transaction.Type == prototk.TransactionInput_PUBLIC {
+		txType = pldapi.TransactionTypePublic
+	}
+	contractAddress, err := tktypes.ParseEthAddress(tx.Transaction.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	var functionABI abi.Entry
+	if err = json.Unmarshal([]byte(tx.Transaction.FunctionAbiJson), &functionABI); err != nil {
+		return nil, err
+	}
+
+	id, err := d.dm.txManager.SendTransaction(ctx, &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			Type: txType.Enum(),
+			From: tx.Transaction.From,
+			To:   contractAddress,
+			Data: tktypes.RawJSON(tx.Transaction.ParamsJson),
+		},
+		ABI: abi.ABI{&functionABI},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &prototk.SendTransactionResponse{Id: id.String()}, nil
+}
