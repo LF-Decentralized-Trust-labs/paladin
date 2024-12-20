@@ -222,30 +222,17 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 		},
 	}
 
-	transactionType := prototk.PreparedTransaction_PUBLIC
-	functionABI := solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onBurn"]
-	var paramsJSON []byte
-
-	if tx.DomainConfig.PrivateAddress != nil {
-		transactionType = prototk.PreparedTransaction_PRIVATE
-		functionABI = penteInvokeABI("onBurn", functionABI.Inputs)
-		penteParams := &PenteInvokeParams{
-			Group:  tx.DomainConfig.PrivateGroup,
-			To:     tx.DomainConfig.PrivateAddress,
-			Inputs: params,
-		}
-		paramsJSON, err = json.Marshal(penteParams)
-	} else {
-		// Note: public hooks aren't really useful except in testing, as they disclose everything
-		// TODO: remove this?
-		paramsJSON, err = json.Marshal(params)
-	}
+	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
+		tx.DomainConfig,
+		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onBurn"],
+		params,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TransactionWrapper{
-		transactionType: transactionType,
+		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
 		contractAddress: &tx.DomainConfig.NotaryAddress,

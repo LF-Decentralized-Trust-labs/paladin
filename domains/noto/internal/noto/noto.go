@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
@@ -643,6 +644,31 @@ func (n *Noto) recordTransactionInfo(ev *prototk.OnChainEvent, txData *types.Not
 			TransactionId: txData.TransactionID.String(),
 		})
 	}
+}
+
+func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, tktypes.HexBytes, error) {
+	if domainConfig.PrivateAddress == nil {
+		// Note: public hooks aren't really useful except in testing, as they disclose everything
+		// TODO: remove this?
+		paramsJSON, err := json.Marshal(params)
+		return pldapi.TransactionTypePublic, functionABI, paramsJSON, err
+	}
+
+	functionABI = penteInvokeABI(functionABI.Name, functionABI.Inputs)
+	penteParams := &PenteInvokeParams{
+		Group:  domainConfig.PrivateGroup,
+		To:     domainConfig.PrivateAddress,
+		Inputs: params,
+	}
+	paramsJSON, err := json.Marshal(penteParams)
+	return pldapi.TransactionTypePrivate, functionABI, paramsJSON, err
+}
+
+func mapPrepareTransactionType(transactionType pldapi.TransactionType) prototk.PreparedTransaction_TransactionType {
+	if transactionType == pldapi.TransactionTypePrivate {
+		return prototk.PreparedTransaction_PRIVATE
+	}
+	return prototk.PreparedTransaction_PUBLIC
 }
 
 func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBatchRequest) (*prototk.HandleEventBatchResponse, error) {
