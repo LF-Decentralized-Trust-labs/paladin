@@ -53,6 +53,7 @@ type NotoParsedConfig struct {
 	PrivateGroup    *PentePrivateGroup  `json:"privateGroup,omitempty"`
 	RestrictMinting bool                `json:"restrictMinting"`
 	AllowBurning    bool                `json:"allowBurning"`
+	IsNotary        bool                `json:"isNotary"`
 }
 
 type PentePrivateGroup struct {

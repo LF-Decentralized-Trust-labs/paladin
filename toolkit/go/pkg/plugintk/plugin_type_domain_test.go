@@ -114,6 +114,32 @@ func TestDomainCallback_RecoverSigner(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDomainCallback_SendTransaction(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_SendTransaction{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_SendTransactionRes{
+			SendTransactionRes: &prototk.SendTransactionResponse{},
+		}
+	}
+	_, err := callbacks.SendTransaction(ctx, &prototk.SendTransactionRequest{})
+	require.NoError(t, err)
+}
+
+func TestDomainCallback_LocalNodeName(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupDomainTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.DomainMessage_LocalNodeName{})] = func(dm *prototk.DomainMessage) {
+		dm.ResponseToDomain = &prototk.DomainMessage_LocalNodeNameRes{
+			LocalNodeNameRes: &prototk.LocalNodeNameResponse{},
+		}
+	}
+	_, err := callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	require.NoError(t, err)
+}
+
 func TestDomainFunction_ConfigureDomain(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupDomainTests(t)
 	defer done()
