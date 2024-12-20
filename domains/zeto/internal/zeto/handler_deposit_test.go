@@ -28,7 +28,7 @@ func TestDepositValidateParams(t *testing.T) {
 	require.ErrorContains(t, err, "PD210105: Failed to decode the deposit call.")
 
 	_, err = h.ValidateParams(ctx, config, "{\"amount\":-100}")
-	require.ErrorContains(t, err, "PD210027: Parameter 'amount' must be greater than 0 (index=0)")
+	require.ErrorContains(t, err, "PD210027: Parameter 'amount' must be in the range (0, 2^100) (index=0)")
 }
 
 func TestDepositInit(t *testing.T) {
