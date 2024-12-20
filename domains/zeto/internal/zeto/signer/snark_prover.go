@@ -205,15 +205,6 @@ func getCircuitId(inputs *pb.ProvingRequest) string {
 }
 
 func validateInputs(ctx context.Context, inputs *pb.ProvingRequestCommon) error {
-	if len(inputs.InputCommitments) == 0 {
-		return i18n.NewError(ctx, msgs.MsgErrorMissingInputCommitments)
-	}
-	if len(inputs.InputValues) == 0 {
-		return i18n.NewError(ctx, msgs.MsgErrorMissingInputValues)
-	}
-	if len(inputs.InputSalts) == 0 {
-		return i18n.NewError(ctx, msgs.MsgErrorMissingInputSalts)
-	}
 	if len(inputs.InputCommitments) != len(inputs.InputValues) || len(inputs.InputCommitments) != len(inputs.InputSalts) {
 		return i18n.NewError(ctx, msgs.MsgErrorInputsDiffLength)
 	}
@@ -256,6 +247,12 @@ func serializeProofResponse(circuitId string, proof *types.ZKProof) ([]byte, err
 	case constants.CIRCUIT_ANON_NULLIFIER_BATCH:
 		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[:10], ",")
 		publicInputs["root"] = proof.PubSignals[10]
+	case constants.CIRCUIT_WITHDRAW_NULLIFIER:
+		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:3], ",")
+		publicInputs["root"] = proof.PubSignals[3]
+	case constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH:
+		publicInputs["nullifiers"] = strings.Join(proof.PubSignals[1:11], ",")
+		publicInputs["root"] = proof.PubSignals[11]
 	}
 
 	res := pb.ProvingResponse{
@@ -283,6 +280,15 @@ func calculateWitness(ctx context.Context, circuitId string, commonInputs *pb.Pr
 		}
 	case constants.CIRCUIT_ANON_NULLIFIER, constants.CIRCUIT_ANON_NULLIFIER_BATCH:
 		witnessInputs, err = assembleInputs_anon_nullifier(ctx, inputs, extras.(*pb.ProvingRequestExtras_Nullifiers), keyEntry)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgErrorAssembleInputs, err)
+		}
+	case constants.CIRCUIT_DEPOSIT:
+		witnessInputs = assembleInputs_deposit(inputs)
+	case constants.CIRCUIT_WITHDRAW, constants.CIRCUIT_WITHDRAW_BATCH:
+		witnessInputs = assembleInputs_withdraw(inputs, keyEntry)
+	case constants.CIRCUIT_WITHDRAW_NULLIFIER, constants.CIRCUIT_WITHDRAW_NULLIFIER_BATCH:
+		witnessInputs, err = assembleInputs_withdraw_nullifier(ctx, inputs, extras.(*pb.ProvingRequestExtras_Nullifiers), keyEntry)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorAssembleInputs, err)
 		}

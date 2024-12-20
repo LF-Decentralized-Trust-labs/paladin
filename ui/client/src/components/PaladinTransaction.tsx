@@ -27,6 +27,7 @@ import { EllapsedTime } from "./EllapsedTime";
 import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import { PaladinTransactionsDetailsDialog } from "../dialogs/TransactionDetails";
 import { Captions, Tag } from 'lucide-react';
+import { formatJSONWhenApplicable } from "../utils";
 
 daysjs.extend(relativeTime);
 
@@ -43,14 +44,6 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
   if (paladinTransaction === undefined) {
     return <></>;
   }
-
-  const formatProperty = (value: any) => {
-    try {
-      const parsed = JSON.stringify(value);
-      return parsed.substring(1, parsed.length - 1);
-    } catch (err) { }
-    return value;
-  };
 
   return (
     <>
@@ -114,14 +107,14 @@ export const PaladinTransaction: React.FC<Props> = ({ paladinTransaction }) => {
               .map((property) => (
                 <TextField
                   key={property}
-                  label={property}
+                  label={t(property)}
                   maxRows={8}
                   multiline
                   fullWidth
                   size="small"
                   sx={{ marginTop: '12px' }}
                   slotProps={{ htmlInput: { style: { fontSize: '12px', color: `${theme.palette.text.secondary}` } } }}
-                  value={formatProperty(paladinTransaction.data[property])}
+                  value={formatJSONWhenApplicable(paladinTransaction.data[property])}
                 />
               ))}
             {Object.keys(paladinTransaction.data).length === 0 &&

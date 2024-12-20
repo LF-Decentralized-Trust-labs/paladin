@@ -9,6 +9,7 @@ import (
 	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -28,7 +29,7 @@ func (z *Zeto) handleMintEvent(ctx context.Context, tree core.SparseMerkleTree, 
 			Location:      ev.Location,
 		})
 		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, mint.Outputs)...)
-		if isNullifiersToken(tokenName) {
+		if common.IsNullifiersToken(tokenName) {
 			err := z.updateMerkleTree(ctx, tree, storage, txID, mint.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOMint", err)
@@ -54,7 +55,7 @@ func (z *Zeto) handleTransferEvent(ctx context.Context, tree core.SparseMerkleTr
 		})
 		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
 		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
-		if isNullifiersToken(tokenName) {
+		if common.IsNullifiersToken(tokenName) {
 			err := z.updateMerkleTree(ctx, tree, storage, txID, transfer.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOTransfer", err)
@@ -80,7 +81,7 @@ func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, tree core.
 		})
 		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, transfer.Inputs)...)
 		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, transfer.Outputs)...)
-		if isNullifiersToken(tokenName) {
+		if common.IsNullifiersToken(tokenName) {
 			err := z.updateMerkleTree(ctx, tree, storage, txID, transfer.Outputs)
 			if err != nil {
 				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOTransferWithEncryptedValues", err)
@@ -88,6 +89,32 @@ func (z *Zeto) handleTransferWithEncryptionEvent(ctx context.Context, tree core.
 		}
 	} else {
 		log.L(ctx).Errorf("Failed to unmarshal transfer event: %s", err)
+	}
+	return nil
+}
+
+func (z *Zeto) handleWithdrawEvent(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, ev *prototk.OnChainEvent, tokenName string, res *prototk.HandleEventBatchResponse) error {
+	var withdraw WithdrawEvent
+	if err := json.Unmarshal([]byte(ev.DataJson), &withdraw); err == nil {
+		txID := decodeTransactionData(withdraw.Data)
+		if txID == nil {
+			log.L(ctx).Errorf("Failed to decode transaction data for withdraw event: %s. Skip to the next event", withdraw.Data)
+			return nil
+		}
+		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
+			TransactionId: txID.String(),
+			Location:      ev.Location,
+		})
+		res.SpentStates = append(res.SpentStates, parseStatesFromEvent(txID, withdraw.Inputs)...)
+		res.ConfirmedStates = append(res.ConfirmedStates, parseStatesFromEvent(txID, []tktypes.HexUint256{withdraw.Output})...)
+		if common.IsNullifiersToken(tokenName) {
+			err := z.updateMerkleTree(ctx, tree, storage, txID, []tktypes.HexUint256{withdraw.Output})
+			if err != nil {
+				return i18n.NewError(ctx, msgs.MsgErrorUpdateSMT, "UTXOWithdraw", err)
+			}
+		}
+	} else {
+		log.L(ctx).Errorf("Failed to unmarshal withdraw event: %s", err)
 	}
 	return nil
 }

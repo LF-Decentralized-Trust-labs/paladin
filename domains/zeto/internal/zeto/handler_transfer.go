@@ -18,18 +18,15 @@ package zeto
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"strings"
 
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/core"
-	"github.com/hyperledger-labs/zeto/go-sdk/pkg/sparse-merkle-tree/node"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/smt"
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
-	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
@@ -145,12 +142,12 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 		return nil, i18n.NewError(ctx, msgs.MsgErrorResolveVerifier, tx.Transaction.From)
 	}
 
-	useNullifiers := isNullifiersToken(tx.DomainConfig.TokenName)
-	inputCoins, inputStates, _, remainder, err := h.zeto.prepareInputs(ctx, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params)
+	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
+	inputCoins, inputStates, _, remainder, err := h.zeto.prepareInputsForTransfer(ctx, useNullifiers, req.StateQueryContext, resolvedSender.Verifier, params)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxInputs, err)
 	}
-	outputCoins, outputStates, err := h.zeto.prepareOutputs(ctx, useNullifiers, params, req.ResolvedVerifiers)
+	outputCoins, outputStates, err := h.zeto.prepareOutputsForTransfer(ctx, useNullifiers, params, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxOutputs, err)
 	}
@@ -163,7 +160,7 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Amount: &remainderHex,
 			},
 		}
-		returnedCoins, returnedStates, err := h.zeto.prepareOutputs(ctx, useNullifiers, remainderParams, req.ResolvedVerifiers)
+		returnedCoins, returnedStates, err := h.zeto.prepareOutputsForTransfer(ctx, useNullifiers, remainderParams, req.ResolvedVerifiers)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorPrepTxChange, err)
 		}
@@ -213,19 +210,6 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func getTransferABI(tokenName string) *abi.Entry {
-	transferFunction := transferABI
-	if isEncryptionToken(tokenName) {
-		transferFunction = transferABI_withEncryption
-		if isNullifiersToken(tokenName) {
-			transferFunction = transferABI_withEncryption_nullifiers
-		}
-	} else if isNullifiersToken(tokenName) {
-		transferFunction = transferABI_nullifiers
-	}
-	return transferFunction
-}
-
 func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {
 	var proofRes corepb.ProvingResponse
 	result := domain.FindAttestation("sender", req.AttestationResult)
@@ -236,7 +220,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		return nil, i18n.NewError(ctx, msgs.MsgErrorUnmarshalProvingRes, err)
 	}
 
-	inputSize := getInputSize(len(req.InputStates))
+	inputSize := common.GetInputSize(len(req.InputStates))
 	inputs := make([]string, inputSize)
 	for i := 0; i < inputSize; i++ {
 		if i < len(req.InputStates) {
@@ -279,16 +263,16 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	params := map[string]any{
 		"inputs":  inputs,
 		"outputs": outputs,
-		"proof":   h.encodeProof(proofRes.Proof),
+		"proof":   encodeProof(proofRes.Proof),
 		"data":    data,
 	}
 	transferFunction := getTransferABI(tx.DomainConfig.TokenName)
-	if isEncryptionToken(tx.DomainConfig.TokenName) {
+	if common.IsEncryptionToken(tx.DomainConfig.TokenName) {
 		params["ecdhPublicKey"] = strings.Split(proofRes.PublicInputs["ecdhPublicKey"], ",")
 		params["encryptionNonce"] = proofRes.PublicInputs["encryptionNonce"]
 		params["encryptedValues"] = strings.Split(proofRes.PublicInputs["encryptedValues"], ",")
 	}
-	if isNullifiersToken(tx.DomainConfig.TokenName) {
+	if common.IsNullifiersToken(tx.DomainConfig.TokenName) {
 		delete(params, "inputs")
 		params["nullifiers"] = strings.Split(proofRes.PublicInputs["nullifiers"], ",")
 		params["root"] = proofRes.PublicInputs["root"]
@@ -311,7 +295,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 }
 
 func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, outputCoins []*types.ZetoCoin, circuitId, tokenName, stateQueryContext string, contractAddress *tktypes.EthAddress) ([]byte, error) {
-	inputSize := getInputSize(len(inputCoins))
+	inputSize := common.GetInputSize(len(inputCoins))
 	inputCommitments := make([]string, inputSize)
 	inputValueInts := make([]uint64, inputSize)
 	inputSalts := make([]string, inputSize)
@@ -347,8 +331,8 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, 
 	}
 
 	var extras []byte
-	if isNullifiersCircuit(circuitId) {
-		proofs, extrasObj, err := h.generateMerkleProofs(ctx, tokenName, stateQueryContext, contractAddress, inputCoins)
+	if common.IsNullifiersCircuit(circuitId) {
+		proofs, extrasObj, err := generateMerkleProofs(ctx, h.zeto, tokenName, stateQueryContext, contractAddress, inputCoins)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
 		}
@@ -381,84 +365,15 @@ func (h *transferHandler) formatProvingRequest(ctx context.Context, inputCoins, 
 	return proto.Marshal(payload)
 }
 
-func (h *transferHandler) encodeProof(proof *corepb.SnarkProof) map[string]interface{} {
-	// Convert the proof json to the format that the Solidity verifier expects
-	return map[string]interface{}{
-		"pA": []string{proof.A[0], proof.A[1]},
-		"pB": [][]string{
-			{proof.B[0].Items[1], proof.B[0].Items[0]},
-			{proof.B[1].Items[1], proof.B[1].Items[0]},
-		},
-		"pC": []string{proof.C[0], proof.C[1]},
+func getTransferABI(tokenName string) *abi.Entry {
+	transferFunction := transferABI
+	if common.IsEncryptionToken(tokenName) {
+		transferFunction = transferABI_withEncryption
+		if common.IsNullifiersToken(tokenName) {
+			transferFunction = transferABI_withEncryption_nullifiers
+		}
+	} else if common.IsNullifiersToken(tokenName) {
+		transferFunction = transferABI_nullifiers
 	}
-}
-
-func (h *transferHandler) generateMerkleProofs(ctx context.Context, tokenName string, stateQueryContext string, contractAddress *tktypes.EthAddress, inputCoins []*types.ZetoCoin) ([]core.Proof, *corepb.ProvingRequestExtras_Nullifiers, error) {
-	smtName := smt.MerkleTreeName(tokenName, contractAddress)
-	storage := smt.NewStatesStorage(h.zeto.Callbacks, smtName, stateQueryContext, h.zeto.merkleTreeRootSchema.Id, h.zeto.merkleTreeNodeSchema.Id)
-	mt, err := smt.NewSmt(storage)
-	if err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorNewSmt, smtName, err)
-	}
-	// verify that the input UTXOs have been indexed by the Merkle tree DB
-	// and generate a merkle proof for each
-	var indexes []*big.Int
-	for _, coin := range inputCoins {
-		pubKey, err := zetosigner.DecodeBabyJubJubPublicKey(coin.Owner.String())
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorLoadOwnerPubKey, err)
-		}
-		idx := node.NewFungible(coin.Amount.Int(), pubKey, coin.Salt.Int())
-		leaf, err := node.NewLeafNode(idx)
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorNewLeafNode, err)
-		}
-		n, err := mt.GetNode(leaf.Ref())
-		if err != nil {
-			// TODO: deal with when the node is not found in the DB tables for the tree
-			// e.g because the transaction event hasn't been processed yet
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorQueryLeafNode, leaf.Ref().Hex(), err)
-		}
-		hash, err := coin.Hash(ctx)
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorHashInputState, err)
-		}
-		if n.Index().BigInt().Cmp(hash.Int()) != 0 {
-			expectedIndex, err := node.NewNodeIndexFromBigInt(hash.Int())
-			if err != nil {
-				return nil, nil, i18n.NewError(ctx, msgs.MsgErrorNewNodeIndex, err)
-			}
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorHashMismatch, leaf.Ref().Hex(), n.Index().BigInt().Text(16), n.Index().Hex(), hash.HexString0xPrefix(), expectedIndex.Hex())
-		}
-		indexes = append(indexes, n.Index().BigInt())
-	}
-	mtRoot := mt.Root()
-	proofs, _, err := mt.GenerateProofs(indexes, mtRoot)
-	if err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgErrorGenerateMTP, err)
-	}
-	var mps []*corepb.MerkleProof
-	var enabled []bool
-	for i, proof := range proofs {
-		cp, err := proof.ToCircomVerifierProof(indexes[i], indexes[i], mtRoot, smt.SMT_HEIGHT_UTXO)
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgErrorConvertToCircomProof, err)
-		}
-		proofSiblings := make([]string, len(cp.Siblings)-1)
-		for i, s := range cp.Siblings[0 : len(cp.Siblings)-1] {
-			proofSiblings[i] = s.BigInt().Text(16)
-		}
-		p := corepb.MerkleProof{
-			Nodes: proofSiblings,
-		}
-		mps = append(mps, &p)
-		enabled = append(enabled, true)
-	}
-	extrasObj := corepb.ProvingRequestExtras_Nullifiers{
-		Root:         mt.Root().BigInt().Text(16),
-		MerkleProofs: mps,
-		Enabled:      enabled,
-	}
-
-	return proofs, &extrasObj, nil
+	return transferFunction
 }

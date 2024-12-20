@@ -14,31 +14,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AppBar, Box, Button, Grid2, IconButton, Tab, Tabs, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, useMediaQuery, useTheme } from "@mui/material";
+import { AppBar, Box, Button, Grid2, IconButton, Tab, Tabs, Toolbar, useMediaQuery, useTheme } from "@mui/material";
 import { useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
-import Brightness4Icon from '@mui/icons-material/Brightness4';
 import { ApplicationContext } from "../contexts/ApplicationContext";
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { SettingsMenu } from "../menus/Settings";
+import MenuIcon from '@mui/icons-material/Menu';
+import { AppRoutes } from "../routes";
 
 export const Header: React.FC = () => {
 
-  const { colorMode, autoRefreshEnabled, setAutoRefreshEnabled, refreshRequired, refresh } = useContext(ApplicationContext);
+  const { refreshRequired, refresh } = useContext(ApplicationContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const pathname = useLocation().pathname.toLowerCase();
   const theme = useTheme();
   const lessThanMedium = useMediaQuery(theme.breakpoints.down("md"));
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const getTabFromPath = (path: string) => {
-    if (path.startsWith('/ui/indexer')) {
+    if (path.startsWith(AppRoutes.Indexer)) {
       return 0;
-    } else if (path.startsWith('/ui/submissions')) {
+    } else if (path.startsWith(AppRoutes.Submissions)) {
       return 1;
-    } else if (path.startsWith('/ui/registry')) {
+    } else if (path.startsWith(AppRoutes.Registry)) {
       return 2;
     }
     return 0;
@@ -49,16 +50,9 @@ export const Header: React.FC = () => {
   const handleNavigation = (tab: number) => {
     setTab(tab);
     switch (tab) {
-      case 0: navigate('/ui/indexer'); break;
-      case 1: navigate('/ui/submissions'); break;
-      case 2: navigate('/ui/registry'); break;
-    }
-  };
-
-  const handleAutoRefreshChange = (value: 'play' | 'pause') => {
-    switch (value) {
-      case 'play': setAutoRefreshEnabled(true); break;
-      case 'pause': setAutoRefreshEnabled(false); break;
+      case 0: navigate(AppRoutes.Indexer); break;
+      case 1: navigate(AppRoutes.Submissions); break;
+      case 2: navigate(AppRoutes.Registry); break;
     }
   };
 
@@ -86,38 +80,16 @@ export const Header: React.FC = () => {
                 <Grid2 container justifyContent={lessThanMedium ? 'center' : 'right'} spacing={1} alignItems="center"
                   sx={{ padding: lessThanMedium ? '20px' : undefined }}>
                   {refreshRequired &&
+                    <Grid2>
+                      <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ textTransform: 'none', borderRadius: '20px' }}
+                        onClick={() => refresh()}>
+                        {t('newData')}
+                      </Button>
+                    </Grid2>}
                   <Grid2>
-                    <Button size="small" startIcon={<RefreshIcon />} variant="outlined" sx={{ textTransform: 'none', borderRadius: '20px'}}
-                    onClick={() => refresh()}>
-                      {t('newData')}
-                    </Button>
-                  </Grid2>}
-                  <Grid2>
-                    <ToggleButtonGroup exclusive onChange={(_event, value) => handleAutoRefreshChange(value)} value={autoRefreshEnabled ? 'play' : 'pause'}>
-                      <Tooltip arrow title={t('autoRefreshOn')}
-                        slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -6] }, }] } }}
-                      >
-                        <ToggleButton color="primary" value="play">
-                          <PlayArrowIcon fontSize="small" />
-                        </ToggleButton>
-                      </Tooltip>
-                      <Tooltip arrow title={t('autoRefreshOff')}
-                        slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -6] }, }] } }}
-                      >
-                        <ToggleButton color="primary" value="pause">
-                          <PauseIcon fontSize="small" />
-                        </ToggleButton>
-                      </Tooltip>
-                    </ToggleButtonGroup>
-                  </Grid2>
-                  <Grid2>
-                    <Tooltip arrow title={t('switchThemeMode')}
-                      slotProps={{ popper: { modifiers: [{ name: 'offset', options: { offset: [0, -4] }, }] } }}
-                    >
-                      <IconButton onClick={() => colorMode.toggleColorMode()}>
-                        <Brightness4Icon />
-                      </IconButton>
-                    </Tooltip>
+                    <IconButton onClick={event => setAnchorEl(event.currentTarget)}>
+                      <MenuIcon />
+                    </IconButton>
                   </Grid2>
                 </Grid2>
               </Grid2>
@@ -129,6 +101,10 @@ export const Header: React.FC = () => {
         height: theme => lessThanMedium ? '190px' :
           theme.mixins.toolbar
       }} />
+      <SettingsMenu
+        anchorEl={anchorEl}
+        setAnchorEl={setAnchorEl}
+      />
     </>
   );
 

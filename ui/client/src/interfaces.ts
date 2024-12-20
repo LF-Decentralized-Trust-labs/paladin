@@ -124,3 +124,5 @@ export interface IABIDecodedEntry {
   signature: string;
   summary?: string; // errors only
 }
+
+export type ABIUploadResponse = string

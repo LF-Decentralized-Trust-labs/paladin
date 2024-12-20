@@ -4,9 +4,9 @@ go 1.22.5
 
 require (
 	github.com/docker/go-units v0.5.0
-	github.com/hyperledger/firefly-common v1.4.11
+	github.com/hyperledger/firefly-common v1.4.14
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/text v0.19.0
+	golang.org/x/text v0.21.0
 	sigs.k8s.io/yaml v1.4.0
 
 )

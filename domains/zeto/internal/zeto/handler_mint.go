@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/domains/zeto/internal/msgs"
+	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -76,8 +77,8 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *pb.AssembleTransactionRequest) (*pb.AssembleTransactionResponse, error) {
 	params := tx.Params.([]*types.TransferParamEntry)
 
-	useNullifiers := isNullifiersToken(tx.DomainConfig.TokenName)
-	_, outputStates, err := h.zeto.prepareOutputs(ctx, useNullifiers, params, req.ResolvedVerifiers)
+	useNullifiers := common.IsNullifiersToken(tx.DomainConfig.TokenName)
+	_, outputStates, err := h.zeto.prepareOutputsForTransfer(ctx, useNullifiers, params, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}

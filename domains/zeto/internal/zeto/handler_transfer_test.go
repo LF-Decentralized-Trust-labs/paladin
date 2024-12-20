@@ -25,6 +25,7 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -139,8 +140,8 @@ func TestTransferAssemble(t *testing.T) {
 		Algorithm:    h.zeto.getAlgoZetoSnarkBJJ(),
 		VerifierType: zetosignerapi.IDEN3_PUBKEY_BABYJUBJUB_COMPRESSED_0X,
 	})
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return nil, errors.New("test error")
 		},
 	}
@@ -149,7 +150,7 @@ func TestTransferAssemble(t *testing.T) {
 	assert.EqualError(t, err, "PD210039: Failed to prepare transaction inputs. PD210032: Failed to query the state store for available coins. test error")
 
 	calls := 0
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()
 		if calls == 0 {
 			return &prototk.FindAvailableStatesResponse{
@@ -176,7 +177,7 @@ func TestTransferAssemble(t *testing.T) {
 	_, err = h.Assemble(ctx, tx, req)
 	assert.EqualError(t, err, "PD210039: Failed to prepare transaction inputs. PD210032: Failed to query the state store for available coins. test error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
@@ -205,7 +206,7 @@ func TestTransferAssemble(t *testing.T) {
 	assert.Equal(t, "0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025", coin2.Owner.String())
 	assert.Equal(t, "0x06", coin2.Amount.String())
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
@@ -228,7 +229,7 @@ func TestTransferAssemble(t *testing.T) {
 	tx.DomainConfig.TokenName = constants.TOKEN_ANON_NULLIFIER
 	tx.DomainConfig.CircuitId = constants.CIRCUIT_ANON_NULLIFIER
 	called := 0
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		var dataJson string
 		if called == 0 {
 			dataJson = "{\"salt\":\"0x13de02d64a5736a56b2d35d2a83dd60397ba70aae6f8347629f0960d4fee5d58\",\"owner\":\"0xc1d218cf8993f940e75eabd3fee23dadc4e89cd1de479f03a61e91727959281b\",\"amount\":\"0x0a\"}"
@@ -247,6 +248,7 @@ func TestTransferAssemble(t *testing.T) {
 		}, nil
 
 	}
+	h.zeto.Callbacks = testCallbacks
 	res, err = h.Assemble(ctx, tx, req)
 	assert.NoError(t, err)
 	assert.Len(t, res.AssembledTransaction.OutputStates, 2)
@@ -389,8 +391,8 @@ func TestTransferPrepare(t *testing.T) {
 }
 
 func TestGenerateMerkleProofs(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return nil, errors.New("test error")
 		},
 	}
@@ -420,10 +422,10 @@ func TestGenerateMerkleProofs(t *testing.T) {
 	}
 	ctx := context.Background()
 	queryContext := "queryContext"
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.EqualError(t, err, "PD210019: Failed to create Merkle tree for smt_Zeto_Anon_0x1234567890123456789012345678901234567890: PD210065: Failed to find available states for the merkle tree. test error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
@@ -432,16 +434,16 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			},
 		}, nil
 	}
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.EqualError(t, err, "PD210037: Failed load owner public key. PD210072: Invalid compressed public key length: 2")
 
 	inputCoins[0].Owner = tktypes.MustParseHexBytes("0x7cdd539f3ed6c283494f47d8481f84308a6d7043087fb6711c9f1df04e2b8025")
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.EqualError(t, err, "PD210054: Failed to create new leaf node. inputs values not inside Finite Field")
 
 	inputCoins[0].Salt = tktypes.MustParseHexUint256("0x042fac32983b19d76425cc54dd80e8a198f5d477c6a327cb286eb81a0c2b95ec")
 	calls := 0
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()
 		if calls == 0 {
 			return &prototk.FindAvailableStatesResponse{
@@ -457,10 +459,10 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.EqualError(t, err, "PD210055: Failed to query the smt DB for leaf node (ref=789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a). key not found")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()
 		if calls == 0 {
 			return &prototk.FindAvailableStatesResponse{
@@ -480,10 +482,10 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.EqualError(t, err, "PD210057: Coin (ref=789c99b9a2196addb3ac11567135877e8b86bc9b5f7725808a79757fd36b2a2a) found in the merkle tree but the persisted hash 26e3879b46b15a4ddbaca5d96af1bd2743f67f13f0bb85c40782950a2a700138 (index=3801702a0a958207c485bbf0137ff64327bdf16ad9a5acdb4d5ab1469b87e326) did not match the expected hash 0x303eb034d22aacc5dff09647928d757017a35e64e696d48609a250a6505e5d5f (index=5f5d5e50a650a20986d496e6645ea31770758d924796f0dfc5ac2ad234b03e30)")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		defer func() { calls++ }()
 		if calls == 0 {
 			return &prototk.FindAvailableStatesResponse{
@@ -503,25 +505,6 @@ func TestGenerateMerkleProofs(t *testing.T) {
 			}, nil
 		}
 	}
-	_, _, err = h.generateMerkleProofs(ctx, "Zeto_Anon", queryContext, addr, inputCoins)
+	_, _, err = generateMerkleProofs(ctx, h.zeto, "Zeto_Anon", queryContext, addr, inputCoins)
 	assert.NoError(t, err)
-}
-
-type testDomainCallbacks struct {
-	returnFunc func() (*prototk.FindAvailableStatesResponse, error)
-}
-
-func (dc *testDomainCallbacks) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
-	return dc.returnFunc()
-}
-
-func (dc *testDomainCallbacks) EncodeData(ctx context.Context, req *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error) {
-	return nil, nil
-}
-func (dc *testDomainCallbacks) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
-	return nil, nil
-}
-
-func (dc *testDomainCallbacks) DecodeData(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error) {
-	return nil, nil
 }

@@ -175,21 +175,18 @@ func (s *Sequencer) assembleAndSign(ctx context.Context, transactionID uuid.UUID
 					}
 					log.L(ctx).Debugf("payload: %x signed %x by %s (%s)", attRequest.Payload, signaturePayload, unqualifiedLookup, resolvedKey.Verifier.Verifier)
 
-					transaction.PostAssembly.Signatures = []*prototk.AttestationResult{
-						{
-							Name:            attRequest.Name,
-							AttestationType: attRequest.AttestationType,
-							Verifier: &prototk.ResolvedVerifier{
-								Lookup:       partyName,
-								Algorithm:    attRequest.Algorithm,
-								Verifier:     resolvedKey.Verifier.Verifier,
-								VerifierType: attRequest.VerifierType,
-							},
-							Payload:     signaturePayload,
-							PayloadType: &attRequest.PayloadType,
+					transaction.PostAssembly.Signatures = append(transaction.PostAssembly.Signatures, &prototk.AttestationResult{
+						Name:            attRequest.Name,
+						AttestationType: attRequest.AttestationType,
+						Verifier: &prototk.ResolvedVerifier{
+							Lookup:       partyName,
+							Algorithm:    attRequest.Algorithm,
+							Verifier:     resolvedKey.Verifier.Verifier,
+							VerifierType: attRequest.VerifierType,
 						},
-					}
-
+						Payload:     signaturePayload,
+						PayloadType: &attRequest.PayloadType,
+					})
 				} else {
 					log.L(ctx).Warnf("assembleAndSign: ignoring signature request of transaction %s for remote party %s ", transactionID, partyName)
 

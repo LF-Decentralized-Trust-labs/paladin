@@ -87,3 +87,21 @@ func TestLibraryLinkingSuccess(t *testing.T) {
 	require.Regexp(t, "PD021000.*0102030405060708aabbccddeeff998877", err) // bad links
 
 }
+
+func TestMustParseBuildABI(t *testing.T) {
+	abi := MustParseBuildABI([]byte(`{
+	"abi": [
+		{
+			"type":"function",
+			"name":"foo",
+			"inputs":[
+				{
+					"name":"a",
+					"type":"uint256"
+				}
+			]
+		}
+	]}`))
+	assert.Equal(t, 1, len(abi.Functions()))
+	assert.Equal(t, "foo", abi.Functions()["foo"].Name)
+}

@@ -300,9 +300,14 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 	if err != nil {
 		return nil, err
 	}
+	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	notaryQualified, err := tktypes.PrivateIdentityLocator(params.Notary).FullyQualified(ctx, localNodeName.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	deployData := &types.NotoConfigData_V0{
-		NotaryLookup:    params.Notary,
+		NotaryLookup:    notaryQualified.String(),
 		NotaryType:      types.NotaryTypeSigner,
 		RestrictMint:    true,
 		AllowBurn:       true,
@@ -361,28 +366,34 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 
 func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractRequest) (*prototk.InitContractResponse, error) {
 	var notoContractConfigJSON []byte
-	var staticCoordinator string
+
 	domainConfig, decodedData, err := n.decodeConfig(ctx, req.ContractConfig)
-	if err == nil {
-		parsedConfig := &types.NotoParsedConfig{
-			NotaryType:      decodedData.NotaryType,
-			NotaryAddress:   domainConfig.NotaryAddress,
-			Variant:         domainConfig.Variant,
-			NotaryLookup:    decodedData.NotaryLookup,
-			PrivateAddress:  decodedData.PrivateAddress,
-			PrivateGroup:    decodedData.PrivateGroup,
-			RestrictMint:    decodedData.RestrictMint,
-			AllowBurn:       decodedData.AllowBurn,
-			AllowUpdateLock: decodedData.AllowUpdateLock,
-		}
-		notoContractConfigJSON, err = json.Marshal(parsedConfig)
-	}
-	if err == nil {
-		staticCoordinator = decodedData.NotaryLookup
-	}
 	if err != nil {
 		// This on-chain contract has invalid configuration - not an error in our process
 		return &prototk.InitContractResponse{Valid: false}, nil
+	}
+
+	localNodeName, _ := n.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	_, notaryNodeName, err := tktypes.PrivateIdentityLocator(decodedData.NotaryLookup).Validate(ctx, localNodeName.Name, true)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedConfig := &types.NotoParsedConfig{
+		NotaryType:      decodedData.NotaryType,
+		NotaryAddress:   domainConfig.NotaryAddress,
+		Variant:         domainConfig.Variant,
+		NotaryLookup:    decodedData.NotaryLookup,
+		IsNotary:        notaryNodeName == localNodeName.Name,
+		PrivateAddress:  decodedData.PrivateAddress,
+		PrivateGroup:    decodedData.PrivateGroup,
+		RestrictMint:    decodedData.RestrictMint,
+		AllowBurn:       decodedData.AllowBurn,
+		AllowUpdateLock: decodedData.AllowUpdateLock,
+	}
+	notoContractConfigJSON, err = json.Marshal(parsedConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	return &prototk.InitContractResponse{
@@ -390,7 +401,7 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 		ContractConfig: &prototk.ContractConfig{
 			ContractConfigJson:   string(notoContractConfigJSON),
 			CoordinatorSelection: prototk.ContractConfig_COORDINATOR_STATIC,
-			StaticCoordinator:    &staticCoordinator,
+			StaticCoordinator:    &decodedData.NotaryLookup,
 			SubmitterSelection:   prototk.ContractConfig_SUBMITTER_COORDINATOR,
 		},
 	}, nil

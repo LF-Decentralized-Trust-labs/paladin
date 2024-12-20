@@ -31,6 +31,7 @@ import { Registries } from "./views/Registries";
 import { Submissions } from "./views/Submissions";
 import { useEffect, useMemo, useState } from "react";
 import { constants } from "./components/config";
+import { AppRoutes } from "./routes";
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({}),
@@ -94,10 +95,10 @@ function App() {
             <BrowserRouter>
               <Header />
               <Routes>
-                <Route path="/ui/indexer" element={<Indexer />} />
-                <Route path="/ui/submissions" element={<Submissions />} />\
-                <Route path="/ui/registry" element={<Registries />} />
-                <Route path="*" element={<Navigate to="/ui/indexer" replace />} />
+                <Route path={AppRoutes.Indexer} element={<Indexer />} />
+                <Route path={AppRoutes.Submissions} element={<Submissions />} />\
+                <Route path={AppRoutes.Registry} element={<Registries />} />
+                <Route path="*" element={<Navigate to={AppRoutes.Indexer} replace />} />
               </Routes>
             </BrowserRouter>
           </ThemeProvider>

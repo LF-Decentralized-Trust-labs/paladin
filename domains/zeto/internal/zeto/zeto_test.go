@@ -31,6 +31,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	assert.NotNil(t, z)
 }
@@ -87,7 +88,7 @@ func TestDecodeDomainConfig(t *testing.T) {
 }
 
 func TestInitDomain(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitDomainRequest{
 		AbiStateSchemas: []*prototk.StateSchema{
@@ -111,7 +112,7 @@ func TestInitDomain(t *testing.T) {
 }
 
 func TestInitDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitDeployRequest{
 		Transaction: &prototk.DeployTransactionSpecification{
@@ -128,7 +129,7 @@ func TestInitDeploy(t *testing.T) {
 }
 
 func TestPrepareDeploy(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.config = &types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
@@ -164,7 +165,7 @@ func TestPrepareDeploy(t *testing.T) {
 }
 
 func TestInitContract(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitContractRequest{
 		ContractConfig: []byte("bad config"),
@@ -191,7 +192,7 @@ func TestInitContract(t *testing.T) {
 }
 
 func TestInitTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.InitTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
@@ -246,9 +247,9 @@ func TestInitTransaction(t *testing.T) {
 
 	req.Transaction.FunctionParamsJson = "{\"mints\":[{\"to\":\"Alice\",\"amount\":\"10\"}]}"
 	_, err = z.InitTransaction(context.Background(), req)
-	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210016: Unexpected signature for function 'mint': expected='function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }', actual=''")
+	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210016: Unexpected signature for function 'mint': expected='function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }', actual=''")
 
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	_, err = z.InitTransaction(context.Background(), req)
 	assert.EqualError(t, err, "PD210008: Failed to validate init transaction spec. PD210017: Failed to decode contract address. bad address - must be 20 bytes (len=0)")
 
@@ -259,7 +260,7 @@ func TestInitTransaction(t *testing.T) {
 }
 
 func TestAssembleTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{
@@ -290,7 +291,7 @@ func TestAssembleTransaction(t *testing.T) {
 	_, err := z.AssembleTransaction(context.Background(), req)
 	assert.ErrorContains(t, err, "PD210009")
 
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -301,7 +302,7 @@ func TestAssembleTransaction(t *testing.T) {
 }
 
 func TestEndorseTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	req := &prototk.EndorseTransactionRequest{
 		Transaction: &prototk.TransactionSpecification{
@@ -316,7 +317,7 @@ func TestEndorseTransaction(t *testing.T) {
 	assert.EqualError(t, err, "PD210010: Failed to validate endorse transaction spec. PD210012: Failed to unmarshal function abi json. unexpected end of JSON input")
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -327,7 +328,7 @@ func TestEndorseTransaction(t *testing.T) {
 }
 
 func TestPrepareTransaction(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.config = &types.DomainFactoryConfig{
 		DomainContracts: types.DomainConfigContracts{
@@ -357,7 +358,7 @@ func TestPrepareTransaction(t *testing.T) {
 	assert.EqualError(t, err, "PD210011: Failed to validate prepare transaction spec. PD210012: Failed to unmarshal function abi json. unexpected end of JSON input")
 
 	req.Transaction.FunctionAbiJson = "{\"type\":\"function\",\"name\":\"mint\"}"
-	req.Transaction.FunctionSignature = "function mint(mints[] memory mints) external { }; struct mints { string to; uint256 amount; }"
+	req.Transaction.FunctionSignature = "function mint(TransferParam[] memory mints) external { }; struct TransferParam { string to; uint256 amount; }"
 	conf := types.DomainInstanceConfig{
 		CircuitId: "circuit1",
 		TokenName: "testToken1",
@@ -368,8 +369,8 @@ func TestPrepareTransaction(t *testing.T) {
 }
 
 func TestFindCoins(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return nil, errors.New("find coins error")
 		},
 	}
@@ -383,7 +384,7 @@ func TestFindCoins(t *testing.T) {
 	_, err := findCoins(context.Background(), z, useNullifiers, addr, "{}")
 	assert.EqualError(t, err, "find coins error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{
 			States: []*prototk.StoredState{
 				{
@@ -397,9 +398,9 @@ func TestFindCoins(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
-func newTestZeto() (*Zeto, *testDomainCallbacks) {
-	testCallbacks := &testDomainCallbacks{
-		returnFunc: func() (*prototk.FindAvailableStatesResponse, error) {
+func newTestZeto() (*Zeto, *domain.MockDomainCallbacks) {
+	testCallbacks := &domain.MockDomainCallbacks{
+		MockFindAvailableStates: func() (*prototk.FindAvailableStatesResponse, error) {
 			return &prototk.FindAvailableStatesResponse{}, nil
 		},
 	}
@@ -422,7 +423,7 @@ func newTestZeto() (*Zeto, *testDomainCallbacks) {
 
 func TestHandleEventBatch(t *testing.T) {
 	z, testCallbacks := newTestZeto()
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return nil, errors.New("find merkle tree root error")
 	}
 	ctx := context.Background()
@@ -452,7 +453,7 @@ func TestHandleEventBatch(t *testing.T) {
 	_, err = z.HandleEventBatch(ctx, req)
 	assert.EqualError(t, err, "PD210019: Failed to create Merkle tree for smt_Zeto_AnonNullifier_0x1234567890123456789012345678901234567890: PD210065: Failed to find available states for the merkle tree. find merkle tree root error")
 
-	testCallbacks.returnFunc = func() (*prototk.FindAvailableStatesResponse, error) {
+	testCallbacks.MockFindAvailableStates = func() (*prototk.FindAvailableStatesResponse, error) {
 		return &prototk.FindAvailableStatesResponse{}, nil
 	}
 	res1, err := z.HandleEventBatch(ctx, req)
@@ -479,10 +480,15 @@ func TestHandleEventBatch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, res4.TransactionsComplete, 1)
 	assert.Len(t, res4.NewStates, 2)
+
+	req.Events[0].SoliditySignature = "event UTXOWithdraw(uint256 amount, uint256[] inputs, uint256 output, address indexed submitter, bytes data)"
+	req.Events[0].DataJson = "{\"data\":\"0x0001000030e43028afbb41d6887444f4c2b4ed6d00000000000000000000000000000000\",\"output\":\"7980718117603030807695495350922077879582656644717071592146865497574198464253\",\"submitter\":\"0x74e71b05854ee819cb9397be01c82570a178d019\"}"
+	_, err = z.HandleEventBatch(ctx, req)
+	assert.NoError(t, err)
 }
 
 func TestGetVerifier(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{
@@ -510,7 +516,7 @@ func TestGetVerifier(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	testCallbacks := &testDomainCallbacks{}
+	testCallbacks := &domain.MockDomainCallbacks{}
 	z := New(testCallbacks)
 	z.name = "z1"
 	z.coinSchema = &prototk.StateSchema{
@@ -641,4 +647,28 @@ func findCoins(ctx context.Context, z *Zeto, useNullifiers bool, contractAddress
 		}
 	}
 	return coins, err
+}
+
+func TestGetHandler(t *testing.T) {
+	z := &Zeto{
+		name: "test1",
+	}
+	assert.NotNil(t, z.GetHandler("mint"))
+	assert.NotNil(t, z.GetHandler("transfer"))
+	assert.NotNil(t, z.GetHandler("lockProof"))
+	assert.NotNil(t, z.GetHandler("deposit"))
+	assert.NotNil(t, z.GetHandler("withdraw"))
+	assert.Nil(t, z.GetHandler("bad"))
+}
+
+func TestUnimplementedMethods(t *testing.T) {
+	z := &Zeto{}
+	_, err := z.InitCall(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210085: Not implemented")
+
+	_, err = z.ExecCall(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210085: Not implemented")
+
+	_, err = z.BuildReceipt(context.Background(), nil)
+	assert.ErrorContains(t, err, "PD210102: Not implemented")
 }

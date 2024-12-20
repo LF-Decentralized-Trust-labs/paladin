@@ -54,6 +54,7 @@ type NotoParsedConfig struct {
 	RestrictMint    bool                `json:"restrictMint"`
 	AllowBurn       bool                `json:"allowBurn"`
 	AllowUpdateLock bool                `json:"allowUpdateLock"`
+	IsNotary        bool                `json:"isNotary"`
 }
 
 type PentePrivateGroup struct {
