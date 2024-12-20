@@ -42,6 +42,8 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &burnHandler{noto: n}
 	case "approveTransfer":
 		return &approveHandler{noto: n}
+	case "lock":
+		return &lockHandler{noto: n}
 	default:
 		return nil
 	}
@@ -81,14 +83,31 @@ func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams
 	return nil
 }
 
+// Check that a lock produces a locked coin and a revert coin, both matching the difference between the inputs and outputs
+func (n *Noto) validateLockAmounts(ctx context.Context, coins *gatheredCoins, lockedCoin *types.NotoLockedCoin, recipientCoins []*types.NotoCoin) error {
+	if len(coins.inCoins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "lock", coins.inCoins)
+	}
+	amount := big.NewInt(0).Sub(coins.inTotal, coins.outTotal)
+	if amount.Cmp(lockedCoin.Amount.Int()) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", lockedCoin.Amount.Int().Text(10), amount.Text(10))
+	}
+	for _, coin := range recipientCoins {
+		if lockedCoin.Amount.Int().Cmp(coin.Amount.Int()) != 0 {
+			return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", lockedCoin.Amount.Int().Text(10), coin.Amount.Int().Text(10))
+		}
+	}
+	return nil
+}
+
 // Check that the sender of a transfer provided a signature on the input transaction details
-func (n *Noto) validateTransferSignature(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest, coins *gatheredCoins) error {
-	signature := domain.FindAttestation("sender", req.Signatures)
+func (n *Noto) validateTransferSignature(ctx context.Context, tx *types.ParsedTransaction, name string, req *prototk.EndorseTransactionRequest, coins *gatheredCoins) error {
+	signature := domain.FindAttestation(name, req.Signatures)
 	if signature == nil {
-		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
+		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, name)
 	}
 	if signature.Verifier.Lookup != tx.Transaction.From {
-		return i18n.NewError(ctx, msgs.MsgAttestationUnexpected, "sender", tx.Transaction.From, signature.Verifier.Lookup)
+		return i18n.NewError(ctx, msgs.MsgAttestationUnexpected, name, tx.Transaction.From, signature.Verifier.Lookup)
 	}
 	encodedTransfer, err := n.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
 	if err != nil {
@@ -99,7 +118,30 @@ func (n *Noto) validateTransferSignature(ctx context.Context, tx *types.ParsedTr
 		return err
 	}
 	if recoveredSignature.String() != signature.Verifier.Verifier {
-		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, "sender", signature.Verifier.Verifier, recoveredSignature.String())
+		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, name, signature.Verifier.Verifier, recoveredSignature.String())
+	}
+	return nil
+}
+
+// Check that the sender of a lock provided a signature on the input transaction details
+func (n *Noto) validateLockSignature(ctx context.Context, tx *types.ParsedTransaction, name string, req *prototk.EndorseTransactionRequest, lockedCoin *types.NotoLockedCoin, recipientCoins []*types.NotoCoin) error {
+	signature := domain.FindAttestation(name, req.Signatures)
+	if signature == nil {
+		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, name)
+	}
+	if signature.Verifier.Lookup != tx.Transaction.From {
+		return i18n.NewError(ctx, msgs.MsgAttestationUnexpected, name, tx.Transaction.From, signature.Verifier.Lookup)
+	}
+	encodedLock, err := n.encodeLock(ctx, tx.ContractAddress, lockedCoin, recipientCoins)
+	if err != nil {
+		return err
+	}
+	recoveredSignature, err := n.recoverSignature(ctx, encodedLock, signature.Payload)
+	if err != nil {
+		return err
+	}
+	if recoveredSignature.String() != signature.Verifier.Verifier {
+		return i18n.NewError(ctx, msgs.MsgSignatureDoesNotMatch, name, signature.Verifier.Verifier, recoveredSignature.String())
 	}
 	return nil
 }
