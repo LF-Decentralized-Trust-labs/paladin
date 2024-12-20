@@ -107,6 +107,15 @@ func (br *domainBridge) RequestReply(ctx context.Context, reqMsg plugintk.Plugin
 				}
 			},
 		)
+	case *prototk.DomainMessage_LocalNodeName:
+		return callManagerImpl(ctx, req.LocalNodeName,
+			br.manager.LocalNodeName,
+			func(resMsg *prototk.DomainMessage, res *prototk.LocalNodeNameResponse) {
+				resMsg.ResponseToDomain = &prototk.DomainMessage_LocalNodeNameRes{
+					LocalNodeNameRes: res,
+				}
+			},
+		)
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgPluginBadRequestBody, req)
 	}

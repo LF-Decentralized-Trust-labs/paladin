@@ -800,3 +800,9 @@ func (d *domain) SendTransaction(ctx context.Context, tx *prototk.SendTransactio
 	}
 	return &prototk.SendTransactionResponse{Id: id.String()}, nil
 }
+
+func (d *domain) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	return &prototk.LocalNodeNameResponse{
+		Name: d.dm.transportMgr.LocalNodeName(),
+	}, nil
+}

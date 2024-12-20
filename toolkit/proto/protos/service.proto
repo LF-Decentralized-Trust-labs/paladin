@@ -88,6 +88,7 @@ message DomainMessage {
     DecodeDataRequest           decode_data =               2030;
     RecoverSignerRequest        recover_signer =            2040;
     SendTransactionRequest      send_transaction =          2050;
+    LocalNodeNameRequest        local_node_name =           2060;
   }
 
   oneof response_to_domain {
@@ -96,6 +97,7 @@ message DomainMessage {
     DecodeDataResponse          decode_data_res =           2031;
     RecoverSignerResponse       recover_signer_res =        2041;
     SendTransactionResponse     send_transaction_res =      2051;
+    LocalNodeNameResponse       local_node_name_res =       2061;
   }
     
 }

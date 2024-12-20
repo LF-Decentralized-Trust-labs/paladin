@@ -49,6 +49,7 @@ type DomainCallbacks interface {
 	DecodeData(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error)
 	RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
 	SendTransaction(ctx context.Context, tx *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error)
+	LocalNodeName(context.Context, *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error)
 }
 
 type DomainFactory func(callbacks DomainCallbacks) DomainAPI
@@ -254,6 +255,17 @@ func (dp *domainHandler) SendTransaction(ctx context.Context, req *prototk.SendT
 	}))
 	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_SendTransactionRes) *prototk.SendTransactionResponse {
 		return msg.SendTransactionRes
+	})
+}
+
+func (dp *domainHandler) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	res, err := dp.proxy.RequestFromPlugin(ctx, dp.Wrap(&prototk.DomainMessage{
+		RequestFromDomain: &prototk.DomainMessage_LocalNodeName{
+			LocalNodeName: req,
+		},
+	}))
+	return responseToPluginAs(ctx, res, err, func(msg *prototk.DomainMessage_LocalNodeNameRes) *prototk.LocalNodeNameResponse {
+		return msg.LocalNodeNameRes
 	})
 }
 

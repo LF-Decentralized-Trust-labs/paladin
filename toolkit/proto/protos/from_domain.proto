@@ -78,6 +78,13 @@ message SendTransactionResponse {
   string id = 1;
 }
 
+message LocalNodeNameRequest {
+}
+
+message LocalNodeNameResponse {
+  string name = 1;
+}
+
 message StoredState {
   string id = 1;
   string schema_id = 2;
