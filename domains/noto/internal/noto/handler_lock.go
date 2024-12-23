@@ -350,6 +350,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 		From:       fromAddress,
 		Amount:     inParams.Amount,
 		Recipients: recipients,
+		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,

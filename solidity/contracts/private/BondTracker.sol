@@ -82,8 +82,9 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         require(sender == _issuer, "Bond must be issued by issuer");
         require(to == owner(), "Bond must be issued to custodian");
         require(_status == Status.INITIALIZED, "Bond has already been issued");
@@ -102,8 +103,9 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address from,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         investorList.checkTransfer(sender, from, to, amount);
         _transfer(from, to, amount);
 
@@ -122,8 +124,9 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         address from,
         address delegate,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         approvals++; // must store something on each call (see https://github.com/kaleido-io/paladin/issues/252)
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -132,8 +135,9 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         address from,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) external override onlyOwner {
         _burn(from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -144,16 +148,18 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address from,
         uint256 amount,
         address[] calldata recipients,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) external override onlyOwner {
         _createLock(id, from, amount, recipients);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
     function onUnlock(
         bytes32 id,
-        address recipient
-    ) external override {
+        address recipient,
+        bytes calldata data
+    ) external override onlyOwner {
         LockDetail memory lock = _removeLock(id);
         _transfer(lock.from, recipient, lock.amount);
     }

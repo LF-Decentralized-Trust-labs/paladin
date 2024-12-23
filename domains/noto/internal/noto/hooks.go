@@ -25,6 +25,7 @@ type MintHookParams struct {
 	Sender   *tktypes.EthAddress `json:"sender"`
 	To       *tktypes.EthAddress `json:"to"`
 	Amount   *tktypes.HexUint256 `json:"amount"`
+	Data     tktypes.HexBytes    `json:"data"`
 	Prepared PreparedTransaction `json:"prepared"`
 }
 
@@ -33,6 +34,7 @@ type TransferHookParams struct {
 	From     *tktypes.EthAddress `json:"from"`
 	To       *tktypes.EthAddress `json:"to"`
 	Amount   *tktypes.HexUint256 `json:"amount"`
+	Data     tktypes.HexBytes    `json:"data"`
 	Prepared PreparedTransaction `json:"prepared"`
 }
 
@@ -40,6 +42,7 @@ type BurnHookParams struct {
 	Sender   *tktypes.EthAddress `json:"sender"`
 	From     *tktypes.EthAddress `json:"from"`
 	Amount   *tktypes.HexUint256 `json:"amount"`
+	Data     tktypes.HexBytes    `json:"data"`
 	Prepared PreparedTransaction `json:"prepared"`
 }
 
@@ -47,6 +50,7 @@ type ApproveTransferHookParams struct {
 	Sender   *tktypes.EthAddress `json:"sender"`
 	From     *tktypes.EthAddress `json:"from"`
 	Delegate *tktypes.EthAddress `json:"delegate"`
+	Data     tktypes.HexBytes    `json:"data"`
 	Prepared PreparedTransaction `json:"prepared"`
 }
 
@@ -56,12 +60,14 @@ type LockHookParams struct {
 	From       *tktypes.EthAddress   `json:"from"`
 	Amount     *tktypes.HexUint256   `json:"amount"`
 	Recipients []*tktypes.EthAddress `json:"recipients"`
+	Data       tktypes.HexBytes      `json:"data"`
 	Prepared   PreparedTransaction   `json:"prepared"`
 }
 
 type UnlockHookParams struct {
 	ID        tktypes.Bytes32     `json:"id"`
 	Recipient *tktypes.EthAddress `json:"recipient"`
+	Data      tktypes.HexBytes    `json:"data"`
 }
 
 type PreparedTransaction struct {

@@ -146,7 +146,7 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
-func (h *approveHandler) baseLedgerApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.ApproveParams)
 	transferHash, err := h.transferHash(ctx, tx, inParams)
 	if err != nil {
@@ -178,7 +178,7 @@ func (h *approveHandler) baseLedgerApprove(ctx context.Context, tx *types.Parsed
 	}, nil
 }
 
-func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *approveHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.ApproveParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -194,6 +194,7 @@ func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransa
 		Sender:   fromAddress,
 		From:     fromAddress,
 		Delegate: inParams.Delegate,
+		Data:     inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
@@ -218,12 +219,12 @@ func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransa
 }
 
 func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerApprove(ctx, tx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookApprove(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

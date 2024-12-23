@@ -162,7 +162,7 @@ func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *burnHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -183,7 +183,7 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoTransferParams{
+	params := &NotoBurnParams{
 		Inputs:    inputs,
 		Outputs:   outputs,
 		Signature: sender.Payload,
@@ -200,7 +200,7 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	}, nil
 }
 
-func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *burnHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.BurnParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -216,6 +216,7 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 		Sender: fromAddress,
 		From:   fromAddress,
 		Amount: inParams.Amount,
+		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
@@ -240,12 +241,12 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *burnHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerBurn(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookBurn(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

@@ -90,6 +90,13 @@ type NotoTransferParams struct {
 	Data      tktypes.HexBytes `json:"data"`
 }
 
+type NotoBurnParams struct {
+	Inputs    []string         `json:"inputs"`
+	Outputs   []string         `json:"outputs"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
+}
+
 type NotoTransferParamsNoData struct {
 	Inputs    []string         `json:"inputs"`
 	Outputs   []string         `json:"outputs"`
