@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import { IGroupInfo, IStateEncoded, TransactionType } from "../interfaces";
 import PaladinClient from "../paladin";
 import * as notoPrivateJSON from "./abis/INotoPrivate.json";
+import * as notoJSON from "./abis/INoto.json";
 import { penteGroupABI } from "./pente";
 import { PaladinVerifier } from "../verifier";
 
@@ -47,9 +48,9 @@ export interface NotoConstructorParams {
     publicAddress?: string;
     privateAddress?: string;
   };
-  restrictMint?: boolean;
-  allowBurn?: boolean;
-  allowUpdateLock?: boolean;
+  restrictMint: boolean;
+  allowBurn: boolean;
+  allowUpdateLock: boolean;
 }
 
 export interface NotoMintParams {
@@ -67,6 +68,24 @@ export interface NotoTransferParams {
 export interface NotoBurnParams {
   amount: string | number;
   data: string;
+}
+
+export interface NotoLockParams {
+  id: string;
+  amount: string | number;
+  delegate: string;
+  recipients: LockRecipient[];
+  data: string;
+}
+
+export interface NotoUnlockParams {
+  locked: string;
+  outcome: string | number;
+}
+
+export interface LockRecipient {
+  ref: number;
+  recipient: string;
 }
 
 export interface NotoApproveTransferParams {
@@ -198,6 +217,30 @@ export class NotoInstance {
       type: TransactionType.PRIVATE,
       abi: notoPrivateJSON.abi,
       function: "burn",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async lock(from: PaladinVerifier, data: NotoLockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PRIVATE,
+      abi: notoPrivateJSON.abi,
+      function: "lock",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async unlock(from: PaladinVerifier, data: NotoUnlockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PUBLIC,
+      abi: notoJSON.abi,
+      function: "unlock",
       to: this.address,
       from: from.lookup,
       data,

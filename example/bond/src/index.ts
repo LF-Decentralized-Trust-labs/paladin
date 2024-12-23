@@ -1,16 +1,14 @@
 import PaladinClient, {
-  Algorithms,
   encodeStates,
   newGroupSalt,
   newTransactionId,
   NotoFactory,
   PenteFactory,
   TransactionType,
-  Verifiers,
 } from "@lfdecentralizedtrust-labs/paladin-sdk";
-import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
-import atomFactoryJson from "./abis/AtomFactory.json";
 import atomJson from "./abis/Atom.json";
+import atomFactoryJson from "./abis/AtomFactory.json";
+import bondTrackerPublicJson from "./abis/BondTrackerPublic.json";
 import { newBondSubscription } from "./helpers/bondsubscription";
 import { newBondTracker } from "./helpers/bondtracker";
 import { checkDeploy, checkReceipt } from "./util";
@@ -41,6 +39,8 @@ async function main(): Promise<boolean> {
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
     restrictMint: true,
+    allowBurn: true,
+    allowUpdateLock: true,
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -113,6 +113,8 @@ async function main(): Promise<boolean> {
       privateAddress: bondTracker.address,
     },
     restrictMint: false,
+    allowBurn: true,
+    allowUpdateLock: true,
   });
   if (!checkDeploy(notoBond)) return false;
 
