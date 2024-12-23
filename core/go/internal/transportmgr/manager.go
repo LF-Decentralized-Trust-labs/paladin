@@ -28,7 +28,6 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 )
 
@@ -47,6 +46,11 @@ type transportManager struct {
 	destinations      map[string]components.TransportClient
 	destinationsFixed bool
 	destinationsMux   sync.RWMutex
+
+	peersLock sync.RWMutex
+	peers     map[string]*peer
+
+	senderBufferLen int
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
@@ -57,6 +61,7 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		transportsByID:   make(map[uuid.UUID]*transport),
 		transportsByName: make(map[string]*transport),
 		destinations:     make(map[string]components.TransportClient),
+		senderBufferLen:  confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
 	}
 }
 
@@ -202,62 +207,20 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	if msg.Node == "" || msg.Node == tm.localNodeName {
-		return i18n.NewError(ctx, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, msg.Node)
-	}
-
 	if msg.ReplyTo == "" {
 		msg.ReplyTo = tm.localNodeName
 	}
 
-	// Note the registry is responsible for caching to make this call as efficient as if
-	// we maintained the transport details in-memory ourselves.
-	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, msg.Node)
+	// Use or establish a peer connection for the send
+	peer, err := tm.getPeer(ctx, msg.Node)
 	if err != nil {
 		return err
 	}
 
-	// See if any of the transports registered by the node, are configured on this local node
-	// Note: We just pick the first one if multiple are available, and there is no retry to
-	//       fallback to a secondary one currently.
-	var transport *transport
-	for _, rtd := range registeredTransportDetails {
-		transport = tm.transportsByName[rtd.Transport]
-	}
-	if transport == nil {
-		// If we didn't find one, then feedback to the caller which transports were registered
-		registeredTransportNames := []string{}
-		for _, rtd := range registeredTransportDetails {
-			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
-		}
-		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, msg.Node, registeredTransportNames)
-	}
+	// Push the send to the peer - this is a best effort interaction.
+	// There is some retry in the Paladin layer, and some transports provide resilience.
+	// However, the send is at-most-once, and the higher level message protocols that
+	// use this "send" must be fault tolerant to message loss.
+	return peer.send(ctx, msg)
 
-	// Call the selected transport to send
-	// Note: We do not push the transport details down to the plugin on every send, as they are very large
-	//       (KBs of certificates and other data).
-	//       The transport plugin uses GetTransportDetails to request them back from us, and then caches
-	//       these internally through use of a long lived connection / connection-pool.
-	var correlID *string
-	if msg.CorrelationID != nil {
-		correlID = confutil.P(msg.CorrelationID.String())
-	}
-	var zeroUUID uuid.UUID
-	if msg.MessageID == zeroUUID {
-		msg.MessageID = uuid.New()
-	}
-	err = transport.send(ctx, &prototk.Message{
-		MessageType:   msg.MessageType,
-		MessageId:     msg.MessageID.String(),
-		CorrelationId: correlID,
-		Component:     msg.Component,
-		Node:          msg.Node,
-		ReplyTo:       msg.ReplyTo,
-		Payload:       msg.Payload,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -14,13 +14,20 @@
  */
 package pldconf
 
+import "github.com/kaleido-io/paladin/config/pkg/confutil"
+
 type TransportManagerConfig struct {
-	NodeName   string                      `json:"nodeName"`
-	Transports map[string]*TransportConfig `json:"transports"`
+	NodeName     string                      `json:"nodeName"`
+	SendQueueLen *int                        `json:"sendQueueLen"`
+	Transports   map[string]*TransportConfig `json:"transports"`
 }
 
 type TransportInitConfig struct {
 	Retry RetryConfig `json:"retry"`
+}
+
+var TransportManagerDefaults = &TransportManagerConfig{
+	SendQueueLen: confutil.P(10),
 }
 
 type TransportConfig struct {

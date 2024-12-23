@@ -29,7 +29,7 @@ type TransportMessage struct {
 	CorrelationID *uuid.UUID
 	Component     string // The name of the component to route the message to once it arrives at the destination node
 	Node          string // The node id to send the message to
-	ReplyTo       string // The node id to send replies to
+	ReplyTo       string // The identity to respond to on the sending node
 	MessageType   string
 	Payload       []byte
 }
