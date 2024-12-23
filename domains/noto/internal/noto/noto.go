@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -164,9 +165,9 @@ type NotoUpdateLock_Event struct {
 }
 
 type NotoUnlock_Event struct {
-	Locked tktypes.Bytes32  `json:"locked"`
-	Output tktypes.Bytes32  `json:"output"`
-	Data   tktypes.HexBytes `json:"data"`
+	Locked  tktypes.Bytes32  `json:"locked"`
+	Outcome tktypes.Bytes32  `json:"outcome"`
+	Data    tktypes.HexBytes `json:"data"`
 }
 
 type gatheredCoins struct {
@@ -664,6 +665,13 @@ func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functio
 	return pldapi.TransactionTypePrivate, functionABI, paramsJSON, err
 }
 
+func mapSendTransactionType(transactionType pldapi.TransactionType) prototk.TransactionInput_TransactionType {
+	if transactionType == pldapi.TransactionTypePrivate {
+		return prototk.TransactionInput_PRIVATE
+	}
+	return prototk.TransactionInput_PUBLIC
+}
+
 func mapPrepareTransactionType(transactionType pldapi.TransactionType) prototk.PreparedTransaction_TransactionType {
 	if transactionType == pldapi.TransactionTypePrivate {
 		return prototk.PreparedTransaction_PRIVATE
@@ -720,17 +728,76 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 
 		case n.unlockSignature:
 			var unlock NotoUnlock_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &unlock); err == nil {
-				txData, err := n.decodeTransactionData(ctx, unlock.Data)
+			if err := json.Unmarshal([]byte(ev.DataJson), &unlock); err != nil {
+				break
+			}
+
+			txData, err := n.decodeTransactionData(ctx, unlock.Data)
+			if err != nil {
+				return nil, err
+			}
+			res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Locked})...)
+			res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Outcome})...)
+
+			var domainConfig *types.NotoParsedConfig
+			err = json.Unmarshal([]byte(req.ContractInfo.ContractConfigJson), &domainConfig)
+			if err != nil {
+				return nil, err
+			}
+			if domainConfig.IsNotary && domainConfig.NotaryType == types.NotaryTypePente {
+				err = n.handleNotaryPrivateUnlock(ctx, req.StateQueryContext, domainConfig, &unlock)
 				if err != nil {
 					return nil, err
 				}
-				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Locked})...)
-				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, []tktypes.Bytes32{unlock.Output})...)
 			}
 		}
 	}
 	return &res, nil
+}
+
+// When notary logic is implemented via Pente, unlock events from the base ledger must be propagated back to the Pente hooks
+// TODO: this method should not be invoked directly on the event loop, but rather via a queue
+func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext string, domainConfig *types.NotoParsedConfig, unlock *NotoUnlock_Event) error {
+	queryBuilder := query.NewQueryBuilder().Limit(1).Equal(".id", unlock.Locked)
+	states, err := n.findLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
+	if err != nil {
+		return err
+	}
+	if len(states) != 1 {
+		return i18n.NewError(ctx, msgs.MsgLockNotFound, unlock.Locked)
+	}
+
+	lock, err := n.unmarshalLockedCoin(states[0].DataJson)
+	if err != nil {
+		return err
+	}
+
+	transactionType, functionABI, paramsJSON, err := n.wrapHookTransaction(
+		domainConfig,
+		types.NotoABI.Functions()["onUnlock"],
+		&UnlockHookParams{
+			ID:        lock.ID,
+			Recipient: lock.Owner,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	functionABIJSON, err := json.Marshal(functionABI)
+	if err != nil {
+		return err
+	}
+
+	_, err = n.Callbacks.SendTransaction(ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			Type:            mapSendTransactionType(transactionType),
+			From:            domainConfig.NotaryLookup,
+			ContractAddress: domainConfig.NotaryAddress.String(),
+			FunctionAbiJson: string(functionABIJSON),
+			ParamsJson:      string(paramsJSON),
+		},
+	})
+	return err
 }
 
 func (n *Noto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {

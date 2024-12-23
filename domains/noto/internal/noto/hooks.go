@@ -50,6 +50,20 @@ type ApproveTransferHookParams struct {
 	Prepared PreparedTransaction `json:"prepared"`
 }
 
+type LockHookParams struct {
+	Sender     *tktypes.EthAddress   `json:"sender"`
+	ID         tktypes.Bytes32       `json:"id"`
+	From       *tktypes.EthAddress   `json:"from"`
+	Amount     *tktypes.HexUint256   `json:"amount"`
+	Recipients []*tktypes.EthAddress `json:"recipients"`
+	Prepared   PreparedTransaction   `json:"prepared"`
+}
+
+type UnlockHookParams struct {
+	ID        tktypes.Bytes32     `json:"id"`
+	Recipient *tktypes.EthAddress `json:"recipient"`
+}
+
 type PreparedTransaction struct {
 	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
 	EncodedCall     tktypes.HexBytes    `json:"encodedCall"`

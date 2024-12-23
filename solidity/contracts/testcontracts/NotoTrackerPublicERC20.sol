@@ -53,6 +53,24 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         _executeOperation(prepared);
     }
 
+    function onLock(
+        address sender,
+        bytes32 id,
+        address from,
+        uint256 amount,
+        address[] calldata recipients,
+        PreparedTransaction calldata prepared
+    ) external override {
+        revert("Lock not supported");
+    }
+
+    function onUnlock(
+        bytes32 id,
+        address recipient
+    ) external override {
+        // do nothing
+    }
+
     function _executeOperation(PreparedTransaction memory op) internal {
         (bool success, bytes memory result) = op.contractAddress.call(
             op.encodedCall
