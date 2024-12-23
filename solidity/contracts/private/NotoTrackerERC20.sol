@@ -15,8 +15,9 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address sender,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         _mint(to, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -26,8 +27,9 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address from,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         _transfer(from, to, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -36,8 +38,9 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address sender,
         address from,
         address delegate,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external {
+    ) external override {
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
@@ -45,6 +48,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address sender,
         address from,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
         _burn(from, amount);
@@ -57,6 +61,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address from,
         uint256 amount,
         address[] calldata recipients,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
         _createLock(id, from, amount, recipients);
@@ -65,7 +70,8 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
 
     function onUnlock(
         bytes32 id,
-        address recipient
+        address recipient,
+        bytes calldata data
     ) external override {
         LockDetail memory lock = _removeLock(id);
         _transfer(lock.from, recipient, lock.amount);

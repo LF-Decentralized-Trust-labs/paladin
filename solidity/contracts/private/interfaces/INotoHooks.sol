@@ -17,6 +17,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
 
@@ -25,6 +26,7 @@ interface INotoHooks is IPenteExternalCall {
         address from,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
 
@@ -32,6 +34,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         address from,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
 
@@ -39,6 +42,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         address from,
         address delegate,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
 
@@ -48,11 +52,13 @@ interface INotoHooks is IPenteExternalCall {
         address from,
         uint256 amount,
         address[] calldata recipients,
+        bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
 
     function onUnlock(
         bytes32 id,
-        address recipient
+        address recipient,
+        bytes calldata data
     ) external;
 }

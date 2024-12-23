@@ -183,7 +183,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	return nil, i18n.NewError(ctx, msgs.MsgUnrecognizedEndorsement, req.EndorsementRequest.Name)
 }
 
-func (h *transferHandler) baseLedgerTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, withApproval bool) (*TransactionWrapper, error) {
+func (h *transferHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, withApproval bool) (*TransactionWrapper, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -230,7 +230,7 @@ func (h *transferHandler) baseLedgerTransfer(ctx context.Context, tx *types.Pars
 	}, nil
 }
 
-func (h *transferHandler) hookTransfer(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *transferHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.TransferParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -251,6 +251,7 @@ func (h *transferHandler) hookTransfer(ctx context.Context, tx *types.ParsedTran
 		From:   fromAddress,
 		To:     toAddress,
 		Amount: inParams.Amount,
+		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
@@ -307,24 +308,24 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 	// If preparing a transaction for later use, return metadata allowing it to be delegated to an approved party
 	prepareApprovals := req.Transaction.Intent == prototk.TransactionSpecification_PREPARE_TRANSACTION
 
-	baseTransaction, err = h.baseLedgerTransfer(ctx, tx, req, false)
+	baseTransaction, err = h.baseLedgerInvoke(ctx, tx, req, false)
 	if err != nil {
 		return nil, err
 	}
 	if prepareApprovals {
-		withApprovalTransaction, err = h.baseLedgerTransfer(ctx, tx, req, true)
+		withApprovalTransaction, err = h.baseLedgerInvoke(ctx, tx, req, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err = h.hookTransfer(ctx, tx, req, baseTransaction)
+		hookTransaction, err = h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}
 		if prepareApprovals {
-			withApprovalHookTransaction, err = h.hookTransfer(ctx, tx, req, withApprovalTransaction)
+			withApprovalHookTransaction, err = h.hookInvoke(ctx, tx, req, withApprovalTransaction)
 			if err != nil {
 				return nil, err
 			}

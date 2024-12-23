@@ -154,7 +154,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *mintHandler) baseLedgerMint(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	outputs := make([]string, len(req.OutputStates))
 	for i, state := range req.OutputStates {
 		outputs[i] = state.Id
@@ -187,7 +187,7 @@ func (h *mintHandler) baseLedgerMint(ctx context.Context, req *prototk.PrepareTr
 	}, nil
 }
 
-func (h *mintHandler) hookMint(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *mintHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.MintParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -207,6 +207,7 @@ func (h *mintHandler) hookMint(ctx context.Context, tx *types.ParsedTransaction,
 		Sender: fromAddress,
 		To:     toAddress,
 		Amount: inParams.Amount,
+		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
@@ -231,12 +232,12 @@ func (h *mintHandler) hookMint(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerMint(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookMint(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}
