@@ -22,7 +22,7 @@ interface INoto {
 
     event NotoLock(bytes32 locked, bytes signature, bytes data);
     event NotoUpdateLock(bytes32 locked, bytes signature, bytes data);
-    event NotoUnlock(bytes32 locked, bytes32 output, bytes data);
+    event NotoUnlock(bytes32 locked, bytes32 outcome, bytes data);
 
     struct LockOutcome {
         uint64 ref;

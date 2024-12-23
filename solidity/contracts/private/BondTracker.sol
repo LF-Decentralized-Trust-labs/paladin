@@ -5,12 +5,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {INotoHooks} from "../private/interfaces/INotoHooks.sol";
 import {InvestorList} from "./InvestorList.sol";
+import {NotoLocks} from "./NotoLocks.sol";
 
 /**
  * @title BondTracker
  * @dev Hook logic to model a simple bond lifecycle on top of Noto.
  */
-contract BondTracker is INotoHooks, ERC20, Ownable {
+contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
     enum Status {
         INITIALIZED,
         ISSUED,
@@ -135,5 +136,25 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
     ) external override {
         _burn(from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onLock(
+        address sender,
+        bytes32 id,
+        address from,
+        uint256 amount,
+        address[] calldata recipients,
+        PreparedTransaction calldata prepared
+    ) external override {
+        _createLock(id, from, amount, recipients);
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onUnlock(
+        bytes32 id,
+        address recipient
+    ) external override {
+        LockDetail memory lock = _removeLock(id);
+        _transfer(lock.from, recipient, lock.amount);
     }
 }
