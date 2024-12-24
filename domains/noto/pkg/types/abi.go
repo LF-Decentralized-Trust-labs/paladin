@@ -30,12 +30,11 @@ var notoPrivateJSON []byte
 var NotoABI = solutils.MustParseBuildABI(notoPrivateJSON)
 
 type ConstructorParams struct {
-	Notary          string      `json:"notary"`                    // Lookup string for the notary identity
-	Implementation  string      `json:"implementation,omitempty"`  // Use a specific implementation of Noto that was registered to the factory (blank to use default)
-	Hooks           *HookParams `json:"hooks,omitempty"`           // Configure hooks for programmable logic around Noto operations
-	RestrictMint    *bool       `json:"restrictMint,omitempty"`    // Only allow notary to mint (default: true)
-	AllowBurn       *bool       `json:"allowBurn,omitempty"`       // Allow token holders to burn their tokens (default: true)
-	AllowUpdateLock *bool       `json:"allowUpdateLock,omitempty"` // Allow token holders to update the possible recipients of locked tokens (default: true)
+	Notary         string      `json:"notary"`                   // Lookup string for the notary identity
+	Implementation string      `json:"implementation,omitempty"` // Use a specific implementation of Noto that was registered to the factory (blank to use default)
+	Hooks          *HookParams `json:"hooks,omitempty"`          // Configure hooks for programmable logic around Noto operations
+	RestrictMint   *bool       `json:"restrictMint,omitempty"`   // Only allow notary to mint (default: true)
+	AllowBurn      *bool       `json:"allowBurn,omitempty"`      // Allow token holders to burn their tokens (default: true)
 }
 
 // Currently the only supported hooks are provided via a Pente private smart contract
@@ -70,17 +69,16 @@ type ApproveParams struct {
 }
 
 type LockParams struct {
-	ID         tktypes.Bytes32     `json:"id"`
-	Amount     *tktypes.HexUint256 `json:"amount"`
-	Delegate   *tktypes.EthAddress `json:"delegate"`
-	Recipients []LockRecipient     `json:"recipients"`
-	Data       tktypes.HexBytes    `json:"data"`
+	ID     tktypes.Bytes32     `json:"id"`
+	Amount *tktypes.HexUint256 `json:"amount"`
+	Data   tktypes.HexBytes    `json:"data"`
 }
 
-type UpdateLockParams struct {
-	ID         tktypes.Bytes32  `json:"id"`
-	Recipients []LockRecipient  `json:"recipients"`
-	Data       tktypes.HexBytes `json:"data"`
+type UnlockParams struct {
+	ID      tktypes.Bytes32       `json:"id"`
+	To      []string              `json:"to"`
+	Amounts []*tktypes.HexUint256 `json:"amounts"`
+	Data    tktypes.HexBytes      `json:"data"`
 }
 
 type LockRecipient struct {

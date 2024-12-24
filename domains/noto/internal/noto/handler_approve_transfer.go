@@ -127,10 +127,17 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
+	lockedCoins, err := h.noto.gatherLockedCoins(ctx, h.decodeStates(params.Inputs), h.decodeStates(params.Outputs))
+	if err != nil {
+		return nil, err
+	}
 	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
+	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateLockOwners(ctx, tx, req, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
 		return nil, err
 	}
 
@@ -138,7 +145,7 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateApprovalSignature(ctx, req, transferHash); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req, transferHash); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{

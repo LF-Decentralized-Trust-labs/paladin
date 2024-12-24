@@ -66,4 +66,5 @@ var (
 	MsgNoBurning                   = ffe("PD200025", "Burn is not enabled")
 	MsgNoLockUpdate                = ffe("PD200026", "Lock updates are not allowed")
 	MsgLockNotFound                = ffe("PD200027", "Locked state not found: %s")
+	MsgArraysMustBeSameLength      = ffe("PD200028", "Arrays '%s' and '%s' must be the same length")
 )

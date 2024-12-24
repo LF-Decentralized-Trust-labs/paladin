@@ -149,12 +149,16 @@ func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	if err := h.noto.validateBurnAmounts(ctx, params, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
+	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	if err := h.noto.validateTransferSignature(ctx, tx, "sender", req, coins); err != nil {
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{

@@ -40,7 +40,6 @@ async function main(): Promise<boolean> {
     notary: cashIssuer,
     restrictMint: true,
     allowBurn: true,
-    allowUpdateLock: true,
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -114,7 +113,6 @@ async function main(): Promise<boolean> {
     },
     restrictMint: false,
     allowBurn: true,
-    allowUpdateLock: true,
   });
   if (!checkDeploy(notoBond)) return false;
 

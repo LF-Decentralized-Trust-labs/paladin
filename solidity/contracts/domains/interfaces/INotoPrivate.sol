@@ -31,14 +31,13 @@ interface INotoPrivate {
     function lock(
         bytes32 id,
         uint256 amount,
-        address delegate,
-        LockRecipient[] calldata recipients,
         bytes calldata data
     ) external;
 
-    function updateLock(
+    function unlock(
         bytes32 id,
-        LockRecipient[] calldata recipients,
+        string[] calldata to,
+        uint256[] calldata amounts,
         bytes calldata data
     ) external;
 

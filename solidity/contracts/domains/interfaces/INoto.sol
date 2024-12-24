@@ -20,27 +20,21 @@ interface INoto {
         bytes data
     );
 
-    event NotoLock(bytes32 locked, bytes signature, bytes data);
-    event NotoUpdateLock(bytes32 locked, bytes signature, bytes data);
-    event NotoUnlock(bytes32 locked, bytes32 outcome, bytes data);
+    event NotoLock(
+        bytes32[] inputs,
+        bytes32[] outputs,
+        bytes32[] lockedOutputs,
+        bytes signature,
+        bytes data
+    );
 
-    struct LockOutcome {
-        uint64 ref;
-        bytes32 state;
-    }
-
-    struct TransferParams {
-        bytes32[] inputs;
-        bytes32[] outputs;
-        bytes signature;
-    }
-
-    struct LockParams {
-        bytes32 locked;
-        LockOutcome[] outcomes;
-        address delegate;
-        bytes signature;
-    }
+    event NotoUnlock(
+        bytes32[] lockedInputs,
+        bytes32[] lockedOutputs,
+        bytes32[] outputs,
+        bytes signature,
+        bytes data
+    );
 
     function initialize(
         address notaryAddress,
@@ -54,48 +48,39 @@ interface INoto {
     ) external;
 
     function transfer(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
     ) external;
 
     function approveTransfer(
         address delegate,
         bytes32 txhash,
-        bytes memory signature,
-        bytes memory data
+        bytes calldata signature,
+        bytes calldata data
     ) external;
 
     function transferWithApproval(
-        bytes32[] memory inputs,
-        bytes32[] memory outputs,
-        bytes memory signature,
-        bytes memory data
-    ) external;
-
-    function createLock(
-        bytes32 locked,
-        LockOutcome[] calldata outcomes,
-        address delegate,
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
     ) external;
 
-    function transferAndLock(
-        TransferParams calldata transfer,
-        LockParams calldata lock,
-        bytes calldata data
-    ) external;
-
-    function updateLock(
-        bytes32 locked,
-        LockOutcome[] calldata outcomes,
+    function lock(
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes32[] calldata lockedOutputs,
         bytes calldata signature,
         bytes calldata data
     ) external;
 
-    function delegateLock(bytes32 locked, address delegate) external;
-
-    function unlock(bytes32 locked, uint64 outcome) external;
+    function unlock(
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
+    ) external;
 }
