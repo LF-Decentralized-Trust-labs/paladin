@@ -90,12 +90,12 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, err
 	}
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, outputCoins)
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.To})
 	if err != nil {
 		return nil, err
 	}
 
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.To})
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, outputCoins)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,11 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	if err := h.noto.validateTransferSignature(ctx, tx, "sender", req, coins); err != nil {
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, coins.outCoins)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{

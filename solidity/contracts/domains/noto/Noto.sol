@@ -26,7 +26,7 @@ import {INoto} from "../interfaces/INoto.sol";
 contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     address _notary;
     mapping(bytes32 => bool) private _unspent;
-    mapping(bytes32 => LockDetail) private _locks;
+    mapping(bytes32 => bool) private _locked;
     mapping(bytes32 => address) private _approvals;
 
     error NotoInvalidInput(bytes32 id);
@@ -39,13 +39,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         address sender
     );
     error NotoInvalidLockOutcome(bytes32 locked, uint64 outcome);
-
-    struct LockDetail {
-        bool initialized;
-        address delegate;
-        mapping(uint64 => bytes32) outcomes;
-        bytes data;
-    }
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V0 = 0x00010000;
@@ -122,7 +115,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      * @return unspent true or false depending on whether the identifier is in the unspent map
      */
     function isLocked(bytes32 id) public view returns (bool unspent) {
-        return _locks[id].initialized;
+        return _locked[id];
     }
 
     /**
@@ -285,114 +278,52 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev Create a new locked state that can only be unlocked by a specific delegate.
-     *      When the locked state is unlocked, it will be spent and replaced by exactly one new state from
-     *      a set of pre-approved outcomes.
-     *
-     * @param locked new output state to generate, representing locked value
-     * @param outcomes possible outcomes of the lock
-     * @param delegate the address that is authorized to unlock the lock
-     * @param signature EIP-712 signature on the original request that spawned this transaction
-     * @param data any additional transaction data (opaque to the blockchain)
+     * @dev Lock some value so it cannot be spent until it is unlocked.
      */
-    function createLock(
-        bytes32 locked,
-        LockOutcome[] calldata outcomes,
-        address delegate,
+    function lock(
+        bytes32[] calldata inputs,
+        bytes32[] calldata outputs,
+        bytes32[] calldata lockedOutputs,
         bytes calldata signature,
         bytes calldata data
     ) public virtual override onlyNotary {
-        LockDetail storage stored = _locks[locked];
-        for (uint256 i = 0; i < outcomes.length; i++) {
-            stored.outcomes[outcomes[i].ref] = outcomes[i].state;
-        }
-        stored.delegate = delegate;
-        stored.initialized = true;
-        stored.data = data;
-        emit NotoLock(locked, signature, data);
+        _checkInputs(inputs);
+        _checkOutputs(outputs);
+        _checkLockedOutputs(lockedOutputs);
+        emit NotoLock(inputs, outputs, lockedOutputs, signature, data);
     }
 
     /**
-     * @dev Perform a transfer and a lock simultaneously.
+     * @dev Unlock some value from a set of locked states.
      */
-    function transferAndLock(
-        TransferParams calldata transfer_,
-        LockParams calldata lock,
-        bytes calldata data
-    ) external virtual override onlyNotary {
-        _transfer(
-            transfer_.inputs,
-            transfer_.outputs,
-            transfer_.signature,
-            data
-        );
-        createLock(
-            lock.locked,
-            lock.outcomes,
-            lock.delegate,
-            lock.signature,
-            data
-        );
-    }
-
-    /**
-     * @dev Update the possible outcomes of a lock.
-     *
-     * @param locked locked state identifier
-     * @param outcomes outcomes to create or update
-     * @param signature EIP-712 signature on the original request that spawned this transaction
-     * @param data any additional transaction data (opaque to the blockchain)
-     */
-    function updateLock(
-        bytes32 locked,
-        LockOutcome[] calldata outcomes,
+    function unlock(
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual override onlyNotary {
-        LockDetail storage lock = _locks[locked];
-        for (uint256 i = 0; i < outcomes.length; i++) {
-            lock.outcomes[outcomes[i].ref] = outcomes[i].state;
-        }
-        emit NotoUpdateLock(locked, signature, data);
-    }
-
-    /**
-     * @dev Delegate ownership of the lock to a new party.
-     *
-     * @param locked locked state identifier
-     * @param delegate the address that is authorized to unlock the lock
-     */
-    function delegateLock(
-        bytes32 locked,
-        address delegate
     ) external virtual override {
-        LockDetail storage lock = _locks[locked];
-        if (lock.delegate != msg.sender) {
-            revert NotoInvalidLockDelegate(locked, lock.delegate, msg.sender);
-        }
-        lock.delegate = delegate;
+        _checkLockedInputs(lockedInputs);
+        _checkLockedOutputs(lockedOutputs);
+        _checkOutputs(outputs);
+        emit NotoUnlock(lockedInputs, lockedOutputs, outputs, signature, data);
     }
 
-    /**
-     * @dev Unlock a locked state and choose from one of the pre-approved outcomes.
-     *
-     * @param locked locked state identifier
-     * @param outcome reference to the chosen lock outcome
-     */
-    function unlock(bytes32 locked, uint64 outcome) external virtual override {
-        LockDetail storage lock = _locks[locked];
-        if (lock.delegate != msg.sender) {
-            revert NotoInvalidLockDelegate(locked, lock.delegate, msg.sender);
+    function _checkLockedInputs(bytes32[] memory inputs) internal {
+        for (uint256 i = 0; i < inputs.length; ++i) {
+            if (_locked[inputs[i]] == false) {
+                revert NotoInvalidInput(inputs[i]);
+            }
+            delete (_locked[inputs[i]]);
         }
-        if (lock.outcomes[outcome] == 0) {
-            revert NotoInvalidLockOutcome(locked, outcome);
+    }
+
+    function _checkLockedOutputs(bytes32[] memory outputs) internal {
+        for (uint256 i = 0; i < outputs.length; ++i) {
+            if (_locked[outputs[i]] == true) {
+                revert NotoInvalidOutput(outputs[i]);
+            }
+            _locked[outputs[i]] = true;
         }
-
-        bytes32[] memory outputs = new bytes32[](1);
-        outputs[0] = lock.outcomes[outcome];
-        _checkOutputs(outputs);
-
-        emit NotoUnlock(locked, lock.outcomes[outcome], lock.data);
-        delete _locks[locked];
     }
 }

@@ -57,7 +57,6 @@ async function main(): Promise<boolean> {
     },
     restrictMint: true,
     allowBurn: true,
-    allowUpdateLock: true,
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -76,14 +75,14 @@ async function main(): Promise<boolean> {
   const investorAdddress = await investor.address();
   receipt = await notoCash.using(paladin2).lock(investor, {
     id: lockId,
-    delegate: investorAdddress,
+    // delegate: investorAdddress,
     amount: 100,
-    recipients: [
-      {
-        ref: 0,
-        recipient: investorAdddress,
-      },
-    ],
+    // recipients: [
+    //   {
+    //     ref: 0,
+    //     recipient: investorAdddress,
+    //   },
+    // ],
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;

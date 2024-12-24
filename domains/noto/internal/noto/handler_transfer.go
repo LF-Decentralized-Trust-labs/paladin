@@ -161,7 +161,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
+	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
 
@@ -169,7 +169,11 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
-			if err := h.noto.validateTransferSignature(ctx, tx, "sender", req, coins); err != nil {
+			encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
+			if err != nil {
+				return nil, err
+			}
+			if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
 				return nil, err
 			}
 			return &prototk.EndorseTransactionResponse{
