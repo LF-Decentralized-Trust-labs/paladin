@@ -11,7 +11,7 @@ CREATE TABLE queued_msgs (
     "node"               TEXT    NOT NULL,
     "component"          TEXT    NOT NULL,
     "reply_to"           TEXT    NOT NULL,
-    "type"               TEXT    NOT NULL,
+    "msg_type"           TEXT    NOT NULL,
     "payload"            TEXT    ,
     PRIMARY KEY ("id")
 );
@@ -20,7 +20,7 @@ CREATE INDEX queued_msgs_node ON queued_msgs ("node");
 
 CREATE TABLE queued_msg_acks (
     "id"                 TEXT    NOT NULL,
-    "acked"              BIGINT  NOT NULL,
+    "time"               BIGINT  NOT NULL,
     PRIMARY KEY ("id"),
     FOREIGN KEY ("id") REFERENCES queued_msgs ("id") ON DELETE CASCADE
 );

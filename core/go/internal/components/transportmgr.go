@@ -19,19 +19,36 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+func (tma TransportMessage) Table() string {
+	return "queued_msgs"
+}
+
 type TransportMessage struct {
-	MessageID     uuid.UUID
-	CorrelationID *uuid.UUID
-	Component     string // The name of the component to route the message to once it arrives at the destination node
-	Node          string // The node id to send the message to
-	ReplyTo       string // The identity to respond to on the sending node
-	MessageType   string
-	Payload       []byte
+	MessageID            uuid.UUID         `json:"id"              gorm:"column:id,primaryKey"`
+	Created              tktypes.Timestamp `json:"created"         gorm:"column:created,autoCreateTime:false"` // generated in our code
+	CorrelationID        *uuid.UUID        `json:"correlationId"   gorm:"column:cid"`
+	Component            string            `json:"component"       gorm:"column:component"` // The name of the component to route the message to once it arrives at the destination node
+	Node                 string            `json:"node"            gorm:"column:node"`      // The node id to send the message to
+	ReplyTo              string            `json:"replyTo"         gorm:"column:reply_to"`  // The identity to respond to on the sending node
+	MessageType          string            `json:"messageType"     gorm:"column:msg_type"`
+	Payload              []byte            `json:"payload"         gorm:"column:payload"`
+	*TransportMessageAck `json:",inline"                           gorm:"foreignKey:pub_txn_id;references:pub_txn_id"`
+}
+
+func (tma TransportMessageAck) Table() string {
+	return "queued_msg_acks"
+}
+
+type TransportMessageAck struct {
+	MessageID uuid.UUID          `json:"-"                        gorm:"column:id,primaryKey"`
+	AckTime   *tktypes.Timestamp `json:"ackTime,omitempty"        gorm:"column:time,autoCreateTime:false"` // generated in our code
 }
 
 type TransportManagerToTransport interface {
@@ -88,8 +105,16 @@ type TransportManager interface {
 	// on delivery, and the target failing to process the message should be considered a possible
 	// situation to recover from (although not critical path).
 	//
-	// e.g. at-most-once delivery semantics
+	// at-most-once delivery semantics
 	Send(ctx context.Context, message *TransportMessage) error
+
+	// Sends a message with at-least-once delivery semantics
+	//
+	// The message is persisted to the DB in the supplied transaction, then sent on the wire with indefinite retry
+	// including over node restart, until an ack is returned from the remote node.
+	//
+	// The pre-commit handler must be called after the DB transaction commits to trigger the delivery.
+	SendReliable(ctx context.Context, dbTX *gorm.DB, msg *TransportMessage) (preCommit func(), err error)
 
 	// RegisterClient registers a client to receive messages from the transport manager
 	// messages are routed to the client based on the Destination field of the message matching the value returned from Destination() function of the TransportClient

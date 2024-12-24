@@ -25,10 +25,12 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type transportManager struct {
@@ -197,14 +199,15 @@ func (tm *transportManager) LocalNodeName() string {
 	return tm.localNodeName
 }
 
-// See docs in components package
-func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
+func (tm *transportManager) prepareNewMessage(ctx context.Context, msg *components.TransportMessage) (*peer, error) {
+	msg.Created = tktypes.TimestampNow()
+	msg.MessageID = uuid.New()
 
 	// Check the message is valid
 	if len(msg.MessageType) == 0 ||
 		len(msg.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msg)
-		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
 	if msg.ReplyTo == "" {
@@ -214,6 +217,17 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 	// Use or establish a peer connection for the send
 	peer, err := tm.getPeer(ctx, msg.Node)
 	if err != nil {
+		return nil, err
+	}
+
+	return peer, nil
+}
+
+// See docs in components package
+func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
+
+	peer, err := tm.prepareNewMessage(ctx, msg)
+	if err != nil {
 		return err
 	}
 
@@ -222,5 +236,25 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 	// However, the send is at-most-once, and the higher level message protocols that
 	// use this "send" must be fault tolerant to message loss.
 	return peer.send(ctx, msg)
+
+}
+
+// See docs in components package
+func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg *components.TransportMessage) (preCommit func(), err error) {
+
+	peer, err := tm.prepareNewMessage(ctx, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	err = dbTX.
+		WithContext(ctx).
+		Create(msg).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return peer.notifyPersistedMsgAvailable, nil
 
 }

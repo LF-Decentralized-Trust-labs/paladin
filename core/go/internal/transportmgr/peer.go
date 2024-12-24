@@ -20,7 +20,6 @@ import (
 	"context"
 	"sort"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
@@ -144,10 +143,6 @@ func (p *peer) send(ctx context.Context, msg *components.TransportMessage) error
 	var correlID *string
 	if msg.CorrelationID != nil {
 		correlID = confutil.P(msg.CorrelationID.String())
-	}
-	var zeroUUID uuid.UUID
-	if msg.MessageID == zeroUUID {
-		msg.MessageID = uuid.New()
 	}
 	pMsg := &prototk.Message{
 		MessageType:   msg.MessageType,
