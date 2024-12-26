@@ -47,6 +47,15 @@ var notoInterfaceJSON []byte
 //go:embed abis/INotoHooks.json
 var notoHooksJSON []byte
 
+var (
+	NotoTransfer       = "NotoTransfer"
+	NotoApproved       = "NotoApproved"
+	NotoLock           = "NotoLock"
+	NotoUnlock         = "NotoUnlock"
+	NotoPreparedUnlock = "NotoPreparedUnlock"
+)
+var allEvents = []string{NotoTransfer, NotoApproved, NotoLock, NotoUnlock, NotoPreparedUnlock}
+
 func NewNoto(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 	return &Noto{Callbacks: callbacks}
 }
@@ -54,18 +63,15 @@ func NewNoto(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
 type Noto struct {
 	Callbacks plugintk.DomainCallbacks
 
-	name              string
-	config            types.DomainConfig
-	chainID           int64
-	coinSchema        *prototk.StateSchema
-	lockedCoinSchema  *prototk.StateSchema
-	dataSchema        *prototk.StateSchema
-	factoryABI        abi.ABI
-	contractABI       abi.ABI
-	transferSignature string
-	approvedSignature string
-	lockSignature     string
-	unlockSignature   string
+	name             string
+	config           types.DomainConfig
+	chainID          int64
+	coinSchema       *prototk.StateSchema
+	lockedCoinSchema *prototk.StateSchema
+	dataSchema       *prototk.StateSchema
+	factoryABI       abi.ABI
+	contractABI      abi.ABI
+	eventSignatures  map[string]string
 }
 
 type NotoDeployParams struct {
@@ -103,6 +109,7 @@ type NotoApproveTransferParams struct {
 }
 
 type NotoLockParams struct {
+	LockID        tktypes.Bytes32  `json:"lockId"`
 	Inputs        []string         `json:"inputs"`
 	Outputs       []string         `json:"outputs"`
 	LockedOutputs []string         `json:"lockedOutputs"`
@@ -111,11 +118,19 @@ type NotoLockParams struct {
 }
 
 type NotoUnlockParams struct {
+	LockID        tktypes.Bytes32  `json:"lockId"`
 	LockedInputs  []string         `json:"lockedInputs"`
 	LockedOutputs []string         `json:"lockedOutputs"`
 	Outputs       []string         `json:"outputs"`
 	Signature     tktypes.HexBytes `json:"signature"`
 	Data          tktypes.HexBytes `json:"data"`
+}
+
+type NotoPrepareUnlockParams struct {
+	LockID    tktypes.Bytes32  `json:"lockId"`
+	TXHash    tktypes.HexBytes `json:"txhash"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
 }
 
 type NotoTransfer_Event struct {
@@ -133,6 +148,7 @@ type NotoApproved_Event struct {
 }
 
 type NotoLock_Event struct {
+	LockID        tktypes.Bytes32   `json:"lockId"`
 	Inputs        []tktypes.Bytes32 `json:"inputs"`
 	Outputs       []tktypes.Bytes32 `json:"outputs"`
 	LockedOutputs []tktypes.Bytes32 `json:"lockedOutputs"`
@@ -141,11 +157,19 @@ type NotoLock_Event struct {
 }
 
 type NotoUnlock_Event struct {
+	LockID        tktypes.Bytes32   `json:"lockId"`
 	LockedInputs  []tktypes.Bytes32 `json:"lockedInputs"`
 	LockedOutputs []tktypes.Bytes32 `json:"lockedOutputs"`
 	Outputs       []tktypes.Bytes32 `json:"outputs"`
 	Signature     tktypes.HexBytes  `json:"signature"`
 	Data          tktypes.HexBytes  `json:"data"`
+}
+
+type NotoPreparedUnlock_Event struct {
+	LockID    tktypes.Bytes32  `json:"lockId"`
+	TXHash    tktypes.Bytes32  `json:"txhash"`
+	Signature tktypes.HexBytes `json:"signature"`
+	Data      tktypes.HexBytes `json:"data"`
 }
 
 type parsedCoins struct {
@@ -209,21 +233,13 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 	n.factoryABI = factory.ABI
 	n.contractABI = contract.ABI
 
-	n.transferSignature, err = getEventSignature(ctx, contract.ABI, "NotoTransfer")
-	if err != nil {
-		return nil, err
-	}
-	n.approvedSignature, err = getEventSignature(ctx, contract.ABI, "NotoApproved")
-	if err != nil {
-		return nil, err
-	}
-	n.lockSignature, err = getEventSignature(ctx, contract.ABI, "NotoLock")
-	if err != nil {
-		return nil, err
-	}
-	n.unlockSignature, err = getEventSignature(ctx, contract.ABI, "NotoUnlock")
-	if err != nil {
-		return nil, err
+	n.eventSignatures = make(map[string]string, len(allEvents))
+	for _, eventName := range allEvents {
+		signature, err := getEventSignature(ctx, contract.ABI, eventName)
+		if err != nil {
+			return nil, err
+		}
+		n.eventSignatures[eventName] = signature
 	}
 
 	coinSchemaJSON, err := json.Marshal(types.NotoCoinABI)
@@ -703,7 +719,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 	var res prototk.HandleEventBatchResponse
 	for _, ev := range req.Events {
 		switch ev.SoliditySignature {
-		case n.transferSignature:
+		case n.eventSignatures[NotoTransfer]:
 			var transfer NotoTransfer_Event
 			if err := json.Unmarshal([]byte(ev.DataJson), &transfer); err == nil {
 				txData, err := n.decodeTransactionData(ctx, transfer.Data)
@@ -715,7 +731,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
 			}
 
-		case n.approvedSignature:
+		case n.eventSignatures[NotoApproved]:
 			var approved NotoApproved_Event
 			if err := json.Unmarshal([]byte(ev.DataJson), &approved); err == nil {
 				txData, err := n.decodeTransactionData(ctx, approved.Data)
@@ -725,7 +741,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				n.recordTransactionInfo(ev, txData, &res)
 			}
 
-		case n.lockSignature:
+		case n.eventSignatures[NotoLock]:
 			var lock NotoLock_Event
 			if err := json.Unmarshal([]byte(ev.DataJson), &lock); err == nil {
 				txData, err := n.decodeTransactionData(ctx, lock.Data)
@@ -738,7 +754,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, lock.LockedOutputs)...)
 			}
 
-		case n.unlockSignature:
+		case n.eventSignatures[NotoUnlock]:
 			var unlock NotoUnlock_Event
 			if err := json.Unmarshal([]byte(ev.DataJson), &unlock); err == nil {
 				txData, err := n.decodeTransactionData(ctx, unlock.Data)
@@ -749,6 +765,16 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedInputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedOutputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.Outputs)...)
+			}
+
+		case n.eventSignatures[NotoPreparedUnlock]:
+			var unlockApproved NotoPreparedUnlock_Event
+			if err := json.Unmarshal([]byte(ev.DataJson), &unlockApproved); err == nil {
+				txData, err := n.decodeTransactionData(ctx, unlockApproved.Data)
+				if err != nil {
+					return nil, err
+				}
+				n.recordTransactionInfo(ev, txData, &res)
 			}
 		}
 	}

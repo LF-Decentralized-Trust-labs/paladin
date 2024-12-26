@@ -41,8 +41,8 @@ func (h *lockHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
 		return nil, err
 	}
-	if lockParams.ID.IsZero() {
-		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "id")
+	if lockParams.LockID.IsZero() {
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
 	}
 	if lockParams.Amount == nil || lockParams.Amount.Int().Sign() != 1 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterGreaterThanZero, "amount")
@@ -86,7 +86,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	if err != nil {
 		return nil, err
 	}
-	lockedOutputCoins, outputStates, err := h.noto.prepareLockedOutputs(params.ID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
+	lockedOutputCoins, outputStates, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,9 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *lockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.LockParams)
+
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -200,6 +202,7 @@ func (h *lockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoLockParams{
+		LockID:        inParams.LockID,
 		Inputs:        inputs,
 		Outputs:       remainderOutputs,
 		LockedOutputs: []string{lockedOutput.String()},
@@ -230,7 +233,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 	}
 	params := &LockHookParams{
 		Sender: fromAddress,
-		ID:     inParams.ID,
+		ID:     inParams.LockID,
 		From:   fromAddress,
 		Amount: inParams.Amount,
 		Data:   inParams.Data,
@@ -258,7 +261,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 }
 
 func (h *lockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

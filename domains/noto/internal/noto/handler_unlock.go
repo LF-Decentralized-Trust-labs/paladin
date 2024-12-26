@@ -41,8 +41,8 @@ func (h *unlockHandler) ValidateParams(ctx context.Context, config *types.NotoPa
 	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
 		return nil, err
 	}
-	if lockParams.ID.IsZero() {
-		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "id")
+	if lockParams.LockID.IsZero() {
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
 	}
 	if len(lockParams.To) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
@@ -104,7 +104,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 		requiredTotal = requiredTotal.Add(requiredTotal, amount.Int())
 	}
 
-	lockedInputCoins, inputStates, selectedTotal, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.ID, requiredTotal)
+	lockedInputCoins, inputStates, selectedTotal, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, requiredTotal)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	lockedOutputCoins := []*types.NotoLockedCoin{}
 	if selectedTotal.Cmp(requiredTotal) == 1 {
 		remainder := big.NewInt(0).Sub(selectedTotal, requiredTotal)
-		coins, states, err := h.noto.prepareLockedOutputs(params.ID, fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+		coins, states, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +208,9 @@ func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction
 	}, nil
 }
 
-func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.UnlockParams)
+
 	lockedInput := req.InputStates[0].Id
 	unlockedOutput := req.OutputStates[0].Id
 	lockedOutputs := make([]string, len(req.OutputStates)-1)
@@ -228,6 +230,7 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 		return nil, err
 	}
 	params := &NotoUnlockParams{
+		LockID:        inParams.LockID,
 		LockedInputs:  []string{lockedInput},
 		LockedOutputs: lockedOutputs,
 		Outputs:       []string{unlockedOutput},
@@ -245,7 +248,7 @@ func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepa
 }
 
 func (h *unlockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}

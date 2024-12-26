@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -60,22 +59,10 @@ func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *approveHandler) transferHash(ctx context.Context, tx *types.ParsedTransaction, params *types.ApproveParams) (ethtypes.HexBytes0xPrefix, error) {
-	inputs := make([]any, len(params.Inputs))
-	for i, state := range params.Inputs {
-		inputs[i] = state.ID
-	}
-	outputs := make([]any, len(params.Outputs))
-	for i, state := range params.Outputs {
-		outputs[i] = state.ID
-	}
-	return h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inputs, outputs, params.Data)
-}
-
 func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.ApproveParams)
 	notary := tx.DomainConfig.NotaryLookup
-	transferHash, err := h.transferHash(ctx, tx, params)
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +128,7 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 		return nil, err
 	}
 
-	transferHash, err := h.transferHash(ctx, tx, params)
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +142,7 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 
 func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.ApproveParams)
-	transferHash, err := h.transferHash(ctx, tx, inParams)
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inParams.Inputs, inParams.Outputs, inParams.Data)
 	if err != nil {
 		return nil, err
 	}
