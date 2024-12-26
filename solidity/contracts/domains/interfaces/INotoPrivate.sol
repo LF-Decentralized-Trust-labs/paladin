@@ -29,22 +29,24 @@ interface INotoPrivate {
     ) external;
 
     function lock(
-        bytes32 id,
+        bytes32 lockId,
         uint256 amount,
         bytes calldata data
     ) external;
 
     function unlock(
-        bytes32 id,
+        bytes32 lockId,
         string[] calldata to,
         uint256[] calldata amounts,
         bytes calldata data
     ) external;
 
-    struct LockRecipient {
-        uint64 ref;
-        string recipient;
-    }
+    function prepareUnlock(
+        bytes32 lockId,
+        string[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external;
 
     struct StateEncoded {
         bytes id;

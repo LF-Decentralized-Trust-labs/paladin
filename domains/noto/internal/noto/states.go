@@ -26,6 +26,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -90,6 +91,16 @@ var NotoUnlockTypeSet = eip712.TypeSet{
 	},
 	"LockedCoin":        NotoLockedCoinType,
 	"Coin":              NotoCoinType,
+	eip712.EIP712Domain: EIP712DomainType,
+}
+
+var NotoUnlockMaskedTypeSet = eip712.TypeSet{
+	"Unlock": {
+		{Name: "lockedInputs", Type: "bytes32[]"},
+		{Name: "lockedOutputs", Type: "bytes32[]"},
+		{Name: "outputs", Type: "bytes32[]"},
+		{Name: "data", Type: "bytes"},
+	},
 	eip712.EIP712Domain: EIP712DomainType,
 }
 
@@ -324,6 +335,22 @@ func (n *Noto) encodeNotoLockedCoins(coins []*types.NotoLockedCoin) []any {
 	return encodedCoins
 }
 
+func (n *Noto) encodedStateIDs(states []*pldapi.StateEncoded) []any {
+	inputs := make([]any, len(states))
+	for i, state := range states {
+		inputs[i] = state.ID
+	}
+	return inputs
+}
+
+func (n *Noto) endorsableStateIDs(states []*prototk.EndorsableState) []any {
+	inputs := make([]any, len(states))
+	for i, state := range states {
+		inputs[i] = state.Id
+	}
+	return inputs
+}
+
 func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferUnmaskedTypeSet,
@@ -336,14 +363,14 @@ func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Ad
 	})
 }
 
-func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []any, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*pldapi.StateEncoded, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
 		Types:       NotoTransferMaskedTypeSet,
 		PrimaryType: "Transfer",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]any{
-			"inputs":  inputs,
-			"outputs": outputs,
+			"inputs":  n.encodedStateIDs(inputs),
+			"outputs": n.encodedStateIDs(outputs),
 			"data":    data,
 		},
 	})
@@ -371,6 +398,20 @@ func (n *Noto) encodeUnlock(ctx context.Context, contract *ethtypes.Address0xHex
 			"lockedInputs":  n.encodeNotoLockedCoins(lockedInputs),
 			"lockedOutputs": n.encodeNotoLockedCoins(lockedOutputs),
 			"outputs":       n.encodeNotoCoins(outputs),
+		},
+	})
+}
+
+func (n *Noto) encodeUnlockMasked(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
+		Types:       NotoUnlockMaskedTypeSet,
+		PrimaryType: "Unlock",
+		Domain:      n.eip712Domain(contract),
+		Message: map[string]any{
+			"lockedInputs":  n.endorsableStateIDs(lockedInputs),
+			"lockedOutputs": n.endorsableStateIDs(lockedOutputs),
+			"outputs":       n.endorsableStateIDs(outputs),
+			"data":          data,
 		},
 	})
 }

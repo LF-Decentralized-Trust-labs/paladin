@@ -69,21 +69,16 @@ type ApproveParams struct {
 }
 
 type LockParams struct {
-	ID     tktypes.Bytes32     `json:"id"`
+	LockID tktypes.Bytes32     `json:"lockId"`
 	Amount *tktypes.HexUint256 `json:"amount"`
 	Data   tktypes.HexBytes    `json:"data"`
 }
 
 type UnlockParams struct {
-	ID      tktypes.Bytes32       `json:"id"`
+	LockID  tktypes.Bytes32       `json:"lockId"`
 	To      []string              `json:"to"`
 	Amounts []*tktypes.HexUint256 `json:"amounts"`
 	Data    tktypes.HexBytes      `json:"data"`
-}
-
-type LockRecipient struct {
-	Ref       tktypes.HexUint64 `json:"ref"`
-	Recipient string            `json:"recipient"`
 }
 
 type ApproveExtraParams struct {

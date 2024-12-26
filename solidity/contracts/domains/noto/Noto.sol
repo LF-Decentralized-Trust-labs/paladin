@@ -26,19 +26,27 @@ import {INoto} from "../interfaces/INoto.sol";
 contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     address _notary;
     mapping(bytes32 => bool) private _unspent;
-    mapping(bytes32 => bool) private _locked;
     mapping(bytes32 => address) private _approvals;
+    mapping(bytes32 => LockDetail) private _locks;
 
     error NotoInvalidInput(bytes32 id);
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
+    error NotoInvalidLock(bytes32 lockId);
     error NotoInvalidLockDelegate(
-        bytes32 locked,
+        bytes32 lockId,
         address delegate,
         address sender
     );
-    error NotoInvalidLockOutcome(bytes32 locked, uint64 outcome);
+    error NotoUnlockNotPrepared(bytes32 lockId, bytes32 txhash);
+
+    struct LockDetail {
+        uint256 stateCount;
+        mapping(bytes32 => bool) states;
+        mapping(bytes32 => bool) prepared;
+        address delegate;
+    }
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
     bytes4 public constant NotoConfigID_V0 = 0x00010000;
@@ -53,6 +61,10 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     bytes32 private constant TRANSFER_TYPEHASH =
         keccak256("Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)");
+    bytes32 private constant UNLOCK_TYPEHASH =
+        keccak256(
+            "Unlock(bytes32[] lockedInputs,bytes32[] lockedOutputs,bytes32[] outputs,bytes data)"
+        );
 
     function requireNotary(address addr) internal view {
         if (addr != _notary) {
@@ -111,11 +123,15 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     /**
      * @dev query whether a TXO is currently in the locked list
-     * @param id the UTXO identifier
-     * @return unspent true or false depending on whether the identifier is in the unspent map
+     * @param lockId the lock identifier
+     * @param state the UTXO identifier
+     * @return locked true or false depending on whether the identifier is in the locked map
      */
-    function isLocked(bytes32 id) public view returns (bool unspent) {
-        return _locked[id];
+    function isLocked(
+        bytes32 lockId,
+        bytes32 state
+    ) public view returns (bool locked) {
+        return _locks[lockId].states[state];
     }
 
     /**
@@ -251,7 +267,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         bytes calldata signature,
         bytes calldata data
     ) public {
-        bytes32 txhash = _buildTXHash(inputs, outputs, data);
+        bytes32 txhash = _buildTransferHash(inputs, outputs, data);
         if (_approvals[txhash] != msg.sender) {
             revert NotoInvalidDelegate(txhash, _approvals[txhash], msg.sender);
         }
@@ -261,7 +277,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         delete _approvals[txhash];
     }
 
-    function _buildTXHash(
+    function _buildTransferHash(
         bytes32[] calldata inputs,
         bytes32[] calldata outputs,
         bytes calldata data
@@ -279,51 +295,191 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     /**
      * @dev Lock some value so it cannot be spent until it is unlocked.
+     *
+     * @param lockId the unique identifier for this lock
+     * @param inputs array of zero or more outputs of a previous function call against this
+     *      contract that have not yet been spent, and the signer is authorized to spend
+     * @param outputs array of zero or more new outputs to generate, for future transactions to spend
+     * @param lockedOutputs array of zero or more locked outputs to generate, which will be tied to the lock ID
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
      */
     function lock(
+        bytes32 lockId,
         bytes32[] calldata inputs,
         bytes32[] calldata outputs,
         bytes32[] calldata lockedOutputs,
         bytes calldata signature,
         bytes calldata data
     ) public virtual override onlyNotary {
+        if (_locks[lockId].stateCount > 0) {
+            revert NotoInvalidLock(lockId);
+        }
         _checkInputs(inputs);
         _checkOutputs(outputs);
-        _checkLockedOutputs(lockedOutputs);
-        emit NotoLock(inputs, outputs, lockedOutputs, signature, data);
+        _checkLockedOutputs(lockId, lockedOutputs);
+        emit NotoLock(lockId, inputs, outputs, lockedOutputs, signature, data);
     }
 
     /**
      * @dev Unlock some value from a set of locked states.
+     *
+     * @param lockId the unique identifier for the lock
+     * @param lockedInputs array of zero or more locked outputs of a previous function call
+     * @param lockedOutputs array of zero or more locked outputs to generate, which will be tied to the lock ID
+     * @param outputs array of zero or more new unlocked outputs to generate, for future transactions to spend
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
      */
     function unlock(
+        bytes32 lockId,
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
+        bytes calldata signature,
+        bytes calldata data
+    ) external virtual override onlyNotary {
+        _unlock(lockId, lockedInputs, lockedOutputs, outputs);
+        emit NotoUnlock(
+            lockId,
+            lockedInputs,
+            lockedOutputs,
+            outputs,
+            signature,
+            data
+        );
+    }
+
+    function _unlock(
+        bytes32 lockId,
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs
+    ) internal {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.stateCount == 0) {
+            revert NotoInvalidLock(lockId);
+        }
+
+        _checkLockedInputs(lockId, lockedInputs);
+        _checkLockedOutputs(lockId, lockedOutputs);
+        _checkOutputs(outputs);
+
+        if (lock_.stateCount == 0) {
+            delete _locks[lockId];
+        }
+    }
+
+    /**
+     * @dev Prepare an unlock operation that can be triggered later by the lock delegate.
+     *
+     * @param lockId the unique identifier for the lock
+     * @param txhash the transaction hash
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
+     */
+    function prepareUnlock(
+        bytes32 lockId,
+        bytes32 txhash,
+        bytes calldata signature,
+        bytes calldata data
+    ) external virtual override onlyNotary {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.stateCount == 0) {
+            revert NotoInvalidLock(lockId);
+        }
+        lock_.prepared[txhash] = true;
+        emit NotoPreparedUnlock(lockId, txhash, signature, data);
+    }
+
+    function delegateLock(
+        bytes32 lockId,
+        address delegate
+    ) external virtual onlyNotary {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.stateCount == 0) {
+            revert NotoInvalidLock(lockId);
+        }
+        lock_.delegate = delegate;
+    }
+
+    function unlockWithApproval(
+        bytes32 lockId,
         bytes32[] calldata lockedInputs,
         bytes32[] calldata lockedOutputs,
         bytes32[] calldata outputs,
         bytes calldata signature,
         bytes calldata data
     ) external virtual override {
-        _checkLockedInputs(lockedInputs);
-        _checkLockedOutputs(lockedOutputs);
-        _checkOutputs(outputs);
-        emit NotoUnlock(lockedInputs, lockedOutputs, outputs, signature, data);
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
+        }
+
+        bytes32 txhash = _buildUnlockHash(
+            lockedInputs,
+            lockedOutputs,
+            outputs,
+            data
+        );
+        if (!lock_.prepared[txhash]) {
+            revert NotoUnlockNotPrepared(lockId, txhash);
+        }
+        delete lock_.prepared[txhash];
+
+        _unlock(lockId, lockedInputs, lockedOutputs, outputs);
+
+        emit NotoDelegateUnlock(
+            lockId,
+            msg.sender,
+            lockedInputs,
+            lockedOutputs,
+            outputs,
+            signature,
+            data
+        );
     }
 
-    function _checkLockedInputs(bytes32[] memory inputs) internal {
+    function _buildUnlockHash(
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
+        bytes calldata data
+    ) internal view returns (bytes32) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                UNLOCK_TYPEHASH,
+                keccak256(abi.encodePacked(lockedInputs)),
+                keccak256(abi.encodePacked(lockedOutputs)),
+                keccak256(abi.encodePacked(outputs)),
+                keccak256(data)
+            )
+        );
+        return _hashTypedDataV4(structHash);
+    }
+
+    function _checkLockedInputs(bytes32 id, bytes32[] memory inputs) internal {
+        LockDetail storage lock_ = _locks[id];
         for (uint256 i = 0; i < inputs.length; ++i) {
-            if (_locked[inputs[i]] == false) {
+            if (lock_.states[inputs[i]] == false) {
                 revert NotoInvalidInput(inputs[i]);
             }
-            delete (_locked[inputs[i]]);
+            delete (lock_.states[inputs[i]]);
+            lock_.stateCount--;
         }
     }
 
-    function _checkLockedOutputs(bytes32[] memory outputs) internal {
+    function _checkLockedOutputs(
+        bytes32 id,
+        bytes32[] memory outputs
+    ) internal {
+        LockDetail storage lock_ = _locks[id];
         for (uint256 i = 0; i < outputs.length; ++i) {
-            if (_locked[outputs[i]] == true) {
+            if (lock_.states[outputs[i]] == true) {
                 revert NotoInvalidOutput(outputs[i]);
             }
-            _locked[outputs[i]] = true;
+            lock_.states[outputs[i]] = true;
+            lock_.stateCount++;
         }
     }
 }
