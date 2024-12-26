@@ -44,7 +44,8 @@ var NotoCoinABI = &abi.Parameter{
 }
 
 type NotoLockedCoin struct {
-	ID     tktypes.Bytes32     `json:"id"`
+	Salt   tktypes.Bytes32     `json:"salt"`
+	LockID tktypes.Bytes32     `json:"lockId"`
 	Owner  *tktypes.EthAddress `json:"owner"`
 	Amount *tktypes.HexUint256 `json:"amount"`
 }
@@ -53,7 +54,8 @@ var NotoLockedCoinABI = &abi.Parameter{
 	Type:         "tuple",
 	InternalType: "struct NotoLockedCoin",
 	Components: abi.ParameterArray{
-		{Name: "id", Type: "bytes32", Indexed: true},
+		{Name: "salt", Type: "bytes32"},
+		{Name: "lockId", Type: "bytes32", Indexed: true},
 		{Name: "owner", Type: "string"},
 		{Name: "amount", Type: "uint256"},
 	},
