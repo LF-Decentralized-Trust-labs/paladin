@@ -33,23 +33,33 @@ import (
 
 var EIP712DomainName = "noto"
 var EIP712DomainVersion = "0.0.1"
+var EIP712DomainType = eip712.Type{
+	{Name: "name", Type: "string"},
+	{Name: "version", Type: "string"},
+	{Name: "chainId", Type: "uint256"},
+	{Name: "verifyingContract", Type: "address"},
+}
+
+var NotoCoinType = eip712.Type{
+	{Name: "salt", Type: "bytes32"},
+	{Name: "owner", Type: "address"},
+	{Name: "amount", Type: "uint256"},
+}
+
+var NotoLockedCoinType = eip712.Type{
+	{Name: "salt", Type: "bytes32"},
+	{Name: "lockId", Type: "bytes32"},
+	{Name: "owner", Type: "address"},
+	{Name: "amount", Type: "uint256"},
+}
 
 var NotoTransferUnmaskedTypeSet = eip712.TypeSet{
 	"Transfer": {
 		{Name: "inputs", Type: "Coin[]"},
 		{Name: "outputs", Type: "Coin[]"},
 	},
-	"Coin": {
-		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "amount", Type: "uint256"},
-	},
-	eip712.EIP712Domain: {
-		{Name: "name", Type: "string"},
-		{Name: "version", Type: "string"},
-		{Name: "chainId", Type: "uint256"},
-		{Name: "verifyingContract", Type: "address"},
-	},
+	"Coin":              NotoCoinType,
+	eip712.EIP712Domain: EIP712DomainType,
 }
 
 var NotoTransferMaskedTypeSet = eip712.TypeSet{
@@ -58,12 +68,7 @@ var NotoTransferMaskedTypeSet = eip712.TypeSet{
 		{Name: "outputs", Type: "bytes32[]"},
 		{Name: "data", Type: "bytes"},
 	},
-	eip712.EIP712Domain: {
-		{Name: "name", Type: "string"},
-		{Name: "version", Type: "string"},
-		{Name: "chainId", Type: "uint256"},
-		{Name: "verifyingContract", Type: "address"},
-	},
+	eip712.EIP712Domain: EIP712DomainType,
 }
 
 var NotoLockTypeSet = eip712.TypeSet{
@@ -72,22 +77,9 @@ var NotoLockTypeSet = eip712.TypeSet{
 		{Name: "outputs", Type: "Coin[]"},
 		{Name: "lockedOutputs", Type: "LockedCoin[]"},
 	},
-	"LockedCoin": {
-		{Name: "id", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "amount", Type: "uint256"},
-	},
-	"Coin": {
-		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "amount", Type: "uint256"},
-	},
-	eip712.EIP712Domain: {
-		{Name: "name", Type: "string"},
-		{Name: "version", Type: "string"},
-		{Name: "chainId", Type: "uint256"},
-		{Name: "verifyingContract", Type: "address"},
-	},
+	"LockedCoin":        NotoLockedCoinType,
+	"Coin":              NotoCoinType,
+	eip712.EIP712Domain: EIP712DomainType,
 }
 
 var NotoUnlockTypeSet = eip712.TypeSet{
@@ -96,22 +88,9 @@ var NotoUnlockTypeSet = eip712.TypeSet{
 		{Name: "lockedOutputs", Type: "LockedCoin[]"},
 		{Name: "outputs", Type: "Coin[]"},
 	},
-	"LockedCoin": {
-		{Name: "id", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "amount", Type: "uint256"},
-	},
-	"Coin": {
-		{Name: "salt", Type: "bytes32"},
-		{Name: "owner", Type: "address"},
-		{Name: "amount", Type: "uint256"},
-	},
-	eip712.EIP712Domain: {
-		{Name: "name", Type: "string"},
-		{Name: "version", Type: "string"},
-		{Name: "chainId", Type: "uint256"},
-		{Name: "verifyingContract", Type: "address"},
-	},
+	"LockedCoin":        NotoLockedCoinType,
+	"Coin":              NotoCoinType,
+	eip712.EIP712Domain: EIP712DomainType,
 }
 
 func (n *Noto) unmarshalCoin(stateData string) (*types.NotoCoin, error) {
@@ -207,7 +186,7 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 	}
 }
 
-func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, id tktypes.Bytes32, amount *big.Int) ([]*types.NotoLockedCoin, []*prototk.StateRef, *big.Int, error) {
+func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, amount *big.Int) ([]*types.NotoLockedCoin, []*prototk.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -216,7 +195,7 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
 			Sort(".created").
-			Equal("id", id)
+			Equal("lockId", lockID)
 
 		if lastStateTimestamp > 0 {
 			queryBuilder.GreaterThan(".created", lastStateTimestamp)
@@ -267,7 +246,8 @@ func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.Et
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoLockedCoin{
-		ID:     id,
+		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		LockID: id,
 		Owner:  ownerAddress,
 		Amount: amount,
 	}
@@ -335,7 +315,8 @@ func (n *Noto) encodeNotoLockedCoins(coins []*types.NotoLockedCoin) []any {
 	encodedCoins := make([]any, len(coins))
 	for i, coin := range coins {
 		encodedCoins[i] = map[string]any{
-			"id":     coin.ID,
+			"salt":   coin.Salt,
+			"lockId": coin.LockID,
 			"owner":  coin.Owner,
 			"amount": coin.Amount.String(),
 		}
