@@ -86,7 +86,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	outputCoins, outputStates, err := h.noto.prepareOutputs(toAddress, params.Amount, []string{notary, params.To})
+	outputStates, err := h.noto.prepareOutputs(toAddress, params.Amount, []string{notary, params.To})
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, outputCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, outputStates.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			OutputStates: outputStates,
+			OutputStates: outputStates.states,
 			InfoStates:   infoStates,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{

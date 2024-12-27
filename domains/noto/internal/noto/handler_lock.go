@@ -82,11 +82,18 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
+	inputStates, revert, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
 	if err != nil {
+		if revert {
+			message := err.Error()
+			return &prototk.AssembleTransactionResponse{
+				AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+				RevertReason:   &message,
+			}, nil
+		}
 		return nil, err
 	}
-	lockedOutputCoins, outputStates, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
+	lockedOutputStates, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
@@ -95,18 +102,21 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		return nil, err
 	}
 
+	var outputStates []*prototk.NewState
+	outputStates = append(outputStates, lockedOutputStates.states...)
+
 	unlockedOutputCoins := []*types.NotoCoin{}
-	if total.Cmp(params.Amount.Int()) == 1 {
-		remainder := big.NewInt(0).Sub(total, params.Amount.Int())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+	if inputStates.total.Cmp(params.Amount.Int()) == 1 {
+		remainder := big.NewInt(0).Sub(inputStates.total, params.Amount.Int())
+		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
-		unlockedOutputCoins = append(unlockedOutputCoins, returnedCoins...)
-		outputStates = append(outputStates, returnedStates...)
+		unlockedOutputCoins = append(unlockedOutputCoins, returnedStates.coins...)
+		outputStates = append(outputStates, returnedStates.states...)
 	}
 
-	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputCoins, unlockedOutputCoins, lockedOutputCoins)
+	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputStates.coins, unlockedOutputCoins, lockedOutputStates.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +145,7 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			InputStates:  inputStates,
+			InputStates:  inputStates.states,
 			OutputStates: outputStates,
 			InfoStates:   infoStates,
 		},

@@ -151,7 +151,29 @@ func (n *Noto) makeNewInfoState(info *types.TransactionData, distributionList []
 	}, nil
 }
 
-func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owner *tktypes.EthAddress, amount *tktypes.HexUint256) ([]*types.NotoCoin, []*prototk.StateRef, *big.Int, error) {
+type preparedInputs struct {
+	coins  []*types.NotoCoin
+	states []*prototk.StateRef
+	total  *big.Int
+}
+
+type preparedLockedInputs struct {
+	coins  []*types.NotoLockedCoin
+	states []*prototk.StateRef
+	total  *big.Int
+}
+
+type preparedOutputs struct {
+	coins  []*types.NotoCoin
+	states []*prototk.NewState
+}
+
+type preparedLockedOutputs struct {
+	coins  []*types.NotoLockedCoin
+	states []*prototk.NewState
+}
+
+func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owner *tktypes.EthAddress, amount *tktypes.HexUint256) (inputs *preparedInputs, revert bool, err error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -169,18 +191,17 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 
 		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
 		states, err := n.findAvailableStates(ctx, stateQueryContext, queryBuilder.Query().String())
-
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, false, err
 		}
 		if len(states) == 0 {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
+			return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
 		}
 		for _, state := range states {
 			lastStateTimestamp = state.CreatedAt
 			coin, err := n.unmarshalCoin(state.DataJson)
 			if err != nil {
-				return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
+				return nil, false, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
 			}
 			total = total.Add(total, coin.Amount.Int())
 			stateRefs = append(stateRefs, &prototk.StateRef{
@@ -190,13 +211,17 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 			coins = append(coins, coin)
 			log.L(ctx).Debugf("Selecting coin %s value=%s total=%s required=%s)", state.Id, coin.Amount.Int().Text(10), total.Text(10), amount.Int().Text(10))
 			if total.Cmp(amount.Int()) >= 0 {
-				return coins, stateRefs, total, nil
+				return &preparedInputs{
+					coins:  coins,
+					states: stateRefs,
+					total:  total,
+				}, false, nil
 			}
 		}
 	}
 }
 
-func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, owner *tktypes.EthAddress, amount *big.Int) ([]*types.NotoLockedCoin, []*prototk.StateRef, *big.Int, error) {
+func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, owner *tktypes.EthAddress, amount *big.Int) (inputs *preparedLockedInputs, revert bool, err error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -213,19 +238,19 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 		}
 
 		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
-		states, err := n.findLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
+		states, err := n.findAvailableLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
 
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, false, err
 		}
 		if len(states) == 0 {
-			return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
+			return nil, true, i18n.NewError(ctx, msgs.MsgInsufficientFunds, total.Text(10))
 		}
 		for _, state := range states {
 			lastStateTimestamp = state.CreatedAt
 			coin, err := n.unmarshalLockedCoin(state.DataJson)
 			if err != nil {
-				return nil, nil, nil, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
+				return nil, false, i18n.NewError(ctx, msgs.MsgInvalidStateData, state.Id, err)
 			}
 			total = total.Add(total, coin.Amount.Int())
 			stateRefs = append(stateRefs, &prototk.StateRef{
@@ -235,13 +260,17 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 			coins = append(coins, coin)
 			log.L(ctx).Debugf("Selecting coin %s value=%s total=%s required=%s)", state.Id, coin.Amount.Int().Text(10), total.Text(10), amount.Text(10))
 			if total.Cmp(amount) >= 0 {
-				return coins, stateRefs, total, nil
+				return &preparedLockedInputs{
+					coins:  coins,
+					states: stateRefs,
+					total:  total,
+				}, false, nil
 			}
 		}
 	}
 }
 
-func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) ([]*types.NotoCoin, []*prototk.NewState, error) {
+func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) (*preparedOutputs, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoCoin{
@@ -250,10 +279,13 @@ func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.
 		Amount: amount,
 	}
 	newState, err := n.makeNewCoinState(newCoin, distributionList)
-	return []*types.NotoCoin{newCoin}, []*prototk.NewState{newState}, err
+	return &preparedOutputs{
+		coins:  []*types.NotoCoin{newCoin},
+		states: []*prototk.NewState{newState},
+	}, err
 }
 
-func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) ([]*types.NotoLockedCoin, []*prototk.NewState, error) {
+func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.EthAddress, amount *tktypes.HexUint256, distributionList []string) (*preparedLockedOutputs, error) {
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoLockedCoin{
@@ -263,7 +295,10 @@ func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.Et
 		Amount: amount,
 	}
 	newState, err := n.makeNewLockedCoinState(newCoin, distributionList)
-	return []*types.NotoLockedCoin{newCoin}, []*prototk.NewState{newState}, err
+	return &preparedLockedOutputs{
+		coins:  []*types.NotoLockedCoin{newCoin},
+		states: []*prototk.NewState{newState},
+	}, err
 }
 
 func (n *Noto) prepareInfo(data tktypes.HexBytes, distributionList []string) ([]*prototk.NewState, error) {
@@ -297,7 +332,7 @@ func (n *Noto) eip712Domain(contract *ethtypes.Address0xHex) map[string]any {
 	}
 }
 
-func (n *Noto) findLockedStates(ctx context.Context, stateQueryContext, query string) ([]*prototk.StoredState, error) {
+func (n *Noto) findAvailableLockedStates(ctx context.Context, stateQueryContext, query string) ([]*prototk.StoredState, error) {
 	req := &prototk.FindAvailableStatesRequest{
 		StateQueryContext: stateQueryContext,
 		SchemaId:          n.lockedCoinSchema.Id,
