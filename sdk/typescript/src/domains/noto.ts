@@ -69,19 +69,17 @@ export interface NotoBurnParams {
 }
 
 export interface NotoLockParams {
-  id: string;
+  lockId: string;
   amount: string | number;
   data: string;
 }
 
 export interface NotoUnlockParams {
-  locked: string;
-  outcome: string | number;
-}
-
-export interface LockRecipient {
-  ref: number;
-  recipient: string;
+  lockId: string;
+  from: PaladinVerifier;
+  to: PaladinVerifier[];
+  amounts: (string | number)[];
+  data: string;
 }
 
 export interface NotoApproveTransferParams {
@@ -234,12 +232,16 @@ export class NotoInstance {
 
   async unlock(from: PaladinVerifier, data: NotoUnlockParams) {
     const txID = await this.paladin.sendTransaction({
-      type: TransactionType.PUBLIC,
-      abi: notoJSON.abi,
+      type: TransactionType.PRIVATE,
+      abi: notoPrivateJSON.abi,
       function: "unlock",
       to: this.address,
       from: from.lookup,
-      data,
+      data: {
+        ...data,
+        from: data.from.lookup,
+        to: data.to.map((to) => to.lookup),
+      },
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
