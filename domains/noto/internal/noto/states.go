@@ -94,11 +94,10 @@ var NotoUnlockTypeSet = eip712.TypeSet{
 	eip712.EIP712Domain: EIP712DomainType,
 }
 
-var NotoUnlockMaskedTypeSet = eip712.TypeSet{
-	"Unlock": {
-		{Name: "lockedInputs", Type: "bytes32[]"},
-		{Name: "lockedOutputs", Type: "bytes32[]"},
-		{Name: "outputs", Type: "bytes32[]"},
+var NotoApproveUnlockTypeSet = eip712.TypeSet{
+	"ApproveUnlock": {
+		{Name: "lockId", Type: "bytes32"},
+		{Name: "delegate", Type: "address"},
 		{Name: "data", Type: "bytes"},
 	},
 	eip712.EIP712Domain: EIP712DomainType,
@@ -197,7 +196,7 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 	}
 }
 
-func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, amount *big.Int) ([]*types.NotoLockedCoin, []*prototk.StateRef, *big.Int, error) {
+func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string, lockID tktypes.Bytes32, owner *tktypes.EthAddress, amount *big.Int) ([]*types.NotoLockedCoin, []*prototk.StateRef, *big.Int, error) {
 	var lastStateTimestamp int64
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
@@ -206,7 +205,8 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
 			Sort(".created").
-			Equal("lockId", lockID)
+			Equal("lockId", lockID).
+			Equal("owner", owner.String())
 
 		if lastStateTimestamp > 0 {
 			queryBuilder.GreaterThan(".created", lastStateTimestamp)
@@ -402,16 +402,15 @@ func (n *Noto) encodeUnlock(ctx context.Context, contract *ethtypes.Address0xHex
 	})
 }
 
-func (n *Noto) encodeUnlockMasked(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeApproveUnlock(ctx context.Context, contract *ethtypes.Address0xHex, lockID tktypes.Bytes32, delegate *tktypes.EthAddress, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
-		Types:       NotoUnlockMaskedTypeSet,
-		PrimaryType: "Unlock",
+		Types:       NotoApproveUnlockTypeSet,
+		PrimaryType: "ApproveUnlock",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]any{
-			"lockedInputs":  n.endorsableStateIDs(lockedInputs),
-			"lockedOutputs": n.endorsableStateIDs(lockedOutputs),
-			"outputs":       n.endorsableStateIDs(outputs),
-			"data":          data,
+			"lockId":   lockID,
+			"delegate": delegate,
+			"data":     data,
 		},
 	})
 }

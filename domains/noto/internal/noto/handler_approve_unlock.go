@@ -18,6 +18,8 @@ package noto
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
@@ -27,19 +29,21 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
-type approveHandler struct {
+type approveUnlockHandler struct {
 	noto *Noto
 }
 
-func (h *approveHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
-	var approveParams types.ApproveParams
+func (h *approveUnlockHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
+	var approveParams types.ApproveUnlockParams
 	if err := json.Unmarshal([]byte(params), &approveParams); err != nil {
 		return nil, err
+	}
+	if approveParams.LockID.IsZero() {
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
 	}
 	if approveParams.Delegate.IsZero() {
 		return nil, i18n.NewError(ctx, msgs.MsgInvalidDelegate, approveParams.Delegate)
@@ -47,7 +51,7 @@ func (h *approveHandler) ValidateParams(ctx context.Context, config *types.NotoP
 	return &approveParams, nil
 }
 
-func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+func (h *approveUnlockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	return &prototk.InitTransactionResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
@@ -59,10 +63,24 @@ func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
-	params := tx.Params.(*types.ApproveParams)
+func (h *approveUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	params := tx.Params.(*types.ApproveUnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
-	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
+
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Requester must own the locked states (only search for the first one)
+	_, lockedStates, _, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, big.NewInt(1))
+	if err != nil {
+		return nil, err
+	}
+
+	// This approval may leak the requesting signature on-chain, as all the inputs are visible on-chain
+	// TODO: possibly we should be signing a different payload here
+	encodedApproval, err := h.noto.encodeApproveUnlock(ctx, tx.ContractAddress, params.LockID, params.Delegate, params.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +88,7 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			InputStates:  []*prototk.StateRef{},
-			OutputStates: []*prototk.NewState{},
+			ReadStates: lockedStates,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{
 			// Sender confirms the initial request with a signature
@@ -81,7 +98,7 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 				Algorithm:       algorithms.ECDSA_SECP256K1,
 				VerifierType:    verifiers.ETH_ADDRESS,
 				PayloadType:     signpayloads.OPAQUE_TO_RSV,
-				Payload:         transferHash,
+				Payload:         encodedApproval,
 				Parties:         []string{req.Transaction.From},
 			},
 			// Notary will endorse the assembled transaction (by submitting to the ledger)
@@ -96,7 +113,7 @@ func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransacti
 	}, nil
 }
 
-func (h *approveHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.EndorsableState {
+func (h *approveUnlockHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.EndorsableState {
 	result := make([]*prototk.EndorsableState, len(states))
 	for i, state := range states {
 		result[i] = &prototk.EndorsableState{
@@ -108,27 +125,27 @@ func (h *approveHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.
 	return result
 }
 
-func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	params := tx.Params.(*types.ApproveParams)
-	coins, _, err := h.noto.gatherCoins(ctx, h.decodeStates(params.Inputs), h.decodeStates(params.Outputs))
+func (h *approveUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	params := tx.Params.(*types.ApproveUnlockParams)
+	_, lockedCoins, err := h.noto.gatherCoins(ctx, req.Reads, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate the amounts, and sender's ownership of the inputs
-	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
-		return nil, err
+	// Sender must specify at least one locked state, to show that they own the lock
+	if len(lockedCoins.inCoins) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgNoStatesSpecified)
 	}
-	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
+	encodedApproval, err := h.noto.encodeApproveUnlock(ctx, tx.ContractAddress, params.LockID, params.Delegate, params.Data)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateSignature(ctx, "sender", req, transferHash); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req, encodedApproval); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
@@ -136,12 +153,8 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
-func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
-	inParams := tx.Params.(*types.ApproveParams)
-	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inParams.Inputs, inParams.Outputs, inParams.Data)
-	if err != nil {
-		return nil, err
-	}
+func (h *approveUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.ApproveUnlockParams)
 
 	sender := domain.FindAttestation("sender", req.AttestationResult)
 	if sender == nil {
@@ -152,9 +165,9 @@ func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedT
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoApproveTransferParams{
+	params := &NotoApproveUnlockParams{
+		LockID:    inParams.LockID,
 		Delegate:  inParams.Delegate,
-		TXHash:    tktypes.HexBytes(transferHash),
 		Signature: sender.Payload,
 		Data:      data,
 	}
@@ -163,62 +176,18 @@ func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedT
 		return nil, err
 	}
 	return &TransactionWrapper{
-		functionABI: h.noto.contractABI.Functions()["approveTransfer"],
+		functionABI: h.noto.contractABI.Functions()["approveUnlock"],
 		paramsJSON:  paramsJSON,
 	}, nil
 }
 
-func (h *approveHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
-	inParams := tx.Params.(*types.ApproveParams)
-
-	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
-
-	encodedCall, err := baseTransaction.encode(ctx)
-	if err != nil {
-		return nil, err
-	}
-	params := &ApproveTransferHookParams{
-		Sender:   fromAddress,
-		From:     fromAddress,
-		Delegate: inParams.Delegate,
-		Data:     inParams.Data,
-		Prepared: PreparedTransaction{
-			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
-			EncodedCall:     encodedCall,
-		},
-	}
-
-	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
-		tx.DomainConfig,
-		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onApproveTransfer"],
-		params,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &TransactionWrapper{
-		transactionType: mapPrepareTransactionType(transactionType),
-		functionABI:     functionABI,
-		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.NotaryAddress,
-	}, nil
-}
-
-func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
+func (h *approveUnlockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
-		if err != nil {
-			return nil, err
-		}
-		return hookTransaction.prepare(nil)
+		return nil, fmt.Errorf("Pente notary type not supported")
 	}
 	return baseTransaction.prepare(nil)
 }

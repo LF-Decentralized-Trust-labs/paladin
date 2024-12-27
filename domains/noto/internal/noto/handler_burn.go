@@ -137,19 +137,19 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
-
 	if !tx.DomainConfig.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
-
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate the amounts, and sender's ownership of the inputs
 	if err := h.noto.validateBurnAmounts(ctx, params, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
 

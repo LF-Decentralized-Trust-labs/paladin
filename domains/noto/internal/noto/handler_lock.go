@@ -144,18 +144,19 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	coins, lockedCoins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
-	lockedCoins, err := h.noto.gatherLockedCoins(ctx, req.Inputs, req.Outputs)
-	if err != nil {
-		return nil, err
-	}
+
+	// Validate the amounts, and sender's ownership of the inputs and locked outputs
 	if err := h.noto.validateLockAmounts(ctx, coins, lockedCoins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
 		return nil, err
 	}
 

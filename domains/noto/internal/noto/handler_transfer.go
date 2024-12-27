@@ -154,14 +154,16 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 }
 
 func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate the amounts, and sender's ownership of the inputs
 	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
 
