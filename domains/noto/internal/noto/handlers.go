@@ -50,6 +50,8 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 		return &prepareUnlockHandler{
 			unlockHandler: unlockHandler{noto: n},
 		}
+	case "approveUnlock":
+		return &approveUnlockHandler{noto: n}
 	default:
 		return nil
 	}
@@ -130,30 +132,30 @@ func (n *Noto) validateSignature(ctx context.Context, name string, req *prototk.
 }
 
 // Check that all coins are owned by the transaction sender
-func (n *Noto) validateOwners(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest, coins []*types.NotoCoin, states []*prototk.StateRef) error {
-	fromAddress, err := n.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+func (n *Noto) validateOwners(ctx context.Context, owner string, req *prototk.EndorseTransactionRequest, coins []*types.NotoCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, req.ResolvedVerifiers)
 	if err != nil {
 		return err
 	}
 
 	for i, coin := range coins {
 		if !coin.Owner.Equals(fromAddress) {
-			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, tx.Transaction.From)
+			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, owner)
 		}
 	}
 	return nil
 }
 
 // Check that all locked coins are owned by the transaction sender
-func (n *Noto) validateLockOwners(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest, coins []*types.NotoLockedCoin, states []*prototk.StateRef) error {
-	fromAddress, err := n.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+func (n *Noto) validateLockOwners(ctx context.Context, owner string, req *prototk.EndorseTransactionRequest, coins []*types.NotoLockedCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, req.ResolvedVerifiers)
 	if err != nil {
 		return err
 	}
 
 	for i, coin := range coins {
 		if !coin.Owner.Equals(fromAddress) {
-			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, tx.Transaction.From)
+			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, owner)
 		}
 	}
 	return nil

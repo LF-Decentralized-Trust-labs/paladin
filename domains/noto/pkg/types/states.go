@@ -56,7 +56,7 @@ var NotoLockedCoinABI = &abi.Parameter{
 	Components: abi.ParameterArray{
 		{Name: "salt", Type: "bytes32"},
 		{Name: "lockId", Type: "bytes32", Indexed: true},
-		{Name: "owner", Type: "string"},
+		{Name: "owner", Type: "string", Indexed: true},
 		{Name: "amount", Type: "uint256"},
 	},
 }

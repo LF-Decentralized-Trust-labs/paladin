@@ -33,19 +33,28 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     error NotoInvalidOutput(bytes32 id);
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
-    error NotoInvalidLock(bytes32 lockId);
+
+    error NotoLockAlreadyExists(bytes32 lockId);
+    error NotoLockAlreadyDelegated(bytes32 lockId);
+    error NotoLockNotFound(bytes32 lockId);
     error NotoInvalidLockDelegate(
         bytes32 lockId,
         address delegate,
         address sender
     );
-    error NotoUnlockNotPrepared(bytes32 lockId, bytes32 txhash);
+    error NotoUnlockNotPrepared(bytes32 lockId);
 
     struct LockDetail {
         uint256 stateCount;
         mapping(bytes32 => bool) states;
-        mapping(bytes32 => bool) prepared;
+        PreparedUnlock unlock;
         address delegate;
+    }
+
+    struct PreparedUnlock {
+        bytes32[] lockedInputs;
+        bytes32[] lockedOutputs;
+        bytes32[] outputs;
     }
 
     // Config follows the convention of a 4 byte type selector, followed by ABI encoded bytes
@@ -61,10 +70,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     bytes32 private constant TRANSFER_TYPEHASH =
         keccak256("Transfer(bytes32[] inputs,bytes32[] outputs,bytes data)");
-    bytes32 private constant UNLOCK_TYPEHASH =
-        keccak256(
-            "Unlock(bytes32[] lockedInputs,bytes32[] lockedOutputs,bytes32[] outputs,bytes data)"
-        );
 
     function requireNotary(address addr) internal view {
         if (addr != _notary) {
@@ -122,19 +127,6 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev query whether a TXO is currently in the locked list
-     * @param lockId the lock identifier
-     * @param state the UTXO identifier
-     * @return locked true or false depending on whether the identifier is in the locked map
-     */
-    function isLocked(
-        bytes32 lockId,
-        bytes32 state
-    ) public view returns (bool locked) {
-        return _locks[lockId].states[state];
-    }
-
-    /**
      * @dev query whether an approval exists for the given transaction
      * @param txhash the transaction hash
      * @return delegate the non-zero owner address, or zero if the TXO ID is not in the approval map
@@ -146,7 +138,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev the main function of the contract, which finalizes execution of a pre-verified
+     * @dev The main function of the contract, which finalizes execution of a pre-verified
      *      transaction. The inputs and outputs are all opaque to this on-chain function.
      *      Provides ordering and double-spend protection.
      *
@@ -168,7 +160,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev mint performs a transfer with no input states. Base implementation is identical
+     * @dev Perform a transfer with no input states. Base implementation is identical
      *      to transfer(), but both methods can be overriden to provide different constraints.
      */
     function mint(
@@ -216,8 +208,8 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev authorizes an operation to be performed by another address in a future transaction.
-     *      For example, a smart contract coordinating a DVP.
+     * @dev Authorize a transfer to be performed by another address in a future transaction
+     *      (for example, a smart contract coordinating a DVP).
      *
      *      Note the txhash will only be spendable if it is exactly correct for
      *      the inputs/outputs/data that are later supplied in useDelegation.
@@ -252,7 +244,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     }
 
     /**
-     * @dev transfer via delegation - must be the approved delegate
+     * @dev Transfer via delegation - must be the approved delegate.
      *
      * @param inputs as per transfer()
      * @param outputs as per transfer()
@@ -303,6 +295,8 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      * @param lockedOutputs array of zero or more locked outputs to generate, which will be tied to the lock ID
      * @param signature EIP-712 signature on the original request that spawned this transaction
      * @param data any additional transaction data (opaque to the blockchain)
+     *
+     * Emits a {NotoLock} event.
      */
     function lock(
         bytes32 lockId,
@@ -313,7 +307,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         bytes calldata data
     ) public virtual override onlyNotary {
         if (_locks[lockId].stateCount > 0) {
-            revert NotoInvalidLock(lockId);
+            revert NotoLockAlreadyExists(lockId);
         }
         _checkInputs(inputs);
         _checkOutputs(outputs);
@@ -330,6 +324,8 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      * @param outputs array of zero or more new unlocked outputs to generate, for future transactions to spend
      * @param signature EIP-712 signature on the original request that spawned this transaction
      * @param data any additional transaction data (opaque to the blockchain)
+     *
+     * Emits a {NotoUnlock} event.
      */
     function unlock(
         bytes32 lockId,
@@ -352,13 +348,13 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
 
     function _unlock(
         bytes32 lockId,
-        bytes32[] calldata lockedInputs,
-        bytes32[] calldata lockedOutputs,
-        bytes32[] calldata outputs
+        bytes32[] memory lockedInputs,
+        bytes32[] memory lockedOutputs,
+        bytes32[] memory outputs
     ) internal {
         LockDetail storage lock_ = _locks[lockId];
         if (lock_.stateCount == 0) {
-            revert NotoInvalidLock(lockId);
+            revert NotoLockNotFound(lockId);
         }
 
         _checkLockedInputs(lockId, lockedInputs);
@@ -373,89 +369,123 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     /**
      * @dev Prepare an unlock operation that can be triggered later by the lock delegate.
      *
-     * @param lockId the unique identifier for the lock
-     * @param txhash the transaction hash
-     * @param signature EIP-712 signature on the original request that spawned this transaction
-     * @param data any additional transaction data (opaque to the blockchain)
+     * @param lockId as per unlock()
+     * @param lockedInputs as per unlock()
+     * @param lockedOutputs as per unlock()
+     * @param outputs as per unlock()
+     * @param signature as per unlock()
+     * @param data as per unlock()
+     *
+     * Emits a {NotoUnlockPrepared} event.
      */
     function prepareUnlock(
-        bytes32 lockId,
-        bytes32 txhash,
-        bytes calldata signature,
-        bytes calldata data
-    ) external virtual override onlyNotary {
-        LockDetail storage lock_ = _locks[lockId];
-        if (lock_.stateCount == 0) {
-            revert NotoInvalidLock(lockId);
-        }
-        lock_.prepared[txhash] = true;
-        emit NotoPreparedUnlock(lockId, txhash, signature, data);
-    }
-
-    function delegateLock(
-        bytes32 lockId,
-        address delegate
-    ) external virtual onlyNotary {
-        LockDetail storage lock_ = _locks[lockId];
-        if (lock_.stateCount == 0) {
-            revert NotoInvalidLock(lockId);
-        }
-        lock_.delegate = delegate;
-    }
-
-    function unlockWithApproval(
         bytes32 lockId,
         bytes32[] calldata lockedInputs,
         bytes32[] calldata lockedOutputs,
         bytes32[] calldata outputs,
         bytes calldata signature,
+        bytes calldata data
+    ) external virtual override onlyNotary {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.stateCount == 0) {
+            revert NotoLockNotFound(lockId);
+        }
+        if (lock_.delegate != address(0)) {
+            revert NotoLockAlreadyDelegated(lockId);
+        }
+        PreparedUnlock storage unlock_ = lock_.unlock;
+        unlock_.lockedInputs = lockedInputs;
+        unlock_.lockedOutputs = lockedOutputs;
+        unlock_.outputs = outputs;
+        emit NotoUnlockPrepared(lockId, signature, data);
+    }
+
+    /**
+     * @dev Approve another address to execute the prepared unlock operation.
+     *
+     * @param lockId the unique identifier for the lock
+     * @param delegate the address that is authorized to perform the unlock
+     * @param signature EIP-712 signature on the original request that spawned this transaction
+     * @param data any additional transaction data (opaque to the blockchain)
+     *
+     * Emits a {NotoUnlockApproved} event.
+     */
+    function approveUnlock(
+        bytes32 lockId,
+        address delegate,
+        bytes calldata signature,
+        bytes calldata data
+    ) external virtual onlyNotary {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.stateCount == 0) {
+            revert NotoLockNotFound(lockId);
+        }
+        PreparedUnlock memory unlock_ = lock_.unlock;
+        if (unlock_.lockedInputs.length == 0) {
+            revert NotoUnlockNotPrepared(lockId);
+        }
+        lock_.delegate = delegate;
+        emit NotoUnlockApproved(lockId, delegate, signature, data);
+    }
+
+    /**
+     * @dev Execute the prepared unlock operation as the authorized delegate.
+     *
+     * @param lockId the unique identifier for the lock
+     * @param data any additional transaction data (opaque to the blockchain)
+     *
+     * Emits a {NotoDelegateUnlock} event.
+     */
+    function unlockWithApproval(
+        bytes32 lockId,
         bytes calldata data
     ) external virtual override {
         LockDetail storage lock_ = _locks[lockId];
         if (lock_.delegate != msg.sender) {
             revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
         }
+        lock_.delegate = address(0);
 
-        bytes32 txhash = _buildUnlockHash(
-            lockedInputs,
-            lockedOutputs,
-            outputs,
-            data
-        );
-        if (!lock_.prepared[txhash]) {
-            revert NotoUnlockNotPrepared(lockId, txhash);
+        PreparedUnlock memory unlock_ = lock_.unlock;
+        if (unlock_.lockedInputs.length == 0) {
+            revert NotoUnlockNotPrepared(lockId);
         }
-        delete lock_.prepared[txhash];
+        delete lock_.unlock;
 
-        _unlock(lockId, lockedInputs, lockedOutputs, outputs);
-
+        _unlock(
+            lockId,
+            unlock_.lockedInputs,
+            unlock_.lockedOutputs,
+            unlock_.outputs
+        );
         emit NotoDelegateUnlock(
             lockId,
             msg.sender,
-            lockedInputs,
-            lockedOutputs,
-            outputs,
-            signature,
+            unlock_.lockedInputs,
+            unlock_.lockedOutputs,
+            unlock_.outputs,
             data
         );
     }
 
-    function _buildUnlockHash(
-        bytes32[] calldata lockedInputs,
-        bytes32[] calldata lockedOutputs,
-        bytes32[] calldata outputs,
+    /**
+     * @dev Relinquish status as the lock delegate without executing the prepared unlock.
+     *
+     * @param lockId the unique identifier for the lock
+     * @param data any additional transaction data (opaque to the blockchain)
+     *
+     * Emits a {NotoUnlockApprovalCancelled} event.
+     */
+    function cancelUnlockApproval(
+        bytes32 lockId,
         bytes calldata data
-    ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(
-            abi.encode(
-                UNLOCK_TYPEHASH,
-                keccak256(abi.encodePacked(lockedInputs)),
-                keccak256(abi.encodePacked(lockedOutputs)),
-                keccak256(abi.encodePacked(outputs)),
-                keccak256(data)
-            )
-        );
-        return _hashTypedDataV4(structHash);
+    ) external virtual override {
+        LockDetail storage lock_ = _locks[lockId];
+        if (lock_.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
+        }
+        lock_.delegate = address(0);
+        emit NotoUnlockApprovalCancelled(lockId, data);
     }
 
     function _checkLockedInputs(bytes32 id, bytes32[] memory inputs) internal {

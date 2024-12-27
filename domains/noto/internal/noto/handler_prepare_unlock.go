@@ -25,10 +25,9 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-// This handler is identical to the unlockHandler, except for the Prepare() method
+// This handler is identical to unlockHandler, except for the Prepare() method
 type prepareUnlockHandler struct {
 	unlockHandler
 }
@@ -39,15 +38,9 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	lockedInput := req.InputStates[0]
 	unlockedOutput := req.OutputStates[0]
 	lockedOutputs := req.OutputStates[1:]
-
-	txhash, err := h.noto.encodeUnlockMasked(ctx, tx.ContractAddress,
-		[]*prototk.EndorsableState{lockedInput},
-		lockedOutputs,
-		[]*prototk.EndorsableState{unlockedOutput},
-		inParams.Data,
-	)
-	if err != nil {
-		return nil, err
+	lockedOutputIds := make([]string, len(lockedOutputs))
+	for i, output := range lockedOutputs {
+		lockedOutputIds[i] = output.Id
 	}
 
 	// Include the signature from the sender
@@ -62,10 +55,12 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 	params := &NotoPrepareUnlockParams{
-		LockID:    inParams.LockID,
-		TXHash:    tktypes.HexBytes(txhash),
-		Signature: unlockSignature.Payload,
-		Data:      data,
+		LockID:        inParams.LockID,
+		LockedInputs:  []string{lockedInput.Id},
+		LockedOutputs: lockedOutputIds,
+		Outputs:       []string{unlockedOutput.Id},
+		Signature:     unlockSignature.Payload,
+		Data:          data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

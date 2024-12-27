@@ -36,6 +36,7 @@ interface INotoPrivate {
 
     function unlock(
         bytes32 lockId,
+        string calldata from,
         string[] calldata to,
         uint256[] calldata amounts,
         bytes calldata data
@@ -43,8 +44,15 @@ interface INotoPrivate {
 
     function prepareUnlock(
         bytes32 lockId,
+        string calldata from,
         string[] calldata to,
         uint256[] calldata amounts,
+        bytes calldata data
+    ) external;
+
+    function approveUnlock(
+        bytes32 lockId,
+        address delegate,
         bytes calldata data
     ) external;
 

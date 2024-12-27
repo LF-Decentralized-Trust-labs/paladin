@@ -37,30 +37,33 @@ type unlockHandler struct {
 }
 
 func (h *unlockHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
-	var lockParams types.UnlockParams
-	if err := json.Unmarshal([]byte(params), &lockParams); err != nil {
+	var unlockParams types.UnlockParams
+	if err := json.Unmarshal([]byte(params), &unlockParams); err != nil {
 		return nil, err
 	}
-	if lockParams.LockID.IsZero() {
+	if unlockParams.LockID.IsZero() {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "lockId")
 	}
-	if len(lockParams.To) == 0 {
+	if len(unlockParams.From) == 0 {
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "from")
+	}
+	if len(unlockParams.To) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
 	}
-	if len(lockParams.Amounts) == 0 {
+	if len(unlockParams.Amounts) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "amounts")
 	}
-	if len(lockParams.To) != len(lockParams.Amounts) {
+	if len(unlockParams.To) != len(unlockParams.Amounts) {
 		return nil, i18n.NewError(ctx, msgs.MsgArraysMustBeSameLength, "to", "amounts")
 	}
-	return &lockParams, nil
+	return &unlockParams, nil
 }
 
 func (h *unlockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	request := make([]*prototk.ResolveVerifierRequest, 0, len(params.To)+2)
+	request := make([]*prototk.ResolveVerifierRequest, 0, len(params.To)+3)
 	request = append(request,
 		&prototk.ResolveVerifierRequest{
 			Lookup:       notary,
@@ -69,6 +72,11 @@ func (h *unlockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, r
 		},
 		&prototk.ResolveVerifierRequest{
 			Lookup:       tx.Transaction.From,
+			Algorithm:    algorithms.ECDSA_SECP256K1,
+			VerifierType: verifiers.ETH_ADDRESS,
+		},
+		&prototk.ResolveVerifierRequest{
+			Lookup:       params.From,
 			Algorithm:    algorithms.ECDSA_SECP256K1,
 			VerifierType: verifiers.ETH_ADDRESS,
 		},
@@ -94,7 +102,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", params.From, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +112,11 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 		requiredTotal = requiredTotal.Add(requiredTotal, amount.Int())
 	}
 
-	lockedInputCoins, inputStates, selectedTotal, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, requiredTotal)
+	lockedInputCoins, inputStates, selectedTotal, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, requiredTotal)
 	if err != nil {
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.From})
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +128,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 		if err != nil {
 			return nil, err
 		}
-		coins, states, err := h.noto.prepareOutputs(toAddress, params.Amounts[i], []string{notary, tx.Transaction.From, to})
+		coins, states, err := h.noto.prepareOutputs(toAddress, params.Amounts[i], []string{notary, params.From, to})
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +139,7 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	lockedOutputCoins := []*types.NotoLockedCoin{}
 	if selectedTotal.Cmp(requiredTotal) == 1 {
 		remainder := big.NewInt(0).Sub(selectedTotal, requiredTotal)
-		coins, states, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+		coins, states, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, params.From})
 		if err != nil {
 			return nil, err
 		}
@@ -177,21 +185,34 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 }
 
 func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	params := tx.Params.(*types.UnlockParams)
+	coins, lockedCoins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
-	lockedCoins, err := h.noto.gatherLockedCoins(ctx, req.Inputs, req.Outputs)
+
+	senderAddress, err := h.noto.findEthAddressVerifier(ctx, "sender", tx.Transaction.From, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", params.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate the amounts, and sender's ownership of all locked inputs/outputs
 	if err := h.noto.validateUnlockAmounts(ctx, coins, lockedCoins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins.outCoins, coins.outStates); err != nil {
+	if !senderAddress.Equals(fromAddress) {
+		// For now, the sender can only unlock their own locked coins
+		// TODO: make this configurable
+		return nil, i18n.NewError(ctx, msgs.MsgUnlockNotAllowed, params.From)
+	}
+	if err := h.noto.validateLockOwners(ctx, params.From, req, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, tx, req, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, params.From, req, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
 		return nil, err
 	}
 
