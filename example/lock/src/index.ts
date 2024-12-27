@@ -21,7 +21,8 @@ const paladin3 = new PaladinClient({
 
 async function main(): Promise<boolean> {
   const [cashIssuer] = paladin1.getVerifiers("cashIssuer@node1");
-  const [investor] = paladin3.getVerifiers("investor@node2");
+  const [investor1] = paladin2.getVerifiers("investor1@node2");
+  const [investor2] = paladin3.getVerifiers("investor2@node3");
 
   // Create a Pente privacy group for the issuer only
   logger.log("Creating issuer privacy group...");
@@ -38,23 +39,23 @@ async function main(): Promise<boolean> {
   if (!checkDeploy(issuerGroup)) return false;
 
   // Deploy private tracker to the issuer privacy group
-  logger.log("Creating private tracker...");
-  const tracker = await newERC20Tracker(issuerGroup, cashIssuer, {
-    name: "CASH",
-    symbol: "CASH",
-  });
-  if (!checkDeploy(tracker)) return false;
+  // logger.log("Creating private tracker...");
+  // const tracker = await newERC20Tracker(issuerGroup, cashIssuer, {
+  //   name: "CASH",
+  //   symbol: "CASH",
+  // });
+  // if (!checkDeploy(tracker)) return false;
 
   // Create a Noto token to represent cash
   logger.log("Deploying Noto cash token...");
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
-    hooks: {
-      privateGroup: issuerGroup.group,
-      publicAddress: issuerGroup.address,
-      privateAddress: tracker.address,
-    },
+    // hooks: {
+    //   privateGroup: issuerGroup.group,
+    //   publicAddress: issuerGroup.address,
+    //   privateAddress: tracker.address,
+    // },
     restrictMint: true,
     allowBurn: true,
   });
@@ -63,7 +64,7 @@ async function main(): Promise<boolean> {
   // Issue some cash
   logger.log("Issuing cash...");
   let receipt = await notoCash.mint(cashIssuer, {
-    to: investor,
+    to: investor1,
     amount: 1000,
     data: "0x",
   });
@@ -72,47 +73,21 @@ async function main(): Promise<boolean> {
   // Lock some tokens
   logger.log("Locking cash...");
   const lockId = randomBytes(32).toString("hex");
-  const investorAdddress = await investor.address();
-  receipt = await notoCash.using(paladin2).lock(investor, {
-    id: lockId,
-    // delegate: investorAdddress,
+  receipt = await notoCash.using(paladin2).lock(investor1, {
+    lockId,
     amount: 100,
-    // recipients: [
-    //   {
-    //     ref: 0,
-    //     recipient: investorAdddress,
-    //   },
-    // ],
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
 
-  const schemas = await paladin2.listSchemas("noto");
-  const lockSchema = schemas.find((schema) =>
-    schema.signature.startsWith("type=NotoLockedCoin")
-  );
-  if (!lockSchema) {
-    logger.error("Failed to find lock schema");
-    return false;
-  }
-  const locks = await paladin2.queryContractStates(
-    "noto",
-    notoCash.address,
-    lockSchema.id,
-    {},
-    "available"
-  );
-  if (locks.length !== 1) {
-    logger.error("Failed to find lock state");
-    return false;
-  }
-  const lock = locks[0];
-
   // Unlock the tokens
   logger.log("Unlocking cash...");
-  receipt = await notoCash.using(paladin2).unlock(investor, {
-    locked: lock.id,
-    outcome: 0,
+  receipt = await notoCash.using(paladin2).unlock(investor1, {
+    lockId,
+    from: investor1,
+    to: [investor2],
+    amounts: [100],
+    data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
 
