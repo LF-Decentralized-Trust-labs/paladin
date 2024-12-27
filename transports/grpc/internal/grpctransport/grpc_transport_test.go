@@ -195,6 +195,47 @@ func TestConnectFail(t *testing.T) {
 
 }
 
+func TestSendNotActivated(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return &prototk.ReceiveMessageResponse{}, nil
+		}
+	})
+	defer done()
+
+	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+		Message: &prototk.Message{
+			ReplyTo:   "node1",
+			Component: "to.you",
+			Node:      "node3",
+		},
+	})
+	assert.Regexp(t, "PD030016", err)
+
+}
+
+func TestActivateBadTransportDetails(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return &prototk.ReceiveMessageResponse{}, nil
+		}
+	})
+	defer done()
+
+	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+		NodeName:         "node2",
+		TransportDetails: `{"endpoint": false}`,
+	})
+	assert.Regexp(t, "PD030014", err)
+
+}
+
 func TestConnectBadTransport(t *testing.T) {
 
 	ctx := context.Background()

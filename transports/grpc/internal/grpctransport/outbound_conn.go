@@ -95,15 +95,16 @@ func (oc *outboundConn) ensureStream() (err error) {
 	return err
 }
 
-func (oc *outboundConn) send(message *proto.Message) (err error) {
+func (oc *outboundConn) send(message *proto.Message) error {
 	oc.sendLock.Lock()
 	defer oc.sendLock.Unlock()
 
-	if err := oc.ensureStream(); err != nil {
-		return err
+	err := oc.ensureStream()
+
+	if err == nil {
+		err = oc.stream.Send(message)
 	}
 
-	err = oc.stream.Send(message)
 	if err != nil {
 		// Clean up the stream - we'll create a new one on next send
 		_ = oc.stream.CloseSend()
