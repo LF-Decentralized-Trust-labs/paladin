@@ -32,6 +32,22 @@ message SendMessageRequest {
 message SendMessageResponse {
 }
 
+message ActivateNodeRequest {
+  string node_name = 1;
+  string transport_details = 2;
+}
+
+message ActivateNodeResponse {
+  string peer_info_json = 1;
+}
+
+message DeactivateNodeRequest {
+  string node_name = 1;
+}
+
+message DeactivateNodeResponse {
+}
+
 message GetLocalDetailsRequest {
 }
 

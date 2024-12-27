@@ -105,12 +105,16 @@ message TransportMessage {
     ConfigureTransportRequest configure_transport =         1010;
     SendMessageRequest send_message =                       1020;
     GetLocalDetailsRequest get_local_details =              1030;
+    ActivateNodeRequest activate_node =                     1040;
+    DeactivateNodeRequest deactivate_node =                 1050;
   }
 
   oneof response_from_transport {
     ConfigureTransportResponse configure_transport_res =    1011;
     SendMessageResponse send_message_res =                  1021;
     GetLocalDetailsResponse get_local_details_res =         1031;
+    ActivateNodeResponse activate_node_res =                1041;
+    DeactivateNodeResponse deactivate_node_res =            1051;
   }
 
   // Request/reply exchanges initiated by the transport, to the paladin node
@@ -123,6 +127,7 @@ message TransportMessage {
     GetTransportDetailsResponse get_transport_details_res = 2011;
     ReceiveMessageResponse receive_message_res =            2021;
   }
+
 }
 
 message RegistryMessage {

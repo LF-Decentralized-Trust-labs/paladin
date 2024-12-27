@@ -37,7 +37,7 @@ type peer struct {
 	transport *transport
 
 	persistedMsgsAvailable chan struct{}
-	sendQueue              chan *prototk.Message
+	sendQueue              chan *components.TransportMessage
 
 	done chan struct{}
 }
@@ -93,7 +93,7 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 		tm:                     tm,
 		name:                   nodeName,
 		persistedMsgsAvailable: make(chan struct{}, 1),
-		sendQueue:              make(chan *prototk.Message, tm.senderBufferLen),
+		sendQueue:              make(chan *components.TransportMessage, tm.senderBufferLen),
 		done:                   make(chan struct{}),
 	}
 	p.ctx, p.cancelCtx = context.WithCancel(
@@ -153,16 +153,8 @@ func (p *peer) send(ctx context.Context, msg *components.TransportMessage) error
 		ReplyTo:       msg.ReplyTo,
 		Payload:       msg.Payload,
 	}
+	return p.transport.send(ctx, pMsg)
 
-	// Push onto the sender channel as a fire-and-forget message, for the
-	// goroutine to handle (alongside dispatching persisted messages)
-	select {
-	case p.sendQueue <- pMsg:
-		log.L(ctx).Debugf("sending %s message %s (cid=%v)", msg.MessageType, msg.MessageID, msg.CorrelationID)
-		return nil
-	case <-ctx.Done():
-		return i18n.NewError(ctx, msgs.MsgContextCanceled)
-	}
 }
 
 func (p *peer) sender() {
@@ -170,11 +162,23 @@ func (p *peer) sender() {
 
 	log.L(p.ctx).Infof("peer %s active", p.name)
 
+	var persistedStale bool
+	var persistedPage []*components.TransportMessage
 	for {
+
+		var nextMessage *components.TransportMessage
+
+		if len(persistedPage) > 0 {
+
+		}
+
 		select {
 		case <-p.ctx.Done():
 			log.L(p.ctx).Infof("peer %s inactive", p.name)
 			return
+		case <-p.persistedMsgsAvailable:
+			persistedStale = true
+		case nextMessage = <-p.sendQueue:
 		}
 	}
 }

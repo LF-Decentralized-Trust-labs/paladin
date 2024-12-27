@@ -235,7 +235,13 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 	// There is some retry in the Paladin layer, and some transports provide resilience.
 	// However, the send is at-most-once, and the higher level message protocols that
 	// use this "send" must be fault tolerant to message loss.
-	return peer.send(ctx, msg)
+	select {
+	case peer.sendQueue <- msg:
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageID, msg.CorrelationID, peer.name)
+		return nil
+	case <-ctx.Done():
+		return i18n.NewError(ctx, msgs.MsgContextCanceled)
+	}
 
 }
 

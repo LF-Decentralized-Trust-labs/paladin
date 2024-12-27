@@ -17,6 +17,7 @@ CREATE TABLE queued_msgs (
 );
 
 CREATE INDEX queued_msgs_node ON queued_msgs ("node");
+CREATE INDEX queued_msgs_created ON queued_msgs ("created");
 
 CREATE TABLE queued_msg_acks (
     "id"                 TEXT    NOT NULL,

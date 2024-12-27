@@ -47,4 +47,7 @@ var (
 	MsgConnectionToWrongNode                = ffe("PD030011", "the TLS identity of the node '%s' does not match the expected node '%s'")
 	MsgPEMCertificateInvalid                = ffe("PD030012", "invalid PEM encoded x509 certificate")
 	MsgErrorNoTargetNode                    = ffe("PD030013", "request to send message but no target node specified")
+	MsgInvalidTransportDetails              = ffe("PD030014", "Invalid transport details for node '%s'")
+	MsgConnectionFailed                     = ffe("PD030015", "GRPC connection failed for endpoint '%s'")
+	MsgNodeNotActive                        = ffe("PD030016", "Send for node that is not active '%s'")
 )

@@ -59,17 +59,8 @@ type grpcTransport struct {
 	localCertificate *tls.Certificate
 
 	conf                Config
-	connLock            sync.Cond
+	connLock            sync.RWMutex
 	outboundConnections map[string]*outboundConn
-}
-
-type outboundConn struct {
-	nodeName   string
-	connecting bool
-	sendLock   sync.Mutex
-	waiting    int
-	connError  error
-	stream     grpc.ClientStreamingClient[proto.Message, proto.Empty]
 }
 
 func NewPlugin(ctx context.Context) plugintk.PluginBase {
@@ -80,15 +71,14 @@ func NewGRPCTransport(callbacks plugintk.TransportCallbacks) plugintk.TransportA
 	return &grpcTransport{
 		bgCtx:               context.Background(),
 		callbacks:           callbacks,
-		connLock:            *sync.NewCond(new(sync.Mutex)),
 		outboundConnections: make(map[string]*outboundConn),
 	}
 }
 
 func (t *grpcTransport) ConfigureTransport(ctx context.Context, req *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error) {
 	// Hold the connlock while setting our state (as we'll read it when creating new conns)
-	t.connLock.L.Lock()
-	defer t.connLock.L.Unlock()
+	t.connLock.Lock()
+	defer t.connLock.Unlock()
 
 	t.name = req.Name
 
@@ -242,85 +232,47 @@ func (t *grpcTransport) getTransportDetails(ctx context.Context, node string) (t
 	return transportDetails, nil
 }
 
-func (t *grpcTransport) waitExistingOrNewConn(nodeName string) (bool, *outboundConn, error) {
-	t.connLock.L.Lock()
-	defer t.connLock.L.Unlock()
-	existing := t.outboundConnections[nodeName]
+func (t *grpcTransport) ActivateNode(ctx context.Context, req *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+	t.connLock.Lock()
+	defer t.connLock.Unlock()
+
+	existing := t.outboundConnections[req.NodeName]
 	if existing != nil {
-		// Multiple routines might try to connect concurrently, so we have a condition
-		existing.waiting++
-		for existing.connecting {
-			t.connLock.Wait()
-		}
-		return false, existing, existing.connError
+		// Replace an existing connection - unexpected as Paladin shouldn't do this
+		log.L(ctx).Warnf("replacing existing activation for node '%s'", req.NodeName)
+		existing.close(ctx)
+		delete(t.outboundConnections, req.NodeName)
 	}
-	// We need to create the connection - put the placeholder in the map
-	newConn := &outboundConn{nodeName: nodeName, connecting: true}
-	t.outboundConnections[nodeName] = newConn
-	return true, newConn, nil
-}
-
-func (t *grpcTransport) send(ctx context.Context, oc *outboundConn, message *proto.Message) (err error) {
-	oc.sendLock.Lock()
-	defer func() {
-		if err != nil {
-			// Close this stream and remove it before dropping the lock (unsafe to call concurrent to send)
-			log.L(ctx).Errorf("closing stream to %s due to send err: %s", oc.nodeName, err)
-			_ = oc.stream.CloseSend()
-			// Drop the send lock before taking conn lock to remove from the connections
-			oc.sendLock.Unlock()
-			t.connLock.L.Lock()
-			defer t.connLock.L.Unlock()
-			delete(t.outboundConnections, oc.nodeName)
-		} else {
-			// Just drop the lock and return
-			oc.sendLock.Unlock()
-		}
-	}()
-	err = oc.stream.Send(message)
-	return
-}
-
-func (t *grpcTransport) getConnection(ctx context.Context, nodeName string) (*outboundConn, error) {
-
-	isNew, oc, err := t.waitExistingOrNewConn(nodeName)
-	if !isNew || err != nil {
-		return oc, err
-	}
-
-	// We must ensure we complete the newConn (for good or bad)
-	// and notify everyone waiting to check status before we return
-	defer func() {
-		t.connLock.L.Lock()
-		oc.connecting = false
-		if err != nil {
-			// copy our error to anyone queuing - everybody fails
-			oc.connError = err
-			// remove this entry, so the next one will try again
-			delete(t.outboundConnections, nodeName)
-		}
-		t.connLock.Broadcast()
-		t.connLock.L.Unlock()
-	}()
-
-	// We need to get the connection details
-	transportDetails, err := t.getTransportDetails(ctx, nodeName)
+	oc, peerInfoJSON, err := t.newConnection(ctx, req.NodeName, req.TransportDetails)
 	if err != nil {
 		return nil, err
 	}
+	t.outboundConnections[req.NodeName] = oc
+	return &prototk.ActivateNodeResponse{
+		PeerInfoJson: string(peerInfoJSON),
+	}, nil
+}
 
-	// Ok - try connecting
-	log.L(ctx).Infof("GRPC connecting to new peer %s (endpoint=%s)", nodeName, transportDetails.Endpoint)
-	individualNodeVerifier := t.peerVerifier.Clone().(*tlsVerifier)
-	individualNodeVerifier.expectedNode = nodeName
-	conn, err := grpc.NewClient(transportDetails.Endpoint,
-		grpc.WithTransportCredentials(individualNodeVerifier),
-	)
-	if err == nil {
-		client := proto.NewPaladinGRPCTransportClient(conn)
-		oc.stream, err = client.ConnectSendStream(ctx)
+func (t *grpcTransport) DeactivateNode(ctx context.Context, req *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+	t.connLock.Lock()
+	defer t.connLock.Unlock()
+
+	existing := t.outboundConnections[req.NodeName]
+	if existing != nil {
+		// Replace an existing connection - unexpected as Paladin shouldn't do this
+		log.L(ctx).Warnf("replacing existing activation for node '%s'", req.NodeName)
+		existing.close(ctx)
+		delete(t.outboundConnections, req.NodeName)
 	}
-	return oc, err
+
+	return &prototk.DeactivateNodeResponse{}, nil
+}
+
+func (t *grpcTransport) getConnection(nodeName string) *outboundConn {
+	t.connLock.RLock()
+	defer t.connLock.RUnlock()
+
+	return t.outboundConnections[nodeName]
 }
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
@@ -328,20 +280,22 @@ func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessag
 	if req.Message.Node == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgErrorNoTargetNode)
 	}
-	oc, err := t.getConnection(ctx, msg.Node)
-	if err == nil {
-		log.L(ctx).Infof("GRPC sending message id=%s cid=%v component=%s messageType=%s replyTo=%s to peer %s",
-			msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, msg.Node)
-		err = t.send(ctx, oc, &proto.Message{
-			MessageId:     msg.MessageId,
-			CorrelationId: msg.CorrelationId,
-			Component:     msg.Component,
-			Node:          msg.Node,
-			ReplyTo:       msg.ReplyTo,
-			MessageType:   msg.MessageType,
-			Payload:       msg.Payload,
-		})
+	oc := t.getConnection(msg.Node)
+	if oc == nil {
+		// This is an error in the Paladin layer
+		return nil, i18n.NewError(ctx, msgs.MsgNodeNotActive, msg.Node)
 	}
+	log.L(ctx).Infof("GRPC sending message id=%s cid=%v component=%s messageType=%s replyTo=%s to peer %s",
+		msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, msg.Node)
+	err := oc.send(&proto.Message{
+		MessageId:     msg.MessageId,
+		CorrelationId: msg.CorrelationId,
+		Component:     msg.Component,
+		Node:          msg.Node,
+		ReplyTo:       msg.ReplyTo,
+		MessageType:   msg.MessageType,
+		Payload:       msg.Payload,
+	})
 	if err != nil {
 		return nil, err
 	}
