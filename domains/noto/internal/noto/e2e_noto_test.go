@@ -238,7 +238,7 @@ func TestNoto(t *testing.T) {
 		ABI: types.NotoABI,
 	}, true)
 	require.NotNil(t, rpcerr)
-	assert.ErrorContains(t, rpcerr.Error(), "PD200005")
+	assert.ErrorContains(t, rpcerr.Error(), "assemble result was REVERT")
 
 	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
 	require.Len(t, coins, 1)

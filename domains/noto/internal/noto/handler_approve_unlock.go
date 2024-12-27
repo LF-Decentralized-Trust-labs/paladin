@@ -73,8 +73,15 @@ func (h *approveUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 	}
 
 	// Requester must own the locked states (only search for the first one)
-	_, lockedStates, _, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, big.NewInt(1))
+	lockedInputs, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, big.NewInt(1))
 	if err != nil {
+		if revert {
+			message := err.Error()
+			return &prototk.AssembleTransactionResponse{
+				AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+				RevertReason:   &message,
+			}, nil
+		}
 		return nil, err
 	}
 
@@ -88,7 +95,7 @@ func (h *approveUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			ReadStates: lockedStates,
+			ReadStates: lockedInputs.states,
 		},
 		AttestationPlan: []*prototk.AttestationRequest{
 			// Sender confirms the initial request with a signature
