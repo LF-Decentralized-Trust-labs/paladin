@@ -59,10 +59,9 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
 
     function onLock(
         address sender,
-        bytes32 id,
+        bytes32 lockId,
         address from,
         uint256 amount,
-        address[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
@@ -70,8 +69,45 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
     }
 
     function onUnlock(
-        bytes32 id,
-        address recipient,
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function onPrepareUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function onApproveUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address delegate,
+        PreparedTransaction calldata prepared
+    ) external override {
+        // do nothing
+    }
+
+    function handleDelegateUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
         bytes calldata data
     ) external override {
         // do nothing

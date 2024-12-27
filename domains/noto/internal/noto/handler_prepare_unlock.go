@@ -18,13 +18,14 @@ package noto
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 // This handler is identical to unlockHandler, except for the Prepare() method
@@ -72,6 +73,55 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	}, nil
 }
 
+func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+	inParams := tx.Params.(*types.UnlockParams)
+
+	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
+	if err != nil {
+		return nil, err
+	}
+	toAddresses := make([]*tktypes.EthAddress, len(inParams.To))
+	for i, to := range inParams.To {
+		toAddresses[i], err = h.noto.findEthAddressVerifier(ctx, "to", to, req.ResolvedVerifiers)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	encodedCall, err := baseTransaction.encode(ctx)
+	if err != nil {
+		return nil, err
+	}
+	params := &UnlockHookParams{
+		Sender:  fromAddress,
+		LockID:  inParams.LockID,
+		From:    fromAddress,
+		To:      toAddresses,
+		Amounts: inParams.Amounts,
+		Data:    inParams.Data,
+		Prepared: PreparedTransaction{
+			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
+			EncodedCall:     encodedCall,
+		},
+	}
+
+	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
+		tx.DomainConfig,
+		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onPrepareUnlock"],
+		params,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TransactionWrapper{
+		transactionType: mapPrepareTransactionType(transactionType),
+		functionABI:     functionABI,
+		paramsJSON:      paramsJSON,
+		contractAddress: &tx.DomainConfig.NotaryAddress,
+	}, nil
+}
+
 func (h *prepareUnlockHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
 	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
@@ -79,7 +129,11 @@ func (h *prepareUnlockHandler) Prepare(ctx context.Context, tx *types.ParsedTran
 	}
 
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		return nil, fmt.Errorf("Pente notary type not supported")
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
+		if err != nil {
+			return nil, err
+		}
+		return hookTransaction.prepare(nil)
 	}
 
 	return baseTransaction.prepare(nil)

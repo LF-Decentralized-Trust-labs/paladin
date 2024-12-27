@@ -68,6 +68,13 @@ export interface NotoBurnParams {
   data: string;
 }
 
+export interface NotoApproveTransferParams {
+  inputs: IStateEncoded[];
+  outputs: IStateEncoded[];
+  data: string;
+  delegate: string;
+}
+
 export interface NotoLockParams {
   lockId: string;
   amount: string | number;
@@ -82,11 +89,15 @@ export interface NotoUnlockParams {
   data: string;
 }
 
-export interface NotoApproveTransferParams {
-  inputs: IStateEncoded[];
-  outputs: IStateEncoded[];
-  data: string;
+export interface NotoApproveUnlockParams {
+  lockId: string;
   delegate: string;
+  data: string;
+}
+
+export interface NotoUnlockWithApprovalParams {
+  lockId: string;
+  data: string;
 }
 
 export class NotoFactory {
@@ -242,6 +253,49 @@ export class NotoInstance {
         from: data.from.lookup,
         to: data.to.map((to) => to.lookup),
       },
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async prepareUnlock(from: PaladinVerifier, data: NotoUnlockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PRIVATE,
+      abi: notoPrivateJSON.abi,
+      function: "prepareUnlock",
+      to: this.address,
+      from: from.lookup,
+      data: {
+        ...data,
+        from: data.from.lookup,
+        to: data.to.map((to) => to.lookup),
+      },
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async approveUnlock(from: PaladinVerifier, data: NotoApproveUnlockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PRIVATE,
+      abi: notoPrivateJSON.abi,
+      function: "approveUnlock",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async unlockWithApproval(
+    from: PaladinVerifier,
+    data: NotoUnlockWithApprovalParams
+  ) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PUBLIC,
+      abi: notoJSON.abi,
+      function: "unlockWithApproval",
+      to: this.address,
+      from: from.lookup,
+      data,
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
