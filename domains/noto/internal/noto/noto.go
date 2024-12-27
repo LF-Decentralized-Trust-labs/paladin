@@ -33,6 +33,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -837,10 +838,108 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedInputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedOutputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.Outputs)...)
+
+				var domainConfig *types.NotoParsedConfig
+				err = json.Unmarshal([]byte(req.ContractInfo.ContractConfigJson), &domainConfig)
+				if err != nil {
+					return nil, err
+				}
+				if domainConfig.IsNotary && domainConfig.NotaryType == types.NotaryTypePente {
+					err = n.handleNotaryPrivateUnlock(ctx, req.StateQueryContext, domainConfig, &unlock)
+					if err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
 	}
 	return &res, nil
+}
+
+// When notary logic is implemented via Pente, unlock events from the base ledger must be propagated back to the Pente hooks
+// TODO: this method should not be invoked directly on the event loop, but rather via a queue
+func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext string, domainConfig *types.NotoParsedConfig, unlock *NotoDelegateUnlock_Event) error {
+	lockedInputs := make([]any, len(unlock.LockedInputs))
+	for i, input := range unlock.LockedInputs {
+		lockedInputs[i] = input.String()
+	}
+	unlockedOutputs := make([]any, len(unlock.Outputs))
+	for i, output := range unlock.Outputs {
+		unlockedOutputs[i] = output.String()
+	}
+
+	// TODO: this should query all states by ID, not just available ones
+	// (if moved to an async handler, the states will likely be spent by the time this runs)
+	queryBuilder := query.NewQueryBuilder().In(".id", lockedInputs)
+	inputStates, err := n.findAvailableLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
+	if err != nil {
+		return err
+	}
+	if len(inputStates) != len(lockedInputs) {
+		return i18n.NewError(ctx, msgs.MsgMissingStateData, unlock.LockedInputs)
+	}
+
+	// TODO: this should query all states by ID, not just available ones
+	queryBuilder = query.NewQueryBuilder().In(".id", unlockedOutputs)
+	outputStates, err := n.findAvailableStates(ctx, stateQueryContext, queryBuilder.Query().String())
+	if err != nil {
+		return err
+	}
+	if len(outputStates) != len(unlock.Outputs) {
+		return i18n.NewError(ctx, msgs.MsgMissingStateData, unlock.Outputs)
+	}
+
+	var from *tktypes.EthAddress
+	for _, state := range inputStates {
+		coin, err := n.unmarshalCoin(state.DataJson)
+		if err != nil {
+			return err
+		}
+		from = coin.Owner
+		// TODO: ensure all are from the same owner?
+	}
+
+	recipients := make([]*tktypes.EthAddress, len(outputStates))
+	amounts := make([]*tktypes.HexUint256, len(outputStates))
+	for i, state := range outputStates {
+		coin, err := n.unmarshalLockedCoin(state.DataJson)
+		if err != nil {
+			return err
+		}
+		recipients[i] = coin.Owner
+		amounts[i] = coin.Amount
+	}
+
+	transactionType, functionABI, paramsJSON, err := n.wrapHookTransaction(
+		domainConfig,
+		types.NotoABI.Functions()["handleDelegateUnlock"],
+		&DelegateUnlockHookParams{
+			Sender:  &unlock.Delegate,
+			LockID:  unlock.LockID,
+			From:    from,
+			To:      recipients,
+			Amounts: amounts,
+			Data:    unlock.Data,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	functionABIJSON, err := json.Marshal(functionABI)
+	if err != nil {
+		return err
+	}
+
+	_, err = n.Callbacks.SendTransaction(ctx, &prototk.SendTransactionRequest{
+		Transaction: &prototk.TransactionInput{
+			Type:            mapSendTransactionType(transactionType),
+			From:            domainConfig.NotaryLookup,
+			ContractAddress: domainConfig.NotaryAddress.String(),
+			FunctionAbiJson: string(functionABIJSON),
+			ParamsJson:      string(paramsJSON),
+		},
+	})
+	return err
 }
 
 func (n *Noto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {

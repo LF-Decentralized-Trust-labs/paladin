@@ -39,30 +39,30 @@ async function main(): Promise<boolean> {
   if (!checkDeploy(issuerGroup)) return false;
 
   // Deploy private tracker to the issuer privacy group
-  // logger.log("Creating private tracker...");
-  // const tracker = await newERC20Tracker(issuerGroup, cashIssuer, {
-  //   name: "CASH",
-  //   symbol: "CASH",
-  // });
-  // if (!checkDeploy(tracker)) return false;
+  logger.log("Creating private tracker...");
+  const tracker = await newERC20Tracker(issuerGroup, cashIssuer, {
+    name: "CASH",
+    symbol: "CASH",
+  });
+  if (!checkDeploy(tracker)) return false;
 
   // Create a Noto token to represent cash
   logger.log("Deploying Noto cash token...");
   const notoFactory = new NotoFactory(paladin1, "noto");
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
-    // hooks: {
-    //   privateGroup: issuerGroup.group,
-    //   publicAddress: issuerGroup.address,
-    //   privateAddress: tracker.address,
-    // },
+    hooks: {
+      privateGroup: issuerGroup.group,
+      publicAddress: issuerGroup.address,
+      privateAddress: tracker.address,
+    },
     restrictMint: true,
     allowBurn: true,
   });
   if (!checkDeploy(notoCash)) return false;
 
   // Issue some cash
-  logger.log("Issuing cash...");
+  logger.log("Issuing cash to investor1...");
   let receipt = await notoCash.mint(cashIssuer, {
     to: investor1,
     amount: 1000,
@@ -71,7 +71,7 @@ async function main(): Promise<boolean> {
   if (!checkReceipt(receipt)) return false;
 
   // Lock some tokens
-  logger.log("Locking cash...");
+  logger.log("Locking cash from investor1...");
   const lockId = randomBytes(32).toString("hex");
   receipt = await notoCash.using(paladin2).lock(investor1, {
     lockId,
@@ -80,13 +80,30 @@ async function main(): Promise<boolean> {
   });
   if (!checkReceipt(receipt)) return false;
 
-  // Unlock the tokens
-  logger.log("Unlocking cash...");
-  receipt = await notoCash.using(paladin2).unlock(investor1, {
+  // Prepare unlock operation
+  logger.log("Preparing unlock to investor2...");
+  receipt = await notoCash.using(paladin2).prepareUnlock(investor1, {
     lockId,
     from: investor1,
     to: [investor2],
     amounts: [100],
+    data: "0x",
+  });
+  if (!checkReceipt(receipt)) return false;
+
+  // Approve unlock operation
+  logger.log("Approving unlock for investor2...");
+  receipt = await notoCash.using(paladin2).approveUnlock(investor1, {
+    lockId,
+    delegate: await investor2.address(),
+    data: "0x",
+  });
+  if (!checkReceipt(receipt)) return false;
+
+  // Unlock the tokens
+  logger.log("Unlocking cash...");
+  receipt = await notoCash.using(paladin3).unlockWithApproval(investor2, {
+    lockId,
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;

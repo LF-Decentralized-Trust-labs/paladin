@@ -144,23 +144,66 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
 
     function onLock(
         address sender,
-        bytes32 id,
+        bytes32 lockId,
         address from,
         uint256 amount,
-        address[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override onlyOwner {
-        _createLock(id, from, amount, recipients);
+        _lock(lockId, from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
     function onUnlock(
-        bytes32 id,
-        address recipient,
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        _unlock(lockId, amounts);
+        for (uint256 i = 0; i < to.length; i++) {
+            _transfer(from, to[i], amounts[i]);
+        }
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onPrepareUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        _prepareUnlock(lockId, to, amounts);
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onApproveUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address delegate,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function handleDelegateUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
         bytes calldata data
     ) external override onlyOwner {
-        LockDetail memory lock = _removeLock(id);
-        _transfer(lock.from, recipient, lock.amount);
+        LockDetail memory lock_ = _handleDelegateUnlock(lockId, amounts);
+        for (uint256 i = 0; i < to.length; i++) {
+            _transfer(lock_.from, to[i], amounts[i]);
+        }
     }
 }
