@@ -157,7 +157,7 @@ func TestStateDistributionWithNullifiersAllRemote(t *testing.T) {
 	// in this example the local coordinator node isn't involved
 	require.Empty(t, sds.Local)
 
-	checkCommon := func(s *components.StateDistribution, withNullifier bool) {
+	checkCommon := func(s *components.StateDistributionWithData, withNullifier bool) {
 		if withNullifier {
 			require.Equal(t, "nullifier_algo", *s.NullifierAlgorithm)
 			require.Equal(t, "nullifier_verifier_type", *s.NullifierVerifierType)

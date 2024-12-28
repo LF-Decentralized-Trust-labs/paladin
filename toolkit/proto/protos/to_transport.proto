@@ -26,7 +26,8 @@ message ConfigureTransportResponse {
 }
 
 message SendMessageRequest {
-    Message message = 1;
+  string node = 1;
+  PaladinMsg message = 2;
 }
 
 message SendMessageResponse {
@@ -55,13 +56,14 @@ message GetLocalDetailsResponse {
   string transport_details = 1; // local transport details that can be shared via registry with other parties
 }
 
-message Message {
-    string message_id = 1;
-    optional string correlation_id = 2;
-    string component = 3; // component name to route message to once it arrives at the destination node
-    string node = 4;      // id of the node to send to
-    string reply_to = 5;  // id of the node to reply to 
-    string message_type =65;
-    bytes payload = 7;
-
+message PaladinMsg {
+    enum Component {
+      TRANSACTION_ENGINE = 0;
+      RELIABLE_MESSAGE_HANDLER = 1;
+    }
+    string message_id = 1; // UUID individually allocated to each message
+    optional string correlation_id = 2; // optional correlation ID to relate "replies" back to original message IDs
+    Component component = 3; // components are allocated here
+    string message_type = 4; // message types are managed within each component
+    bytes payload = 5; // arbitrary payload
 }

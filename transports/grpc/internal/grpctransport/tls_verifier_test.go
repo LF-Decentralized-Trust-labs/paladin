@@ -208,7 +208,7 @@ func testActivateNode(t *testing.T, sender *grpcTransport, remoteNodeName string
 func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 	ctx := context.Background()
 
-	received := make(chan *prototk.Message)
+	received := make(chan *prototk.PaladinMsg)
 	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
 		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 			received <- rmr.Message
@@ -219,10 +219,9 @@ func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 
 	// Connect and send from plugin1 to plugin2
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node2",
+		Node: "node2",
+		Message: &prototk.PaladinMsg{
+			Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 		},
 	})
 	assert.NoError(t, err)
@@ -244,7 +243,7 @@ func TestGRPCTransport_DirectCertVerification_OK(t *testing.T) {
 func TestGRPCTransport_DirectCertVerificationWithKeyRotation_OK(t *testing.T) {
 	ctx := context.Background()
 
-	received := make(chan *prototk.Message)
+	received := make(chan *prototk.PaladinMsg)
 
 	// the default config is direct cert verification
 	node1Cert, node1Key := buildTestCertificate(t, pkix.Name{CommonName: "node1"}, nil, nil)
@@ -273,10 +272,9 @@ func TestGRPCTransport_DirectCertVerificationWithKeyRotation_OK(t *testing.T) {
 	deactivate := testActivateNode(t, plugin1, "node2", transportDetails2)
 	defer deactivate()
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node2",
+		Node: "node2",
+		Message: &prototk.PaladinMsg{
+			Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 		},
 	})
 	assert.NoError(t, err)
@@ -315,7 +313,7 @@ func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
 	defer done2()
 	transportDetails1.Issuers = "" // to ensure we're not falling back to cert verification
 
-	received := make(chan *prototk.Message)
+	received := make(chan *prototk.PaladinMsg)
 	callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
 		received <- rmr.Message
 		return &prototk.ReceiveMessageResponse{}, nil
@@ -330,10 +328,9 @@ func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
 	deactivate := testActivateNode(t, plugin1, "node2", transportDetails2)
 	defer deactivate()
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node2",
+		Node: "node2",
+		Message: &prototk.PaladinMsg{
+			Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 		},
 	})
 	assert.NoError(t, err)

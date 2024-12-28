@@ -18,7 +18,9 @@ package transportmgr
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"sort"
+	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
@@ -26,6 +28,8 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"gorm.io/gorm/clause"
 )
 
 type peer struct {
@@ -34,10 +38,15 @@ type peer struct {
 
 	name      string
 	tm        *transportManager
-	transport *transport
+	transport *transport     // the transport mutually supported by us and the remote node
+	peerInfo  map[string]any // opaque JSON object from the transport
 
 	persistedMsgsAvailable chan struct{}
 	sendQueue              chan *components.TransportMessage
+
+	// Send loop state (no lock as only used on the loop)
+	lastFullScan time.Time
+	lastDrainHWM *tktypes.Timestamp
 
 	done chan struct{}
 }
@@ -113,8 +122,10 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 	// See if any of the transports registered by the node, are configured on this local node
 	// Note: We just pick the first one if multiple are available, and there is no retry to
 	//       fallback to a secondary one currently.
+	var remoteTransportDetails string
 	for _, rtd := range registeredTransportDetails {
 		p.transport = tm.transportsByName[rtd.Transport]
+		remoteTransportDetails = rtd.Details
 	}
 	if p.transport == nil {
 		// If we didn't find one, then feedback to the caller which transports were registered
@@ -123,6 +134,18 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
 		}
 		return nil, i18n.NewError(p.ctx, msgs.MsgTransportNoTransportsConfiguredForNode, nodeName, registeredTransportNames)
+	}
+
+	// Activate the connection (the deactivate is deferred to the send loop)
+	res, err := p.transport.api.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+		NodeName:         nodeName,
+		TransportDetails: remoteTransportDetails,
+	})
+	if err == nil {
+		err = json.Unmarshal([]byte(res.PeerInfoJson), &p.peerInfo)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	log.L(ctx).Debugf("connected to peer '%s'", nodeName)
@@ -137,14 +160,13 @@ func (p *peer) notifyPersistedMsgAvailable() {
 	}
 }
 
-func (p *peer) send(ctx context.Context, msg *components.TransportMessage) error {
-
+func (p *peer) mapMsg(msg *components.TransportMessage) *prototk.Message {
 	// Convert the message to the protobuf transport payload
 	var correlID *string
 	if msg.CorrelationID != nil {
 		correlID = confutil.P(msg.CorrelationID.String())
 	}
-	pMsg := &prototk.Message{
+	return &prototk.Message{
 		MessageType:   msg.MessageType,
 		MessageId:     msg.MessageID.String(),
 		CorrelationId: correlID,
@@ -153,32 +175,208 @@ func (p *peer) send(ctx context.Context, msg *components.TransportMessage) error
 		ReplyTo:       msg.ReplyTo,
 		Payload:       msg.Payload,
 	}
-	return p.transport.send(ctx, pMsg)
+}
+
+func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, targetNode string, sd *components.StateDistributionWithData) *prototk.Message {
+	payload, _ := json.Marshal(sd)
+	return &prototk.Message{
+
+		MessageType: "StateProducedEvent",
+		Payload:     payload,
+		Node:        targetNode,
+		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		ReplyTo:     p.tm.localNodeName,
+	}
+}
+
+func (p *peer) send(msg *prototk.Message) error {
+	return p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
+		return true, p.transport.send(p.ctx, msg)
+	})
+}
+
+func (p *peer) senderDone() {
+	log.L(p.ctx).Infof("peer %s deactivating", p.name)
+	if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
+		NodeName: p.name,
+	}); err != nil {
+		log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.name, err)
+	}
+	close(p.done)
+}
+
+func (p *peer) reliableMessageScan() error {
+
+	checkNew := true
+	fullScan := p.lastDrainHWM == nil || time.Since(p.lastFullScan) >= p.tm.reliableMessageResend
+	select {
+	case <-p.persistedMsgsAvailable:
+		checkNew = true
+	default:
+	}
+
+	if !fullScan && !checkNew {
+		return nil // Nothing to do
+	}
+
+	const pageSize = 100
+
+	var total = 0
+	var lastPageEnd *tktypes.Timestamp
+	for {
+		query := p.tm.persistence.DB().
+			WithContext(p.ctx).
+			Order("created ASC").
+			Joins("Ack").
+			Where(`"Ack"."time" IS NULL`).
+			Limit(pageSize)
+		if lastPageEnd != nil {
+			query = query.Where("created > ?", *lastPageEnd)
+		} else if !fullScan {
+			query = query.Where("created > ?", *p.lastDrainHWM)
+		}
+
+		var page []*components.ReliableMessage
+		err := query.Find(&page).Error
+		if err != nil {
+			return err
+		}
+
+		// Process the page - building and sending the proto messages
+		if err = p.processReliableMsgPage(page); err != nil {
+			// Errors returned are retryable - for data errors the function
+			// must record those as acks with an error.
+			return err
+		}
+
+		if len(page) > 0 {
+			total += len(page)
+			lastPageEnd = &page[len(page)-1].Created
+		}
+
+		// If we didn't have a full page, then we're done
+		if len(page) < pageSize {
+			break
+		}
+
+	}
+
+	log.L(p.ctx).Debugf("reliableMessageScan fullScan=%t total=%d lastPageEnd=%v", fullScan, total, lastPageEnd)
+
+	// If we found anything, then mark that as our high water mark for
+	// future scans. If an empty full scan - then we store nil
+	if lastPageEnd != nil || fullScan {
+		p.lastDrainHWM = lastPageEnd
+	}
+
+	// Record the last full scan
+	if fullScan {
+		p.lastFullScan = time.Now()
+	}
+
+	return nil
+}
+
+func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*prototk.Message, error, error) {
+
+	// Validate the message first (not retryable)
+	var sd components.StateDistributionWithData
+	var stateID tktypes.HexBytes
+	var contractAddr *tktypes.EthAddress
+	parseErr := json.Unmarshal(rm.Metadata, &sd)
+	if parseErr == nil {
+		stateID, parseErr = tktypes.ParseHexBytes(p.ctx, sd.StateID)
+	}
+	if parseErr == nil {
+		contractAddr, parseErr = tktypes.ParseEthAddress(sd.ContractAddress)
+	}
+	if parseErr != nil {
+		return nil, parseErr, nil
+	}
+
+	// Get the state - distinguishing between not found, vs. a retryable error
+	state, err := p.tm.stateManager.GetState(p.ctx, p.tm.persistence.DB(), sd.Domain, *contractAddr, stateID, false, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if state == nil {
+		return nil,
+			i18n.NewError(p.ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, *contractAddr, stateID),
+			nil
+	}
+
+	return nil, nil, nil
+}
+
+func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err error) {
+
+	// Build the messages
+	msgsToSend := make([]*prototk.Message, 0, len(page))
+	var errorAcks []*components.ReliableMessageAck
+	for _, rm := range page {
+		var msg *prototk.Message
+		var errorAck error
+		switch rm.MessageType.V() {
+		case components.RMTState:
+			msg, errorAck, err = p.buildStateDistributionMsg(rm)
+		case components.RMTReceipt:
+			// TODO: Implement for receipt distribution
+			fallthrough
+		default:
+			errorAck = i18n.NewError(p.ctx, msgs.MsgTransportUnsupportedReliableMsg, rm.MessageType)
+		}
+		switch {
+		case err != nil:
+			return err
+		case errorAck != nil:
+			errorAcks = append(errorAcks, &components.ReliableMessageAck{
+				MessageID: rm.ID,
+				Time:      tktypes.TimestampNow(),
+				Error:     errorAck.Error(),
+			})
+		case msg != nil:
+			msgsToSend = append(msgsToSend, msg)
+		}
+	}
+
+	// Persist any bad message failures
+	if len(errorAcks) > 0 {
+		err := p.tm.persistence.DB().
+			WithContext(p.ctx).
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(errorAcks).
+			Error
+		if err != nil {
+			return err
+		}
+	}
+
+	// Send the messages, with short retry.
+	// We fail the whole page on error, so we don't thrash (the outer infinite retry
+	// gives a much longer maximum back-off).
+	for _, msg := range msgsToSend {
+		if err := p.send(msg); err != nil {
+			return err
+		}
+	}
+
+	return nil
 
 }
 
 func (p *peer) sender() {
-	defer close(p.done)
+	defer p.senderDone()
 
 	log.L(p.ctx).Infof("peer %s active", p.name)
 
-	var persistedStale bool
-	var persistedPage []*components.TransportMessage
 	for {
 
-		var nextMessage *components.TransportMessage
-
-		if len(persistedPage) > 0 {
-
-		}
-
-		select {
-		case <-p.ctx.Done():
-			log.L(p.ctx).Infof("peer %s inactive", p.name)
-			return
-		case <-p.persistedMsgsAvailable:
-			persistedStale = true
-		case nextMessage = <-p.sendQueue:
+		// We send/resend any reliable messages queued up first
+		err := p.tm.reliableScanRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
+			return true, p.reliableMessageScan()
+		})
+		if err != nil {
+			return // context closed
 		}
 	}
 }

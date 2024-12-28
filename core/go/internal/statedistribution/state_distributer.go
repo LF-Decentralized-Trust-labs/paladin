@@ -42,10 +42,10 @@ func NewStateDistributer(
 ) StateDistributer {
 	sd := &stateDistributer{
 		persistence:      persistence,
-		inputChan:        make(chan *components.StateDistribution),
+		inputChan:        make(chan *components.StateDistributionWithData),
 		retryChan:        make(chan string),
 		acknowledgedChan: make(chan string),
-		pendingMap:       make(map[string]*components.StateDistribution),
+		pendingMap:       make(map[string]*components.StateDistributionWithData),
 		stateManager:     stateManager,
 		keyManager:       keyManager,
 		transportManager: transportManager,
@@ -81,8 +81,8 @@ StateDistributer is a component that is responsible for distributing state to re
 type StateDistributer interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context)
-	BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistribution) ([]*components.NullifierUpsert, error)
-	DistributeStates(ctx context.Context, stateDistributions []*components.StateDistribution)
+	BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistributionWithData) ([]*components.NullifierUpsert, error)
+	DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData)
 	HandleStateProducedEvent(ctx context.Context, stateProducedEvent *pb.StateProducedEvent, distributingNode string)
 	HandleStateAcknowledgedEvent(ctx context.Context, messagePayload []byte)
 }
@@ -93,10 +93,10 @@ type stateDistributer struct {
 	persistence           persistence.Persistence
 	stateManager          components.StateManager
 	keyManager            components.KeyManager
-	inputChan             chan *components.StateDistribution
+	inputChan             chan *components.StateDistributionWithData
 	retryChan             chan string
 	acknowledgedChan      chan string
-	pendingMap            map[string]*components.StateDistribution
+	pendingMap            map[string]*components.StateDistributionWithData
 	acknowledgementWriter *acknowledgementWriter
 	receivedStateWriter   *receivedStateWriter
 	transportManager      components.TransportManager
@@ -151,7 +151,7 @@ func (sd *stateDistributer) Start(bgCtx context.Context) error {
 						continue
 					}
 
-					sd.inputChan <- &components.StateDistribution{
+					sd.inputChan <- &components.StateDistributionWithData{
 						ID:                    stateDistribution.ID,
 						StateID:               stateDistribution.StateID.String(),
 						IdentityLocator:       stateDistribution.IdentityLocator,
@@ -218,7 +218,7 @@ func (sd *stateDistributer) Start(bgCtx context.Context) error {
 	return nil
 }
 
-func (sd *stateDistributer) buildNullifier(ctx context.Context, krc components.KeyResolutionContextLazyDB, s *components.StateDistribution) (*components.NullifierUpsert, error) {
+func (sd *stateDistributer) buildNullifier(ctx context.Context, krc components.KeyResolutionContextLazyDB, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
 	// We need to call the signing engine with the local identity to build the nullifier
 	log.L(ctx).Infof("Generating nullifier for state %s on node %s (algorithm=%s,verifierType=%s,payloadType=%s)",
 		s.StateID, sd.localNodeName, *s.NullifierAlgorithm, *s.NullifierVerifierType, *s.NullifierPayloadType)
@@ -261,7 +261,7 @@ func (sd *stateDistributer) withKeyResolutionContext(ctx context.Context, fn fun
 	return err // note we require err to be set before return
 }
 
-func (sd *stateDistributer) BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistribution) (nullifiers []*components.NullifierUpsert, err error) {
+func (sd *stateDistributer) BuildNullifiers(ctx context.Context, stateDistributions []*components.StateDistributionWithData) (nullifiers []*components.NullifierUpsert, err error) {
 
 	nullifiers = []*components.NullifierUpsert{}
 	err = sd.withKeyResolutionContext(ctx, func(krc components.KeyResolutionContextLazyDB) error {

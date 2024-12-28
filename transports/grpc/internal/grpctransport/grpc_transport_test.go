@@ -134,32 +134,9 @@ func TestReceiveFail(t *testing.T) {
 	var err error
 	for err == nil {
 		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-			Message: &prototk.Message{
-				ReplyTo:   "node1",
-				Component: "to.you",
-				Node:      "node2",
-			},
-		})
-	}
-	assert.Error(t, err)
-
-}
-
-func TestBadReplyTo(t *testing.T) {
-
-	ctx := context.Background()
-
-	plugin1, _, done := newSuccessfulVerifiedConnection(t)
-	defer done()
-
-	// Send and we should get an error as the server fails
-	var err error
-	for err == nil {
-		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-			Message: &prototk.Message{
-				ReplyTo:   "not.mine",
-				Component: "to.you",
-				Node:      "node2",
+			Node: "node2",
+			Message: &prototk.PaladinMsg{
+				Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 			},
 		})
 	}
@@ -184,10 +161,9 @@ func TestConnectFail(t *testing.T) {
 	var err error
 	for err == nil {
 		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-			Message: &prototk.Message{
-				ReplyTo:   "node1",
-				Component: "to.you",
-				Node:      "node2",
+			Node: "node2",
+			Message: &prototk.PaladinMsg{
+				Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 			},
 		})
 	}
@@ -207,10 +183,9 @@ func TestSendNotActivated(t *testing.T) {
 	defer done()
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node3",
+		Node: "node3",
+		Message: &prototk.PaladinMsg{
+			Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 		},
 	})
 	assert.Regexp(t, "PD030016", err)
@@ -251,27 +226,6 @@ func TestConnectBadTransport(t *testing.T) {
 
 }
 
-func TestSendNoNode(t *testing.T) {
-
-	ctx := context.Background()
-
-	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
-		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
-			return &prototk.ReceiveMessageResponse{}, nil
-		}
-	})
-	defer done()
-
-	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "someComponent",
-		},
-	})
-	assert.Regexp(t, "PD030013", err)
-
-}
-
 func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 
 	plugin, _, _, done := newTestGRPCTransport(t, "", "", &Config{})
@@ -298,9 +252,7 @@ func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 
 	for err == nil {
 		err = s.Send(&proto.Message{
-			ReplyTo:   "not.mine",
-			Component: "to.you",
-			Node:      "node2",
+			Component: int32(prototk.PaladinMsg_TRANSACTION_ENGINE),
 		})
 	}
 	assert.Error(t, err)

@@ -1,5 +1,5 @@
 BEGIN;
-DROP TABLE queued_msg_acks;
-DROP TABLE queued_msgs;
+DROP TABLE reliable_msg_acks;
+DROP TABLE reliable_msgs;
 COMMIT;
 

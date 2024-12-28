@@ -18,6 +18,7 @@ package transportmgr
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -25,10 +26,12 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -41,6 +44,8 @@ type transportManager struct {
 	conf            *pldconf.TransportManagerConfig
 	localNodeName   string
 	registryManager components.RegistryManager
+	stateManager    components.StateManager
+	persistence     persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
@@ -52,18 +57,25 @@ type transportManager struct {
 	peersLock sync.RWMutex
 	peers     map[string]*peer
 
-	senderBufferLen int
+	sendShortRetry    *retry.Retry
+	reliableScanRetry *retry.Retry
+
+	senderBufferLen       int
+	reliableMessageResend time.Duration
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
 	return &transportManager{
-		bgCtx:            bgCtx,
-		conf:             conf,
-		localNodeName:    conf.NodeName,
-		transportsByID:   make(map[uuid.UUID]*transport),
-		transportsByName: make(map[string]*transport),
-		destinations:     make(map[string]components.TransportClient),
-		senderBufferLen:  confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
+		bgCtx:                 bgCtx,
+		conf:                  conf,
+		localNodeName:         conf.NodeName,
+		transportsByID:        make(map[uuid.UUID]*transport),
+		transportsByName:      make(map[string]*transport),
+		destinations:          make(map[string]components.TransportClient),
+		senderBufferLen:       confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
+		reliableMessageResend: confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
+		sendShortRetry:        retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
+		reliableScanRetry:     retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
 	}
 }
 
@@ -82,6 +94,8 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	// plugin manager starts, and thus before any domain would have started any go-routine
 	// that could have cached a nil value in memory.
 	tm.registryManager = c.RegistryManager()
+	tm.stateManager = c.StateManager()
+	tm.persistence = c.Persistence()
 	return nil
 }
 
@@ -199,15 +213,16 @@ func (tm *transportManager) LocalNodeName() string {
 	return tm.localNodeName
 }
 
-func (tm *transportManager) prepareNewMessage(ctx context.Context, msg *components.TransportMessage) (*peer, error) {
-	msg.Created = tktypes.TimestampNow()
+// See docs in components package
+func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
+
 	msg.MessageID = uuid.New()
 
 	// Check the message is valid
 	if len(msg.MessageType) == 0 ||
 		len(msg.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", msg)
-		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
 	if msg.ReplyTo == "" {
@@ -216,17 +231,6 @@ func (tm *transportManager) prepareNewMessage(ctx context.Context, msg *componen
 
 	// Use or establish a peer connection for the send
 	peer, err := tm.getPeer(ctx, msg.Node)
-	if err != nil {
-		return nil, err
-	}
-
-	return peer, nil
-}
-
-// See docs in components package
-func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
-
-	peer, err := tm.prepareNewMessage(ctx, msg)
 	if err != nil {
 		return err
 	}
@@ -246,21 +250,29 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 }
 
 // See docs in components package
-func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg *components.TransportMessage) (preCommit func(), err error) {
+func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg *components.ReliableMessage) (preCommit func(), err error) {
 
-	peer, err := tm.prepareNewMessage(ctx, msg)
+	var p *peer
+
+	msg.ID = uuid.New()
+	msg.Created = tktypes.TimestampNow()
+	_, err = msg.MessageType.Validate()
+
+	if err == nil {
+		p, err = tm.getPeer(ctx, msg.Node)
+	}
+
+	if err == nil {
+		err = dbTX.
+			WithContext(ctx).
+			Create(msg).
+			Error
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	err = dbTX.
-		WithContext(ctx).
-		Create(msg).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return peer.notifyPersistedMsgAvailable, nil
+	return p.notifyPersistedMsgAvailable, nil
 
 }

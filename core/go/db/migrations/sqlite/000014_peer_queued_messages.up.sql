@@ -4,26 +4,24 @@ BEGIN;
 DROP TABLE state_distribution_acknowledgments;
 DROP TABLE state_distributions;
 
-CREATE TABLE queued_msgs (
-    "id"                 TEXT    NOT NULL,
+CREATE TABLE reliable_msgs (
+    "id"                 UUID    NOT NULL,
     "created"            BIGINT  NOT NULL,
-    "cid"                TEXT    ,
     "node"               TEXT    NOT NULL,
-    "component"          TEXT    NOT NULL,
-    "reply_to"           TEXT    NOT NULL,
     "msg_type"           TEXT    NOT NULL,
-    "payload"            TEXT    ,
+    "metadata"           TEXT    NOT NULL,
     PRIMARY KEY ("id")
 );
 
-CREATE INDEX queued_msgs_node ON queued_msgs ("node");
-CREATE INDEX queued_msgs_created ON queued_msgs ("created");
+CREATE INDEX reliable_msgs_node ON reliable_msgs ("node");
+CREATE INDEX reliable_msgs_created ON reliable_msgs ("created");
 
-CREATE TABLE queued_msg_acks (
-    "id"                 TEXT    NOT NULL,
+CREATE TABLE reliable_msg_acks (
+    "id"                 UUID    NOT NULL,
     "time"               BIGINT  NOT NULL,
+    "error"              TEXT,
     PRIMARY KEY ("id"),
-    FOREIGN KEY ("id") REFERENCES queued_msgs ("id") ON DELETE CASCADE
+    FOREIGN KEY ("id") REFERENCES reliable_msgs ("id") ON DELETE CASCADE
 );
 
 

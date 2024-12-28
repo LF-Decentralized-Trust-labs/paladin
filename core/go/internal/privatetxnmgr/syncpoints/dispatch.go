@@ -60,7 +60,7 @@ type DispatchBatch struct {
 
 // PersistDispatches persists the dispatches to the database and coordinates with the public transaction manager
 // to submit public transactions.
-func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistribution, preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistribution) error {
+func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistribution) error {
 
 	stateDistributionsPersisted := make([]*statedistribution.StateDistributionPersisted, 0, len(stateDistributions))
 	for _, stateDistribution := range stateDistributions {

@@ -367,6 +367,8 @@ var (
 	MsgTransportClientAlreadyRegistered       = ffe("PD012010", "Client '%s' already registered")
 	MsgTransportDestinationNotFound           = ffe("PD012011", "Destination '%s' not found")
 	MsgTransportClientRegisterAfterStartup    = ffe("PD012012", "Client '%s' attempted registration after startup")
+	MsgTransportUnsupportedReliableMsg        = ffe("PD012013", "Unsupported reliable message type '%s'")
+	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")

@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -51,29 +52,28 @@ type PrivateTxStatus struct {
 	FailureMessage string                       `json:"failureMessage,omitempty"`
 }
 
-// If we had lots of these we would probably want to centralize the assignment of the constants to avoid duplication
-// but currently there is only 2 ( the other being IDENTITY_RESOLVER_DESTINATION )
-const PRIVATE_TX_MANAGER_DESTINATION = "private-tx-manager"
-
 type StateDistributionSet struct {
 	LocalNode  string
 	SenderNode string
-	Remote     []*StateDistribution
-	Local      []*StateDistribution
+	Remote     []*StateDistributionWithData
+	Local      []*StateDistributionWithData
 }
 
-// A StateDistribution is an intent to send private data for a given state to a remote party
 type StateDistribution struct {
-	ID                    string
-	StateID               string
-	IdentityLocator       string
-	Domain                string
-	ContractAddress       string
-	SchemaID              string
-	StateDataJson         string
-	NullifierAlgorithm    *string
-	NullifierVerifierType *string
-	NullifierPayloadType  *string
+	StateID               string  `json:"stateId"`
+	IdentityLocator       string  `json:"identityLocator"`
+	Domain                string  `json:"domain"`
+	ContractAddress       string  `json:"contractAddress"`
+	SchemaID              string  `json:"schemaId"`
+	NullifierAlgorithm    *string `json:"nullifierAlgorithm"`
+	NullifierVerifierType *string `json:"nullifierVerifierType"`
+	NullifierPayloadType  *string `json:"nullifierPayloadType"`
+}
+
+// A StateDistributionWithData is an intent to send private data for a given state to a remote party
+type StateDistributionWithData struct {
+	StateDistribution
+	StateData tktypes.RawJSON `json:"stateData"`
 }
 
 type PrivateTxManager interface {

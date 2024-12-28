@@ -71,7 +71,7 @@ func TestBuildNullifiersNoOp(t *testing.T) {
 
 	ctx, _, sd := newTestStateDistributor(t)
 
-	nullifiers, err := sd.BuildNullifiers(ctx, []*components.StateDistribution{
+	nullifiers, err := sd.BuildNullifiers(ctx, []*components.StateDistributionWithData{
 		{
 			ID:              uuid.New().String(),
 			StateID:         "id1",
@@ -105,7 +105,7 @@ func TestBuildNullifiersOk(t *testing.T) {
 		Return(nullifierBytes, nil)
 
 	stateID := tktypes.HexBytes(tktypes.RandBytes(32))
-	nullifiers, err := sd.BuildNullifiers(ctx, []*components.StateDistribution{
+	nullifiers, err := sd.BuildNullifiers(ctx, []*components.StateDistributionWithData{
 		{
 			ID:                    uuid.New().String(),
 			StateID:               stateID.String(),
@@ -139,7 +139,7 @@ func TestBuildNullifiersFail(t *testing.T) {
 		Return(nil, fmt.Errorf("pop"))
 
 	stateID := tktypes.HexBytes(tktypes.RandBytes(32))
-	_, err := sd.BuildNullifiers(ctx, []*components.StateDistribution{
+	_, err := sd.BuildNullifiers(ctx, []*components.StateDistributionWithData{
 		{
 			ID:                    uuid.New().String(),
 			StateID:               stateID.String(),
@@ -159,7 +159,7 @@ func TestBuildNullifiersNotLocal(t *testing.T) {
 	ctx, _, sd := newTestStateDistributor(t)
 
 	stateID := tktypes.HexBytes(tktypes.RandHex(32))
-	_, err := sd.BuildNullifiers(ctx, []*components.StateDistribution{
+	_, err := sd.BuildNullifiers(ctx, []*components.StateDistributionWithData{
 		{
 			ID:                    uuid.New().String(),
 			StateID:               stateID.String(),

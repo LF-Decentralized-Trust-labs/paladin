@@ -29,7 +29,7 @@ func (sd *stateDistributer) HandleStateProducedEvent(ctx context.Context, stateP
 	log.L(ctx).Debugf("stateDistributer:handleStateProducedEvent")
 
 	var err error
-	s := &components.StateDistribution{
+	s := &components.StateDistributionWithData{
 		ID:                    stateProducedEvent.DistributionId,
 		StateID:               stateProducedEvent.StateId,
 		IdentityLocator:       stateProducedEvent.Party,

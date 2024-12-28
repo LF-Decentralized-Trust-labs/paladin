@@ -26,14 +26,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (sd *stateDistributer) DistributeStates(ctx context.Context, stateDistributions []*components.StateDistribution) {
+func (sd *stateDistributer) DistributeStates(ctx context.Context, stateDistributions []*components.StateDistributionWithData) {
 	log.L(ctx).Debugf("stateDistributer:DistributeStates %d state distributions", len(stateDistributions))
 	for _, stateDistribution := range stateDistributions {
 		sd.inputChan <- stateDistribution
 	}
 }
 
-func (sd *stateDistributer) sendState(ctx context.Context, stateDistribution *components.StateDistribution) {
+func (sd *stateDistributer) sendState(ctx context.Context, stateDistribution *components.StateDistributionWithData) {
 	log.L(ctx).Debugf("stateDistributer:sendState id=%s,domain=%s contractAddress=%s schemaId=%s stateId=%s identity=%s, nullifierAlgorithm=%v nullifierVerifierType=%v nullifierPayloadType=%v]",
 		stateDistribution.ID,
 		stateDistribution.Domain,

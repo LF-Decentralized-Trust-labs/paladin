@@ -45,8 +45,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		PublicDispatches: make([]*syncpoints.PublicDispatch, 0, len(dispatchableTransactions)),
 	}
 
-	stateDistributions := make([]*components.StateDistribution, 0)
-	localStateDistributions := make([]*components.StateDistribution, 0)
+	stateDistributions := make([]*components.StateDistributionWithData, 0)
+	localStateDistributions := make([]*components.StateDistributionWithData, 0)
 	preparedTxnDistributions := make([]*preparedtxdistribution.PreparedTxnDistribution, 0)
 
 	for signingAddress, transactionFlows := range dispatchableTransactions {

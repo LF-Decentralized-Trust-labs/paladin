@@ -185,24 +185,16 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 			return err
 		}
 
-		log.L(ctx).Infof("GRPC received message id=%s cid=%v component=%s messageType=%s replyTo=%s from peer %s",
-			msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, ai.verifiedNodeName)
-
-		// Check the message is from the node we expect.
-		// Note the destination node is checked by Paladin - just just have to verify the sender.
-		if msg.ReplyTo != ai.verifiedNodeName {
-			log.L(ctx).Errorf("Invalid replyTo: %s", msg.ReplyTo)
-			return i18n.NewError(ctx, msgs.MsgInvalidReplyToNode)
-		}
+		log.L(ctx).Infof("GRPC received message id=%s cid=%v component=%d messageType=%s from peer %s",
+			msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, ai.verifiedNodeName)
 
 		// Deliver it to Paladin
 		_, err = t.callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
-			Message: &prototk.Message{
+			Node: ai.verifiedNodeName,
+			Message: &prototk.PaladinMsg{
 				MessageId:     msg.MessageId,
 				CorrelationId: msg.CorrelationId,
-				Component:     msg.Component,
-				Node:          msg.Node,
-				ReplyTo:       msg.ReplyTo,
+				Component:     prototk.PaladinMsg_Component(msg.Component),
 				MessageType:   msg.MessageType,
 				Payload:       msg.Payload,
 			},
@@ -277,22 +269,17 @@ func (t *grpcTransport) getConnection(nodeName string) *outboundConn {
 
 func (t *grpcTransport) SendMessage(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 	msg := req.Message
-	if req.Message.Node == "" {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorNoTargetNode)
-	}
-	oc := t.getConnection(msg.Node)
+	oc := t.getConnection(req.Node)
 	if oc == nil {
 		// This is an error in the Paladin layer
-		return nil, i18n.NewError(ctx, msgs.MsgNodeNotActive, msg.Node)
+		return nil, i18n.NewError(ctx, msgs.MsgNodeNotActive, req.Node)
 	}
-	log.L(ctx).Infof("GRPC sending message id=%s cid=%v component=%s messageType=%s replyTo=%s to peer %s",
-		msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, msg.ReplyTo, msg.Node)
+	log.L(ctx).Infof("GRPC sending message id=%s cid=%v component=%s messageType=%s to peer %s",
+		msg.MessageId, msg.CorrelationId, msg.Component, msg.MessageType, req.Node)
 	err := oc.send(&proto.Message{
 		MessageId:     msg.MessageId,
 		CorrelationId: msg.CorrelationId,
-		Component:     msg.Component,
-		Node:          msg.Node,
-		ReplyTo:       msg.ReplyTo,
+		Component:     int32(msg.Component),
 		MessageType:   msg.MessageType,
 		Payload:       msg.Payload,
 	})
