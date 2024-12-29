@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -34,7 +33,6 @@ type dispatchOperation struct {
 	privateDispatches        []*components.ValidatedTransaction
 	preparedTransactions     []*components.PrepareTransactionWithRefs
 	preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistributionPersisted
-	stateDistributions       []*statedistribution.StateDistributionPersisted
 }
 
 type DispatchPersisted struct {
@@ -62,17 +60,6 @@ type DispatchBatch struct {
 // to submit public transactions.
 func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistribution) error {
 
-	stateDistributionsPersisted := make([]*statedistribution.StateDistributionPersisted, 0, len(stateDistributions))
-	for _, stateDistribution := range stateDistributions {
-		stateDistributionsPersisted = append(stateDistributionsPersisted, &statedistribution.StateDistributionPersisted{
-			ID:              stateDistribution.ID,
-			StateID:         tktypes.MustParseHexBytes(stateDistribution.StateID),
-			IdentityLocator: stateDistribution.IdentityLocator,
-			DomainName:      stateDistribution.Domain,
-			ContractAddress: *tktypes.MustEthAddress(stateDistribution.ContractAddress),
-		})
-	}
-
 	preparedTxnDistributionsPersisted := make([]*preparedtxdistribution.PreparedTxnDistributionPersisted, 0, len(dispatchBatch.PreparedTransactions))
 	for _, preparedTxnDistribution := range preparedTxnDistributions {
 		preparedTxnDistributionsPersisted = append(preparedTxnDistributionsPersisted, &preparedtxdistribution.PreparedTxnDistributionPersisted{
@@ -93,7 +80,6 @@ func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contrac
 			privateDispatches:        dispatchBatch.PrivateDispatches,
 			preparedTransactions:     dispatchBatch.PreparedTransactions,
 			preparedTxnDistributions: preparedTxnDistributionsPersisted,
-			stateDistributions:       stateDistributionsPersisted,
 		},
 	})
 

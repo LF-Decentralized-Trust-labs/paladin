@@ -359,7 +359,6 @@ var (
 	MsgTransportNodeNameNotConfigured         = ffe("PD012002", "nodeName must be configured to set the identity of the local node")
 	MsgTransportNoTransportsConfiguredForNode = ffe("PD012003", "None of the transports registered by node '%s' are configured locally on this node: %v")
 	MsgTransportDetailsNotAvailable           = ffe("PD012004", "Transport '%s' not available for node '%s'")
-	MsgTransportInvalidNodeReceived           = ffe("PD012005", "Message received on node '%s' but is addressed for node '%s'")
 	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
 	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")

@@ -22,9 +22,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -152,16 +150,7 @@ func (tb *testbed) writeNullifiersToContext(dCtx components.DomainContext, tx *c
 		return fmt.Errorf("testbed does not support states for remote nodes")
 	}
 
-	// We construct a state distributor each time, but DO NOT START IT.
-	// TODO: State distributor needs to become a first class component with significant lifecycle activities
-	sd := statedistribution.NewStateDistributer(tb.ctx,
-		tb.c.TransportManager(),
-		tb.c.StateManager(),
-		tb.c.KeyManager(),
-		tb.c.Persistence(),
-		&pldconf.DistributerConfig{},
-	)
-	nullifiers, err := sd.BuildNullifiers(tb.ctx, distributions.Local)
+	nullifiers, err := tb.c.PrivateTxManager().BuildNullifiers(tb.ctx, distributions.Local)
 	if err != nil {
 		return err
 	}

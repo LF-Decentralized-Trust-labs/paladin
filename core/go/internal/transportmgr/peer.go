@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -42,7 +41,7 @@ type peer struct {
 	peerInfo  map[string]any // opaque JSON object from the transport
 
 	persistedMsgsAvailable chan struct{}
-	sendQueue              chan *components.TransportMessage
+	sendQueue              chan *prototk.PaladinMsg
 
 	// Send loop state (no lock as only used on the loop)
 	lastFullScan time.Time
@@ -102,7 +101,7 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 		tm:                     tm,
 		name:                   nodeName,
 		persistedMsgsAvailable: make(chan struct{}, 1),
-		sendQueue:              make(chan *components.TransportMessage, tm.senderBufferLen),
+		sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
 		done:                   make(chan struct{}),
 	}
 	p.ctx, p.cancelCtx = context.WithCancel(
@@ -160,38 +159,19 @@ func (p *peer) notifyPersistedMsgAvailable() {
 	}
 }
 
-func (p *peer) mapMsg(msg *components.TransportMessage) *prototk.Message {
-	// Convert the message to the protobuf transport payload
-	var correlID *string
-	if msg.CorrelationID != nil {
-		correlID = confutil.P(msg.CorrelationID.String())
-	}
-	return &prototk.Message{
-		MessageType:   msg.MessageType,
-		MessageId:     msg.MessageID.String(),
-		CorrelationId: correlID,
-		Component:     msg.Component,
-		Node:          msg.Node,
-		ReplyTo:       msg.ReplyTo,
-		Payload:       msg.Payload,
-	}
-}
-
-func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, targetNode string, sd *components.StateDistributionWithData) *prototk.Message {
+func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, targetNode string, sd *components.StateDistributionWithData) *prototk.PaladinMsg {
 	payload, _ := json.Marshal(sd)
-	return &prototk.Message{
-
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
 		MessageType: "StateProducedEvent",
 		Payload:     payload,
-		Node:        targetNode,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
-		ReplyTo:     p.tm.localNodeName,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	}
 }
 
-func (p *peer) send(msg *prototk.Message) error {
+func (p *peer) send(msg *prototk.PaladinMsg) error {
 	return p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
-		return true, p.transport.send(p.ctx, msg)
+		return true, p.transport.send(p.ctx, p.name, msg)
 	})
 }
 
@@ -277,7 +257,7 @@ func (p *peer) reliableMessageScan() error {
 	return nil
 }
 
-func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*prototk.Message, error, error) {
+func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*prototk.PaladinMsg, error, error) {
 
 	// Validate the message first (not retryable)
 	var sd components.StateDistributionWithData
@@ -311,10 +291,10 @@ func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*proto
 func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err error) {
 
 	// Build the messages
-	msgsToSend := make([]*prototk.Message, 0, len(page))
+	msgsToSend := make([]*prototk.PaladinMsg, 0, len(page))
 	var errorAcks []*components.ReliableMessageAck
 	for _, rm := range page {
-		var msg *prototk.Message
+		var msg *prototk.PaladinMsg
 		var errorAck error
 		switch rm.MessageType.V() {
 		case components.RMTState:

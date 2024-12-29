@@ -26,7 +26,7 @@ func (p *privateTxManager) Destination() string {
 	return components.PRIVATE_TX_MANAGER_DESTINATION
 }
 
-func (p *privateTxManager) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
+func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
 	//TODO this need to become an ultra low latency, non blocking, handover to the event loop thread.
 	// need some thought on how to handle errors, retries, buffering, swapping idle sequencers in and out of memory etc...
 

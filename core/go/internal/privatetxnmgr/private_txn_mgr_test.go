@@ -856,14 +856,14 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 		go func() {
 			assert.Equal(t, remoteNodeName, args.Get(1).(*components.TransportMessage).Node)
 			transportMessage := args.Get(1).(*components.TransportMessage)
-			remoteEngine.ReceiveTransportMessage(ctx, transportMessage)
+			remoteEngine.HandlePaladinMsg(ctx, transportMessage)
 		}()
 	}).Return(nil).Maybe()
 
 	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
 			transportMessage := args.Get(1).(*components.TransportMessage)
-			privateTxManager.ReceiveTransportMessage(ctx, transportMessage)
+			privateTxManager.HandlePaladinMsg(ctx, transportMessage)
 		}()
 	}).Return(nil).Maybe()
 
@@ -1048,7 +1048,7 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 				//ignore the first delegate request and force a retry
 				ignoredDelegateRequest = true
 			} else {
-				remoteEngine.ReceiveTransportMessage(ctx, transportMessage)
+				remoteEngine.HandlePaladinMsg(ctx, transportMessage)
 			}
 		}()
 	}).Return(nil).Maybe()
@@ -1056,7 +1056,7 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
 			transportMessage := args.Get(1).(*components.TransportMessage)
-			privateTxManager.ReceiveTransportMessage(ctx, transportMessage)
+			privateTxManager.HandlePaladinMsg(ctx, transportMessage)
 		}()
 	}).Return(nil).Maybe()
 
@@ -2004,7 +2004,7 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	//now send the endorsements back
-	aliceEngine.ReceiveTransportMessage(ctx, &components.TransportMessage{
+	aliceEngine.HandlePaladinMsg(ctx, &components.TransportMessage{
 		MessageType: "EndorsementResponse",
 		Payload:     endorsementResponse2bytes,
 	})
@@ -2034,7 +2034,7 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	//now send the final endorsement back
-	aliceEngine.ReceiveTransportMessage(ctx, &components.TransportMessage{
+	aliceEngine.HandlePaladinMsg(ctx, &components.TransportMessage{
 		MessageType: "EndorsementResponse",
 		Payload:     endorsementResponse1Bytes,
 	})
@@ -2683,7 +2683,7 @@ func mockNetwork(t *testing.T, transactionManagers []privateTransactionMgrForPac
 			transportMessage := args.Get(1).(*components.TransportMessage)
 			for _, tm := range transactionManagers {
 				if tm.NodeName() == transportMessage.Node {
-					tm.ReceiveTransportMessage(context.Background(), transportMessage)
+					tm.HandlePaladinMsg(context.Background(), transportMessage)
 					return
 				}
 			}

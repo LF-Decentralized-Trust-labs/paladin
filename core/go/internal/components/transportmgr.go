@@ -23,17 +23,16 @@ import (
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type TransportMessage struct {
-	MessageID     uuid.UUID  `json:"id"`
-	CorrelationID *uuid.UUID `json:"correlationId"`
-	Component     string     `json:"component"`
-	Node          string     `json:"node"`    // The node id to send the message to
-	ReplyTo       string     `json:"replyTo"` // The identity to respond to on the sending node
-	MessageType   string     `json:"messageType"`
-	Payload       []byte     `json:"payload"`
+type FireAndForgetMessageSend struct {
+	Node          string
+	Component     prototk.PaladinMsg_Component
+	CorrelationID *uuid.UUID
+	MessageType   string
+	Payload       []byte
 }
 
 type ReliableMessageType string
@@ -79,7 +78,8 @@ type TransportManagerToTransport interface {
 // TransportClient is the interface for a component that can receive messages from the transport manager
 type TransportClient interface {
 	// Destination returns a string that should be matched with the Destination field of incomming messages to be routed to this client
-	Destination() string
+	Destination() prototk.PaladinMsg_Component
+
 	// This function is used by the transport manager to deliver messages to the engine.
 	//
 	// The implementation of this function:
@@ -107,7 +107,7 @@ type TransportClient interface {
 	// It delivers messages to this function:
 	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
 	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
-	ReceiveTransportMessage(context.Context, *TransportMessage)
+	HandlePaladinMsg(context.Context, *prototk.PaladinMsg)
 }
 
 type TransportManager interface {
@@ -126,7 +126,7 @@ type TransportManager interface {
 	// situation to recover from (although not critical path).
 	//
 	// at-most-once delivery semantics
-	Send(ctx context.Context, message *TransportMessage) error
+	Send(ctx context.Context, send *FireAndForgetMessageSend) error
 
 	// Sends a message with at-least-once delivery semantics
 	//

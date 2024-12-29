@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -58,7 +57,6 @@ type privateTxManager struct {
 	subscribers                    []components.PrivateTxEventSubscriber
 	subscribersLock                sync.Mutex
 	syncPoints                     syncpoints.SyncPoints
-	stateDistributer               statedistribution.StateDistributer
 	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer
 	blockHeight                    int64
 }
@@ -81,13 +79,6 @@ func (p *privateTxManager) PostInit(c components.AllComponents) error {
 	p.components = c
 	p.nodeName = p.components.TransportManager().LocalNodeName()
 	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager())
-	p.stateDistributer = statedistribution.NewStateDistributer(
-		p.ctx,
-		p.components.TransportManager(),
-		p.components.StateManager(),
-		p.components.KeyManager(),
-		p.components.Persistence(),
-		&p.config.StateDistributer)
 	p.preparedTransactionDistributer = preparedtxdistribution.NewPreparedTransactionDistributer(
 		p.ctx,
 		p.nodeName,
@@ -96,11 +87,7 @@ func (p *privateTxManager) PostInit(c components.AllComponents) error {
 		p.components.Persistence(),
 		&p.config.PreparedTransactionDistributer)
 
-	err := p.stateDistributer.Start(p.ctx)
-	if err != nil {
-		return err
-	}
-	err = p.preparedTransactionDistributer.Start(p.ctx)
+	err := p.preparedTransactionDistributer.Start(p.ctx)
 	if err != nil {
 		return err
 	}

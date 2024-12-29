@@ -44,3 +44,10 @@ func ValidateSafeCharsStartEndAlphaNum(ctx context.Context, val string, maxLen i
 	}
 	return nil
 }
+
+func StrOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

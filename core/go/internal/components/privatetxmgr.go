@@ -96,4 +96,5 @@ type PrivateTxManager interface {
 	PrivateTransactionConfirmed(ctx context.Context, receipt *TxCompletion)
 
 	BuildStateDistributions(ctx context.Context, tx *PrivateTransaction) (*StateDistributionSet, error)
+	BuildNullifiers(ctx context.Context, distributions []*StateDistributionWithData) (nullifiers []*NullifierUpsert, err error)
 }

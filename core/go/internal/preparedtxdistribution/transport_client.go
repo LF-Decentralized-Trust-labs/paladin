@@ -32,8 +32,8 @@ func (sd *preparedTransactionDistributer) Destination() string {
 	return PREPARED_TRANSACTION_DISTRIBUTER_DESTINATION
 }
 
-func (sd *preparedTransactionDistributer) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
-	log.L(ctx).Debugf("preparedTransactionDistributer:ReceiveTransportMessage")
+func (sd *preparedTransactionDistributer) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
+	log.L(ctx).Debugf("preparedTransactionDistributer:HandlePaladinMsg")
 	messagePayload := message.Payload
 
 	switch message.MessageType {

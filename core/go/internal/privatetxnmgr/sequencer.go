@@ -30,7 +30,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
@@ -120,7 +119,6 @@ type Sequencer struct {
 	publisher                      ptmgrtypes.Publisher
 	identityResolver               components.IdentityResolver
 	syncPoints                     syncpoints.SyncPoints
-	stateDistributer               statedistribution.StateDistributer
 	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer
 	transportWriter                ptmgrtypes.TransportWriter
 	graph                          Graph
@@ -143,7 +141,6 @@ func NewSequencer(
 	publisher ptmgrtypes.Publisher,
 	syncPoints syncpoints.SyncPoints,
 	identityResolver components.IdentityResolver,
-	stateDistributer statedistribution.StateDistributer,
 	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer,
 	transportWriter ptmgrtypes.TransportWriter,
 	requestTimeout time.Duration,
@@ -176,7 +173,6 @@ func NewSequencer(
 		publisher:                      publisher,
 		syncPoints:                     syncPoints,
 		identityResolver:               identityResolver,
-		stateDistributer:               stateDistributer,
 		preparedTransactionDistributer: preparedTransactionDistributer,
 		transportWriter:                transportWriter,
 		graph:                          NewGraph(),
@@ -225,7 +221,6 @@ func NewSequencer(
 		contractAddress,
 		newSequencer.environment,
 		confutil.DurationMin(sequencerConfig.AssembleRequestTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.AssembleRequestTimeout),
-		stateDistributer,
 		newSequencer,
 	)
 

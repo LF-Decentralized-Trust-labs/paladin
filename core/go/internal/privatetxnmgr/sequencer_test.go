@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/preparedtxdistributionmocks"
 	"github.com/kaleido-io/paladin/core/mocks/privatetxnmgrmocks"
-	"github.com/kaleido-io/paladin/core/mocks/statedistributionmocks"
 
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
@@ -52,7 +51,6 @@ type sequencerDepencyMocks struct {
 	endorsementGatherer            *privatetxnmgrmocks.EndorsementGatherer
 	publisher                      *privatetxnmgrmocks.Publisher
 	identityResolver               *componentmocks.IdentityResolver
-	stateDistributer               *statedistributionmocks.StateDistributer
 	preparedTransactionDistributer *preparedtxdistributionmocks.PreparedTransactionDistributer
 	txManager                      *componentmocks.TXManager
 	pubTxManager                   *componentmocks.PublicTxManager
@@ -77,7 +75,6 @@ func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *tk
 		endorsementGatherer:            privatetxnmgrmocks.NewEndorsementGatherer(t),
 		publisher:                      privatetxnmgrmocks.NewPublisher(t),
 		identityResolver:               componentmocks.NewIdentityResolver(t),
-		stateDistributer:               statedistributionmocks.NewStateDistributer(t),
 		preparedTransactionDistributer: preparedtxdistributionmocks.NewPreparedTransactionDistributer(t),
 		txManager:                      componentmocks.NewTXManager(t),
 		pubTxManager:                   componentmocks.NewPublicTxManager(t),

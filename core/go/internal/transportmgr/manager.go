@@ -31,6 +31,7 @@ import (
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -50,7 +51,7 @@ type transportManager struct {
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	destinations      map[string]components.TransportClient
+	components        map[prototk.PaladinMsg_Component]components.TransportClient
 	destinationsFixed bool
 	destinationsMux   sync.RWMutex
 
@@ -71,7 +72,7 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		localNodeName:         conf.NodeName,
 		transportsByID:        make(map[uuid.UUID]*transport),
 		transportsByName:      make(map[string]*transport),
-		destinations:          make(map[string]components.TransportClient),
+		components:            make(map[prototk.PaladinMsg_Component]components.TransportClient),
 		senderBufferLen:       confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
 		reliableMessageResend: confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
 		sendShortRetry:        retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
@@ -126,11 +127,11 @@ func (tm *transportManager) RegisterClient(ctx context.Context, client component
 	if tm.destinationsFixed {
 		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientRegisterAfterStartup, client.Destination())
 	}
-	if _, found := tm.destinations[client.Destination()]; found {
+	if _, found := tm.components[client.Destination()]; found {
 		log.L(ctx).Errorf("Client already registered for destination %s", client.Destination())
 		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientAlreadyRegistered, client.Destination())
 	}
-	tm.destinations[client.Destination()] = client
+	tm.components[client.Destination()] = client
 	return nil
 
 }
@@ -214,25 +215,30 @@ func (tm *transportManager) LocalNodeName() string {
 }
 
 // See docs in components package
-func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
-
-	msg.MessageID = uuid.New()
+func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
 
 	// Check the message is valid
-	if len(msg.MessageType) == 0 ||
-		len(msg.Payload) == 0 {
-		log.L(ctx).Errorf("Invalid message send request %+v", msg)
+	if len(send.MessageType) == 0 ||
+		len(send.Payload) == 0 {
+		log.L(ctx).Errorf("Invalid message send request %+v", send)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	if msg.ReplyTo == "" {
-		msg.ReplyTo = tm.localNodeName
-	}
-
 	// Use or establish a peer connection for the send
-	peer, err := tm.getPeer(ctx, msg.Node)
+	peer, err := tm.getPeer(ctx, send.Node)
 	if err != nil {
 		return err
+	}
+
+	msg := &prototk.PaladinMsg{
+		MessageId:   uuid.NewString(),
+		MessageType: send.MessageType,
+		Component:   send.Component,
+		Payload:     send.Payload,
+	}
+	if send.CorrelationID != nil {
+		cidStr := send.CorrelationID.String()
+		msg.CorrelationId = &cidStr
 	}
 
 	// Push the send to the peer - this is a best effort interaction.
@@ -241,7 +247,7 @@ func (tm *transportManager) Send(ctx context.Context, msg *components.TransportM
 	// use this "send" must be fault tolerant to message loss.
 	select {
 	case peer.sendQueue <- msg:
-		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageID, msg.CorrelationID, peer.name)
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, send.CorrelationID, peer.name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)

@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
-	"github.com/kaleido-io/paladin/core/internal/statedistribution"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
@@ -40,7 +39,6 @@ type assembleCoordinator struct {
 	contractAddress      tktypes.EthAddress
 	sequencerEnvironment ptmgrtypes.SequencerEnvironment
 	requestTimeout       time.Duration
-	stateDistributer     statedistribution.StateDistributer
 	localAssembler       ptmgrtypes.LocalAssembler
 }
 
@@ -51,7 +49,7 @@ type assembleRequest struct {
 	transactionPreassembly *components.TransactionPreAssembly
 }
 
-func NewAssembleCoordinator(ctx context.Context, nodeName string, maxPendingRequests int, components components.AllComponents, domainAPI components.DomainSmartContract, domainContext components.DomainContext, transportWriter ptmgrtypes.TransportWriter, contractAddress tktypes.EthAddress, sequencerEnvironment ptmgrtypes.SequencerEnvironment, requestTimeout time.Duration, stateDistributer statedistribution.StateDistributer, localAssembler ptmgrtypes.LocalAssembler) ptmgrtypes.AssembleCoordinator {
+func NewAssembleCoordinator(ctx context.Context, nodeName string, maxPendingRequests int, components components.AllComponents, domainAPI components.DomainSmartContract, domainContext components.DomainContext, transportWriter ptmgrtypes.TransportWriter, contractAddress tktypes.EthAddress, sequencerEnvironment ptmgrtypes.SequencerEnvironment, requestTimeout time.Duration, localAssembler ptmgrtypes.LocalAssembler) ptmgrtypes.AssembleCoordinator {
 	return &assembleCoordinator{
 		ctx:                  ctx,
 		nodeName:             nodeName,
@@ -65,7 +63,6 @@ func NewAssembleCoordinator(ctx context.Context, nodeName string, maxPendingRequ
 		contractAddress:      contractAddress,
 		sequencerEnvironment: sequencerEnvironment,
 		requestTimeout:       requestTimeout,
-		stateDistributer:     stateDistributer,
 		localAssembler:       localAssembler,
 	}
 }

@@ -31,7 +31,7 @@ func (p *identityResolver) Destination() string {
 	return IDENTITY_RESOLVER_DESTINATION
 }
 
-func (ir *identityResolver) ReceiveTransportMessage(ctx context.Context, message *components.TransportMessage) {
+func (ir *identityResolver) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
 	//TODO this need to become an ultra low latency, non blocking, handover to the event loop thread.
 	// need some thought on how to handle errors, retries, buffering, swapping idle sequencers in and out of memory etc...
 

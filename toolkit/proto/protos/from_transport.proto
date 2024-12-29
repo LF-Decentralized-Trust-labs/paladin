@@ -20,8 +20,7 @@ package io.kaleido.paladin.toolkit;
 import "to_transport.proto";
 
 message ReceiveMessageRequest {
-    string node = 1;
-    PaladinMsg message = 2;
+    PaladinMsg message = 1;
 }
 
 message ReceiveMessageResponse {
