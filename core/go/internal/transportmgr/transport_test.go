@@ -51,9 +51,9 @@ func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestTransport(t *testing.T, extraSetup ...func(mc *mockComponents) components.TransportClient) (context.Context, *transportManager, *testPlugin, func()) {
+func newTestTransport(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents) components.TransportClient) (context.Context, *transportManager, *testPlugin, func()) {
 
-	ctx, tm, _, done := newTestTransportManager(t, &pldconf.TransportManagerConfig{
+	ctx, tm, _, done := newTestTransportManager(t, realDB, &pldconf.TransportManagerConfig{
 		NodeName: "node1",
 		Transports: map[string]*pldconf.TransportConfig{
 			"test1": {
@@ -89,7 +89,7 @@ func registerTestTransport(t *testing.T, tm *transportManager, tp *testPlugin) {
 
 func TestDoubleRegisterReplaces(t *testing.T) {
 
-	_, rm, tp0, done := newTestTransport(t)
+	_, rm, tp0, done := newTestTransport(t, false)
 	defer done()
 	assert.Nil(t, tp0.t.initError.Load())
 	assert.True(t, tp0.initialized.Load())
@@ -111,6 +111,7 @@ func TestDoubleRegisterReplaces(t *testing.T) {
 
 func testMessage() *components.FireAndForgetMessageSend {
 	return &components.FireAndForgetMessageSend{
+		Node:          "node2",
 		CorrelationID: confutil.P(uuid.New()),
 		MessageType:   "myMessageType",
 		Payload:       []byte("something"),
@@ -118,7 +119,7 @@ func testMessage() *components.FireAndForgetMessageSend {
 }
 
 func TestSendMessage(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node2",
@@ -133,6 +134,12 @@ func TestSendMessage(t *testing.T) {
 	message := testMessage()
 
 	sentMessages := make(chan *prototk.PaladinMsg, 1)
+	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+		return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
+	}
+	tp.Functions.DeactivateNode = func(ctx context.Context, dnr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+		return &prototk.DeactivateNodeResponse{}, nil
+	}
 	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 		sent := req.Message
 		assert.NotEmpty(t, sent.MessageId)
@@ -157,7 +164,7 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestSendMessageNotInit(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node1",
@@ -179,7 +186,7 @@ func TestSendMessageNotInit(t *testing.T) {
 }
 
 func TestSendMessageFail(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node1",
@@ -203,7 +210,7 @@ func TestSendMessageFail(t *testing.T) {
 }
 
 func TestSendMessageDestNotFound(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, fmt.Errorf("not found"))
 		return nil
 	})
@@ -217,7 +224,7 @@ func TestSendMessageDestNotFound(t *testing.T) {
 }
 
 func TestSendMessageDestNotAvailable(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node1",
@@ -247,7 +254,7 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 }
 
 func TestSendMessageDestWrong(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t)
+	ctx, tm, _, done := newTestTransport(t, false)
 	defer done()
 
 	message := testMessage()
@@ -265,7 +272,7 @@ func TestSendMessageDestWrong(t *testing.T) {
 }
 
 func TestSendInvalidMessageNoPayload(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t)
+	ctx, tm, _, done := newTestTransport(t, false)
 	defer done()
 
 	message := &components.FireAndForgetMessageSend{}
@@ -277,7 +284,7 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 func TestReceiveMessage(t *testing.T) {
 	receivedMessages := make(chan *prototk.PaladinMsg, 1)
 
-	ctx, _, tp, done := newTestTransport(t, func(mc *mockComponents) components.TransportClient {
+	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		receivingClient := componentmocks.NewTransportClient(t)
 		receivingClient.On("Destination").Return("receivingClient1")
 		receivingClient.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -290,9 +297,7 @@ func TestReceiveMessage(t *testing.T) {
 	msg := &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Node:          "node1",
-		Component:     "receivingClient1",
-		ReplyTo:       "node2",
+		Component:     prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -307,15 +312,13 @@ func TestReceiveMessage(t *testing.T) {
 }
 
 func TestReceiveMessageNoReceiver(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Node:          "node1",
-		Component:     "receivingClient1",
-		ReplyTo:       "node2",
+		Component:     prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -327,15 +330,13 @@ func TestReceiveMessageNoReceiver(t *testing.T) {
 }
 
 func TestReceiveMessageInvalidDestination(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     "___",
-		Node:          "node1",
-		ReplyTo:       "node2",
+		Component:     prototk.PaladinMsg_Component(42),
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -347,7 +348,7 @@ func TestReceiveMessageInvalidDestination(t *testing.T) {
 }
 
 func TestReceiveMessageNotInit(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	tp.t.initialized.Store(false)
@@ -355,9 +356,7 @@ func TestReceiveMessageNotInit(t *testing.T) {
 	msg := &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     "to",
-		Node:          "node1",
-		ReplyTo:       "node2",
+		Component:     prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}
@@ -368,7 +367,7 @@ func TestReceiveMessageNotInit(t *testing.T) {
 }
 
 func TestReceiveMessageNoPayload(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{}
@@ -379,13 +378,11 @@ func TestReceiveMessageNoPayload(t *testing.T) {
 }
 
 func TestReceiveMessageWrongNode(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
-		Component:   "to",
-		Node:        "node2",
-		ReplyTo:     "node2",
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -396,14 +393,12 @@ func TestReceiveMessageWrongNode(t *testing.T) {
 }
 
 func TestReceiveMessageBadDestination(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
 		MessageId:   uuid.NewString(),
-		Component:   "to",
-		Node:        "node2",
-		ReplyTo:     "node1",
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -414,13 +409,11 @@ func TestReceiveMessageBadDestination(t *testing.T) {
 }
 
 func TestReceiveMessageBadMsgID(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
-		Component:   "to",
-		Node:        "node1",
-		ReplyTo:     "node2",
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
@@ -431,15 +424,13 @@ func TestReceiveMessageBadMsgID(t *testing.T) {
 }
 
 func TestReceiveMessageBadCorrelID(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t)
+	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P("wrong"),
-		Component:     "to",
-		Node:          "node1",
-		ReplyTo:       "node2",
+		Component:     prototk.PaladinMsg_TRANSACTION_ENGINE,
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}

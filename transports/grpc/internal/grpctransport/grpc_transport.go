@@ -190,6 +190,7 @@ func (t *grpcTransport) ConnectSendStream(stream grpc.ClientStreamingServer[prot
 
 		// Deliver it to Paladin
 		_, err = t.callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+			FromNode: ai.verifiedNodeName,
 			Message: &prototk.PaladinMsg{
 				MessageId:     msg.MessageId,
 				CorrelationId: msg.CorrelationId,

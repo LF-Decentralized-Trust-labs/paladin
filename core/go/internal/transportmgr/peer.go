@@ -91,7 +91,7 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 	p = tm.peers[nodeName]
 	if p != nil {
 		// There was a race to connect to this peer, and the other routine won
-		log.L(ctx).Debugf("connection already active for peer '%s' (aft4er connection race)", nodeName)
+		log.L(ctx).Debugf("connection already active for peer '%s' (after connection race)", nodeName)
 		return p, nil
 	}
 
@@ -140,15 +140,17 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 		NodeName:         nodeName,
 		TransportDetails: remoteTransportDetails,
 	})
-	if err == nil {
-		err = json.Unmarshal([]byte(res.PeerInfoJson), &p.peerInfo)
-	}
 	if err != nil {
 		return nil, err
+	}
+	if err = json.Unmarshal([]byte(res.PeerInfoJson), &p.peerInfo); err != nil {
+		log.L(ctx).Errorf("Invalid peerInfo: %s", p.peerInfo)
+		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidPeerInfo)
 	}
 
 	log.L(ctx).Debugf("connected to peer '%s'", nodeName)
 	tm.peers[nodeName] = p
+	go p.sender()
 	return p, nil
 }
 
@@ -159,7 +161,7 @@ func (p *peer) notifyPersistedMsgAvailable() {
 	}
 }
 
-func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, targetNode string, sd *components.StateDistributionWithData) *prototk.PaladinMsg {
+func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, sd *components.StateDistributionWithData) *prototk.PaladinMsg {
 	payload, _ := json.Marshal(sd)
 	return &prototk.PaladinMsg{
 		MessageId:   rm.ID.String(),
@@ -358,6 +360,11 @@ func (p *peer) sender() {
 		if err != nil {
 			return // context closed
 		}
+
+		// TODO:
+		// - Send fire & forget messages
+		// - Unregister selves on stop
+		// - Stop automatically on idle timeout
 	}
 }
 

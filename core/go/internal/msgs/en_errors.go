@@ -368,6 +368,7 @@ var (
 	MsgTransportClientRegisterAfterStartup    = ffe("PD012012", "Client '%s' attempted registration after startup")
 	MsgTransportUnsupportedReliableMsg        = ffe("PD012013", "Unsupported reliable message type '%s'")
 	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")
+	MsgTransportInvalidPeerInfo               = ffe("PD012015", "Invalid peer info JSON returned by plugin")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")

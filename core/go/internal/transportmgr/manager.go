@@ -73,6 +73,7 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		transportsByID:        make(map[uuid.UUID]*transport),
 		transportsByName:      make(map[string]*transport),
 		components:            make(map[prototk.PaladinMsg_Component]components.TransportClient),
+		peers:                 make(map[string]*peer),
 		senderBufferLen:       confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
 		reliableMessageResend: confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
 		sendShortRetry:        retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),

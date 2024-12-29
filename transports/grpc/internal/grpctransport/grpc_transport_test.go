@@ -150,6 +150,7 @@ func TestConnectFail(t *testing.T) {
 
 	plugin1, plugin2, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
 		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			require.Equal(t, "node1", rmr.FromNode)
 			return &prototk.ReceiveMessageResponse{}, nil
 		}
 	})

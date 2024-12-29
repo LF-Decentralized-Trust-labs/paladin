@@ -31,7 +31,7 @@ import (
 )
 
 func TestRPCLocalDetails(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t)
+	ctx, tm, tp, done := newTestTransport(t, false)
 	defer done()
 
 	rpc, rpcDone := newTestRPCServer(t, ctx, tm)
