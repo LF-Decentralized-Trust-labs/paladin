@@ -140,13 +140,16 @@ func (dth *DomainTransactionHelper) Prepare(signer string) *testbed.TransactionR
 	return &result
 }
 
-func (st *SentDomainTransaction) Wait() {
+func (st *SentDomainTransaction) Wait() map[string]any {
 	result := <-st.result
 	switch r := result.(type) {
 	case error:
 		require.NoError(st.t, r)
+	case map[string]any:
+		return r
 	default:
 	}
+	return nil
 }
 
 func toJSON(t *testing.T, v any) []byte {
