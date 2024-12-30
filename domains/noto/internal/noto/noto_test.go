@@ -17,6 +17,7 @@ package noto
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -215,4 +216,76 @@ func TestPrepareTransactionBadAbi(t *testing.T) {
 		},
 	})
 	assert.ErrorContains(t, err, "invalid character")
+}
+
+func TestHandleEventBatch_NotoTransfer(t *testing.T) {
+	n := &Noto{Callbacks: mockCallbacks}
+	ctx := context.Background()
+
+	input := tktypes.Bytes32(tktypes.RandBytes(32))
+	output := tktypes.Bytes32(tktypes.RandBytes(32))
+	event := &NotoTransfer_Event{
+		Inputs:    []tktypes.Bytes32{input},
+		Outputs:   []tktypes.Bytes32{output},
+		Signature: tktypes.MustParseHexBytes("0x1234"),
+		Data:      tktypes.MustParseHexBytes("0x"),
+	}
+	notoEventJson, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	req := &prototk.HandleEventBatchRequest{
+		Events: []*prototk.OnChainEvent{
+			{
+				SoliditySignature: n.eventSignatures[NotoTransfer],
+				DataJson:          string(notoEventJson),
+			},
+		},
+	}
+
+	res, err := n.HandleEventBatch(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, res.TransactionsComplete, 1)
+	require.Len(t, res.SpentStates, 1)
+	require.Len(t, res.ConfirmedStates, 1)
+}
+
+func TestHandleEventBatch_NotoTransferBadData(t *testing.T) {
+	n := &Noto{Callbacks: mockCallbacks}
+	ctx := context.Background()
+
+	req := &prototk.HandleEventBatchRequest{
+		Events: []*prototk.OnChainEvent{
+			{
+				SoliditySignature: n.eventSignatures[NotoTransfer],
+				DataJson:          "!!wrong",
+			}},
+	}
+
+	res, err := n.HandleEventBatch(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, res.TransactionsComplete, 0)
+	require.Len(t, res.SpentStates, 0)
+	require.Len(t, res.ConfirmedStates, 0)
+}
+
+func TestHandleEventBatch_NotoTransferBadTransactionData(t *testing.T) {
+	n := &Noto{Callbacks: mockCallbacks}
+	ctx := context.Background()
+
+	event := &NotoTransfer_Event{
+		Data: tktypes.MustParseHexBytes("0x00010000"),
+	}
+	notoEventJson, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	req := &prototk.HandleEventBatchRequest{
+		Events: []*prototk.OnChainEvent{
+			{
+				SoliditySignature: n.eventSignatures[NotoTransfer],
+				DataJson:          string(notoEventJson),
+			}},
+	}
+
+	_, err = n.HandleEventBatch(ctx, req)
+	require.ErrorContains(t, err, "FF22047")
 }

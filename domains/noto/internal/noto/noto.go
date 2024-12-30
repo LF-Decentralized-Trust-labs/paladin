@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
@@ -675,18 +676,17 @@ func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.T
 
 func (n *Noto) decodeTransactionData(ctx context.Context, data tktypes.HexBytes) (*types.NotoTransactionData_V0, error) {
 	var dataValues types.NotoTransactionData_V0
-	if len(data) > 4 {
+	if len(data) >= 4 {
 		dataPrefix := data[0:4]
 		if dataPrefix.String() == types.NotoTransactionDataID_V0.String() {
 			dataDecoded, err := types.NotoTransactionDataABI_V0.DecodeABIDataCtx(ctx, data, 4)
-			if err != nil {
-				return nil, err
+			if err == nil {
+				var dataJSON []byte
+				dataJSON, err = dataDecoded.JSON()
+				if err == nil {
+					err = json.Unmarshal(dataJSON, &dataValues)
+				}
 			}
-			dataJSON, err := dataDecoded.JSON()
-			if err != nil {
-				return nil, err
-			}
-			err = json.Unmarshal(dataJSON, &dataValues)
 			if err != nil {
 				return nil, err
 			}
@@ -769,6 +769,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				n.recordTransactionInfo(ev, txData, &res)
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Inputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, transfer.Outputs)...)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoTransfer event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoApproved]:
@@ -779,6 +781,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 					return nil, err
 				}
 				n.recordTransactionInfo(ev, txData, &res)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoApproved event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoLock]:
@@ -792,6 +796,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, lock.Inputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, lock.Outputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, lock.LockedOutputs)...)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoLock event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoUnlock]:
@@ -805,6 +811,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedInputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedOutputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.Outputs)...)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoUnlock event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoUnlockPrepared]:
@@ -815,6 +823,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 					return nil, err
 				}
 				n.recordTransactionInfo(ev, txData, &res)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoUnlockPrepared event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoUnlockApproved]:
@@ -825,6 +835,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 					return nil, err
 				}
 				n.recordTransactionInfo(ev, txData, &res)
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoUnlockApproved event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoDelegateUnlock]:
@@ -850,6 +862,8 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 						return nil, err
 					}
 				}
+			} else {
+				log.L(ctx).Warnf("Ignoring malformed NotoDelegateUnlock event in batch %s: %s", req.BatchId, err)
 			}
 		}
 	}
