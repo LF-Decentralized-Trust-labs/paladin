@@ -19,6 +19,7 @@ import "github.com/kaleido-io/paladin/config/pkg/confutil"
 type TransportManagerConfig struct {
 	NodeName              string                      `json:"nodeName"`
 	SendQueueLen          *int                        `json:"sendQueueLen"`
+	PeerInactivityTimeout *string                     `json:"peerInactivityTimeout"`
 	SendRetry             RetryConfigWithMax          `json:"sendRetry"`
 	ReliableScanRetry     RetryConfig                 `json:"reliableScanRetry"`
 	ReliableMessageResend *string                     `json:"reliableMessageResend"`
@@ -32,6 +33,7 @@ type TransportInitConfig struct {
 var TransportManagerDefaults = &TransportManagerConfig{
 	SendQueueLen:          confutil.P(10),
 	ReliableMessageResend: confutil.P("30s"),
+	PeerInactivityTimeout: confutil.P("1m"),
 	ReliableScanRetry:     GenericRetryDefaults.RetryConfig,
 	// SendRetry defaults are deliberately short
 	SendRetry: RetryConfigWithMax{

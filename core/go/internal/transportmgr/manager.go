@@ -58,8 +58,10 @@ type transportManager struct {
 	peersLock sync.RWMutex
 	peers     map[string]*peer
 
-	sendShortRetry    *retry.Retry
-	reliableScanRetry *retry.Retry
+	sendShortRetry        *retry.Retry
+	reliableScanRetry     *retry.Retry
+	peerInactivityTimeout time.Duration
+	quiesceTimeout        time.Duration
 
 	senderBufferLen       int
 	reliableMessageResend time.Duration
@@ -78,6 +80,8 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		reliableMessageResend: confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
 		sendShortRetry:        retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
 		reliableScanRetry:     retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
+		peerInactivityTimeout: confutil.DurationMin(conf.PeerInactivityTimeout, 0, *pldconf.TransportManagerDefaults.PeerInactivityTimeout),
+		quiesceTimeout:        1 * time.Second, // not currently tunable (considered very small edge case)
 	}
 }
 
@@ -225,12 +229,6 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	// Use or establish a peer connection for the send
-	peer, err := tm.getPeer(ctx, send.Node)
-	if err != nil {
-		return err
-	}
-
 	msg := &prototk.PaladinMsg{
 		MessageId:   uuid.NewString(),
 		MessageType: send.MessageType,
@@ -242,13 +240,23 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 		msg.CorrelationId = &cidStr
 	}
 
+	return tm.queueFireAndForget(ctx, send.Node, msg)
+}
+
+func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
+	// Use or establish a peer connection for the send
+	peer, err := tm.getPeer(ctx, nodeName)
+	if err != nil {
+		return err
+	}
+
 	// Push the send to the peer - this is a best effort interaction.
 	// There is some retry in the Paladin layer, and some transports provide resilience.
 	// However, the send is at-most-once, and the higher level message protocols that
 	// use this "send" must be fault tolerant to message loss.
 	select {
 	case peer.sendQueue <- msg:
-		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, send.CorrelationID, peer.name)
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), peer.name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)

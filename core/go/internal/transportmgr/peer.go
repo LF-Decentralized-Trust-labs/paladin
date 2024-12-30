@@ -44,10 +44,12 @@ type peer struct {
 	sendQueue              chan *prototk.PaladinMsg
 
 	// Send loop state (no lock as only used on the loop)
-	lastFullScan time.Time
-	lastDrainHWM *tktypes.Timestamp
+	lastFullScan          time.Time
+	lastDrainHWM          *tktypes.Timestamp
+	persistentMsgsDrained bool
 
-	done chan struct{}
+	quiescing bool
+	done      chan struct{}
 }
 
 type nameSortedPeers []*peer
@@ -178,13 +180,40 @@ func (p *peer) send(msg *prototk.PaladinMsg) error {
 }
 
 func (p *peer) senderDone() {
+	p.deactivate()
+
+	// There's a very small window where we might have got delivered a message by a routine
+	// that got us out of the map before we deactivated.
+	// In this edge case, we need to spin off the new peer connection to replace us.
+	for p.quiescing {
+		select {
+		case msg := <-p.sendQueue:
+			log.L(p.ctx).Infof("message delivered in inactivity quiesce window. Re-connecting")
+			_ = p.tm.queueFireAndForget(p.ctx, p.name, msg)
+		case <-p.persistedMsgsAvailable:
+			log.L(p.ctx).Infof("reliable message delivered in inactivity quiesce window. Re-connecting")
+			_, _ = p.tm.getPeer(p.ctx, p.name)
+		case <-time.After(p.tm.quiesceTimeout):
+			p.quiescing = false
+		}
+	}
+
+	close(p.done)
+}
+
+func (p *peer) deactivate() {
+	// Hold the peers write lock to do this
+	p.tm.peersLock.Lock()
+	defer p.tm.peersLock.Unlock()
+	delete(p.tm.peers, p.name)
+
+	// Holding the lock while activating/deactivating ensures we never dual-activate in the transport
 	log.L(p.ctx).Infof("peer %s deactivating", p.name)
 	if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
 		NodeName: p.name,
 	}); err != nil {
 		log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.name, err)
 	}
-	close(p.done)
 }
 
 func (p *peer) reliableMessageScan() error {
@@ -232,6 +261,7 @@ func (p *peer) reliableMessageScan() error {
 		}
 
 		if len(page) > 0 {
+			p.persistentMsgsDrained = false // we know there's some messages
 			total += len(page)
 			lastPageEnd = &page[len(page)-1].Created
 		}
@@ -253,6 +283,9 @@ func (p *peer) reliableMessageScan() error {
 
 	// Record the last full scan
 	if fullScan {
+		// We only know we're empty when we do a full re-scan, and that comes back empty
+		p.persistentMsgsDrained = (total == 0)
+
 		p.lastFullScan = time.Now()
 	}
 
@@ -296,6 +329,15 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 	msgsToSend := make([]*prototk.PaladinMsg, 0, len(page))
 	var errorAcks []*components.ReliableMessageAck
 	for _, rm := range page {
+
+		// Check it's either after our HWM, or eligible for re-send
+		afterHWM := p.lastDrainHWM == nil || *p.lastDrainHWM < rm.Created
+		if !afterHWM && time.Since(rm.Created.Time()) < p.tm.reliableMessageResend {
+			log.L(p.ctx).Infof("Unacknowledged message %s not yet eligible for re-send", rm.ID)
+			continue
+		}
+
+		// Process it
 		var msg *prototk.PaladinMsg
 		var errorAck error
 		switch rm.MessageType.V() {
@@ -351,6 +393,7 @@ func (p *peer) sender() {
 
 	log.L(p.ctx).Infof("peer %s active", p.name)
 
+	hitInactivityTimeout := false
 	for {
 
 		// We send/resend any reliable messages queued up first
@@ -361,10 +404,38 @@ func (p *peer) sender() {
 			return // context closed
 		}
 
-		// TODO:
-		// - Send fire & forget messages
-		// - Unregister selves on stop
-		// - Stop automatically on idle timeout
+		// Depending on our persistent message status, check if we're able to quiesce
+		if hitInactivityTimeout && p.persistentMsgsDrained {
+			p.quiescing = true
+			return // quiesce handling is in senderDone() deferred function
+		}
+		hitInactivityTimeout = false
+
+		// Our wait timeout needs to be the shortest of:
+		// - The full re-scan timeout for reliable messages
+		// - The inactivity timeout
+		inactivityTimeout := p.tm.reliableMessageResend
+		if inactivityTimeout > p.tm.peerInactivityTimeout {
+			inactivityTimeout = p.tm.peerInactivityTimeout
+		}
+		inactivityTimer := time.NewTimer(inactivityTimeout)
+		processingMsgs := true
+		for processingMsgs {
+			select {
+			case <-inactivityTimer.C:
+				hitInactivityTimeout = true
+				processingMsgs = false // spin round and check if we have persisted messages to (re)process
+			case <-p.persistedMsgsAvailable:
+				processingMsgs = false // spin round and get the messages
+			case <-p.ctx.Done():
+				return // we're done
+			case msg := <-p.sendQueue:
+				// send and spin straight round
+				if err := p.send(msg); err != nil {
+					log.L(p.ctx).Errorf("failed to send message '%s' after short retry (discarding): %s", msg.MessageId, err)
+				}
+			}
+		}
 	}
 }
 
