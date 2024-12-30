@@ -172,6 +172,11 @@ func (r *BesuReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.Besu{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
 		Complete(r)
 }
 
@@ -516,16 +521,17 @@ func (r *BesuReconciler) createPDB(ctx context.Context, node *corev1alpha1.Besu,
 	}
 
 	var foundPDB policyv1.PodDisruptionBudget
-	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: pdb.Namespace}, &foundPDB); err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, pdb)
-		if err != nil {
-			return pdb, err
-		}
-		setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionTrue, corev1alpha1.ReasonPDBCreated, fmt.Sprintf("Name: %s", name))
-	} else if err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: pdb.Namespace}, &foundPDB); err == nil {
+		return &foundPDB, nil
+	} else if !errors.IsNotFound(err) {
 		return nil, err
 	}
-	return &foundPDB, nil
+
+	if err := r.Create(ctx, pdb); err != nil {
+		return pdb, err
+	}
+	setCondition(&node.Status.Conditions, corev1alpha1.ConditionPDB, metav1.ConditionTrue, corev1alpha1.ReasonPDBCreated, fmt.Sprintf("Name: %s", name))
+	return pdb, nil
 }
 
 func (r *BesuReconciler) generateStatefulSetTemplate(node *corev1alpha1.Besu, name, configSum string) *appsv1.StatefulSet {
