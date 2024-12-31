@@ -114,6 +114,12 @@ func (tm *transportManager) Start() error {
 }
 
 func (tm *transportManager) Stop() {
+
+	peers := tm.listActivePeers()
+	for _, p := range peers {
+		p.close()
+	}
+
 	tm.mux.Lock()
 	var allTransports []*transport
 	for _, t := range tm.transportsByID {
@@ -244,8 +250,11 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 }
 
 func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
-	// Use or establish a peer connection for the send
-	peer, err := tm.getPeer(ctx, nodeName)
+	// Use or establish a p connection for the send
+	p, err := tm.getPeer(ctx, nodeName)
+	if err == nil {
+		err = p.transport.checkInit(ctx)
+	}
 	if err != nil {
 		return err
 	}
@@ -255,8 +264,8 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 	// However, the send is at-most-once, and the higher level message protocols that
 	// use this "send" must be fault tolerant to message loss.
 	select {
-	case peer.sendQueue <- msg:
-		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), peer.name)
+	case p.sendQueue <- msg:
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), p.name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)

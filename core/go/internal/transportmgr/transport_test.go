@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
@@ -118,28 +119,40 @@ func testMessage() *components.FireAndForgetMessageSend {
 	}
 }
 
-func TestSendMessage(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
-			{
-				Node:      "node2",
-				Transport: "test1",
-				Details:   `{"likely":"json stuff"}`,
-			},
-		}, nil)
-		return nil
-	})
-	defer done()
+func mockEmptyReliableMsgs(mc *mockComponents) components.TransportClient {
+	mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnRows(sqlmock.NewRows([]string{}))
+	mc.db.Mock.MatchExpectationsInOrder(false)
+	return nil
+}
 
-	message := testMessage()
-
-	sentMessages := make(chan *prototk.PaladinMsg, 1)
+func mockActivateDeactivateOk(tp *testPlugin) {
 	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
 		return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
 	}
 	tp.Functions.DeactivateNode = func(ctx context.Context, dnr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
 		return &prototk.DeactivateNodeResponse{}, nil
 	}
+}
+
+func TestSendMessage(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockEmptyReliableMsgs,
+		func(mc *mockComponents) components.TransportClient {
+			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+				{
+					Node:      "node2",
+					Transport: "test1",
+					Details:   `{"likely":"json stuff"}`,
+				},
+			}, nil)
+			return nil
+		})
+	defer done()
+
+	message := testMessage()
+
+	sentMessages := make(chan *prototk.PaladinMsg, 1)
+	mockActivateDeactivateOk(tp)
 	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
 		sent := req.Message
 		assert.NotEmpty(t, sent.MessageId)
@@ -164,48 +177,57 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestSendMessageNotInit(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
-			{
-				Node:      "node1",
-				Transport: "test1",
-				Details:   `{"likely":"json stuff"}`,
-			},
-		}, nil)
-		return nil
-	})
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockEmptyReliableMsgs,
+		func(mc *mockComponents) components.TransportClient {
+			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+				{
+					Node:      "node1",
+					Transport: "test1",
+					Details:   `{"likely":"json stuff"}`,
+				},
+			}, nil)
+			return nil
+		})
 	defer done()
 
 	tp.t.initialized.Store(false)
 
 	message := testMessage()
 
+	mockActivateDeactivateOk(tp)
 	err := tm.Send(ctx, message)
 	assert.Regexp(t, "PD011601", err)
 
 }
 
 func TestSendMessageFail(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
-		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
-			{
-				Node:      "node1",
-				Transport: "test1",
-				Details:   `{"likely":"json stuff"}`,
-			},
-		}, nil)
-		return nil
-	})
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockEmptyReliableMsgs,
+		func(mc *mockComponents) components.TransportClient {
+			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+				{
+					Node:      "node1",
+					Transport: "test1",
+					Details:   `{"likely":"json stuff"}`,
+				},
+			}, nil)
+			return nil
+		})
 	defer done()
 
+	sent := make(chan struct{})
 	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+		close(sent)
 		return nil, fmt.Errorf("pop")
 	}
 
 	message := testMessage()
 
+	mockActivateDeactivateOk(tp)
 	err := tm.Send(ctx, message)
-	assert.Regexp(t, "pop", err)
+	assert.NoError(t, err)
+	<-sent
 
 }
 

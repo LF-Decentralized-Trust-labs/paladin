@@ -53,10 +53,10 @@ type ReliableMessage struct {
 	ReplyTo     string                            `json:"replyTo"         gorm:"column:reply_to"`                     // The identity to respond to on the sending node
 	MessageType tktypes.Enum[ReliableMessageType] `json:"messageType"     gorm:"column:msg_type"`
 	Metadata    tktypes.RawJSON                   `json:"metadata"        gorm:"column:metadata"`
-	Ack         *ReliableMessageAck               `json:"ack,omitempty"   gorm:"foreignKey:id;references:id;"`
+	Ack         *ReliableMessageAck               `json:"ack,omitempty"   gorm:"foreignKey:MessageID;references:ID;"`
 }
 
-func (rm ReliableMessage) Table() string {
+func (rm ReliableMessage) TableName() string {
 	return "reliable_msgs"
 }
 
@@ -66,7 +66,7 @@ type ReliableMessageAck struct {
 	Error     string            `json:"error,omitempty"                  gorm:"column:error,autoCreateTime:false"`
 }
 
-func (rma ReliableMessageAck) Table() string {
+func (rma ReliableMessageAck) TableName() string {
 	return "reliable_msg_acks"
 }
 

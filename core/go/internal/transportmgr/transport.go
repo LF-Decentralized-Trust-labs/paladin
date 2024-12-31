@@ -98,9 +98,6 @@ func (t *transport) checkInit(ctx context.Context) error {
 }
 
 func (t *transport) send(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
-	if err := t.checkInit(ctx); err != nil {
-		return err
-	}
 
 	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
 		Node:    nodeName,
