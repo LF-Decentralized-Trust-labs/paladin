@@ -274,7 +274,7 @@ func (n *Noto) prepareOutputs(ownerAddress *tktypes.EthAddress, amount *tktypes.
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoCoin{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  ownerAddress,
 		Amount: amount,
 	}
@@ -289,7 +289,7 @@ func (n *Noto) prepareLockedOutputs(id tktypes.Bytes32, ownerAddress *tktypes.Et
 	// Always produce a single coin for the entire output amount
 	// TODO: make this configurable
 	newCoin := &types.NotoLockedCoin{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		LockID: id,
 		Owner:  ownerAddress,
 		Amount: amount,

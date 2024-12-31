@@ -366,8 +366,8 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 		})
 
 		penteGroupNodes1and2 := nototypes.PentePrivateGroup{
-			Salt:    tktypes.Bytes32(tktypes.RandBytes(32)), // unique salt must be shared privately to retain anonymity
-			Members: []string{"bob@node1", "sally@node2"},   // these will be salted to establish the endorsement key identifiers
+			Salt:    tktypes.RandBytes32(),                // unique salt must be shared privately to retain anonymity
+			Members: []string{"bob@node1", "sally@node2"}, // these will be salted to establish the endorsement key identifiers
 		}
 
 		var penteContract *tktypes.EthAddress

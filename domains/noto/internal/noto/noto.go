@@ -694,7 +694,7 @@ func (n *Noto) decodeTransactionData(ctx context.Context, data tktypes.HexBytes)
 	}
 	if dataValues.TransactionID.IsZero() {
 		// If no transaction ID could be decoded, assign a random one
-		dataValues.TransactionID = tktypes.Bytes32(tktypes.RandBytes(32))
+		dataValues.TransactionID = tktypes.RandBytes32()
 	}
 	return &dataValues, nil
 }

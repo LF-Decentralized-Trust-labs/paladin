@@ -901,13 +901,13 @@ func TestGetIndexedTransactionByHashErrors(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnRows(sqlmock.NewRows([]string{}))
 
-	res, err := bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
+	res, err := bi.GetIndexedTransactionByHash(ctx, tktypes.RandBytes32())
 	require.NoError(t, err)
 	assert.Nil(t, res)
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err = bi.GetIndexedTransactionByHash(ctx, tktypes.Bytes32(tktypes.RandBytes(32)))
+	_, err = bi.GetIndexedTransactionByHash(ctx, tktypes.RandBytes32())
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1011,7 +1011,7 @@ func TestWaitForTransactionErrorCases(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_transactions").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := bi.WaitForTransactionSuccess(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	_, err := bi.WaitForTransactionSuccess(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1023,7 +1023,7 @@ func TestDecodeTransactionEventsFail(t *testing.T) {
 
 	p.Mock.ExpectQuery("SELECT.*indexed_events").WillReturnError(fmt.Errorf("pop"))
 
-	_, err := bi.DecodeTransactionEvents(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), testABI, "")
+	_, err := bi.DecodeTransactionEvents(ctx, tktypes.RandBytes32(), testABI, "")
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1037,7 +1037,7 @@ func TestWaitForTransactionSuccessGetReceiptFail(t *testing.T) {
 		rpcclient.WrapErrorRPC(rpcclient.RPCCodeInternalError, fmt.Errorf("pop")),
 	)
 
-	err := bi.getReceiptRevertError(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	err := bi.getReceiptRevertError(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -1053,7 +1053,7 @@ func TestWaitForTransactionSuccessGetReceiptFallback(t *testing.T) {
 		},
 	).Return(nil)
 
-	err := bi.getReceiptRevertError(ctx, tktypes.Bytes32(tktypes.RandBytes(32)), nil)
+	err := bi.getReceiptRevertError(ctx, tktypes.RandBytes32(), nil)
 	assert.Regexp(t, "PD011309", err)
 
 }

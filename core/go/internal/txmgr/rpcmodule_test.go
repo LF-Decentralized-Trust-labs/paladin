@@ -209,7 +209,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 
 	// Null on not found is the consistent ethereum pattern
 	var abiNotFound *pldapi.StoredABI
-	err = rpcClient.CallRPC(ctx, &abiNotFound, "ptx_getStoredABI", tktypes.Bytes32(tktypes.RandBytes(32)))
+	err = rpcClient.CallRPC(ctx, &abiNotFound, "ptx_getStoredABI", tktypes.RandBytes32())
 	require.NoError(t, err)
 	assert.Nil(t, abiNotFound)
 
@@ -250,7 +250,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 	assert.Nil(t, txNotFound)
 
 	// Finalize the deploy as a success
-	txHash1 := tktypes.Bytes32(tktypes.RandBytes(32))
+	txHash1 := tktypes.RandBytes32()
 	blockNumber1 := int64(12345)
 	err = tmr.FinalizeTransactions(ctx, tmr.p.DB(), []*components.ReceiptInput{
 		{
@@ -287,7 +287,7 @@ func TestPublicTransactionLifecycle(t *testing.T) {
 	require.Len(t, pendingTransactions, 1)
 
 	// Finalize the invoke as a revert with an encoded error
-	txHash2 := tktypes.Bytes32(tktypes.RandBytes(32))
+	txHash2 := tktypes.RandBytes32()
 	blockNumber2 := int64(12345)
 	revertData, err := sampleABI.Errors()["BadValue"].EncodeCallDataValuesCtx(ctx, []any{12345})
 	require.NoError(t, err)
@@ -445,7 +445,7 @@ func TestPublicTransactionPassthroughQueries(t *testing.T) {
 	require.Regexp(t, "pop", err)
 
 	// Query by hash
-	txHash := tktypes.Bytes32(tktypes.RandBytes(32))
+	txHash := tktypes.RandBytes32()
 	mockGetByHash = func(hash tktypes.Bytes32) (*pldapi.PublicTxWithBinding, error) {
 		assert.Equal(t, txHash, hash)
 		return tx, nil

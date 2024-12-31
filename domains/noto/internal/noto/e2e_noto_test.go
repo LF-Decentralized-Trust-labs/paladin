@@ -498,7 +498,7 @@ func TestNotoLock(t *testing.T) {
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
 
 	log.L(ctx).Infof("Lock 50 from recipient1")
-	lockID := tktypes.Bytes32(tktypes.RandBytes(32))
+	lockID := tktypes.RandBytes32()
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     recipient1Name,

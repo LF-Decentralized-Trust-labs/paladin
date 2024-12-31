@@ -38,9 +38,9 @@ func newTestStateDistributionBuilder(t *testing.T, tx *components.PrivateTransac
 }
 
 func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
-	schema1ID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schema1ID := tktypes.RandBytes32()
 	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
-	schema2ID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schema2ID := tktypes.RandBytes32()
 	state2ID := tktypes.HexBytes(tktypes.RandBytes(32))
 	contractAddr := *tktypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
@@ -98,7 +98,7 @@ func TestStateDistributionBuilderAllSenderNoNullifiers(t *testing.T) {
 }
 
 func TestStateDistributionWithNullifiersAllRemote(t *testing.T) {
-	schema1ID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schema1ID := tktypes.RandBytes32()
 	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
 	state2ID := tktypes.HexBytes(tktypes.RandBytes(32))
 	contractAddr := *tktypes.RandAddress()
@@ -233,7 +233,7 @@ func TestStateDistributionInvalidAssembly(t *testing.T) {
 
 func TestStateDistributionInvalidNullifiers(t *testing.T) {
 
-	schema1ID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schema1ID := tktypes.RandBytes32()
 	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
 	contractAddr := *tktypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{
@@ -275,7 +275,7 @@ func TestStateDistributionInvalidNullifiers(t *testing.T) {
 
 func TestStateDistributionInfoStateNoNodeName(t *testing.T) {
 
-	schema1ID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schema1ID := tktypes.RandBytes32()
 	state1ID := tktypes.HexBytes(tktypes.RandBytes(32))
 	contractAddr := *tktypes.RandAddress()
 	ctx, sd := newTestStateDistributionBuilder(t, &components.PrivateTransaction{

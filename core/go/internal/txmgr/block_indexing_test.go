@@ -37,7 +37,7 @@ import (
 func newTestConfirm(revertReason ...[]byte) *blockindexer.IndexedTransactionNotify {
 	txi := &blockindexer.IndexedTransactionNotify{
 		IndexedTransaction: pldapi.IndexedTransaction{
-			Hash:             tktypes.Bytes32(tktypes.RandBytes(32)),
+			Hash:             tktypes.RandBytes32(),
 			BlockNumber:      12345,
 			TransactionIndex: 0,
 			From:             tktypes.MustEthAddress(tktypes.RandHex(20)),
