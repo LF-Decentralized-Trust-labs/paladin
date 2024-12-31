@@ -54,10 +54,10 @@ func (t ReliableMessageType) Options() []string {
 }
 
 type ReliableMessage struct {
-	ID          uuid.UUID                         `json:"id"              gorm:"column:id,primaryKey"`
-	Created     tktypes.Timestamp                 `json:"created"         gorm:"column:created,autoCreateTime:false"` // generated in our code
+	Sequence    uint64                            `json:"sequence"        gorm:"column:sequence;primaryKey"`
+	ID          uuid.UUID                         `json:"id"              gorm:"column:id"`
+	Created     tktypes.Timestamp                 `json:"created"         gorm:"column:created;autoCreateTime:false"` // generated in our code
 	Node        string                            `json:"node"            gorm:"column:node"`                         // The node id to send the message to
-	ReplyTo     string                            `json:"replyTo"         gorm:"column:reply_to"`                     // The identity to respond to on the sending node
 	MessageType tktypes.Enum[ReliableMessageType] `json:"messageType"     gorm:"column:msg_type"`
 	Metadata    tktypes.RawJSON                   `json:"metadata"        gorm:"column:metadata"`
 	Ack         *ReliableMessageAck               `json:"ack,omitempty"   gorm:"foreignKey:MessageID;references:ID;"`
@@ -68,9 +68,9 @@ func (rm ReliableMessage) TableName() string {
 }
 
 type ReliableMessageAck struct {
-	MessageID uuid.UUID         `json:"-"                                gorm:"column:id,primaryKey"`
-	Time      tktypes.Timestamp `json:"time,omitempty"                   gorm:"column:time,autoCreateTime:false"` // generated in our code
-	Error     string            `json:"error,omitempty"                  gorm:"column:error,autoCreateTime:false"`
+	MessageID uuid.UUID         `json:"-"                                gorm:"column:id;primaryKey"`
+	Time      tktypes.Timestamp `json:"time,omitempty"                   gorm:"column:time;autoCreateTime:false"` // generated in our code
+	Error     string            `json:"error,omitempty"                  gorm:"column:error"`
 }
 
 func (rma ReliableMessageAck) TableName() string {

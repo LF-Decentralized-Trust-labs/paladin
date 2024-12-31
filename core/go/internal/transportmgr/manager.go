@@ -28,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
@@ -298,4 +299,16 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg
 
 	return p.notifyPersistedMsgAvailable, nil
 
+}
+
+func (tm *transportManager) writeAcks(ctx context.Context, dbTX *gorm.DB, acks ...*components.ReliableMessageAck) error {
+	for _, ack := range acks {
+		log.L(ctx).Infof("ack received for message %s", ack.MessageID)
+		ack.Time = tktypes.TimestampNow()
+	}
+	return dbTX.
+		WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(acks).
+		Error
 }

@@ -45,7 +45,7 @@ type peer struct {
 
 	// Send loop state (no lock as only used on the loop)
 	lastFullScan          time.Time
-	lastDrainHWM          *tktypes.Timestamp
+	lastDrainHWM          *uint64
 	persistentMsgsDrained bool
 
 	quiescing bool
@@ -94,10 +94,14 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 		return p, nil
 	}
 
-	// Otherwise take the write-lock and race to connect
+	return tm.connectPeer(ctx, nodeName)
+}
+
+func (tm *transportManager) connectPeer(ctx context.Context, nodeName string) (*peer, error) {
+	// Race to grab the write-lock and race to connect
 	tm.peersLock.Lock()
 	defer tm.peersLock.Unlock()
-	p = tm.peers[nodeName]
+	p := tm.peers[nodeName]
 	if p != nil {
 		// There was a race to connect to this peer, and the other routine won
 		log.L(ctx).Debugf("connection already active for peer '%s' (after connection race)", nodeName)
@@ -166,16 +170,6 @@ func (p *peer) notifyPersistedMsgAvailable() {
 	}
 }
 
-func (p *peer) stateDistributionMsg(rm *components.ReliableMessage, sd *components.StateDistributionWithData) *prototk.PaladinMsg {
-	payload, _ := json.Marshal(sd)
-	return &prototk.PaladinMsg{
-		MessageId:   rm.ID.String(),
-		MessageType: "StateProducedEvent",
-		Payload:     payload,
-		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-	}
-}
-
 func (p *peer) send(msg *prototk.PaladinMsg) error {
 	return p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
 		return true, p.transport.send(p.ctx, p.name, msg)
@@ -236,18 +230,18 @@ func (p *peer) reliableMessageScan() error {
 	const pageSize = 100
 
 	var total = 0
-	var lastPageEnd *tktypes.Timestamp
+	var lastPageEnd *uint64
 	for {
 		query := p.tm.persistence.DB().
 			WithContext(p.ctx).
-			Order("created ASC").
+			Order("sequence ASC").
 			Joins("Ack").
 			Where(`"Ack"."time" IS NULL`).
 			Limit(pageSize)
 		if lastPageEnd != nil {
-			query = query.Where("created > ?", *lastPageEnd)
+			query = query.Where("sequence > ?", *lastPageEnd)
 		} else if !fullScan {
-			query = query.Where("created > ?", *p.lastDrainHWM)
+			query = query.Where("sequence > ?", *p.lastDrainHWM)
 		}
 
 		var page []*components.ReliableMessage
@@ -266,7 +260,7 @@ func (p *peer) reliableMessageScan() error {
 		if len(page) > 0 {
 			p.persistentMsgsDrained = false // we know there's some messages
 			total += len(page)
-			lastPageEnd = &page[len(page)-1].Created
+			lastPageEnd = &page[len(page)-1].Sequence
 		}
 
 		// If we didn't have a full page, then we're done
@@ -322,8 +316,14 @@ func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*proto
 			i18n.NewError(p.ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, *contractAddr, stateID),
 			nil
 	}
+	sd.StateData = state.Data
 
-	return nil, nil, nil
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
+		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType: string(rm.MessageType),
+		Payload:     tktypes.JSONString(sd),
+	}, nil, nil
 }
 
 func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err error) {
@@ -334,7 +334,7 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 	for _, rm := range page {
 
 		// Check it's either after our HWM, or eligible for re-send
-		afterHWM := p.lastDrainHWM == nil || *p.lastDrainHWM < rm.Created
+		afterHWM := p.lastDrainHWM == nil || *p.lastDrainHWM < rm.Sequence
 		if !afterHWM && time.Since(rm.Created.Time()) < p.tm.reliableMessageResend {
 			log.L(p.ctx).Infof("Unacknowledged message %s not yet eligible for re-send", rm.ID)
 			continue
@@ -356,6 +356,7 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 		case err != nil:
 			return err
 		case errorAck != nil:
+			log.L(p.ctx).Errorf("Unable to send reliable message %s - writing persistent error: %s", rm.ID, errorAck)
 			errorAcks = append(errorAcks, &components.ReliableMessageAck{
 				MessageID: rm.ID,
 				Time:      tktypes.TimestampNow(),

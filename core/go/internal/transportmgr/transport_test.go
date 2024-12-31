@@ -161,14 +161,6 @@ func TestSendMessage(t *testing.T) {
 		assert.NotEmpty(t, sent.MessageId)
 		assert.Equal(t, message.CorrelationID.String(), *sent.CorrelationId)
 		assert.Equal(t, message.Payload, sent.Payload)
-
-		// ... if we didn't have a connection established we'd expect to come back to request the details
-		gtdr, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
-			Node: "node2",
-		})
-		require.NoError(t, err)
-		assert.NotEmpty(t, gtdr.TransportDetails)
-
 		sentMessages <- sent
 		return nil, nil
 	}

@@ -99,9 +99,11 @@ func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportM
 	assert.Equal(t, conf.NodeName, tm.LocalNodeName())
 
 	return ctx, tm.(*transportManager), mc, func() {
-		logrus.SetLevel(oldLevel)
-		cancelCtx()
-		tm.Stop()
+		if !t.Failed() {
+			logrus.SetLevel(oldLevel)
+			cancelCtx()
+			tm.Stop()
+		}
 	}
 }
 

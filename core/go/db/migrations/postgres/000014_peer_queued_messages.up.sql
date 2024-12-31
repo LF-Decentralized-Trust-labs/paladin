@@ -5,14 +5,16 @@ DROP TABLE state_distribution_acknowledgments;
 DROP TABLE state_distributions;
 
 CREATE TABLE reliable_msgs (
-    "id"                 UUID    NOT NULL,
-    "created"            BIGINT  NOT NULL,
-    "node"               TEXT    NOT NULL,
-    "msg_type"           TEXT    NOT NULL,
-    "metadata"           TEXT    NOT NULL,
+    "sequence"           BIGINT   GENERATED ALWAYS AS IDENTITY,
+    "id"                 UUID     NOT NULL,
+    "created"            BIGINT   NOT NULL,
+    "node"               TEXT     NOT NULL,
+    "msg_type"           TEXT     NOT NULL,
+    "metadata"           TEXT     NOT NULL,
     PRIMARY KEY ("id")
 );
 
+CREATE INDEX reliable_msgs_id ON reliable_msgs ("id");
 CREATE INDEX reliable_msgs_node ON reliable_msgs ("node");
 CREATE INDEX reliable_msgs_created ON reliable_msgs ("created");
 
