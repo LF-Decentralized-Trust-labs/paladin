@@ -17,6 +17,7 @@ package transportmgr
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -134,19 +135,21 @@ func mockActivateDeactivateOk(tp *testPlugin) {
 	}
 }
 
+func mockGoodTransport(mc *mockComponents) components.TransportClient {
+	mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+		{
+			Node:      "node2",
+			Transport: "test1",
+			Details:   `{"likely":"json stuff"}`,
+		},
+	}, nil)
+	return nil
+}
+
 func TestSendMessage(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents) components.TransportClient {
-			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
-				{
-					Node:      "node2",
-					Transport: "test1",
-					Details:   `{"likely":"json stuff"}`,
-				},
-			}, nil)
-			return nil
-		})
+		mockGoodTransport)
 	defer done()
 
 	message := testMessage()
@@ -284,7 +287,7 @@ func TestSendMessageDestWrong(t *testing.T) {
 	message.Component = prototk.PaladinMsg_TRANSACTION_ENGINE
 	message.Node = ""
 	err := tm.Send(ctx, message)
-	assert.Regexp(t, "PD012007", err)
+	assert.Regexp(t, "PD012016", err)
 
 	message.Component = prototk.PaladinMsg_TRANSACTION_ENGINE
 	message.Node = "node1"
@@ -445,4 +448,61 @@ func TestReceiveMessageBadCorrelID(t *testing.T) {
 		Message: msg,
 	})
 	assert.Regexp(t, "PD012000", err)
+}
+
+func TestSendContextClosed(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, false)
+	done()
+
+	tm.peers = map[string]*peer{
+		"node2": {
+			transport: tp.t,
+			sendQueue: make(chan *prototk.PaladinMsg),
+		},
+	}
+
+	err := tm.Send(ctx, testMessage())
+	assert.Regexp(t, "PD010301", err)
+
+}
+
+func TestSendReliableOk(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGoodTransport,
+		func(mc *mockComponents) components.TransportClient {
+			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
+			return nil
+		},
+	)
+	defer done()
+
+	mockActivateDeactivateOk(tp)
+	pc, err := tm.SendReliable(ctx, tm.persistence.DB(), &components.ReliableMessage{
+		Node:        "node2",
+		MessageType: components.RMTState.Enum(),
+		Metadata:    []byte(`{"some":"data"}`),
+	})
+	require.NoError(t, err)
+	pc()
+
+}
+
+func TestSendReliableFail(t *testing.T) {
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGoodTransport,
+		func(mc *mockComponents) components.TransportClient {
+			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
+			return nil
+		},
+	)
+	defer done()
+
+	mockActivateDeactivateOk(tp)
+	_, err := tm.SendReliable(ctx, tm.persistence.DB(), &components.ReliableMessage{
+		Node:        "node2",
+		MessageType: components.RMTState.Enum(),
+		Metadata:    []byte(`{"some":"data"}`),
+	})
+	require.Regexp(t, "pop", err)
+
 }

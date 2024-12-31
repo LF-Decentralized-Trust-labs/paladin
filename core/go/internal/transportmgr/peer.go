@@ -79,6 +79,13 @@ func (tm *transportManager) getActivePeer(nodeName string) *peer {
 
 func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer, error) {
 
+	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, tktypes.DefaultNameMaxLen, "node"); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidTargetNode, nodeName)
+	}
+	if nodeName == tm.localNodeName {
+		return nil, i18n.NewError(ctx, msgs.MsgTransportSendLocalNode, tm.localNodeName)
+	}
+
 	// Hopefully this is an already active connection
 	p := tm.getActivePeer(nodeName)
 	if p != nil {
@@ -108,10 +115,6 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 	}
 	p.ctx, p.cancelCtx = context.WithCancel(
 		log.WithLogField(tm.bgCtx /* go-routine need bg context*/, "peer", nodeName))
-
-	if nodeName == "" || nodeName == tm.localNodeName {
-		return nil, i18n.NewError(p.ctx, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, nodeName)
-	}
 
 	// Note the registry is responsible for caching to make this call as efficient as if
 	// we maintained the transport details in-memory ourselves.

@@ -229,8 +229,7 @@ func (tm *transportManager) LocalNodeName() string {
 func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
 
 	// Check the message is valid
-	if len(send.MessageType) == 0 ||
-		len(send.Payload) == 0 {
+	if len(send.Payload) == 0 {
 		log.L(ctx).Errorf("Invalid message send request %+v", send)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}

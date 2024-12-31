@@ -42,8 +42,15 @@ const (
 	RMTReceipt ReliableMessageType = "receipt"
 )
 
+func (t ReliableMessageType) Enum() tktypes.Enum[ReliableMessageType] {
+	return tktypes.Enum[ReliableMessageType](t)
+}
+
 func (t ReliableMessageType) Options() []string {
-	return []string{}
+	return []string{
+		string(RMTState),
+		string(RMTReceipt),
+	}
 }
 
 type ReliableMessage struct {

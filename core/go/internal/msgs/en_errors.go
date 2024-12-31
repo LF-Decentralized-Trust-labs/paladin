@@ -360,7 +360,7 @@ var (
 	MsgTransportNoTransportsConfiguredForNode = ffe("PD012003", "None of the transports registered by node '%s' are configured locally on this node: %v")
 	MsgTransportDetailsNotAvailable           = ffe("PD012004", "Transport '%s' not available for node '%s'")
 	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
-	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
+	MsgTransportSendLocalNode                 = ffe("PD012007", "Attempt to send message to local node '%s'")
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
 	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 	MsgTransportClientAlreadyRegistered       = ffe("PD012010", "Client '%s' already registered")
@@ -369,6 +369,7 @@ var (
 	MsgTransportUnsupportedReliableMsg        = ffe("PD012013", "Unsupported reliable message type '%s'")
 	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")
 	MsgTransportInvalidPeerInfo               = ffe("PD012015", "Invalid peer info JSON returned by plugin")
+	MsgTransportInvalidTargetNode             = ffe("PD012016", "Invalid target node '%s'")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")
