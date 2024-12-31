@@ -676,7 +676,7 @@ func TestInvokeNewWidgetCustomError(t *testing.T) {
 
 func TestNewWSOk(t *testing.T) {
 
-	expected := tktypes.Bytes32(tktypes.RandBytes(32))
+	expected := tktypes.RandBytes32()
 	ctx, ecf, done := newTestClientAndServer(t, &mockEth{
 		eth_sendRawTransaction: func(ctx context.Context, rawTX tktypes.HexBytes) (tktypes.HexBytes, error) {
 			return tktypes.HexBytes(expected[:]), nil

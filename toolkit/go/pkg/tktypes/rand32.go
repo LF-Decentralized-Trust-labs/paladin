@@ -35,3 +35,7 @@ func RandBytes(count int) []byte {
 	}
 	return b
 }
+
+func RandBytes32() Bytes32 {
+	return Bytes32(RandBytes(32))
+}

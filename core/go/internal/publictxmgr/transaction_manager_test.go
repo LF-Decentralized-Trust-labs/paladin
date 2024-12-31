@@ -123,7 +123,7 @@ func newTestPublicTxManager(t *testing.T, realDBAndSigner bool, extraSetup ...fu
 								Keys: map[string]pldconf.StaticKeyEntryConfig{
 									"seed": {
 										Encoding: "hex",
-										Inline:   tktypes.Bytes32(tktypes.RandBytes(32)).String(),
+										Inline:   tktypes.RandBytes32().String(),
 									},
 								},
 							},
@@ -406,7 +406,7 @@ func fakeTxManagerInsert(t *testing.T, db *gorm.DB, txID uuid.UUID, fromStr stri
 	// Yes, there is a slight smell of un-partitioned DB responsibilities between components
 	// here. But the saving is critical path avoidance of one extra DB query for every block
 	// that is mined. So it's currently considered worth this limited quirk.
-	fakeABI := tktypes.Bytes32(tktypes.RandBytes(32))
+	fakeABI := tktypes.RandBytes32()
 	err := db.Exec(`INSERT INTO "abis" ("hash","abi","created") VALUES (?, ?, ?)`,
 		fakeABI, `[]`, tktypes.TimestampNow()).
 		Error

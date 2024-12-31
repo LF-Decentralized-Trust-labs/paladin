@@ -93,7 +93,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 		})
 
 		penteGroupStars := nototypes.PentePrivateGroup{
-			Salt:    tktypes.Bytes32(tktypes.RandBytes(32)),               // unique salt must be shared privately to retain anonymity
+			Salt:    tktypes.RandBytes32(),                                // unique salt must be shared privately to retain anonymity
 			Members: []string{"tara@node1", "hoshi@node2", "seren@node3"}, // these will be salted to establish the endorsement key identifiers
 		}
 

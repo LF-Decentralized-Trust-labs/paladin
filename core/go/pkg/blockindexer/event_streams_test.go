@@ -792,13 +792,13 @@ func TestProcessCatchupEventMultiPageRealDB(t *testing.T) {
 	allTransactions := []*pldapi.IndexedTransaction{}
 	allEvents := []*pldapi.IndexedEvent{}
 	for b := 1; b < 14; b++ {
-		blockHash := tktypes.Bytes32(tktypes.RandBytes(32))
+		blockHash := tktypes.RandBytes32()
 		allBlocks = append(allBlocks, &pldapi.IndexedBlock{
 			Number: int64(b),
 			Hash:   blockHash,
 		})
 		for tx := 0; tx < 8; tx++ {
-			txHash := tktypes.Bytes32(tktypes.RandBytes(32))
+			txHash := tktypes.RandBytes32()
 			allTransactions = append(allTransactions, &pldapi.IndexedTransaction{
 				Hash:             txHash,
 				BlockNumber:      int64(b),

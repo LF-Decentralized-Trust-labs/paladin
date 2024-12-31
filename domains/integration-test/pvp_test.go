@@ -351,7 +351,7 @@ func TestNotoForZeto(t *testing.T) {
 		TokenValue2:   tktypes.Int64ToInt256(1),
 	})
 
-	lockID := tktypes.Bytes32(tktypes.RandBytes(32))
+	lockID := tktypes.RandBytes32()
 	notoUnlockParams, err := json.Marshal(map[string]any{
 		"lockId": lockID,
 		"data":   "0x",

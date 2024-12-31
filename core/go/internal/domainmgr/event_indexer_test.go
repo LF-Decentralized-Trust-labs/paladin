@@ -205,7 +205,7 @@ func TestHandleEventBatch(t *testing.T) {
 	stateConfirmed := tktypes.RandHex(32)
 	stateInfo := tktypes.RandHex(32)
 	fakeHash1 := tktypes.RandHex(32)
-	fakeSchema := tktypes.Bytes32(tktypes.RandBytes(32))
+	fakeSchema := tktypes.RandBytes32()
 	event1 := &pldapi.EventWithData{
 		Address: *contract1,
 		IndexedEvent: &pldapi.IndexedEvent{
@@ -439,7 +439,7 @@ func TestHandleEventBatchRegistrationError(t *testing.T) {
 	mp.Mock.ExpectExec("INSERT.*private_smart_contracts").WillReturnError(fmt.Errorf("pop"))
 
 	registrationData := &event_PaladinRegisterSmartContract_V0{
-		TXId: tktypes.Bytes32(tktypes.RandBytes(32)),
+		TXId: tktypes.RandBytes32(),
 	}
 	registrationDataJSON, err := json.Marshal(registrationData)
 	require.NoError(t, err)

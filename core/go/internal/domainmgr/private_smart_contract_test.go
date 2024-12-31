@@ -651,13 +651,13 @@ func TestFullTransactionRealDBOK(t *testing.T) {
 	state4 := storeTestState(t, td, ptx.ID, ethtypes.NewHexInteger64(4444444))
 
 	state5 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(5555555),
 	}
 
 	state6 := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: ethtypes.NewHexInteger64(6666666),
 	}
@@ -1002,7 +1002,7 @@ func TestDomainWritePotentialStatesBadSchema(t *testing.T) {
 
 func TestDomainWritePotentialStatesFail(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
@@ -1020,7 +1020,7 @@ func TestDomainWritePotentialStatesFail(t *testing.T) {
 
 func TestDomainWritePotentialStatesBadID(t *testing.T) {
 	schema := componentmocks.NewSchema(t)
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	schema.On("ID").Return(schemaID)
 	schema.On("Signature").Return("schema1_signature")
 	td, done := newTestDomain(t, false, goodDomainConf(), mockSchemas(schema), mockBlockHeight)
