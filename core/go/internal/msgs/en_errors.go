@@ -364,7 +364,7 @@ var (
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
 	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 	MsgTransportClientAlreadyRegistered       = ffe("PD012010", "Client '%s' already registered")
-	MsgTransportDestinationNotFound           = ffe("PD012011", "Destination '%s' not found")
+	MsgTransportComponentNotFound             = ffe("PD012011", "Component '%s' not found")
 	MsgTransportClientRegisterAfterStartup    = ffe("PD012012", "Client '%s' attempted registration after startup")
 	MsgTransportUnsupportedReliableMsg        = ffe("PD012013", "Unsupported reliable message type '%s'")
 	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")

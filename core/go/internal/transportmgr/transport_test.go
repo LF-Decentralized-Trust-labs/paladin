@@ -308,7 +308,7 @@ func TestReceiveMessage(t *testing.T) {
 
 	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
 		receivingClient := componentmocks.NewTransportClient(t)
-		receivingClient.On("Destination").Return("receivingClient1")
+		receivingClient.On("Destination").Return(prototk.PaladinMsg_TRANSACTION_ENGINE)
 		receivingClient.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 			receivedMessages <- args[1].(*prototk.PaladinMsg)
 		})
@@ -399,35 +399,20 @@ func TestReceiveMessageNoPayload(t *testing.T) {
 	assert.Regexp(t, "PD012000", err)
 }
 
-func TestReceiveMessageWrongNode(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t, false)
-	defer done()
-
-	msg := &prototk.PaladinMsg{
-		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		MessageType: "myMessageType",
-		Payload:     []byte("some data"),
-	}
-	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
-		Message: msg,
-	})
-	assert.Regexp(t, "PD012005", err)
-}
-
 func TestReceiveMessageBadDestination(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
 
 	msg := &prototk.PaladinMsg{
 		MessageId:   uuid.NewString(),
-		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		Component:   prototk.PaladinMsg_Component(42),
 		MessageType: "myMessageType",
 		Payload:     []byte("some data"),
 	}
 	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		Message: msg,
 	})
-	assert.Regexp(t, "PD012005", err)
+	assert.Regexp(t, "PD012011", err)
 }
 
 func TestReceiveMessageBadMsgID(t *testing.T) {

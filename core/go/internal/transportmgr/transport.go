@@ -143,6 +143,14 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
+	if msg.CorrelationId != nil {
+		_, err := uuid.Parse(*msg.CorrelationId)
+		if err != nil {
+			log.L(ctx).Errorf("Invalid correlationId from transport: %s", protoToJSON(msg))
+			return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
+		}
+	}
+
 	log.L(ctx).Debugf("transport %s message received id=%s (cid=%s)", t.name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
@@ -163,7 +171,7 @@ func (t *transport) deliverMessage(ctx context.Context, component prototk.Paladi
 	receiver, found := t.tm.components[component]
 	if !found {
 		log.L(ctx).Errorf("Component not found: %s", component)
-		return i18n.NewError(ctx, msgs.MsgTransportDestinationNotFound, component.String())
+		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, component.String())
 	}
 
 	receiver.HandlePaladinMsg(ctx, msg)
