@@ -10,7 +10,7 @@ CREATE TABLE reliable_msgs (
     "created"            BIGINT   NOT NULL,
     "node"               TEXT     NOT NULL,
     "msg_type"           TEXT     NOT NULL,
-    "metadata"           TEXT     NOT NULL,
+    "metadata"           TEXT     ,
     PRIMARY KEY ("id")
 );
 

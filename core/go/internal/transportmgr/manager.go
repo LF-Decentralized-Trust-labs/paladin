@@ -312,3 +312,19 @@ func (tm *transportManager) writeAcks(ctx context.Context, dbTX *gorm.DB, acks .
 		Create(acks).
 		Error
 }
+
+func (tm *transportManager) getReliableMessageByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*components.ReliableMessage, error) {
+	var rms []*components.ReliableMessage
+	err := dbTX.
+		WithContext(ctx).
+		Order("sequence ASC").
+		Joins("Ack").
+		Where(`"reliable_msgs"."id" = ?`, id).
+		Limit(1).
+		Find(&rms).
+		Error
+	if err != nil || len(rms) < 1 {
+		return nil, err
+	}
+	return rms[0], nil
+}

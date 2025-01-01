@@ -303,7 +303,7 @@ func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*proto
 		contractAddr, parseErr = tktypes.ParseEthAddress(sd.ContractAddress)
 	}
 	if parseErr != nil {
-		return nil, parseErr, nil
+		return nil, i18n.WrapError(p.ctx, parseErr, msgs.MsgTransportInvalidMessageData, rm.ID), nil
 	}
 
 	// Get the state - distinguishing between not found, vs. a retryable error
