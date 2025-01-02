@@ -44,6 +44,8 @@ type testDomainManager struct {
 	encodeData          func(context.Context, *prototk.EncodeDataRequest) (*prototk.EncodeDataResponse, error)
 	decodeData          func(context.Context, *prototk.DecodeDataRequest) (*prototk.DecodeDataResponse, error)
 	recoverSigner       func(context.Context, *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error)
+	sendTransaction     func(context.Context, *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error)
+	localNodeName       func(context.Context, *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error)
 }
 
 func (tp *testDomainManager) FindAvailableStates(ctx context.Context, req *prototk.FindAvailableStatesRequest) (*prototk.FindAvailableStatesResponse, error) {
@@ -60,6 +62,14 @@ func (tp *testDomainManager) DecodeData(ctx context.Context, req *prototk.Decode
 
 func (tp *testDomainManager) RecoverSigner(ctx context.Context, req *prototk.RecoverSignerRequest) (*prototk.RecoverSignerResponse, error) {
 	return tp.recoverSigner(ctx, req)
+}
+
+func (tp *testDomainManager) SendTransaction(ctx context.Context, req *prototk.SendTransactionRequest) (*prototk.SendTransactionResponse, error) {
+	return tp.sendTransaction(ctx, req)
+}
+
+func (tp *testDomainManager) LocalNodeName(ctx context.Context, req *prototk.LocalNodeNameRequest) (*prototk.LocalNodeNameResponse, error) {
+	return tp.localNodeName(ctx, req)
 }
 
 func domainConnectFactory(ctx context.Context, client prototk.PluginControllerClient) (grpc.BidiStreamingClient[prototk.DomainMessage, prototk.DomainMessage], error) {
