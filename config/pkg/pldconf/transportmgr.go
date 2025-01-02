@@ -23,6 +23,7 @@ type TransportManagerConfig struct {
 	SendRetry             RetryConfigWithMax          `json:"sendRetry"`
 	ReliableScanRetry     RetryConfig                 `json:"reliableScanRetry"`
 	ReliableMessageResend *string                     `json:"reliableMessageResend"`
+	ReliableMessageWriter FlushWriterConfig           `json:"reliableMessageWriter"`
 	Transports            map[string]*TransportConfig `json:"transports"`
 }
 
@@ -43,6 +44,11 @@ var TransportManagerDefaults = &TransportManagerConfig{
 			Factor:       confutil.P(2.0),
 		},
 		MaxAttempts: confutil.P(3),
+	},
+	ReliableMessageWriter: FlushWriterConfig{
+		WorkerCount:  confutil.P(1),
+		BatchTimeout: confutil.P("250ms"),
+		BatchMaxSize: confutil.P(50),
 	},
 }
 

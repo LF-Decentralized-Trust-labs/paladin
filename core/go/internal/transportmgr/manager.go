@@ -25,6 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/flushwriter"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"gorm.io/gorm"
@@ -42,22 +43,23 @@ type transportManager struct {
 	bgCtx context.Context
 	mux   sync.Mutex
 
-	rpcModule       *rpcserver.RPCModule
-	conf            *pldconf.TransportManagerConfig
-	localNodeName   string
-	registryManager components.RegistryManager
-	stateManager    components.StateManager
-	persistence     persistence.Persistence
+	rpcModule        *rpcserver.RPCModule
+	conf             *pldconf.TransportManagerConfig
+	localNodeName    string
+	registryManager  components.RegistryManager
+	stateManager     components.StateManager
+	domainManager    components.DomainManager
+	privateTxManager components.PrivateTxManager
+	identityResolver components.IdentityResolver
+	persistence      persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	components        map[prototk.PaladinMsg_Component]components.TransportClient
-	destinationsFixed bool
-	destinationsMux   sync.RWMutex
-
 	peersLock sync.RWMutex
 	peers     map[string]*peer
+
+	reliableMsgWriter flushwriter.Writer[*reliableMsgOp, *noResult]
 
 	sendShortRetry        *retry.Retry
 	reliableScanRetry     *retry.Retry
@@ -70,13 +72,12 @@ type transportManager struct {
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
-	return &transportManager{
+	tm := &transportManager{
 		bgCtx:                   bgCtx,
 		conf:                    conf,
 		localNodeName:           conf.NodeName,
 		transportsByID:          make(map[uuid.UUID]*transport),
 		transportsByName:        make(map[string]*transport),
-		components:              make(map[prototk.PaladinMsg_Component]components.TransportClient),
 		peers:                   make(map[string]*peer),
 		senderBufferLen:         confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
 		reliableMessageResend:   confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
@@ -86,6 +87,9 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
 		reliableMessagePageSize: 100,             // not currently tunable
 	}
+	tm.reliableMsgWriter = flushwriter.NewWriter(bgCtx, tm.handleReliableMsgBatch, tm.persistence,
+		&conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
+	return tm
 }
 
 func (tm *transportManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
@@ -104,15 +108,14 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	// that could have cached a nil value in memory.
 	tm.registryManager = c.RegistryManager()
 	tm.stateManager = c.StateManager()
+	tm.domainManager = c.DomainManager()
+	tm.privateTxManager = c.PrivateTxManager()
+	tm.identityResolver = c.IdentityResolver()
 	tm.persistence = c.Persistence()
 	return nil
 }
 
 func (tm *transportManager) Start() error {
-	tm.destinationsMux.Lock()
-	defer tm.destinationsMux.Unlock()
-	// All destinations must be registered as part of the startup sequence
-	tm.destinationsFixed = true
 	return nil
 }
 
@@ -132,21 +135,6 @@ func (tm *transportManager) Stop() {
 	for _, t := range allTransports {
 		tm.cleanupTransport(t)
 	}
-
-}
-
-func (tm *transportManager) RegisterClient(ctx context.Context, client components.TransportClient) error {
-	tm.destinationsMux.Lock()
-	defer tm.destinationsMux.Unlock()
-	if tm.destinationsFixed {
-		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientRegisterAfterStartup, client.Destination())
-	}
-	if _, found := tm.components[client.Destination()]; found {
-		log.L(ctx).Errorf("Client already registered for destination %s", client.Destination())
-		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientAlreadyRegistered, client.Destination())
-	}
-	tm.components[client.Destination()] = client
-	return nil
 
 }
 

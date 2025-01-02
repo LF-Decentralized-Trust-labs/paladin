@@ -151,30 +151,41 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		}
 	}
 
-	log.L(ctx).Debugf("transport %s message received id=%s (cid=%s)", t.name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
+	p, err := t.tm.getPeer(ctx, req.FromNode, false /* we do not require a connection for sending here */)
+	if err != nil {
+		return nil, err
+	}
+
+	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
 	}
 
-	if err = t.deliverMessage(ctx, msg.Component, msg); err != nil {
+	if err := t.deliverMessage(ctx, p, msgID, msg); err != nil {
 		return nil, err
 	}
 
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
-func (t *transport) deliverMessage(ctx context.Context, component prototk.PaladinMsg_Component, msg *prototk.PaladinMsg) error {
-	t.tm.destinationsMux.RLock()
-	defer t.tm.destinationsMux.RUnlock()
+func (t *transport) deliverMessage(ctx context.Context, p *peer, msgID uuid.UUID, msg *prototk.PaladinMsg) error {
 
-	// TODO: Reconcile why we're using the identity as the component routing location - Broadhurst/Hosie discussion required
-	receiver, found := t.tm.components[component]
-	if !found {
-		log.L(ctx).Errorf("Component not found: %s", component)
-		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, component.String())
+	switch msg.Component {
+	case prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER:
+		_ = t.tm.reliableMsgWriter.Queue(ctx, &reliableMsgOp{
+			p:     p,
+			msgID: msgID,
+			msg:   msg,
+		})
+	case prototk.PaladinMsg_TRANSACTION_ENGINE:
+		t.tm.privateTxManager.HandlePaladinMsg(ctx, msg)
+	case prototk.PaladinMsg_IDENTITY_RESOLVER:
+		t.tm.identityResolver.HandlePaladinMsg(ctx, msg)
+	default:
+		log.L(ctx).Errorf("Component not found for message '%s': %s", msgID, msg.Component)
+		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, msg.Component.String())
 	}
 
-	receiver.HandlePaladinMsg(ctx, msg)
 	return nil
 }
 

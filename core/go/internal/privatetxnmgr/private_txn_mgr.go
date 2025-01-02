@@ -87,11 +87,7 @@ func (p *privateTxManager) PostInit(c components.AllComponents) error {
 		p.components.Persistence(),
 		&p.config.PreparedTransactionDistributer)
 
-	err := p.preparedTransactionDistributer.Start(p.ctx)
-	if err != nil {
-		return err
-	}
-	return p.components.TransportManager().RegisterClient(p.ctx, p)
+	return p.preparedTransactionDistributer.Start(p.ctx)
 }
 
 func (p *privateTxManager) Start() error {

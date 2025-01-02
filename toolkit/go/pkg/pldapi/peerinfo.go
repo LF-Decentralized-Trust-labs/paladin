@@ -27,11 +27,12 @@ type PeerInfo struct {
 }
 
 type PeerStats struct {
-	QueuedMsgs    uint64             `docstruct:"PeerStats" json:"queuedMsgs,omitempty"`
-	SentMsgs      uint64             `docstruct:"PeerStats" json:"sentMsgs,omitempty"`
-	ReceivedMsgs  uint64             `docstruct:"PeerStats" json:"receivedMsgs,omitempty"`
-	SentBytes     uint64             `docstruct:"PeerStats" json:"sentBytes,omitempty"`
-	ReceivedBytes uint64             `docstruct:"PeerStats" json:"receivedBytes,omitempty"`
-	LastSend      *tktypes.Timestamp `docstruct:"PeerStats" json:"lastSend,omitempty"`
-	LastReceive   *tktypes.Timestamp `docstruct:"PeerStats" json:"lastReceive,omitempty"`
+	SentMsgs            uint64             `docstruct:"PeerStats" json:"sentMsgs"`
+	ReceivedMsgs        uint64             `docstruct:"PeerStats" json:"receivedMsgs"`
+	SentBytes           uint64             `docstruct:"PeerStats" json:"sentBytes"`
+	ReceivedBytes       uint64             `docstruct:"PeerStats" json:"receivedBytes"`
+	LastSend            *tktypes.Timestamp `docstruct:"PeerStats" json:"lastSend"`
+	LastReceive         *tktypes.Timestamp `docstruct:"PeerStats" json:"lastReceive"`
+	ReliableHighestSent uint64             `docstruct:"PeerStats" json:"reliableHighestSent"`
+	ReliableAckBase     uint64             `docstruct:"PeerStats" json:"reliableAckBase"`
 }

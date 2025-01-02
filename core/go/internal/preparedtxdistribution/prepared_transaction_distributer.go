@@ -103,12 +103,6 @@ func (sd *preparedTransactionDistributer) Start(bgCtx context.Context) error {
 	ctx := sd.runCtx
 	log.L(ctx).Info("preparedTransactionDistributer:Start")
 
-	err := sd.transportManager.RegisterClient(ctx, sd)
-	if err != nil {
-		log.L(ctx).Errorf("Error registering transport client: %s", err)
-		return err
-	}
-
 	sd.acknowledgementWriter.Start()
 	sd.receivedPreparedTransactionWriter.Start()
 

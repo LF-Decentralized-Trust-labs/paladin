@@ -196,7 +196,7 @@ func (p *peer) notifyPersistedMsgAvailable() {
 	}
 }
 
-func (p *peer) send(msg *prototk.PaladinMsg) error {
+func (p *peer) send(msg *prototk.PaladinMsg, reliableSeq *uint64) error {
 	err := p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
 		return true, p.transport.send(p.ctx, p.Name, msg)
 	})
@@ -207,8 +207,23 @@ func (p *peer) send(msg *prototk.PaladinMsg) error {
 		p.Stats.LastSend = &now
 		p.Stats.SentMsgs++
 		p.Stats.SentBytes += uint64(len(msg.Payload))
+		if reliableSeq != nil && *reliableSeq > p.Stats.ReliableHighestSent {
+			p.Stats.ReliableHighestSent = *reliableSeq
+		}
+		if p.lastDrainHWM != nil {
+			p.Stats.ReliableAckBase = *p.lastDrainHWM
+		}
 	}
 	return err
+}
+
+func (p *peer) updateReceivedStats(msg *prototk.PaladinMsg) {
+	now := tktypes.TimestampNow()
+	p.statsLock.Lock()
+	defer p.statsLock.Unlock()
+	p.Stats.LastReceive = &now
+	p.Stats.ReceivedMsgs++
+	p.Stats.ReceivedBytes += uint64(len(msg.Payload))
 }
 
 func (p *peer) senderCleanup() {
@@ -319,28 +334,19 @@ func (p *peer) reliableMessageScan(checkNew bool) error {
 func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*prototk.PaladinMsg, error, error) {
 
 	// Validate the message first (not retryable)
-	var sd components.StateDistributionWithData
-	var stateID tktypes.HexBytes
-	var contractAddr *tktypes.EthAddress
-	parseErr := json.Unmarshal(rm.Metadata, &sd)
-	if parseErr == nil {
-		stateID, parseErr = tktypes.ParseHexBytes(p.ctx, sd.StateID)
-	}
-	if parseErr == nil {
-		contractAddr, parseErr = tktypes.ParseEthAddress(sd.ContractAddress)
-	}
+	sd, parsed, parseErr := parseStateDistribution(p.ctx, rm.ID, rm.Metadata)
 	if parseErr != nil {
-		return nil, i18n.WrapError(p.ctx, parseErr, msgs.MsgTransportInvalidMessageData, rm.ID), nil
+		return nil, parseErr, nil
 	}
 
 	// Get the state - distinguishing between not found, vs. a retryable error
-	state, err := p.tm.stateManager.GetState(p.ctx, p.tm.persistence.DB(), sd.Domain, *contractAddr, stateID, false, false)
+	state, err := p.tm.stateManager.GetState(p.ctx, p.tm.persistence.DB(), sd.Domain, parsed.ContractAddress, parsed.ID, false, false)
 	if err != nil {
 		return nil, nil, err
 	}
 	if state == nil {
 		return nil,
-			i18n.NewError(p.ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, *contractAddr, stateID),
+			i18n.NewError(p.ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, parsed.ContractAddress, parsed.ID),
 			nil
 	}
 	sd.StateData = state.Data
@@ -348,15 +354,20 @@ func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*proto
 	return &prototk.PaladinMsg{
 		MessageId:   rm.ID.String(),
 		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType: string(rm.MessageType),
+		MessageType: RMHMessageTypeStateDistribution,
 		Payload:     tktypes.JSONString(sd),
 	}, nil, nil
 }
 
 func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err error) {
 
+	type paladinMsgWithSeq struct {
+		*prototk.PaladinMsg
+		seq uint64
+	}
+
 	// Build the messages
-	msgsToSend := make([]*prototk.PaladinMsg, 0, len(page))
+	msgsToSend := make([]paladinMsgWithSeq, 0, len(page))
 	var errorAcks []*components.ReliableMessageAck
 	for _, rm := range page {
 
@@ -390,7 +401,10 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 				Error:     errorAck.Error(),
 			})
 		case msg != nil:
-			msgsToSend = append(msgsToSend, msg)
+			msgsToSend = append(msgsToSend, paladinMsgWithSeq{
+				seq:        rm.Sequence,
+				PaladinMsg: msg,
+			})
 		}
 	}
 
@@ -410,7 +424,7 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 	// We fail the whole page on error, so we don't thrash (the outer infinite retry
 	// gives a much longer maximum back-off).
 	for _, msg := range msgsToSend {
-		if err := p.send(msg); err != nil {
+		if err := p.send(msg.PaladinMsg, &msg.seq); err != nil {
 			return err
 		}
 	}
@@ -465,7 +479,7 @@ func (p *peer) sender() {
 			case msg := <-p.sendQueue:
 				resendTimer.Stop()
 				// send and spin straight round
-				if err := p.send(msg); err != nil {
+				if err := p.send(msg, nil); err != nil {
 					log.L(p.ctx).Errorf("failed to send message '%s' after short retry (discarding): %s", msg.MessageId, err)
 				}
 			}

@@ -70,7 +70,7 @@ func (ir *identityResolver) PostInit(c components.AllComponents) error {
 	ir.nodeName = c.TransportManager().LocalNodeName()
 	ir.keyManager = c.KeyManager()
 	ir.transportManager = c.TransportManager()
-	return c.TransportManager().RegisterClient(ir.bgCtx, ir)
+	return nil
 }
 
 func (ir *identityResolver) Start() error {

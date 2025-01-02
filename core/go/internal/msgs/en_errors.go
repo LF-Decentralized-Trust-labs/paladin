@@ -370,6 +370,9 @@ var (
 	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")
 	MsgTransportInvalidTargetNode             = ffe("PD012015", "Invalid target node '%s'")
 	MsgTransportInvalidMessageData            = ffe("PD012016", "Invalid data for message %s")
+	MsgTransportUnsupportedReliableMsgType    = ffe("PD012017", "Unsupported reliable message type '%s'")
+	MsgTransportAckMissingCorrelationID       = ffe("PD012018", "Ack/nack missing correlation ID")
+	MsgTransportNackMissingError              = ffe("PD012019", "Nack missing error information")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")

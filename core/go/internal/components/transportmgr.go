@@ -146,8 +146,4 @@ type TransportManager interface {
 	//
 	// The pre-commit handler must be called after the DB transaction commits to trigger the delivery.
 	SendReliable(ctx context.Context, dbTX *gorm.DB, msg *ReliableMessage) (preCommit func(), err error)
-
-	// RegisterClient registers a client to receive messages from the transport manager
-	// messages are routed to the client based on the Destination field of the message matching the value returned from Destination() function of the TransportClient
-	RegisterClient(ctx context.Context, client TransportClient) error
 }

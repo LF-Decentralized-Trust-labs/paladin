@@ -60,6 +60,7 @@ message PaladinMsg {
     enum Component {
       TRANSACTION_ENGINE = 0;
       RELIABLE_MESSAGE_HANDLER = 1;
+      IDENTITY_RESOLVER = 2;
     }
     string message_id = 1; // UUID individually allocated to each message
     optional string correlation_id = 2; // optional correlation ID to relate "replies" back to original message IDs

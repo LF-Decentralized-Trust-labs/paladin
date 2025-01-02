@@ -39,14 +39,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func mockGetStateRetryThenOk(mc *mockComponents) components.TransportClient {
+func mockGetStateRetryThenOk(mc *mockComponents) {
 	mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 		Return(nil, fmt.Errorf("pop")).Once()
 	mockGetStateOk(mc)
-	return nil
 }
 
-func mockGetStateOk(mc *mockComponents) components.TransportClient {
+func mockGetStateOk(mc *mockComponents) {
 	mGS := mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false)
 	mGS.Run(func(args mock.Arguments) {
 		mGS.Return(&pldapi.State{
@@ -58,7 +57,6 @@ func mockGetStateOk(mc *mockComponents) components.TransportClient {
 			},
 		}, nil)
 	})
-	return nil
 }
 
 func TestReliableMessageResendRealDB(t *testing.T) {
@@ -96,6 +94,7 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 			sds[i] = &components.StateDistribution{
 				Domain:          "domain1",
 				ContractAddress: tktypes.RandAddress().String(),
+				SchemaID:        tktypes.RandHex(32),
 				StateID:         tktypes.RandHex(32),
 			}
 
@@ -174,6 +173,7 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 		sd := &components.StateDistribution{
 			Domain:          "domain1",
 			ContractAddress: tktypes.RandAddress().String(),
+			SchemaID:        tktypes.RandHex(32),
 			StateID:         tktypes.RandHex(32),
 		}
 
@@ -216,11 +216,10 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
-		func(mc *mockComponents) components.TransportClient {
+		func(mc *mockComponents) {
 			// missing state
 			mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 				Return(nil, nil).Once()
-			return nil
 		},
 	)
 	defer done()
@@ -250,6 +249,7 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 		Metadata: tktypes.JSONString(&components.StateDistribution{
 			Domain:          "domain1",
 			ContractAddress: tktypes.RandAddress().String(),
+			SchemaID:        tktypes.RandHex(32),
 			StateID:         tktypes.RandHex(32),
 		}),
 	}
@@ -301,7 +301,7 @@ func TestConnectionRace(t *testing.T) {
 	connRelease := make(chan struct{})
 
 	ctx, tm, tp, done := newTestTransport(t, false,
-		func(mc *mockComponents) components.TransportClient {
+		func(mc *mockComponents) {
 			mGNT := mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node2",
@@ -313,7 +313,6 @@ func TestConnectionRace(t *testing.T) {
 				close(connWaiting)
 				<-connRelease
 			})
-			return nil
 		},
 	)
 	defer done()
@@ -372,7 +371,7 @@ func TestQuiesceDetectPersistentMessage(t *testing.T) {
 	// Load up a notification for a persistent message
 	tm.reliableMessageResend = 10 * time.Millisecond
 	tm.peerInactivityTimeout = 1 * time.Second
-	tm.quiesceTimeout = 1 * time.Second
+	tm.quiesceTimeout = 1 * time.Millisecond
 
 	mockActivateDeactivateOk(tp)
 
@@ -408,7 +407,7 @@ func TestQuiesceDetectFireAndForgetMessage(t *testing.T) {
 	// Load up a notification for a persistent message
 	tm.reliableMessageResend = 1 * time.Second
 	tm.peerInactivityTimeout = 1 * time.Second
-	tm.quiesceTimeout = 1 * time.Second
+	tm.quiesceTimeout = 1 * time.Millisecond
 
 	mockActivateDeactivateOk(tp)
 
@@ -473,9 +472,8 @@ func TestDeactivateFail(t *testing.T) {
 
 func TestGetReliableMessageByIDFail(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) {
 		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
-		return nil
 	})
 	defer done()
 
@@ -525,9 +523,8 @@ func TestProcessReliableMsgPageIgnoreBeforeHWM(t *testing.T) {
 
 func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) {
 		mc.db.Mock.ExpectExec("INSERT.*reliable_msg_acks").WillReturnError(fmt.Errorf("pop"))
-		return nil
 	})
 	defer done()
 
@@ -552,9 +549,8 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGetStateOk,
-		func(mc *mockComponents) components.TransportClient {
+		func(mc *mockComponents) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
-			return nil
 		})
 	defer done()
 
@@ -567,6 +563,7 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 	sd := &components.StateDistribution{
 		Domain:          "domain1",
 		ContractAddress: tktypes.RandAddress().String(),
+		SchemaID:        tktypes.RandHex(32),
 		StateID:         tktypes.RandHex(32),
 	}
 

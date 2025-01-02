@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
-	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
@@ -36,17 +35,23 @@ import (
 )
 
 type mockComponents struct {
-	c               *componentmocks.AllComponents
-	db              *mockpersistence.SQLMockProvider
-	p               persistence.Persistence
-	registryManager *componentmocks.RegistryManager
-	stateManager    *componentmocks.StateManager
+	c                *componentmocks.AllComponents
+	db               *mockpersistence.SQLMockProvider
+	p                persistence.Persistence
+	registryManager  *componentmocks.RegistryManager
+	stateManager     *componentmocks.StateManager
+	domainManager    *componentmocks.DomainManager
+	privateTxManager *componentmocks.PrivateTxManager
+	identityResolver *componentmocks.IdentityResolver
 }
 
 func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc := &mockComponents{c: componentmocks.NewAllComponents(t)}
 	mc.registryManager = componentmocks.NewRegistryManager(t)
 	mc.stateManager = componentmocks.NewStateManager(t)
+	mc.domainManager = componentmocks.NewDomainManager(t)
+	mc.privateTxManager = componentmocks.NewPrivateTxManager(t)
+	mc.identityResolver = componentmocks.NewIdentityResolver(t)
 	if realDB {
 		p, cleanup, err := persistence.NewUnitTestPersistence(context.Background(), "transportmgr")
 		require.NoError(t, err)
@@ -61,21 +66,20 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.c.On("Persistence").Return(mc.p).Maybe()
 	mc.c.On("RegistryManager").Return(mc.registryManager).Maybe()
 	mc.c.On("StateManager").Return(mc.stateManager).Maybe()
+	mc.c.On("DomainManager").Return(mc.domainManager).Maybe()
+	mc.c.On("PrivateTxManager").Return(mc.privateTxManager).Maybe()
+	mc.c.On("IdentityResolver").Return(mc.identityResolver).Maybe()
 	return mc
 }
 
-func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents) components.TransportClient) (context.Context, *transportManager, *mockComponents, func()) {
+func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	oldLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.TraceLevel)
 
 	mc := newMockComponents(t, realDB)
-	var clients []components.TransportClient
 	for _, fn := range extraSetup {
-		client := fn(mc)
-		if client != nil {
-			clients = append(clients, client)
-		}
+		fn(mc)
 	}
 
 	tm := NewTransportManager(ctx, conf)
@@ -83,12 +87,6 @@ func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportM
 	ir, err := tm.PreInit(mc.c)
 	require.NoError(t, err)
 	assert.NotNil(t, ir)
-
-	// registration happens during init
-	for _, c := range clients {
-		err := tm.RegisterClient(ctx, c)
-		require.NoError(t, err)
-	}
 
 	err = tm.PostInit(mc.c)
 	require.NoError(t, err)
@@ -166,30 +164,6 @@ func TestConfigureTransportFail(t *testing.T) {
 
 	registerTestTransport(t, tm, tp)
 	assert.Regexp(t, "pop", *tp.t.initError.Load())
-}
-
-func TestDoubleRegisterClient(t *testing.T) {
-	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{})
-
-	receivingClient := componentmocks.NewTransportClient(t)
-	receivingClient.On("Destination").Return(prototk.PaladinMsg_TRANSACTION_ENGINE)
-
-	err := tm.RegisterClient(context.Background(), receivingClient)
-	require.NoError(t, err)
-
-	err = tm.RegisterClient(context.Background(), receivingClient)
-	assert.Regexp(t, "PD012010", err)
-}
-
-func TestDoubleRegisterAfterStart(t *testing.T) {
-	tm := NewTransportManager(context.Background(), &pldconf.TransportManagerConfig{})
-	tm.(*transportManager).destinationsFixed = true
-
-	receivingClient := componentmocks.NewTransportClient(t)
-	receivingClient.On("Destination").Return(prototk.PaladinMsg_TRANSACTION_ENGINE)
-
-	err := tm.RegisterClient(context.Background(), receivingClient)
-	assert.Regexp(t, "PD012012", err)
 }
 
 func TestGetLocalTransportDetailsNotFound(t *testing.T) {
