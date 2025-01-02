@@ -253,7 +253,7 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 
 func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
 	// Use or establish a p connection for the send
-	p, err := tm.getPeer(ctx, nodeName)
+	p, err := tm.getPeer(ctx, nodeName, true)
 	if err == nil {
 		err = p.transport.checkInit(ctx)
 	}
@@ -267,7 +267,7 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 	// use this "send" must be fault tolerant to message loss.
 	select {
 	case p.sendQueue <- msg:
-		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), p.name)
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), p.Name)
 		return nil
 	case <-ctx.Done():
 		return i18n.NewError(ctx, msgs.MsgContextCanceled)
@@ -285,7 +285,7 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg
 	_, err = msg.MessageType.Validate()
 
 	if err == nil {
-		p, err = tm.getPeer(ctx, msg.Node)
+		p, err = tm.getPeer(ctx, msg.Node, true)
 	}
 
 	if err == nil {

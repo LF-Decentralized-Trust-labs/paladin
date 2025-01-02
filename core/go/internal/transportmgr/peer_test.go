@@ -208,7 +208,7 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	}
 
 	// Wait for the peer to end via quiesce
-	<-p.done
+	<-p.senderDone
 
 }
 
@@ -265,7 +265,7 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NotNil(t, rmWithAck.Ack)
-	require.Regexp(t, "PD012017", rmWithAck.Ack.Error)
+	require.Regexp(t, "PD012016", rmWithAck.Ack.Error)
 
 	// Second nack
 	rmWithAck, err = tm.getReliableMessageByID(ctx, tm.persistence.DB(), rm2.ID)
@@ -278,19 +278,19 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 func TestNameSortedPeers(t *testing.T) {
 
 	peerList := nameSortedPeers{
-		{name: "ccc"},
-		{name: "aaa"},
-		{name: "ddd"},
-		{name: "bbb"},
+		{PeerInfo: pldapi.PeerInfo{Name: "ccc"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "aaa"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "ddd"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "bbb"}},
 	}
 
 	sort.Sort(peerList)
 
 	require.Equal(t, nameSortedPeers{
-		{name: "aaa"},
-		{name: "bbb"},
-		{name: "ccc"},
-		{name: "ddd"},
+		{PeerInfo: pldapi.PeerInfo{Name: "aaa"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "bbb"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "ccc"}},
+		{PeerInfo: pldapi.PeerInfo{Name: "ddd"}},
 	}, peerList)
 
 }
@@ -322,7 +322,7 @@ func TestConnectionRace(t *testing.T) {
 	connDone := make(chan bool)
 	for i := 0; i < 2; i++ {
 		go func() {
-			_, err := tm.connectPeer(ctx, "node2")
+			_, err := tm.connectPeer(ctx, "node2", true)
 			require.NoError(t, err)
 			connDone <- true
 		}()
@@ -344,7 +344,7 @@ func TestActivateFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := tm.getPeer(ctx, "node2")
+	_, err := tm.getPeer(ctx, "node2", true)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -355,11 +355,12 @@ func TestActivateBadPeerInfo(t *testing.T) {
 	defer done()
 
 	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-		return &prototk.ActivateNodeResponse{PeerInfoJson: ""}, nil
+		return &prototk.ActivateNodeResponse{PeerInfoJson: "!{ not valid JSON"}, nil
 	}
 
-	_, err := tm.getPeer(ctx, "node2")
-	assert.Regexp(t, "PD012015", err)
+	p, err := tm.getPeer(ctx, "node2", true)
+	assert.NoError(t, err)
+	assert.Regexp(t, "!{ not valid JSON", p.Outbound["info"])
 
 }
 
@@ -375,21 +376,21 @@ func TestQuiesceDetectPersistentMessage(t *testing.T) {
 
 	mockActivateDeactivateOk(tp)
 
-	quiescingPeer, err := tm.getPeer(ctx, "node2")
+	quiescingPeer, err := tm.getPeer(ctx, "node2", true)
 	require.NoError(t, err)
 
 	// Force cancel that peer
 	quiescingPeer.cancelCtx()
-	<-quiescingPeer.done
+	<-quiescingPeer.senderDone
 
 	// Simulate quiescing with persistent messages delivered
 	quiescingPeer.quiescing = true
-	quiescingPeer.done = make(chan struct{})
+	quiescingPeer.senderDone = make(chan struct{})
 	quiescingPeer.persistedMsgsAvailable = make(chan struct{}, 1)
 	quiescingPeer.persistedMsgsAvailable <- struct{}{}
 
 	// Now in quiesce it will start up a new one
-	quiescingPeer.senderDone()
+	quiescingPeer.senderCleanup()
 
 	require.NotNil(t, tm.peers["node2"])
 
@@ -411,17 +412,17 @@ func TestQuiesceDetectFireAndForgetMessage(t *testing.T) {
 
 	mockActivateDeactivateOk(tp)
 
-	quiescingPeer, err := tm.getPeer(ctx, "node2")
+	quiescingPeer, err := tm.getPeer(ctx, "node2", true)
 	require.NoError(t, err)
 
 	// Force cancel that peer
 	quiescingPeer.cancelCtx()
-	<-quiescingPeer.done
+	<-quiescingPeer.senderDone
 
 	// Simulate quiescing with persistent messages delivered
 	quiescingPeer.quiescing = true
 	quiescingPeer.ctx = ctx
-	quiescingPeer.done = make(chan struct{})
+	quiescingPeer.senderDone = make(chan struct{})
 	quiescingPeer.sendQueue = make(chan *prototk.PaladinMsg, 1)
 	quiescingPeer.sendQueue <- &prototk.PaladinMsg{
 		MessageId:   uuid.NewString(),
@@ -438,7 +439,7 @@ func TestQuiesceDetectFireAndForgetMessage(t *testing.T) {
 		return nil, nil
 	}
 	// Now in quiesce it will start up a new one
-	quiescingPeer.senderDone()
+	quiescingPeer.senderCleanup()
 
 	require.NotNil(t, tm.peers["node2"])
 
@@ -465,7 +466,7 @@ func TestDeactivateFail(t *testing.T) {
 		return nil, fmt.Errorf("pop")
 	}
 
-	_, err := tm.getPeer(ctx, "node2")
+	_, err := tm.getPeer(ctx, "node2", true)
 	require.NoError(t, err)
 
 }

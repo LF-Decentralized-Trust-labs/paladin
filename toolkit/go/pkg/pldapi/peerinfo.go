@@ -1,0 +1,37 @@
+// Copyright © 2024 Kaleido, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package pldapi
+
+import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+
+type PeerInfo struct {
+	Name          string            `docstruct:"PeerInfo" json:"name"`
+	Stats         PeerStats         `docstruct:"PeerInfo" json:"stats"`
+	Activated     tktypes.Timestamp `docstruct:"PeerInfo" json:"activated"`
+	Outbound      map[string]any    `docstruct:"PeerInfo" json:"outbound,omitempty"`
+	OutboundError error             `docstruct:"PeerInfo" json:"outboundError,omitempty"`
+}
+
+type PeerStats struct {
+	QueuedMsgs    uint64             `docstruct:"PeerStats" json:"queuedMsgs,omitempty"`
+	SentMsgs      uint64             `docstruct:"PeerStats" json:"sentMsgs,omitempty"`
+	ReceivedMsgs  uint64             `docstruct:"PeerStats" json:"receivedMsgs,omitempty"`
+	SentBytes     uint64             `docstruct:"PeerStats" json:"sentBytes,omitempty"`
+	ReceivedBytes uint64             `docstruct:"PeerStats" json:"receivedBytes,omitempty"`
+	LastSend      *tktypes.Timestamp `docstruct:"PeerStats" json:"lastSend,omitempty"`
+	LastReceive   *tktypes.Timestamp `docstruct:"PeerStats" json:"lastReceive,omitempty"`
+}

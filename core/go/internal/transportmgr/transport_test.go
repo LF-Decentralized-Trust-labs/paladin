@@ -300,7 +300,7 @@ func TestSendMessageDestWrong(t *testing.T) {
 	message.Component = prototk.PaladinMsg_TRANSACTION_ENGINE
 	message.Node = ""
 	err := tm.Send(ctx, message)
-	assert.Regexp(t, "PD012016", err)
+	assert.Regexp(t, "PD012015", err)
 
 	message.Component = prototk.PaladinMsg_TRANSACTION_ENGINE
 	message.Node = "node1"
@@ -467,12 +467,14 @@ func TestSendContextClosed(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false)
 	done()
 
-	tm.peers = map[string]*peer{
-		"node2": {
-			transport: tp.t,
-			sendQueue: make(chan *prototk.PaladinMsg),
-		},
+	p := &peer{
+		transport: tp.t,
+		sendQueue: make(chan *prototk.PaladinMsg),
 	}
+	tm.peers = map[string]*peer{
+		"node2": p,
+	}
+	p.senderStarted.Store(true)
 
 	err := tm.Send(ctx, testMessage())
 	assert.Regexp(t, "PD010301", err)

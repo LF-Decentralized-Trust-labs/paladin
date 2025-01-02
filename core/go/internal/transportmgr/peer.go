@@ -20,12 +20,15 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm/clause"
@@ -35,10 +38,11 @@ type peer struct {
 	ctx       context.Context
 	cancelCtx context.CancelFunc
 
-	name      string
 	tm        *transportManager
-	transport *transport     // the transport mutually supported by us and the remote node
-	peerInfo  map[string]any // opaque JSON object from the transport
+	transport *transport // the transport mutually supported by us and the remote node
+
+	pldapi.PeerInfo
+	statsLock sync.Mutex
 
 	persistedMsgsAvailable chan struct{}
 	sendQueue              chan *prototk.PaladinMsg
@@ -48,15 +52,16 @@ type peer struct {
 	lastDrainHWM          *uint64
 	persistentMsgsDrained bool
 
-	quiescing bool
-	done      chan struct{}
+	quiescing     bool
+	senderStarted atomic.Bool
+	senderDone    chan struct{}
 }
 
 type nameSortedPeers []*peer
 
 func (p nameSortedPeers) Len() int           { return len(p) }
 func (p nameSortedPeers) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p nameSortedPeers) Less(i, j int) bool { return cmp.Less(p[i].name, p[j].name) }
+func (p nameSortedPeers) Less(i, j int) bool { return cmp.Less(p[i].Name, p[j].Name) }
 
 // get a list of all active peers
 func (tm *transportManager) listActivePeers() nameSortedPeers {
@@ -77,7 +82,7 @@ func (tm *transportManager) getActivePeer(nodeName string) *peer {
 	return tm.peers[nodeName]
 }
 
-func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer, error) {
+func (tm *transportManager) getPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
 
 	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, tktypes.DefaultNameMaxLen, "node"); err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidTargetNode, nodeName)
@@ -88,43 +93,62 @@ func (tm *transportManager) getPeer(ctx context.Context, nodeName string) (*peer
 
 	// Hopefully this is an already active connection
 	p := tm.getActivePeer(nodeName)
-	if p != nil {
+	if p != nil && (p.senderStarted.Load() || !sending) {
 		// Already active and obtained via read-lock
 		log.L(ctx).Debugf("connection already active for peer '%s'", nodeName)
 		return p, nil
 	}
 
-	return tm.connectPeer(ctx, nodeName)
+	return tm.connectPeer(ctx, nodeName, sending)
 }
 
-func (tm *transportManager) connectPeer(ctx context.Context, nodeName string) (*peer, error) {
+func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
 	// Race to grab the write-lock and race to connect
 	tm.peersLock.Lock()
 	defer tm.peersLock.Unlock()
 	p := tm.peers[nodeName]
-	if p != nil {
+	if p != nil && (p.senderStarted.Load() || !sending) {
 		// There was a race to connect to this peer, and the other routine won
 		log.L(ctx).Debugf("connection already active for peer '%s' (after connection race)", nodeName)
 		return p, nil
 	}
 
-	// We need to resolve the node transport, and build a new connection
-	log.L(ctx).Debugf("attempting connection for peer '%s'", nodeName)
-	p = &peer{
-		tm:                     tm,
-		name:                   nodeName,
-		persistedMsgsAvailable: make(chan struct{}, 1),
-		sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
-		done:                   make(chan struct{}),
+	if p == nil {
+		// We need to resolve the node transport, and build a new connection
+		log.L(ctx).Debugf("activating new peer '%s'", nodeName)
+		p = &peer{
+			tm: tm,
+			PeerInfo: pldapi.PeerInfo{
+				Name:      nodeName,
+				Activated: tktypes.TimestampNow(),
+			},
+			persistedMsgsAvailable: make(chan struct{}, 1),
+			sendQueue:              make(chan *prototk.PaladinMsg, tm.senderBufferLen),
+			senderDone:             make(chan struct{}),
+		}
+		p.ctx, p.cancelCtx = context.WithCancel(
+			log.WithLogField(tm.bgCtx /* go-routine need bg context*/, "peer", nodeName))
 	}
-	p.ctx, p.cancelCtx = context.WithCancel(
-		log.WithLogField(tm.bgCtx /* go-routine need bg context*/, "peer", nodeName))
+	tm.peers[nodeName] = p
 
+	if sending {
+		if err := p.startSender(); err != nil {
+			// Note the peer is still in our list, but not connected for send.
+			// This means status can be reported for it.
+			p.OutboundError = err
+			return nil, err
+		}
+	}
+
+	return p, nil
+}
+
+func (p *peer) startSender() error {
 	// Note the registry is responsible for caching to make this call as efficient as if
 	// we maintained the transport details in-memory ourselves.
-	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(p.ctx, nodeName)
+	registeredTransportDetails, err := p.tm.registryManager.GetNodeTransports(p.ctx, p.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// See if any of the transports registered by the node, are configured on this local node
@@ -132,7 +156,7 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string) (*
 	//       fallback to a secondary one currently.
 	var remoteTransportDetails string
 	for _, rtd := range registeredTransportDetails {
-		p.transport = tm.transportsByName[rtd.Transport]
+		p.transport = p.tm.transportsByName[rtd.Transport]
 		remoteTransportDetails = rtd.Details
 	}
 	if p.transport == nil {
@@ -141,26 +165,28 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string) (*
 		for _, rtd := range registeredTransportDetails {
 			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
 		}
-		return nil, i18n.NewError(p.ctx, msgs.MsgTransportNoTransportsConfiguredForNode, nodeName, registeredTransportNames)
+		return i18n.NewError(p.ctx, msgs.MsgTransportNoTransportsConfiguredForNode, p.Name, registeredTransportNames)
 	}
 
 	// Activate the connection (the deactivate is deferred to the send loop)
-	res, err := p.transport.api.ActivateNode(ctx, &prototk.ActivateNodeRequest{
-		NodeName:         nodeName,
+	res, err := p.transport.api.ActivateNode(p.ctx, &prototk.ActivateNodeRequest{
+		NodeName:         p.Name,
 		TransportDetails: remoteTransportDetails,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err = json.Unmarshal([]byte(res.PeerInfoJson), &p.peerInfo); err != nil {
-		log.L(ctx).Errorf("Invalid peerInfo: %s", p.peerInfo)
-		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidPeerInfo)
+	if err = json.Unmarshal([]byte(res.PeerInfoJson), &p.Outbound); err != nil {
+		// We've already activated at this point, so we need to keep going - but this
+		// will mean there's no peer info, so we put it in as a string
+		log.L(p.ctx).Warnf("Invalid peerInfo: %s", res.PeerInfoJson)
+		p.Outbound = map[string]any{"info": string(res.PeerInfoJson)}
 	}
 
-	log.L(ctx).Debugf("connected to peer '%s'", nodeName)
-	tm.peers[nodeName] = p
+	log.L(p.ctx).Debugf("connected to peer '%s'", p.Name)
+	p.senderStarted.Store(true)
 	go p.sender()
-	return p, nil
+	return nil
 }
 
 func (p *peer) notifyPersistedMsgAvailable() {
@@ -171,12 +197,21 @@ func (p *peer) notifyPersistedMsgAvailable() {
 }
 
 func (p *peer) send(msg *prototk.PaladinMsg) error {
-	return p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
-		return true, p.transport.send(p.ctx, p.name, msg)
+	err := p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
+		return true, p.transport.send(p.ctx, p.Name, msg)
 	})
+	if err == nil {
+		now := tktypes.TimestampNow()
+		p.statsLock.Lock()
+		defer p.statsLock.Unlock()
+		p.Stats.LastSend = &now
+		p.Stats.SentMsgs++
+		p.Stats.SentBytes += uint64(len(msg.Payload))
+	}
+	return err
 }
 
-func (p *peer) senderDone() {
+func (p *peer) senderCleanup() {
 	p.deactivate()
 
 	// There's a very small window where we might have got delivered a message by a routine
@@ -186,30 +221,30 @@ func (p *peer) senderDone() {
 		select {
 		case msg := <-p.sendQueue:
 			log.L(p.ctx).Infof("message delivered in inactivity quiesce window. Re-connecting")
-			_ = p.tm.queueFireAndForget(p.ctx, p.name, msg)
+			_ = p.tm.queueFireAndForget(p.ctx, p.Name, msg)
 		case <-p.persistedMsgsAvailable:
 			log.L(p.ctx).Infof("reliable message delivered in inactivity quiesce window. Re-connecting")
-			_, _ = p.tm.getPeer(p.ctx, p.name)
+			_, _ = p.tm.getPeer(p.ctx, p.Name, true)
 		case <-time.After(p.tm.quiesceTimeout):
 			p.quiescing = false
 		}
 	}
 
-	close(p.done)
+	close(p.senderDone)
 }
 
 func (p *peer) deactivate() {
 	// Hold the peers write lock to do this
 	p.tm.peersLock.Lock()
 	defer p.tm.peersLock.Unlock()
-	delete(p.tm.peers, p.name)
+	delete(p.tm.peers, p.Name)
 
 	// Holding the lock while activating/deactivating ensures we never dual-activate in the transport
-	log.L(p.ctx).Infof("peer %s deactivating", p.name)
+	log.L(p.ctx).Infof("peer %s deactivating", p.Name)
 	if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
-		NodeName: p.name,
+		NodeName: p.Name,
 	}); err != nil {
-		log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.name, err)
+		log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.Name, err)
 	}
 }
 
@@ -385,9 +420,9 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 }
 
 func (p *peer) sender() {
-	defer p.senderDone()
+	defer p.senderCleanup()
 
-	log.L(p.ctx).Infof("peer %s active", p.name)
+	log.L(p.ctx).Infof("peer %s active", p.Name)
 
 	checkNew := false
 	hitInactivityTimeout := false
@@ -402,7 +437,8 @@ func (p *peer) sender() {
 		}
 
 		// Depending on our persistent message status, check if we're able to quiesce
-		if hitInactivityTimeout && p.persistentMsgsDrained {
+		if hitInactivityTimeout && p.persistentMsgsDrained &&
+			(p.Stats.LastReceive == nil || time.Since(p.Stats.LastReceive.Time()) > p.tm.peerInactivityTimeout) {
 			p.quiescing = true
 			return // quiesce handling is in senderDone() deferred function
 		}
@@ -412,23 +448,22 @@ func (p *peer) sender() {
 		// Our wait timeout needs to be the shortest of:
 		// - The full re-scan timeout for reliable messages
 		// - The inactivity timeout
-		inactivityTimeout := p.tm.reliableMessageResend
-		if inactivityTimeout > p.tm.peerInactivityTimeout {
-			inactivityTimeout = p.tm.peerInactivityTimeout
-		}
-		inactivityTimer := time.NewTimer(inactivityTimeout)
+		resendTimer := time.NewTimer(p.tm.reliableMessageResend)
 		processingMsgs := true
 		for processingMsgs {
 			select {
-			case <-inactivityTimer.C:
+			case <-resendTimer.C:
 				hitInactivityTimeout = true
 				processingMsgs = false // spin round and check if we have persisted messages to (re)process
 			case <-p.persistedMsgsAvailable:
+				resendTimer.Stop()
 				checkNew = true
 				processingMsgs = false // spin round and get the messages
 			case <-p.ctx.Done():
+				resendTimer.Stop()
 				return // we're done
 			case msg := <-p.sendQueue:
+				resendTimer.Stop()
 				// send and spin straight round
 				if err := p.send(msg); err != nil {
 					log.L(p.ctx).Errorf("failed to send message '%s' after short retry (discarding): %s", msg.MessageId, err)
@@ -440,5 +475,7 @@ func (p *peer) sender() {
 
 func (p *peer) close() {
 	p.cancelCtx()
-	<-p.done
+	if p.senderStarted.Load() {
+		<-p.senderDone
+	}
 }
