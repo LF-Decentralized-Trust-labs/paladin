@@ -1,0 +1,31 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ .Values.operator.name }}
+  name: {{ .Values.operator.name }}
+  namespace: {{ .Values.operator.namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ .Values.operator.name }}
+    app.kubernetes.io/instance: {{ .Values.operator.name }}
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: paladin
+  name: {{ .Values.operator.name }}
+  namespace: {{ .Values.operator.namespace }}
+spec:
+  dnsNames:
+  - {{ .Values.operator.name }}.{{ .Values.operator.namespace }}.svc
+  - {{ .Values.operator.name }}.{{ .Values.operator.namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ .Values.operator.name }}
+  secretName: webhook-server-cert
+
+{{- end }}
