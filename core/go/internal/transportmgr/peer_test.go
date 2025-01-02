@@ -17,6 +17,7 @@ package transportmgr
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -27,6 +28,7 @@ import (
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
@@ -36,6 +38,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func mockGetStateRetryThenOk(mc *mockComponents) components.TransportClient {
+	mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
+		Return(nil, fmt.Errorf("pop")).Once()
+	mockGetStateOk(mc)
+	return nil
+}
 
 func mockGetStateOk(mc *mockComponents) components.TransportClient {
 	mGS := mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false)
@@ -56,16 +65,20 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
-		mockGetStateOk,
+		mockGetStateRetryThenOk,
 	)
 	defer done()
 
 	tm.sendShortRetry = retry.NewRetryLimited(&pldconf.RetryConfigWithMax{
 		MaxAttempts: confutil.P(1),
 	})
+	tm.reliableScanRetry = retry.NewRetryIndefinite(&pldconf.RetryConfig{
+		MaxDelay: confutil.P("1ms"),
+	})
 	tm.quiesceTimeout = 10 * time.Millisecond
 	tm.reliableMessageResend = 10 * time.Millisecond
 	tm.peerInactivityTimeout = 1 * time.Second
+	tm.reliableMessagePageSize = 1 // forking pagination
 
 	mockActivateDeactivateOk(tp)
 
@@ -137,6 +150,8 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	)
 	defer done()
 
+	log.SetLevel("debug")
+
 	tm.sendShortRetry = retry.NewRetryLimited(&pldconf.RetryConfigWithMax{
 		MaxAttempts: confutil.P(1),
 	})
@@ -201,6 +216,12 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
+		func(mc *mockComponents) components.TransportClient {
+			// missing state
+			mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
+				Return(nil, nil).Once()
+			return nil
+		},
 	)
 	defer done()
 
@@ -213,12 +234,26 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 
 	mockActivateDeactivateOk(tp)
 
+	// First with missing metadata
 	rm := &components.ReliableMessage{
 		MessageType: components.RMTState.Enum(),
 		Node:        "node2",
-		// Missing metadata
 	}
 	postCommit, err := tm.SendReliable(ctx, tm.persistence.DB(), rm)
+	require.NoError(t, err)
+	postCommit()
+
+	// Second with missing state
+	rm2 := &components.ReliableMessage{
+		MessageType: components.RMTState.Enum(),
+		Node:        "node2",
+		Metadata: tktypes.JSONString(&components.StateDistribution{
+			Domain:          "domain1",
+			ContractAddress: tktypes.RandAddress().String(),
+			StateID:         tktypes.RandHex(32),
+		}),
+	}
+	postCommit, err = tm.SendReliable(ctx, tm.persistence.DB(), rm2)
 	require.NoError(t, err)
 	postCommit()
 
@@ -231,6 +266,12 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 	}
 	require.NotNil(t, rmWithAck.Ack)
 	require.Regexp(t, "PD012017", rmWithAck.Ack.Error)
+
+	// Second nack
+	rmWithAck, err = tm.getReliableMessageByID(ctx, tm.persistence.DB(), rm2.ID)
+	require.NoError(t, err)
+	require.NotNil(t, rmWithAck.Ack)
+	require.Regexp(t, "PD012014", rmWithAck.Ack.Error)
 
 }
 
@@ -319,5 +360,225 @@ func TestActivateBadPeerInfo(t *testing.T) {
 
 	_, err := tm.getPeer(ctx, "node2")
 	assert.Regexp(t, "PD012015", err)
+
+}
+
+func TestQuiesceDetectPersistentMessage(t *testing.T) {
+
+	ctx, tm, tp, done := newTestTransport(t, false, mockGoodTransport)
+	defer done()
+
+	// Load up a notification for a persistent message
+	tm.reliableMessageResend = 10 * time.Millisecond
+	tm.peerInactivityTimeout = 1 * time.Second
+	tm.quiesceTimeout = 1 * time.Second
+
+	mockActivateDeactivateOk(tp)
+
+	quiescingPeer, err := tm.getPeer(ctx, "node2")
+	require.NoError(t, err)
+
+	// Force cancel that peer
+	quiescingPeer.cancelCtx()
+	<-quiescingPeer.done
+
+	// Simulate quiescing with persistent messages delivered
+	quiescingPeer.quiescing = true
+	quiescingPeer.done = make(chan struct{})
+	quiescingPeer.persistedMsgsAvailable = make(chan struct{}, 1)
+	quiescingPeer.persistedMsgsAvailable <- struct{}{}
+
+	// Now in quiesce it will start up a new one
+	quiescingPeer.senderDone()
+
+	require.NotNil(t, tm.peers["node2"])
+
+}
+
+func TestQuiesceDetectFireAndForgetMessage(t *testing.T) {
+
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGoodTransport,
+		mockEmptyReliableMsgs,
+		mockEmptyReliableMsgs,
+	)
+	defer done()
+
+	// Load up a notification for a persistent message
+	tm.reliableMessageResend = 1 * time.Second
+	tm.peerInactivityTimeout = 1 * time.Second
+	tm.quiesceTimeout = 1 * time.Second
+
+	mockActivateDeactivateOk(tp)
+
+	quiescingPeer, err := tm.getPeer(ctx, "node2")
+	require.NoError(t, err)
+
+	// Force cancel that peer
+	quiescingPeer.cancelCtx()
+	<-quiescingPeer.done
+
+	// Simulate quiescing with persistent messages delivered
+	quiescingPeer.quiescing = true
+	quiescingPeer.ctx = ctx
+	quiescingPeer.done = make(chan struct{})
+	quiescingPeer.sendQueue = make(chan *prototk.PaladinMsg, 1)
+	quiescingPeer.sendQueue <- &prototk.PaladinMsg{
+		MessageId:   uuid.NewString(),
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
+		MessageType: "example",
+		Payload:     []byte(`{}`),
+	}
+
+	sentMessages := make(chan *prototk.PaladinMsg, 1)
+	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
+		sent := req.Message
+		assert.NotEmpty(t, sent.MessageId)
+		sentMessages <- sent
+		return nil, nil
+	}
+	// Now in quiesce it will start up a new one
+	quiescingPeer.senderDone()
+
+	require.NotNil(t, tm.peers["node2"])
+
+	<-sentMessages
+
+}
+
+func TestDeactivateFail(t *testing.T) {
+
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGoodTransport,
+		mockEmptyReliableMsgs,
+	)
+	defer done()
+
+	tm.reliableMessageResend = 1 * time.Second
+	tm.peerInactivityTimeout = 1 * time.Second
+	tm.quiesceTimeout = 1 * time.Millisecond
+
+	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+		return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
+	}
+	tp.Functions.DeactivateNode = func(ctx context.Context, dnr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+		return nil, fmt.Errorf("pop")
+	}
+
+	_, err := tm.getPeer(ctx, "node2")
+	require.NoError(t, err)
+
+}
+
+func TestGetReliableMessageByIDFail(t *testing.T) {
+
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
+		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
+		return nil
+	})
+	defer done()
+
+	_, err := tm.getReliableMessageByID(ctx, tm.persistence.DB(), uuid.New())
+	require.Regexp(t, "pop", err)
+
+}
+
+func TestGetReliableMessageScanNoAction(t *testing.T) {
+
+	_, tm, _, done := newTestTransport(t, false)
+	defer done()
+
+	tm.reliableMessageResend = 100 * time.Second
+
+	p := &peer{
+		tm:           tm,
+		lastDrainHWM: confutil.P(uint64(100)),
+		lastFullScan: time.Now(),
+	}
+
+	require.Nil(t, p.reliableMessageScan(false))
+
+}
+
+func TestProcessReliableMsgPageIgnoreBeforeHWM(t *testing.T) {
+
+	ctx, tm, _, done := newTestTransport(t, false)
+	defer done()
+
+	p := &peer{
+		ctx:          ctx,
+		tm:           tm,
+		lastDrainHWM: confutil.P(uint64(100)),
+	}
+
+	err := p.processReliableMsgPage([]*components.ReliableMessage{
+		{
+			ID:       uuid.New(),
+			Sequence: 50,
+			Created:  tktypes.TimestampNow(),
+		},
+	})
+	require.NoError(t, err)
+
+}
+
+func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
+
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
+		mc.db.Mock.ExpectExec("INSERT.*reliable_msg_acks").WillReturnError(fmt.Errorf("pop"))
+		return nil
+	})
+	defer done()
+
+	p := &peer{
+		ctx: ctx,
+		tm:  tm,
+	}
+
+	err := p.processReliableMsgPage([]*components.ReliableMessage{
+		{
+			ID:          uuid.New(),
+			Sequence:    50,
+			Created:     tktypes.TimestampNow(),
+			MessageType: components.RMTReceipt.Enum(),
+		},
+	})
+	require.Regexp(t, "pop", err)
+
+}
+
+func TestProcessReliableMsgPageInsertFail(t *testing.T) {
+
+	ctx, tm, tp, done := newTestTransport(t, false,
+		mockGetStateOk,
+		func(mc *mockComponents) components.TransportClient {
+			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
+			return nil
+		})
+	defer done()
+
+	p := &peer{
+		ctx:       ctx,
+		tm:        tm,
+		transport: tp.t,
+	}
+
+	sd := &components.StateDistribution{
+		Domain:          "domain1",
+		ContractAddress: tktypes.RandAddress().String(),
+		StateID:         tktypes.RandHex(32),
+	}
+
+	rm := &components.ReliableMessage{
+		ID:          uuid.New(),
+		Sequence:    50,
+		MessageType: components.RMTState.Enum(),
+		Node:        "node2",
+		Metadata:    tktypes.JSONString(sd),
+		Created:     tktypes.TimestampNow(),
+	}
+
+	err := p.processReliableMsgPage([]*components.ReliableMessage{rm})
+	require.Regexp(t, "PD020302", err)
 
 }

@@ -64,25 +64,27 @@ type transportManager struct {
 	peerInactivityTimeout time.Duration
 	quiesceTimeout        time.Duration
 
-	senderBufferLen       int
-	reliableMessageResend time.Duration
+	senderBufferLen         int
+	reliableMessageResend   time.Duration
+	reliableMessagePageSize int
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
 	return &transportManager{
-		bgCtx:                 bgCtx,
-		conf:                  conf,
-		localNodeName:         conf.NodeName,
-		transportsByID:        make(map[uuid.UUID]*transport),
-		transportsByName:      make(map[string]*transport),
-		components:            make(map[prototk.PaladinMsg_Component]components.TransportClient),
-		peers:                 make(map[string]*peer),
-		senderBufferLen:       confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
-		reliableMessageResend: confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
-		sendShortRetry:        retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
-		reliableScanRetry:     retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
-		peerInactivityTimeout: confutil.DurationMin(conf.PeerInactivityTimeout, 0, *pldconf.TransportManagerDefaults.PeerInactivityTimeout),
-		quiesceTimeout:        1 * time.Second, // not currently tunable (considered very small edge case)
+		bgCtx:                   bgCtx,
+		conf:                    conf,
+		localNodeName:           conf.NodeName,
+		transportsByID:          make(map[uuid.UUID]*transport),
+		transportsByName:        make(map[string]*transport),
+		components:              make(map[prototk.PaladinMsg_Component]components.TransportClient),
+		peers:                   make(map[string]*peer),
+		senderBufferLen:         confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
+		reliableMessageResend:   confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
+		sendShortRetry:          retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
+		reliableScanRetry:       retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
+		peerInactivityTimeout:   confutil.DurationMin(conf.PeerInactivityTimeout, 0, *pldconf.TransportManagerDefaults.PeerInactivityTimeout),
+		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
+		reliableMessagePageSize: 100,             // not currently tunable
 	}
 }
 

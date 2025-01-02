@@ -213,22 +213,14 @@ func (p *peer) deactivate() {
 	}
 }
 
-func (p *peer) reliableMessageScan() error {
+func (p *peer) reliableMessageScan(checkNew bool) error {
 
-	checkNew := true
 	fullScan := p.lastDrainHWM == nil || time.Since(p.lastFullScan) >= p.tm.reliableMessageResend
-	select {
-	case <-p.persistedMsgsAvailable:
-		checkNew = true
-	default:
-	}
-
 	if !fullScan && !checkNew {
 		return nil // Nothing to do
 	}
 
-	const pageSize = 100
-
+	pageSize := p.tm.reliableMessagePageSize
 	var total = 0
 	var lastPageEnd *uint64
 	for {
@@ -397,12 +389,13 @@ func (p *peer) sender() {
 
 	log.L(p.ctx).Infof("peer %s active", p.name)
 
+	checkNew := false
 	hitInactivityTimeout := false
 	for {
 
 		// We send/resend any reliable messages queued up first
 		err := p.tm.reliableScanRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
-			return true, p.reliableMessageScan()
+			return true, p.reliableMessageScan(checkNew)
 		})
 		if err != nil {
 			return // context closed
@@ -414,6 +407,7 @@ func (p *peer) sender() {
 			return // quiesce handling is in senderDone() deferred function
 		}
 		hitInactivityTimeout = false
+		checkNew = false
 
 		// Our wait timeout needs to be the shortest of:
 		// - The full re-scan timeout for reliable messages
@@ -430,6 +424,7 @@ func (p *peer) sender() {
 				hitInactivityTimeout = true
 				processingMsgs = false // spin round and check if we have persisted messages to (re)process
 			case <-p.persistedMsgsAvailable:
+				checkNew = true
 				processingMsgs = false // spin round and get the messages
 			case <-p.ctx.Done():
 				return // we're done

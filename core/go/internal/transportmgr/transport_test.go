@@ -270,6 +270,27 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 
 }
 
+func TestGetTransportDetailsOk(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents) components.TransportClient {
+		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
+			{
+				Node:      "node1",
+				Transport: "test1",
+				Details:   `{"the":"stuff we need"}`,
+			},
+		}, nil)
+		return nil
+	})
+	defer done()
+
+	tspt, err := tp.t.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{
+		Node: "node2",
+	})
+	assert.NoError(t, err)
+	require.NotEmpty(t, tspt.TransportDetails)
+
+}
+
 func TestSendMessageDestWrong(t *testing.T) {
 	ctx, tm, _, done := newTestTransport(t, false)
 	defer done()
