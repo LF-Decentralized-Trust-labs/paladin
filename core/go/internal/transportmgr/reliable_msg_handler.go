@@ -18,6 +18,7 @@ package transportmgr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -52,7 +53,7 @@ type noResult struct{}
 type ackInfo struct {
 	node  string
 	id    uuid.UUID // sent in CID on wire
-	Error error     `json:"error,omitempty"`
+	Error string    `json:"error,omitempty"`
 }
 
 type stateAndAck struct {
@@ -74,7 +75,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 			sd, stateToAdd, err := parseStateDistribution(ctx, v.msgID, v.msg.Payload)
 			if err != nil {
 				acksToSend = append(acksToSend,
-					&ackInfo{node: v.p.Name, id: v.msgID, Error: err}, // reject the message permanently
+					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
 				)
 			} else {
 				statesToAdd[sd.Domain] = append(statesToAdd[sd.Domain], &stateAndAck{
@@ -90,7 +91,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		default:
 			err := i18n.NewError(ctx, msgs.MsgTransportUnsupportedReliableMsgType, v.msg.MessageType)
 			acksToSend = append(acksToSend,
-				&ackInfo{node: v.p.Name, id: v.msgID, Error: err}, // reject the message permanently
+				&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
 			)
 		}
 	}
@@ -111,7 +112,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 				_, err := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{s.state})
 				if err != nil {
 					log.L(ctx).Errorf("insert state %s from message %s for domain %s failed - attempting each individually: %s", s.state.ID, s.ack.id, domain, batchErr)
-					s.ack.Error = err
+					s.ack.Error = err.Error()
 				}
 			}
 		}
@@ -154,8 +155,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		if err == nil {
 			// We've committed the database work ok - send the acks/nacks to the other side
 			for _, a := range acksToSend {
-
-				_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error))
+				_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, errors.New(a.Error)))
 			}
 		}
 	}, make([]flushwriter.Result[*noResult], len(values)), nil
@@ -165,15 +165,17 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 func buildAck(msgID uuid.UUID, err error) *prototk.PaladinMsg {
 	cid := msgID.String()
 	msgType := RMHMessageTypeAck
+	var errString string
 	if err != nil {
 		msgType = RMHMessageTypeNack
+		errString = err.Error()
 	}
 	return &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
 		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
 		MessageType:   msgType,
 		CorrelationId: &cid,
-		Payload:       tktypes.JSONString(&ackInfo{Error: err}),
+		Payload:       tktypes.JSONString(&ackInfo{Error: errString}),
 	}
 }
 
@@ -196,10 +198,10 @@ func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *proto
 		Time:      tktypes.TimestampNow(),
 	}
 	if msg.MessageType == RMHMessageTypeNack {
-		if info.Error == nil {
-			info.Error = i18n.NewError(ctx, msgs.MsgTransportNackMissingError)
+		if info.Error == "" {
+			info.Error = i18n.NewError(ctx, msgs.MsgTransportNackMissingError).Error()
 		}
-		ackNackToWrite.Error = info.Error.Error()
+		ackNackToWrite.Error = info.Error
 	}
 	return ackNackToWrite
 }

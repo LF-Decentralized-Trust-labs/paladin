@@ -390,6 +390,25 @@ func TestReceiveMessageInvalidComponent(t *testing.T) {
 	require.Regexp(t, "PD012011", err)
 }
 
+func TestReceiveMessageInvalidNode(t *testing.T) {
+	ctx, _, tp, done := newTestTransport(t, false)
+	defer done()
+
+	msg := &prototk.PaladinMsg{
+		MessageId:     uuid.NewString(),
+		CorrelationId: confutil.P(uuid.NewString()),
+		Component:     prototk.PaladinMsg_Component(42),
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
+	}
+
+	_, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		FromNode: ".wrong",
+		Message:  msg,
+	})
+	require.Regexp(t, "PD012015", err)
+}
+
 func TestReceiveMessageNotInit(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t, false)
 	defer done()
