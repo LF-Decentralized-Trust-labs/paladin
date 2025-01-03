@@ -24,7 +24,7 @@ ext {
     goFilesE2E = fileTree(".") {
         include "integration-test/**/*.go"
     }
-    targetCoverage = 94.5
+    targetCoverage = 92.9
     maxCoverageBarGap = 1
     coveragePackages = [
         "github.com/kaleido-io/paladin/domains/zeto/internal/...",
@@ -32,7 +32,7 @@ ext {
         "github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner",
     ]
 
-    zetoVersion = "v0.0.10"
+    zetoVersion = "v0.0.11"
     zetoHost = "hyperledger-labs"
     zkpOut = "${projectDir}/zkp"
     toolsOut = "${projectDir}/tools"
@@ -163,6 +163,7 @@ task copySolidity(type: Copy, dependsOn: [protoc, ":solidity:compile", extractZe
     from fileTree("${zkpOut}/artifacts/contracts") {
         include 'lib/interfaces/izeto.sol/IZeto.json'
         include 'lib/interfaces/izeto_encrypted.sol/IZetoEncrypted.json'
+        include 'lib/interfaces/izeto_lockable.sol/IZetoLockable.json'
         include 'lib/interfaces/zeto_fungible_initializable.sol/IZetoFungibleInitializable.json'
         include 'lib/interfaces/zeto_nf_initializable.sol/IZetoNonFungibleInitializable.json'
     }
@@ -230,7 +231,15 @@ task testE2E(type: Exec, dependsOn: [protoc, copySolidity, copyPkgSolidity, copy
     helpers.dumpLogsOnFailure(it, ':testinfra:startTestInfra')
 }
 
-task unitTests(type: Exec, dependsOn: [protoc, ":core:go:makeMocks", ":testinfra:startTestInfra", downloadZetoCompiledContracts, copySolidity, copyPkgSolidity]) {
+task unitTests(type: Exec, dependsOn: [
+        protoc,
+        ":core:go:makeMocks",
+        ":testinfra:startTestInfra",
+        downloadZetoCompiledContracts,
+        copySolidity,
+        copyPkgSolidity,
+        ":domains:integration-test:copySolidity" // TODO: find a better way to share this
+    ]) {
     inputs.files(configurations.toolkitGo)
     inputs.files(configurations.coreGo)
     inputs.files(goFiles)

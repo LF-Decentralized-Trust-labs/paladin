@@ -25,9 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/domains/zeto/internal/zeto/common"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
 var mintABI = &abi.Entry{
@@ -87,22 +85,12 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		AssembledTransaction: &pb.AssembledTransaction{
 			OutputStates: outputStates,
 		},
-		AttestationPlan: []*pb.AttestationRequest{
-			{
-				Name:            "submitter",
-				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
-				Parties:         []string{tx.Transaction.From},
-			},
-		},
+		AttestationPlan: []*pb.AttestationRequest{},
 	}, nil
 }
 
 func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	return &pb.EndorseTransactionResponse{
-		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-	}, nil
+	return nil, nil
 }
 
 func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {

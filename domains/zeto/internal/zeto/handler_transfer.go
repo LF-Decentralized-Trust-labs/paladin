@@ -28,11 +28,9 @@ import (
 	corepb "github.com/kaleido-io/paladin/domains/zeto/pkg/proto"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
-	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	pb "github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
-	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -193,21 +191,12 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 				Payload:         payloadBytes,
 				Parties:         []string{tx.Transaction.From},
 			},
-			{
-				Name:            "submitter",
-				AttestationType: pb.AttestationType_ENDORSE,
-				Algorithm:       algorithms.ECDSA_SECP256K1,
-				VerifierType:    verifiers.ETH_ADDRESS,
-				Parties:         []string{tx.Transaction.From},
-			},
 		},
 	}, nil
 }
 
 func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *pb.EndorseTransactionRequest) (*pb.EndorseTransactionResponse, error) {
-	return &pb.EndorseTransactionResponse{
-		EndorsementResult: pb.EndorseTransactionResponse_ENDORSER_SUBMIT,
-	}, nil
+	return nil, nil
 }
 
 func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *pb.PrepareTransactionRequest) (*pb.PrepareTransactionResponse, error) {

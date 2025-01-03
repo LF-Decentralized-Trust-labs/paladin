@@ -144,22 +144,11 @@ func TestMintAssemble(t *testing.T) {
 func TestMintEndorse(t *testing.T) {
 	h := mintHandler{}
 	ctx := context.Background()
-	tx := &types.ParsedTransaction{
-		Params: []*types.TransferParamEntry{
-			{
-				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
-			},
-		},
-		Transaction: &prototk.TransactionSpecification{
-			From: "Bob",
-		},
-	}
-
+	tx := &types.ParsedTransaction{}
 	req := &prototk.EndorseTransactionRequest{}
 	res, err := h.Endorse(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, res.EndorsementResult)
+	assert.Nil(t, res)
 }
 
 func TestMintPrepare(t *testing.T) {

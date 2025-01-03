@@ -20,12 +20,20 @@ contracts:
     - name: Groth16Verifier_CheckInputsOutputsValueBatch
       abiAndBytecode:
         path: ./helpers/abis/Groth16Verifier_CheckInputsOutputsValueBatch.json
+    - name: Groth16Verifier_CheckUtxosOwner
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_CheckUtxosOwner.json
+    - name: Groth16Verifier_CheckUtxosOwnerBatch
+      abiAndBytecode:
+        path: ./helpers/abis/Groth16Verifier_CheckUtxosOwnerBatch.json
     - name: Zeto_Anon
       verifier: Groth16Verifier_Anon
       batchVerifier: Groth16Verifier_AnonBatch
       depositVerifier: Groth16Verifier_CheckHashesValue
       withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
       batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
+      lockVerifier: Groth16Verifier_CheckUtxosOwner
+      batchLockVerifier: Groth16Verifier_CheckUtxosOwnerBatch
       circuitId: anon
       cloneable: true
       abiAndBytecode:

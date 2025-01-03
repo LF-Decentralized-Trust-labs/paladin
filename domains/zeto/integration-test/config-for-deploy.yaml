@@ -25,6 +25,22 @@ contracts:
     - name: Groth16Verifier_CheckNullifierValueBatch
       abiAndBytecode:
         path: ./abis/Groth16Verifier_CheckNullifierValueBatch.json
+    # for lock (without nullifiers)
+    - name: Groth16Verifier_CheckUtxosOwner
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckUtxosOwner.json
+    # for batch lock (without nullifiers)
+    - name: Groth16Verifier_CheckUtxosOwnerBatch
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckUtxosOwnerBatch.json
+    # for lock (with nullifiers)
+    - name: Groth16Verifier_CheckNullifiersOwner
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckNullifiersOwner.json
+    # for batch lock (with nullifiers)
+    - name: Groth16Verifier_CheckNullifiersOwnerBatch
+      abiAndBytecode:
+        path: ./abis/Groth16Verifier_CheckNullifiersOwnerBatch.json
     # for the Zeto_Anon token
     - name: Groth16Verifier_Anon
       abiAndBytecode:
@@ -38,6 +54,8 @@ contracts:
       depositVerifier: Groth16Verifier_CheckHashesValue
       withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
       batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
+      lockVerifier: Groth16Verifier_CheckUtxosOwner
+      batchLockVerifier: Groth16Verifier_CheckUtxosOwnerBatch
       circuitId: anon
       cloneable: true
       abiAndBytecode:
@@ -55,6 +73,8 @@ contracts:
       depositVerifier: Groth16Verifier_CheckHashesValue
       withdrawVerifier: Groth16Verifier_CheckInputsOutputsValue
       batchWithdrawVerifier: Groth16Verifier_CheckInputsOutputsValueBatch
+      lockVerifier: Groth16Verifier_CheckUtxosOwner
+      batchLockVerifier: Groth16Verifier_CheckUtxosOwnerBatch
       circuitId: anon_enc
       cloneable: true
       abiAndBytecode:
@@ -81,6 +101,8 @@ contracts:
       depositVerifier: Groth16Verifier_CheckHashesValue
       withdrawVerifier: Groth16Verifier_CheckNullifierValue
       batchWithdrawVerifier: Groth16Verifier_CheckNullifierValueBatch
+      lockVerifier: Groth16Verifier_CheckNullifiersOwner
+      batchLockVerifier: Groth16Verifier_CheckNullifiersOwnerBatch
       circuitId: anon_nullifier
       cloneable: true
       abiAndBytecode:

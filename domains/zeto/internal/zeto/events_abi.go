@@ -23,15 +23,21 @@ import (
 )
 
 //go:embed abis/IZeto.json
-var zetoABIBytes []byte // From "gradle copySolidity"
+var zetoABIBytes []byte
+
 //go:embed abis/IZetoEncrypted.json
-var zetoEncryptedABIBytes []byte // From "gradle copySolidity"
+var zetoEncryptedABIBytes []byte
+
+//go:embed abis/IZetoLockable.json
+var zetoLockableABIBytes []byte
 
 func getAllZetoEventAbis() abi.ABI {
 	var events abi.ABI
 	contract := solutils.MustLoadBuild(zetoABIBytes)
 	events = buildEvents(events, contract)
 	contract = solutils.MustLoadBuild(zetoEncryptedABIBytes)
+	events = buildEvents(events, contract)
+	contract = solutils.MustLoadBuild(zetoLockableABIBytes)
 	events = buildEvents(events, contract)
 	return events
 }

@@ -41,6 +41,18 @@
     "zeto_g16_check_nullifier_batch": {
         "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifierValueBatch.json"
     },
+    "zeto_g16_check_nullifiers_owner": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifiersOwner.json"
+    },
+    "zeto_g16_check_nullifiers_owner_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckNullifiersOwnerBatch.json"
+    },
+    "zeto_g16_check_utxos_owner": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckUtxosOwner.json"
+    },
+    "zeto_g16_check_utxos_owner_batch": {
+        "filename": "test/e2e/abis/zeto/Groth16Verifier_CheckUtxosOwnerBatch.json"
+    },
     "zeto_poseidon_unit2l": {
         "filename": "test/e2e/abis/zeto/Poseidon2.json"
     },
