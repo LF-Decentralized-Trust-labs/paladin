@@ -17,6 +17,8 @@ package pldclient
 
 import (
 	"context"
+
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 )
 
 type Transport interface {
@@ -25,6 +27,8 @@ type Transport interface {
 	NodeName(ctx context.Context) (nodeName string, err error)
 	LocalTransports(ctx context.Context) (transportNames []string, err error)
 	LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error)
+	Peers(ctx context.Context) (peers []*pldapi.PeerInfo, err error)
+	PeerInfo(ctx context.Context, nodeName string) (peer *pldapi.PeerInfo, err error)
 }
 
 // This is necessary because there's no way to introspect function parameter names via reflection
@@ -69,5 +73,15 @@ func (t *transport) LocalTransports(ctx context.Context) (transportNames []strin
 
 func (t *transport) LocalTransportDetails(ctx context.Context, transportName string) (transportDetailsStr string, err error) {
 	err = t.c.CallRPC(ctx, &transportDetailsStr, "transport_localTransportDetails", transportName)
+	return
+}
+
+func (t *transport) Peers(ctx context.Context) (peers []*pldapi.PeerInfo, err error) {
+	err = t.c.CallRPC(ctx, &peers, "transport_peers")
+	return
+}
+
+func (t *transport) PeerInfo(ctx context.Context, nodeName string) (peer *pldapi.PeerInfo, err error) {
+	err = t.c.CallRPC(ctx, &peer, "transport_peerInfo", nodeName)
 	return
 }
