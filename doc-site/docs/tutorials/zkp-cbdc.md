@@ -6,7 +6,7 @@ This shows how to leverage the [Zeto](../../architecture/zeto/) in order to buil
 
 ## Running the example
 
-Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paldin environment, and
+Follow the [Getting Started](../../getting-started/installation/) instructions to set up a Paladin environment, and
 then follow the example [README](https://github.com/LF-Decentralized-Trust-labs/paladin/blob/main/example/zeto/README.md)
 to run the code.
 
