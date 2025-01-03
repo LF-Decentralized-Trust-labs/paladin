@@ -163,11 +163,15 @@ type TransactionDependencies struct {
 	PrereqOf  []uuid.UUID `docstruct:"TransactionDependencies" json:"prereqOf"`
 }
 
-type PreparedTransaction struct {
+type PreparedTransactionBase struct {
 	ID          uuid.UUID           `docstruct:"PreparedTransaction" json:"id"`
 	Domain      string              `docstruct:"PreparedTransaction" json:"domain"`
 	To          *tktypes.EthAddress `docstruct:"PreparedTransaction" json:"to"`
 	Transaction TransactionInput    `docstruct:"PreparedTransaction" json:"transaction"`
 	Metadata    tktypes.RawJSON     `docstruct:"PreparedTransaction" json:"metadata,omitempty"`
-	States      TransactionStates   `docstruct:"PreparedTransaction" json:"states"`
+}
+
+type PreparedTransaction struct {
+	PreparedTransactionBase
+	States TransactionStates `docstruct:"PreparedTransaction" json:"states"`
 }

@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/mocks/privatetxnmgrmocks"
 	"github.com/kaleido-io/paladin/core/mocks/prvtxsyncpointsmocks"
-	"github.com/kaleido-io/paladin/core/mocks/statedistributionmocks"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
@@ -53,7 +52,6 @@ type transactionFlowDepencyMocks struct {
 	transportWriter     *privatetxnmgrmocks.TransportWriter
 	environment         *privatetxnmgrmocks.SequencerEnvironment
 	coordinatorSelector *privatetxnmgrmocks.CoordinatorSelector
-	stateDistributer    *statedistributionmocks.StateDistributer
 	localAssembler      *privatetxnmgrmocks.LocalAssembler
 }
 
@@ -74,7 +72,6 @@ func newTransactionFlowForTesting(t *testing.T, ctx context.Context, transaction
 		transportWriter:     privatetxnmgrmocks.NewTransportWriter(t),
 		environment:         privatetxnmgrmocks.NewSequencerEnvironment(t),
 		coordinatorSelector: privatetxnmgrmocks.NewCoordinatorSelector(t),
-		stateDistributer:    statedistributionmocks.NewStateDistributer(t),
 		localAssembler:      privatetxnmgrmocks.NewLocalAssembler(t),
 	}
 	contractAddress := tktypes.RandAddress()

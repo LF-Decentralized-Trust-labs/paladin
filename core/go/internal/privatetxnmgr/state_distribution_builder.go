@@ -32,8 +32,8 @@ func newStateDistributionBuilder(c components.AllComponents, tx *components.Priv
 		tx: tx,
 		StateDistributionSet: components.StateDistributionSet{
 			LocalNode: c.TransportManager().LocalNodeName(),
-			Remote:    []*components.StateDistribution{},
-			Local:     []*components.StateDistribution{},
+			Remote:    []*components.StateDistributionWithData{},
+			Local:     []*components.StateDistributionWithData{},
 		},
 	}
 }
@@ -78,7 +78,7 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 		}
 		remainingNullifiers = newRemainingNullifiers
 
-		distribution := &components.StateDistribution{
+		distribution := &components.StateDistributionWithData{
 			ID:              uuid.New().String(),
 			IdentityLocator: recipient,
 			Domain:          tx.Domain,

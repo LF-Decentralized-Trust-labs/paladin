@@ -19,6 +19,7 @@ package transportmgr
 import (
 	"context"
 
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
 )
 
@@ -30,7 +31,9 @@ func (tm *transportManager) initRPC() {
 	tm.rpcModule = rpcserver.NewRPCModule("transport").
 		Add("transport_nodeName", tm.rpcNodeName()).
 		Add("transport_localTransports", tm.rpcLocalTransports()).
-		Add("transport_localTransportDetails", tm.rpcLocalTransportDetails())
+		Add("transport_localTransportDetails", tm.rpcLocalTransportDetails()).
+		Add("transport_peers", tm.rpcPeers()).
+		Add("transport_peerInfo", tm.rpcPeerInfo())
 }
 
 func (tm *transportManager) rpcNodeName() rpcserver.RPCHandler {
@@ -52,5 +55,17 @@ func (tm *transportManager) rpcLocalTransportDetails() rpcserver.RPCHandler {
 		transportName string,
 	) (string, error) {
 		return tm.getLocalTransportDetails(ctx, transportName)
+	})
+}
+
+func (tm *transportManager) rpcPeers() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod0(func(ctx context.Context) ([]*pldapi.PeerInfo, error) {
+		return tm.listActivePeerInfo(), nil
+	})
+}
+
+func (tm *transportManager) rpcPeerInfo() rpcserver.RPCHandler {
+	return rpcserver.RPCMethod1(func(ctx context.Context, nodeName string) (*pldapi.PeerInfo, error) {
+		return tm.getPeerInfo(nodeName), nil
 	})
 }

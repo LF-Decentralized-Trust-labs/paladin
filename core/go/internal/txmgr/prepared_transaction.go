@@ -71,7 +71,7 @@ var preparedTransactionFilters = filters.FieldMap{
 	"created": filters.TimestampField("created"),
 }
 
-func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.DB, prepared []*components.PrepareTransactionWithRefs) (postCommit func(), err error) {
+func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.DB, prepared []*components.PreparedTransactionWithRefs) (postCommit func(), err error) {
 
 	var preparedTxInserts []*preparedTransaction
 	var preparedTxStateInserts []*preparedTransactionState
@@ -84,7 +84,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 			Metadata: p.Metadata,
 		}
 		// We do the work for the ABI validation etc. before we insert the TX
-		txPostCommit, resolved, err := tm.resolveNewTransaction(ctx, dbTX, p.Transaction, pldapi.SubmitModePrepare)
+		txPostCommit, resolved, err := tm.resolveNewTransaction(ctx, dbTX, &p.Transaction, pldapi.SubmitModePrepare)
 		if err == nil {
 			p.Transaction.ABI = nil // move to the reference
 			p.Transaction.ABIReference = resolved.Function.ABIReference
@@ -96,7 +96,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 		}
 		postCommits = append(postCommits, txPostCommit)
 		preparedTxInserts = append(preparedTxInserts, dbPreparedTx)
-		for i, stateID := range p.States.Spent {
+		for i, stateID := range p.StateRefs.Spent {
 			preparedTxStateInserts = append(preparedTxStateInserts, &preparedTransactionState{
 				Transaction: p.ID,
 				Type:        preparedSpend,
@@ -105,7 +105,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 				StateIdx:    i,
 			})
 		}
-		for i, stateID := range p.States.Read {
+		for i, stateID := range p.StateRefs.Read {
 			preparedTxStateInserts = append(preparedTxStateInserts, &preparedTransactionState{
 				Transaction: p.ID,
 				Type:        preparedRead,
@@ -114,7 +114,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 				StateIdx:    i,
 			})
 		}
-		for i, stateID := range p.States.Confirmed {
+		for i, stateID := range p.StateRefs.Confirmed {
 			preparedTxStateInserts = append(preparedTxStateInserts, &preparedTransactionState{
 				Transaction: p.ID,
 				Type:        preparedConfirm,
@@ -123,7 +123,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 				StateIdx:    i,
 			})
 		}
-		for i, stateID := range p.States.Info {
+		for i, stateID := range p.StateRefs.Info {
 			preparedTxStateInserts = append(preparedTxStateInserts, &preparedTransactionState{
 				Transaction: p.ID,
 				Type:        preparedInfo,
@@ -133,7 +133,7 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 			})
 		}
 		log.L(ctx).Infof("Inserting prepared %s transaction for transaction %s with spent=%d read=%d confirmed=%d info=%d",
-			p.Transaction.Type, p.ID, len(p.States.Spent), len(p.States.Read), len(p.States.Confirmed), len(p.States.Info))
+			p.Transaction.Type, p.ID, len(p.StateRefs.Spent), len(p.StateRefs.Read), len(p.StateRefs.Confirmed), len(p.StateRefs.Info))
 	}
 
 	if len(preparedTxInserts) > 0 {
@@ -168,10 +168,12 @@ func (tm *txManager) QueryPreparedTransactions(ctx context.Context, dbTX *gorm.D
 		query:       jq,
 		mapResult: func(pt *preparedTransaction) (*pldapi.PreparedTransaction, error) {
 			preparedTx := &pldapi.PreparedTransaction{
-				ID:       pt.ID,
-				Domain:   pt.Domain,
-				To:       pt.To,
-				Metadata: pt.Metadata,
+				PreparedTransactionBase: pldapi.PreparedTransactionBase{
+					ID:       pt.ID,
+					Domain:   pt.Domain,
+					To:       pt.To,
+					Metadata: pt.Metadata,
+				},
 			}
 			return preparedTx, json.Unmarshal(pt.Transaction, &preparedTx.Transaction)
 		},

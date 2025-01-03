@@ -45,8 +45,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		PublicDispatches: make([]*syncpoints.PublicDispatch, 0, len(dispatchableTransactions)),
 	}
 
-	stateDistributions := make([]*components.StateDistribution, 0)
-	localStateDistributions := make([]*components.StateDistribution, 0)
+	stateDistributions := make([]*components.StateDistributionWithData, 0)
+	localStateDistributions := make([]*components.StateDistributionWithData, 0)
 	preparedTxnDistributions := make([]*preparedtxdistribution.PreparedTxnDistribution, 0)
 
 	for signingAddress, transactionFlows := range dispatchableTransactions {
@@ -216,8 +216,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 
 }
 
-func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PrepareTransactionWithRefs {
-	pt := &components.PrepareTransactionWithRefs{
+func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PreparedTransactionWithRefs {
+	pt := &components.PreparedTransactionWithRefs{
 		ID:       tx.ID,
 		Domain:   tx.Domain,
 		To:       &tx.Address,
@@ -225,16 +225,16 @@ func mapPreparedTransaction(tx *components.PrivateTransaction) *components.Prepa
 		Sender:   tx.PreAssembly.TransactionSpecification.From,
 	}
 	for _, s := range tx.PostAssembly.InputStates {
-		pt.States.Spent = append(pt.States.Spent, s.ID)
+		pt.StateRefs.Spent = append(pt.StateRefs.Spent, s.ID)
 	}
 	for _, s := range tx.PostAssembly.ReadStates {
-		pt.States.Read = append(pt.States.Read, s.ID)
+		pt.StateRefs.Read = append(pt.StateRefs.Read, s.ID)
 	}
 	for _, s := range tx.PostAssembly.OutputStates {
-		pt.States.Confirmed = append(pt.States.Confirmed, s.ID)
+		pt.StateRefs.Confirmed = append(pt.StateRefs.Confirmed, s.ID)
 	}
 	for _, s := range tx.PostAssembly.InfoStates {
-		pt.States.Info = append(pt.States.Info, s.ID)
+		pt.StateRefs.Info = append(pt.StateRefs.Info, s.ID)
 	}
 	if tx.PreparedPublicTransaction != nil {
 		pt.Transaction = tx.PreparedPublicTransaction

@@ -62,19 +62,6 @@ func setupTransportTests(t *testing.T) (context.Context, *pluginExerciser[protot
 	}
 }
 
-func TestTransportCallback_GetTransportDetails(t *testing.T) {
-	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
-	defer done()
-
-	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_GetTransportDetails{})] = func(dm *prototk.TransportMessage) {
-		dm.ResponseToTransport = &prototk.TransportMessage_GetTransportDetailsRes{
-			GetTransportDetailsRes: &prototk.GetTransportDetailsResponse{},
-		}
-	}
-	_, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{})
-	require.NoError(t, err)
-}
-
 func TestTransportCallback_ReceiveMessage(t *testing.T) {
 	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
 	defer done()
@@ -85,6 +72,19 @@ func TestTransportCallback_ReceiveMessage(t *testing.T) {
 		}
 	}
 	_, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{})
+	require.NoError(t, err)
+}
+
+func TestTransportCallback_GetTransportDetails(t *testing.T) {
+	ctx, _, _, callbacks, inOutMap, done := setupTransportTests(t)
+	defer done()
+
+	inOutMap[fmt.Sprintf("%T", &prototk.TransportMessage_GetTransportDetails{})] = func(dm *prototk.TransportMessage) {
+		dm.ResponseToTransport = &prototk.TransportMessage_GetTransportDetailsRes{
+			GetTransportDetailsRes: &prototk.GetTransportDetailsResponse{},
+		}
+	}
+	_, err := callbacks.GetTransportDetails(ctx, &prototk.GetTransportDetailsRequest{})
 	require.NoError(t, err)
 }
 
@@ -136,6 +136,40 @@ func TestTransportFunction_GetLocalDetails(t *testing.T) {
 		}
 	}, func(res *prototk.TransportMessage) {
 		assert.IsType(t, &prototk.TransportMessage_GetLocalDetailsRes{}, res.ResponseFromTransport)
+	})
+}
+
+func TestTransportFunction_ActivateNode(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupTransportTests(t)
+	defer done()
+
+	// InitTransport - paladin to transport
+	funcs.ActivateNode = func(ctx context.Context, cdr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+		return &prototk.ActivateNodeResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
+		req.RequestToTransport = &prototk.TransportMessage_ActivateNode{
+			ActivateNode: &prototk.ActivateNodeRequest{},
+		}
+	}, func(res *prototk.TransportMessage) {
+		assert.IsType(t, &prototk.TransportMessage_ActivateNodeRes{}, res.ResponseFromTransport)
+	})
+}
+
+func TestTransportFunction_DeactivateNode(t *testing.T) {
+	_, exerciser, funcs, _, _, done := setupTransportTests(t)
+	defer done()
+
+	// InitTransport - paladin to transport
+	funcs.DeactivateNode = func(ctx context.Context, cdr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+		return &prototk.DeactivateNodeResponse{}, nil
+	}
+	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
+		req.RequestToTransport = &prototk.TransportMessage_DeactivateNode{
+			DeactivateNode: &prototk.DeactivateNodeRequest{},
+		}
+	}, func(res *prototk.TransportMessage) {
+		assert.IsType(t, &prototk.TransportMessage_DeactivateNodeRes{}, res.ResponseFromTransport)
 	})
 }
 
