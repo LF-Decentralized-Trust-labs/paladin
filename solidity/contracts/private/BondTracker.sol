@@ -5,12 +5,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {INotoHooks} from "../private/interfaces/INotoHooks.sol";
 import {InvestorList} from "./InvestorList.sol";
+import {NotoLocks} from "./NotoLocks.sol";
 
 /**
  * @title BondTracker
  * @dev Hook logic to model a simple bond lifecycle on top of Noto.
  */
-contract BondTracker is INotoHooks, ERC20, Ownable {
+contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
     enum Status {
         INITIALIZED,
         ISSUED,
@@ -81,8 +82,9 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         address sender,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         require(sender == _issuer, "Bond must be issued by issuer");
         require(to == owner(), "Bond must be issued to custodian");
         require(_status == Status.INITIALIZED, "Bond has already been issued");
@@ -101,8 +103,9 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         address from,
         address to,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         investorList.checkTransfer(sender, from, to, amount);
         _transfer(from, to, amount);
 
@@ -121,8 +124,9 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         address sender,
         address from,
         address delegate,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external onlyOwner {
+    ) external override onlyOwner {
         approvals++; // must store something on each call (see https://github.com/kaleido-io/paladin/issues/252)
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -131,9 +135,75 @@ contract BondTracker is INotoHooks, ERC20, Ownable {
         address sender,
         address from,
         uint256 amount,
+        bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) external override onlyOwner {
         _burn(from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onLock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        uint256 amount,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        _lock(lockId, from, amount);
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        _unlock(lockId, amounts);
+        for (uint256 i = 0; i < to.length; i++) {
+            _transfer(from, to[i], amounts[i]);
+        }
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onPrepareUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        _prepareUnlock(lockId, to, amounts);
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function onApproveUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address delegate,
+        PreparedTransaction calldata prepared
+    ) external override onlyOwner {
+        emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
+    }
+
+    function handleDelegateUnlock(
+        address sender,
+        bytes32 lockId,
+        address from,
+        address[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external override onlyOwner {
+        LockDetail memory lock_ = _handleDelegateUnlock(lockId, amounts);
+        for (uint256 i = 0; i < to.length; i++) {
+            _transfer(lock_.from, to[i], amounts[i]);
+        }
     }
 }

@@ -19,16 +19,41 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
-    function burn(
-        uint256 amount,
-        bytes calldata data
-    ) external;
+    function burn(uint256 amount, bytes calldata data) external;
 
     function approveTransfer(
         StateEncoded[] calldata inputs,
         StateEncoded[] calldata outputs,
         bytes calldata data,
         address delegate
+    ) external;
+
+    function lock(
+        bytes32 lockId,
+        uint256 amount,
+        bytes calldata data
+    ) external;
+
+    function unlock(
+        bytes32 lockId,
+        string calldata from,
+        string[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external;
+
+    function prepareUnlock(
+        bytes32 lockId,
+        string calldata from,
+        string[] calldata to,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external;
+
+    function approveUnlock(
+        bytes32 lockId,
+        address delegate,
+        bytes calldata data
     ) external;
 
     struct StateEncoded {

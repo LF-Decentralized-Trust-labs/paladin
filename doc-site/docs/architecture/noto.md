@@ -25,8 +25,8 @@ Creates a new Noto token, with a new address on the base ledger.
     "inputs": [
         {"name": "notary", "type": "string"},
         {"name": "implementation", "type": "string"},
-        {"name": "restrictMinting", "type": "boolean"},
-        {"name": "allowBurning", "type": "boolean"},
+        {"name": "restrictMint", "type": "boolean"},
+        {"name": "allowBurn", "type": "boolean"},
         {"name": "hooks", "type": "tuple", "components": [
             {"name": "privateGroup", "type": "tuple", "components": [
                 {"name": "salt", "type": "bytes32"},
@@ -43,8 +43,8 @@ Inputs:
 
 * **notary** - lookup string for the identity that will serve as the notary for this token instance. May be located at this node or another node
 * **implementation** - (optional) the name of a non-default Noto implementation that has previously been registered
-* **restrictMinting** - (optional - default true) only allow the notary to request mint
-* **allowBurning** - (optional - default true) allow token owners to request burn
+* **restrictMint** - (optional - default true) only allow the notary to request mint
+* **allowBurn** - (optional - default true) allow token owners to request burn
 * **hooks** - (optional) specify a [Pente](../pente) private smart contract that will be called for each Noto transaction, to provide custom logic and policies
 
 ### mint

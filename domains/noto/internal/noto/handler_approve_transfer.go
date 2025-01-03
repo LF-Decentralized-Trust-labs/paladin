@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
@@ -60,22 +59,10 @@ func (h *approveHandler) Init(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *approveHandler) transferHash(ctx context.Context, tx *types.ParsedTransaction, params *types.ApproveParams) (ethtypes.HexBytes0xPrefix, error) {
-	inputs := make([]any, len(params.Inputs))
-	for i, state := range params.Inputs {
-		inputs[i] = state.ID
-	}
-	outputs := make([]any, len(params.Outputs))
-	for i, state := range params.Outputs {
-		outputs[i] = state.ID
-	}
-	return h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inputs, outputs, params.Data)
-}
-
 func (h *approveHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
 	params := tx.Params.(*types.ApproveParams)
 	notary := tx.DomainConfig.NotaryLookup
-	transferHash, err := h.transferHash(ctx, tx, params)
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -123,22 +110,25 @@ func (h *approveHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.
 
 func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.ApproveParams)
-	coins, err := h.noto.gatherCoins(ctx, h.decodeStates(params.Inputs), h.decodeStates(params.Outputs))
+	coins, _, err := h.noto.gatherCoins(ctx, h.decodeStates(params.Inputs), h.decodeStates(params.Outputs))
 	if err != nil {
-		return nil, err
-	}
-	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
-		return nil, err
-	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
 		return nil, err
 	}
 
-	transferHash, err := h.transferHash(ctx, tx, params)
+	// Validate the amounts, and sender's ownership of the inputs
+	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+		return nil, err
+	}
+
+	// Notary checks the signature from the sender, then submits the transaction
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, params.Inputs, params.Outputs, params.Data)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateApprovalSignature(ctx, req, transferHash); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req, transferHash); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
@@ -146,9 +136,9 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	}, nil
 }
 
-func (h *approveHandler) baseLedgerApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.ApproveParams)
-	transferHash, err := h.transferHash(ctx, tx, inParams)
+	transferHash, err := h.noto.encodeTransferMasked(ctx, tx.ContractAddress, inParams.Inputs, inParams.Outputs, inParams.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +168,7 @@ func (h *approveHandler) baseLedgerApprove(ctx context.Context, tx *types.Parsed
 	}, nil
 }
 
-func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *approveHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.ApproveParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -194,36 +184,24 @@ func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransa
 		Sender:   fromAddress,
 		From:     fromAddress,
 		Delegate: inParams.Delegate,
+		Data:     inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}
 
-	transactionType := prototk.PreparedTransaction_PUBLIC
-	functionABI := solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onApproveTransfer"]
-	var paramsJSON []byte
-
-	if tx.DomainConfig.PrivateAddress != nil {
-		transactionType = prototk.PreparedTransaction_PRIVATE
-		functionABI = penteInvokeABI("onApproveTransfer", functionABI.Inputs)
-		penteParams := &PenteInvokeParams{
-			Group:  tx.DomainConfig.PrivateGroup,
-			To:     tx.DomainConfig.PrivateAddress,
-			Inputs: params,
-		}
-		paramsJSON, err = json.Marshal(penteParams)
-	} else {
-		// Note: public hooks aren't really useful except in testing, as they disclose everything
-		// TODO: remove this?
-		paramsJSON, err = json.Marshal(params)
-	}
+	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
+		tx.DomainConfig,
+		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onApproveTransfer"],
+		params,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TransactionWrapper{
-		transactionType: transactionType,
+		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
 		contractAddress: &tx.DomainConfig.NotaryAddress,
@@ -231,12 +209,12 @@ func (h *approveHandler) hookApprove(ctx context.Context, tx *types.ParsedTransa
 }
 
 func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerApprove(ctx, tx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookApprove(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

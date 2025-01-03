@@ -78,3 +78,23 @@ func (n *NotoHelper) ApproveTransfer(ctx context.Context, params *types.ApproveP
 	fn := types.NotoABI.Functions()["approveTransfer"]
 	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
 }
+
+func (n *NotoHelper) Lock(ctx context.Context, params *types.LockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["lock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) Unlock(ctx context.Context, params *types.UnlockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["unlock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) PrepareUnlock(ctx context.Context, params *types.UnlockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["prepareUnlock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}
+
+func (n *NotoHelper) ApproveUnlock(ctx context.Context, params *types.ApproveUnlockParams) *DomainTransactionHelper {
+	fn := types.NotoABI.Functions()["approveUnlock"]
+	return NewDomainTransactionHelper(ctx, n.t, n.rpc, n.Address, fn, toJSON(n.t, params))
+}

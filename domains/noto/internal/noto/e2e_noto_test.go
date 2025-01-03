@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 
@@ -30,17 +31,16 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
+	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-//go:embed abis/NotoSelfSubmit.json
-var notoSelfSubmitJSON []byte
 
 var (
 	notaryName     = "notary@node1"
@@ -95,12 +95,14 @@ func newNotoDomain(t *testing.T, config *types.DomainConfig) (*Noto, *testbed.Te
 	}
 }
 
-func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend) {
+func newTestbed(t *testing.T, hdWalletSeed *testbed.UTInitFunction, domains map[string]*testbed.TestbedDomain) (context.CancelFunc, testbed.Testbed, rpcbackend.Backend, pldclient.PaladinClient) {
 	tb := testbed.NewTestBed()
 	url, _, done, err := tb.StartForTest("../../testbed.config.yaml", domains, hdWalletSeed)
 	assert.NoError(t, err)
-	rpc := rpcbackend.NewRPCClient(resty.New().SetBaseURL(url))
-	return done, tb, rpc
+	rc := resty.New().SetBaseURL(url)
+	rpc := rpcbackend.NewRPCClient(rc)
+	client := pldclient.Wrap(rpcclient.WrapRestyClient(rc))
+	return done, tb, rpc, client
 }
 
 func findAvailableCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backend, noto *Noto, address tktypes.EthAddress, jq *query.QueryJSON) []*types.NotoCoinState {
@@ -112,6 +114,23 @@ func findAvailableCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backen
 		noto.name,
 		address,
 		noto.coinSchema.Id,
+		jq,
+		"available")
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+	return notoCoins
+}
+
+func findLockedCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backend, noto *Noto, address tktypes.EthAddress, jq *query.QueryJSON) []*types.NotoCoinState {
+	if jq == nil {
+		jq = query.NewQueryBuilder().Limit(100).Query()
+	}
+	var notoCoins []*types.NotoCoinState
+	rpcerr := rpc.CallRPC(ctx, &notoCoins, "pstate_queryContractStates",
+		noto.name,
+		address,
+		noto.lockedCoinSchema.Id,
 		jq,
 		"available")
 	if rpcerr != nil {
@@ -140,7 +159,7 @@ func TestNoto(t *testing.T) {
 	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
 		FactoryAddress: contracts["factory"],
 	})
-	done, tb, rpc := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
+	done, tb, rpc, _ := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,
 	})
 	defer done()
@@ -219,7 +238,7 @@ func TestNoto(t *testing.T) {
 		ABI: types.NotoABI,
 	}, true)
 	require.NotNil(t, rpcerr)
-	assert.ErrorContains(t, rpcerr.Error(), "PD200005")
+	assert.ErrorContains(t, rpcerr.Error(), "assemble result was REVERT")
 
 	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
 	require.Len(t, coins, 1)
@@ -322,7 +341,7 @@ func TestNotoApprove(t *testing.T) {
 	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
 		FactoryAddress: contracts["factory"],
 	})
-	done, tb, rpc := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
+	done, tb, rpc, _ := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,
 	})
 	defer done()
@@ -414,9 +433,9 @@ func TestNotoApprove(t *testing.T) {
 	log.L(ctx).Infof("Claimed with transaction: %s", receipt.TransactionHash)
 }
 
-func TestNotoSelfSubmit(t *testing.T) {
+func TestNotoLock(t *testing.T) {
 	ctx := context.Background()
-	log.L(ctx).Infof("TestNotoSelfSubmit")
+	log.L(ctx).Infof("TestNotoLock")
 	domainName := "noto_" + tktypes.RandHex(8)
 	log.L(ctx).Infof("Domain name = %s", domainName)
 
@@ -425,84 +444,37 @@ func TestNotoSelfSubmit(t *testing.T) {
 	log.L(ctx).Infof("Deploying Noto factory")
 	contractSource := map[string][]byte{
 		"factory": notoFactoryJSON,
-		"noto":    notoSelfSubmitJSON,
 	}
 	contracts := deployContracts(ctx, t, hdWalletSeed, contractSource)
 	for name, address := range contracts {
 		log.L(ctx).Infof("%s deployed to %s", name, address)
 	}
 
-	factoryAddress, err := tktypes.ParseEthAddress(contracts["factory"])
-	require.NoError(t, err)
-
 	noto, notoTestbed := newNotoDomain(t, &types.DomainConfig{
-		FactoryAddress: factoryAddress.String(),
+		FactoryAddress: contracts["factory"],
 	})
-	done, tb, rpc := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
+	done, tb, rpc, client := newTestbed(t, hdWalletSeed, map[string]*testbed.TestbedDomain{
 		domainName: notoTestbed,
 	})
 	defer done()
 
-	notaryKey, err := tb.ResolveKey(ctx, notaryName, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
-	require.NoError(t, err)
 	recipient1Key, err := tb.ResolveKey(ctx, recipient1Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 	recipient2Key, err := tb.ResolveKey(ctx, recipient2Name, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 
-	notoFactory := solutils.MustLoadBuild(notoFactoryJSON)
-	_, err = tb.ExecTransactionSync(ctx, &pldapi.TransactionInput{
-		TransactionBase: pldapi.TransactionBase{
-			Type:     pldapi.TransactionTypePublic.Enum(),
-			Function: "registerImplementation",
-			From:     notaryName,
-			To:       factoryAddress,
-			Data: tktypes.JSONString(map[string]any{
-				"name":           "selfsubmit",
-				"implementation": contracts["noto"],
-			}),
-		},
-		ABI: notoFactory.ABI,
-	})
-	require.NoError(t, err)
-
-	var callResult map[string]any
-	rpcerr := rpc.CallRPC(ctx, &callResult, "ptx_call", &pldapi.TransactionCall{
-		TransactionInput: pldapi.TransactionInput{
-			TransactionBase: pldapi.TransactionBase{
-				Type:     pldapi.TransactionTypePublic.Enum(),
-				To:       factoryAddress,
-				Function: "getImplementation",
-				From:     notaryName,
-				Data: tktypes.JSONString(map[string]any{
-					"name": "selfsubmit",
-				}),
-			},
-			ABI: notoFactory.ABI,
-		},
-		PublicCallOptions: pldapi.PublicCallOptions{
-			Block: "latest",
-		},
-	})
-	if rpcerr != nil {
-		require.NoError(t, rpcerr.Error())
-	}
-	require.NotEmpty(t, callResult["implementation"])
-
 	log.L(ctx).Infof("Deploying an instance of Noto")
 	var notoAddress tktypes.EthAddress
-	rpcerr = rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
+	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, "me", &types.ConstructorParams{
-			Notary:         notaryName,
-			Implementation: "selfsubmit",
-		},
-	)
+			Notary: notaryName,
+		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
 	log.L(ctx).Infof("Noto instance deployed to %s", notoAddress)
 
-	log.L(ctx).Infof("Mint 100 from notary to notary")
+	log.L(ctx).Infof("Mint 100 from notary to recipient1")
 	var invokeResult testbed.TransactionResult
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
@@ -510,7 +482,7 @@ func TestNotoSelfSubmit(t *testing.T) {
 			To:       &notoAddress,
 			Function: "mint",
 			Data: toJSON(t, &types.MintParams{
-				To:     notaryName,
+				To:     recipient1Name,
 				Amount: tktypes.Int64ToInt256(100),
 			}),
 		},
@@ -521,19 +493,19 @@ func TestNotoSelfSubmit(t *testing.T) {
 	}
 
 	coins := findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
-	require.NoError(t, err)
-	assert.Len(t, coins, 1)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(100), coins[0].Data.Amount.Int().Int64())
-	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
+	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
 
-	log.L(ctx).Infof("Transfer 50 from notary to recipient1")
+	log.L(ctx).Infof("Lock 50 from recipient1")
+	lockID := tktypes.RandBytes32()
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
-			From:     notaryName,
+			From:     recipient1Name,
 			To:       &notoAddress,
-			Function: "transfer",
-			Data: toJSON(t, &types.TransferParams{
-				To:     recipient1Name,
+			Function: "lock",
+			Data: toJSON(t, &types.LockParams{
+				LockID: lockID,
 				Amount: tktypes.Int64ToInt256(50),
 			}),
 		},
@@ -543,16 +515,16 @@ func TestNotoSelfSubmit(t *testing.T) {
 		require.NoError(t, rpcerr.Error())
 	}
 
-	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
-	require.NoError(t, err)
-	require.Len(t, coins, 2)
-
+	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
-	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
-	assert.Equal(t, notaryKey.Verifier.Verifier, coins[1].Data.Owner.String())
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
 
-	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2")
+	log.L(ctx).Infof("Transfer 50 from recipient1 to recipient2 (succeeds but does not use locked state)")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     recipient1Name,
@@ -569,12 +541,70 @@ func TestNotoSelfSubmit(t *testing.T) {
 		require.NoError(t, rpcerr.Error())
 	}
 
-	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
-	require.NoError(t, err)
-	require.Len(t, coins, 2)
-
+	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
 	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
-	assert.Equal(t, notaryKey.Verifier.Verifier, coins[0].Data.Owner.String())
+	assert.Equal(t, recipient1Key.Verifier.Verifier, coins[0].Data.Owner.String())
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 1)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[0].Data.Owner.String())
+
+	log.L(ctx).Infof("Prepare unlock that will send all 50 to recipient2")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       &notoAddress,
+			Function: "prepareUnlock",
+			Data: toJSON(t, &types.UnlockParams{
+				LockID:  lockID,
+				From:    recipient1Name,
+				To:      []string{recipient2Name},
+				Amounts: []*tktypes.HexUint256{tktypes.Int64ToInt256(50)},
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	log.L(ctx).Infof("Approve unlock to be executed by recipient2")
+	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
+		TransactionBase: pldapi.TransactionBase{
+			From:     recipient1Name,
+			To:       &notoAddress,
+			Function: "approveUnlock",
+			Data: toJSON(t, &types.ApproveUnlockParams{
+				LockID:   lockID,
+				Delegate: tktypes.MustEthAddress(recipient2Key.Verifier.Verifier),
+			}),
+		},
+		ABI: types.NotoABI,
+	}, true)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
+	log.L(ctx).Infof("Unlock from recipient2")
+	tx := client.ForABI(ctx, noto.contractABI).
+		Public().
+		From(recipient2Name).
+		To(&notoAddress).
+		Function("unlockWithApproval").
+		Inputs(&NotoUnlockWithApprovalParams{
+			LockID: lockID,
+		}).
+		Send().
+		Wait(3 * time.Second)
+	require.NoError(t, tx.Error())
+
+	coins = findLockedCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 0)
+	coins = findAvailableCoins(t, ctx, rpc, noto, notoAddress, nil)
+	require.Len(t, coins, 2)
+	assert.Equal(t, int64(50), coins[0].Data.Amount.Int().Int64())
+	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[0].Data.Owner.String())
 	assert.Equal(t, int64(50), coins[1].Data.Amount.Int().Int64())
 	assert.Equal(t, recipient2Key.Verifier.Verifier, coins[1].Data.Owner.String())
 }

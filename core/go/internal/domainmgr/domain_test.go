@@ -287,7 +287,7 @@ func TestDomainInitStates(t *testing.T) {
 }
 func mockUpsertABIOk(mc *mockComponents) {
 	mc.txManager.On("UpsertABI", mock.Anything, mock.Anything, mock.Anything).Return(func() {}, &pldapi.StoredABI{
-		Hash: tktypes.Bytes32(tktypes.RandBytes(32)),
+		Hash: tktypes.RandBytes32(),
 	}, nil)
 }
 
@@ -496,7 +496,7 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 	})
 	defer done()
 
-	schemaID := tktypes.Bytes32(tktypes.RandBytes(32))
+	schemaID := tktypes.RandBytes32()
 	td.mdc.On("FindAvailableStates", mock.Anything, schemaID, mock.Anything).Return(nil, nil, fmt.Errorf("pop"))
 
 	assert.Nil(t, td.d.initError.Load())
@@ -510,7 +510,7 @@ func TestDomainFindAvailableStatesFail(t *testing.T) {
 
 func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount *ethtypes.HexInteger) *fakeState {
 	state := &fakeState{
-		Salt:   tktypes.Bytes32(tktypes.RandBytes(32)),
+		Salt:   tktypes.RandBytes32(),
 		Owner:  tktypes.EthAddress(tktypes.RandBytes(20)),
 		Amount: amount,
 	}

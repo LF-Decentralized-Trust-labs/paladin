@@ -1013,7 +1013,7 @@ func TestDCUpsertStatesFailSchemaLookup(t *testing.T) {
 
 	_, err := dc.UpsertStates(ss.p.DB(), &components.StateUpsert{
 		ID:       tktypes.RandBytes(32),
-		SchemaID: tktypes.Bytes32(tktypes.RandBytes(32)),
+		SchemaID: tktypes.RandBytes32(),
 	})
 	assert.Regexp(t, "pop", err)
 

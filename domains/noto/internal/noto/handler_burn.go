@@ -50,9 +50,10 @@ func (h *burnHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
-	if !tx.DomainConfig.AllowBurning {
+	if !tx.DomainConfig.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
+
 	return &prototk.InitTransactionResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
@@ -73,17 +74,20 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	params := tx.Params.(*types.BurnParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	_, err := h.noto.findEthAddressVerifier(ctx, "notary", notary, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
 	if err != nil {
 		return nil, err
 	}
 
-	inputCoins, inputStates, total, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
+	inputStates, revert, err := h.noto.prepareInputs(ctx, req.StateQueryContext, fromAddress, params.Amount)
 	if err != nil {
+		if revert {
+			message := err.Error()
+			return &prototk.AssembleTransactionResponse{
+				AssemblyResult: prototk.AssembleTransactionResponse_REVERT,
+				RevertReason:   &message,
+			}, nil
+		}
 		return nil, err
 	}
 	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
@@ -93,17 +97,17 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 	var outputCoins []*types.NotoCoin
 	var outputStates []*prototk.NewState
-	if total.Cmp(params.Amount.Int()) == 1 {
-		remainder := big.NewInt(0).Sub(total, params.Amount.Int())
-		returnedCoins, returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
+	if inputStates.total.Cmp(params.Amount.Int()) == 1 {
+		remainder := big.NewInt(0).Sub(inputStates.total, params.Amount.Int())
+		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
-		outputCoins = append(outputCoins, returnedCoins...)
-		outputStates = append(outputStates, returnedStates...)
+		outputCoins = append(outputCoins, returnedStates.coins...)
+		outputStates = append(outputStates, returnedStates.states...)
 	}
 
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputCoins, outputCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputStates.coins, outputCoins)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +115,7 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 	return &prototk.AssembleTransactionResponse{
 		AssemblyResult: prototk.AssembleTransactionResponse_OK,
 		AssembledTransaction: &prototk.AssembledTransaction{
-			InputStates:  inputStates,
+			InputStates:  inputStates.states,
 			OutputStates: outputStates,
 			InfoStates:   infoStates,
 		},
@@ -140,19 +144,28 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
-	coins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	if !tx.DomainConfig.AllowBurn {
+		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
+	}
+	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate the amounts, and sender's ownership of the inputs
 	if err := h.noto.validateBurnAmounts(ctx, params, coins); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx, req, coins); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	if err := h.noto.validateTransferSignature(ctx, tx, req, coins); err != nil {
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
@@ -160,7 +173,7 @@ func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}, nil
 }
 
-func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
+func (h *burnHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inputs := make([]string, len(req.InputStates))
 	for i, state := range req.InputStates {
 		inputs[i] = state.Id
@@ -181,7 +194,7 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	if err != nil {
 		return nil, err
 	}
-	params := &NotoTransferParams{
+	params := &NotoBurnParams{
 		Inputs:    inputs,
 		Outputs:   outputs,
 		Signature: sender.Payload,
@@ -198,7 +211,7 @@ func (h *burnHandler) baseLedgerBurn(ctx context.Context, req *prototk.PrepareTr
 	}, nil
 }
 
-func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
+func (h *burnHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, baseTransaction *TransactionWrapper) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.BurnParams)
 
 	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", tx.Transaction.From, req.ResolvedVerifiers)
@@ -214,36 +227,24 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 		Sender: fromAddress,
 		From:   fromAddress,
 		Amount: inParams.Amount,
+		Data:   inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
 		},
 	}
 
-	transactionType := prototk.PreparedTransaction_PUBLIC
-	functionABI := solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onBurn"]
-	var paramsJSON []byte
-
-	if tx.DomainConfig.PrivateAddress != nil {
-		transactionType = prototk.PreparedTransaction_PRIVATE
-		functionABI = penteInvokeABI("onBurn", functionABI.Inputs)
-		penteParams := &PenteInvokeParams{
-			Group:  tx.DomainConfig.PrivateGroup,
-			To:     tx.DomainConfig.PrivateAddress,
-			Inputs: params,
-		}
-		paramsJSON, err = json.Marshal(penteParams)
-	} else {
-		// Note: public hooks aren't really useful except in testing, as they disclose everything
-		// TODO: remove this?
-		paramsJSON, err = json.Marshal(params)
-	}
+	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
+		tx.DomainConfig,
+		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onBurn"],
+		params,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TransactionWrapper{
-		transactionType: transactionType,
+		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
 		contractAddress: &tx.DomainConfig.NotaryAddress,
@@ -251,12 +252,12 @@ func (h *burnHandler) hookBurn(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *burnHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*prototk.PrepareTransactionResponse, error) {
-	baseTransaction, err := h.baseLedgerBurn(ctx, req)
+	baseTransaction, err := h.baseLedgerInvoke(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
-		hookTransaction, err := h.hookBurn(ctx, tx, req, baseTransaction)
+		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err
 		}

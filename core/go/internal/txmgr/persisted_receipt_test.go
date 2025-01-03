@@ -430,7 +430,7 @@ func TestDecodeEvent(t *testing.T) {
 	_, err = txm.DecodeEvent(ctx, txm.p.DB(), []tktypes.Bytes32{validTopic0 /* missing 2nd topic*/}, []byte{}, "")
 	assert.Regexp(t, "PD012229.*1 matched signature", err)
 
-	_, err = txm.DecodeEvent(ctx, txm.p.DB(), []tktypes.Bytes32{tktypes.Bytes32(tktypes.RandBytes(32)) /* unknown topic */}, []byte{}, "")
+	_, err = txm.DecodeEvent(ctx, txm.p.DB(), []tktypes.Bytes32{tktypes.RandBytes32() /* unknown topic */}, []byte{}, "")
 	assert.Regexp(t, "PD012229", err)
 
 	_, err = txm.DecodeEvent(ctx, txm.p.DB(), []tktypes.Bytes32{ /* no topics */ }, []byte{}, "")
