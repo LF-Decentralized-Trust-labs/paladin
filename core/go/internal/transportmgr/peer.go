@@ -52,7 +52,6 @@ type peer struct {
 	lastDrainHWM          *uint64
 	persistentMsgsDrained bool
 
-	quiescing     bool
 	senderStarted atomic.Bool
 	senderDone    chan struct{}
 }
@@ -62,6 +61,26 @@ type nameSortedPeers []*peer
 func (p nameSortedPeers) Len() int           { return len(p) }
 func (p nameSortedPeers) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p nameSortedPeers) Less(i, j int) bool { return cmp.Less(p[i].Name, p[j].Name) }
+
+func (tm *transportManager) getPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
+
+	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, tktypes.DefaultNameMaxLen, "node"); err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidTargetNode, nodeName)
+	}
+	if nodeName == tm.localNodeName {
+		return nil, i18n.NewError(ctx, msgs.MsgTransportSendLocalNode, tm.localNodeName)
+	}
+
+	// Hopefully this is an already active connection
+	p := tm.getActivePeer(nodeName)
+	if p != nil && (p.senderStarted.Load() || !sending) {
+		// Already active and obtained via read-lock
+		log.L(ctx).Debugf("connection already active for peer '%s'", nodeName)
+		return p, nil
+	}
+
+	return tm.connectPeer(ctx, nodeName, sending)
+}
 
 // get a list of all active peers
 func (tm *transportManager) listActivePeers() nameSortedPeers {
@@ -82,24 +101,47 @@ func (tm *transportManager) getActivePeer(nodeName string) *peer {
 	return tm.peers[nodeName]
 }
 
-func (tm *transportManager) getPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
+func (tm *transportManager) reapPeer(p *peer) {
+	p.tm.peersLock.Lock()
+	defer p.tm.peersLock.Unlock()
+	delete(p.tm.peers, p.Name)
 
-	if err := tktypes.ValidateSafeCharsStartEndAlphaNum(ctx, nodeName, tktypes.DefaultNameMaxLen, "node"); err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgTransportInvalidTargetNode, nodeName)
-	}
-	if nodeName == tm.localNodeName {
-		return nil, i18n.NewError(ctx, msgs.MsgTransportSendLocalNode, tm.localNodeName)
+	// Close down the peer
+	log.L(p.ctx).Infof("peer %s deactivating", p.Name)
+	p.close()
+
+	if p.senderStarted.Load() {
+		// Holding the lock while activating/deactivating ensures we never dual-activate in the transport
+		if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
+			NodeName: p.Name,
+		}); err != nil {
+			log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.Name, err)
+		}
 	}
 
-	// Hopefully this is an already active connection
-	p := tm.getActivePeer(nodeName)
-	if p != nil && (p.senderStarted.Load() || !sending) {
-		// Already active and obtained via read-lock
-		log.L(ctx).Debugf("connection already active for peer '%s'", nodeName)
-		return p, nil
-	}
+}
 
-	return tm.connectPeer(ctx, nodeName, sending)
+func (tm *transportManager) peerReaper() {
+	defer close(tm.peerReaperDone)
+
+	for {
+		select {
+		case <-tm.bgCtx.Done():
+			log.L(tm.bgCtx).Debugf("peer reaper exiting")
+			return
+		case <-time.After(tm.peerReaperInterval):
+		}
+
+		candidates := tm.listActivePeers()
+		var reaped []*peer
+		for _, p := range candidates {
+			if p.isInactive() {
+				tm.reapPeer(p)
+				reaped = append(reaped, p)
+			}
+		}
+		log.L(tm.bgCtx).Debugf("peer reaper before=%d reaped=%d", len(candidates), len(reaped))
+	}
 }
 
 func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, sending bool) (*peer, error) {
@@ -224,43 +266,6 @@ func (p *peer) updateReceivedStats(msg *prototk.PaladinMsg) {
 	p.Stats.LastReceive = &now
 	p.Stats.ReceivedMsgs++
 	p.Stats.ReceivedBytes += uint64(len(msg.Payload))
-}
-
-func (p *peer) senderCleanup() {
-	p.deactivate()
-
-	// There's a very small window where we might have got delivered a message by a routine
-	// that got us out of the map before we deactivated.
-	// In this edge case, we need to spin off the new peer connection to replace us.
-	for p.quiescing {
-		select {
-		case msg := <-p.sendQueue:
-			log.L(p.ctx).Infof("message delivered in inactivity quiesce window. Re-connecting")
-			_ = p.tm.queueFireAndForget(p.ctx, p.Name, msg)
-		case <-p.persistedMsgsAvailable:
-			log.L(p.ctx).Infof("reliable message delivered in inactivity quiesce window. Re-connecting")
-			_, _ = p.tm.getPeer(p.ctx, p.Name, true)
-		case <-time.After(p.tm.quiesceTimeout):
-			p.quiescing = false
-		}
-	}
-
-	close(p.senderDone)
-}
-
-func (p *peer) deactivate() {
-	// Hold the peers write lock to do this
-	p.tm.peersLock.Lock()
-	defer p.tm.peersLock.Unlock()
-	delete(p.tm.peers, p.Name)
-
-	// Holding the lock while activating/deactivating ensures we never dual-activate in the transport
-	log.L(p.ctx).Infof("peer %s deactivating", p.Name)
-	if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
-		NodeName: p.Name,
-	}); err != nil {
-		log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.Name, err)
-	}
 }
 
 func (p *peer) reliableMessageScan(checkNew bool) error {
@@ -434,12 +439,11 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 }
 
 func (p *peer) sender() {
-	defer p.senderCleanup()
+	defer close(p.senderDone)
 
 	log.L(p.ctx).Infof("peer %s active", p.Name)
 
 	checkNew := false
-	hitInactivityTimeout := false
 	for {
 
 		// We send/resend any reliable messages queued up first
@@ -449,14 +453,6 @@ func (p *peer) sender() {
 		if err != nil {
 			return // context closed
 		}
-
-		// Depending on our persistent message status, check if we're able to quiesce
-		if hitInactivityTimeout && p.persistentMsgsDrained &&
-			(p.Stats.LastReceive == nil || time.Since(p.Stats.LastReceive.Time()) > p.tm.peerInactivityTimeout) {
-			p.quiescing = true
-			return // quiesce handling is in senderDone() deferred function
-		}
-		hitInactivityTimeout = false
 		checkNew = false
 
 		// Our wait timeout needs to be the shortest of:
@@ -467,7 +463,6 @@ func (p *peer) sender() {
 		for processingMsgs {
 			select {
 			case <-resendTimer.C:
-				hitInactivityTimeout = true
 				processingMsgs = false // spin round and check if we have persisted messages to (re)process
 			case <-p.persistedMsgsAvailable:
 				resendTimer.Stop()

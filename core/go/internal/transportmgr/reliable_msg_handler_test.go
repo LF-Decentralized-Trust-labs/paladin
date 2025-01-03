@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReceiveMessageStateWithAckRealDB(t *testing.T) {
+func TestReceiveMessageStateSendAckRealDB(t *testing.T) {
 	ctx, _, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
 		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
@@ -65,6 +65,7 @@ func TestReceiveMessageStateWithAckRealDB(t *testing.T) {
 		return nil, nil
 	}
 
+	// Receive the message that needs the ack
 	rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 		FromNode: "node2",
 		Message:  msg,
@@ -75,4 +76,5 @@ func TestReceiveMessageStateWithAckRealDB(t *testing.T) {
 	ack := <-sentMessages
 	require.JSONEq(t, string(ack.Payload), `{}`)
 	require.Equal(t, msgID.String(), *ack.CorrelationId)
+
 }

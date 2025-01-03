@@ -120,10 +120,32 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		}
 	}
 
-	// Inserting the acks we receive over the wire is a simple activity
+	// We can only store acks for messages that are in our DB (due to foreign key relationship),
+	// so we have to query them first to validate the acks before attempting insert.
 	if len(acksToWrite) > 0 {
-		if err := tm.writeAcks(ctx, dbTX, acksToWrite...); err != nil {
+		ackQuery := make([]uuid.UUID, len(acksToWrite))
+		for i, a := range acksToWrite {
+			ackQuery[i] = a.MessageID
+		}
+		var matchedMsgs []*components.ReliableMessage
+		err := dbTX.WithContext(ctx).Select("id").Find(&matchedMsgs).Error
+		if err != nil {
 			return nil, nil, err
+		}
+		validatedAcks := make([]*components.ReliableMessageAck, 0, len(acksToWrite))
+		for _, a := range acksToWrite {
+			for _, mm := range matchedMsgs {
+				if mm.ID == a.MessageID {
+					log.L(ctx).Infof("Writing ack for message %s", a.MessageID)
+					validatedAcks = append(validatedAcks, a)
+				}
+			}
+		}
+		if len(validatedAcks) > 0 {
+			// Now we're actually ready to insert them
+			if err := tm.writeAcks(ctx, dbTX, acksToWrite...); err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -132,22 +154,27 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		if err == nil {
 			// We've committed the database work ok - send the acks/nacks to the other side
 			for _, a := range acksToSend {
-				cid := a.id.String()
-				msgType := RMHMessageTypeAck
-				if a.Error != nil {
-					msgType = RMHMessageTypeNack
-				}
-				_ = tm.queueFireAndForget(ctx, a.node, &prototk.PaladinMsg{
-					MessageId:     uuid.NewString(),
-					Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-					MessageType:   msgType,
-					CorrelationId: &cid,
-					Payload:       tktypes.JSONString(a),
-				})
+
+				_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error))
 			}
 		}
 	}, make([]flushwriter.Result[*noResult], len(values)), nil
 
+}
+
+func buildAck(msgID uuid.UUID, err error) *prototk.PaladinMsg {
+	cid := msgID.String()
+	msgType := RMHMessageTypeAck
+	if err != nil {
+		msgType = RMHMessageTypeNack
+	}
+	return &prototk.PaladinMsg{
+		MessageId:     uuid.NewString(),
+		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType:   msgType,
+		CorrelationId: &cid,
+		Payload:       tktypes.JSONString(&ackInfo{Error: err}),
+	}
 }
 
 func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *prototk.PaladinMsg) *components.ReliableMessageAck {

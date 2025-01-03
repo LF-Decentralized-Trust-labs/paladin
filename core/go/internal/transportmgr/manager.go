@@ -130,7 +130,7 @@ func (tm *transportManager) Stop() {
 
 	peers := tm.listActivePeers()
 	for _, p := range peers {
-		p.close()
+		tm.reapPeer(p)
 	}
 
 	tm.mux.Lock()
@@ -303,29 +303,6 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg
 
 	return p.notifyPersistedMsgAvailable, nil
 
-}
-
-func (tm *transportManager) peerReaper() {
-	defer close(tm.peerReaperDone)
-
-	for {
-		select {
-		case <-tm.bgCtx.Done():
-			log.L(tm.bgCtx).Debugf("peer reaper exiting")
-			return
-		case <-time.After(tm.peerReaperInterval):
-		}
-
-		candidates := tm.listActivePeers()
-		var reaped []*peer
-		for _, p := range candidates {
-			if p.isInactive() {
-				reaped = append(reaped, p)
-				p.close()
-			}
-		}
-		log.L(tm.bgCtx).Debugf("peer reaper before=%d reaped=%d", len(candidates), len(reaped))
-	}
 }
 
 func (tm *transportManager) writeAcks(ctx context.Context, dbTX *gorm.DB, acks ...*components.ReliableMessageAck) error {

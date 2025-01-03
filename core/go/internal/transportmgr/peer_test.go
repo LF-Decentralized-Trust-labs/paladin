@@ -204,10 +204,12 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	// Deliver the two acks
 	p := tm.peers["node2"]
 	for _, msgID := range msgIDs {
-		err := tm.writeAcks(ctx, tm.persistence.DB(), &components.ReliableMessageAck{
-			MessageID: msgID,
+		rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+			FromNode: "node2",
+			Message:  buildAck(msgID, nil),
 		})
 		require.NoError(t, err)
+		assert.NotNil(t, rmr)
 	}
 
 	// Wait for the peer to end via quiesce
@@ -363,89 +365,6 @@ func TestActivateBadPeerInfo(t *testing.T) {
 	p, err := tm.getPeer(ctx, "node2", true)
 	assert.NoError(t, err)
 	assert.Regexp(t, "!{ not valid JSON", p.Outbound["info"])
-
-}
-
-func TestQuiesceDetectPersistentMessage(t *testing.T) {
-
-	ctx, tm, tp, done := newTestTransport(t, false, mockGoodTransport)
-	defer done()
-
-	// Load up a notification for a persistent message
-	tm.reliableMessageResend = 10 * time.Millisecond
-	tm.peerInactivityTimeout = 1 * time.Second
-	tm.quiesceTimeout = 1 * time.Millisecond
-
-	mockActivateDeactivateOk(tp)
-
-	quiescingPeer, err := tm.getPeer(ctx, "node2", true)
-	require.NoError(t, err)
-
-	// Force cancel that peer
-	quiescingPeer.cancelCtx()
-	<-quiescingPeer.senderDone
-
-	// Simulate quiescing with persistent messages delivered
-	quiescingPeer.quiescing = true
-	quiescingPeer.senderDone = make(chan struct{})
-	quiescingPeer.persistedMsgsAvailable = make(chan struct{}, 1)
-	quiescingPeer.persistedMsgsAvailable <- struct{}{}
-
-	// Now in quiesce it will start up a new one
-	quiescingPeer.senderCleanup()
-
-	require.NotNil(t, tm.peers["node2"])
-
-}
-
-func TestQuiesceDetectFireAndForgetMessage(t *testing.T) {
-
-	ctx, tm, tp, done := newTestTransport(t, false,
-		mockGoodTransport,
-		mockEmptyReliableMsgs,
-		mockEmptyReliableMsgs,
-	)
-	defer done()
-
-	// Load up a notification for a persistent message
-	tm.reliableMessageResend = 1 * time.Second
-	tm.peerInactivityTimeout = 1 * time.Second
-	tm.quiesceTimeout = 1 * time.Millisecond
-
-	mockActivateDeactivateOk(tp)
-
-	quiescingPeer, err := tm.getPeer(ctx, "node2", true)
-	require.NoError(t, err)
-
-	// Force cancel that peer
-	quiescingPeer.cancelCtx()
-	<-quiescingPeer.senderDone
-
-	// Simulate quiescing with persistent messages delivered
-	quiescingPeer.quiescing = true
-	quiescingPeer.ctx = ctx
-	quiescingPeer.senderDone = make(chan struct{})
-	quiescingPeer.sendQueue = make(chan *prototk.PaladinMsg, 1)
-	quiescingPeer.sendQueue <- &prototk.PaladinMsg{
-		MessageId:   uuid.NewString(),
-		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
-		MessageType: "example",
-		Payload:     []byte(`{}`),
-	}
-
-	sentMessages := make(chan *prototk.PaladinMsg, 1)
-	tp.Functions.SendMessage = func(ctx context.Context, req *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-		sent := req.Message
-		assert.NotEmpty(t, sent.MessageId)
-		sentMessages <- sent
-		return nil, nil
-	}
-	// Now in quiesce it will start up a new one
-	quiescingPeer.senderCleanup()
-
-	require.NotNil(t, tm.peers["node2"])
-
-	<-sentMessages
 
 }
 

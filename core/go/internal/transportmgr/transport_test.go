@@ -61,6 +61,9 @@ func newTestTransport(t *testing.T, realDB bool, extraSetup ...func(mc *mockComp
 				Config: map[string]any{"some": "conf"},
 			},
 		},
+		ReliableMessageWriter: pldconf.FlushWriterConfig{
+			BatchMaxSize: confutil.P(1),
+		},
 	}
 	ctx, tm, _, done := newTestTransportManager(t, realDB, conf, extraSetup...)
 
