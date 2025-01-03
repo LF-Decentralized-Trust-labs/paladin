@@ -191,11 +191,11 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 	tm.peers[nodeName] = p
 
 	if sending {
-		if err := p.startSender(); err != nil {
+		p.OutboundError = p.startSender()
+		if p.OutboundError != nil {
 			// Note the peer is still in our list, but not connected for send.
 			// This means status can be reported for it.
-			p.OutboundError = err
-			return nil, err
+			return nil, p.OutboundError
 		}
 	}
 

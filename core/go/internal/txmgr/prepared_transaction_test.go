@@ -131,28 +131,30 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	info, infoIDs := writeStates(t, txm, testSchemaID, contractAddressDomain1, 1)
 
 	childFnABI := abi.ABI{{Type: abi.Function, Name: "doThing2"}}
-	ptInsert := &components.PrepareTransactionWithRefs{
-		ID:     *parentTx.Transaction.ID,
-		Domain: parentTx.Transaction.Domain,
-		To:     &contractAddressDomain1,
-		Transaction: &pldapi.TransactionInput{
-			TransactionBase: pldapi.TransactionBase{
-				From:           "me@node1",
-				IdempotencyKey: "child_txn",
-				Type:           pldapi.TransactionTypePrivate.Enum(),
-				Domain:         "domain2",
-				To:             &contractAddressDomain2,
-				Function:       "doThing2",
+	ptInsert := &components.PreparedTransactionWithRefs{
+		PreparedTransactionBase: pldapi.PreparedTransactionBase{
+			ID:       *parentTx.Transaction.ID,
+			Domain:   parentTx.Transaction.Domain,
+			To:       &contractAddressDomain1,
+			Metadata: tktypes.RawJSON(`{"some":"data"}`),
+			Transaction: pldapi.TransactionInput{
+				TransactionBase: pldapi.TransactionBase{
+					From:           "me@node1",
+					IdempotencyKey: "child_txn",
+					Type:           pldapi.TransactionTypePrivate.Enum(),
+					Domain:         "domain2",
+					To:             &contractAddressDomain2,
+					Function:       "doThing2",
+				},
+				ABI: childFnABI,
 			},
-			ABI: childFnABI,
 		},
-		States: components.TransactionStateRefs{
+		StateRefs: components.TransactionStateRefs{
 			Spent:     spentIDs,
 			Read:      readIDs,
 			Confirmed: confirmIDs,
 			Info:      infoIDs,
 		},
-		Metadata: tktypes.RawJSON(`{"some":"data"}`),
 	}
 
 	postCommit, storedABI, err := txm.UpsertABI(ctx, txm.p.DB(), childFnABI)
@@ -160,7 +162,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	postCommit()
 
 	// Write the prepared TX it results in
-	postCommit, err = txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PrepareTransactionWithRefs{ptInsert})
+	postCommit, err = txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PreparedTransactionWithRefs{ptInsert})
 	require.NoError(t, err)
 	postCommit()
 
@@ -168,20 +170,23 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	pt, err := txm.GetPreparedTransactionByID(ctx, txm.p.DB(), *parentTx.Transaction.ID)
 	require.NoError(t, err)
 	require.Equal(t, &pldapi.PreparedTransaction{
-		ID:     *parentTx.Transaction.ID,
-		Domain: "domain1",
-		To:     &contractAddressDomain1,
-		Transaction: pldapi.TransactionInput{
-			TransactionBase: pldapi.TransactionBase{
-				From:           "me@node1",
-				IdempotencyKey: "child_txn",
-				Type:           pldapi.TransactionTypePrivate.Enum(),
-				Domain:         "domain2",
-				To:             &contractAddressDomain2,
-				Function:       "doThing2()",          // now fully qualified
-				ABIReference:   &storedABI.Hash,       // now resolved
-				Data:           tktypes.RawJSON(`{}`), // normalized
+		PreparedTransactionBase: pldapi.PreparedTransactionBase{
+			ID:     *parentTx.Transaction.ID,
+			Domain: "domain1",
+			To:     &contractAddressDomain1,
+			Transaction: pldapi.TransactionInput{
+				TransactionBase: pldapi.TransactionBase{
+					From:           "me@node1",
+					IdempotencyKey: "child_txn",
+					Type:           pldapi.TransactionTypePrivate.Enum(),
+					Domain:         "domain2",
+					To:             &contractAddressDomain2,
+					Function:       "doThing2()",          // now fully qualified
+					ABIReference:   &storedABI.Hash,       // now resolved
+					Data:           tktypes.RawJSON(`{}`), // normalized
+				},
 			},
+			Metadata: tktypes.RawJSON(`{"some":"data"}`),
 		},
 		States: pldapi.TransactionStates{
 			Spent:     spent,
@@ -189,7 +194,6 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 			Confirmed: confirm,
 			Info:      info,
 		},
-		Metadata: tktypes.RawJSON(`{"some":"data"}`),
 	}, pt)
 
 }
@@ -199,9 +203,7 @@ func TestWritePreparedTransactionsBadTX(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false)
 	defer done()
 
-	_, err := txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PrepareTransactionWithRefs{{
-		Transaction: &pldapi.TransactionInput{},
-	}})
+	_, err := txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PreparedTransactionWithRefs{{}})
 	assert.Regexp(t, "PD012211", err)
 
 }

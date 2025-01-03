@@ -30,14 +30,9 @@ type TransactionStateRefs struct {
 	Info      []tktypes.HexBytes
 }
 
-type PrepareTransactionWithRefs struct {
-	ID          uuid.UUID                // ID of the original private transaction
-	Domain      string                   // domain of the original private transaction
-	To          *tktypes.EthAddress      // the private smart contract that was invoked
-	States      TransactionStateRefs     // the states associated with the original private transaction
-	Metadata    tktypes.RawJSON          // metadta produced from the prepare of the original private transaction, in addition to the prepared transaction
-	Transaction *pldapi.TransactionInput // the downstream transaction - might be public or private
-	Sender      string                   // the sender of the original private transaction
+type PreparedTransactionWithRefs struct {
+	pldapi.PreparedTransactionBase
+	StateRefs TransactionStateRefs `json:"stateRefs"` // the states associated with the original private transaction
 }
 
 type TransactionPreAssembly struct {

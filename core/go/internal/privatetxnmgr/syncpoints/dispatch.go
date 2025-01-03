@@ -31,7 +31,7 @@ import (
 type dispatchOperation struct {
 	publicDispatches         []*PublicDispatch
 	privateDispatches        []*components.ValidatedTransaction
-	preparedTransactions     []*components.PrepareTransactionWithRefs
+	preparedTransactions     []*components.PreparedTransactionWithRefs
 	preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistributionPersisted
 }
 
@@ -53,7 +53,7 @@ type PublicDispatch struct {
 type DispatchBatch struct {
 	PublicDispatches     []*PublicDispatch
 	PrivateDispatches    []*components.ValidatedTransaction
-	PreparedTransactions []*components.PrepareTransactionWithRefs
+	PreparedTransactions []*components.PreparedTransactionWithRefs
 }
 
 // PersistDispatches persists the dispatches to the database and coordinates with the public transaction manager

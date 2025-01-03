@@ -3,6 +3,8 @@ BEGIN;
 -- These tables are replaced (data is not migrated from initial state distribution specific implementation)
 DROP TABLE state_distribution_acknowledgments;
 DROP TABLE state_distributions;
+DROP TABLE prepared_txn_distribution_acknowledgments;
+DROP TABLE prepared_txn_distributions;
 
 CREATE TABLE reliable_msgs (
     "sequence"           BIGINT   GENERATED ALWAYS AS IDENTITY,
