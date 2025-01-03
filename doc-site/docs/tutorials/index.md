@@ -19,6 +19,12 @@ ensure you're familiar with running Paladin before walking through any of the tu
 
 <div class="grid cards" markdown>
 
+-   :fontawesome-solid-rocket:{ .lg .middle } __[Hello World](hello-world.md)__ 
+
+    ---
+
+    Get started with a simple Hello World example.
+
 -   :fontawesome-solid-stamp:{ .lg .middle } __[Bond Issuance](bond-issuance.md)__ 
 
     ---

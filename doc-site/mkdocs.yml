@@ -116,6 +116,7 @@ nav:
     - User Interface: getting-started/user-interface.md
   - Tutorials:
     - Introduction: tutorials/index.md
+    - Hello World: tutorials/hello-world.md
     - Bond Issuance: tutorials/bond-issuance.md
     - Wholesale CBDC: tutorials/zkp-cbdc.md
   - Reference:
