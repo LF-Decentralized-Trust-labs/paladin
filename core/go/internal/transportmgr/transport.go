@@ -155,6 +155,7 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 	if err != nil {
 		return nil, err
 	}
+	p.updateReceivedStats(msg)
 
 	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {

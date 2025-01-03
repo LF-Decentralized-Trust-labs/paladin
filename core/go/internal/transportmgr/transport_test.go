@@ -312,7 +312,7 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 	assert.Regexp(t, "PD012000", err)
 }
 
-func TestReceiveMessage(t *testing.T) {
+func TestReceiveMessageTransactionEngine(t *testing.T) {
 	receivedMessages := make(chan *prototk.PaladinMsg, 1)
 
 	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
@@ -326,6 +326,34 @@ func TestReceiveMessage(t *testing.T) {
 		MessageId:     uuid.NewString(),
 		CorrelationId: confutil.P(uuid.NewString()),
 		Component:     prototk.PaladinMsg_TRANSACTION_ENGINE,
+		MessageType:   "myMessageType",
+		Payload:       []byte("some data"),
+	}
+
+	rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
+		FromNode: "node2",
+		Message:  msg,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, rmr)
+
+	<-receivedMessages
+}
+
+func TestReceiveMessageIdentityResolver(t *testing.T) {
+	receivedMessages := make(chan *prototk.PaladinMsg, 1)
+
+	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+		mc.identityResolver.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
+			receivedMessages <- args[1].(*prototk.PaladinMsg)
+		})
+	})
+	defer done()
+
+	msg := &prototk.PaladinMsg{
+		MessageId:     uuid.NewString(),
+		CorrelationId: confutil.P(uuid.NewString()),
+		Component:     prototk.PaladinMsg_IDENTITY_RESOLVER,
 		MessageType:   "myMessageType",
 		Payload:       []byte("some data"),
 	}

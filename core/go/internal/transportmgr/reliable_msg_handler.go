@@ -52,34 +52,35 @@ type noResult struct{}
 type ackInfo struct {
 	node  string
 	id    uuid.UUID // sent in CID on wire
-	Error error     `json:"error"`
+	Error error     `json:"error,omitempty"`
 }
 
-// p, err := tm.getPeer(ctx, v.node, false)
-// if err != nil {
-// 	log.L(ctx).Errorf("Discarding message from invalid peer '%s': %s", v.node, err)
-// 	continue
-// }
-// p.updateReceivedStats(v.msg)
+type stateAndAck struct {
+	state *components.StateUpsertOutsideContext
+	ack   *ackInfo
+}
 
 func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *gorm.DB, values []*reliableMsgOp) (func(error), []flushwriter.Result[*noResult], error) {
 
 	var acksToWrite []*components.ReliableMessageAck
 	var acksToSend []*ackInfo
-	var statesToAdd []*components.StateUpsertOutsideContext
+	statesToAdd := make(map[string][]*stateAndAck)
 
+	// The batch can contain different kinds of message that all need persistence activity
 	for _, v := range values {
 
 		switch v.msg.MessageType {
 		case RMHMessageTypeStateDistribution:
-			_, stateToAdd, err := parseStateDistribution(ctx, v.msgID, v.msg.Payload)
+			sd, stateToAdd, err := parseStateDistribution(ctx, v.msgID, v.msg.Payload)
 			if err != nil {
 				acksToSend = append(acksToSend,
 					&ackInfo{node: v.p.Name, id: v.msgID, Error: err}, // reject the message permanently
 				)
 			} else {
-				statesToAdd = append(statesToAdd, stateToAdd)
-				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msgID})
+				statesToAdd[sd.Domain] = append(statesToAdd[sd.Domain], &stateAndAck{
+					state: stateToAdd,
+					ack:   &ackInfo{node: v.p.Name, id: v.msgID},
+				})
 			}
 		case RMHMessageTypeAck, RMHMessageTypeNack:
 			ackNackToWrite := tm.parseReceivedAckNack(ctx, v.msg)
@@ -94,12 +95,39 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		}
 	}
 
+	// Inserting the states is a performance critical activity that we ensure we batch as efficiently as possible,
+	// while protecting ourselves from inserting states that we haven't done the local validation of.
+	for domain, states := range statesToAdd {
+		batchStates := make([]*components.StateUpsertOutsideContext, len(states))
+		for i, s := range states {
+			batchStates[i] = s.state
+		}
+		_, batchErr := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, batchStates)
+		if batchErr != nil {
+			// We have to try each individually (note if the error was transient in the DB we will rollback
+			// the whole transaction and won't send any acks at all - which is good as sender will retry in that case)
+			log.L(ctx).Errorf("batch insert of %d states for domain %s failed - attempting each individually: %s", len(states), domain, batchErr)
+			for _, s := range states {
+				_, err := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{s.state})
+				if err != nil {
+					log.L(ctx).Errorf("insert state %s from message %s for domain %s failed - attempting each individually: %s", s.state.ID, s.ack.id, domain, batchErr)
+					s.ack.Error = err
+				}
+			}
+		}
+		for _, s := range states {
+			acksToSend = append(acksToSend, s.ack)
+		}
+	}
+
+	// Inserting the acks we receive over the wire is a simple activity
 	if len(acksToWrite) > 0 {
 		if err := tm.writeAcks(ctx, dbTX, acksToWrite...); err != nil {
 			return nil, nil, err
 		}
 	}
 
+	// We use a post-commit handler to send back any acks to the other side that are required
 	return func(err error) {
 		if err == nil {
 			// We've committed the database work ok - send the acks/nacks to the other side

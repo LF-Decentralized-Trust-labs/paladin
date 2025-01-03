@@ -91,8 +91,6 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		reliableMessagePageSize: 100,             // not currently tunable
 	}
 	tm.bgCtx, tm.cancelCtx = context.WithCancel(bgCtx)
-	tm.reliableMsgWriter = flushwriter.NewWriter(bgCtx, tm.handleReliableMsgBatch, tm.persistence,
-		&conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
 	return tm
 }
 
@@ -116,11 +114,14 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.privateTxManager = c.PrivateTxManager()
 	tm.identityResolver = c.IdentityResolver()
 	tm.persistence = c.Persistence()
+	tm.reliableMsgWriter = flushwriter.NewWriter(tm.bgCtx, tm.handleReliableMsgBatch, tm.persistence,
+		&tm.conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
 	return nil
 }
 
 func (tm *transportManager) Start() error {
 	tm.peerReaperDone = make(chan struct{})
+	tm.reliableMsgWriter.Start()
 	go tm.peerReaper()
 	return nil
 }
@@ -146,6 +147,8 @@ func (tm *transportManager) Stop() {
 	if tm.peerReaperDone != nil {
 		<-tm.peerReaperDone
 	}
+
+	tm.reliableMsgWriter.Shutdown()
 
 }
 
