@@ -108,13 +108,27 @@ func (h *lockHandler) loadCoins(ctx context.Context, ids []any, stateQueryContex
 		}
 	}
 
+	// TODO: this should probably query all states and not just available ones
 	queryBuilder := query.NewQueryBuilder().In(".id", inputIDs)
 	inputStates, err := h.zeto.findAvailableStates(ctx, false, stateQueryContext, queryBuilder.Query().String())
 	if err != nil {
 		return nil, err
 	}
 	if len(inputStates) != len(inputIDs) {
-		return nil, i18n.NewError(ctx, msgs.MsgErrorParseInputStates)
+		missingStates := make([]*tktypes.HexUint256, 0, len(inputIDs))
+		for _, id := range inputIDs {
+			idInt := id.(*tktypes.HexUint256)
+			found := false
+			for _, state := range inputStates {
+				if state.Id == idInt.String() {
+					found = true
+				}
+			}
+			if !found {
+				missingStates = append(missingStates, idInt)
+			}
+		}
+		return nil, i18n.NewError(ctx, msgs.MsgStatesNotFound, missingStates)
 	}
 
 	inputCoins := make([]*types.ZetoCoin, len(inputStates))
