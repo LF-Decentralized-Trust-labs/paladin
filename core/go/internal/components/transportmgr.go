@@ -84,9 +84,6 @@ type TransportManagerToTransport interface {
 
 // TransportClient is the interface for a component that can receive messages from the transport manager
 type TransportClient interface {
-	// Destination returns a string that should be matched with the Destination field of incomming messages to be routed to this client
-	Destination() prototk.PaladinMsg_Component
-
 	// This function is used by the transport manager to deliver messages to the engine.
 	//
 	// The implementation of this function:

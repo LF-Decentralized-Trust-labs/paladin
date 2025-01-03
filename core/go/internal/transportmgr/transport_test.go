@@ -52,16 +52,17 @@ func newTestPlugin(transportFuncs *plugintk.TransportAPIFunctions) *testPlugin {
 	}
 }
 
-func newTestTransport(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *testPlugin, func()) {
+func newTestTransport(t *testing.T, realDB bool, extraSetup ...func(mc *mockComponents, conf *pldconf.TransportManagerConfig)) (context.Context, *transportManager, *testPlugin, func()) {
 
-	ctx, tm, _, done := newTestTransportManager(t, realDB, &pldconf.TransportManagerConfig{
+	conf := &pldconf.TransportManagerConfig{
 		NodeName: "node1",
 		Transports: map[string]*pldconf.TransportConfig{
 			"test1": {
 				Config: map[string]any{"some": "conf"},
 			},
 		},
-	}, extraSetup...)
+	}
+	ctx, tm, _, done := newTestTransportManager(t, realDB, conf, extraSetup...)
 
 	tp := newTestPlugin(nil)
 	tp.Functions = &plugintk.TransportAPIFunctions{
@@ -119,7 +120,7 @@ func testMessage() *components.FireAndForgetMessageSend {
 	}
 }
 
-func mockEmptyReliableMsgs(mc *mockComponents) {
+func mockEmptyReliableMsgs(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 	mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnRows(sqlmock.NewRows([]string{}))
 	mc.db.Mock.MatchExpectationsInOrder(false)
 }
@@ -133,7 +134,7 @@ func mockActivateDeactivateOk(tp *testPlugin) {
 	}
 }
 
-func mockGoodTransport(mc *mockComponents) {
+func mockGoodTransport(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 	mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 		{
 			Node:      "node2",
@@ -171,7 +172,7 @@ func TestSendMessage(t *testing.T) {
 func TestSendMessageNotInit(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node1",
@@ -195,7 +196,7 @@ func TestSendMessageNotInit(t *testing.T) {
 func TestSendMessageFail(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockEmptyReliableMsgs,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node1",
@@ -222,7 +223,7 @@ func TestSendMessageFail(t *testing.T) {
 }
 
 func TestSendMessageDestNotFound(t *testing.T) {
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return(nil, fmt.Errorf("not found"))
 	})
 	defer done()
@@ -235,7 +236,7 @@ func TestSendMessageDestNotFound(t *testing.T) {
 }
 
 func TestSendMessageDestNotAvailable(t *testing.T) {
-	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, tm, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node1",
@@ -264,7 +265,7 @@ func TestSendMessageDestNotAvailable(t *testing.T) {
 }
 
 func TestGetTransportDetailsOk(t *testing.T) {
-	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 			{
 				Node:      "node1",
@@ -314,7 +315,7 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 func TestReceiveMessage(t *testing.T) {
 	receivedMessages := make(chan *prototk.PaladinMsg, 1)
 
-	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.privateTxManager.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 			receivedMessages <- args[1].(*prototk.PaladinMsg)
 		})
@@ -458,7 +459,7 @@ func TestSendContextClosed(t *testing.T) {
 func TestSendReliableOk(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
 		},
 	)
@@ -478,7 +479,7 @@ func TestSendReliableOk(t *testing.T) {
 func TestSendReliableFail(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
 		},
 	)

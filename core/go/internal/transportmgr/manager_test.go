@@ -72,14 +72,14 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	return mc
 }
 
-func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents)) (context.Context, *transportManager, *mockComponents, func()) {
+func newTestTransportManager(t *testing.T, realDB bool, conf *pldconf.TransportManagerConfig, extraSetup ...func(mc *mockComponents, conf *pldconf.TransportManagerConfig)) (context.Context, *transportManager, *mockComponents, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	oldLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.TraceLevel)
 
 	mc := newMockComponents(t, realDB)
 	for _, fn := range extraSetup {
-		fn(mc)
+		fn(mc, conf)
 	}
 
 	tm := NewTransportManager(ctx, conf)

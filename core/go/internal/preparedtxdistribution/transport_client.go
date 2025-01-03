@@ -26,12 +26,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const PREPARED_TRANSACTION_DISTRIBUTER_DESTINATION = "prepared-transaction-distributer"
-
-func (sd *preparedTransactionDistributer) Destination() string {
-	return PREPARED_TRANSACTION_DISTRIBUTER_DESTINATION
-}
-
 func (sd *preparedTransactionDistributer) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
 	log.L(ctx).Debugf("preparedTransactionDistributer:HandlePaladinMsg")
 	messagePayload := message.Payload

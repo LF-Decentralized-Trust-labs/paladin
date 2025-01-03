@@ -40,8 +40,9 @@ import (
 )
 
 type transportManager struct {
-	bgCtx context.Context
-	mux   sync.Mutex
+	bgCtx     context.Context
+	cancelCtx context.CancelFunc
+	mux       sync.Mutex
 
 	rpcModule        *rpcserver.RPCModule
 	conf             *pldconf.TransportManagerConfig
@@ -56,8 +57,9 @@ type transportManager struct {
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	peersLock sync.RWMutex
-	peers     map[string]*peer
+	peersLock      sync.RWMutex
+	peers          map[string]*peer
+	peerReaperDone chan struct{}
 
 	reliableMsgWriter flushwriter.Writer[*reliableMsgOp, *noResult]
 
@@ -65,6 +67,7 @@ type transportManager struct {
 	reliableScanRetry     *retry.Retry
 	peerInactivityTimeout time.Duration
 	quiesceTimeout        time.Duration
+	peerReaperInterval    time.Duration
 
 	senderBufferLen         int
 	reliableMessageResend   time.Duration
@@ -73,7 +76,6 @@ type transportManager struct {
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
 	tm := &transportManager{
-		bgCtx:                   bgCtx,
 		conf:                    conf,
 		localNodeName:           conf.NodeName,
 		transportsByID:          make(map[uuid.UUID]*transport),
@@ -84,9 +86,11 @@ func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerCo
 		sendShortRetry:          retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
 		reliableScanRetry:       retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
 		peerInactivityTimeout:   confutil.DurationMin(conf.PeerInactivityTimeout, 0, *pldconf.TransportManagerDefaults.PeerInactivityTimeout),
+		peerReaperInterval:      confutil.DurationMin(conf.PeerReaperInterval, 100*time.Millisecond, *pldconf.TransportManagerDefaults.PeerReaperInterval),
 		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
 		reliableMessagePageSize: 100,             // not currently tunable
 	}
+	tm.bgCtx, tm.cancelCtx = context.WithCancel(bgCtx)
 	tm.reliableMsgWriter = flushwriter.NewWriter(bgCtx, tm.handleReliableMsgBatch, tm.persistence,
 		&conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
 	return tm
@@ -116,6 +120,8 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 }
 
 func (tm *transportManager) Start() error {
+	tm.peerReaperDone = make(chan struct{})
+	go tm.peerReaper()
 	return nil
 }
 
@@ -134,6 +140,11 @@ func (tm *transportManager) Stop() {
 	tm.mux.Unlock()
 	for _, t := range allTransports {
 		tm.cleanupTransport(t)
+	}
+
+	tm.cancelCtx()
+	if tm.peerReaperDone != nil {
+		<-tm.peerReaperDone
 	}
 
 }
@@ -289,6 +300,29 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg
 
 	return p.notifyPersistedMsgAvailable, nil
 
+}
+
+func (tm *transportManager) peerReaper() {
+	defer close(tm.peerReaperDone)
+
+	for {
+		select {
+		case <-tm.bgCtx.Done():
+			log.L(tm.bgCtx).Debugf("peer reaper exiting")
+			return
+		case <-time.After(tm.peerReaperInterval):
+		}
+
+		candidates := tm.listActivePeers()
+		var reaped []*peer
+		for _, p := range candidates {
+			if p.isInactive() {
+				reaped = append(reaped, p)
+				p.close()
+			}
+		}
+		log.L(tm.bgCtx).Debugf("peer reaper before=%d reaped=%d", len(candidates), len(reaped))
+	}
 }
 
 func (tm *transportManager) writeAcks(ctx context.Context, dbTX *gorm.DB, acks ...*components.ReliableMessageAck) error {

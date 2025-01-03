@@ -23,14 +23,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-// If we had lots of these we would probably want to centralise the assignment of the constants to avoid duplication
-// but currently there is only 2 ( the other being PRIVATE_TX_MANAGER_DESTINATION )
-const IDENTITY_RESOLVER_DESTINATION = "identity-resolver-manager"
-
-func (p *identityResolver) Destination() string {
-	return IDENTITY_RESOLVER_DESTINATION
-}
-
 func (ir *identityResolver) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
 	//TODO this need to become an ultra low latency, non blocking, handover to the event loop thread.
 	// need some thought on how to handle errors, retries, buffering, swapping idle sequencers in and out of memory etc...

@@ -487,6 +487,15 @@ func (p *peer) sender() {
 	}
 }
 
+func (p *peer) isInactive() bool {
+	p.statsLock.Lock()
+	defer p.statsLock.Unlock()
+
+	now := time.Now()
+	return (p.Stats.LastSend == nil || now.Sub(p.Stats.LastSend.Time()) > p.tm.peerInactivityTimeout) &&
+		(p.Stats.LastReceive == nil || now.Sub(p.Stats.LastReceive.Time()) > p.tm.peerInactivityTimeout)
+}
+
 func (p *peer) close() {
 	p.cancelCtx()
 	if p.senderStarted.Load() {

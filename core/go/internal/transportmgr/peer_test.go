@@ -39,13 +39,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func mockGetStateRetryThenOk(mc *mockComponents) {
+func mockGetStateRetryThenOk(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 	mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 		Return(nil, fmt.Errorf("pop")).Once()
-	mockGetStateOk(mc)
+	mockGetStateOk(mc, conf)
 }
 
-func mockGetStateOk(mc *mockComponents) {
+func mockGetStateOk(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 	mGS := mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false)
 	mGS.Run(func(args mock.Arguments) {
 		mGS.Return(&pldapi.State{
@@ -144,6 +144,9 @@ func TestReliableMessageResendRealDB(t *testing.T) {
 func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
+			conf.PeerReaperInterval = confutil.P("50ms")
+		},
 		mockGoodTransport,
 		mockGetStateOk,
 	)
@@ -216,7 +219,7 @@ func TestSendBadReliableMessageMarkedFailRealDB(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, true,
 		mockGoodTransport,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			// missing state
 			mc.stateManager.On("GetState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false).
 				Return(nil, nil).Once()
@@ -301,7 +304,7 @@ func TestConnectionRace(t *testing.T) {
 	connRelease := make(chan struct{})
 
 	ctx, tm, tp, done := newTestTransport(t, false,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mGNT := mc.registryManager.On("GetNodeTransports", mock.Anything, "node2").Return([]*components.RegistryNodeTransportEntry{
 				{
 					Node:      "node2",
@@ -472,7 +475,7 @@ func TestDeactivateFail(t *testing.T) {
 
 func TestGetReliableMessageByIDFail(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.db.Mock.ExpectQuery("SELECT.*reliable_msgs").WillReturnError(fmt.Errorf("pop"))
 	})
 	defer done()
@@ -523,7 +526,7 @@ func TestProcessReliableMsgPageIgnoreBeforeHWM(t *testing.T) {
 
 func TestProcessReliableMsgPageIgnoreUnsupported(t *testing.T) {
 
-	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents) {
+	ctx, tm, _, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.db.Mock.ExpectExec("INSERT.*reliable_msg_acks").WillReturnError(fmt.Errorf("pop"))
 	})
 	defer done()
@@ -549,7 +552,7 @@ func TestProcessReliableMsgPageInsertFail(t *testing.T) {
 
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGetStateOk,
-		func(mc *mockComponents) {
+		func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 			mc.db.Mock.ExpectExec("INSERT.*reliable_msgs").WillReturnResult(driver.ResultNoRows)
 		})
 	defer done()

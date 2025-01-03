@@ -20,6 +20,7 @@ type TransportManagerConfig struct {
 	NodeName              string                      `json:"nodeName"`
 	SendQueueLen          *int                        `json:"sendQueueLen"`
 	PeerInactivityTimeout *string                     `json:"peerInactivityTimeout"`
+	PeerReaperInterval    *string                     `json:"peerReaperInterval"`
 	SendRetry             RetryConfigWithMax          `json:"sendRetry"`
 	ReliableScanRetry     RetryConfig                 `json:"reliableScanRetry"`
 	ReliableMessageResend *string                     `json:"reliableMessageResend"`
@@ -35,6 +36,7 @@ var TransportManagerDefaults = &TransportManagerConfig{
 	SendQueueLen:          confutil.P(10),
 	ReliableMessageResend: confutil.P("30s"),
 	PeerInactivityTimeout: confutil.P("1m"),
+	PeerReaperInterval:    confutil.P("30s"),
 	ReliableScanRetry:     GenericRetryDefaults.RetryConfig,
 	// SendRetry defaults are deliberately short
 	SendRetry: RetryConfigWithMax{
