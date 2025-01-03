@@ -94,6 +94,23 @@ func (tm *transportManager) listActivePeers() nameSortedPeers {
 	return peers
 }
 
+func (tm *transportManager) listActivePeerInfo() []*pldapi.PeerInfo {
+	peers := tm.listActivePeers()
+	peerInfo := make([]*pldapi.PeerInfo, len(peers))
+	for i, p := range peers {
+		peerInfo[i] = &p.PeerInfo
+	}
+	return peerInfo
+}
+
+func (tm *transportManager) getPeerInfo(nodeName string) *pldapi.PeerInfo {
+	peer := tm.getActivePeer(nodeName)
+	if peer == nil {
+		return nil
+	}
+	return &peer.PeerInfo
+}
+
 // efficient read-locked call to get an active peer connection
 func (tm *transportManager) getActivePeer(nodeName string) *peer {
 	tm.peersLock.RLock()

@@ -23,6 +23,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcclient"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
@@ -38,13 +39,13 @@ func TestRPCLocalDetails(t *testing.T) {
 	defer rpcDone()
 
 	var nodeName string
-	err := rpc.CallRPC(ctx, &nodeName, "transport_nodeName")
-	require.NoError(t, err)
+	rpcErr := rpc.CallRPC(ctx, &nodeName, "transport_nodeName")
+	require.NoError(t, rpcErr)
 	assert.Equal(t, "node1", nodeName)
 
 	var localTransports []string
-	err = rpc.CallRPC(ctx, &localTransports, "transport_localTransports")
-	require.NoError(t, err)
+	rpcErr = rpc.CallRPC(ctx, &localTransports, "transport_localTransports")
+	require.NoError(t, rpcErr)
 	assert.Equal(t, []string{tp.t.name}, localTransports)
 
 	tp.Functions.GetLocalDetails = func(ctx context.Context, gldr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
@@ -54,9 +55,26 @@ func TestRPCLocalDetails(t *testing.T) {
 	}
 
 	var localTransportDetails string
-	err = rpc.CallRPC(ctx, &localTransportDetails, "transport_localTransportDetails", localTransports[0])
-	require.NoError(t, err)
+	rpcErr = rpc.CallRPC(ctx, &localTransportDetails, "transport_localTransportDetails", localTransports[0])
+	require.NoError(t, rpcErr)
 	assert.Equal(t, "some details", localTransportDetails)
+
+	_, err := tm.getPeer(ctx, "node2", false)
+	require.NoError(t, err)
+
+	var peers []*pldapi.PeerInfo
+	rpcErr = rpc.CallRPC(ctx, &peers, "transport_peers")
+	require.NoError(t, rpcErr)
+	require.Len(t, peers, 1)
+	require.Equal(t, "node2", peers[0].Name)
+
+	var peer *pldapi.PeerInfo
+	rpcErr = rpc.CallRPC(ctx, &peer, "transport_peerInfo", "node2")
+	require.NoError(t, rpcErr)
+	require.Equal(t, "node2", peer.Name)
+	rpcErr = rpc.CallRPC(ctx, &peer, "transport_peerInfo", "node3")
+	require.NoError(t, rpcErr)
+	require.Nil(t, peer)
 
 }
 
