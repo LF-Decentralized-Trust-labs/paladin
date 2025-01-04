@@ -39,9 +39,8 @@ const (
 )
 
 type reliableMsgOp struct {
-	msgID uuid.UUID
-	p     *peer
-	msg   *prototk.PaladinMsg
+	p   *peer
+	msg *components.ReceivedMessage
 }
 
 func (op *reliableMsgOp) WriteKey() string {
@@ -74,15 +73,15 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 
 		switch v.msg.MessageType {
 		case RMHMessageTypeStateDistribution:
-			sd, stateToAdd, err := parseStateDistribution(ctx, v.msgID, v.msg.Payload)
+			sd, stateToAdd, err := parseStateDistribution(ctx, v.msg.MessageID, v.msg.Payload)
 			if err != nil {
 				acksToSend = append(acksToSend,
-					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+					&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
 				)
 			} else {
 				statesToAdd[sd.Domain] = append(statesToAdd[sd.Domain], &stateAndAck{
 					state: stateToAdd,
-					ack:   &ackInfo{node: v.p.Name, id: v.msgID},
+					ack:   &ackInfo{node: v.p.Name, id: v.msg.MessageID},
 				})
 			}
 		case RMHMessageTypePreparedTransaction:
@@ -90,11 +89,11 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 			err := json.Unmarshal(v.msg.Payload, &pt)
 			if err != nil {
 				acksToSend = append(acksToSend,
-					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+					&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
 				)
 			} else {
 				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
-				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msgID})
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msg.MessageID})
 				preparedTxnToAdd = append(preparedTxnToAdd, &pt)
 			}
 		case RMHMessageTypeReceipt:
@@ -102,11 +101,11 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 			err := json.Unmarshal(v.msg.Payload, &receipt)
 			if err != nil {
 				acksToSend = append(acksToSend,
-					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+					&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
 				)
 			} else {
 				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
-				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msgID})
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msg.MessageID})
 				txReceiptsToFinalize = append(txReceiptsToFinalize, &receipt)
 			}
 		case RMHMessageTypeAck, RMHMessageTypeNack:
@@ -117,7 +116,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		default:
 			err := i18n.NewError(ctx, msgs.MsgTransportUnsupportedReliableMsgType, v.msg.MessageType)
 			acksToSend = append(acksToSend,
-				&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+				&ackInfo{node: v.p.Name, id: v.msg.MessageID, Error: err.Error()}, // reject the message permanently
 			)
 		}
 	}
@@ -222,22 +221,18 @@ func buildAck(msgID uuid.UUID, errString string) *prototk.PaladinMsg {
 	}
 }
 
-func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *prototk.PaladinMsg) *components.ReliableMessageAck {
+func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *components.ReceivedMessage) *components.ReliableMessageAck {
 	var info ackInfo
-	var cid uuid.UUID
 	err := json.Unmarshal(msg.Payload, &info)
-	if msg.CorrelationId == nil {
+	if msg.CorrelationID == nil {
 		err = i18n.NewError(ctx, msgs.MsgTransportAckMissingCorrelationID)
-	}
-	if err == nil {
-		cid, err = uuid.Parse(*msg.CorrelationId)
 	}
 	if err != nil {
 		log.L(ctx).Errorf("Received invalid ack/nack: %s", msg.Payload)
 		return nil
 	}
 	ackNackToWrite := &components.ReliableMessageAck{
-		MessageID: cid,
+		MessageID: *msg.CorrelationID,
 		Time:      tktypes.TimestampNow(),
 	}
 	if msg.MessageType == RMHMessageTypeNack {

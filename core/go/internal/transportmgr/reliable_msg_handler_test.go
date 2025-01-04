@@ -102,6 +102,15 @@ func TestReceiveMessageStateSendAckRealDB(t *testing.T) {
 
 }
 
+func testReceivedReliableMsg(msgType string, payloadObj any) *components.ReceivedMessage {
+	return &components.ReceivedMessage{
+		MessageID:     uuid.New(),
+		CorrelationID: confutil.P(uuid.New()),
+		MessageType:   msgType,
+		Payload:       tktypes.JSONString(payloadObj),
+	}
+}
+
 func TestHandleStateDistroBadState(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false,
 		mockGoodTransport,
@@ -113,13 +122,9 @@ func TestHandleStateDistroBadState(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeStateDistribution,
-		Payload: tktypes.JSONString(&components.StateDistributionWithData{
+	msg := testReceivedReliableMsg(
+		RMHMessageTypeStateDistribution,
+		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
 				ContractAddress: tktypes.RandAddress().String(),
@@ -127,17 +132,16 @@ func TestHandleStateDistroBadState(t *testing.T) {
 				StateID:         tktypes.RandHex(32),
 			},
 			StateData: []byte(`{"some":"data"}`),
-		}),
-	}
+		})
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "bad data")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "bad data")
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	postCommit, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 
@@ -154,13 +158,9 @@ func TestHandleStateDistroBadMsg(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeStateDistribution,
-		Payload: tktypes.JSONString(&components.StateDistributionWithData{
+	msg := testReceivedReliableMsg(
+		RMHMessageTypeStateDistribution,
+		&components.StateDistributionWithData{
 			StateDistribution: components.StateDistribution{
 				Domain:          "domain1",
 				ContractAddress: tktypes.RandAddress().String(),
@@ -168,17 +168,16 @@ func TestHandleStateDistroBadMsg(t *testing.T) {
 				StateID:         tktypes.RandHex(32),
 			},
 			StateData: []byte(`{"some":"data"}`),
-		}),
-	}
+		})
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "PD012016")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "PD012016")
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	postCommit, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 
@@ -195,23 +194,16 @@ func TestHandleStateDistroUnknownMsgType(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   "unknown",
-		Payload:       []byte(`{}`),
-	}
+	msg := testReceivedReliableMsg("unknown", struct{}{})
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "PD012017")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "PD012017")
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	postCommit, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 
@@ -227,21 +219,14 @@ func TestHandleAckFailReadMsg(t *testing.T) {
 	})
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeAck,
-		Payload:       []byte(`{}`),
-	}
+	msg := testReceivedReliableMsg(RMHMessageTypeAck, struct{}{})
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	_, _, err = tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.Regexp(t, "pop", err)
 
@@ -256,44 +241,34 @@ func TestHandleNackFailWriteAck(t *testing.T) {
 	})
 	defer done()
 
-	msg := &prototk.PaladinMsg{
-		MessageId:     uuid.NewString(),
-		CorrelationId: confutil.P(msgID.String()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeNack,
-		Payload:       []byte(`{}`),
-	}
+	msg := testReceivedReliableMsg(RMHMessageTypeNack, struct{}{})
+	msg.CorrelationID = &msgID
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	_, _, err = tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.Regexp(t, "pop", err)
 
 }
 
 func TestHandleBadAckNoCorrelId(t *testing.T) {
-	msgID := uuid.New()
 
 	ctx, tm, _, done := newTestTransport(t, false)
 	defer done()
 
-	msg := &prototk.PaladinMsg{
-		MessageId:   uuid.NewString(),
-		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType: RMHMessageTypeAck,
-		Payload:     []byte(`{}`),
-	}
+	msg := testReceivedReliableMsg(RMHMessageTypeAck, struct{}{})
+	msg.CorrelationID = nil
 
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	postCommit, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 	postCommit(nil)
@@ -308,23 +283,19 @@ func TestHandleReceiptFail(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeReceipt,
-		Payload: tktypes.JSONString(&components.ReceiptInput{
+	msg := testReceivedReliableMsg(
+		RMHMessageTypeReceipt,
+		&components.ReceiptInput{
 			Domain:      "domain1",
 			ReceiptType: components.RT_Success,
-		}),
-	}
+		})
+
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	// Handle the batch - will fail to write the states
 	_, _, err = tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.Regexp(t, "pop", err)
 
@@ -339,23 +310,19 @@ func TestHandlePreparedTxFail(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypePreparedTransaction,
-		Payload: tktypes.JSONString(&components.PreparedTransactionWithRefs{
+	msg := testReceivedReliableMsg(
+		RMHMessageTypePreparedTransaction,
+		&components.PreparedTransactionWithRefs{
 			PreparedTransactionBase: &pldapi.PreparedTransactionBase{
 				ID: uuid.New(),
 			},
-		}),
-	}
+		})
+
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
 	_, _, err = tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.Regexp(t, "pop", err)
 
@@ -368,22 +335,17 @@ func TestHandleReceiptBadData(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypeReceipt,
-		Payload:       []byte(`!{ bad data`),
-	}
+	msg := testReceivedReliableMsg(RMHMessageTypeReceipt, nil)
+	msg.Payload = []byte(`!{ bad data`)
+
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "invalid character")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "invalid character")
 
 	// Handle the batch - will fail to write the states
 	pc, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 
@@ -399,21 +361,16 @@ func TestHandlePreparedTxBadData(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypePreparedTransaction,
-		Payload:       []byte(`!{ bad data`),
-	}
+	msg := testReceivedReliableMsg(RMHMessageTypePreparedTransaction, nil)
+	msg.Payload = []byte(`!{ bad data`)
+
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "invalid character")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "invalid character")
 
 	pc, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 
@@ -436,24 +393,20 @@ func TestHandlePreparedOk(t *testing.T) {
 	)
 	defer done()
 
-	msgID := uuid.New()
-	msg := &prototk.PaladinMsg{
-		MessageId:     msgID.String(),
-		CorrelationId: confutil.P(uuid.NewString()),
-		Component:     prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType:   RMHMessageTypePreparedTransaction,
-		Payload: tktypes.JSONString(&components.PreparedTransactionWithRefs{
+	msg := testReceivedReliableMsg(
+		RMHMessageTypePreparedTransaction,
+		&components.PreparedTransactionWithRefs{
 			PreparedTransactionBase: &pldapi.PreparedTransactionBase{
 				ID: uuid.New(),
 			},
-		}),
-	}
+		})
+
 	p, err := tm.getPeer(ctx, "node2", false)
 	require.NoError(t, err)
 
-	ackNackCheck := setupAckOrNackCheck(t, tp, msgID, "")
+	ackNackCheck := setupAckOrNackCheck(t, tp, msg.MessageID, "")
 	pc, _, err := tm.handleReliableMsgBatch(ctx, tm.persistence.DB(), []*reliableMsgOp{
-		{msgID: msgID, p: p, msg: msg},
+		{p: p, msg: msg},
 	})
 	require.NoError(t, err)
 

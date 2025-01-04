@@ -35,6 +35,14 @@ type FireAndForgetMessageSend struct {
 	Payload       []byte
 }
 
+type ReceivedMessage struct {
+	FromNode      string
+	MessageID     uuid.UUID
+	CorrelationID *uuid.UUID
+	MessageType   string
+	Payload       []byte
+}
+
 type ReliableMessageType string
 
 const (
@@ -112,7 +120,7 @@ type TransportClient interface {
 	// It delivers messages to this function:
 	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
 	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
-	HandlePaladinMsg(context.Context, *prototk.PaladinMsg)
+	HandlePaladinMsg(ctx context.Context, msg *ReceivedMessage)
 }
 
 type TransportManager interface {

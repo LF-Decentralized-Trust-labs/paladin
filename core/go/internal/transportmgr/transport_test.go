@@ -316,11 +316,11 @@ func TestSendInvalidMessageNoPayload(t *testing.T) {
 }
 
 func TestReceiveMessageTransactionEngine(t *testing.T) {
-	receivedMessages := make(chan *prototk.PaladinMsg, 1)
+	receivedMessages := make(chan *components.ReceivedMessage, 1)
 
 	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.privateTxManager.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
-			receivedMessages <- args[1].(*prototk.PaladinMsg)
+			receivedMessages <- args[1].(*components.ReceivedMessage)
 		})
 	})
 	defer done()
@@ -344,11 +344,11 @@ func TestReceiveMessageTransactionEngine(t *testing.T) {
 }
 
 func TestReceiveMessageIdentityResolver(t *testing.T) {
-	receivedMessages := make(chan *prototk.PaladinMsg, 1)
+	receivedMessages := make(chan *components.ReceivedMessage, 1)
 
 	ctx, _, tp, done := newTestTransport(t, false, func(mc *mockComponents, conf *pldconf.TransportManagerConfig) {
 		mc.identityResolver.On("HandlePaladinMsg", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
-			receivedMessages <- args[1].(*prototk.PaladinMsg)
+			receivedMessages <- args[1].(*components.ReceivedMessage)
 		})
 	})
 	defer done()

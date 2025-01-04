@@ -30,6 +30,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/cache"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/proto"
 )
@@ -172,12 +173,10 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 			return
 		}
 
-		err = ir.transportManager.Send(ctx, &components.TransportMessage{
+		err = ir.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
 			MessageType: "ResolveVerifierRequest",
-			MessageID:   requestID,
-			Component:   IDENTITY_RESOLVER_DESTINATION,
+			Component:   prototk.PaladinMsg_IDENTITY_RESOLVER,
 			Node:        remoteNodeId,
-			ReplyTo:     ir.nodeName,
 			Payload:     resolveVerifierRequestBytes,
 		})
 		if err != nil {
@@ -280,10 +279,10 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 		}
 		resolveVerifierResponseBytes, err := proto.Marshal(resolveVerifierResponse)
 		if err == nil {
-			err = ir.transportManager.Send(ctx, &components.TransportMessage{
+			err = ir.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
 				MessageType:   "ResolveVerifierResponse",
 				CorrelationID: requestID,
-				Component:     IDENTITY_RESOLVER_DESTINATION,
+				Component:     prototk.PaladinMsg_IDENTITY_RESOLVER,
 				Node:          replyTo,
 				Payload:       resolveVerifierResponseBytes,
 			})
@@ -308,11 +307,10 @@ func (ir *identityResolver) handleResolveVerifierRequest(ctx context.Context, me
 		}
 		resolveVerifierErrorBytes, err := proto.Marshal(resolveVerifierError)
 		if err == nil {
-			err = ir.transportManager.Send(ctx, &components.TransportMessage{
+			err = ir.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
 				MessageType:   "ResolveVerifierError",
 				CorrelationID: requestID,
-				ReplyTo:       ir.nodeName,
-				Component:     IDENTITY_RESOLVER_DESTINATION,
+				Component:     prototk.PaladinMsg_IDENTITY_RESOLVER,
 				Node:          replyTo,
 				Payload:       resolveVerifierErrorBytes,
 			})

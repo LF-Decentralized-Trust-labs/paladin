@@ -143,12 +143,14 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
+	var correlationID *uuid.UUID
 	if msg.CorrelationId != nil {
-		_, err := uuid.Parse(*msg.CorrelationId)
+		parsedUUID, err := uuid.Parse(*msg.CorrelationId)
 		if err != nil {
 			log.L(ctx).Errorf("Invalid correlationId from transport: %s", protoToJSON(msg))
 			return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 		}
+		correlationID = &parsedUUID
 	}
 
 	p, err := t.tm.getPeer(ctx, req.FromNode, false /* we do not require a connection for sending here */)
@@ -162,29 +164,34 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
 	}
 
-	if err := t.deliverMessage(ctx, p, msgID, msg); err != nil {
+	if err := t.deliverMessage(ctx, p, msg.Component, &components.ReceivedMessage{
+		FromNode:      req.FromNode,
+		MessageID:     msgID,
+		CorrelationID: correlationID,
+		MessageType:   msg.MessageType,
+		Payload:       msg.Payload,
+	}); err != nil {
 		return nil, err
 	}
 
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
-func (t *transport) deliverMessage(ctx context.Context, p *peer, msgID uuid.UUID, msg *prototk.PaladinMsg) error {
+func (t *transport) deliverMessage(ctx context.Context, p *peer, component prototk.PaladinMsg_Component, msg *components.ReceivedMessage) error {
 
-	switch msg.Component {
+	switch component {
 	case prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER:
 		_ = t.tm.reliableMsgWriter.Queue(ctx, &reliableMsgOp{
-			p:     p,
-			msgID: msgID,
-			msg:   msg,
+			p:   p,
+			msg: msg,
 		})
 	case prototk.PaladinMsg_TRANSACTION_ENGINE:
 		t.tm.privateTxManager.HandlePaladinMsg(ctx, msg)
 	case prototk.PaladinMsg_IDENTITY_RESOLVER:
 		t.tm.identityResolver.HandlePaladinMsg(ctx, msg)
 	default:
-		log.L(ctx).Errorf("Component not found for message '%s': %s", msgID, msg.Component)
-		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, msg.Component.String())
+		log.L(ctx).Errorf("Component not found for message '%s': %s", msg.MessageID, component)
+		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, component.String())
 	}
 
 	return nil
