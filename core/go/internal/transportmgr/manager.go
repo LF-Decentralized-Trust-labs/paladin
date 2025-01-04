@@ -50,6 +50,7 @@ type transportManager struct {
 	registryManager  components.RegistryManager
 	stateManager     components.StateManager
 	domainManager    components.DomainManager
+	txManager        components.TXManager
 	privateTxManager components.PrivateTxManager
 	identityResolver components.IdentityResolver
 	persistence      persistence.Persistence
@@ -111,6 +112,7 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	tm.registryManager = c.RegistryManager()
 	tm.stateManager = c.StateManager()
 	tm.domainManager = c.DomainManager()
+	tm.txManager = c.TxManager()
 	tm.privateTxManager = c.PrivateTxManager()
 	tm.identityResolver = c.IdentityResolver()
 	tm.persistence = c.Persistence()

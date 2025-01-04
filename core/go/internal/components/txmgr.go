@@ -100,7 +100,9 @@ type TXManager interface {
 	QueryTransactionReceipts(ctx context.Context, jq *query.QueryJSON) ([]*pldapi.TransactionReceipt, error)
 	GetTransactionReceiptByID(ctx context.Context, id uuid.UUID) (*pldapi.TransactionReceipt, error)
 	GetPreparedTransactionByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*pldapi.PreparedTransaction, error)
+	GetPreparedTransactionWithRefsByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*PreparedTransactionWithRefs, error)
 	QueryPreparedTransactions(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error)
+	QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*PreparedTransactionWithRefs, error)
 	CallTransaction(ctx context.Context, result any, tx *pldapi.TransactionCall) (err error)
 	UpsertABI(ctx context.Context, dbTX *gorm.DB, a abi.ABI) (func(), *pldapi.StoredABI, error)
 

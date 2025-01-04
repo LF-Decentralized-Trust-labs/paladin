@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
@@ -32,7 +31,7 @@ type dispatchOperation struct {
 	publicDispatches         []*PublicDispatch
 	privateDispatches        []*components.ValidatedTransaction
 	preparedTransactions     []*components.PreparedTransactionWithRefs
-	preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistributionPersisted
+	preparedTxnDistributions []*components.PreparedTransactionWithRefs
 }
 
 type DispatchPersisted struct {
@@ -58,11 +57,14 @@ type DispatchBatch struct {
 
 // PersistDispatches persists the dispatches to the database and coordinates with the public transaction manager
 // to submit public transactions.
-func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*preparedtxdistribution.PreparedTxnDistribution) error {
+func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error {
 
-	preparedTxnDistributionsPersisted := make([]*preparedtxdistribution.PreparedTxnDistributionPersisted, 0, len(dispatchBatch.PreparedTransactions))
+	preparedTxnDistributionsPersisted := make([]*components.ReliableMessage, 0, len(dispatchBatch.PreparedTransactions))
 	for _, preparedTxnDistribution := range preparedTxnDistributions {
-		preparedTxnDistributionsPersisted = append(preparedTxnDistributionsPersisted, &preparedtxdistribution.PreparedTxnDistributionPersisted{
+		preparedTxnDistributionsPersisted = append(preparedTxnDistributionsPersisted, &components.ReliableMessage{
+			MessageType:     components.RMTPreparedTransaction.Enum(),
+			Node:            "node2",
+			Metadata:        tktypes.JSONString(sds[i]),
 			ID:              preparedTxnDistribution.ID,
 			PreparedTxnID:   preparedTxnDistribution.PreparedTxnID,
 			IdentityLocator: preparedTxnDistribution.IdentityLocator,

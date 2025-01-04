@@ -132,7 +132,7 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 
 	childFnABI := abi.ABI{{Type: abi.Function, Name: "doThing2"}}
 	ptInsert := &components.PreparedTransactionWithRefs{
-		PreparedTransactionBase: pldapi.PreparedTransactionBase{
+		PreparedTransactionBase: &pldapi.PreparedTransactionBase{
 			ID:       *parentTx.Transaction.ID,
 			Domain:   parentTx.Transaction.Domain,
 			To:       &contractAddressDomain1,
@@ -166,28 +166,30 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 	require.NoError(t, err)
 	postCommit()
 
+	expectedPBT := &pldapi.PreparedTransactionBase{
+		ID:     *parentTx.Transaction.ID,
+		Domain: "domain1",
+		To:     &contractAddressDomain1,
+		Transaction: pldapi.TransactionInput{
+			TransactionBase: pldapi.TransactionBase{
+				From:           "me@node1",
+				IdempotencyKey: "child_txn",
+				Type:           pldapi.TransactionTypePrivate.Enum(),
+				Domain:         "domain2",
+				To:             &contractAddressDomain2,
+				Function:       "doThing2()",          // now fully qualified
+				ABIReference:   &storedABI.Hash,       // now resolved
+				Data:           tktypes.RawJSON(`{}`), // normalized
+			},
+		},
+		Metadata: tktypes.RawJSON(`{"some":"data"}`),
+	}
+
 	// Query it back
 	pt, err := txm.GetPreparedTransactionByID(ctx, txm.p.DB(), *parentTx.Transaction.ID)
 	require.NoError(t, err)
 	require.Equal(t, &pldapi.PreparedTransaction{
-		PreparedTransactionBase: pldapi.PreparedTransactionBase{
-			ID:     *parentTx.Transaction.ID,
-			Domain: "domain1",
-			To:     &contractAddressDomain1,
-			Transaction: pldapi.TransactionInput{
-				TransactionBase: pldapi.TransactionBase{
-					From:           "me@node1",
-					IdempotencyKey: "child_txn",
-					Type:           pldapi.TransactionTypePrivate.Enum(),
-					Domain:         "domain2",
-					To:             &contractAddressDomain2,
-					Function:       "doThing2()",          // now fully qualified
-					ABIReference:   &storedABI.Hash,       // now resolved
-					Data:           tktypes.RawJSON(`{}`), // normalized
-				},
-			},
-			Metadata: tktypes.RawJSON(`{"some":"data"}`),
-		},
+		PreparedTransactionBase: expectedPBT,
 		States: pldapi.TransactionStates{
 			Spent:     spent,
 			Read:      read,
@@ -196,6 +198,27 @@ func TestPreparedTransactionRealDB(t *testing.T) {
 		},
 	}, pt)
 
+	// Query it back
+	ptr, err := txm.GetPreparedTransactionWithRefsByID(ctx, txm.p.DB(), *parentTx.Transaction.ID)
+	require.NoError(t, err)
+	require.Equal(t, &components.PreparedTransactionWithRefs{
+		PreparedTransactionBase: expectedPBT,
+		StateRefs: components.TransactionStateRefs{
+			Spent:     stateIDs(spent),
+			Read:      stateIDs(read),
+			Confirmed: stateIDs(confirm),
+			Info:      stateIDs(info),
+		},
+	}, ptr)
+
+}
+
+func stateIDs(states []*pldapi.StateBase) []tktypes.HexBytes {
+	stateIDs := make([]tktypes.HexBytes, len(states))
+	for i, s := range states {
+		stateIDs[i] = s.ID
+	}
+	return stateIDs
 }
 
 func TestWritePreparedTransactionsBadTX(t *testing.T) {
@@ -203,7 +226,9 @@ func TestWritePreparedTransactionsBadTX(t *testing.T) {
 	ctx, txm, done := newTestTransactionManager(t, false)
 	defer done()
 
-	_, err := txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PreparedTransactionWithRefs{{}})
+	_, err := txm.WritePreparedTransactions(ctx, txm.p.DB(), []*components.PreparedTransactionWithRefs{{
+		PreparedTransactionBase: &pldapi.PreparedTransactionBase{},
+	}})
 	assert.Regexp(t, "PD012211", err)
 
 }
@@ -214,6 +239,16 @@ func TestQueryPreparedTransactionFailNoLimit(t *testing.T) {
 	defer done()
 
 	_, err := txm.QueryPreparedTransactions(ctx, txm.p.DB(), query.NewQueryBuilder().Query())
+	assert.Regexp(t, "PD012200", err)
+
+}
+
+func TestQueryPreparedTransactionWithRefsFailNoLimit(t *testing.T) {
+
+	ctx, txm, done := newTestTransactionManager(t, false)
+	defer done()
+
+	_, err := txm.QueryPreparedTransactionsWithRefs(ctx, txm.p.DB(), query.NewQueryBuilder().Query())
 	assert.Regexp(t, "PD012200", err)
 
 }
@@ -231,5 +266,35 @@ func TestQueryPreparedTransactionFailStates(t *testing.T) {
 
 	_, err := txm.QueryPreparedTransactions(ctx, txm.p.DB(), query.NewQueryBuilder().Limit(1).Query())
 	assert.Regexp(t, "pop", err)
+
+}
+
+func TestQueryPreparedTransactionWithRefsFailStates(t *testing.T) {
+
+	txID := uuid.New()
+	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*prepared_txns").WillReturnRows(
+			sqlmock.NewRows([]string{"id", "transaction"}).
+				AddRow(txID, `{}`))
+		mc.db.ExpectQuery("SELECT.*prepared_txn_states").WillReturnError(fmt.Errorf("pop"))
+	})
+	defer done()
+
+	_, err := txm.QueryPreparedTransactionsWithRefs(ctx, txm.p.DB(), query.NewQueryBuilder().Limit(1).Query())
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestGetPreparedTransactionWithRefsByIDNotFound(t *testing.T) {
+
+	ctx, txm, done := newTestTransactionManager(t, false, func(conf *pldconf.TxManagerConfig, mc *mockComponents) {
+		mc.db.ExpectQuery("SELECT.*prepared_txns").WillReturnRows(
+			sqlmock.NewRows([]string{"id", "transaction"}))
+	})
+	defer done()
+
+	pt, err := txm.GetPreparedTransactionWithRefsByID(ctx, txm.p.DB(), uuid.New())
+	require.NoError(t, err)
+	assert.Nil(t, pt)
 
 }

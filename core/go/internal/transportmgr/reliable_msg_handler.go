@@ -18,7 +18,6 @@ package transportmgr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -32,10 +31,11 @@ import (
 )
 
 const (
-	RMHMessageTypeAck               = "ack"
-	RMHMessageTypeNack              = "nack"
-	RMHMessageTypeStateDistribution = string(components.RMTState)
-	RMHMessageTypeStateReceipt      = string(components.RMTReceipt)
+	RMHMessageTypeAck                 = "ack"
+	RMHMessageTypeNack                = "nack"
+	RMHMessageTypeStateDistribution   = string(components.RMTState)
+	RMHMessageTypeReceipt             = string(components.RMTReceipt)
+	RMHMessageTypePreparedTransaction = string(components.RMTPreparedTransaction)
 )
 
 type reliableMsgOp struct {
@@ -66,6 +66,8 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 	var acksToWrite []*components.ReliableMessageAck
 	var acksToSend []*ackInfo
 	statesToAdd := make(map[string][]*stateAndAck)
+	var preparedTxnToAdd []*components.PreparedTransactionWithRefs
+	var txReceiptsToFinalize []*components.ReceiptInput
 
 	// The batch can contain different kinds of message that all need persistence activity
 	for _, v := range values {
@@ -82,6 +84,30 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 					state: stateToAdd,
 					ack:   &ackInfo{node: v.p.Name, id: v.msgID},
 				})
+			}
+		case RMHMessageTypePreparedTransaction:
+			var pt components.PreparedTransactionWithRefs
+			err := json.Unmarshal(v.msg.Payload, &pt)
+			if err != nil {
+				acksToSend = append(acksToSend,
+					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+				)
+			} else {
+				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msgID})
+				preparedTxnToAdd = append(preparedTxnToAdd, &pt)
+			}
+		case RMHMessageTypeReceipt:
+			var receipt components.ReceiptInput
+			err := json.Unmarshal(v.msg.Payload, &receipt)
+			if err != nil {
+				acksToSend = append(acksToSend,
+					&ackInfo{node: v.p.Name, id: v.msgID, Error: err.Error()}, // reject the message permanently
+				)
+			} else {
+				// Build the ack now, as we'll fail the whole TX and not send any acks if the write fails
+				acksToSend = append(acksToSend, &ackInfo{node: v.p.Name, id: v.msgID})
+				txReceiptsToFinalize = append(txReceiptsToFinalize, &receipt)
 			}
 		case RMHMessageTypeAck, RMHMessageTypeNack:
 			ackNackToWrite := tm.parseReceivedAckNack(ctx, v.msg)
@@ -150,25 +176,42 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 		}
 	}
 
+	// Insert the transaction receipts
+	if len(txReceiptsToFinalize) > 0 {
+		if err := tm.txManager.FinalizeTransactions(ctx, dbTX, txReceiptsToFinalize); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Insert the prepared transactions, capturing any post-commit
+	var writePreparedTxPostCommit func()
+	if len(preparedTxnToAdd) > 0 {
+		var err error
+		if writePreparedTxPostCommit, err = tm.txManager.WritePreparedTransactions(ctx, dbTX, preparedTxnToAdd); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// We use a post-commit handler to send back any acks to the other side that are required
 	return func(err error) {
 		if err == nil {
 			// We've committed the database work ok - send the acks/nacks to the other side
 			for _, a := range acksToSend {
-				_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, errors.New(a.Error)))
+				_ = tm.queueFireAndForget(ctx, a.node, buildAck(a.id, a.Error))
+			}
+			if writePreparedTxPostCommit != nil {
+				writePreparedTxPostCommit()
 			}
 		}
 	}, make([]flushwriter.Result[*noResult], len(values)), nil
 
 }
 
-func buildAck(msgID uuid.UUID, err error) *prototk.PaladinMsg {
+func buildAck(msgID uuid.UUID, errString string) *prototk.PaladinMsg {
 	cid := msgID.String()
 	msgType := RMHMessageTypeAck
-	var errString string
-	if err != nil {
+	if errString != "" {
 		msgType = RMHMessageTypeNack
-		errString = err.Error()
 	}
 	return &prototk.PaladinMsg{
 		MessageId:     uuid.NewString(),
@@ -204,6 +247,34 @@ func (tm *transportManager) parseReceivedAckNack(ctx context.Context, msg *proto
 		ackNackToWrite.Error = info.Error
 	}
 	return ackNackToWrite
+}
+
+func (tm *transportManager) buildStateDistributionMsg(ctx context.Context, dbTX *gorm.DB, rm *components.ReliableMessage) (*prototk.PaladinMsg, error, error) {
+
+	// Validate the message first (not retryable)
+	sd, parsed, parseErr := parseStateDistribution(ctx, rm.ID, rm.Metadata)
+	if parseErr != nil {
+		return nil, parseErr, nil
+	}
+
+	// Get the state - distinguishing between not found, vs. a retryable error
+	state, err := tm.stateManager.GetState(ctx, dbTX, sd.Domain, parsed.ContractAddress, parsed.ID, false, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if state == nil {
+		return nil,
+			i18n.NewError(ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, parsed.ContractAddress, parsed.ID),
+			nil
+	}
+	sd.StateData = state.Data
+
+	return &prototk.PaladinMsg{
+		MessageId:   rm.ID.String(),
+		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
+		MessageType: RMHMessageTypeStateDistribution,
+		Payload:     tktypes.JSONString(sd),
+	}, nil, nil
 }
 
 func parseStateDistribution(ctx context.Context, msgID uuid.UUID, data []byte) (sd *components.StateDistributionWithData, parsed *components.StateUpsertOutsideContext, err error) {

@@ -353,34 +353,6 @@ func (p *peer) reliableMessageScan(checkNew bool) error {
 	return nil
 }
 
-func (p *peer) buildStateDistributionMsg(rm *components.ReliableMessage) (*prototk.PaladinMsg, error, error) {
-
-	// Validate the message first (not retryable)
-	sd, parsed, parseErr := parseStateDistribution(p.ctx, rm.ID, rm.Metadata)
-	if parseErr != nil {
-		return nil, parseErr, nil
-	}
-
-	// Get the state - distinguishing between not found, vs. a retryable error
-	state, err := p.tm.stateManager.GetState(p.ctx, p.tm.persistence.DB(), sd.Domain, parsed.ContractAddress, parsed.ID, false, false)
-	if err != nil {
-		return nil, nil, err
-	}
-	if state == nil {
-		return nil,
-			i18n.NewError(p.ctx, msgs.MsgTransportStateNotAvailableLocally, sd.Domain, parsed.ContractAddress, parsed.ID),
-			nil
-	}
-	sd.StateData = state.Data
-
-	return &prototk.PaladinMsg{
-		MessageId:   rm.ID.String(),
-		Component:   prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER,
-		MessageType: RMHMessageTypeStateDistribution,
-		Payload:     tktypes.JSONString(sd),
-	}, nil, nil
-}
-
 func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err error) {
 
 	type paladinMsgWithSeq struct {
@@ -405,7 +377,7 @@ func (p *peer) processReliableMsgPage(page []*components.ReliableMessage) (err e
 		var errorAck error
 		switch rm.MessageType.V() {
 		case components.RMTState:
-			msg, errorAck, err = p.buildStateDistributionMsg(rm)
+			msg, errorAck, err = p.tm.buildStateDistributionMsg(p.ctx, p.tm.persistence.DB(), rm)
 		case components.RMTReceipt:
 			// TODO: Implement for receipt distribution
 			fallthrough

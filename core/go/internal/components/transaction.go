@@ -31,7 +31,7 @@ type TransactionStateRefs struct {
 }
 
 type PreparedTransactionWithRefs struct {
-	pldapi.PreparedTransactionBase
+	*pldapi.PreparedTransactionBase
 	StateRefs TransactionStateRefs `json:"stateRefs"` // the states associated with the original private transaction
 }
 

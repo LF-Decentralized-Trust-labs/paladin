@@ -17,14 +17,11 @@ package privatetxnmgr
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
-	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 
@@ -47,7 +44,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 
 	stateDistributions := make([]*components.StateDistributionWithData, 0)
 	localStateDistributions := make([]*components.StateDistributionWithData, 0)
-	preparedTxnDistributions := make([]*preparedtxdistribution.PreparedTxnDistribution, 0)
+	preparedTxnDistributions := make([]*components.PreparedTransactionWithRefs, 0)
 
 	for signingAddress, transactionFlows := range dispatchableTransactions {
 		log.L(ctx).Debugf("DispatchTransactions: %d transactions for signingAddress %s", len(transactionFlows), signingAddress)
@@ -90,20 +87,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				log.L(ctx).Infof("Result of transaction %s is a prepared transaction public=%t private=%t", preparedTransaction.ID, hasPublicTransaction, hasPrivateTransaction)
 				preparedTransactionWithRefs := mapPreparedTransaction(preparedTransaction)
 				dispatchBatch.PreparedTransactions = append(dispatchBatch.PreparedTransactions, preparedTransactionWithRefs)
-				preparedTransactionJSON, err := json.Marshal(preparedTransactionWithRefs)
-				if err != nil {
-					log.L(ctx).Errorf("Error marshalling prepared transaction: %s", err)
-					// TODO: this is just an error situation for one transaction - this function is a batch function
-					return err
-				}
-				preparedTxnDistributions = append(preparedTxnDistributions, &preparedtxdistribution.PreparedTxnDistribution{
-					ID:                      uuid.New().String(),
-					PreparedTxnID:           preparedTransactionWithRefs.ID.String(),
-					IdentityLocator:         preparedTransactionWithRefs.Sender,
-					Domain:                  preparedTransactionWithRefs.Domain,
-					ContractAddress:         preparedTransactionWithRefs.To.String(),
-					PreparedTransactionJSON: preparedTransactionJSON,
-				})
+				preparedTxnDistributions = append(preparedTxnDistributions, preparedTransactionWithRefs)
 
 			default:
 				err = i18n.NewError(ctx, msgs.MsgPrivateTxMgrInvalidPrepareOutcome, preparedTransaction.ID, preparedTransaction.Intent, hasPublicTransaction, hasPrivateTransaction)
@@ -179,7 +163,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 
 	// Determine if there are any local nullifiers that need to be built and put into the domain context
 	// before we persist the dispatch batch
-	localNullifiers, err := s.stateDistributer.BuildNullifiers(ctx, localStateDistributions)
+	localNullifiers, err := s.privateTxManager.BuildNullifiers(ctx, localStateDistributions)
 	if err == nil && len(localNullifiers) > 0 {
 		err = dCtx.UpsertNullifiers(localNullifiers...)
 	}
@@ -201,7 +185,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		s.publisher.PublishTransactionPreparedEvent(ctx, preparedTransaction.ID.String())
 	}
 	//now that the DB write has been persisted, we can trigger the in-memory distribution of the prepared transactions and states
-	s.stateDistributer.DistributeStates(ctx, stateDistributions)
+	s.todo.DistributeStates(ctx, stateDistributions)
 
 	s.preparedTransactionDistributer.DistributePreparedTransactions(ctx, preparedTxnDistributions)
 

@@ -24,7 +24,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/kaleido-io/paladin/core/internal/components"
-	"github.com/kaleido-io/paladin/core/internal/preparedtxdistribution"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
 	"gorm.io/gorm"
@@ -46,19 +45,18 @@ import (
 )
 
 type privateTxManager struct {
-	ctx                            context.Context
-	ctxCancel                      func()
-	config                         *pldconf.PrivateTxManagerConfig
-	sequencers                     map[string]*Sequencer
-	sequencersLock                 sync.RWMutex
-	endorsementGatherers           map[string]ptmgrtypes.EndorsementGatherer
-	components                     components.AllComponents
-	nodeName                       string
-	subscribers                    []components.PrivateTxEventSubscriber
-	subscribersLock                sync.Mutex
-	syncPoints                     syncpoints.SyncPoints
-	preparedTransactionDistributer preparedtxdistribution.PreparedTransactionDistributer
-	blockHeight                    int64
+	ctx                  context.Context
+	ctxCancel            func()
+	config               *pldconf.PrivateTxManagerConfig
+	sequencers           map[string]*Sequencer
+	sequencersLock       sync.RWMutex
+	endorsementGatherers map[string]ptmgrtypes.EndorsementGatherer
+	components           components.AllComponents
+	nodeName             string
+	subscribers          []components.PrivateTxEventSubscriber
+	subscribersLock      sync.Mutex
+	syncPoints           syncpoints.SyncPoints
+	blockHeight          int64
 }
 
 // Init implements Engine.
@@ -79,15 +77,7 @@ func (p *privateTxManager) PostInit(c components.AllComponents) error {
 	p.components = c
 	p.nodeName = p.components.TransportManager().LocalNodeName()
 	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager())
-	p.preparedTransactionDistributer = preparedtxdistribution.NewPreparedTransactionDistributer(
-		p.ctx,
-		p.nodeName,
-		p.components.TransportManager(),
-		p.components.TxManager(),
-		p.components.Persistence(),
-		&p.config.PreparedTransactionDistributer)
-
-	return p.preparedTransactionDistributer.Start(p.ctx)
+	return nil
 }
 
 func (p *privateTxManager) Start() error {
@@ -96,8 +86,6 @@ func (p *privateTxManager) Start() error {
 }
 
 func (p *privateTxManager) Stop() {
-	p.stateDistributer.Stop(p.ctx)
-
 }
 
 func NewPrivateTransactionMgr(ctx context.Context, config *pldconf.PrivateTxManagerConfig) components.PrivateTxManager {

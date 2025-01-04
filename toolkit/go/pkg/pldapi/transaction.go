@@ -172,6 +172,6 @@ type PreparedTransactionBase struct {
 }
 
 type PreparedTransaction struct {
-	PreparedTransactionBase
+	*PreparedTransactionBase
 	States TransactionStates `docstruct:"PreparedTransaction" json:"states"`
 }

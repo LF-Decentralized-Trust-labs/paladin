@@ -38,8 +38,9 @@ type FireAndForgetMessageSend struct {
 type ReliableMessageType string
 
 const (
-	RMTState   ReliableMessageType = "state"
-	RMTReceipt ReliableMessageType = "receipt"
+	RMTState               ReliableMessageType = "state"
+	RMTReceipt             ReliableMessageType = "receipt"
+	RMTPreparedTransaction ReliableMessageType = "prepared_txn"
 )
 
 func (t ReliableMessageType) Enum() tktypes.Enum[ReliableMessageType] {

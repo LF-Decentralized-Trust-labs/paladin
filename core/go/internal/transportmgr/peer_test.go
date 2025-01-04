@@ -206,7 +206,7 @@ func TestReliableMessageSendSendQuiesceRealDB(t *testing.T) {
 	for _, msgID := range msgIDs {
 		rmr, err := tp.t.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
 			FromNode: "node2",
-			Message:  buildAck(msgID, nil),
+			Message:  buildAck(msgID, ""),
 		})
 		require.NoError(t, err)
 		assert.NotNil(t, rmr)

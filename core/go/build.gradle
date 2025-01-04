@@ -231,12 +231,6 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
         outputDir 'mocks/ethclientmocks'
     }
     mock {
-        inputDir 'internal/preparedtxdistribution'
-        includeAll true
-        outputPackage 'preparedtxdistributionmocks'
-        outputDir 'mocks/preparedtxdistributionmocks'
-    }
-     mock {
         inputDir 'internal/privatetxnmgr/ptmgrtypes'
         name "TransactionFlow"
         inpackage true

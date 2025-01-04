@@ -160,27 +160,47 @@ func (tm *txManager) WritePreparedTransactions(ctx context.Context, dbTX *gorm.D
 }
 
 func (tm *txManager) QueryPreparedTransactions(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PreparedTransaction, error) {
-	qw := &queryWrapper[preparedTransaction, pldapi.PreparedTransaction]{
+	bpts, err := tm.queryPreparedTransactionsBase(ctx, dbTX, jq)
+	if err != nil {
+		return nil, err
+	}
+	return tm.enrichPreparedTransactionsFull(ctx, dbTX, bpts)
+}
+
+func (tm *txManager) QueryPreparedTransactionsWithRefs(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*components.PreparedTransactionWithRefs, error) {
+	bpts, err := tm.queryPreparedTransactionsBase(ctx, dbTX, jq)
+	if err != nil {
+		return nil, err
+	}
+	return tm.enrichPreparedTransactionsRefs(ctx, dbTX, bpts)
+}
+
+func (tm *txManager) queryPreparedTransactionsBase(ctx context.Context, dbTX *gorm.DB, jq *query.QueryJSON) ([]*pldapi.PreparedTransactionBase, error) {
+	qw := &queryWrapper[preparedTransaction, pldapi.PreparedTransactionBase]{
 		p:           tm.p,
 		table:       "prepared_txns",
 		defaultSort: "-created",
 		filters:     preparedTransactionFilters,
 		query:       jq,
-		mapResult: func(pt *preparedTransaction) (*pldapi.PreparedTransaction, error) {
-			preparedTx := &pldapi.PreparedTransaction{
-				PreparedTransactionBase: pldapi.PreparedTransactionBase{
-					ID:       pt.ID,
-					Domain:   pt.Domain,
-					To:       pt.To,
-					Metadata: pt.Metadata,
-				},
+		mapResult: func(pt *preparedTransaction) (*pldapi.PreparedTransactionBase, error) {
+			preparedTx := &pldapi.PreparedTransactionBase{
+				ID:       pt.ID,
+				Domain:   pt.Domain,
+				To:       pt.To,
+				Metadata: pt.Metadata,
 			}
 			return preparedTx, json.Unmarshal(pt.Transaction, &preparedTx.Transaction)
 		},
 	}
-	preparedTransactions, err := qw.run(ctx, dbTX)
-	if err != nil {
-		return nil, err
+	return qw.run(ctx, dbTX)
+}
+
+func (tm *txManager) enrichPreparedTransactionsFull(ctx context.Context, dbTX *gorm.DB, basePTs []*pldapi.PreparedTransactionBase) ([]*pldapi.PreparedTransaction, error) {
+	preparedTransactions := make([]*pldapi.PreparedTransaction, len(basePTs))
+	for i, bpt := range basePTs {
+		preparedTransactions[i] = &pldapi.PreparedTransaction{
+			PreparedTransactionBase: bpt,
+		}
 	}
 	if len(preparedTransactions) > 0 {
 		transactionIDs := make([]uuid.UUID, len(preparedTransactions))
@@ -220,8 +240,60 @@ func (tm *txManager) QueryPreparedTransactions(ctx context.Context, dbTX *gorm.D
 	return preparedTransactions, nil
 }
 
+func (tm *txManager) enrichPreparedTransactionsRefs(ctx context.Context, dbTX *gorm.DB, basePTs []*pldapi.PreparedTransactionBase) ([]*components.PreparedTransactionWithRefs, error) {
+	preparedTransactions := make([]*components.PreparedTransactionWithRefs, len(basePTs))
+	for i, bpt := range basePTs {
+		preparedTransactions[i] = &components.PreparedTransactionWithRefs{
+			PreparedTransactionBase: bpt,
+		}
+	}
+	if len(preparedTransactions) > 0 {
+		transactionIDs := make([]uuid.UUID, len(preparedTransactions))
+		for i, pt := range preparedTransactions {
+			transactionIDs[i] = pt.ID
+		}
+		var preparedStates []*preparedTransactionState
+		err := dbTX.WithContext(ctx).
+			Where(`"transaction" IN (?)`, transactionIDs).
+			Order(`"transaction"`).
+			Order(`"type"`).
+			Order(`"state_idx"`).
+			Find(&preparedStates).
+			Error
+		if err != nil {
+			return nil, err
+		}
+		for _, ps := range preparedStates {
+			for _, pt := range preparedTransactions {
+				if ps.Transaction == pt.ID {
+					switch ps.Type {
+					case preparedSpend:
+						pt.StateRefs.Spent = append(pt.StateRefs.Spent, ps.StateID)
+					case preparedRead:
+						pt.StateRefs.Read = append(pt.StateRefs.Read, ps.StateID)
+					case preparedConfirm:
+						pt.StateRefs.Confirmed = append(pt.StateRefs.Confirmed, ps.StateID)
+					case preparedInfo:
+						pt.StateRefs.Info = append(pt.StateRefs.Info, ps.StateID)
+					}
+				}
+			}
+		}
+
+	}
+	return preparedTransactions, nil
+}
+
 func (tm *txManager) GetPreparedTransactionByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*pldapi.PreparedTransaction, error) {
 	pts, err := tm.QueryPreparedTransactions(ctx, dbTX, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
+	if len(pts) == 0 || err != nil {
+		return nil, err
+	}
+	return pts[0], nil
+}
+
+func (tm *txManager) GetPreparedTransactionWithRefsByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*components.PreparedTransactionWithRefs, error) {
+	pts, err := tm.QueryPreparedTransactionsWithRefs(ctx, dbTX, query.NewQueryBuilder().Limit(1).Equal("id", id).Query())
 	if len(pts) == 0 || err != nil {
 		return nil, err
 	}
