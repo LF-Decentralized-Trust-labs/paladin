@@ -129,3 +129,33 @@ func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.Get
 	)
 	return
 }
+
+func (br *TransportBridge) ActivateNode(ctx context.Context, req *prototk.ActivateNodeRequest) (res *prototk.ActivateNodeResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivateNode{ActivateNode: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_ActivateNodeRes); ok {
+				res = r.ActivateNodeRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *TransportBridge) DeactivateNode(ctx context.Context, req *prototk.DeactivateNodeRequest) (res *prototk.DeactivateNodeResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivateNode{DeactivateNode: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_DeactivateNodeRes); ok {
+				res = r.DeactivateNodeRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
