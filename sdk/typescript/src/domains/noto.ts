@@ -46,6 +46,8 @@ export const notoConstructorABI = (
                 components: [
                   { name: "restrictMint", type: "bool" },
                   { name: "allowBurn", type: "bool" },
+                  { name: "allowLock", type: "bool" },
+                  { name: "restrictUnlock", type: "bool" },
                 ],
               },
             ]),
@@ -57,10 +59,12 @@ export const notoConstructorABI = (
 export interface NotoConstructorParams {
   notary: PaladinVerifier;
   notaryMode: "basic" | "hooks";
-  options: {
+  options?: {
     basic?: {
       restrictMint: boolean;
       allowBurn: boolean;
+      allowLock: boolean;
+      restrictUnlock: boolean;
     };
     hooks?: {
       publicAddress: string;
@@ -141,7 +145,7 @@ export class NotoFactory {
     const txID = await this.paladin.sendTransaction({
       type: TransactionType.PRIVATE,
       domain: this.domain,
-      abi: [notoConstructorABI(!!data.options.hooks)],
+      abi: [notoConstructorABI(!!data.options?.hooks)],
       function: "",
       from: from.lookup,
       data: {

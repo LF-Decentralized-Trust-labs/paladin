@@ -50,8 +50,21 @@ func (h *lockHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	return &lockParams, nil
 }
 
+func (h *lockHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransaction) error {
+	if tx.DomainConfig.NotaryMode != types.NotaryModeBasic.Enum() {
+		return nil
+	}
+	if *tx.DomainConfig.Options.Basic.AllowLock {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgLockNotAllowed)
+}
+
 func (h *lockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
+	}
 
 	return &prototk.InitTransactionResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
@@ -154,6 +167,10 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 }
 
 func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
+	}
+
 	coins, lockedCoins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err

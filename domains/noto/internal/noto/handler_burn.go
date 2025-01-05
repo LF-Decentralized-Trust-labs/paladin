@@ -54,7 +54,7 @@ func (h *burnHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransact
 	if *tx.DomainConfig.Options.Basic.AllowBurn {
 		return nil
 	}
-	return i18n.NewError(ctx, msgs.MsgNoBurning)
+	return i18n.NewError(ctx, msgs.MsgBurnNotAllowed)
 }
 
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {

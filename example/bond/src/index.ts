@@ -39,12 +39,6 @@ async function main(): Promise<boolean> {
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
     notaryMode: "basic",
-    options: {
-      basic: {
-        restrictMint: true,
-        allowBurn: true,
-      },
-    },
   });
   if (!checkDeploy(notoCash)) return false;
 

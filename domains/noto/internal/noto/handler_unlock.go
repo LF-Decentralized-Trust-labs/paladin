@@ -59,9 +59,32 @@ func (h *unlockHandler) ValidateParams(ctx context.Context, config *types.NotoPa
 	return &unlockParams, nil
 }
 
+func (h *unlockHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransaction, sender, from string) error {
+	if tx.DomainConfig.NotaryMode != types.NotaryModeBasic.Enum() {
+		return nil
+	}
+	if !*tx.DomainConfig.Options.Basic.RestrictUnlock {
+		return nil
+	}
+
+	params := tx.Params.(*types.UnlockParams)
+	localNodeName, _ := h.noto.Callbacks.LocalNodeName(ctx, &prototk.LocalNodeNameRequest{})
+	fromQualified, err := tktypes.PrivateIdentityLocator(params.From).FullyQualified(ctx, localNodeName.Name)
+	if err != nil {
+		return err
+	}
+	if sender == fromQualified.String() {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgUnlockOnlyCreator, sender, from)
+}
+
 func (h *unlockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
 	notary := tx.DomainConfig.NotaryLookup
+	if err := h.checkAllowed(ctx, tx, req.Transaction.From, params.From); err != nil {
+		return nil, err
+	}
 
 	request := make([]*prototk.ResolveVerifierRequest, 0, len(params.To)+3)
 	request = append(request,
@@ -193,28 +216,18 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 
 func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
+	if err := h.checkAllowed(ctx, tx, req.Transaction.From, params.From); err != nil {
+		return nil, err
+	}
+
 	coins, lockedCoins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 
-	senderAddress, err := h.noto.findEthAddressVerifier(ctx, "sender", tx.Transaction.From, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
-	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", params.From, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate the amounts, and sender's ownership of all locked inputs/outputs
+	// Validate the amounts, and lock creator's ownership of all locked inputs/outputs
 	if err := h.noto.validateUnlockAmounts(ctx, coins, lockedCoins); err != nil {
 		return nil, err
-	}
-	if !senderAddress.Equals(fromAddress) {
-		// For now, the sender can only unlock their own locked coins
-		// TODO: make this configurable
-		return nil, i18n.NewError(ctx, msgs.MsgUnlockNotAllowed, params.From)
 	}
 	if err := h.noto.validateLockOwners(ctx, params.From, req, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
 		return nil, err

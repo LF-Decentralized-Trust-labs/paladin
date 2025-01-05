@@ -30,6 +30,8 @@ Creates a new Noto token, with a new address on the base ledger.
             {"name": "basic", "type": "tuple", "components": [
                 {"name": "restrictMint", "type": "boolean"},
                 {"name": "allowBurn", "type": "boolean"},
+                {"name": "allowLock", "type": "boolean"},
+                {"name": "restrictUnlock", "type": "boolean"},
             ]},
             {"name": "hooks", "type": "tuple", "components": [
                 {"name": "privateGroup", "type": "tuple", "components": [
@@ -51,6 +53,8 @@ Inputs:
 * **implementation** - (optional) the name of a non-default Noto implementation that has previously been registered
 * **options.basic.restrictMint** - (optional - default true) only allow the notary to request mint
 * **options.basic.allowBurn** - (optional - default true) allow token owners to request burn
+* **options.basic.allowLock** - (optional - default true) allow token owners to lock tokens (for purposes such as preparing or delegating transfers)
+* **options.basic.restrictUnlock** - (optional - default true) only allow the lock creator to unlock tokens
 * **options.hooks** - (optional) specify a [Pente](../pente) private smart contract that will be called for each Noto transaction, to provide custom logic and policies
 
 ### mint

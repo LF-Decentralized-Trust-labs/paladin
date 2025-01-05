@@ -129,7 +129,9 @@ func TestInitContractOk(t *testing.T) {
 		"options": {
 			"basic": {
 				"restrictMint": false,
-				"allowBurn": false
+				"allowBurn": false,
+				"allowLock": false,
+				"restrictUnlock": false
 			}
 		}
 	}`, res.ContractConfig.ContractConfigJson)
