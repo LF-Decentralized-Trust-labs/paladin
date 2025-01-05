@@ -864,7 +864,7 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 
 	localNodeMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
-			assert.Equal(t, remoteNodeName, args.Get(1).(*components.ReceivedMessage).FromNode)
+			assert.Equal(t, remoteNodeName, args.Get(1).(*components.FireAndForgetMessageSend).Node)
 			send := args.Get(1).(*components.FireAndForgetMessageSend)
 			remoteEngine.HandlePaladinMsg(ctx, inMsgToOut(localNodeName, send))
 		}()

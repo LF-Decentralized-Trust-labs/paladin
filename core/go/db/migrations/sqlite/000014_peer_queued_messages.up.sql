@@ -1,5 +1,3 @@
-BEGIN;
-
 -- These tables are replaced (data is not migrated from initial state distribution specific implementation)
 DROP TABLE state_distribution_acknowledgments;
 DROP TABLE state_distributions;
@@ -12,8 +10,7 @@ CREATE TABLE reliable_msgs (
     "created"            BIGINT  NOT NULL,
     "node"               TEXT    NOT NULL,
     "msg_type"           TEXT    NOT NULL,
-    "metadata"           TEXT    ,
-    PRIMARY KEY ("id")
+    "metadata"           TEXT
 );
 
 CREATE INDEX reliable_msgs_id ON reliable_msgs ("id");

@@ -12,8 +12,7 @@ CREATE TABLE reliable_msgs (
     "created"            BIGINT   NOT NULL,
     "node"               TEXT     NOT NULL,
     "msg_type"           TEXT     NOT NULL,
-    "metadata"           TEXT     ,
-    PRIMARY KEY ("id")
+    "metadata"           TEXT
 );
 
 CREATE INDEX reliable_msgs_id ON reliable_msgs ("id");
@@ -28,4 +27,4 @@ CREATE TABLE reliable_msg_acks (
     FOREIGN KEY ("id") REFERENCES reliable_msgs ("id") ON DELETE CASCADE
 );
 
-
+COMMIT;
