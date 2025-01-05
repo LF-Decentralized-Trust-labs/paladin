@@ -85,6 +85,8 @@ public class DomainIntegrationTests {
             @JsonProperty
             String notary,
             @JsonProperty
+            String notaryMode,
+            @JsonProperty
             NotoHookParamsJSON hooks
     ) {
     }
@@ -262,6 +264,7 @@ public class DomainIntegrationTests {
                     "noto", "notary",
                     new NotoConstructorParamsJSON(
                             "notary@node1",
+                            "hooks",
                             new NotoHookParamsJSON(
                                     penteInstanceAddress,
                                     notoTrackerAddress,

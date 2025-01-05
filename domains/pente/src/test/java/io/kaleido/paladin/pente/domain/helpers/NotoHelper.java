@@ -39,6 +39,8 @@ public class NotoHelper {
             @JsonProperty
             String notary,
             @JsonProperty
+            String notaryMode,
+            @JsonProperty
             HookParams hooks,
             @JsonProperty
             boolean restrictMint

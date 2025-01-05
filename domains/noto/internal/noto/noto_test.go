@@ -123,8 +123,8 @@ func TestInitContractOk(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{
 		"notaryLookup": "notary@node1",
+		"notaryMode": "basic",
 		"isNotary": true,
-		"notaryType": "0x0",
 		"variant": "0x0",
 		"options": {
 			"basic": {

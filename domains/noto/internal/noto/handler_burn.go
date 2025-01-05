@@ -50,7 +50,7 @@ func (h *burnHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
 
-	if tx.DomainConfig.NotaryType == types.NotaryTypeSigner && !tx.DomainConfig.Options.Basic.AllowBurn {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && !tx.DomainConfig.Options.Basic.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
 
@@ -144,7 +144,7 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
-	if tx.DomainConfig.NotaryType == types.NotaryTypeSigner && !tx.DomainConfig.Options.Basic.AllowBurn {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && !tx.DomainConfig.Options.Basic.AllowBurn {
 		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
 	}
 	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
@@ -256,7 +256,7 @@ func (h *burnHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
 		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err

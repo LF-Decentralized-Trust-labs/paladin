@@ -53,7 +53,7 @@ func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 	params := tx.Params.(*types.MintParams)
 	notary := tx.DomainConfig.NotaryLookup
 
-	if tx.DomainConfig.NotaryType == types.NotaryTypeSigner && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
 		return nil, i18n.NewError(ctx, msgs.MsgMintOnlyNotary, notary, req.Transaction.From)
 	}
 	return &prototk.InitTransactionResponse{
@@ -138,7 +138,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	}
 
 	// Validate the amounts, and if configured, ensure the sender is the notary
-	if tx.DomainConfig.NotaryType == types.NotaryTypeSigner && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
 		return nil, i18n.NewError(ctx, msgs.MsgMintOnlyNotary, notary, req.Transaction.From)
 	}
 	if err := h.noto.validateMintAmounts(ctx, params, coins); err != nil {
@@ -240,7 +240,7 @@ func (h *mintHandler) Prepare(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
 		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err

@@ -24,6 +24,7 @@ Creates a new Noto token, with a new address on the base ledger.
     "type": "constructor",
     "inputs": [
         {"name": "notary", "type": "string"},
+        {"name": "notaryMode", "type": "string"},
         {"name": "implementation", "type": "string"},
         {"name": "restrictMint", "type": "boolean"},
         {"name": "allowBurn", "type": "boolean"},
@@ -42,6 +43,7 @@ Creates a new Noto token, with a new address on the base ledger.
 Inputs:
 
 * **notary** - lookup string for the identity that will serve as the notary for this token instance. May be located at this node or another node
+* **notaryMode** - choose the notary's mode of operation - must be "basic" or "hooks"
 * **implementation** - (optional) the name of a non-default Noto implementation that has previously been registered
 * **restrictMint** - (optional - default true) only allow the notary to request mint
 * **allowBurn** - (optional - default true) allow token owners to request burn

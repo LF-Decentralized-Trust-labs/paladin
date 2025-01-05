@@ -18,6 +18,7 @@ export const notoConstructorABI = (
   type: "constructor",
   inputs: [
     { name: "notary", type: "string" },
+    { name: "notaryMode", type: "string" },
     { name: "restrictMint", type: "bool" },
     { name: "allowBurn", type: "bool" },
     ...(withHooks
@@ -42,6 +43,7 @@ export const notoConstructorABI = (
 
 export interface NotoConstructorParams {
   notary: PaladinVerifier;
+  notaryMode: "basic" | "hooks";
   hooks?: {
     privateGroup?: IGroupInfo;
     publicAddress?: string;

@@ -332,7 +332,7 @@ func (h *transferHandler) Prepare(ctx context.Context, tx *types.ParsedTransacti
 		}
 	}
 
-	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
 		hookTransaction, err = h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err

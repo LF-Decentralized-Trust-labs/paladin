@@ -213,7 +213,7 @@ func (h *approveHandler) Prepare(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	if tx.DomainConfig.NotaryType == types.NotaryTypePente {
+	if tx.DomainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
 		hookTransaction, err := h.hookInvoke(ctx, tx, req, baseTransaction)
 		if err != nil {
 			return nil, err

@@ -172,6 +172,7 @@ public class BondTest {
             var notoCash = NotoHelper.deploy("noto", cashIssuer, testbed,
                     new NotoHelper.ConstructorParams(
                             cashIssuer + "@node1",
+                            "basic",
                             null,
                             true));
             assertFalse(notoCash.address().isBlank());
@@ -201,6 +202,7 @@ public class BondTest {
             var notoBond = NotoHelper.deploy("noto", bondCustodian, testbed,
                     new NotoHelper.ConstructorParams(
                             bondCustodian + "@node1",
+                            "hooks",
                             new NotoHelper.HookParams(
                                     issuerCustodianInstance.address(),
                                     bondTracker.address(),

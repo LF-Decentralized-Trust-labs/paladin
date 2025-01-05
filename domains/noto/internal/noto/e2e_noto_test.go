@@ -175,7 +175,8 @@ func TestNoto(t *testing.T) {
 	var notoAddress tktypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, "me", &types.ConstructorParams{
-			Notary: notaryName,
+			Notary:     notaryName,
+			NotaryMode: types.NotaryModeBasic,
 		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
@@ -353,7 +354,8 @@ func TestNotoApprove(t *testing.T) {
 	var notoAddress tktypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, "me", &types.ConstructorParams{
-			Notary: notaryName,
+			Notary:     notaryName,
+			NotaryMode: types.NotaryModeBasic,
 		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
@@ -467,7 +469,8 @@ func TestNotoLock(t *testing.T) {
 	var notoAddress tktypes.EthAddress
 	rpcerr := rpc.CallRPC(ctx, &notoAddress, "testbed_deploy",
 		domainName, "me", &types.ConstructorParams{
-			Notary: notaryName,
+			Notary:     notaryName,
+			NotaryMode: types.NotaryModeBasic,
 		})
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())

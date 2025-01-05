@@ -332,6 +332,14 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 	if err != nil {
 		return nil, err
 	}
+
+	switch params.NotaryMode {
+	case types.NotaryModeBasic:
+	case types.NotaryModeHooks:
+	default:
+		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "notaryMode")
+	}
+
 	return &prototk.InitDeployResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
@@ -360,7 +368,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 
 	deployData := &types.NotoConfigData_V0{
 		NotaryLookup: notaryQualified.String(),
-		NotaryType:   types.NotaryTypeSigner,
+		NotaryMode:   types.NotaryModeIntBasic,
 		RestrictMint: true,
 		AllowBurn:    true,
 	}
@@ -373,7 +381,7 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 
 	if params.Hooks != nil && !params.Hooks.PublicAddress.IsZero() {
 		notaryAddress = params.Hooks.PublicAddress
-		deployData.NotaryType = types.NotaryTypePente
+		deployData.NotaryMode = types.NotaryModeIntHooks
 		deployData.PrivateAddress = params.Hooks.PrivateAddress
 		deployData.PrivateGroup = params.Hooks.PrivateGroup
 	}
@@ -428,12 +436,13 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	parsedConfig := &types.NotoParsedConfig{
-		NotaryType:   decodedData.NotaryType,
+		NotaryMode:   types.NotaryModeBasic.Enum(),
 		Variant:      domainConfig.Variant,
 		NotaryLookup: decodedData.NotaryLookup,
 		IsNotary:     notaryNodeName == localNodeName.Name,
 	}
-	if decodedData.NotaryType == types.NotaryTypePente {
+	if decodedData.NotaryMode == types.NotaryModeIntHooks {
+		parsedConfig.NotaryMode = types.NotaryModeHooks.Enum()
 		parsedConfig.Options.Hooks = &types.NotoHooksOptions{
 			NotaryAddress:  domainConfig.NotaryAddress,
 			PrivateAddress: decodedData.PrivateAddress,
@@ -864,7 +873,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				if err != nil {
 					return nil, err
 				}
-				if domainConfig.IsNotary && domainConfig.NotaryType == types.NotaryTypePente {
+				if domainConfig.IsNotary && domainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
 					err = n.handleNotaryPrivateUnlock(ctx, req.StateQueryContext, domainConfig, &unlock)
 					if err != nil {
 						return nil, err
