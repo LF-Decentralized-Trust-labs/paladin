@@ -96,20 +96,6 @@ message DelegationRequestAcknowledgment {
     string contract_address = 4;
 }
 
-//To be distrubuted to all parties mentioned in the distribution list for a state, as chosen by the domain
-message StateProducedEvent {
-    string state_id = 1;
-    string state_data_json = 2;
-    string party = 3;
-    string domain_name = 4;
-	string contract_address = 5;
-	string schema_id = 6;
-    string distribution_id = 7; //this is used to correlate the acknowledgement back to the distribution. unlike the transport message id / correlation id, this is not unique across retries
-    optional string nullifier_algorithm = 8;
-    optional string nullifier_verifier_type = 9;
-    optional string nullifier_payload_type = 10;
-}
-
 message StateAcknowledgedEvent {
     string state_id = 1;
     string state_data_json = 2;

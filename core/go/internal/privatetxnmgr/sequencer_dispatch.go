@@ -42,7 +42,7 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 		PublicDispatches: make([]*syncpoints.PublicDispatch, 0, len(dispatchableTransactions)),
 	}
 
-	stateDistributions := make([]*components.StateDistributionWithData, 0)
+	stateDistributions := make([]*components.StateDistribution, 0)
 	localStateDistributions := make([]*components.StateDistributionWithData, 0)
 	preparedTxnDistributions := make([]*components.PreparedTransactionWithRefs, 0)
 
@@ -100,7 +100,9 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 			if err != nil {
 				return err
 			}
-			stateDistributions = append(stateDistributions, sds.Remote...)
+			for _, sd := range sds.Remote {
+				stateDistributions = append(stateDistributions, &sd.StateDistribution)
+			}
 			localStateDistributions = append(localStateDistributions, sds.Local...)
 		}
 
@@ -184,10 +186,6 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 	for _, preparedTransaction := range dispatchBatch.PreparedTransactions {
 		s.publisher.PublishTransactionPreparedEvent(ctx, preparedTransaction.ID.String())
 	}
-	//now that the DB write has been persisted, we can trigger the in-memory distribution of the prepared transactions and states
-	s.todo.DistributeStates(ctx, stateDistributions)
-
-	s.preparedTransactionDistributer.DistributePreparedTransactions(ctx, preparedTxnDistributions)
 
 	// We also need to trigger ourselves for any private TX we chained
 	for _, tx := range dispatchBatch.PrivateDispatches {
@@ -202,11 +200,12 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 
 func mapPreparedTransaction(tx *components.PrivateTransaction) *components.PreparedTransactionWithRefs {
 	pt := &components.PreparedTransactionWithRefs{
-		ID:       tx.ID,
-		Domain:   tx.Domain,
-		To:       &tx.Address,
-		Metadata: tx.PreparedMetadata,
-		Sender:   tx.PreAssembly.TransactionSpecification.From,
+		PreparedTransactionBase: &pldapi.PreparedTransactionBase{
+			ID:       tx.ID,
+			Domain:   tx.Domain,
+			To:       &tx.Address,
+			Metadata: tx.PreparedMetadata,
+		},
 	}
 	for _, s := range tx.PostAssembly.InputStates {
 		pt.StateRefs.Spent = append(pt.StateRefs.Spent, s.ID)
@@ -221,9 +220,9 @@ func mapPreparedTransaction(tx *components.PrivateTransaction) *components.Prepa
 		pt.StateRefs.Info = append(pt.StateRefs.Info, s.ID)
 	}
 	if tx.PreparedPublicTransaction != nil {
-		pt.Transaction = tx.PreparedPublicTransaction
+		pt.Transaction = *tx.PreparedPublicTransaction
 	} else {
-		pt.Transaction = tx.PreparedPrivateTransaction
+		pt.Transaction = *tx.PreparedPrivateTransaction
 	}
 	return pt
 

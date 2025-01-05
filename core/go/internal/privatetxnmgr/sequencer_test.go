@@ -97,8 +97,8 @@ func newSequencerForTesting(t *testing.T, ctx context.Context, domainAddress *tk
 	mocks.stateStore.On("NewDomainContext", mock.Anything, mocks.domain, *domainAddress, mock.Anything).Return(mocks.domainContext).Maybe()
 	//mocks.domain.On("Configuration").Return(&prototk.DomainConfig{}).Maybe()
 
-	syncPoints := syncpoints.NewSyncPoints(ctx, &pldconf.FlushWriterConfig{}, p, mocks.txManager, mocks.pubTxManager)
-	o, err := NewSequencer(ctx, mocks.privateTxManager, tktypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerSequencerConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.endorsementGatherer, mocks.publisher, syncPoints, mocks.identityResolver, mocks.stateDistributer, mocks.preparedTransactionDistributer, mocks.transportWriter, 30*time.Second, 0)
+	syncPoints := syncpoints.NewSyncPoints(ctx, &pldconf.FlushWriterConfig{}, p, mocks.txManager, mocks.pubTxManager, mocks.transportManager)
+	o, err := NewSequencer(ctx, mocks.privateTxManager, tktypes.RandHex(16), *domainAddress, &pldconf.PrivateTxManagerSequencerConfig{}, mocks.allComponents, mocks.domainSmartContract, mocks.endorsementGatherer, mocks.publisher, syncPoints, mocks.identityResolver, mocks.transportWriter, 30*time.Second, 0)
 	require.NoError(t, err)
 	ocDone, err := o.Start(ctx)
 	require.NoError(t, err)

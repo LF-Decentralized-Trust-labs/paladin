@@ -280,22 +280,31 @@ func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName str
 }
 
 // See docs in components package
-func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg *components.ReliableMessage) (preCommit func(), err error) {
+func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msgs ...*components.ReliableMessage) (preCommit func(), err error) {
 
-	var p *peer
+	peers := make(map[string]*peer)
+	for _, msg := range msgs {
+		var p *peer
 
-	msg.ID = uuid.New()
-	msg.Created = tktypes.TimestampNow()
-	_, err = msg.MessageType.Validate()
+		msg.ID = uuid.New()
+		msg.Created = tktypes.TimestampNow()
+		_, err = msg.MessageType.Validate()
 
-	if err == nil {
-		p, err = tm.getPeer(ctx, msg.Node, true)
+		if err == nil {
+			p, err = tm.getPeer(ctx, msg.Node, true)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		peers[p.Name] = p
 	}
 
 	if err == nil {
 		err = dbTX.
 			WithContext(ctx).
-			Create(msg).
+			Create(msgs).
 			Error
 	}
 
@@ -303,7 +312,11 @@ func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msg
 		return nil, err
 	}
 
-	return p.notifyPersistedMsgAvailable, nil
+	return func() {
+		for _, p := range peers {
+			p.notifyPersistedMsgAvailable()
+		}
+	}, nil
 
 }
 

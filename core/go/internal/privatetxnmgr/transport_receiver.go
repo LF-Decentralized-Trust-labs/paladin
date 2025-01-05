@@ -22,33 +22,29 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 )
 
-func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *components.TransportMessage) {
+func (p *privateTxManager) HandlePaladinMsg(ctx context.Context, message *components.ReceivedMessage) {
 	//TODO this need to become an ultra low latency, non blocking, handover to the event loop thread.
 	// need some thought on how to handle errors, retries, buffering, swapping idle sequencers in and out of memory etc...
 
 	//Send the event to the sequencer for the contract and any transaction manager for the signing key
 	messagePayload := message.Payload
-	replyToDestination := message.ReplyTo
+	fromNode := message.FromNode
 
 	switch message.MessageType {
 	case "EndorsementRequest":
-		go p.handleEndorsementRequest(p.ctx, messagePayload, replyToDestination)
+		go p.handleEndorsementRequest(p.ctx, messagePayload, fromNode)
 	case "EndorsementResponse":
 		go p.handleEndorsementResponse(p.ctx, messagePayload)
 	case "DelegationRequest":
-		go p.handleDelegationRequest(p.ctx, messagePayload, replyToDestination)
+		go p.handleDelegationRequest(p.ctx, messagePayload, fromNode)
 	case "DelegationRequestAcknowledgment":
 		go p.handleDelegationRequestAcknowledgment(p.ctx, messagePayload)
 	case "AssembleRequest":
-		go p.handleAssembleRequest(p.ctx, messagePayload, replyToDestination)
+		go p.handleAssembleRequest(p.ctx, messagePayload, fromNode)
 	case "AssembleResponse":
 		go p.handleAssembleResponse(p.ctx, messagePayload)
 	case "AssembleError":
 		go p.handleAssembleError(p.ctx, messagePayload)
-	case "StateProducedEvent":
-		go p.handleStateProducedEvent(p.ctx, messagePayload, replyToDestination)
-	case "StateAcknowledgedEvent":
-		go p.stateDistributer.HandleStateAcknowledgedEvent(p.ctx, message.Payload)
 	default:
 		log.L(ctx).Errorf("Unknown message type: %s", message.MessageType)
 	}

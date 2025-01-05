@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
+	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/mocks/componentmocks"
 	"github.com/kaleido-io/paladin/core/pkg/persistence"
 	"github.com/kaleido-io/paladin/core/pkg/persistence/mockpersistence"
@@ -186,4 +187,14 @@ func TestGetLocalTransportDetailsNotFail(t *testing.T) {
 
 	_, err := tm.getLocalTransportDetails(ctx, tp.t.name)
 	assert.Regexp(t, "pop", err)
+}
+
+func TestSendReliableBadMsg(t *testing.T) {
+	ctx, tm, _, done := newTestTransport(t, false)
+	defer done()
+
+	_, err := tm.SendReliable(ctx, tm.persistence.DB(), &components.ReliableMessage{
+		MessageType: components.RMTReceipt.Enum(),
+	})
+	assert.Regexp(t, "PD012015", err)
 }

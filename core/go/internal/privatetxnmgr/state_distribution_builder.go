@@ -18,7 +18,6 @@ package privatetxnmgr
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/core/internal/components"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
@@ -79,15 +78,16 @@ func (sd *stateDistributionBuilder) processStateForDistribution(ctx context.Cont
 		remainingNullifiers = newRemainingNullifiers
 
 		distribution := &components.StateDistributionWithData{
-			ID:              uuid.New().String(),
-			IdentityLocator: recipient,
-			Domain:          tx.Domain,
-			ContractAddress: tx.Address.String(),
-			// the state data json is available on both but we take it
-			// from the outputState to make sure it is the same json that was used to generate the hash
-			StateID:       fullState.ID.String(),
-			SchemaID:      fullState.Schema.String(),
-			StateDataJson: string(fullState.Data),
+			StateDistribution: components.StateDistribution{
+				IdentityLocator: recipient,
+				Domain:          tx.Domain,
+				ContractAddress: tx.Address.String(),
+				// the state data json is available on both but we take it
+				// from the outputState to make sure it is the same json that was used to generate the hash
+				StateID:  fullState.ID.String(),
+				SchemaID: fullState.Schema.String(),
+			},
+			StateData: fullState.Data,
 		}
 
 		// Add the nullifier requirement if there is one

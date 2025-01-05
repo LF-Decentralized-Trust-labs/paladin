@@ -28,10 +28,10 @@ import (
 )
 
 type dispatchOperation struct {
-	publicDispatches         []*PublicDispatch
-	privateDispatches        []*components.ValidatedTransaction
-	preparedTransactions     []*components.PreparedTransactionWithRefs
-	preparedTxnDistributions []*components.PreparedTransactionWithRefs
+	publicDispatches     []*PublicDispatch
+	privateDispatches    []*components.ValidatedTransaction
+	preparedTransactions []*components.PreparedTransactionWithRefs
+	preparedReliableMsgs []*components.ReliableMessage
 }
 
 type DispatchPersisted struct {
@@ -57,19 +57,26 @@ type DispatchBatch struct {
 
 // PersistDispatches persists the dispatches to the database and coordinates with the public transaction manager
 // to submit public transactions.
-func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error {
+func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistribution, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error {
 
-	preparedTxnDistributionsPersisted := make([]*components.ReliableMessage, 0, len(dispatchBatch.PreparedTransactions))
+	preparedReliableMsgs := make([]*components.ReliableMessage, 0,
+		len(dispatchBatch.PreparedTransactions)+len(stateDistributions))
+
 	for _, preparedTxnDistribution := range preparedTxnDistributions {
-		preparedTxnDistributionsPersisted = append(preparedTxnDistributionsPersisted, &components.ReliableMessage{
-			MessageType:     components.RMTPreparedTransaction.Enum(),
-			Node:            "node2",
-			Metadata:        tktypes.JSONString(sds[i]),
-			ID:              preparedTxnDistribution.ID,
-			PreparedTxnID:   preparedTxnDistribution.PreparedTxnID,
-			IdentityLocator: preparedTxnDistribution.IdentityLocator,
-			DomainName:      preparedTxnDistribution.Domain,
-			ContractAddress: preparedTxnDistribution.ContractAddress,
+		node, _ := tktypes.PrivateIdentityLocator(preparedTxnDistribution.Transaction.From).Node(dCtx.Ctx(), false)
+		preparedReliableMsgs = append(preparedReliableMsgs, &components.ReliableMessage{
+			Node:        node,
+			MessageType: components.RMTPreparedTransaction.Enum(),
+			Metadata:    tktypes.JSONString(preparedTxnDistribution),
+		})
+	}
+
+	for _, stateDistribution := range stateDistributions {
+		node, _ := tktypes.PrivateIdentityLocator(stateDistribution.IdentityLocator).Node(dCtx.Ctx(), false)
+		preparedReliableMsgs = append(preparedReliableMsgs, &components.ReliableMessage{
+			Node:        node,
+			MessageType: components.RMTState.Enum(),
+			Metadata:    tktypes.JSONString(stateDistribution),
 		})
 	}
 
@@ -78,10 +85,10 @@ func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contrac
 		domainContext:   dCtx,
 		contractAddress: contractAddress,
 		dispatchOperation: &dispatchOperation{
-			publicDispatches:         dispatchBatch.PublicDispatches,
-			privateDispatches:        dispatchBatch.PrivateDispatches,
-			preparedTransactions:     dispatchBatch.PreparedTransactions,
-			preparedTxnDistributions: preparedTxnDistributionsPersisted,
+			publicDispatches:     dispatchBatch.PublicDispatches,
+			privateDispatches:    dispatchBatch.PrivateDispatches,
+			preparedTransactions: dispatchBatch.PreparedTransactions,
+			preparedReliableMsgs: preparedReliableMsgs,
 		},
 	})
 
@@ -181,49 +188,17 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 			postCommits = append(postCommits, txPostCommit)
 		}
 
-		if len(op.preparedTxnDistributions) == 0 {
-			log.L(ctx).Debug("No prepared transaction distributions to persist")
+		if len(op.preparedReliableMsgs) == 0 {
+			log.L(ctx).Debug("No prepared reliable messages to persist to persist")
 		} else {
 
-			log.L(ctx).Debugf("Writing distribution record to send prepared transaction to remote node %d", len(op.preparedTxnDistributions))
-			err := dbTX.
-				Table("prepared_txn_distributions").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{
-						{Name: "prepared_txn_id"},
-						{Name: "identity_locator"},
-					},
-					DoNothing: true, // immutable
-				}).
-				Create(op.preparedTxnDistributions).
-				Error
-
+			log.L(ctx).Debugf("Writing %d reliable messages", len(op.preparedReliableMsgs))
+			msgPostCommit, err := s.transportMgr.SendReliable(ctx, dbTX, op.preparedReliableMsgs...)
 			if err != nil {
-				log.L(ctx).Errorf("Error persisting prepared transaction distributions: %s", err)
+				log.L(ctx).Errorf("Error persisting prepared reliable messages: %s", err)
 				return nil, err
 			}
-		}
-
-		if len(op.stateDistributions) == 0 {
-			log.L(ctx).Debug("No state distributions to persist")
-		} else {
-			log.L(ctx).Debugf("Writing state distributions %d", len(op.stateDistributions))
-			err := dbTX.
-				Table("state_distributions").
-				Clauses(clause.OnConflict{
-					Columns: []clause.Column{
-						{Name: "state_id"},
-						{Name: "identity_locator"},
-					},
-					DoNothing: true, // immutable
-				}).
-				Create(op.stateDistributions).
-				Error
-
-			if err != nil {
-				log.L(ctx).Errorf("Error persisting state distributions: %s", err)
-				return nil, err
-			}
+			postCommits = append(postCommits, msgPostCommit)
 		}
 
 	}

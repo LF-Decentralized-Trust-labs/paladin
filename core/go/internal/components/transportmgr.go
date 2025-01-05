@@ -59,6 +59,7 @@ func (t ReliableMessageType) Options() []string {
 	return []string{
 		string(RMTState),
 		string(RMTReceipt),
+		string(RMTPreparedTransaction),
 	}
 }
 
@@ -151,5 +152,5 @@ type TransportManager interface {
 	// including over node restart, until an ack is returned from the remote node.
 	//
 	// The pre-commit handler must be called after the DB transaction commits to trigger the delivery.
-	SendReliable(ctx context.Context, dbTX *gorm.DB, msg *ReliableMessage) (preCommit func(), err error)
+	SendReliable(ctx context.Context, dbTX *gorm.DB, msg ...*ReliableMessage) (preCommit func(), err error)
 }

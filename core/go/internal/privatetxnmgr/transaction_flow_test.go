@@ -89,7 +89,7 @@ func newTransactionFlowForTesting(t *testing.T, ctx context.Context, transaction
 	domain.On("Configuration").Return(&prototk.DomainConfig{}).Maybe()
 	mocks.domainSmartContract.On("Domain").Return(domain).Maybe()
 
-	assembleCoordinator := NewAssembleCoordinator(ctx, nodeName, 1, mocks.allComponents, mocks.domainSmartContract, mocks.domainContext, mocks.transportWriter, *contractAddress, mocks.environment, 1*time.Second, mocks.stateDistributer, mocks.localAssembler)
+	assembleCoordinator := NewAssembleCoordinator(ctx, nodeName, 1, mocks.allComponents, mocks.domainSmartContract, mocks.domainContext, mocks.transportWriter, *contractAddress, mocks.environment, 1*time.Second, mocks.localAssembler)
 
 	tp := NewTransactionFlow(ctx, transaction, nodeName, mocks.allComponents, mocks.domainSmartContract, mocks.domainContext, mocks.publisher, mocks.endorsementGatherer, mocks.identityResolver, mocks.syncPoints, mocks.transportWriter, 1*time.Minute, mocks.coordinatorSelector, assembleCoordinator, mocks.environment)
 

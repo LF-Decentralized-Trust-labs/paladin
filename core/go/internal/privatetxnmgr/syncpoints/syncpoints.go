@@ -50,7 +50,7 @@ type SyncPoints interface {
 	// to the PrivateTxnManager's persistence store in the same database transaction
 	// Although the actual persistence is offloaded to the flushwriter, this method is synchronous and will block until the
 	// dispatch sequence is written to the database
-	PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistributionWithData, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error
+	PersistDispatchBatch(dCtx components.DomainContext, contractAddress tktypes.EthAddress, dispatchBatch *DispatchBatch, stateDistributions []*components.StateDistribution, preparedTxnDistributions []*components.PreparedTransactionWithRefs) error
 
 	// Deploy is a special case of dispatch batch, where there are no private states, so no domain context is required
 	PersistDeployDispatchBatch(ctx context.Context, dispatchBatch *DispatchBatch) error
@@ -64,16 +64,18 @@ type SyncPoints interface {
 }
 
 type syncPoints struct {
-	started  bool
-	writer   flushwriter.Writer[*syncPointOperation, *noResult]
-	txMgr    components.TXManager
-	pubTxMgr components.PublicTxManager
+	started      bool
+	writer       flushwriter.Writer[*syncPointOperation, *noResult]
+	txMgr        components.TXManager
+	pubTxMgr     components.PublicTxManager
+	transportMgr components.TransportManager
 }
 
-func NewSyncPoints(ctx context.Context, conf *pldconf.FlushWriterConfig, p persistence.Persistence, txMgr components.TXManager, pubTxMgr components.PublicTxManager) SyncPoints {
+func NewSyncPoints(ctx context.Context, conf *pldconf.FlushWriterConfig, p persistence.Persistence, txMgr components.TXManager, pubTxMgr components.PublicTxManager, transportMgr components.TransportManager) SyncPoints {
 	s := &syncPoints{
-		txMgr:    txMgr,
-		pubTxMgr: pubTxMgr,
+		txMgr:        txMgr,
+		pubTxMgr:     pubTxMgr,
+		transportMgr: transportMgr,
 	}
 	s.writer = flushwriter.NewWriter(ctx, s.runBatch, p, conf, &WriterConfigDefaults)
 	return s

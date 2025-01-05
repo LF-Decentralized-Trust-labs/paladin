@@ -85,6 +85,16 @@ func mockWritePublicTxsOk(mocks *dependencyMocks) chan struct{} {
 	return dispatched
 }
 
+func inMsgToOut(fromNode string, send *components.FireAndForgetMessageSend) *components.ReceivedMessage {
+	return &components.ReceivedMessage{
+		FromNode:      fromNode,
+		MessageID:     uuid.New(),
+		CorrelationID: send.CorrelationID,
+		MessageType:   send.MessageType,
+		Payload:       send.Payload,
+	}
+}
+
 func TestPrivateTxManagerInit(t *testing.T) {
 
 	privateTxManager, mocks := NewPrivateTransactionMgrForPackageTesting(t, "node1")
@@ -854,16 +864,16 @@ func TestPrivateTxManagerRemoteNotaryEndorser(t *testing.T) {
 
 	localNodeMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
-			assert.Equal(t, remoteNodeName, args.Get(1).(*components.ReceivedMessage).Node)
-			transportMessage := args.Get(1).(*components.TransportMessage)
-			remoteEngine.HandlePaladinMsg(ctx, transportMessage)
+			assert.Equal(t, remoteNodeName, args.Get(1).(*components.ReceivedMessage).FromNode)
+			send := args.Get(1).(*components.FireAndForgetMessageSend)
+			remoteEngine.HandlePaladinMsg(ctx, inMsgToOut(localNodeName, send))
 		}()
 	}).Return(nil).Maybe()
 
 	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
-			transportMessage := args.Get(1).(*components.TransportMessage)
-			privateTxManager.HandlePaladinMsg(ctx, transportMessage)
+			send := args.Get(1).(*components.FireAndForgetMessageSend)
+			privateTxManager.HandlePaladinMsg(ctx, inMsgToOut(remoteNodeName, send))
 		}()
 	}).Return(nil).Maybe()
 
@@ -1042,21 +1052,21 @@ func TestPrivateTxManagerRemoteNotaryEndorserRetry(t *testing.T) {
 
 	localNodeMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
-			assert.Equal(t, remoteNodeName, args.Get(1).(*components.TransportMessage).Node)
-			transportMessage := args.Get(1).(*components.TransportMessage)
-			if transportMessage.MessageType == "DelegationRequest" && !ignoredDelegateRequest {
+			assert.Equal(t, remoteNodeName, args.Get(1).(*components.FireAndForgetMessageSend).Node)
+			send := args.Get(1).(*components.FireAndForgetMessageSend)
+			if send.MessageType == "DelegationRequest" && !ignoredDelegateRequest {
 				//ignore the first delegate request and force a retry
 				ignoredDelegateRequest = true
 			} else {
-				remoteEngine.HandlePaladinMsg(ctx, transportMessage)
+				remoteEngine.HandlePaladinMsg(ctx, inMsgToOut(localNodeName, send))
 			}
 		}()
 	}).Return(nil).Maybe()
 
 	remoteEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		go func() {
-			transportMessage := args.Get(1).(*components.TransportMessage)
-			privateTxManager.HandlePaladinMsg(ctx, transportMessage)
+			send := args.Get(1).(*components.FireAndForgetMessageSend)
+			privateTxManager.HandlePaladinMsg(ctx, inMsgToOut(remoteNodeName, send))
 		}()
 	}).Return(nil).Maybe()
 
@@ -1868,9 +1878,9 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 
 	sentEndorsementRequest := make(chan string, 1)
 	aliceEngineMocks.transportManager.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		message := args.Get(1).(*components.TransportMessage)
+		send := args.Get(1).(*components.FireAndForgetMessageSend)
 		endorsementRequest := &pbEngine.EndorsementRequest{}
-		err := proto.Unmarshal(message.Payload, endorsementRequest)
+		err := proto.Unmarshal(send.Payload, endorsementRequest)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to unmarshal endorsement request: %s", err)
 			return
@@ -2004,7 +2014,8 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	//now send the endorsements back
-	aliceEngine.HandlePaladinMsg(ctx, &components.TransportMessage{
+	aliceEngine.HandlePaladinMsg(ctx, &components.ReceivedMessage{
+		FromNode:    bobNodeName,
 		MessageType: "EndorsementResponse",
 		Payload:     endorsementResponse2bytes,
 	})
@@ -2034,7 +2045,8 @@ func TestPrivateTxManagerDependantTransactionEndorsedOutOfOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	//now send the final endorsement back
-	aliceEngine.HandlePaladinMsg(ctx, &components.TransportMessage{
+	aliceEngine.HandlePaladinMsg(ctx, &components.ReceivedMessage{
+		FromNode:    bobNodeName,
 		MessageType: "EndorsementResponse",
 		Payload:     endorsementResponse1Bytes,
 	})
@@ -2678,20 +2690,22 @@ func (m *dependencyMocks) mockForSubmitter(t *testing.T, transactionID *uuid.UUI
 
 func mockNetwork(t *testing.T, transactionManagers []privateTransactionMgrForPackageTesting) {
 
-	routeToNode := func(args mock.Arguments) {
-		go func() {
-			transportMessage := args.Get(1).(*components.TransportMessage)
-			for _, tm := range transactionManagers {
-				if tm.NodeName() == transportMessage.Node {
-					tm.HandlePaladinMsg(context.Background(), transportMessage)
-					return
+	routeToNode := func(fromNode string) func(args mock.Arguments) {
+		return func(args mock.Arguments) {
+			go func() {
+				send := args.Get(1).(*components.FireAndForgetMessageSend)
+				for _, tm := range transactionManagers {
+					if tm.NodeName() == send.Node {
+						tm.HandlePaladinMsg(context.Background(), inMsgToOut(fromNode, send))
+						return
+					}
 				}
-			}
-			assert.Failf(t, "no transaction manager found for node %s", transportMessage.Node)
-		}()
+				assert.Failf(t, "no transaction manager found for node %s", send.Node)
+			}()
+		}
 	}
 	for _, tm := range transactionManagers {
-		tm.DependencyMocks().transportManager.On("Send", mock.Anything, mock.Anything).Run(routeToNode).Return(nil).Maybe()
+		tm.DependencyMocks().transportManager.On("Send", mock.Anything, mock.Anything).Run(routeToNode(tm.NodeName())).Return(nil).Maybe()
 	}
 
 }

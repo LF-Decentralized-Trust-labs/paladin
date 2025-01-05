@@ -29,7 +29,6 @@ import (
 	"github.com/kaleido-io/paladin/core/internal/msgs"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes"
 	"github.com/kaleido-io/paladin/core/internal/privatetxnmgr/syncpoints"
-	pbEngine "github.com/kaleido-io/paladin/core/pkg/proto/engine"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
@@ -158,22 +157,21 @@ func NewSequencer(
 		incompleteTxSProcessMap: make(map[string]ptmgrtypes.TransactionFlow),
 		persistenceRetryTimeout: confutil.DurationMin(sequencerConfig.PersistenceRetryTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.PersistenceRetryTimeout),
 
-		staleTimeout:                   confutil.DurationMin(sequencerConfig.StaleTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.StaleTimeout),
-		processedTxIDs:                 make(map[string]bool),
-		orchestrationEvalRequestChan:   make(chan bool, 1),
-		stopProcess:                    make(chan bool, 1),
-		pendingTransactionEvents:       make(chan ptmgrtypes.PrivateTransactionEvent, *pldconf.PrivateTxManagerDefaults.Sequencer.MaxPendingEvents),
-		nodeName:                       nodeName,
-		domainAPI:                      domainAPI,
-		components:                     allComponents,
-		endorsementGatherer:            endorsementGatherer,
-		publisher:                      publisher,
-		syncPoints:                     syncPoints,
-		identityResolver:               identityResolver,
-		preparedTransactionDistributer: preparedTransactionDistributer,
-		transportWriter:                transportWriter,
-		graph:                          NewGraph(),
-		requestTimeout:                 requestTimeout,
+		staleTimeout:                 confutil.DurationMin(sequencerConfig.StaleTimeout, 1*time.Millisecond, *pldconf.PrivateTxManagerDefaults.Sequencer.StaleTimeout),
+		processedTxIDs:               make(map[string]bool),
+		orchestrationEvalRequestChan: make(chan bool, 1),
+		stopProcess:                  make(chan bool, 1),
+		pendingTransactionEvents:     make(chan ptmgrtypes.PrivateTransactionEvent, *pldconf.PrivateTxManagerDefaults.Sequencer.MaxPendingEvents),
+		nodeName:                     nodeName,
+		domainAPI:                    domainAPI,
+		components:                   allComponents,
+		endorsementGatherer:          endorsementGatherer,
+		publisher:                    publisher,
+		syncPoints:                   syncPoints,
+		identityResolver:             identityResolver,
+		transportWriter:              transportWriter,
+		graph:                        NewGraph(),
+		requestTimeout:               requestTimeout,
 		environment: &sequencerEnvironment{
 			blockHeight: blockHeight,
 		},
@@ -370,19 +368,4 @@ func (s *Sequencer) GetTxStatus(ctx context.Context, txID uuid.UUID) (components
 		Status:         status,
 		FailureMessage: failureMessage,
 	}, nil
-}
-
-func (s *Sequencer) HandleStateProducedEvent(ctx context.Context, stateProducedEvent *pbEngine.StateProducedEvent) {
-	readTX := s.components.Persistence().DB() // no DB transaction required here for the reads from the DB
-	log.L(ctx).Debug("Sequencer:HandleStateProducedEvent Upserting state to delegateDomainContext")
-
-	states, err := s.delegateDomainContext.UpsertStates(readTX, &components.StateUpsert{
-		SchemaID: tktypes.MustParseBytes32(stateProducedEvent.SchemaId),
-		Data:     tktypes.RawJSON(stateProducedEvent.StateDataJson),
-	})
-	if err != nil {
-		log.L(ctx).Errorf("Error upserting states: %s", err)
-		return
-	}
-	log.L(ctx).Debugf("Upserted states: %v", states)
 }

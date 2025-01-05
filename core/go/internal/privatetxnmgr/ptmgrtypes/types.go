@@ -162,7 +162,7 @@ type AssembleCoordinator interface {
 	Start()
 	Stop()
 	QueueAssemble(ctx context.Context, assemblingNode string, transactionID uuid.UUID, transactionPreAssembly *components.TransactionPreAssembly)
-	Complete(requestID string, stateDistributions []*components.StateDistributionWithData)
+	Complete(requestID string)
 }
 
 type LocalAssembler interface {

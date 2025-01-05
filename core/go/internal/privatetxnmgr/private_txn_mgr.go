@@ -76,7 +76,7 @@ func (p *privateTxManager) PreInit(c components.PreInitComponents) (*components.
 func (p *privateTxManager) PostInit(c components.AllComponents) error {
 	p.components = c
 	p.nodeName = p.components.TransportManager().LocalNodeName()
-	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager())
+	p.syncPoints = syncpoints.NewSyncPoints(p.ctx, &p.config.Writer, c.Persistence(), c.TxManager(), c.PublicTxManager(), c.TransportManager())
 	return nil
 }
 
@@ -155,8 +155,6 @@ func (p *privateTxManager) getSequencerForContract(ctx context.Context, dbTX *go
 				publisher,
 				p.syncPoints,
 				p.components.IdentityResolver(),
-				p.stateDistributer,
-				p.preparedTransactionDistributer,
 				transportWriter,
 				confutil.DurationMin(p.config.RequestTimeout, 0, *pldconf.PrivateTxManagerDefaults.RequestTimeout),
 				p.blockHeight,
@@ -659,12 +657,11 @@ func (p *privateTxManager) handleEndorsementRequest(ctx context.Context, message
 		return
 	}
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "EndorsementResponse",
-		ReplyTo:     p.nodeName,
 		Payload:     endorsementResponseBytes,
 		Node:        replyTo,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send endorsement response: %s", err)
@@ -775,12 +772,11 @@ func (p *privateTxManager) sendAssembleError(ctx context.Context, node string, a
 
 	log.L(ctx).Infof("Sending Assemble Error: ContractAddress: %s, TransactionId: %s, AssembleRequestId %s, Error: %s", contractAddress, transactionID, assembleRequestId, assembleError.ErrorMessage)
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "AssembleError",
-		ReplyTo:     p.nodeName,
 		Payload:     assembleErrorBytes,
 		Node:        node,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send  assemble error: %s", err)
@@ -859,12 +855,11 @@ func (p *privateTxManager) handleAssembleRequest(ctx context.Context, messagePay
 		return
 	}
 
-	err = p.components.TransportManager().Send(ctx, &components.TransportMessage{
+	err = p.components.TransportManager().Send(ctx, &components.FireAndForgetMessageSend{
 		MessageType: "AssembleResponse",
-		ReplyTo:     p.nodeName,
 		Payload:     assembleResponseBytes,
 		Node:        replyTo,
-		Component:   components.PRIVATE_TX_MANAGER_DESTINATION,
+		Component:   prototk.PaladinMsg_TRANSACTION_ENGINE,
 	})
 	if err != nil {
 		log.L(ctx).Errorf("Failed to send assemble response: %s", err)
@@ -993,31 +988,6 @@ func (p *privateTxManager) PrivateTransactionConfirmed(ctx context.Context, rece
 		}
 		seq.publisher.PublishTransactionConfirmedEvent(ctx, receipt.TransactionID.String())
 	}
-}
-
-func (p *privateTxManager) handleStateProducedEvent(ctx context.Context, messagePayload []byte, replyToDestination string) {
-
-	//in the meantime, we share with the sequencer in memory in case that state is needed to assemble in flight transactions
-	stateProducedEvent := &pbEngine.StateProducedEvent{}
-	err := proto.Unmarshal(messagePayload, stateProducedEvent)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to unmarshal StateProducedEvent: %s", err)
-		return
-	}
-
-	//State distributer deals with the reliable delivery e.g. sending acks etc
-	go p.stateDistributer.HandleStateProducedEvent(ctx, stateProducedEvent, replyToDestination)
-
-	contractAddressString := stateProducedEvent.ContractAddress
-	contractAddress := tktypes.MustEthAddress(contractAddressString)
-
-	sequencer, err := p.getSequencerForContract(ctx, p.components.Persistence().DB(), *contractAddress, nil)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to get sequencer for contract address %s: %s", contractAddress, err)
-		return
-	}
-	sequencer.HandleStateProducedEvent(ctx, stateProducedEvent)
-
 }
 
 func (p *privateTxManager) CallPrivateSmartContract(ctx context.Context, call *components.ResolvedTransaction) (*abi.ComponentValue, error) {
