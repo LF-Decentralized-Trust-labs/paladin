@@ -52,7 +52,10 @@ func DeployNoto(ctx context.Context, t *testing.T, rpc rpcbackend.Backend, domai
 		Notary:     notary + "@node1",
 		NotaryMode: notaryMode,
 		Options: types.NotoOptions{
-			Hooks: &types.NotoHooksOptions{PublicAddress: hooks},
+			Hooks: &types.NotoHooksOptions{
+				PublicAddress:     hooks,
+				DevUsePublicHooks: true,
+			},
 		},
 	})
 	if rpcerr != nil {

@@ -64,9 +64,10 @@ type NotoBasicOptions struct {
 }
 
 type NotoHooksOptions struct {
-	PublicAddress  *tktypes.EthAddress `json:"publicAddress"`            // Public address of the Pente privacy group
-	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`   // Details on the Pente privacy group
-	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"` // Private address of the hook contract deployed within the privacy group
+	PublicAddress     *tktypes.EthAddress `json:"publicAddress"`               // Public address of the Pente privacy group
+	PrivateGroup      *PentePrivateGroup  `json:"privateGroup,omitempty"`      // Details on the Pente privacy group
+	PrivateAddress    *tktypes.EthAddress `json:"privateAddress,omitempty"`    // Private address of the hook contract deployed within the privacy group
+	DevUsePublicHooks bool                `json:"devUsePublicHooks,omitempty"` // Use a public hooks contract - insecure, for dev purposes only! (privateGroup/privateAddress are ignored)
 }
 
 type PentePrivateGroup struct {

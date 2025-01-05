@@ -343,6 +343,14 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 		if params.Options.Hooks.PublicAddress == nil {
 			return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.notaryAddress")
 		}
+		if !params.Options.Hooks.DevUsePublicHooks {
+			if params.Options.Hooks.PrivateAddress == nil {
+				return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.privateAddress")
+			}
+			if params.Options.Hooks.PrivateGroup == nil {
+				return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.privateGroup")
+			}
+		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "notaryMode")
 	}
@@ -454,9 +462,10 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	if decodedData.NotaryMode == types.NotaryModeIntHooks {
 		parsedConfig.NotaryMode = types.NotaryModeHooks.Enum()
 		parsedConfig.Options.Hooks = &types.NotoHooksOptions{
-			PublicAddress:  &domainConfig.NotaryAddress,
-			PrivateAddress: decodedData.PrivateAddress,
-			PrivateGroup:   decodedData.PrivateGroup,
+			PublicAddress:     &domainConfig.NotaryAddress,
+			PrivateAddress:    decodedData.PrivateAddress,
+			PrivateGroup:      decodedData.PrivateGroup,
+			DevUsePublicHooks: decodedData.PrivateAddress == nil,
 		}
 	} else {
 		parsedConfig.Options.Basic = &types.NotoBasicOptions{
@@ -751,9 +760,7 @@ func (n *Noto) recordTransactionInfo(ev *prototk.OnChainEvent, txData *types.Not
 }
 
 func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, tktypes.HexBytes, error) {
-	if domainConfig.Options.Hooks.PrivateAddress == nil {
-		// Note: public hooks aren't really useful except in testing, as they disclose everything
-		// TODO: remove this?
+	if domainConfig.Options.Hooks.DevUsePublicHooks {
 		paramsJSON, err := json.Marshal(params)
 		return pldapi.TransactionTypePublic, functionABI, paramsJSON, err
 	}
