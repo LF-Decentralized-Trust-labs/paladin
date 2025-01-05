@@ -151,6 +151,16 @@ export class NotoFactory {
       data: {
         ...data,
         notary: data.notary.lookup,
+        options: {
+          basic: {
+            restrictMint: true,
+            allowBurn: true,
+            allowLock: true,
+            restrictUnlock: true,
+            ...data.options?.basic,
+          },
+          ...data.options,
+        },
       },
     });
     const receipt = await this.paladin.pollForReceipt(
