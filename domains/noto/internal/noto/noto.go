@@ -428,16 +428,24 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	}
 
 	parsedConfig := &types.NotoParsedConfig{
-		NotaryType:     decodedData.NotaryType,
-		NotaryAddress:  domainConfig.NotaryAddress,
-		Variant:        domainConfig.Variant,
-		NotaryLookup:   decodedData.NotaryLookup,
-		IsNotary:       notaryNodeName == localNodeName.Name,
-		PrivateAddress: decodedData.PrivateAddress,
-		PrivateGroup:   decodedData.PrivateGroup,
-		RestrictMint:   decodedData.RestrictMint,
-		AllowBurn:      decodedData.AllowBurn,
+		NotaryType:   decodedData.NotaryType,
+		Variant:      domainConfig.Variant,
+		NotaryLookup: decodedData.NotaryLookup,
+		IsNotary:     notaryNodeName == localNodeName.Name,
 	}
+	if decodedData.NotaryType == types.NotaryTypePente {
+		parsedConfig.Options.Hooks = &types.NotoHooksOptions{
+			NotaryAddress:  domainConfig.NotaryAddress,
+			PrivateAddress: decodedData.PrivateAddress,
+			PrivateGroup:   decodedData.PrivateGroup,
+		}
+	} else {
+		parsedConfig.Options.Basic = &types.NotoBasicOptions{
+			RestrictMint: decodedData.RestrictMint,
+			AllowBurn:    decodedData.AllowBurn,
+		}
+	}
+
 	notoContractConfigJSON, err = json.Marshal(parsedConfig)
 	if err != nil {
 		return nil, err
@@ -724,7 +732,7 @@ func (n *Noto) recordTransactionInfo(ev *prototk.OnChainEvent, txData *types.Not
 }
 
 func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functionABI *abi.Entry, params any) (pldapi.TransactionType, *abi.Entry, tktypes.HexBytes, error) {
-	if domainConfig.PrivateAddress == nil {
+	if domainConfig.Options.Hooks.PrivateAddress == nil {
 		// Note: public hooks aren't really useful except in testing, as they disclose everything
 		// TODO: remove this?
 		paramsJSON, err := json.Marshal(params)
@@ -733,8 +741,8 @@ func (n *Noto) wrapHookTransaction(domainConfig *types.NotoParsedConfig, functio
 
 	functionABI = penteInvokeABI(functionABI.Name, functionABI.Inputs)
 	penteParams := &PenteInvokeParams{
-		Group:  domainConfig.PrivateGroup,
-		To:     domainConfig.PrivateAddress,
+		Group:  domainConfig.Options.Hooks.PrivateGroup,
+		To:     domainConfig.Options.Hooks.PrivateAddress,
 		Inputs: params,
 	}
 	paramsJSON, err := json.Marshal(penteParams)
@@ -948,7 +956,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		Transaction: &prototk.TransactionInput{
 			Type:            mapSendTransactionType(transactionType),
 			From:            domainConfig.NotaryLookup,
-			ContractAddress: domainConfig.NotaryAddress.String(),
+			ContractAddress: domainConfig.Options.Hooks.NotaryAddress.String(),
 			FunctionAbiJson: string(functionABIJSON),
 			ParamsJson:      string(paramsJSON),
 		},

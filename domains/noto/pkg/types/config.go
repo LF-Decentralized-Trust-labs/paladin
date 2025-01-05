@@ -27,12 +27,14 @@ type DomainConfig struct {
 
 var NotoConfigID_V0 = tktypes.MustParseHexBytes("0x00010000")
 
+// This is the config we expect to receive from the contract registration event
 type NotoConfig_V0 struct {
 	NotaryAddress tktypes.EthAddress `json:"notaryAddress"`
 	Variant       tktypes.HexUint64  `json:"variant"`
 	Data          tktypes.HexBytes   `json:"data"`
 }
 
+// This is the structure we expect to unpack from the config data
 type NotoConfigData_V0 struct {
 	NotaryLookup   string              `json:"notaryLookup"`
 	NotaryType     tktypes.HexUint64   `json:"notaryType"`
@@ -44,15 +46,27 @@ type NotoConfigData_V0 struct {
 
 // This is the structure we parse the config into in InitConfig and gets passed back to us on every call
 type NotoParsedConfig struct {
-	NotaryLookup   string              `json:"notaryLookup"`
-	NotaryType     tktypes.HexUint64   `json:"notaryType"`
+	NotaryLookup string            `json:"notaryLookup"`
+	NotaryType   tktypes.HexUint64 `json:"notaryType"`
+	Variant      tktypes.HexUint64 `json:"variant"`
+	IsNotary     bool              `json:"isNotary"`
+	Options      NotoOptions       `json:"options"`
+}
+
+type NotoOptions struct {
+	Basic *NotoBasicOptions `json:"basic,omitempty"`
+	Hooks *NotoHooksOptions `json:"hooks,omitempty"`
+}
+
+type NotoBasicOptions struct {
+	RestrictMint bool `json:"restrictMint"`
+	AllowBurn    bool `json:"allowBurn"`
+}
+
+type NotoHooksOptions struct {
 	NotaryAddress  tktypes.EthAddress  `json:"notaryAddress"`
-	Variant        tktypes.HexUint64   `json:"variant"`
 	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"`
 	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`
-	RestrictMint   bool                `json:"restrictMint"`
-	AllowBurn      bool                `json:"allowBurn"`
-	IsNotary       bool                `json:"isNotary"`
 }
 
 type PentePrivateGroup struct {

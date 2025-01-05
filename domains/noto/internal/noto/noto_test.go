@@ -122,13 +122,16 @@ func TestInitContractOk(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, `{
-		"notaryAddress": "0x138baffcdcc3543aad1afd81c71d2182cdf9c8cd",
 		"notaryLookup": "notary@node1",
 		"isNotary": true,
 		"notaryType": "0x0",
-		"restrictMint": false,
-		"allowBurn": false,
-		"variant": "0x0"
+		"variant": "0x0",
+		"options": {
+			"basic": {
+				"restrictMint": false,
+				"allowBurn": false
+			}
+		}
 	}`, res.ContractConfig.ContractConfigJson)
 }
 
