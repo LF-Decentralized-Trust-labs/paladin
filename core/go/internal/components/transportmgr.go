@@ -30,6 +30,7 @@ import (
 type FireAndForgetMessageSend struct {
 	Node          string
 	Component     prototk.PaladinMsg_Component
+	MessageID     *uuid.UUID // optionally supplied by caller for request/reply correlation
 	CorrelationID *uuid.UUID
 	MessageType   string
 	Payload       []byte

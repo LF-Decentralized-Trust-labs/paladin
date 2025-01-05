@@ -259,6 +259,7 @@ func (p *peer) send(msg *prototk.PaladinMsg, reliableSeq *uint64) error {
 	err := p.tm.sendShortRetry.Do(p.ctx, func(attempt int) (retryable bool, err error) {
 		return true, p.transport.send(p.ctx, p.Name, msg)
 	})
+	log.L(p.ctx).Infof("Sent %s/%s message %s to %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, tktypes.StrOrEmpty(msg.CorrelationId))
 	if err == nil {
 		now := tktypes.TimestampNow()
 		p.statsLock.Lock()
@@ -277,6 +278,8 @@ func (p *peer) send(msg *prototk.PaladinMsg, reliableSeq *uint64) error {
 }
 
 func (p *peer) updateReceivedStats(msg *prototk.PaladinMsg) {
+	log.L(p.ctx).Infof("Received %s/%s message %s from %s (cid=%s)", msg.Component.String(), msg.MessageType, msg.MessageId, p.Name, tktypes.StrOrEmpty(msg.CorrelationId))
+
 	now := tktypes.TimestampNow()
 	p.statsLock.Lock()
 	defer p.statsLock.Unlock()

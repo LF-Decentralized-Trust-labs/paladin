@@ -174,6 +174,7 @@ func (ir *identityResolver) ResolveVerifierAsync(ctx context.Context, lookup str
 		}
 
 		err = ir.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+			MessageID:   &requestID,
 			MessageType: "ResolveVerifierRequest",
 			Component:   prototk.PaladinMsg_IDENTITY_RESOLVER,
 			Node:        remoteNodeId,

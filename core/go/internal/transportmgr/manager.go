@@ -241,8 +241,12 @@ func (tm *transportManager) Send(ctx context.Context, send *components.FireAndFo
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
+	if send.MessageID == nil {
+		msgID := uuid.New()
+		send.MessageID = &msgID
+	}
 	msg := &prototk.PaladinMsg{
-		MessageId:   uuid.NewString(),
+		MessageId:   send.MessageID.String(),
 		MessageType: send.MessageType,
 		Component:   send.Component,
 		Payload:     send.Payload,
