@@ -47,11 +47,20 @@ func (h *burnHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	return &BurnParams, nil
 }
 
+func (h *burnHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransaction) error {
+	if tx.DomainConfig.NotaryMode != types.NotaryModeBasic.Enum() {
+		return nil
+	}
+	if *tx.DomainConfig.Options.Basic.AllowBurn {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgNoBurning)
+}
+
 func (h *burnHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	notary := tx.DomainConfig.NotaryLookup
-
-	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && !tx.DomainConfig.Options.Basic.AllowBurn {
-		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
 	}
 
 	return &prototk.InitTransactionResponse{
@@ -144,9 +153,10 @@ func (h *burnHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *burnHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.BurnParams)
-	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && !tx.DomainConfig.Options.Basic.AllowBurn {
-		return nil, i18n.NewError(ctx, msgs.MsgNoBurning)
+	if err := h.checkAllowed(ctx, tx); err != nil {
+		return nil, err
 	}
+
 	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
@@ -247,7 +257,7 @@ func (h *burnHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.Options.Hooks.NotaryAddress,
+		contractAddress: tx.DomainConfig.Options.Hooks.PublicAddress,
 	}, nil
 }
 

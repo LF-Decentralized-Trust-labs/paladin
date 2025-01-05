@@ -87,6 +87,13 @@ public class DomainIntegrationTests {
             @JsonProperty
             String notaryMode,
             @JsonProperty
+            NotoOptionsJSON options
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record NotoOptionsJSON(
+            @JsonProperty
             NotoHookParamsJSON hooks
     ) {
     }
@@ -265,10 +272,11 @@ public class DomainIntegrationTests {
                     new NotoConstructorParamsJSON(
                             "notary@node1",
                             "hooks",
-                            new NotoHookParamsJSON(
-                                    penteInstanceAddress,
-                                    notoTrackerAddress,
-                                    groupInfo)));
+                            new NotoOptionsJSON(
+                                    new NotoHookParamsJSON(
+                                            penteInstanceAddress,
+                                            notoTrackerAddress,
+                                            groupInfo))));
             assertFalse(notoInstanceAddress.isBlank());
 
             // Perform Noto mint

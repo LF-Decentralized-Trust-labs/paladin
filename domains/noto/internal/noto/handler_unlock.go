@@ -324,7 +324,7 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.Options.Hooks.NotaryAddress,
+		contractAddress: tx.DomainConfig.Options.Hooks.PublicAddress,
 	}, nil
 }
 

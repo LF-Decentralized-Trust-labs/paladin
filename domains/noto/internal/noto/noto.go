@@ -335,7 +335,14 @@ func (n *Noto) InitDeploy(ctx context.Context, req *prototk.InitDeployRequest) (
 
 	switch params.NotaryMode {
 	case types.NotaryModeBasic:
+		// no required params
 	case types.NotaryModeHooks:
+		if params.Options.Hooks == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks")
+		}
+		if params.Options.Hooks.PublicAddress == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "options.hooks.notaryAddress")
+		}
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgParameterRequired, "notaryMode")
 	}
@@ -368,22 +375,25 @@ func (n *Noto) PrepareDeploy(ctx context.Context, req *prototk.PrepareDeployRequ
 
 	deployData := &types.NotoConfigData_V0{
 		NotaryLookup: notaryQualified.String(),
-		NotaryMode:   types.NotaryModeIntBasic,
-		RestrictMint: true,
-		AllowBurn:    true,
 	}
-	if params.RestrictMint != nil {
-		deployData.RestrictMint = *params.RestrictMint
-	}
-	if params.AllowBurn != nil {
-		deployData.AllowBurn = *params.AllowBurn
-	}
-
-	if params.Hooks != nil && !params.Hooks.PublicAddress.IsZero() {
-		notaryAddress = params.Hooks.PublicAddress
+	switch params.NotaryMode {
+	case types.NotaryModeBasic:
+		deployData.NotaryMode = types.NotaryModeIntBasic
+		deployData.RestrictMint = true
+		deployData.AllowBurn = true
+		if params.Options.Basic != nil {
+			if params.Options.Basic.RestrictMint != nil {
+				deployData.RestrictMint = *params.Options.Basic.RestrictMint
+			}
+			if params.Options.Basic.AllowBurn != nil {
+				deployData.AllowBurn = *params.Options.Basic.AllowBurn
+			}
+		}
+	case types.NotaryModeHooks:
 		deployData.NotaryMode = types.NotaryModeIntHooks
-		deployData.PrivateAddress = params.Hooks.PrivateAddress
-		deployData.PrivateGroup = params.Hooks.PrivateGroup
+		deployData.PrivateAddress = params.Options.Hooks.PrivateAddress
+		deployData.PrivateGroup = params.Options.Hooks.PrivateGroup
+		notaryAddress = params.Options.Hooks.PublicAddress
 	}
 
 	deployDataJSON, err := json.Marshal(deployData)
@@ -444,14 +454,14 @@ func (n *Noto) InitContract(ctx context.Context, req *prototk.InitContractReques
 	if decodedData.NotaryMode == types.NotaryModeIntHooks {
 		parsedConfig.NotaryMode = types.NotaryModeHooks.Enum()
 		parsedConfig.Options.Hooks = &types.NotoHooksOptions{
-			NotaryAddress:  domainConfig.NotaryAddress,
+			PublicAddress:  &domainConfig.NotaryAddress,
 			PrivateAddress: decodedData.PrivateAddress,
 			PrivateGroup:   decodedData.PrivateGroup,
 		}
 	} else {
 		parsedConfig.Options.Basic = &types.NotoBasicOptions{
-			RestrictMint: decodedData.RestrictMint,
-			AllowBurn:    decodedData.AllowBurn,
+			RestrictMint: &decodedData.RestrictMint,
+			AllowBurn:    &decodedData.AllowBurn,
 		}
 	}
 
@@ -965,7 +975,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		Transaction: &prototk.TransactionInput{
 			Type:            mapSendTransactionType(transactionType),
 			From:            domainConfig.NotaryLookup,
-			ContractAddress: domainConfig.Options.Hooks.NotaryAddress.String(),
+			ContractAddress: domainConfig.Options.Hooks.PublicAddress.String(),
 			FunctionAbiJson: string(functionABIJSON),
 			ParamsJson:      string(paramsJSON),
 		},

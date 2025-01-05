@@ -49,13 +49,26 @@ func (h *mintHandler) ValidateParams(ctx context.Context, config *types.NotoPars
 	return &mintParams, nil
 }
 
+func (h *mintHandler) checkAllowed(ctx context.Context, tx *types.ParsedTransaction, from string) error {
+	if tx.DomainConfig.NotaryMode != types.NotaryModeBasic.Enum() {
+		return nil
+	}
+	if !*tx.DomainConfig.Options.Basic.RestrictMint {
+		return nil
+	}
+	if from == tx.DomainConfig.NotaryLookup {
+		return nil
+	}
+	return i18n.NewError(ctx, msgs.MsgMintOnlyNotary, tx.DomainConfig.NotaryLookup, from)
+}
+
 func (h *mintHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
 	notary := tx.DomainConfig.NotaryLookup
-
-	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
-		return nil, i18n.NewError(ctx, msgs.MsgMintOnlyNotary, notary, req.Transaction.From)
+	if err := h.checkAllowed(ctx, tx, req.Transaction.From); err != nil {
+		return nil, err
 	}
+
 	return &prototk.InitTransactionResponse{
 		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
 			{
@@ -131,16 +144,16 @@ func (h *mintHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 
 func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.MintParams)
-	notary := tx.DomainConfig.NotaryLookup
+	if err := h.checkAllowed(ctx, tx, req.Transaction.From); err != nil {
+		return nil, err
+	}
+
 	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate the amounts, and if configured, ensure the sender is the notary
-	if tx.DomainConfig.NotaryMode == types.NotaryModeBasic.Enum() && tx.DomainConfig.Options.Basic.RestrictMint && req.Transaction.From != notary {
-		return nil, i18n.NewError(ctx, msgs.MsgMintOnlyNotary, notary, req.Transaction.From)
-	}
+	// Validate the amounts
 	if err := h.noto.validateMintAmounts(ctx, params, coins); err != nil {
 		return nil, err
 	}
@@ -231,7 +244,7 @@ func (h *mintHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.Options.Hooks.NotaryAddress,
+		contractAddress: tx.DomainConfig.Options.Hooks.PublicAddress,
 	}, nil
 }
 

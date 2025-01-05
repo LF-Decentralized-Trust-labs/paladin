@@ -19,38 +19,55 @@ export const notoConstructorABI = (
   inputs: [
     { name: "notary", type: "string" },
     { name: "notaryMode", type: "string" },
-    { name: "restrictMint", type: "bool" },
-    { name: "allowBurn", type: "bool" },
-    ...(withHooks
-      ? [
-          {
-            name: "hooks",
-            type: "tuple",
-            components: [
+    {
+      name: "options",
+      type: "tuple",
+      components: [
+        ...(withHooks
+          ? [
               {
-                name: "privateGroup",
+                name: "hooks",
                 type: "tuple",
-                components: penteGroupABI.components,
+                components: [
+                  {
+                    name: "privateGroup",
+                    type: "tuple",
+                    components: penteGroupABI.components,
+                  },
+                  { name: "publicAddress", type: "address" },
+                  { name: "privateAddress", type: "address" },
+                ],
               },
-              { name: "publicAddress", type: "address" },
-              { name: "privateAddress", type: "address" },
-            ],
-          },
-        ]
-      : []),
+            ]
+          : [
+              {
+                name: "basic",
+                type: "tuple",
+                components: [
+                  { name: "restrictMint", type: "bool" },
+                  { name: "allowBurn", type: "bool" },
+                ],
+              },
+            ]),
+      ],
+    },
   ],
 });
 
 export interface NotoConstructorParams {
   notary: PaladinVerifier;
   notaryMode: "basic" | "hooks";
-  hooks?: {
-    privateGroup?: IGroupInfo;
-    publicAddress?: string;
-    privateAddress?: string;
+  options: {
+    basic?: {
+      restrictMint: boolean;
+      allowBurn: boolean;
+    };
+    hooks?: {
+      publicAddress: string;
+      privateGroup?: IGroupInfo;
+      privateAddress?: string;
+    };
   };
-  restrictMint: boolean;
-  allowBurn: boolean;
 }
 
 export interface NotoMintParams {
@@ -124,7 +141,7 @@ export class NotoFactory {
     const txID = await this.paladin.sendTransaction({
       type: TransactionType.PRIVATE,
       domain: this.domain,
-      abi: [notoConstructorABI(!!data.hooks)],
+      abi: [notoConstructorABI(!!data.options.hooks)],
       function: "",
       from: from.lookup,
       data: {

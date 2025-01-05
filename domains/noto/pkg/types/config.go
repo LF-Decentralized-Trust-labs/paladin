@@ -59,14 +59,14 @@ type NotoOptions struct {
 }
 
 type NotoBasicOptions struct {
-	RestrictMint bool `json:"restrictMint"`
-	AllowBurn    bool `json:"allowBurn"`
+	RestrictMint *bool `json:"restrictMint"` // Only allow notary to mint (default: true)
+	AllowBurn    *bool `json:"allowBurn"`    // Allow token holders to burn their tokens (default: true)
 }
 
 type NotoHooksOptions struct {
-	NotaryAddress  tktypes.EthAddress  `json:"notaryAddress"`
-	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"`
-	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`
+	PublicAddress  *tktypes.EthAddress `json:"publicAddress"`            // Public address of the Pente privacy group
+	PrivateGroup   *PentePrivateGroup  `json:"privateGroup,omitempty"`   // Details on the Pente privacy group
+	PrivateAddress *tktypes.EthAddress `json:"privateAddress,omitempty"` // Private address of the hook contract deployed within the privacy group
 }
 
 type PentePrivateGroup struct {

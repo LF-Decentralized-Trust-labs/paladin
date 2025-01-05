@@ -173,8 +173,7 @@ public class BondTest {
                     new NotoHelper.ConstructorParams(
                             cashIssuer + "@node1",
                             "basic",
-                            null,
-                            true));
+                            null));
             assertFalse(notoCash.address().isBlank());
 
             // Create the public bond tracker on the base ledger (controlled by the privacy group)
@@ -203,11 +202,11 @@ public class BondTest {
                     new NotoHelper.ConstructorParams(
                             bondCustodian + "@node1",
                             "hooks",
-                            new NotoHelper.HookParams(
-                                    issuerCustodianInstance.address(),
-                                    bondTracker.address(),
-                                    issuerCustodianGroup),
-                            false));
+                            new NotoHelper.OptionsParams(
+                                    new NotoHelper.HookParams(
+                                            issuerCustodianInstance.address(),
+                                            bondTracker.address(),
+                                            issuerCustodianGroup))));
             assertFalse(notoBond.address().isBlank());
 
             // Issue cash to investors

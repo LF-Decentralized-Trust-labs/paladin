@@ -284,7 +284,7 @@ func (h *transferHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransa
 		transactionType: mapPrepareTransactionType(transactionType),
 		functionABI:     functionABI,
 		paramsJSON:      paramsJSON,
-		contractAddress: &tx.DomainConfig.Options.Hooks.NotaryAddress,
+		contractAddress: tx.DomainConfig.Options.Hooks.PublicAddress,
 	}, nil
 }
 

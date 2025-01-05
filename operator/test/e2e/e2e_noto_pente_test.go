@@ -622,10 +622,12 @@ var _ = Describe("noto/pente - simple", Ordered, func() {
 				From(notary).
 				Inputs(&nototypes.ConstructorParams{
 					Notary: notary,
-					Hooks: &nototypes.HookParams{
-						PublicAddress:  penteContract,
-						PrivateAddress: notoTrackerAddr,
-						PrivateGroup:   &penteGroupNodes1and2,
+					Options: nototypes.NotoOptions{
+						Hooks: &nototypes.NotoHooksOptions{
+							PublicAddress:  penteContract,
+							PrivateAddress: notoTrackerAddr,
+							PrivateGroup:   &penteGroupNodes1and2,
+						},
 					},
 				}).
 				Send().

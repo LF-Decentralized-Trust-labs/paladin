@@ -39,8 +39,12 @@ async function main(): Promise<boolean> {
   const notoCash = await notoFactory.newNoto(cashIssuer, {
     notary: cashIssuer,
     notaryMode: "basic",
-    restrictMint: true,
-    allowBurn: true,
+    options: {
+      basic: {
+        restrictMint: true,
+        allowBurn: true,
+      },
+    },
   });
   if (!checkDeploy(notoCash)) return false;
 
@@ -108,13 +112,13 @@ async function main(): Promise<boolean> {
   const notoBond = await notoFactory.newNoto(bondIssuer, {
     notary: bondCustodian,
     notaryMode: "hooks",
-    hooks: {
-      privateGroup: issuerCustodianGroup.group,
-      publicAddress: issuerCustodianGroup.address,
-      privateAddress: bondTracker.address,
+    options: {
+      hooks: {
+        privateGroup: issuerCustodianGroup.group,
+        publicAddress: issuerCustodianGroup.address,
+        privateAddress: bondTracker.address,
+      },
     },
-    restrictMint: false,
-    allowBurn: true,
   });
   if (!checkDeploy(notoBond)) return false;
 
