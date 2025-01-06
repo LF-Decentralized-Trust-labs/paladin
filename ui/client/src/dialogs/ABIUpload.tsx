@@ -53,7 +53,7 @@ export const ABIUploadDialog: React.FC<Props> = ({
   const [abiText, setAbiText] = useState('');
   const [abiUploadCount, setAbiUploadCount] = useState(0);
 
-  const { mutate, data, reset } = useMutation({
+  const { mutate, data, reset, error } = useMutation({
     mutationFn: (value: Object) => uploadABI(value)
   });
 
@@ -63,8 +63,15 @@ export const ABIUploadDialog: React.FC<Props> = ({
       setRadioSelection('file');
       setFileSelected(null);
       setAbiText('');
+      setErrorMessage(undefined);
     }
   }, [dialogOpen]);
+
+  useEffect(() => {
+    if(error !== null) {
+      setErrorMessage(t('invalidABI'));
+    }
+  }, [error]);
 
   const handleSubmit = async () => {
     setErrorMessage(undefined);
