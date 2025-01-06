@@ -42,6 +42,7 @@ type mockComponents struct {
 	registryManager  *componentmocks.RegistryManager
 	stateManager     *componentmocks.StateManager
 	domainManager    *componentmocks.DomainManager
+	keyManager       *componentmocks.KeyManager
 	txManager        *componentmocks.TXManager
 	privateTxManager *componentmocks.PrivateTxManager
 	identityResolver *componentmocks.IdentityResolver
@@ -52,6 +53,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.registryManager = componentmocks.NewRegistryManager(t)
 	mc.stateManager = componentmocks.NewStateManager(t)
 	mc.domainManager = componentmocks.NewDomainManager(t)
+	mc.keyManager = componentmocks.NewKeyManager(t)
 	mc.txManager = componentmocks.NewTXManager(t)
 	mc.privateTxManager = componentmocks.NewPrivateTxManager(t)
 	mc.identityResolver = componentmocks.NewIdentityResolver(t)
@@ -70,6 +72,7 @@ func newMockComponents(t *testing.T, realDB bool) *mockComponents {
 	mc.c.On("RegistryManager").Return(mc.registryManager).Maybe()
 	mc.c.On("StateManager").Return(mc.stateManager).Maybe()
 	mc.c.On("DomainManager").Return(mc.domainManager).Maybe()
+	mc.c.On("KeyManager").Return(mc.keyManager).Maybe()
 	mc.c.On("TxManager").Return(mc.txManager).Maybe()
 	mc.c.On("PrivateTxManager").Return(mc.privateTxManager).Maybe()
 	mc.c.On("IdentityResolver").Return(mc.identityResolver).Maybe()

@@ -25,7 +25,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-func (p *privateTxManager) buildNullifier(ctx context.Context, krc components.KeyResolutionContextLazyDB, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
+func (p *privateTxManager) BuildNullifier(ctx context.Context, kr components.KeyResolver, s *components.StateDistributionWithData) (*components.NullifierUpsert, error) {
 	// We need to call the signing engine with the local identity to build the nullifier
 	log.L(ctx).Infof("Generating nullifier for state %s on node %s (algorithm=%s,verifierType=%s,payloadType=%s)",
 		s.StateID, p.nodeName, *s.NullifierAlgorithm, *s.NullifierVerifierType, *s.NullifierPayloadType)
@@ -38,7 +38,7 @@ func (p *privateTxManager) buildNullifier(ctx context.Context, krc components.Ke
 
 	// Call the signing engine to build the nullifier
 	var nulliferBytes []byte
-	mapping, err := krc.KeyResolverLazyDB().ResolveKey(identifier, *s.NullifierAlgorithm, *s.NullifierVerifierType)
+	mapping, err := kr.ResolveKey(identifier, *s.NullifierAlgorithm, *s.NullifierVerifierType)
 	if err == nil {
 		nulliferBytes, err = p.components.KeyManager().Sign(ctx, mapping, *s.NullifierPayloadType, s.StateData.Bytes())
 	}
@@ -78,7 +78,7 @@ func (p *privateTxManager) BuildNullifiers(ctx context.Context, stateDistributio
 				continue
 			}
 
-			nullifier, err := p.buildNullifier(ctx, krc, s)
+			nullifier, err := p.BuildNullifier(ctx, krc.KeyResolverLazyDB(), s)
 			if err != nil {
 				return err
 			}
