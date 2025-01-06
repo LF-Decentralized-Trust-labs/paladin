@@ -312,10 +312,12 @@ func TestBuildAndPreparePrivateTXHTTPOk(t *testing.T) {
 			"ptx_getPreparedTransaction", rpcserver.RPCMethod1(func(ctx context.Context, suppliedID uuid.UUID) (*pldapi.PreparedTransaction, error) {
 				require.Equal(t, txID, suppliedID)
 				return &pldapi.PreparedTransaction{
-					ID: txID,
-					Transaction: pldapi.TransactionInput{
-						TransactionBase: pldapi.TransactionBase{
-							IdempotencyKey: "tx1",
+					PreparedTransactionBase: &pldapi.PreparedTransactionBase{
+						ID: txID,
+						Transaction: pldapi.TransactionInput{
+							TransactionBase: pldapi.TransactionBase{
+								IdempotencyKey: "tx1",
+							},
 						},
 					},
 				}, nil
