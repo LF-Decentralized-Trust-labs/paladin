@@ -381,6 +381,8 @@ func testConfig(t *testing.T) pldconf.PaladinConfig {
 	conf.RPCServer.WS.Disabled = true
 	conf.Log.Level = confutil.P("info")
 
+	conf.TransportManagerConfig.ReliableMessageWriter.BatchMaxSize = confutil.P(1)
+
 	conf.Wallets[0].Signer.KeyStore.Static.Keys["seed"] = pldconf.StaticKeyEntryConfig{
 		Encoding: "hex",
 		Inline:   tktypes.RandHex(32),

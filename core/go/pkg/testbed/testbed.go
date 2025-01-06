@@ -160,7 +160,7 @@ func unitTestComponentManagerStart(ctx context.Context, conf *pldconf.PaladinCon
 	return cm, err
 }
 
-func (tb *testbed) HandlePaladinMsg(context.Context, *components.TransportMessage) {
+func (tb *testbed) HandlePaladinMsg(context.Context, *components.ReceivedMessage) {
 	// no-op
 }
 
