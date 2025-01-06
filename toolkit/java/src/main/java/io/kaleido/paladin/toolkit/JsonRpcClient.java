@@ -18,7 +18,7 @@ package io.kaleido.paladin.toolkit;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class JsonRpcClient implements Closeable {
 
-    private static final Logger LOGGER = LogManager.getLogger(JsonRpcClient.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(JsonRpcClient.class);
 
     private final String uriString;
 

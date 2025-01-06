@@ -15,7 +15,7 @@
 
 package io.kaleido.paladin.pente.evmstate;
 
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Transaction;
@@ -31,7 +31,7 @@ import java.util.Optional;
 
 public class DebugEVMTracer implements OperationTracer {
 
-    private static final Logger logger = LogManager.getLogger(DebugEVMTracer.class);
+    private static final Logger logger = PaladinLogging.getLogger(DebugEVMTracer.class);
 
     @Override
     public void tracePreExecution(MessageFrame frame) {

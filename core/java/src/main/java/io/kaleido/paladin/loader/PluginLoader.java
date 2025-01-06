@@ -15,14 +15,14 @@
 
 package io.kaleido.paladin.loader;
 
+import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import io.kaleido.paladin.diagnostics.VirtualMachineDiagnostics;
+import io.kaleido.paladin.logging.PaladinLogging;
+import io.kaleido.paladin.toolkit.GRPCTargetConnector;
 import io.kaleido.paladin.toolkit.PluginControllerGrpc;
 import io.kaleido.paladin.toolkit.Service;
 import io.kaleido.paladin.toolkit.Service.PluginLoad;
-import io.grpc.ManagedChannel;
-import io.grpc.stub.StreamObserver;
-import io.kaleido.paladin.toolkit.GRPCTargetConnector;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 public class PluginLoader implements StreamObserver<PluginLoad> {
 
-    private static final Logger LOGGER = LogManager.getLogger(PluginLoader.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PluginLoader.class);
 
     static final long INITIAL_CONNECT_DELAY_MS = 250;
 
@@ -190,6 +190,7 @@ public class PluginLoader implements StreamObserver<PluginLoad> {
     }
 
     private synchronized void loadPlugin(PluginLoad loadInstruction, Plugin plugin) {
+        LOGGER.info("Loading plugin {} type={}", plugin.info.name(), plugin.info.pluginType());
         try {
             plugins.put(loadInstruction.getPlugin().getId(), plugin);
             plugin.loadAndStart();

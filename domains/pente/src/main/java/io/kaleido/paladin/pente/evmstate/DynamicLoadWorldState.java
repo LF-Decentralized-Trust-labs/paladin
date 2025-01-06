@@ -15,15 +15,15 @@
 
 package io.kaleido.paladin.pente.evmstate;
 
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
+import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.evm.account.Account;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.evm.worldstate.AbstractWorldUpdater;
 import org.hyperledger.besu.evm.worldstate.UpdateTrackingAccount;
-import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.evm.worldstate.WorldUpdater;
 
 import java.io.IOException;
@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 
 public class DynamicLoadWorldState implements org.hyperledger.besu.evm.worldstate.WorldState {
 
-    private static final Logger logger = LogManager.getLogger(DynamicLoadWorldState.class);
+    private static final Logger logger = PaladinLogging.getLogger(DynamicLoadWorldState.class);
 
     private final AccountLoader accountLoader;
 

@@ -15,24 +15,18 @@
 
 package io.kaleido.paladin.toolkit;
 
-import io.kaleido.paladin.toolkit.PluginControllerGrpc;
-import io.kaleido.paladin.toolkit.Service;
-import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
-import io.netty.util.concurrent.CompleteFuture;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
-import org.apache.logging.log4j.message.Message;
 
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.*;
 
 abstract class PluginInstance<MSG> {
 
-    private static final Logger LOGGER = LogManager.getLogger(PluginInstance.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PluginInstance.class);
 
     static final long INITIAL_CONNECT_DELAY_MS = 250;
 
@@ -42,7 +36,7 @@ abstract class PluginInstance<MSG> {
 
     private final String grpcTarget;
 
-    private final String pluginId;
+    protected final String pluginId;
 
     private final InFlight<UUID, MSG> inflightRequests = new InFlight<UUID, MSG>();
 
@@ -58,6 +52,8 @@ abstract class PluginInstance<MSG> {
 
     private StreamObserver<MSG> sendStream;
 
+    private final ExecutorService reconnectExecutor = Executors.newFixedThreadPool(1);
+
     public PluginInstance(String grpcTarget, String pluginId) {
         this.grpcTarget = grpcTarget;
         this.pluginId = pluginId;
@@ -67,6 +63,7 @@ abstract class PluginInstance<MSG> {
        in super() call otherwise we cannot guarantee the child constructor will have
        finished initializing variables before we go async */
     protected void init() {
+        LOGGER.info("scheduling connect for initialization of pluginId={}", pluginId);
         scheduleConnect();
     }
 
@@ -79,14 +76,16 @@ abstract class PluginInstance<MSG> {
     abstract MSG buildMessage(Service.Header header);
 
     public final synchronized void shutdown() {
+        LOGGER.info("plugin shutdown pluginId={}", pluginId);
         shuttingDown = true;
         if (channel != null) {
             channel.shutdownNow();
         }
+        reconnectExecutor.shutdown();
     }
 
     private synchronized void connectAndRegister() {
-        LOGGER.info("Plugin loader connecting to {}", grpcTarget);
+        LOGGER.info("Plugin instance connecting to {} pluginId={}", grpcTarget, pluginId);
         if (reconnect != null) {
             reconnect.cancel(false);
             reconnect = null;
@@ -94,10 +93,13 @@ abstract class PluginInstance<MSG> {
         try {
             if (channel == null || channel.isShutdown()) {
                 channel = GRPCTargetConnector.connect(grpcTarget);
+                LOGGER.error("Connected channel {} for pluginId={}", channel, pluginId);
                 stub = PluginControllerGrpc.newStub(channel);
+                LOGGER.error("Created stub {} for pluginId={}", stub, pluginId);
             }
             this.sendStream = connect(new StreamHandler());
             // Send the register - which will kick the server to send use messages to process
+            LOGGER.info("Plugin connected and sending register pluginId={}", pluginId);
             Service.Header registerHeader = newHeader(Service.Header.MessageType.REGISTER);
             this.sendStream.onNext(buildMessage(registerHeader));
             reconnectCount = 0;
@@ -147,11 +149,14 @@ abstract class PluginInstance<MSG> {
                 break;
             }
         }
-        LOGGER.info("Scheduling loader connect in {}ms", delay);
+        LOGGER.info("Scheduling plugin {} connect in {}ms", pluginId, delay);
         reconnectCount++;
         reconnect = new CompletableFuture<>();
-        reconnect.completeAsync(() -> { connectAndRegister(); return null; },
-                CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS));
+        reconnect.completeAsync(() -> {
+            LOGGER.info("Popping plugin {} connect on executor", pluginId);
+            connectAndRegister();
+            return null;
+        }, CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS, reconnectExecutor));
     }
 
     private UUID getCorrelationUUID(Service.Header header) {

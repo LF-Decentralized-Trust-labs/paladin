@@ -15,7 +15,7 @@
 
 package io.kaleido.paladin.toolkit;
 
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
@@ -23,13 +23,14 @@ import java.util.Map;
 
 abstract class PluginBase<MSG> {
 
-    private static final Logger LOGGER = LogManager.getLogger(PluginBase.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PluginBase.class);
 
     abstract PluginInstance<MSG> newPluginInstance(String grpcTarget, String instanceId);
 
     private final Map<String, PluginInstance<MSG>> instances = new HashMap<>();
 
     public synchronized void startInstance(String grpcTarget, String instanceId) {
+        LOGGER.info("starting plugin instance {}", instanceId);
         instances.put(instanceId, newPluginInstance(grpcTarget, instanceId));
     }
 

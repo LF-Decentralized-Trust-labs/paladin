@@ -18,6 +18,7 @@ package io.kaleido.paladin.testbed;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.toolkit.JsonABI;
 import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonRpcClient;
@@ -28,6 +29,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.kaleido.paladin.Main;
+import org.apache.logging.log4j.Logger;
 
 import java.io.Closeable;
 import java.io.File;
@@ -43,6 +45,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 public class Testbed implements Closeable {
+
+    private final Logger LOGGER = PaladinLogging.getLogger(Testbed.class);
 
     private final String yamlConfigMerged;
 
@@ -266,6 +270,7 @@ public class Testbed implements Closeable {
     }
 
     public void stop() throws ExecutionException, InterruptedException {
+        LOGGER.info("Stopping testbed");
         CompletableFuture<Integer> mainRun = getMainRun();
         if (mainRun != null) {
             Main.stop();

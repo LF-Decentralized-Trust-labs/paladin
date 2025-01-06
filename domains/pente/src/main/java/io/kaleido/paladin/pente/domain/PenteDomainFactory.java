@@ -15,12 +15,18 @@
 
 package io.kaleido.paladin.pente.domain;
 
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.toolkit.DomainBase;
 import io.kaleido.paladin.toolkit.DomainInstance;
+import org.apache.logging.log4j.Logger;
 
 public class PenteDomainFactory extends DomainBase {
+
+    private static final Logger LOGGER = PaladinLogging.getLogger(PenteDomainFactory.class);
+
     @Override
     protected DomainInstance newDomainInstance(String grpcTarget, String instanceId) {
+        LOGGER.info("starting paladin domain id={}", instanceId);
         return new PenteDomain(grpcTarget, instanceId);
     }
 }

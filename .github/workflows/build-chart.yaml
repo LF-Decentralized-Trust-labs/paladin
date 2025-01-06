@@ -96,6 +96,23 @@ jobs:
             -PpaladinImageTag=${{ inputs.paladin-image-tag }} \
             -PdeleteCluster=false
 
+      - name: Port-forward pprof endpoints
+        if: failure()
+        run: |
+          for i in 1 2 3; do
+            POD_NAME="paladin-node$i-0"
+            echo "Port-forwarding $POD_NAME on port $((6060 + i))"
+            kubectl port-forward pod/$POD_NAME $((6060 + i)):6060 -n ${{ env.NAMESPACE }} &
+          done
+          
+          sleep 10
+
+          for i in 1 2 3; do
+            POD_NAME="paladin-node$i-0"
+            curl "http://localhost:$((6060 + i))/debug/pprof/goroutine?debug=2" > goroutine_dump_node$i.txt
+            curl "http://localhost:$((6060 + i))/debug/javadump"
+          done
+
       - name: Save logs
         if: failure()
         run: |
@@ -113,22 +130,6 @@ jobs:
           kubectl get cm paladin-node2 -n ${{ env.NAMESPACE }} -o json > cm-2.json
           kubectl get cm paladin-node3 -n ${{ env.NAMESPACE }} -o json > cm-3.json
 
-
-      - name: Port-forward pprof endpoints
-        if: failure()
-        run: |
-          for i in 1 2 3; do
-            POD_NAME="paladin-node$i-0"
-            echo "Port-forwarding $POD_NAME on port $((6060 + i))"
-            kubectl port-forward pod/$POD_NAME $((6060 + i)):6060 -n ${{ env.NAMESPACE }} &
-          done
-          
-          sleep 10
-
-          for i in 1 2 3; do
-            POD_NAME="paladin-node$i-0"
-            curl "http://localhost:$((6060 + i))/debug/pprof/goroutine?debug=2" > goroutine_dump_node$i.txt
-          done
  
       - name: Upload logs
         if: failure()
