@@ -72,7 +72,7 @@ public class Main {
         PluginLoader loader = null;
 
         if (args.length < 2) {
-            throw new Error("usage: <config.paladin.yaml> <node|testbed>");
+            throw new Error("usage: <config.paladin.yaml> <engine|testbed>");
         }
         try {
             final String configFile = args[0];

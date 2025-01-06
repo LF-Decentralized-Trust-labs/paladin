@@ -382,7 +382,7 @@ func (r *PaladinReconciler) generateStatefulSetTemplate(node *corev1alpha1.Palad
 							},
 							Args: []string{
 								"/app/config/pldconf.paladin.yaml",
-								"testbed",
+								"engine",
 								"--logtostderr=true",
 								"--v=4",
 							},
