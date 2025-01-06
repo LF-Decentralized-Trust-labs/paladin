@@ -25,7 +25,6 @@ import (
 
 // The gRPC stream connected to by Transport plugins
 func (pm *pluginManager) ConnectTransport(stream prototk.PluginController_ConnectTransportServer) error {
-	pm.initMux.Lock()
 	handler := newPluginHandler(pm, prototk.PluginInfo_TRANSPORT, pm.transportPlugins, stream,
 		&plugintk.TransportMessageWrapper{},
 		func(plugin *plugin[prototk.TransportMessage], toPlugin managerToPlugin[prototk.TransportMessage]) (pluginToManager pluginToManager[prototk.TransportMessage], err error) {
@@ -42,8 +41,6 @@ func (pm *pluginManager) ConnectTransport(stream prototk.PluginController_Connec
 			}
 			return br, nil
 		})
-
-	pm.initMux.Unlock()
 
 	return handler.serve()
 }

@@ -403,19 +403,6 @@ task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyAllRegistriesPubli
         println 'Deploy setup completed. Operator is running in the paladin namespace.'
     }
 }
-
-// The 'e2e' task runs the whole flow
-task e2e(type: Exec, dependsOn: [deploy]) {
-    inputs.files(configurations.toolkitGo)
-    inputs.files(configurations.notoGo)
-    inputs.files(configurations.zetoGo)
-
-    executable 'make'
-    args 'test-e2e'
-    args "NAMESPACE=${namespace}"
-    args "CLUSTER_NAME=${clusterName}"
-}
-
  
 // Task to clean up resources
 task cleanCluster(type: Exec) {

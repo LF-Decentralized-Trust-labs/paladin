@@ -46,7 +46,6 @@ type pluginManager struct {
 	prototk.UnimplementedPluginControllerServer
 	bgCtx    context.Context
 	mux      *sync.Mutex
-	initMux  *sync.Mutex
 	listener net.Listener
 	server   *grpc.Server
 
@@ -92,8 +91,7 @@ func NewPluginManager(bgCtx context.Context,
 		notifySystemCommand:  make(chan prototk.PluginLoad_SysCommand, 1),
 		loadingProgressed:    make(chan *prototk.PluginLoadFailed, 1),
 
-		mux:     &sync.Mutex{},
-		initMux: &sync.Mutex{},
+		mux: &sync.Mutex{},
 	}
 	return pc
 }

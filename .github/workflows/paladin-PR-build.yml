@@ -28,6 +28,9 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          
+      - name: Install pre-requisites
+        uses: ./.github/actions/setup
 
       # Build with Gradle
       # This does not build any docker images, and does not run any dockerized tests.
