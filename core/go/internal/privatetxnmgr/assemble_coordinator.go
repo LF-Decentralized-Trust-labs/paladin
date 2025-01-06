@@ -182,7 +182,7 @@ func (req *assembleRequest) processRemote(ctx context.Context, assemblingNode st
 
 	log.L(ctx).Debugf("assembleRequest:processRemote requestID %s", requestID)
 
-	stateLocksJSON, err := req.assembleCoordinator.domainContext.ExportStateLocks()
+	stateLocksJSON, err := req.assembleCoordinator.domainContext.ExportSnapshot()
 	if err != nil {
 		return err
 	}

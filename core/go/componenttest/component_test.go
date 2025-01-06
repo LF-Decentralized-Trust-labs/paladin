@@ -915,12 +915,17 @@ func TestNotaryDelegatedPrepare(t *testing.T) {
 
 	assert.Eventually(t,
 		func() bool {
-			preparedTx := pldapi.PreparedTransaction{}
+			var preparedTx *pldapi.PreparedTransaction
 
-			err = client1.CallRPC(ctx, &preparedTx, "ptx_getPreparedTransaction", transferA2BTxId)
+			// The transaction is prepared with a from-address that is local to node3 - so only
+			// node3 will be able to send it. So that's where it gets persisted.
+			err = client3.CallRPC(ctx, &preparedTx, "ptx_getPreparedTransaction", transferA2BTxId)
 			require.NoError(t, err)
-			assert.Empty(t, preparedTx.Transaction.Domain)
 
+			if preparedTx == nil {
+				return false
+			}
+			assert.Empty(t, preparedTx.Transaction.Domain)
 			return preparedTx.ID == transferA2BTxId && len(preparedTx.States.Spent) == 1 && len(preparedTx.States.Confirmed) == 2
 
 		},

@@ -87,6 +87,8 @@ func (s *Sequencer) DispatchTransactions(ctx context.Context, dispatchableTransa
 				log.L(ctx).Infof("Result of transaction %s is a prepared transaction public=%t private=%t", preparedTransaction.ID, hasPublicTransaction, hasPrivateTransaction)
 				preparedTransactionWithRefs := mapPreparedTransaction(preparedTransaction)
 				dispatchBatch.PreparedTransactions = append(dispatchBatch.PreparedTransactions, preparedTransactionWithRefs)
+
+				// The prepared transaction needs to end up on the node that is able to submit it.
 				preparedTxnDistributions = append(preparedTxnDistributions, preparedTransactionWithRefs)
 
 			default:

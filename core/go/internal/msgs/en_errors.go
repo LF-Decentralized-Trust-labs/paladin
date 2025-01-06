@@ -106,6 +106,7 @@ var (
 	MsgStateIDMissing                 = ffe("PD010130", "The state id must be supplied for this domain")
 	MsgStateFlushInProgress           = ffe("PD010131", "A flush is already in progress for this domain context")
 	MsgDomainContextImportInvalidJSON = ffe("PD010132", "Attempted to import state locks but the JSON could not be parsed")
+	MsgDomainContextImportBadStates   = ffe("PD010133", "Attempted to import state failed")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
@@ -126,9 +127,9 @@ var (
 	MsgTransactionProcessorEmptyAssembledResult = ffe("PD010305", "No transaction was assembled for transaction with ID: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Missing %v")
 	MsgTransactionParseError           = ffe("PD010401", "Failed to parse transaction message.")
-	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialize transaction response.")
 	MsgTransactionInvalidTransactionID = ffe("PD010403", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Key manager PD0105XX

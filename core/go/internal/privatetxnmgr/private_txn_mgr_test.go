@@ -2851,8 +2851,8 @@ func NewPrivateTransactionMgrForPackageTesting(t *testing.T, nodeName string) (p
 
 	mocks.domainContext.On("Ctx").Return(ctx).Maybe()
 	mocks.domainContext.On("Info").Return(components.DomainContextInfo{ID: uuid.New()}).Maybe()
-	mocks.domainContext.On("ExportStateLocks").Return([]byte("[]"), nil).Maybe()
-	mocks.domainContext.On("ImportStateLocks", mock.Anything).Return(nil).Maybe()
+	mocks.domainContext.On("ExportSnapshot").Return([]byte("[]"), nil).Maybe()
+	mocks.domainContext.On("ImportSnapshot", mock.Anything).Return(nil).Maybe()
 
 	e := NewPrivateTransactionMgr(ctx, &pldconf.PrivateTxManagerConfig{
 		Writer: pldconf.FlushWriterConfig{

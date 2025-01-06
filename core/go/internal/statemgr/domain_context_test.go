@@ -162,16 +162,16 @@ func TestUpsertSchemaAndStates(t *testing.T) {
 	defer dc.Close()
 
 	upsert1 := &components.StateUpsert{
-		ID:       fakeHash1,
-		SchemaID: schemaID,
-		Data:     tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
+		ID:     fakeHash1,
+		Schema: schemaID,
+		Data:   tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
 	}
 	states, err := dc.UpsertStates(ss.p.DB(),
 		upsert1,
 		&components.StateUpsert{
-			ID:       fakeHash2,
-			SchemaID: schemaID,
-			Data:     tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
+			ID:     fakeHash2,
+			Schema: schemaID,
+			Data:   tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
 		},
 	)
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestStateLockErrorsTransaction(t *testing.T) {
 	zeroTxn := uuid.UUID{}
 	_, err = dc.UpsertStates(ss.p.DB(),
 		&components.StateUpsert{
-			SchemaID:  schemas[0].ID(),
+			Schema:    schemas[0].ID(),
 			Data:      tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0x1eDfD974fE6828dE81a1a762df680111870B7cDD", "salt": "%s"}`, tktypes.RandHex(32))),
 			CreatedBy: &zeroTxn,
 		},
@@ -229,7 +229,7 @@ func TestStateLockErrorsTransaction(t *testing.T) {
 
 	err = dc.AddStateLocks(&pldapi.StateLock{
 		Type:        pldapi.StateLockTypeCreate.Enum(),
-		State:       tktypes.RandBytes(32),
+		StateID:     tktypes.RandBytes(32),
 		Transaction: txn1,
 	})
 	require.Regexp(t, "PD010118", err) // create lock for state not in context
@@ -259,10 +259,10 @@ func TestStateContextMintSpendMint(t *testing.T) {
 
 	// Store some states
 	tx1states, err := dc.UpsertStates(ss.p.DB(),
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
-		&components.StateUpsert{SchemaID: infoSchema, Data: tktypes.RawJSON(fmt.Sprintf(`{"info": "some info", "salt": "%s"}`, tktypes.RandHex(32)))},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 100, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 10,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 75,  "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID1},
+		&components.StateUpsert{Schema: infoSchema, Data: tktypes.RawJSON(fmt.Sprintf(`{"info": "some info", "salt": "%s"}`, tktypes.RandHex(32)))},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx1states, 4)
@@ -270,7 +270,7 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	// Mark an in-memory read - doesn't affect it's availability
 	transactionID2 := uuid.New()
 	err = dc.AddStateLocks(
-		&pldapi.StateLock{Type: pldapi.StateLockTypeRead.Enum(), State: tx1states[1].ID, Transaction: transactionID2},
+		&pldapi.StateLock{Type: pldapi.StateLockTypeRead.Enum(), StateID: tx1states[1].ID, Transaction: transactionID2},
 	)
 	require.NoError(t, err)
 
@@ -279,12 +279,12 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	lockView := dc.StateLocksByTransaction()
 	assert.Equal(t, map[uuid.UUID][]pldapi.StateLock{
 		transactionID1: {
-			{Type: pldapi.StateLockTypeCreate.Enum(), State: tx1states[0].ID, Transaction: transactionID1},
-			{Type: pldapi.StateLockTypeCreate.Enum(), State: tx1states[1].ID, Transaction: transactionID1},
-			{Type: pldapi.StateLockTypeCreate.Enum(), State: tx1states[2].ID, Transaction: transactionID1},
+			{Type: pldapi.StateLockTypeCreate.Enum(), StateID: tx1states[0].ID, Transaction: transactionID1},
+			{Type: pldapi.StateLockTypeCreate.Enum(), StateID: tx1states[1].ID, Transaction: transactionID1},
+			{Type: pldapi.StateLockTypeCreate.Enum(), StateID: tx1states[2].ID, Transaction: transactionID1},
 		},
 		transactionID2: {
-			{Type: pldapi.StateLockTypeRead.Enum(), State: tx1states[1].ID, Transaction: transactionID2},
+			{Type: pldapi.StateLockTypeRead.Enum(), StateID: tx1states[1].ID, Transaction: transactionID2},
 		},
 	}, lockView)
 
@@ -307,15 +307,15 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	// Simulate a transaction where we spend two states, and create 2 new ones
 	transactionID3 := uuid.New()
 	err = dc.AddStateLocks(
-		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), State: tx1states[1].ID, Transaction: transactionID3}, // 10 +
-		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), State: tx1states[2].ID, Transaction: transactionID3}, // 75 +
+		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), StateID: tx1states[1].ID, Transaction: transactionID3}, // 10 +
+		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), StateID: tx1states[2].ID, Transaction: transactionID3}, // 75 +
 	)
 	require.NoError(t, err)
 
 	// Do a quick check on upsert semantics with un-flushed updates, to make sure the unflushed list doesn't dup
 	tx3states, err := dc.UpsertStates(ss.p.DB(),
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 35, "owner": "0xf7b1c69F5690993F2C8ecE56cc89D42b1e737180", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 50, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID3},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx3states, 2)
@@ -351,13 +351,13 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	// Write another transaction that splits a coin to two
 	transactionID4 := uuid.New()
 	err = dc.AddStateLocks(
-		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), State: tx3states[1].ID, Transaction: transactionID4}, // 50
-		&pldapi.StateLock{Type: pldapi.StateLockTypeRead.Enum(), State: tx1states[0].ID, Transaction: transactionID4},  // 100
+		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), StateID: tx3states[1].ID, Transaction: transactionID4}, // 50
+		&pldapi.StateLock{Type: pldapi.StateLockTypeRead.Enum(), StateID: tx1states[0].ID, Transaction: transactionID4},  // 100
 	)
 	require.NoError(t, err)
 	tx4states, err := dc.UpsertStates(ss.p.DB(),
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
-		&components.StateUpsert{SchemaID: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
+		&components.StateUpsert{Schema: schemaID, Data: tktypes.RawJSON(fmt.Sprintf(`{"amount": 30, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`, tktypes.RandHex(32))), CreatedBy: &transactionID4},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx4states, 2)
@@ -386,11 +386,11 @@ func TestStateContextMintSpendMint(t *testing.T) {
 	for _, lock := range dc.txLocks {
 		switch lock.Type.V() {
 		case pldapi.StateLockTypeSpend:
-			spends = append(spends, &pldapi.StateSpendRecord{DomainName: "domain1", State: lock.State, Transaction: lock.Transaction})
+			spends = append(spends, &pldapi.StateSpendRecord{DomainName: "domain1", State: lock.StateID, Transaction: lock.Transaction})
 		case pldapi.StateLockTypeRead:
-			reads = append(reads, &pldapi.StateReadRecord{DomainName: "domain1", State: lock.State, Transaction: lock.Transaction})
+			reads = append(reads, &pldapi.StateReadRecord{DomainName: "domain1", State: lock.StateID, Transaction: lock.Transaction})
 		case pldapi.StateLockTypeCreate:
-			confirms = append(confirms, &pldapi.StateConfirmRecord{DomainName: "domain1", State: lock.State, Transaction: lock.Transaction})
+			confirms = append(confirms, &pldapi.StateConfirmRecord{DomainName: "domain1", State: lock.StateID, Transaction: lock.Transaction})
 		}
 	}
 	// We add one extra spend that simulates something happening outside of this context
@@ -514,8 +514,8 @@ func TestStateContextMintSpendWithNullifier(t *testing.T) {
 
 	// Start with 2 states
 	tx1states, err := dc.UpsertStates(ss.p.DB(),
-		&components.StateUpsert{ID: stateID1, SchemaID: schemaID, Data: data1, CreatedBy: &transactionID1},
-		&components.StateUpsert{ID: stateID2, SchemaID: schemaID, Data: data2, CreatedBy: &transactionID1},
+		&components.StateUpsert{ID: stateID1, Schema: schemaID, Data: data1, CreatedBy: &transactionID1},
+		&components.StateUpsert{ID: stateID2, Schema: schemaID, Data: data2, CreatedBy: &transactionID1},
 	)
 	require.NoError(t, err)
 	assert.Len(t, tx1states, 2)
@@ -571,7 +571,7 @@ func TestStateContextMintSpendWithNullifier(t *testing.T) {
 	// Mark the first state as "spending"
 	transactionID2 := uuid.New()
 	err = dc.AddStateLocks(
-		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), State: stateID1, Transaction: transactionID2},
+		&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), StateID: stateID1, Transaction: transactionID2},
 	)
 	assert.NoError(t, err)
 
@@ -610,7 +610,7 @@ func TestStateContextMintSpendWithNullifier(t *testing.T) {
 	// - the creation of the nullifier in the DB might fail due to the state not existing
 	err = dc.UpsertNullifiers(&components.NullifierUpsert{State: stateID2, ID: nullifier2})
 	assert.Regexp(t, "PD010126", err)
-	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: stateID2, SchemaID: schemaID, Data: data2, CreatedBy: &transactionID1})
+	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: stateID2, Schema: schemaID, Data: data2, CreatedBy: &transactionID1})
 	require.NoError(t, err)
 	err = dc.UpsertNullifiers(&components.NullifierUpsert{State: stateID2, ID: nullifier2})
 	require.NoError(t, err)
@@ -676,10 +676,10 @@ func TestDomainContextFlushErrorCapture(t *testing.T) {
 	err = dc.AddStateLocks(&pldapi.StateLock{})
 	assert.Regexp(t, "PD010119.*pop", err) // needs reset
 
-	_, err = dc.ExportStateLocks()
+	_, err = dc.ExportSnapshot()
 	assert.Regexp(t, "PD010119.*pop", err) // needs reset
 
-	err = dc.ImportStateLocks([]byte("{}"))
+	err = dc.ImportSnapshot([]byte("{}"))
 	assert.Regexp(t, "PD010119.*pop", err) // needs reset
 
 	err = dc.AddStateLocks(&pldapi.StateLock{})
@@ -739,7 +739,7 @@ func TestDCMergeUnFlushedWhileFlushing(t *testing.T) {
 		tktypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
-	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, SchemaID: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
+	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
 
 	// Fake a flush transition
@@ -855,7 +855,7 @@ func TestDCMergeUnFlushedWhileFlushingDedup(t *testing.T) {
 		tktypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
-	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, SchemaID: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
+	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
 
 	// We add a second state, that will be excluded from the query due to a spending lock
@@ -863,9 +863,9 @@ func TestDCMergeUnFlushedWhileFlushingDedup(t *testing.T) {
 		`{"amount": 20, "owner": "0x615dD09124271D8008225054d85Ffe720E7a447A", "salt": "%s"}`,
 		tktypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
-	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s2.ID, SchemaID: schema.ID(), Data: s2.Data, CreatedBy: &tx1})
+	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s2.ID, Schema: schema.ID(), Data: s2.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
-	err = dc.AddStateLocks(&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), State: s2.ID, Transaction: tx1})
+	err = dc.AddStateLocks(&pldapi.StateLock{Type: pldapi.StateLockTypeSpend.Enum(), StateID: s2.ID, Transaction: tx1})
 	require.NoError(t, err)
 
 	// Fake a flush transition
@@ -908,7 +908,7 @@ func TestDCMergeUnFlushedEvalError(t *testing.T) {
 		tktypes.RandHex(32))), nil, dc.customHashFunction)
 	require.NoError(t, err)
 	tx1 := uuid.New()
-	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, SchemaID: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
+	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{ID: s1.ID, Schema: schema.ID(), Data: s1.Data, CreatedBy: &tx1})
 	require.NoError(t, err)
 
 	_, err = dc.mergeUnFlushedApplyLocks(schema, []*pldapi.State{},
@@ -995,7 +995,7 @@ func TestDCFindBadQueryAndInsertBadValue(t *testing.T) {
 	assert.Regexp(t, "PD010700", err)
 
 	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{
-		SchemaID: schemaID, Data: tktypes.RawJSON(`"wrong"`),
+		Schema: schemaID, Data: tktypes.RawJSON(`"wrong"`),
 	})
 	assert.Regexp(t, "FF22038", err)
 
@@ -1012,8 +1012,8 @@ func TestDCUpsertStatesFailSchemaLookup(t *testing.T) {
 	defer dc.Close()
 
 	_, err := dc.UpsertStates(ss.p.DB(), &components.StateUpsert{
-		ID:       tktypes.RandBytes(32),
-		SchemaID: tktypes.Bytes32(tktypes.RandBytes(32)),
+		ID:     tktypes.RandBytes(32),
+		Schema: tktypes.Bytes32(tktypes.RandBytes(32)),
 	})
 	assert.Regexp(t, "pop", err)
 
@@ -1030,19 +1030,19 @@ func TestDCResetWithMixedTxns(t *testing.T) {
 	state1 := tktypes.HexBytes("state1")
 	transactionID1 := uuid.New()
 	err := dc.AddStateLocks(
-		&pldapi.StateLock{State: state1, Type: pldapi.StateLockTypeRead.Enum(), Transaction: transactionID1})
+		&pldapi.StateLock{StateID: state1, Type: pldapi.StateLockTypeRead.Enum(), Transaction: transactionID1})
 	require.NoError(t, err)
 
 	state2 := tktypes.HexBytes("state2")
 	transactionID2 := uuid.New()
 	err = dc.AddStateLocks(
-		&pldapi.StateLock{State: state2, Type: pldapi.StateLockTypeSpend.Enum(), Transaction: transactionID2})
+		&pldapi.StateLock{StateID: state2, Type: pldapi.StateLockTypeSpend.Enum(), Transaction: transactionID2})
 	require.NoError(t, err)
 
 	dc.ResetTransactions(transactionID1)
 
 	assert.Len(t, dc.txLocks, 1)
-	assert.Equal(t, dc.txLocks[0].State, state2)
+	assert.Equal(t, dc.txLocks[0].StateID, state2)
 
 }
 
@@ -1086,7 +1086,7 @@ func TestCheckEvalGTTimestamp(t *testing.T) {
 
 }
 
-func TestExportStateLocks(t *testing.T) {
+func TestExportSnapshot(t *testing.T) {
 
 	ctx, ss, _, _, done := newDBMockStateManager(t)
 	defer done()
@@ -1120,13 +1120,13 @@ func TestExportStateLocks(t *testing.T) {
 		ss.p.DB(),
 		&components.StateUpsert{
 			ID:        s1.ID,
-			SchemaID:  schema1.ID(),
+			Schema:    schema1.ID(),
 			Data:      s1.Data,
 			CreatedBy: &transactionID1,
 		},
 		&components.StateUpsert{
 			ID:        s2.ID,
-			SchemaID:  schema2.ID(),
+			Schema:    schema2.ID(),
 			Data:      s2.Data,
 			CreatedBy: &transactionID2,
 		},
@@ -1136,37 +1136,49 @@ func TestExportStateLocks(t *testing.T) {
 	err = dc.AddStateLocks(
 		&pldapi.StateLock{
 			Type:        pldapi.StateLockTypeSpend.Enum(),
-			State:       s2.ID,
+			StateID:     s2.ID,
 			Transaction: transactionID3,
 		},
 	)
 	assert.NoError(t, err)
 
-	json, err := dc.ExportStateLocks()
+	json, err := dc.ExportSnapshot()
 	require.NoError(t, err)
-	assert.JSONEq(t, `
-		[
+	assert.JSONEq(t, `{
+		"locks": [
 			{
-				"stateID":"`+s1.ID.String()+`",
+				"stateId":"`+s1.ID.String()+`",
 				"transaction":"`+transactionID1.String()+`",
 				"type":"create"
 			},
 			{
-				"stateID":"`+s2.ID.String()+`",
+				"stateId":"`+s2.ID.String()+`",
 				"transaction":"`+transactionID2.String()+`",
 				"type":"create"
 			},
 			{
-				"stateID":"`+s2.ID.String()+`",
+				"stateId":"`+s2.ID.String()+`",
 				"transaction":"`+transactionID3.String()+`",
 				"type":"spend"
 			}
-		]`,
-		string(json),
+		],
+		"states": [
+		    {
+			   "id": "`+s1.ID.String()+`",
+			   "schema": "`+s1.Schema.String()+`",
+		       "data": `+s1.Data.String()+`
+		    },
+		    {
+			   "id": "`+s2.ID.String()+`",
+			   "schema": "`+s2.Schema.String()+`",
+		       "data": `+s2.Data.String()+`
+		    }
+		]
+	}`, string(json),
 	)
 }
 
-func TestImportStateLocks(t *testing.T) {
+func TestImportSnapshot(t *testing.T) {
 
 	ctx, ss, _, done := newDBTestStateManager(t)
 	defer done()
@@ -1204,28 +1216,29 @@ func TestImportStateLocks(t *testing.T) {
 	transactionID2 := uuid.New()
 	transactionID3 := uuid.New()
 
-	_, err = dc.UpsertStates(ss.p.DB(),
-		&components.StateUpsert{
-			ID:       s1.ID,
-			SchemaID: schema1.ID(),
-			Data:     s1.Data,
+	stateUpserts := []*components.StateUpsert{
+		{
+			ID:     s1.ID,
+			Schema: schema1.ID(),
+			Data:   s1.Data,
 		},
-		&components.StateUpsert{
-			ID:       s2.ID,
-			SchemaID: schema1.ID(),
-			Data:     s2.Data,
+		{
+			ID:     s2.ID,
+			Schema: schema1.ID(),
+			Data:   s2.Data,
 		},
-		&components.StateUpsert{
-			ID:       s4.ID,
-			SchemaID: schema1.ID(),
-			Data:     s4.Data,
+		{
+			ID:     s4.ID,
+			Schema: schema1.ID(),
+			Data:   s4.Data,
 		},
-		&components.StateUpsert{
-			ID:       s5.ID,
-			SchemaID: schema1.ID(),
-			Data:     s5.Data,
+		{
+			ID:     s5.ID,
+			Schema: schema1.ID(),
+			Data:   s5.Data,
 		},
-	)
+	}
+	_, err = dc.UpsertStates(ss.p.DB(), stateUpserts...)
 	require.NoError(t, err)
 
 	//imported locks include
@@ -1235,8 +1248,8 @@ func TestImportStateLocks(t *testing.T) {
 	// - state4 created by transaction3 for which we do have the data
 	// and does not include state5 even though we do have the data for that
 	// so after all that, the only available states should be state1 and state 4
-	jsonToImport := fmt.Sprintf(`
-		[
+	jsonToImport := fmt.Sprintf(`{
+		"locks": [
 			{
 				"stateID":"%s",
 				"transaction":"%s",
@@ -1262,7 +1275,9 @@ func TestImportStateLocks(t *testing.T) {
 				"transaction":"%s",
 				"type":"spend"
 			}
-		]`,
+		],
+		"states": `+tktypes.JSONString(stateUpserts).Pretty()+`
+	}`,
 		s1.ID.String(), transactionID1.String(),
 		s2.ID.String(), transactionID2.String(),
 		s3ID, transactionID3.String(),
@@ -1270,7 +1285,7 @@ func TestImportStateLocks(t *testing.T) {
 		s2.ID.String(), transactionID3.String(),
 	)
 
-	err = dc.ImportStateLocks([]byte(jsonToImport))
+	err = dc.ImportSnapshot([]byte(jsonToImport))
 	require.NoError(t, err)
 	_, states, err := dc.FindAvailableStates(ss.p.DB(), schema1.ID(), query.NewQueryBuilder().Query())
 	require.NoError(t, err)
@@ -1280,7 +1295,28 @@ func TestImportStateLocks(t *testing.T) {
 
 }
 
-func TestImportStateLocksJSONError(t *testing.T) {
+func TestImportSnapshotBadStates(t *testing.T) {
+
+	ctx, ss, _, done := newDBTestStateManager(t)
+	defer done()
+
+	_, dc := newTestDomainContext(t, ctx, ss, "domain1", false)
+	defer dc.Close()
+
+	err := dc.ImportSnapshot([]byte(`{
+		"states": [
+			{
+				"id": "` + tktypes.RandHex(32) + `",
+				"schema": "` + tktypes.RandHex(32) + `",
+				"data": {}
+			}
+		]
+	}`))
+	require.Regexp(t, "PD010133.*PD010106" /* unknown state schema */, err)
+
+}
+
+func TestImportSnapshotJSONError(t *testing.T) {
 
 	ctx, ss, _, _, done := newDBMockStateManager(t)
 	defer done()
@@ -1294,7 +1330,7 @@ func TestImportStateLocksJSONError(t *testing.T) {
 			}
 		]`
 
-	err := dc.ImportStateLocks([]byte(jsonToImport))
+	err := dc.ImportSnapshot([]byte(jsonToImport))
 	assert.Error(t, err)
 	assert.Regexp(t, "PD010132", err)
 

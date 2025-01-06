@@ -136,7 +136,7 @@ func (tm *transportManager) handleReliableMsgBatch(ctx context.Context, dbTX *go
 			for _, s := range states {
 				_, err := tm.stateManager.WriteReceivedStates(ctx, dbTX, domain, []*components.StateUpsertOutsideContext{s.state})
 				if err != nil {
-					log.L(ctx).Errorf("insert state %s from message %s for domain %s failed - attempting each individually: %s", s.state.ID, s.ack.id, domain, batchErr)
+					log.L(ctx).Errorf("insert state %s from message %s for domain %s failed: %s", s.state.ID, s.ack.id, domain, batchErr)
 					s.ack.Error = err.Error()
 				}
 			}
@@ -277,6 +277,7 @@ func parseStateDistribution(ctx context.Context, msgID uuid.UUID, data []byte) (
 	var contractAddr *tktypes.EthAddress
 	err = json.Unmarshal(data, &sd)
 	if err == nil {
+		parsed.Data = sd.StateData
 		parsed.ID, err = tktypes.ParseHexBytes(ctx, sd.StateID)
 	}
 	if err == nil {

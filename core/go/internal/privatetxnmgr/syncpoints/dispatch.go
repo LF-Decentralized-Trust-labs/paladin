@@ -30,7 +30,7 @@ import (
 type dispatchOperation struct {
 	publicDispatches     []*PublicDispatch
 	privateDispatches    []*components.ValidatedTransaction
-	preparedTransactions []*components.PreparedTransactionWithRefs
+	localPreparedTxns    []*components.PreparedTransactionWithRefs
 	preparedReliableMsgs []*components.ReliableMessage
 }
 
@@ -62,13 +62,18 @@ func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contrac
 	preparedReliableMsgs := make([]*components.ReliableMessage, 0,
 		len(dispatchBatch.PreparedTransactions)+len(stateDistributions))
 
+	var localPreparedTxns []*components.PreparedTransactionWithRefs
 	for _, preparedTxnDistribution := range preparedTxnDistributions {
 		node, _ := tktypes.PrivateIdentityLocator(preparedTxnDistribution.Transaction.From).Node(dCtx.Ctx(), false)
-		preparedReliableMsgs = append(preparedReliableMsgs, &components.ReliableMessage{
-			Node:        node,
-			MessageType: components.RMTPreparedTransaction.Enum(),
-			Metadata:    tktypes.JSONString(preparedTxnDistribution),
-		})
+		if node != s.transportMgr.LocalNodeName() {
+			preparedReliableMsgs = append(preparedReliableMsgs, &components.ReliableMessage{
+				Node:        node,
+				MessageType: components.RMTPreparedTransaction.Enum(),
+				Metadata:    tktypes.JSONString(preparedTxnDistribution),
+			})
+		} else {
+			localPreparedTxns = append(localPreparedTxns, preparedTxnDistribution)
+		}
 	}
 
 	for _, stateDistribution := range stateDistributions {
@@ -87,7 +92,7 @@ func (s *syncPoints) PersistDispatchBatch(dCtx components.DomainContext, contrac
 		dispatchOperation: &dispatchOperation{
 			publicDispatches:     dispatchBatch.PublicDispatches,
 			privateDispatches:    dispatchBatch.PrivateDispatches,
-			preparedTransactions: dispatchBatch.PreparedTransactions,
+			localPreparedTxns:    localPreparedTxns,
 			preparedReliableMsgs: preparedReliableMsgs,
 		},
 	})
@@ -177,10 +182,10 @@ func (s *syncPoints) writeDispatchOperations(ctx context.Context, dbTX *gorm.DB,
 			postCommits = append(postCommits, txPostCommit)
 		}
 
-		if len(op.preparedTransactions) > 0 {
-			log.L(ctx).Debugf("Writing prepared transactions locally  %d", len(op.preparedTransactions))
+		if len(op.localPreparedTxns) > 0 {
+			log.L(ctx).Debugf("Writing prepared transactions locally  %d", len(op.localPreparedTxns))
 
-			txPostCommit, err := s.txMgr.WritePreparedTransactions(ctx, dbTX, op.preparedTransactions)
+			txPostCommit, err := s.txMgr.WritePreparedTransactions(ctx, dbTX, op.localPreparedTxns)
 			if err != nil {
 				log.L(ctx).Errorf("Error persisting prepared transactions: %s", err)
 				return nil, err

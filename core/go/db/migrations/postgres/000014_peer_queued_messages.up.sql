@@ -15,7 +15,7 @@ CREATE TABLE reliable_msgs (
     "metadata"           TEXT
 );
 
-CREATE INDEX reliable_msgs_id ON reliable_msgs ("id");
+CREATE UNIQUE INDEX reliable_msgs_id ON reliable_msgs ("id");
 CREATE INDEX reliable_msgs_node ON reliable_msgs ("node");
 CREATE INDEX reliable_msgs_created ON reliable_msgs ("created");
 

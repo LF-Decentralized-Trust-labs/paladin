@@ -97,10 +97,10 @@ type DomainContext interface {
 	FindAvailableStates(dbTX *gorm.DB, schemaID tktypes.Bytes32, query *query.QueryJSON) (Schema, []*pldapi.State, error)
 
 	// Return a snapshot of all currently known state locks
-	ExportStateLocks() ([]byte, error)
+	ExportSnapshot() ([]byte, error)
 
-	// ImportStateLocks is used to restore the state of the domain context, by adding a set of locks
-	ImportStateLocks([]byte) error
+	// ImportSnapshot is used to restore the state of the domain context, by adding a set of locks
+	ImportSnapshot([]byte) error
 
 	// FindAvailableNullifiers is similar to FindAvailableStates, but for domains that leverage
 	// nullifiers to record spending.
@@ -171,10 +171,10 @@ type DomainContext interface {
 }
 
 type StateUpsert struct {
-	ID        tktypes.HexBytes
-	SchemaID  tktypes.Bytes32
-	Data      tktypes.RawJSON
-	CreatedBy *uuid.UUID
+	ID        tktypes.HexBytes `json:"id"`
+	Schema    tktypes.Bytes32  `json:"schema"`
+	Data      tktypes.RawJSON  `json:"data"`
+	CreatedBy *uuid.UUID       `json:"createdBy,omitempty"` // not exported
 }
 
 type StateUpsertOutsideContext struct {
