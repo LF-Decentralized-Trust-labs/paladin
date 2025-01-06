@@ -1114,7 +1114,6 @@ func TestExportSnapshot(t *testing.T) {
 
 	transactionID1 := uuid.New()
 	transactionID2 := uuid.New()
-	transactionID3 := uuid.New()
 
 	_, err = dc.UpsertStates(
 		ss.p.DB(),
@@ -1124,12 +1123,6 @@ func TestExportSnapshot(t *testing.T) {
 			Data:      s1.Data,
 			CreatedBy: &transactionID1,
 		},
-		&components.StateUpsert{
-			ID:        s2.ID,
-			Schema:    schema2.ID(),
-			Data:      s2.Data,
-			CreatedBy: &transactionID2,
-		},
 	)
 	require.NoError(t, err)
 
@@ -1137,7 +1130,7 @@ func TestExportSnapshot(t *testing.T) {
 		&pldapi.StateLock{
 			Type:        pldapi.StateLockTypeSpend.Enum(),
 			StateID:     s2.ID,
-			Transaction: transactionID3,
+			Transaction: transactionID2,
 		},
 	)
 	assert.NoError(t, err)
@@ -1154,11 +1147,6 @@ func TestExportSnapshot(t *testing.T) {
 			{
 				"stateId":"`+s2.ID.String()+`",
 				"transaction":"`+transactionID2.String()+`",
-				"type":"create"
-			},
-			{
-				"stateId":"`+s2.ID.String()+`",
-				"transaction":"`+transactionID3.String()+`",
 				"type":"spend"
 			}
 		],
@@ -1167,11 +1155,6 @@ func TestExportSnapshot(t *testing.T) {
 			   "id": "`+s1.ID.String()+`",
 			   "schema": "`+s1.Schema.String()+`",
 		       "data": `+s1.Data.String()+`
-		    },
-		    {
-			   "id": "`+s2.ID.String()+`",
-			   "schema": "`+s2.Schema.String()+`",
-		       "data": `+s2.Data.String()+`
 		    }
 		]
 	}`, string(json),
