@@ -191,7 +191,7 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 	tm.peers[nodeName] = p
 
 	if sending {
-		p.OutboundError = p.startSender()
+		p.OutboundTransport, p.OutboundError = p.startSender()
 		if p.OutboundError != nil {
 			// Note the peer is still in our list, but not connected for send.
 			// This means status can be reported for it.
@@ -202,12 +202,12 @@ func (tm *transportManager) connectPeer(ctx context.Context, nodeName string, se
 	return p, nil
 }
 
-func (p *peer) startSender() error {
+func (p *peer) startSender() (string, error) {
 	// Note the registry is responsible for caching to make this call as efficient as if
 	// we maintained the transport details in-memory ourselves.
 	registeredTransportDetails, err := p.tm.registryManager.GetNodeTransports(p.ctx, p.Name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// See if any of the transports registered by the node, are configured on this local node
@@ -224,7 +224,7 @@ func (p *peer) startSender() error {
 		for _, rtd := range registeredTransportDetails {
 			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
 		}
-		return i18n.NewError(p.ctx, msgs.MsgTransportNoTransportsConfiguredForNode, p.Name, registeredTransportNames)
+		return "", i18n.NewError(p.ctx, msgs.MsgTransportNoTransportsConfiguredForNode, p.Name, registeredTransportNames)
 	}
 
 	// Activate the connection (the deactivate is deferred to the send loop)
@@ -233,7 +233,7 @@ func (p *peer) startSender() error {
 		TransportDetails: remoteTransportDetails,
 	})
 	if err != nil {
-		return err
+		return p.transport.name, err
 	}
 	if err = json.Unmarshal([]byte(res.PeerInfoJson), &p.Outbound); err != nil {
 		// We've already activated at this point, so we need to keep going - but this
@@ -245,7 +245,7 @@ func (p *peer) startSender() error {
 	log.L(p.ctx).Debugf("connected to peer '%s'", p.Name)
 	p.senderStarted.Store(true)
 	go p.sender()
-	return nil
+	return p.transport.name, nil
 }
 
 func (p *peer) notifyPersistedMsgAvailable() {

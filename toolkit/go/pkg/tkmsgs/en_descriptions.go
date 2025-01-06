@@ -243,3 +243,22 @@ var (
 	OnChainLocationLogIndex               = ffm("OnChainLocation.logIndex", "The log index within the transaction of the event")
 	ActiveFlagActive                      = ffm("ActiveFlag.active", "When querying with an activeFilter of 'any' or 'inactive', this boolean shows if the entry/property is active or not")
 )
+
+// pldclient/transport.go
+var (
+	PeerInfoName              = ffm("PeerInfo.name", "The name of the peer node")
+	PeerInfoStats             = ffm("PeerInfo.stats", "Statistics for the outbound and inbound data transfer")
+	PeerInfoActivated         = ffm("PeerInfo.activated", "The time when the peer was activated by an attempt to send data, or data arriving on a transport from this peer")
+	PeerInfoOutbound          = ffm("PeerInfo.outbound", "Transport specific information about an established outbound connection to the peer. Omitted if the peer does not have an established outbound connection")
+	PeerInfoOutboundTransport = ffm("PeerInfo.outboundTransport", "The name of the transport selected for outbound connection to the peer. Omitted if no attempt to send data has occurred for this peer")
+	PeerInfoOutboundError     = ffm("PeerInfo.outboundError", "Contains an error if attempting to send data, and the transport connection failed")
+
+	PeerStatsSentMsgs            = ffm("PeerStats.sentMsgs", "Count of messages sent since activation of this peer")
+	PeerStatsReceivedMsgs        = ffm("PeerStats.receivedMsgs", "Count of messages received since activation of this peer")
+	PeerStatsSentBytes           = ffm("PeerStats.sentBytes", "Count of payload bytes sent since activation of this peer (does not include header data)")
+	PeerStatsReceivedBytes       = ffm("PeerStats.receivedBytes", "Count of payload bytes received since activation of this peer (does not include header data)")
+	PeerStatsLastSend            = ffm("PeerStats.lastSend", "Timestamp of the last send to this peer")
+	PeerStatsLastReceive         = ffm("PeerStats.lastReceive", "Timestamp of the last receive from this peer")
+	PeerStatsReliableHighestSent = ffm("PeerStats.reliableHighestSent", "Outbound reliable messages are assigned a sequence. This is the highest sequence sent to the peer since activation")
+	PeerStatsReliableAckBase     = ffm("PeerStats.reliableAckBase", "Outbound reliable messages are assigned a sequence. This is the lowest sequence that has not received an acknowledgement from the peer")
+)

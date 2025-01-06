@@ -19,11 +19,12 @@ package pldapi
 import "github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 
 type PeerInfo struct {
-	Name          string            `docstruct:"PeerInfo" json:"name"`
-	Stats         PeerStats         `docstruct:"PeerInfo" json:"stats"`
-	Activated     tktypes.Timestamp `docstruct:"PeerInfo" json:"activated"`
-	Outbound      map[string]any    `docstruct:"PeerInfo" json:"outbound,omitempty"`
-	OutboundError error             `docstruct:"PeerInfo" json:"outboundError,omitempty"`
+	Name              string            `docstruct:"PeerInfo" json:"name"`
+	Stats             PeerStats         `docstruct:"PeerInfo" json:"stats"`
+	Activated         tktypes.Timestamp `docstruct:"PeerInfo" json:"activated"`
+	OutboundTransport string            `docstruct:"PeerInfo" json:"outboundTransport,omitempty"`
+	Outbound          map[string]any    `docstruct:"PeerInfo" json:"outbound,omitempty"`
+	OutboundError     error             `docstruct:"PeerInfo" json:"outboundError,omitempty"`
 }
 
 type PeerStats struct {

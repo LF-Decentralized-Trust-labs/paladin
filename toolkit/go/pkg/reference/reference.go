@@ -113,6 +113,7 @@ var allTypes = []interface{}{
 	pldapi.IndexedEvent{},
 	pldapi.EventWithData{},
 	pldapi.ABIDecodedData{},
+	pldapi.PeerInfo{},
 	tktypes.JSONFormatOptions(""),
 	pldapi.StateStatusQualifier(""),
 	query.QueryJSON{
