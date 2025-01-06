@@ -28,8 +28,8 @@ type TransportAPI interface {
 	ConfigureTransport(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
 	SendMessage(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
 	GetLocalDetails(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
-	ActivateNode(context.Context, *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error)
-	DeactivateNode(context.Context, *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error)
+	ActivatePeer(context.Context, *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error)
+	DeactivatePeer(context.Context, *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error)
 }
 
 type TransportCallbacks interface {
@@ -130,13 +130,13 @@ func (th *transportHandler) RequestToPlugin(ctx context.Context, iReq PluginMess
 		resMsg := &prototk.TransportMessage_GetLocalDetailsRes{}
 		resMsg.GetLocalDetailsRes, err = th.api.GetLocalDetails(ctx, input.GetLocalDetails)
 		res.ResponseFromTransport = resMsg
-	case *prototk.TransportMessage_ActivateNode:
-		resMsg := &prototk.TransportMessage_ActivateNodeRes{}
-		resMsg.ActivateNodeRes, err = th.api.ActivateNode(ctx, input.ActivateNode)
+	case *prototk.TransportMessage_ActivatePeer:
+		resMsg := &prototk.TransportMessage_ActivatePeerRes{}
+		resMsg.ActivatePeerRes, err = th.api.ActivatePeer(ctx, input.ActivatePeer)
 		res.ResponseFromTransport = resMsg
-	case *prototk.TransportMessage_DeactivateNode:
-		resMsg := &prototk.TransportMessage_DeactivateNodeRes{}
-		resMsg.DeactivateNodeRes, err = th.api.DeactivateNode(ctx, input.DeactivateNode)
+	case *prototk.TransportMessage_DeactivatePeer:
+		resMsg := &prototk.TransportMessage_DeactivatePeerRes{}
+		resMsg.DeactivatePeerRes, err = th.api.DeactivatePeer(ctx, input.DeactivatePeer)
 		res.ResponseFromTransport = resMsg
 	default:
 		err = i18n.NewError(ctx, tkmsgs.MsgPluginUnsupportedRequest, input)
@@ -170,8 +170,8 @@ type TransportAPIFunctions struct {
 	ConfigureTransport func(context.Context, *prototk.ConfigureTransportRequest) (*prototk.ConfigureTransportResponse, error)
 	SendMessage        func(context.Context, *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error)
 	GetLocalDetails    func(context.Context, *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error)
-	ActivateNode       func(context.Context, *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error)
-	DeactivateNode     func(context.Context, *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error)
+	ActivatePeer       func(context.Context, *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error)
+	DeactivatePeer     func(context.Context, *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error)
 }
 
 type TransportAPIBase struct {
@@ -190,10 +190,10 @@ func (tb *TransportAPIBase) GetLocalDetails(ctx context.Context, req *prototk.Ge
 	return callPluginImpl(ctx, req, tb.Functions.GetLocalDetails)
 }
 
-func (tb *TransportAPIBase) ActivateNode(ctx context.Context, req *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-	return callPluginImpl(ctx, req, tb.Functions.ActivateNode)
+func (tb *TransportAPIBase) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+	return callPluginImpl(ctx, req, tb.Functions.ActivatePeer)
 }
 
-func (tb *TransportAPIBase) DeactivateNode(ctx context.Context, req *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
-	return callPluginImpl(ctx, req, tb.Functions.DeactivateNode)
+func (tb *TransportAPIBase) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
+	return callPluginImpl(ctx, req, tb.Functions.DeactivatePeer)
 }

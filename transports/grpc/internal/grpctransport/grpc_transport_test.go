@@ -204,7 +204,7 @@ func TestActivateBadTransportDetails(t *testing.T) {
 	})
 	defer done()
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: `{"endpoint": false}`,
 	})
@@ -219,7 +219,7 @@ func TestConnectBadTransport(t *testing.T) {
 	plugin1, _, done := newSuccessfulVerifiedConnection(t)
 	defer done()
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: `{"endpoint": "WRONG:::::::"}`,
 	})

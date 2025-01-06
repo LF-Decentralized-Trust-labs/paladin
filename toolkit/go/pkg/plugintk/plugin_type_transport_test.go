@@ -139,37 +139,37 @@ func TestTransportFunction_GetLocalDetails(t *testing.T) {
 	})
 }
 
-func TestTransportFunction_ActivateNode(t *testing.T) {
+func TestTransportFunction_ActivatePeer(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupTransportTests(t)
 	defer done()
 
 	// InitTransport - paladin to transport
-	funcs.ActivateNode = func(ctx context.Context, cdr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-		return &prototk.ActivateNodeResponse{}, nil
+	funcs.ActivatePeer = func(ctx context.Context, cdr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+		return &prototk.ActivatePeerResponse{}, nil
 	}
 	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
-		req.RequestToTransport = &prototk.TransportMessage_ActivateNode{
-			ActivateNode: &prototk.ActivateNodeRequest{},
+		req.RequestToTransport = &prototk.TransportMessage_ActivatePeer{
+			ActivatePeer: &prototk.ActivatePeerRequest{},
 		}
 	}, func(res *prototk.TransportMessage) {
-		assert.IsType(t, &prototk.TransportMessage_ActivateNodeRes{}, res.ResponseFromTransport)
+		assert.IsType(t, &prototk.TransportMessage_ActivatePeerRes{}, res.ResponseFromTransport)
 	})
 }
 
-func TestTransportFunction_DeactivateNode(t *testing.T) {
+func TestTransportFunction_DeactivatePeer(t *testing.T) {
 	_, exerciser, funcs, _, _, done := setupTransportTests(t)
 	defer done()
 
 	// InitTransport - paladin to transport
-	funcs.DeactivateNode = func(ctx context.Context, cdr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
-		return &prototk.DeactivateNodeResponse{}, nil
+	funcs.DeactivatePeer = func(ctx context.Context, cdr *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
+		return &prototk.DeactivatePeerResponse{}, nil
 	}
 	exerciser.doExchangeToPlugin(func(req *prototk.TransportMessage) {
-		req.RequestToTransport = &prototk.TransportMessage_DeactivateNode{
-			DeactivateNode: &prototk.DeactivateNodeRequest{},
+		req.RequestToTransport = &prototk.TransportMessage_DeactivatePeer{
+			DeactivatePeer: &prototk.DeactivatePeerRequest{},
 		}
 	}, func(res *prototk.TransportMessage) {
-		assert.IsType(t, &prototk.TransportMessage_DeactivateNodeRes{}, res.ResponseFromTransport)
+		assert.IsType(t, &prototk.TransportMessage_DeactivatePeerRes{}, res.ResponseFromTransport)
 	})
 }
 

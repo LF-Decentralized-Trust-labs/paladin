@@ -129,11 +129,11 @@ func mockEmptyReliableMsgs(mc *mockComponents, conf *pldconf.TransportManagerCon
 }
 
 func mockActivateDeactivateOk(tp *testPlugin) {
-	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-		return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
+	tp.Functions.ActivatePeer = func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+		return &prototk.ActivatePeerResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
 	}
-	tp.Functions.DeactivateNode = func(ctx context.Context, dnr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
-		return &prototk.DeactivateNodeResponse{}, nil
+	tp.Functions.DeactivatePeer = func(ctx context.Context, dnr *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
+		return &prototk.DeactivatePeerResponse{}, nil
 	}
 }
 

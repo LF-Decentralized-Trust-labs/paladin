@@ -128,13 +128,13 @@ func TestTransportRequestsOK(t *testing.T) {
 		GetLocalDetails: func(ctx context.Context, gldr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
 			return &prototk.GetLocalDetailsResponse{TransportDetails: "endpoint stuff"}, nil
 		},
-		ActivateNode: func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+		ActivatePeer: func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
 			assert.Equal(t, "node1", anr.NodeName)
-			return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint": "stuff"}`}, nil
+			return &prototk.ActivatePeerResponse{PeerInfoJson: `{"endpoint": "stuff"}`}, nil
 		},
-		DeactivateNode: func(ctx context.Context, danr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+		DeactivatePeer: func(ctx context.Context, danr *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
 			assert.Equal(t, "node1", danr.NodeName)
-			return &prototk.DeactivateNodeResponse{}, nil
+			return &prototk.DeactivatePeerResponse{}, nil
 		},
 	}
 
@@ -184,12 +184,12 @@ func TestTransportRequestsOK(t *testing.T) {
 	assert.NotNil(t, smr)
 	assert.Equal(t, "endpoint stuff", gldr.TransportDetails)
 
-	anr, err := transportAPI.ActivateNode(ctx, &prototk.ActivateNodeRequest{NodeName: "node1"})
+	anr, err := transportAPI.ActivatePeer(ctx, &prototk.ActivatePeerRequest{NodeName: "node1"})
 	require.NoError(t, err)
 	assert.NotNil(t, anr)
 	assert.Equal(t, `{"endpoint": "stuff"}`, anr.PeerInfoJson)
 
-	danr, err := transportAPI.DeactivateNode(ctx, &prototk.DeactivateNodeRequest{NodeName: "node1"})
+	danr, err := transportAPI.DeactivatePeer(ctx, &prototk.DeactivatePeerRequest{NodeName: "node1"})
 	require.NoError(t, err)
 	assert.NotNil(t, danr)
 

@@ -129,7 +129,7 @@ func (tm *transportManager) reapPeer(p *peer) {
 
 	if p.senderStarted.Load() {
 		// Holding the lock while activating/deactivating ensures we never dual-activate in the transport
-		if _, err := p.transport.api.DeactivateNode(p.ctx, &prototk.DeactivateNodeRequest{
+		if _, err := p.transport.api.DeactivatePeer(p.ctx, &prototk.DeactivatePeerRequest{
 			NodeName: p.Name,
 		}); err != nil {
 			log.L(p.ctx).Warnf("peer %s returned deactivation error: %s", p.Name, err)
@@ -228,7 +228,7 @@ func (p *peer) startSender() (string, error) {
 	}
 
 	// Activate the connection (the deactivate is deferred to the send loop)
-	res, err := p.transport.api.ActivateNode(p.ctx, &prototk.ActivateNodeRequest{
+	res, err := p.transport.api.ActivatePeer(p.ctx, &prototk.ActivatePeerRequest{
 		NodeName:         p.Name,
 		TransportDetails: remoteTransportDetails,
 	})

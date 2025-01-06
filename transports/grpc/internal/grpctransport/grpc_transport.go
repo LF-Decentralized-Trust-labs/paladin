@@ -224,7 +224,7 @@ func (t *grpcTransport) getTransportDetails(ctx context.Context, node string) (t
 	return transportDetails, nil
 }
 
-func (t *grpcTransport) ActivateNode(ctx context.Context, req *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+func (t *grpcTransport) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
 	t.connLock.Lock()
 	defer t.connLock.Unlock()
 
@@ -240,12 +240,12 @@ func (t *grpcTransport) ActivateNode(ctx context.Context, req *prototk.ActivateN
 		return nil, err
 	}
 	t.outboundConnections[req.NodeName] = oc
-	return &prototk.ActivateNodeResponse{
+	return &prototk.ActivatePeerResponse{
 		PeerInfoJson: string(peerInfoJSON),
 	}, nil
 }
 
-func (t *grpcTransport) DeactivateNode(ctx context.Context, req *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+func (t *grpcTransport) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
 	t.connLock.Lock()
 	defer t.connLock.Unlock()
 
@@ -257,7 +257,7 @@ func (t *grpcTransport) DeactivateNode(ctx context.Context, req *prototk.Deactiv
 		delete(t.outboundConnections, req.NodeName)
 	}
 
-	return &prototk.DeactivateNodeResponse{}, nil
+	return &prototk.DeactivatePeerResponse{}, nil
 }
 
 func (t *grpcTransport) getConnection(nodeName string) *outboundConn {

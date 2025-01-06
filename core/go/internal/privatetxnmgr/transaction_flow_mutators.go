@@ -112,16 +112,8 @@ func (tf *transactionFlow) applyTransactionAssembledEvent(ctx context.Context, e
 	}
 	tf.status = "assembled"
 	tf.writeAndLockStates(ctx)
-	//allow assembly thread to proceed
-	_, err := tf.GetStateDistributions(ctx)
-	if err != nil {
-		log.L(ctx).Errorf("Error getting state distributions: %s", err)
-		// we need to proceed with unblocking the assembleCoordinator.  It wont have a chance to distribute the states to the remote assembler nodes
-		// so they may fail to assemble or may assemble a transaction that does not get endorsed but that is always a possibility anyway and the
-		// engine's retry strategy and the eventually consistent distribution of states will mean we will eventually process
-		// all transactions if they are valid
 
-	}
+	//allow assembly thread to proceed
 	tf.assembleCoordinator.Complete(event.AssembleRequestID)
 
 }

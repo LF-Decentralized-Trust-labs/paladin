@@ -130,14 +130,14 @@ func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.Get
 	return
 }
 
-func (br *TransportBridge) ActivateNode(ctx context.Context, req *prototk.ActivateNodeRequest) (res *prototk.ActivateNodeResponse, err error) {
+func (br *TransportBridge) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (res *prototk.ActivatePeerResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
-			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivateNode{ActivateNode: req}
+			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivatePeer{ActivatePeer: req}
 		},
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
-			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_ActivateNodeRes); ok {
-				res = r.ActivateNodeRes
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_ActivatePeerRes); ok {
+				res = r.ActivatePeerRes
 			}
 			return res != nil
 		},
@@ -145,14 +145,14 @@ func (br *TransportBridge) ActivateNode(ctx context.Context, req *prototk.Activa
 	return
 }
 
-func (br *TransportBridge) DeactivateNode(ctx context.Context, req *prototk.DeactivateNodeRequest) (res *prototk.DeactivateNodeResponse, err error) {
+func (br *TransportBridge) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (res *prototk.DeactivatePeerResponse, err error) {
 	err = br.toPlugin.RequestReply(ctx,
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
-			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivateNode{DeactivateNode: req}
+			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivatePeer{DeactivatePeer: req}
 		},
 		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
-			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_DeactivateNodeRes); ok {
-				res = r.DeactivateNodeRes
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_DeactivatePeerRes); ok {
+				res = r.DeactivatePeerRes
 			}
 			return res != nil
 		},

@@ -175,7 +175,7 @@ func newSuccessfulVerifiedConnection(t *testing.T, setup ...func(callbacks1, cal
 		fn(callbacks1, callbacks2)
 	}
 
-	deactivate := testActivateNode(t, plugin1, "node2", transportDetails2)
+	deactivate := testActivatePeer(t, plugin1, "node2", transportDetails2)
 
 	return plugin1, plugin2, func() {
 		deactivate()
@@ -184,11 +184,11 @@ func newSuccessfulVerifiedConnection(t *testing.T, setup ...func(callbacks1, cal
 	}
 }
 
-func testActivateNode(t *testing.T, sender *grpcTransport, remoteNodeName string, transportDetails *PublishedTransportDetails) func() {
+func testActivatePeer(t *testing.T, sender *grpcTransport, remoteNodeName string, transportDetails *PublishedTransportDetails) func() {
 
 	ctx := context.Background()
 
-	res, err := sender.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	res, err := sender.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         remoteNodeName,
 		TransportDetails: tktypes.JSONString(transportDetails).Pretty(),
 	})
@@ -196,7 +196,7 @@ func testActivateNode(t *testing.T, sender *grpcTransport, remoteNodeName string
 	assert.NotNil(t, res)
 
 	return func() {
-		res, err := sender.DeactivateNode(ctx, &prototk.DeactivateNodeRequest{
+		res, err := sender.DeactivatePeer(ctx, &prototk.DeactivatePeerRequest{
 			NodeName: remoteNodeName,
 		})
 		assert.NoError(t, err)
@@ -269,7 +269,7 @@ func TestGRPCTransport_DirectCertVerificationWithKeyRotation_OK(t *testing.T) {
 	}
 
 	// Connect and send from plugin1 to plugin2
-	deactivate := testActivateNode(t, plugin1, "node2", transportDetails2)
+	deactivate := testActivatePeer(t, plugin1, "node2", transportDetails2)
 	defer deactivate()
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Node: "node2",
@@ -325,7 +325,7 @@ func TestGRPCTransport_CACertVerificationWithSubjectRegex_OK(t *testing.T) {
 	mockRegistry(callbacks2, ptds)
 
 	// Connect and send from plugin1 to plugin2
-	deactivate := testActivateNode(t, plugin1, "node2", transportDetails2)
+	deactivate := testActivatePeer(t, plugin1, "node2", transportDetails2)
 	defer deactivate()
 	sendRes, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
 		Node: "node2",
@@ -371,7 +371,7 @@ func TestGRPCTransport_CAServerWrongCA(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err = plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err = plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -408,7 +408,7 @@ func TestGRPCTransport_CAClientWrongCA(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err = plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err = plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -436,7 +436,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerServer(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -464,7 +464,7 @@ func TestGRPCTransport_DirectCertVerification_WrongIssuerClient(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -489,7 +489,7 @@ func TestGRPCTransport_DirectCertVerification_BadIssuersServer(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -515,7 +515,7 @@ func TestGRPCTransport_SubjectRegexpMismatch(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -539,7 +539,7 @@ func TestGRPCTransport_ClientWrongNode(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node3",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -567,7 +567,7 @@ func TestGRPCTransport_BadTransportDetails(t *testing.T) {
 	ptds := map[string]*PublishedTransportDetails{"node1": transportDetails1, "node2": transportDetails2}
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -593,7 +593,7 @@ func TestGRPCTransport_BadTransportIssuerPEM(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -617,7 +617,7 @@ func TestGRPCTransport_NodeUnknownToServer(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, map[string]*PublishedTransportDetails{})
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -641,7 +641,7 @@ func TestGRPCTransport_NodeUnknownToClient(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})
@@ -666,7 +666,7 @@ func TestGRPCTransport_ServerRejectNoCerts(t *testing.T) {
 	mockRegistry(callbacks1, ptds)
 	mockRegistry(callbacks2, ptds)
 
-	_, err := plugin1.ActivateNode(ctx, &prototk.ActivateNodeRequest{
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
 		NodeName:         "node2",
 		TransportDetails: tktypes.JSONString(transportDetails2).Pretty(),
 	})

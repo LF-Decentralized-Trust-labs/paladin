@@ -344,7 +344,7 @@ func TestActivateFail(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false, mockGoodTransport)
 	defer done()
 
-	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
+	tp.Functions.ActivatePeer = func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
@@ -358,8 +358,8 @@ func TestActivateBadPeerInfo(t *testing.T) {
 	ctx, tm, tp, done := newTestTransport(t, false, mockGoodTransport)
 	defer done()
 
-	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-		return &prototk.ActivateNodeResponse{PeerInfoJson: "!{ not valid JSON"}, nil
+	tp.Functions.ActivatePeer = func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+		return &prototk.ActivatePeerResponse{PeerInfoJson: "!{ not valid JSON"}, nil
 	}
 
 	p, err := tm.getPeer(ctx, "node2", true)
@@ -380,10 +380,10 @@ func TestDeactivateFail(t *testing.T) {
 	tm.peerInactivityTimeout = 1 * time.Second
 	tm.quiesceTimeout = 1 * time.Millisecond
 
-	tp.Functions.ActivateNode = func(ctx context.Context, anr *prototk.ActivateNodeRequest) (*prototk.ActivateNodeResponse, error) {
-		return &prototk.ActivateNodeResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
+	tp.Functions.ActivatePeer = func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+		return &prototk.ActivatePeerResponse{PeerInfoJson: `{"endpoint":"some.url"}`}, nil
 	}
-	tp.Functions.DeactivateNode = func(ctx context.Context, dnr *prototk.DeactivateNodeRequest) (*prototk.DeactivateNodeResponse, error) {
+	tp.Functions.DeactivatePeer = func(ctx context.Context, dnr *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
 		return nil, fmt.Errorf("pop")
 	}
 
