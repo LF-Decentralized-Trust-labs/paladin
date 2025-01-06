@@ -15,19 +15,17 @@
 
 package io.kaleido.paladin.toolkit;
 
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 public class InFlight<K, V> {
-    private static final Logger LOGGER = LogManager.getLogger(InFlight.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(InFlight.class);
 
     private final Map<K, CompletableFuture<V>> requests = new HashMap<>();
 

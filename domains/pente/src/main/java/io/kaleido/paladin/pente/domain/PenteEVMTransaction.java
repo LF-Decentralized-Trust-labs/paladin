@@ -17,35 +17,31 @@ package io.kaleido.paladin.pente.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.google.protobuf.ByteString;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.pente.evmrunner.EVMRunner;
 import io.kaleido.paladin.pente.evmrunner.EVMVersion;
 import io.kaleido.paladin.pente.evmstate.AccountLoader;
-import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
-import io.kaleido.paladin.pente.evmstate.PersistedAccount;
-import io.kaleido.paladin.toolkit.*;
+import io.kaleido.paladin.toolkit.FromDomain;
+import io.kaleido.paladin.toolkit.JsonHex;
 import io.kaleido.paladin.toolkit.JsonHex.Address;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.toolkit.JsonHexNum;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 import org.hyperledger.besu.evm.internal.EvmConfiguration;
-import org.hyperledger.besu.evm.log.Log;
 
 import java.io.IOException;
-import java.math.BigInteger;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 // This is the data structure
 @JsonIgnoreProperties(ignoreUnknown = true)
 class PenteEVMTransaction {
 
-    private static final Logger LOGGER = LogManager.getLogger(PenteEVMTransaction.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(PenteEVMTransaction.class);
 
     @JsonProperty
     Address from;

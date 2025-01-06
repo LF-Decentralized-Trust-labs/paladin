@@ -17,12 +17,12 @@ package io.kaleido.paladin.pente.evmrunner;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.kaleido.paladin.logging.PaladinLogging;
 import io.kaleido.paladin.pente.evmstate.AccountLoader;
 import io.kaleido.paladin.pente.evmstate.DebugEVMTracer;
 import io.kaleido.paladin.pente.evmstate.DynamicLoadWorldState;
 import io.kaleido.paladin.pente.evmstate.VirtualBlockchain;
 import io.kaleido.paladin.toolkit.JsonHex;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
@@ -48,13 +48,12 @@ import org.web3j.rlp.RlpString;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class EVMRunner {
 
-    private static final Logger logger = LogManager.getLogger(EVMRunner.class);
+    private static final Logger logger = PaladinLogging.getLogger(EVMRunner.class);
 
     private final EVMVersion evmVersion;
 

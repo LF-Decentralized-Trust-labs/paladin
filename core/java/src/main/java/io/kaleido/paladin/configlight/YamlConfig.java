@@ -17,13 +17,9 @@ package io.kaleido.paladin.configlight;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.appender.ConsoleAppender;
-import org.apache.logging.log4j.core.config.Configurator;
-import org.apache.logging.log4j.core.config.builder.api.*;
-import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +27,7 @@ import java.util.UUID;
 
 public class YamlConfig {
 
-    private static final Logger LOGGER = LogManager.getLogger(YamlConfig.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(YamlConfig.class);
 
     private final YamlRootConfig loadedConfig;
 
@@ -74,22 +70,7 @@ public class YamlConfig {
             case "trace" -> Level.TRACE;
             default -> Level.INFO;
         };
-
-        // TODO: Support more than just stdout logging for the Java part
-        ConfigurationBuilder<BuiltConfiguration> logConfigBuilder = ConfigurationBuilderFactory
-                .newConfigurationBuilder();
-        var l4jConfig = logConfigBuilder
-                .add(logConfigBuilder
-                        .newAppender("Stdout", "CONSOLE")
-                        .addAttribute("target", ConsoleAppender.Target.SYSTEM_OUT)
-                )
-                .add(logConfigBuilder
-                        .newRootLogger(Level.ALL)
-                        .add(logConfigBuilder.newAppenderRef("Stdout"))
-                )
-                .build(false);
-        Configurator.reconfigure(l4jConfig);
-        Configurator.setAllLevels("io.kaleido.paladin", level);
+        PaladinLogging.setLevel(level);
 
     }
 

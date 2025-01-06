@@ -19,15 +19,14 @@ import io.grpc.internal.PickFirstLoadBalancerProvider;
 import io.kaleido.paladin.configlight.RuntimeInfo;
 import io.kaleido.paladin.configlight.YamlConfig;
 import io.kaleido.paladin.loader.PluginLoader;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class Main {
 
-    private static final Logger LOGGER = LogManager.getLogger(Main.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(Main.class);
 
     static CoreJNA.PaladinGo paladinGo;
 
@@ -50,6 +49,7 @@ public class Main {
     }
 
     public static synchronized void stop() {
+        LOGGER.info("Stopping paladin");
         final RuntimeInfo runningInstance = instance;
         if (runningInstance != null) {
             CompletableFuture.runAsync(() -> ensureLoaded().Stop());
@@ -85,13 +85,16 @@ public class Main {
 
             loader = new PluginLoader(runtimeInfo.socketFilename(), runtimeInfo.instanceId());
 
-            return ensureLoaded().Run(
+            var rc = ensureLoaded().Run(
                     runtimeInfo.socketFilename(),
                     runtimeInfo.instanceId().toString(),
                     configFile,
                     engineName
             );
+            LOGGER.error("Paladin shutting down with rc={}", rc);
+            return rc;
         } catch(Throwable e) {
+            LOGGER.error("Paladin shutting down due to error", e);
             throw new RuntimeException(e.getMessage(), e);
         } finally {
             if (loader != null) {

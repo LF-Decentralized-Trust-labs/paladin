@@ -373,7 +373,7 @@ task verifyPaladin(dependsOn: verifyBesu) {
 task verifyAllScdSuccess(dependsOn: verifyPaladin ) {
     doLast {
         println 'Verifying all scd resources have status "Success"...'
-        waitForAllSuccess(namespace, "scd", 240)
+        waitForAllSuccess(namespace, "scd", 320)
     }
 }
 

@@ -15,11 +15,8 @@
 
 package io.kaleido.paladin.toolkit;
 
-import io.kaleido.paladin.toolkit.FromDomain;
-import io.kaleido.paladin.toolkit.Service;
-import io.kaleido.paladin.toolkit.ToDomain;
 import io.grpc.stub.StreamObserver;
-import org.apache.logging.log4j.LogManager;
+import io.kaleido.paladin.logging.PaladinLogging;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
@@ -27,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
 
 public abstract class DomainInstance extends PluginInstance<Service.DomainMessage> {
 
-    private static final Logger LOGGER = LogManager.getLogger(DomainInstance.class);
+    private static final Logger LOGGER = PaladinLogging.getLogger(DomainInstance.class);
 
     protected abstract CompletableFuture<ToDomain.ConfigureDomainResponse> configureDomain(ToDomain.ConfigureDomainRequest request);
     protected abstract CompletableFuture<ToDomain.InitDomainResponse> initDomain(ToDomain.InitDomainRequest request);
@@ -84,6 +81,7 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
 
     @Override
     final StreamObserver<Service.DomainMessage> connect(StreamObserver<Service.DomainMessage> observer) {
+        LOGGER.info("connecting domain gRPC to Paladin");
         return stub.connectDomain(observer);
     }
 
@@ -99,6 +97,7 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
 
     @Override
     final CompletableFuture<Service.DomainMessage> handleRequest(Service.DomainMessage request) {
+        LOGGER.info("JAVA_PLUGIN_REQUEST - pluginId={} type={} msgId={}", pluginId, request.getRequestToDomainCase().toString(), request.getHeader().getMessageId());
         Service.DomainMessage.Builder response = Service.DomainMessage.newBuilder();
         try {
             CompletableFuture<?> resultApplied = switch (request.getRequestToDomainCase()) {
@@ -122,10 +121,12 @@ public abstract class DomainInstance extends PluginInstance<Service.DomainMessag
             };
             return resultApplied.thenApply((ra) -> {
                 response.setHeader(getReplyHeader(request));
-                return response.build();
+                var builtResponse = response.build();
+                LOGGER.info("JAVA_PLUGIN_RESPONSE - pluginId={} type={} msgId={}", pluginId, request.getResponseFromDomainCase().toString(), request.getHeader().getMessageId());
+                return builtResponse;
             });
         } catch(Exception e) {
-            LOGGER.error(new FormattedMessage("unable to process {} {}", request.getRequestToDomainCase(), request.getHeader().getMessageId()), e);
+            LOGGER.error(new FormattedMessage("JAVA_PLUGIN_ERROR - pluginId={} type={} msgId={}", pluginId, request.getRequestToDomainCase(), request.getHeader().getMessageId()), e);
             return CompletableFuture.failedFuture(e);
         }
     }
