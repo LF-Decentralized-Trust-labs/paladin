@@ -47,6 +47,8 @@ type domainContract struct {
 	DepositVerifier       string         `yaml:"depositVerifier"`
 	WithdrawVerifier      string         `yaml:"withdrawVerifier"`
 	BatchWithdrawVerifier string         `yaml:"batchWithdrawVerifier"`
+	LockVerifier          string         `yaml:"lockVerifier"`
+	BatchLockVerifier     string         `yaml:"batchLockVerifier"`
 	CircuitId             string         `yaml:"circuitId"`
 	AbiAndBytecode        abiAndBytecode `yaml:"abiAndBytecode"`
 	Libraries             []string       `yaml:"libraries"`
@@ -69,6 +71,8 @@ type implementationInfo struct {
 	DepositVerifier       string `json:"depositVerifier"`
 	WithdrawVerifier      string `json:"withdrawVerifier"`
 	BatchWithdrawVerifier string `json:"batchWithdrawVerifier"`
+	LockVerifier          string `json:"lockVerifier"`
+	BatchLockVerifier     string `json:"batchLockVerifier"`
 }
 
 func DeployZetoContracts(t *testing.T, hdWalletSeed *testbed.UTInitFunction, configFile string, controller string) *ZetoDomainContracts {

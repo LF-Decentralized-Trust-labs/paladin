@@ -120,17 +120,11 @@ func TestDepositAssemble(t *testing.T) {
 func TestDepositEndorse(t *testing.T) {
 	h := depositHandler{}
 	ctx := context.Background()
-	tx := &types.ParsedTransaction{
-		Params: tktypes.MustParseHexUint256("100"),
-		Transaction: &prototk.TransactionSpecification{
-			From: "Bob",
-		},
-	}
-
+	tx := &types.ParsedTransaction{}
 	req := &prototk.EndorseTransactionRequest{}
 	res, err := h.Endorse(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, res.EndorsementResult)
+	assert.Nil(t, res)
 }
 
 func TestDepositPrepare(t *testing.T) {

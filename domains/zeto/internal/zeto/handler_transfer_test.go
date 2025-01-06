@@ -265,22 +265,11 @@ func TestTransferAssemble(t *testing.T) {
 func TestTransferEndorse(t *testing.T) {
 	h := transferHandler{}
 	ctx := context.Background()
-	tx := &types.ParsedTransaction{
-		Params: []*types.TransferParamEntry{
-			{
-				To:     "Alice",
-				Amount: tktypes.MustParseHexUint256("0x0a"),
-			},
-		},
-		Transaction: &prototk.TransactionSpecification{
-			From: "Bob",
-		},
-	}
-
+	tx := &types.ParsedTransaction{}
 	req := &prototk.EndorseTransactionRequest{}
 	res, err := h.Endorse(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, res.EndorsementResult)
+	assert.Nil(t, res)
 }
 
 func TestTransferPrepare(t *testing.T) {

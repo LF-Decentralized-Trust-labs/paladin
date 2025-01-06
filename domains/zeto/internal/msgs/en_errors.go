@@ -39,7 +39,7 @@ var ffe = func(key, translation string, statusHint ...int) i18n.ErrorMessageKey 
 }
 
 var (
-	MsgContractNotFound                    = ffe("PD210000", "Contract %s not found")
+	MsgContractNotFound                    = ffe("PD210000", "Contract '%s' not found")
 	MsgErrorDecodeBJJKey                   = ffe("PD210001", "Failed to decode babyjubjub key. %s")
 	MsgErrorParseDomainConfig              = ffe("PD210002", "Failed to parse domain config json. %s")
 	MsgErrorConfigZetoDomain               = ffe("PD210003", "Failed to configure Zeto domain. %s")

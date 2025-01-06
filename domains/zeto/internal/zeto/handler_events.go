@@ -119,6 +119,24 @@ func (z *Zeto) handleWithdrawEvent(ctx context.Context, tree core.SparseMerkleTr
 	return nil
 }
 
+func (z *Zeto) handleLockedEvent(ctx context.Context, ev *prototk.OnChainEvent, res *prototk.HandleEventBatchResponse) error {
+	var lock LockedEvent
+	if err := json.Unmarshal([]byte(ev.DataJson), &lock); err == nil {
+		txID := decodeTransactionData(lock.Data)
+		if txID == nil {
+			log.L(ctx).Errorf("Failed to decode transaction data for lock event: %s. Skip to the next event", lock.Data)
+			return nil
+		}
+		res.TransactionsComplete = append(res.TransactionsComplete, &prototk.CompletedTransaction{
+			TransactionId: txID.String(),
+			Location:      ev.Location,
+		})
+	} else {
+		log.L(ctx).Errorf("Failed to unmarshal lock event: %s", err)
+	}
+	return nil
+}
+
 func (z *Zeto) updateMerkleTree(ctx context.Context, tree core.SparseMerkleTree, storage smt.StatesStorage, txID tktypes.HexBytes, outputs []tktypes.HexUint256) error {
 	storage.SetTransactionId(txID.HexString0xPrefix())
 	for _, out := range outputs {

@@ -156,7 +156,7 @@ func TestPrepareDeploy(t *testing.T) {
 
 	req.Transaction.ConstructorParamsJson = "{}"
 	_, err = z.PrepareDeploy(context.Background(), req)
-	assert.EqualError(t, err, "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract  not found")
+	assert.EqualError(t, err, "PD210007: Failed to find circuit ID based on the token name. PD210000: Contract '' not found")
 
 	req.Transaction.ConstructorParamsJson = "{\"tokenName\":\"testToken1\"}"
 	_, err = z.PrepareDeploy(context.Background(), req)
@@ -654,7 +654,7 @@ func TestGetHandler(t *testing.T) {
 	}
 	assert.NotNil(t, z.GetHandler("mint"))
 	assert.NotNil(t, z.GetHandler("transfer"))
-	assert.NotNil(t, z.GetHandler("lockProof"))
+	assert.NotNil(t, z.GetHandler("lock"))
 	assert.NotNil(t, z.GetHandler("deposit"))
 	assert.NotNil(t, z.GetHandler("withdraw"))
 	assert.Nil(t, z.GetHandler("bad"))

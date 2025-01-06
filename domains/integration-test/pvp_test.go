@@ -287,6 +287,15 @@ func TestNotoForZeto(t *testing.T) {
 	notoDomain := <-waitForNoto
 	zetoDomain := <-waitForZeto
 
+	tokenName := "Zeto_Anon"
+	contractAbi, ok := zetoContracts.DeployedContractAbis[tokenName]
+	require.True(t, ok, "Missing ABI for contract %s", tokenName)
+	var result tktypes.HexBytes
+	rpcerr := rpc.CallRPC(ctx, &result, "ptx_storeABI", contractAbi)
+	if rpcerr != nil {
+		require.NoError(t, rpcerr.Error())
+	}
+
 	aliceKey, err := tb.ResolveKey(ctx, alice, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
 	require.NoError(t, err)
 	bobKey, err := tb.ResolveKey(ctx, bob, algorithms.ECDSA_SECP256K1, verifiers.ETH_ADDRESS)
@@ -296,7 +305,7 @@ func TestNotoForZeto(t *testing.T) {
 
 	log.L(ctx).Infof("Deploying Noto and Zeto")
 	noto := helpers.DeployNoto(ctx, t, rpc, notoDomainName, notary, nil)
-	zeto := helpers.DeployZeto(ctx, t, rpc, zetoDomainName, notary, "Zeto_Anon")
+	zeto := helpers.DeployZeto(ctx, t, rpc, zetoDomainName, notary, tokenName)
 	log.L(ctx).Infof("Noto deployed to %s", noto.Address)
 	log.L(ctx).Infof("Zeto deployed to %s", zeto.Address)
 
@@ -336,7 +345,7 @@ func TestNotoForZeto(t *testing.T) {
 	log.L(ctx).Infof("Prepare the transfers")
 	transferNoto := noto.Transfer(ctx, bob, 1).Prepare(alice)
 	transferZeto := zeto.Transfer(ctx, alice, 1).Prepare(bob)
-	zeto.LockProof(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), transferZeto.EncodedCall).SignAndSend(bob, false).Wait()
+	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), transferZeto.EncodedCall).SignAndSend(bob).Wait()
 
 	// TODO: this should actually be a Pente state transition
 	log.L(ctx).Infof("Prepare the trade execute")
@@ -404,7 +413,7 @@ func TestNotoForZeto(t *testing.T) {
 		Data:     transferNotoParams.Data,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()
-	zeto.LockProof(ctx, transferAtom.Address, transferZeto.EncodedCall).SignAndSend(bob, false).Wait()
+	zeto.Lock(ctx, transferAtom.Address, transferZeto.EncodedCall).SignAndSend(bob).Wait()
 
 	log.L(ctx).Infof("Execute the atomic operation")
 	sent = transferAtom.Execute(ctx).SignAndSend(alice).Wait(5 * time.Second)

@@ -257,7 +257,7 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string, u
 func (s *zetoDomainTestSuite) setupContractsAbi(t *testing.T, ctx context.Context, tokenName string) {
 	var result tktypes.HexBytes
 
-	contractAbi, ok := s.deployedContracts.deployedContractAbis[tokenName]
+	contractAbi, ok := s.deployedContracts.DeployedContractAbis[tokenName]
 	require.True(t, ok, "Missing ABI for contract %s", tokenName)
 	rpcerr := s.rpc.CallRPC(ctx, &result, "ptx_storeABI", contractAbi)
 	if rpcerr != nil {

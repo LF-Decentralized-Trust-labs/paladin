@@ -204,17 +204,11 @@ func TestWithdrawAssemble(t *testing.T) {
 func TestWithdrawEndorse(t *testing.T) {
 	h := withdrawHandler{}
 	ctx := context.Background()
-	tx := &types.ParsedTransaction{
-		Params: tktypes.MustParseHexUint256("100"),
-		Transaction: &prototk.TransactionSpecification{
-			From: "Bob",
-		},
-	}
-
+	tx := &types.ParsedTransaction{}
 	req := &prototk.EndorseTransactionRequest{}
 	res, err := h.Endorse(ctx, tx, req)
 	assert.NoError(t, err)
-	assert.Equal(t, prototk.EndorseTransactionResponse_ENDORSER_SUBMIT, res.EndorsementResult)
+	assert.Nil(t, res)
 }
 
 func TestWithdrawPrepare(t *testing.T) {

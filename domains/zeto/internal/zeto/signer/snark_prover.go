@@ -208,12 +208,6 @@ func validateInputs(ctx context.Context, inputs *pb.ProvingRequestCommon) error 
 	if len(inputs.InputCommitments) != len(inputs.InputValues) || len(inputs.InputCommitments) != len(inputs.InputSalts) {
 		return i18n.NewError(ctx, msgs.MsgErrorInputsDiffLength)
 	}
-	if len(inputs.OutputValues) == 0 {
-		return i18n.NewError(ctx, msgs.MsgErrorMissingOutputValues)
-	}
-	if len(inputs.OutputOwners) == 0 {
-		return i18n.NewError(ctx, msgs.MsgErrorMissingOutputOwners)
-	}
 	if len(inputs.OutputValues) != len(inputs.OutputOwners) {
 		return i18n.NewError(ctx, msgs.MsgErrorOutputsDiffLength)
 	}
@@ -292,6 +286,8 @@ func calculateWitness(ctx context.Context, circuitId string, commonInputs *pb.Pr
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgErrorAssembleInputs, err)
 		}
+	case constants.CIRCUIT_LOCK, constants.CIRCUIT_LOCK_BATCH:
+		witnessInputs = assembleInputs_lock(inputs, keyEntry)
 	}
 
 	wtns, err := circuit.CalculateWTNSBin(witnessInputs, true)

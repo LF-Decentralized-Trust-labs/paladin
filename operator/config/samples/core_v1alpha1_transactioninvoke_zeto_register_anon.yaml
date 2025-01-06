@@ -18,6 +18,8 @@ spec:
   - "zeto-g16-check-inputs-outputs-batch"
   - "zeto-g16-verifier-anon"
   - "zeto-g16-verifier-anon-batch"
+  - "zeto-g16-check-utxos-owner"
+  - "zeto-g16-check-utxos-owner-batch"
   function: registerImplementation
   paramsJSONTemplate: |
     {
@@ -28,7 +30,9 @@ spec:
         "withdrawVerifier":      "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs" }}",
         "batchWithdrawVerifier": "{{ index .status.resolvedContractAddresses "zeto-g16-check-inputs-outputs-batch" }}",
         "verifier":              "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon" }}",
-        "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-batch" }}"
+        "batchVerifier":         "{{ index .status.resolvedContractAddresses "zeto-g16-verifier-anon-batch" }}",
+        "lockVerifier":          "{{ index .status.resolvedContractAddresses "zeto-g16-check-utxos-owner" }}",
+        "batchLockVerifier":     "{{ index .status.resolvedContractAddresses "zeto-g16-check-utxos-owner-batch" }}"
       }
     }
   abiJSON: |
@@ -59,6 +63,11 @@ spec:
               },
               {
                 "internalType": "address",
+                "name": "lockVerifier",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
                 "name": "verifier",
                 "type": "address"
               },
@@ -70,6 +79,11 @@ spec:
               {
                 "internalType": "address",
                 "name": "batchWithdrawVerifier",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "batchLockVerifier",
                 "type": "address"
               }
             ],

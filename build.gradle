@@ -227,12 +227,26 @@ task copyZetoZKPFiles(type: Copy) {
         include 'check_inputs_outputs_value_batch-vkey.json'
         include 'check_inputs_outputs_value_batch_js/check_inputs_outputs_value_batch.wasm'
         // withdraw_nullifier
-        include 'check_nullifier_value.zkey'
-        include 'check_nullifier_value-vkey.json'
-        include 'check_nullifier_value_js/check_nullifier_value.wasm'
-        include 'check_nullifier_value_batch.zkey'
-        include 'check_nullifier_value_batch-vkey.json'
-        include 'check_nullifier_value_batch_js/check_nullifier_value_batch.wasm'
+        include 'check_nullifiers_value.zkey'
+        include 'check_nullifiers_value-vkey.json'
+        include 'check_nullifiers_value_js/check_nullifiers_value.wasm'
+        include 'check_nullifiers_value_batch.zkey'
+        include 'check_nullifiers_value_batch-vkey.json'
+        include 'check_nullifiers_value_batch_js/check_nullifiers_value_batch.wasm'
+        // check_utxos_owner
+        include 'check_utxos_owner.zkey'
+        include 'check_utxos_owner-vkey.json'
+        include 'check_utxos_owner_js/check_utxos_owner.wasm'
+        include 'check_utxos_owner_batch.zkey'
+        include 'check_utxos_owner_batch-vkey.json'
+        include 'check_utxos_owner_batch_js/check_utxos_owner_batch.wasm'
+        // check_nullifiers_owner
+        include 'check_nullifiers_owner.zkey'
+        include 'check_nullifiers_owner-vkey.json'
+        include 'check_nullifiers_owner_js/check_nullifiers_owner.wasm'
+        include 'check_nullifiers_owner_batch.zkey'
+        include 'check_nullifiers_owner_batch-vkey.json'
+        include 'check_nullifiers_owner_batch_js/check_nullifiers_owner_batch.wasm'
     }
     into zetoZkpDir
 

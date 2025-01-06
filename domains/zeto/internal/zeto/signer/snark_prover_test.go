@@ -261,29 +261,6 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 
 	req := pb.ProvingRequest{
 		CircuitId: constants.CIRCUIT_ANON,
-		Common:    &pb.ProvingRequestCommon{},
-	}
-	payload, err := proto.Marshal(&req)
-	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "output values are required")
-
-	req = pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
-		Common: &pb.ProvingRequestCommon{
-			InputCommitments: []string{"input1", "input2"},
-			InputValues:      []uint64{30, 40},
-			InputSalts:       []string{"salt1", "salt2"},
-			OutputValues:     []uint64{32, 38},
-		},
-	}
-	payload, err = proto.Marshal(&req)
-	require.NoError(t, err)
-	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
-	assert.ErrorContains(t, err, "output owner keys are required")
-
-	req = pb.ProvingRequest{
-		CircuitId: constants.CIRCUIT_ANON,
 		Common: &pb.ProvingRequestCommon{
 			InputCommitments: []string{"input1", "input2"},
 			InputValues:      []uint64{30, 40},
@@ -292,7 +269,7 @@ func TestSnarkProveErrorInputs(t *testing.T) {
 			OutputOwners:     []string{"bob", "alice"},
 		},
 	}
-	payload, err = proto.Marshal(&req)
+	payload, err := proto.Marshal(&req)
 	require.NoError(t, err)
 	_, err = prover.Sign(context.Background(), zetosignerapi.AlgoDomainZetoSnarkBJJ("zeto"), zetosignerapi.PAYLOAD_DOMAIN_ZETO_SNARK, alice.PrivateKey[:], payload)
 	assert.ErrorContains(t, err, "anon.wasm: no such file or directory")

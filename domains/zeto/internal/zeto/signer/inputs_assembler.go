@@ -147,6 +147,16 @@ func assembleInputs_withdraw_nullifier(ctx context.Context, inputs *commonWitnes
 	return witnessInputs, nil
 }
 
+func assembleInputs_lock(inputs *commonWitnessInputs, keyEntry *core.KeyEntry) map[string]interface{} {
+	witnessInputs := map[string]interface{}{
+		"commitments":     inputs.inputCommitments,
+		"values":          inputs.inputValues,
+		"salts":           inputs.inputSalts,
+		"ownerPrivateKey": keyEntry.PrivateKeyForZkp,
+	}
+	return witnessInputs
+}
+
 func prepareInputsForNullifiers(ctx context.Context, inputs *commonWitnessInputs, extras *pb.ProvingRequestExtras_Nullifiers, keyEntry *core.KeyEntry) ([]*big.Int, *big.Int, [][]*big.Int, []*big.Int, error) {
 	// calculate the nullifiers for the input UTXOs
 	nullifiers := make([]*big.Int, len(inputs.inputCommitments))

@@ -28,6 +28,11 @@ export interface ZetoTransferParams {
   transfers: ZetoTransfer[];
 }
 
+export interface ZetoLockParams {
+  delegate: string;
+  call: string;
+}
+
 export interface ZetoSetERC20Params {
   erc20: string;
 }
@@ -130,6 +135,18 @@ export class ZetoInstance {
       },
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
+  async lock(from: PaladinVerifier, data: ZetoLockParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PRIVATE,
+      abi: zetoAbi,
+      function: "lock",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
+    return this.paladin.pollForReceipt(txID, POLL_TIMEOUT_MS);
   }
 
   async setERC20(from: PaladinVerifier, data: ZetoSetERC20Params) {

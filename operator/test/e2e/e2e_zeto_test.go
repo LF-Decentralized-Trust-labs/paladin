@@ -24,6 +24,7 @@ import (
 
 	_ "embed"
 
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -42,6 +43,12 @@ const isNullifier = false
 
 // const tokenType = "Zeto_AnonNullifier"
 // const isNullifier = true
+
+var zetoConstructorABI = &abi.Entry{
+	Type: abi.Constructor, Inputs: abi.ParameterArray{
+		{Name: "tokenName", Type: "string"},
+	},
+}
 
 var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 	BeforeAll(func() {
@@ -99,7 +106,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 		var zetoContract *tktypes.EthAddress
 		operator := "zeto.operator@node1"
 		It("deploys a zeto", func() {
-			deploy := rpc["node1"].ForABI(ctx, zetotypes.ZetoABI).
+			deploy := rpc["node1"].ForABI(ctx, abi.ABI{zetoConstructorABI}).
 				Private().
 				Domain("zeto").
 				Constructor().
@@ -173,7 +180,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 					}).
 					Send().
 					Wait(5 * time.Second)
-				testLog("Noto mint transaction %s", txn.ID())
+				testLog("Zeto mint transaction %s", txn.ID())
 				Expect(txn.Error()).To(BeNil())
 				logWallet("bob", "node1")
 			}
@@ -200,7 +207,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 					}).
 					Send().
 					Wait(5 * time.Second)
-				testLog("Noto transfer transaction %s", txn.ID())
+				testLog("Zeto transfer transaction %s", txn.ID())
 				Expect(txn.Error()).To(BeNil())
 				logWallet("bob", "node1")
 				logWallet("sally", "node2")
@@ -224,7 +231,7 @@ var _ = Describe(fmt.Sprintf("zeto - %s", tokenType), Ordered, func() {
 				}).
 				Send().
 				Wait(5 * time.Second)
-			testLog("Noto transfer transaction %s", txn.ID())
+			testLog("Zeto transfer transaction %s", txn.ID())
 			Expect(txn.Error()).To(BeNil())
 			logWallet("sally", "node2")
 			logWallet("fred", "node3")

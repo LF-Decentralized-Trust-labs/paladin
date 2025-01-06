@@ -55,6 +55,7 @@ type Zeto struct {
 	transferSignature        string
 	transferWithEncSignature string
 	withdrawSignature        string
+	lockSignature            string
 	snarkProver              signerapi.InMemorySigner
 }
 
@@ -82,6 +83,13 @@ type WithdrawEvent struct {
 	Inputs []tktypes.HexUint256 `json:"inputs"`
 	Output tktypes.HexUint256   `json:"output"`
 	Data   tktypes.HexBytes     `json:"data"`
+}
+
+type LockedEvent struct {
+	UTXOs     []tktypes.HexUint256 `json:"utxos"`
+	Delegate  tktypes.EthAddress   `json:"delegate"`
+	Submitter tktypes.EthAddress   `json:"submitter"`
+	Data      tktypes.HexBytes     `json:"data"`
 }
 
 var factoryDeployABI = &abi.Entry{
@@ -289,7 +297,7 @@ func (z *Zeto) GetHandler(method string) types.DomainHandler {
 		return &mintHandler{zeto: z}
 	case "transfer":
 		return &transferHandler{zeto: z}
-	case "lockProof":
+	case "lock":
 		return &lockHandler{zeto: z}
 	case "deposit":
 		return &depositHandler{zeto: z}
@@ -373,6 +381,8 @@ func (z *Zeto) registerEventSignatures(eventAbis abi.ABI) {
 			z.transferWithEncSignature = event.SolString()
 		case "UTXOWithdraw":
 			z.withdrawSignature = event.SolString()
+		case "UTXOsLocked":
+			z.lockSignature = event.SolString()
 		}
 	}
 }
@@ -413,6 +423,8 @@ func (z *Zeto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 			err = z.handleTransferWithEncryptionEvent(ctx, tree, storage, ev, domainConfig.TokenName, &res)
 		case z.withdrawSignature:
 			err = z.handleWithdrawEvent(ctx, tree, storage, ev, domainConfig.TokenName, &res)
+		case z.lockSignature:
+			err = z.handleLockedEvent(ctx, ev, &res)
 		}
 		if err != nil {
 			errors = append(errors, err.Error())
