@@ -28,14 +28,12 @@ import (
 )
 
 type outboundConn struct {
-	t         *grpcTransport
-	nodeName  string
-	client    proto.PaladinGRPCTransportClient
-	peerInfo  PeerInfo
-	sendLock  sync.Mutex
-	waiting   int
-	connError error
-	stream    grpc.ClientStreamingClient[proto.Message, proto.Empty]
+	t        *grpcTransport
+	nodeName string
+	client   proto.PaladinGRPCTransportClient
+	peerInfo PeerInfo
+	sendLock sync.Mutex
+	stream   grpc.ClientStreamingClient[proto.Message, proto.Empty]
 }
 
 func (t *grpcTransport) newConnection(ctx context.Context, nodeName string, transportDetailsJSON string) (oc *outboundConn, peerInfoJSON []byte, err error) {
