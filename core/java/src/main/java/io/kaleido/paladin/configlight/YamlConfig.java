@@ -25,7 +25,6 @@ import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.config.builder.api.*;
 import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 
-import javax.security.auth.login.Configuration;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
