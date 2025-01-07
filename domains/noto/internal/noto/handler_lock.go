@@ -183,7 +183,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
 		return nil, err
 	}
 
@@ -192,7 +192,7 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateSignature(ctx, "sender", req, encodedLock); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req.Signatures, encodedLock); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{

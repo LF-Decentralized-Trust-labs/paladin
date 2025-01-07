@@ -139,6 +139,32 @@ func findLockedCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backend, 
 	return notoCoins
 }
 
+// TODO: make this easier to extract
+func buildUnlockWithApproval(notoDomain *Noto, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) *NotoUnlockWithApprovalParams {
+	lockedInputs := make([]tktypes.HexBytes, 0)
+	lockedOutputs := make([]tktypes.HexBytes, 0)
+	unlockedOutputs := make([]tktypes.HexBytes, 0)
+	for _, input := range prepareUnlockResult.ReadStates {
+		lockedInputs = append(lockedInputs, input.ID)
+	}
+	for _, output := range prepareUnlockResult.InfoStates {
+		switch output.Schema.String() {
+		case notoDomain.CoinSchemaID():
+			unlockedOutputs = append(unlockedOutputs, output.ID)
+		case notoDomain.LockedCoinSchemaID():
+			lockedOutputs = append(lockedOutputs, output.ID)
+		}
+	}
+
+	return &NotoUnlockWithApprovalParams{
+		LockID:        lockID,
+		LockedInputs:  lockedInputs,
+		LockedOutputs: lockedOutputs,
+		Outputs:       unlockedOutputs,
+		Data:          tktypes.HexBytes{},
+	}
+}
+
 func TestNoto(t *testing.T) {
 	ctx := context.Background()
 	log.L(ctx).Infof("TestNoto")
@@ -564,6 +590,7 @@ func TestNotoLock(t *testing.T) {
 				From:    recipient1Name,
 				To:      []string{recipient2Name},
 				Amounts: []*tktypes.HexUint256{tktypes.Int64ToInt256(50)},
+				Data:    tktypes.HexBytes{},
 			}),
 		},
 		ABI: types.NotoABI,
@@ -571,6 +598,7 @@ func TestNotoLock(t *testing.T) {
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
+	unlockParams := buildUnlockWithApproval(noto, lockID, &invokeResult)
 
 	log.L(ctx).Infof("Approve unlock to be executed by recipient2")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
@@ -595,9 +623,7 @@ func TestNotoLock(t *testing.T) {
 		From(recipient2Name).
 		To(&notoAddress).
 		Function("unlockWithApproval").
-		Inputs(&NotoUnlockWithApprovalParams{
-			LockID: lockID,
-		}).
+		Inputs(unlockParams).
 		Send().
 		Wait(3 * time.Second)
 	require.NoError(t, tx.Error())

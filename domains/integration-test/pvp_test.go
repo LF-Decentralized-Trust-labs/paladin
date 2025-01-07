@@ -22,14 +22,17 @@ import (
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
 	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
+	"github.com/kaleido-io/paladin/domains/noto/pkg/noto"
 	nototypes "github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	zetotests "github.com/kaleido-io/paladin/domains/zeto/integration-test"
 	zetotypes "github.com/kaleido-io/paladin/domains/zeto/pkg/types"
 	"github.com/kaleido-io/paladin/domains/zeto/pkg/zetosigner/zetosignerapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
+	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -69,6 +72,42 @@ func decodeTransactionResult(t *testing.T, resultInput map[string]any) *testbed.
 	err = json.Unmarshal(resultJSON, &result)
 	require.NoError(t, err)
 	return &result
+}
+
+// TODO: make this easier to extract
+func buildUnlockWithApproval(ctx context.Context, notoDomain noto.Noto, abi abi.ABI, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) ([]*pldapi.StateEncoded, []*pldapi.StateEncoded, []byte, error) {
+	notoInputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.ReadStates))
+	notoOutputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.InfoStates))
+	lockedInputs := make([]tktypes.HexBytes, 0)
+	lockedOutputs := make([]tktypes.HexBytes, 0)
+	unlockedOutputs := make([]tktypes.HexBytes, 0)
+	for _, input := range prepareUnlockResult.ReadStates {
+		notoInputStates = append(notoInputStates, input)
+		lockedInputs = append(lockedInputs, input.ID)
+	}
+	for _, output := range prepareUnlockResult.InfoStates {
+		switch output.Schema.String() {
+		case notoDomain.CoinSchemaID():
+			notoOutputStates = append(notoOutputStates, output)
+			unlockedOutputs = append(unlockedOutputs, output.ID)
+		case notoDomain.LockedCoinSchemaID():
+			notoOutputStates = append(notoOutputStates, output)
+			lockedOutputs = append(lockedOutputs, output.ID)
+		}
+	}
+
+	unlockWithApprovalParams, err := json.Marshal(map[string]any{
+		"lockId":        lockID,
+		"lockedInputs":  lockedInputs,
+		"lockedOutputs": lockedOutputs,
+		"outputs":       unlockedOutputs,
+		"data":          "0x",
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	encodedCall, err := abi.Functions()["unlockWithApproval"].EncodeCallDataJSONCtx(ctx, unlockWithApprovalParams)
+	return notoInputStates, notoOutputStates, encodedCall, err
 }
 
 func TestNotoForNoto(t *testing.T) {
@@ -352,13 +391,8 @@ func TestNotoForZeto(t *testing.T) {
 	})
 
 	lockID := tktypes.RandBytes32()
-	notoUnlockParams, err := json.Marshal(map[string]any{
-		"lockId": lockID,
-		"data":   "0x",
-	})
-	require.NoError(t, err)
 
-	log.L(ctx).Infof("Prepare the transfers")
+	log.L(ctx).Infof("Prepare the Noto transfer")
 	noto.Lock(ctx, &nototypes.LockParams{
 		LockID: lockID,
 		Amount: tktypes.Int64ToInt256(1),
@@ -371,8 +405,12 @@ func TestNotoForZeto(t *testing.T) {
 		Amounts: []*tktypes.HexUint256{tktypes.Int64ToInt256(1)},
 	}).SignAndSend(alice).Wait()
 	require.NotNil(t, notoPrepareUnlock)
-	transferNoto, err := noto.ABI.Functions()["unlockWithApproval"].EncodeCallDataJSONCtx(ctx, notoUnlockParams)
+	prepareUnlockResult := decodeTransactionResult(t, notoPrepareUnlock)
+
+	notoInputStates, notoOutputStates, transferNoto, err := buildUnlockWithApproval(ctx, notoDomain, noto.ABI, lockID, prepareUnlockResult)
 	require.NoError(t, err)
+
+	log.L(ctx).Infof("Prepare the Zeto transfer")
 	transferZeto := zeto.Transfer(ctx, alice, 1).Prepare(bob)
 	zeto.Lock(ctx, tktypes.MustEthAddress(bobKey.Verifier.Verifier), transferZeto.EncodedCall).SignAndSend(bob).Wait()
 
@@ -382,10 +420,9 @@ func TestNotoForZeto(t *testing.T) {
 
 	// TODO: should probably include the full encoded calls (including the zkp)
 	log.L(ctx).Infof("Record the prepared transfers")
-	prepareUnlockResult := decodeTransactionResult(t, notoPrepareUnlock)
 	sent := swap.Prepare(ctx, &helpers.StateData{
-		Inputs:  prepareUnlockResult.InputStates,
-		Outputs: prepareUnlockResult.OutputStates,
+		Inputs:  notoInputStates,
+		Outputs: notoOutputStates,
 	}).SignAndSend(alice).Wait(5 * time.Second)
 	require.NoError(t, sent.Error())
 	sent = swap.Prepare(ctx, &helpers.StateData{

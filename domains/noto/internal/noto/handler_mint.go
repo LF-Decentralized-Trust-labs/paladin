@@ -163,7 +163,7 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req.Signatures, encodedTransfer); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
@@ -172,11 +172,6 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 }
 
 func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
-	outputs := make([]string, len(req.OutputStates))
-	for i, state := range req.OutputStates {
-		outputs[i] = state.Id
-	}
-
 	// Include the signature from the sender/notary
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
 	sender := domain.FindAttestation("sender", req.AttestationResult)
@@ -189,7 +184,7 @@ func (h *mintHandler) baseLedgerInvoke(ctx context.Context, req *prototk.Prepare
 		return nil, err
 	}
 	params := &NotoMintParams{
-		Outputs:   outputs,
+		Outputs:   endorsableStateIDs(req.OutputStates),
 		Signature: sender.Payload,
 		Data:      data,
 	}

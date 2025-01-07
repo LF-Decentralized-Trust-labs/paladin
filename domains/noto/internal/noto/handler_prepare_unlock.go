@@ -28,20 +28,35 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-// This handler is identical to unlockHandler, except for the Prepare() method
+// This handler inherits the majority of its behavior from unlockHandler
 type prepareUnlockHandler struct {
 	unlockHandler
+}
+
+func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
+	res, lockedInputStates, lockedOutputStates, unlockedOutputStates, infoStates, err := h.assembleUnlock(ctx, tx, req)
+	if err == nil && res.AssembledTransaction != nil {
+		res.AssembledTransaction.ReadStates = lockedInputStates
+		res.AssembledTransaction.InfoStates = infoStates
+		res.AssembledTransaction.InfoStates = append(res.AssembledTransaction.InfoStates, unlockedOutputStates...)
+		res.AssembledTransaction.InfoStates = append(res.AssembledTransaction.InfoStates, lockedOutputStates...)
+	}
+	return res, err
+}
+
+func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	lockedInputs, lockedOutputs, outputs := h.extractStates(req.Reads, req.Info)
+	outputs = append(outputs, lockedOutputs...)
+	return h.endorseUnlock(ctx, tx, req.Transaction.From, req.ResolvedVerifiers, req.Signatures, lockedInputs, outputs)
 }
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
 
-	lockedInput := req.InputStates[0]
-	unlockedOutput := req.OutputStates[0]
-	lockedOutputs := req.OutputStates[1:]
-	lockedOutputIds := make([]string, len(lockedOutputs))
-	for i, output := range lockedOutputs {
-		lockedOutputIds[i] = output.Id
+	lockedInputs, lockedOutputs, outputs := h.extractStates(req.ReadStates, req.InfoStates)
+	unlockHash, err := h.noto.encodeUnlockMasked(ctx, tx.ContractAddress, lockedInputs, lockedOutputs, outputs, inParams.Data)
+	if err != nil {
+		return nil, err
 	}
 
 	// Include the signature from the sender
@@ -56,12 +71,11 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 		return nil, err
 	}
 	params := &NotoPrepareUnlockParams{
-		LockID:        inParams.LockID,
-		LockedInputs:  []string{lockedInput.Id},
-		LockedOutputs: lockedOutputIds,
-		Outputs:       []string{unlockedOutput.Id},
-		Signature:     unlockSignature.Payload,
-		Data:          data,
+		LockID:       inParams.LockID,
+		LockedInputs: endorsableStateIDs(lockedInputs),
+		TXHash:       tktypes.HexBytes(unlockHash),
+		Signature:    unlockSignature.Payload,
+		Data:         data,
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {

@@ -94,6 +94,16 @@ var NotoUnlockTypeSet = eip712.TypeSet{
 	eip712.EIP712Domain: EIP712DomainType,
 }
 
+var NotoUnlockMaskedTypeSet = eip712.TypeSet{
+	"Unlock": {
+		{Name: "lockedInputs", Type: "bytes32[]"},
+		{Name: "lockedOutputs", Type: "bytes32[]"},
+		{Name: "outputs", Type: "bytes32[]"},
+		{Name: "data", Type: "bytes"},
+	},
+	eip712.EIP712Domain: EIP712DomainType,
+}
+
 var NotoApproveUnlockTypeSet = eip712.TypeSet{
 	"ApproveUnlock": {
 		{Name: "lockId", Type: "bytes32"},
@@ -370,20 +380,28 @@ func (n *Noto) encodeNotoLockedCoins(coins []*types.NotoLockedCoin) []any {
 	return encodedCoins
 }
 
-func (n *Noto) encodedStateIDs(states []*pldapi.StateEncoded) []any {
-	inputs := make([]any, len(states))
+func encodedStateIDs(states []*pldapi.StateEncoded) []string {
+	inputs := make([]string, len(states))
 	for i, state := range states {
-		inputs[i] = state.ID
+		inputs[i] = state.ID.String()
 	}
 	return inputs
 }
 
-func (n *Noto) endorsableStateIDs(states []*prototk.EndorsableState) []any {
-	inputs := make([]any, len(states))
+func endorsableStateIDs(states []*prototk.EndorsableState) []string {
+	inputs := make([]string, len(states))
 	for i, state := range states {
 		inputs[i] = state.Id
 	}
 	return inputs
+}
+
+func stringToAny(ids []string) []any {
+	result := make([]any, len(ids))
+	for i, id := range ids {
+		result[i] = id
+	}
+	return result
 }
 
 func (n *Noto) encodeTransferUnmasked(ctx context.Context, contract *ethtypes.Address0xHex, inputs, outputs []*types.NotoCoin) (ethtypes.HexBytes0xPrefix, error) {
@@ -404,8 +422,8 @@ func (n *Noto) encodeTransferMasked(ctx context.Context, contract *ethtypes.Addr
 		PrimaryType: "Transfer",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]any{
-			"inputs":  n.encodedStateIDs(inputs),
-			"outputs": n.encodedStateIDs(outputs),
+			"inputs":  stringToAny(encodedStateIDs(inputs)),
+			"outputs": stringToAny(encodedStateIDs(outputs)),
 			"data":    data,
 		},
 	})
@@ -433,6 +451,20 @@ func (n *Noto) encodeUnlock(ctx context.Context, contract *ethtypes.Address0xHex
 			"lockedInputs":  n.encodeNotoLockedCoins(lockedInputs),
 			"lockedOutputs": n.encodeNotoLockedCoins(lockedOutputs),
 			"outputs":       n.encodeNotoCoins(outputs),
+		},
+	})
+}
+
+func (n *Noto) encodeUnlockMasked(ctx context.Context, contract *ethtypes.Address0xHex, lockedInputs, lockedOutputs, outputs []*prototk.EndorsableState, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
+		Types:       NotoUnlockMaskedTypeSet,
+		PrimaryType: "Unlock",
+		Domain:      n.eip712Domain(contract),
+		Message: map[string]any{
+			"lockedInputs":  stringToAny(endorsableStateIDs(lockedInputs)),
+			"lockedOutputs": stringToAny(endorsableStateIDs(lockedOutputs)),
+			"outputs":       stringToAny(endorsableStateIDs(outputs)),
+			"data":          data,
 		},
 	})
 }

@@ -38,7 +38,13 @@ interface INoto {
         bytes data
     );
 
-    event NotoUnlockPrepared(bytes32 lockId, bytes signature, bytes data);
+    event NotoUnlockPrepared(
+        bytes32 lockId,
+        bytes32[] lockedInputs,
+        bytes32 txhash,
+        bytes signature,
+        bytes data
+    );
 
     event NotoUnlockApproved(
         bytes32 lockId,
@@ -111,8 +117,7 @@ interface INoto {
     function prepareUnlock(
         bytes32 lockId,
         bytes32[] calldata lockedInputs,
-        bytes32[] calldata lockedOutputs,
-        bytes32[] calldata outputs,
+        bytes32 txhash,
         bytes calldata signature,
         bytes calldata data
     ) external;
@@ -124,7 +129,13 @@ interface INoto {
         bytes calldata data
     ) external;
 
-    function unlockWithApproval(bytes32 lockId, bytes calldata data) external;
+    function unlockWithApproval(
+        bytes32 lockId,
+        bytes32[] calldata lockedInputs,
+        bytes32[] calldata lockedOutputs,
+        bytes32[] calldata outputs,
+        bytes calldata data
+    ) external;
 
     function cancelUnlockApproval(bytes32 lockId, bytes calldata data) external;
 }

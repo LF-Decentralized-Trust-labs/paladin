@@ -59,6 +59,7 @@ export interface ITransactionReceipt {
   success: boolean;
   transactionHash: string;
   source: string;
+  domain?: string;
   contractAddress?: string;
   states?: ITransactionStates;
   domainReceipt?: IPenteDomainReceipt;

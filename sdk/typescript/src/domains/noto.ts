@@ -120,6 +120,9 @@ export interface NotoApproveUnlockParams {
 
 export interface NotoUnlockWithApprovalParams {
   lockId: string;
+  lockedInputs: string[];
+  lockedOutputs: string[];
+  outputs: string[];
   data: string;
 }
 

@@ -182,7 +182,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 			if err != nil {
 				return nil, err
 			}
-			if err := h.noto.validateSignature(ctx, "sender", req, encodedTransfer); err != nil {
+			if err := h.noto.validateSignature(ctx, "sender", req.Signatures, encodedTransfer); err != nil {
 				return nil, err
 			}
 			return &prototk.EndorseTransactionResponse{
@@ -197,15 +197,6 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 }
 
 func (h *transferHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest, withApproval bool) (*TransactionWrapper, error) {
-	inputs := make([]string, len(req.InputStates))
-	for i, state := range req.InputStates {
-		inputs[i] = state.Id
-	}
-	outputs := make([]string, len(req.OutputStates))
-	for i, state := range req.OutputStates {
-		outputs[i] = state.Id
-	}
-
 	var signature *prototk.AttestationResult
 	switch tx.DomainConfig.Variant {
 	case types.NotoVariantDefault:
@@ -224,8 +215,8 @@ func (h *transferHandler) baseLedgerInvoke(ctx context.Context, tx *types.Parsed
 		return nil, err
 	}
 	params := &NotoTransferParams{
-		Inputs:    inputs,
-		Outputs:   outputs,
+		Inputs:    endorsableStateIDs(req.InputStates),
+		Outputs:   endorsableStateIDs(req.OutputStates),
 		Signature: signature.Payload,
 		Data:      data,
 	}

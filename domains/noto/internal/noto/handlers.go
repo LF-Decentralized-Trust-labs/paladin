@@ -116,8 +116,8 @@ func (n *Noto) validateUnlockAmounts(ctx context.Context, coins *gatheredCoins, 
 }
 
 // Check that the sender of a transaction provided a signature on the input details
-func (n *Noto) validateSignature(ctx context.Context, name string, req *prototk.EndorseTransactionRequest, encodedMessage []byte) error {
-	signature := domain.FindAttestation(name, req.Signatures)
+func (n *Noto) validateSignature(ctx context.Context, name string, attestations []*prototk.AttestationResult, encodedMessage []byte) error {
+	signature := domain.FindAttestation(name, attestations)
 	if signature == nil {
 		return i18n.NewError(ctx, msgs.MsgAttestationNotFound, name)
 	}
@@ -147,12 +147,11 @@ func (n *Noto) validateOwners(ctx context.Context, owner string, req *prototk.En
 }
 
 // Check that all locked coins are owned by the transaction sender
-func (n *Noto) validateLockOwners(ctx context.Context, owner string, req *prototk.EndorseTransactionRequest, coins []*types.NotoLockedCoin, states []*prototk.StateRef) error {
-	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, req.ResolvedVerifiers)
+func (n *Noto) validateLockOwners(ctx context.Context, owner string, verifiers []*prototk.ResolvedVerifier, coins []*types.NotoLockedCoin, states []*prototk.StateRef) error {
+	fromAddress, err := n.findEthAddressVerifier(ctx, "from", owner, verifiers)
 	if err != nil {
 		return err
 	}
-
 	for i, coin := range coins {
 		if !coin.Owner.Equals(fromAddress) {
 			return i18n.NewError(ctx, msgs.MsgStateWrongOwner, states[i].Id, owner)

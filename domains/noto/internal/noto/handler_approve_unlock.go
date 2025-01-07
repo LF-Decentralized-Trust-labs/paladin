@@ -143,7 +143,7 @@ func (h *approveUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTran
 	if len(lockedCoins.inCoins) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgNoStatesSpecified)
 	}
-	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +152,7 @@ func (h *approveUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTran
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateSignature(ctx, "sender", req, encodedApproval); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req.Signatures, encodedApproval); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{

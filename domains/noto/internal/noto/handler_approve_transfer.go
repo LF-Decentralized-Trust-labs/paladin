@@ -128,7 +128,7 @@ func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransactio
 	if err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateSignature(ctx, "sender", req, transferHash); err != nil {
+	if err := h.noto.validateSignature(ctx, "sender", req.Signatures, transferHash); err != nil {
 		return nil, err
 	}
 	return &prototk.EndorseTransactionResponse{
