@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
@@ -264,7 +263,7 @@ func (h *transferHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransa
 
 	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
 		tx.DomainConfig,
-		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onTransfer"],
+		h.noto.hooksABI.Functions()["onTransfer"],
 		params,
 	)
 	if err != nil {

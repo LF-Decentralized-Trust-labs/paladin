@@ -24,7 +24,6 @@ import (
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
@@ -121,7 +120,7 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 
 	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
 		tx.DomainConfig,
-		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onPrepareUnlock"],
+		h.noto.hooksABI.Functions()["onPrepareUnlock"],
 		params,
 	)
 	if err != nil {

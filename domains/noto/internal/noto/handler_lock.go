@@ -27,7 +27,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
@@ -273,7 +272,7 @@ func (h *lockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransactio
 
 	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
 		tx.DomainConfig,
-		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onLock"],
+		h.noto.hooksABI.Functions()["onLock"],
 		params,
 	)
 	if err != nil {

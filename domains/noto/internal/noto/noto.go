@@ -83,6 +83,7 @@ type Noto struct {
 	dataSchema       *prototk.StateSchema
 	factoryABI       abi.ABI
 	contractABI      abi.ABI
+	hooksABI         abi.ABI
 	eventSignatures  map[string]string
 }
 
@@ -272,11 +273,13 @@ func (n *Noto) ConfigureDomain(ctx context.Context, req *prototk.ConfigureDomain
 
 	factory := solutils.MustLoadBuild(notoFactoryJSON)
 	contract := solutils.MustLoadBuild(notoInterfaceJSON)
+	hooks := solutils.MustLoadBuild(notoHooksJSON)
 
 	n.name = req.Name
 	n.chainID = req.ChainId
 	n.factoryABI = factory.ABI
 	n.contractABI = contract.ABI
+	n.hooksABI = hooks.ABI
 
 	n.eventSignatures = make(map[string]string, len(allEvents))
 	for _, eventName := range allEvents {
@@ -976,7 +979,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 
 	transactionType, functionABI, paramsJSON, err := n.wrapHookTransaction(
 		domainConfig,
-		types.NotoABI.Functions()["handleDelegateUnlock"],
+		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["handleDelegateUnlock"],
 		&DelegateUnlockHookParams{
 			Sender:  &unlock.Delegate,
 			LockID:  unlock.LockID,

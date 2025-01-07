@@ -28,7 +28,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
-	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
@@ -214,7 +213,7 @@ func (h *approveUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 
 	transactionType, functionABI, paramsJSON, err := h.noto.wrapHookTransaction(
 		tx.DomainConfig,
-		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["onApproveUnlock"],
+		h.noto.hooksABI.Functions()["onApproveUnlock"],
 		params,
 	)
 	if err != nil {
