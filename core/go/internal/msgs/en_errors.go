@@ -106,6 +106,7 @@ var (
 	MsgStateIDMissing                 = ffe("PD010130", "The state id must be supplied for this domain")
 	MsgStateFlushInProgress           = ffe("PD010131", "A flush is already in progress for this domain context")
 	MsgDomainContextImportInvalidJSON = ffe("PD010132", "Attempted to import state locks but the JSON could not be parsed")
+	MsgDomainContextImportBadStates   = ffe("PD010133", "Attempted to import state failed")
 
 	// Persistence PD0102XX
 	MsgPersistenceInvalidType         = ffe("PD010200", "Invalid persistence type: %s")
@@ -126,9 +127,9 @@ var (
 	MsgTransactionProcessorEmptyAssembledResult = ffe("PD010305", "No transaction was assembled for transaction with ID: %s")
 
 	// Transaction store PD0104XX
-	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Mising %v")
+	MsgTransactionMissingField         = ffe("PD010400", "Must provide a payload (one of PayloadJSON or PayloadRLP), from, and contract address.  Missing %v")
 	MsgTransactionParseError           = ffe("PD010401", "Failed to parse transaction message.")
-	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialise transaction response.")
+	MsgTransactionSerializeError       = ffe("PD010402", "Failed to serialize transaction response.")
 	MsgTransactionInvalidTransactionID = ffe("PD010403", "The provided ID %s cannot be parsed into a valid UUID due to %s")
 
 	// Key manager PD0105XX
@@ -359,14 +360,20 @@ var (
 	MsgTransportNodeNameNotConfigured         = ffe("PD012002", "nodeName must be configured to set the identity of the local node")
 	MsgTransportNoTransportsConfiguredForNode = ffe("PD012003", "None of the transports registered by node '%s' are configured locally on this node: %v")
 	MsgTransportDetailsNotAvailable           = ffe("PD012004", "Transport '%s' not available for node '%s'")
-	MsgTransportInvalidNodeReceived           = ffe("PD012005", "Message received on node '%s' but is addressed for node '%s'")
 	MsgTransportInvalidReplyToReceived        = ffe("PD012006", "Message received with invalid replyTo destination: '%s'")
-	MsgTransportInvalidDestinationSend        = ffe("PD012007", "Message has invalid destination for sending from local node '%s': '%s'")
+	MsgTransportSendLocalNode                 = ffe("PD012007", "Attempt to send message to local node '%s'")
 	MsgTransportInvalidReplyToSend            = ffe("PD012008", "Message has invalid replyTo destination: '%s'")
 	MsgTransportInvalidLocalNode              = ffe("PD012009", "Node '%s' is the local node")
 	MsgTransportClientAlreadyRegistered       = ffe("PD012010", "Client '%s' already registered")
-	MsgTransportDestinationNotFound           = ffe("PD012011", "Destination '%s' not found")
+	MsgTransportComponentNotFound             = ffe("PD012011", "Component '%s' not found")
 	MsgTransportClientRegisterAfterStartup    = ffe("PD012012", "Client '%s' attempted registration after startup")
+	MsgTransportUnsupportedReliableMsg        = ffe("PD012013", "Unsupported reliable message type '%s'")
+	MsgTransportStateNotAvailableLocally      = ffe("PD012014", "State not available locally: domain=%s,contract=%s,id=%s")
+	MsgTransportInvalidTargetNode             = ffe("PD012015", "Invalid target node '%s'")
+	MsgTransportInvalidMessageData            = ffe("PD012016", "Invalid data for message %s")
+	MsgTransportUnsupportedReliableMsgType    = ffe("PD012017", "Unsupported reliable message type '%s'")
+	MsgTransportAckMissingCorrelationID       = ffe("PD012018", "Ack/nack missing correlation ID")
+	MsgTransportNackMissingError              = ffe("PD012019", "Nack missing error information")
 
 	// RegistryManager module PD0121XX
 	MsgRegistryNodeEntiresNotFound     = ffe("PD012100", "No entries found for node '%s'")

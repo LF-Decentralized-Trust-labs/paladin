@@ -1,6 +1,6 @@
 BEGIN;
-DROP TABLE dispatches;
-DROP TABLE state_distribution_acknowledgments;
-DROP TABLE state_distributions;
+DROP TABLE IF EXISTS dispatches;
+DROP TABLE IF EXISTS state_distribution_acknowledgments;
+DROP TABLE IF EXISTS state_distributions;
 COMMIT;
 

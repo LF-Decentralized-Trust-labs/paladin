@@ -233,7 +233,7 @@ func (tt StateLockType) Options() []string {
 // (and maybe later spending) a state that is yet to be confirmed.
 type StateLock struct {
 	DomainName  string                      `json:"-"`
-	State       tktypes.HexBytes            `json:"-"`
+	StateID     tktypes.HexBytes            `json:"-"`
 	Transaction uuid.UUID                   `docstruct:"StateLock" json:"transaction"`
 	Type        tktypes.Enum[StateLockType] `docstruct:"StateLock" json:"type"`
 }

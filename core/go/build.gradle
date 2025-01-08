@@ -31,7 +31,7 @@ ext {
         include "mocks/**/*.go"
     }
 
-    targetCoverage = 92.5
+    targetCoverage = 93.5
     maxCoverageBarGap = 1
     coverageExcludedPackages = [
         'github.com/kaleido-io/paladin/core/internal/privatetxnmgr/ptmgrtypes/mock_transaction_flow.go',
@@ -231,18 +231,6 @@ task makeMocks(type: Mockery, dependsOn: [":installMockery", protoc, goGet]) {
         outputDir 'mocks/ethclientmocks'
     }
     mock {
-        inputDir 'internal/statedistribution'
-        includeAll true
-        outputPackage 'statedistributionmocks'
-        outputDir 'mocks/statedistributionmocks'
-    }
-    mock {
-        inputDir 'internal/preparedtxdistribution'
-        includeAll true
-        outputPackage 'preparedtxdistributionmocks'
-        outputDir 'mocks/preparedtxdistributionmocks'
-    }
-     mock {
         inputDir 'internal/privatetxnmgr/ptmgrtypes'
         name "TransactionFlow"
         inpackage true

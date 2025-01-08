@@ -72,8 +72,20 @@ func buildReversedTableListFromMigrations() []string {
 		case strings.HasSuffix(migrationFile, ".up.sql"):
 			for scanner.Scan() {
 				createTableMatch := createTableRegex.FindStringSubmatch(scanner.Text())
+				dropTableMatch := dropTableRegex.FindStringSubmatch(scanner.Text())
 				if len(createTableMatch) == 2 {
 					createTables[createTableMatch[1]] = migrationFile
+				} else if len(dropTableMatch) == 3 {
+					// Remove from create & drop list - as it's been superseded in a .up migration
+					delete(dropTables, dropTableMatch[2])
+					delete(createTables, dropTableMatch[2])
+					newDropList := make([]string, 0, len(dropList))
+					for _, t := range dropList {
+						if t != dropTableMatch[2] {
+							newDropList = append(newDropList, t)
+						}
+					}
+					dropList = newDropList
 				}
 			}
 		case strings.HasSuffix(migrationFile, ".down.sql"):

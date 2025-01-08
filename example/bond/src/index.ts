@@ -192,13 +192,15 @@ async function main(): Promise<boolean> {
 
   // Prepare the payment transfer (investor -> custodian)
   logger.log("Preparing payment transfer...");
-  const paymentTransfer = await notoCash
-    .using(paladin3)
-    .prepareTransfer(investor, {
-      to: bondCustodian,
-      amount: 100,
-      data: "0x",
-    });
+  txID = await notoCash.using(paladin3).prepareTransfer(investor, {
+    to: bondCustodian,
+    amount: 100,
+    data: "0x",
+  });
+  const paymentTransfer = await paladin1.pollForPreparedTransaction(
+    txID,
+    10000
+  );
   if (paymentTransfer === undefined) {
     logger.error("Failed!");
     return false;
@@ -213,13 +215,12 @@ async function main(): Promise<boolean> {
   // Prepare the bond transfer (custodian -> investor)
   // Requires 2 calls to prepare, as the Noto transaction spawns a Pente transaction to wrap it
   logger.log("Preparing bond transfer (step 1/2)...");
-  const bondTransfer1 = await notoBond
-    .using(paladin2)
-    .prepareTransfer(bondCustodian, {
-      to: investor,
-      amount: 100,
-      data: "0x",
-    });
+  txID = await notoBond.using(paladin2).prepareTransfer(bondCustodian, {
+    to: investor,
+    amount: 100,
+    data: "0x",
+  });
+  const bondTransfer1 = await paladin2.pollForPreparedTransaction(txID, 10000);
   if (bondTransfer1 === undefined) {
     logger.error("Failed!");
     return false;

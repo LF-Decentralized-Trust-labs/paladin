@@ -18,46 +18,82 @@ package transportmgr
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/config/pkg/confutil"
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/core/internal/flushwriter"
 	"github.com/kaleido-io/paladin/core/internal/msgs"
+	"github.com/kaleido-io/paladin/core/pkg/persistence"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
 	"github.com/kaleido-io/paladin/toolkit/pkg/rpcserver"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
 type transportManager struct {
-	bgCtx context.Context
-	mux   sync.Mutex
+	bgCtx     context.Context
+	cancelCtx context.CancelFunc
+	mux       sync.Mutex
 
-	rpcModule       *rpcserver.RPCModule
-	conf            *pldconf.TransportManagerConfig
-	localNodeName   string
-	registryManager components.RegistryManager
+	rpcModule        *rpcserver.RPCModule
+	conf             *pldconf.TransportManagerConfig
+	localNodeName    string
+	registryManager  components.RegistryManager
+	stateManager     components.StateManager
+	domainManager    components.DomainManager
+	keyManager       components.KeyManager
+	txManager        components.TXManager
+	privateTxManager components.PrivateTxManager
+	identityResolver components.IdentityResolver
+	persistence      persistence.Persistence
 
 	transportsByID   map[uuid.UUID]*transport
 	transportsByName map[string]*transport
 
-	destinations      map[string]components.TransportClient
-	destinationsFixed bool
-	destinationsMux   sync.RWMutex
+	peersLock      sync.RWMutex
+	peers          map[string]*peer
+	peerReaperDone chan struct{}
+
+	reliableMsgWriter flushwriter.Writer[*reliableMsgOp, *noResult]
+
+	sendShortRetry        *retry.Retry
+	reliableScanRetry     *retry.Retry
+	peerInactivityTimeout time.Duration
+	quiesceTimeout        time.Duration
+	peerReaperInterval    time.Duration
+
+	senderBufferLen         int
+	reliableMessageResend   time.Duration
+	reliableMessagePageSize int
 }
 
 func NewTransportManager(bgCtx context.Context, conf *pldconf.TransportManagerConfig) components.TransportManager {
-	return &transportManager{
-		bgCtx:            bgCtx,
-		conf:             conf,
-		localNodeName:    conf.NodeName,
-		transportsByID:   make(map[uuid.UUID]*transport),
-		transportsByName: make(map[string]*transport),
-		destinations:     make(map[string]components.TransportClient),
+	tm := &transportManager{
+		conf:                    conf,
+		localNodeName:           conf.NodeName,
+		transportsByID:          make(map[uuid.UUID]*transport),
+		transportsByName:        make(map[string]*transport),
+		peers:                   make(map[string]*peer),
+		senderBufferLen:         confutil.IntMin(conf.SendQueueLen, 0, *pldconf.TransportManagerDefaults.SendQueueLen),
+		reliableMessageResend:   confutil.DurationMin(conf.ReliableMessageResend, 100*time.Millisecond, *pldconf.TransportManagerDefaults.ReliableMessageResend),
+		sendShortRetry:          retry.NewRetryLimited(&conf.SendRetry, &pldconf.TransportManagerDefaults.SendRetry),
+		reliableScanRetry:       retry.NewRetryIndefinite(&conf.ReliableScanRetry, &pldconf.TransportManagerDefaults.ReliableScanRetry),
+		peerInactivityTimeout:   confutil.DurationMin(conf.PeerInactivityTimeout, 0, *pldconf.TransportManagerDefaults.PeerInactivityTimeout),
+		peerReaperInterval:      confutil.DurationMin(conf.PeerReaperInterval, 100*time.Millisecond, *pldconf.TransportManagerDefaults.PeerReaperInterval),
+		quiesceTimeout:          1 * time.Second, // not currently tunable (considered very small edge case)
+		reliableMessagePageSize: 100,             // not currently tunable
 	}
+	tm.bgCtx, tm.cancelCtx = context.WithCancel(bgCtx)
+	return tm
 }
 
 func (tm *transportManager) PreInit(pic components.PreInitComponents) (*components.ManagerInitResult, error) {
@@ -75,18 +111,32 @@ func (tm *transportManager) PostInit(c components.AllComponents) error {
 	// plugin manager starts, and thus before any domain would have started any go-routine
 	// that could have cached a nil value in memory.
 	tm.registryManager = c.RegistryManager()
+	tm.stateManager = c.StateManager()
+	tm.domainManager = c.DomainManager()
+	tm.keyManager = c.KeyManager()
+	tm.txManager = c.TxManager()
+	tm.privateTxManager = c.PrivateTxManager()
+	tm.identityResolver = c.IdentityResolver()
+	tm.persistence = c.Persistence()
+	tm.reliableMsgWriter = flushwriter.NewWriter(tm.bgCtx, tm.handleReliableMsgBatch, tm.persistence,
+		&tm.conf.ReliableMessageWriter, &pldconf.TransportManagerDefaults.ReliableMessageWriter)
 	return nil
 }
 
 func (tm *transportManager) Start() error {
-	tm.destinationsMux.Lock()
-	defer tm.destinationsMux.Unlock()
-	// All destinations must be registered as part of the startup sequence
-	tm.destinationsFixed = true
+	tm.peerReaperDone = make(chan struct{})
+	tm.reliableMsgWriter.Start()
+	go tm.peerReaper()
 	return nil
 }
 
 func (tm *transportManager) Stop() {
+
+	peers := tm.listActivePeers()
+	for _, p := range peers {
+		tm.reapPeer(p)
+	}
+
 	tm.mux.Lock()
 	var allTransports []*transport
 	for _, t := range tm.transportsByID {
@@ -97,20 +147,12 @@ func (tm *transportManager) Stop() {
 		tm.cleanupTransport(t)
 	}
 
-}
+	tm.cancelCtx()
+	if tm.peerReaperDone != nil {
+		<-tm.peerReaperDone
+	}
 
-func (tm *transportManager) RegisterClient(ctx context.Context, client components.TransportClient) error {
-	tm.destinationsMux.Lock()
-	defer tm.destinationsMux.Unlock()
-	if tm.destinationsFixed {
-		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientRegisterAfterStartup, client.Destination())
-	}
-	if _, found := tm.destinations[client.Destination()]; found {
-		log.L(ctx).Errorf("Client already registered for destination %s", client.Destination())
-		return i18n.NewError(tm.bgCtx, msgs.MsgTransportClientAlreadyRegistered, client.Destination())
-	}
-	tm.destinations[client.Destination()] = client
-	return nil
+	tm.reliableMsgWriter.Shutdown()
 
 }
 
@@ -193,71 +235,121 @@ func (tm *transportManager) LocalNodeName() string {
 }
 
 // See docs in components package
-func (tm *transportManager) Send(ctx context.Context, msg *components.TransportMessage) error {
+func (tm *transportManager) Send(ctx context.Context, send *components.FireAndForgetMessageSend) error {
 
 	// Check the message is valid
-	if len(msg.MessageType) == 0 ||
-		len(msg.Payload) == 0 {
-		log.L(ctx).Errorf("Invalid message send request %+v", msg)
+	if len(send.Payload) == 0 {
+		log.L(ctx).Errorf("Invalid message send request %+v", send)
 		return i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	if msg.Node == "" || msg.Node == tm.localNodeName {
-		return i18n.NewError(ctx, msgs.MsgTransportInvalidDestinationSend, tm.localNodeName, msg.Node)
+	if send.MessageID == nil {
+		msgID := uuid.New()
+		send.MessageID = &msgID
+	}
+	msg := &prototk.PaladinMsg{
+		MessageId:   send.MessageID.String(),
+		MessageType: send.MessageType,
+		Component:   send.Component,
+		Payload:     send.Payload,
+	}
+	if send.CorrelationID != nil {
+		cidStr := send.CorrelationID.String()
+		msg.CorrelationId = &cidStr
 	}
 
-	if msg.ReplyTo == "" {
-		msg.ReplyTo = tm.localNodeName
-	}
+	return tm.queueFireAndForget(ctx, send.Node, msg)
+}
 
-	// Note the registry is responsible for caching to make this call as efficient as if
-	// we maintained the transport details in-memory ourselves.
-	registeredTransportDetails, err := tm.registryManager.GetNodeTransports(ctx, msg.Node)
+func (tm *transportManager) queueFireAndForget(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
+	// Use or establish a p connection for the send
+	p, err := tm.getPeer(ctx, nodeName, true)
+	if err == nil {
+		err = p.transport.checkInit(ctx)
+	}
 	if err != nil {
 		return err
 	}
 
-	// See if any of the transports registered by the node, are configured on this local node
-	// Note: We just pick the first one if multiple are available, and there is no retry to
-	//       fallback to a secondary one currently.
-	var transport *transport
-	for _, rtd := range registeredTransportDetails {
-		transport = tm.transportsByName[rtd.Transport]
+	// Push the send to the peer - this is a best effort interaction.
+	// There is some retry in the Paladin layer, and some transports provide resilience.
+	// However, the send is at-most-once, and the higher level message protocols that
+	// use this "send" must be fault tolerant to message loss.
+	select {
+	case p.sendQueue <- msg:
+		log.L(ctx).Debugf("queued %s message %s (cid=%v) to %s", msg.MessageType, msg.MessageId, tktypes.StrOrEmpty(msg.CorrelationId), p.Name)
+		return nil
+	case <-ctx.Done():
+		return i18n.NewError(ctx, msgs.MsgContextCanceled)
 	}
-	if transport == nil {
-		// If we didn't find one, then feedback to the caller which transports were registered
-		registeredTransportNames := []string{}
-		for _, rtd := range registeredTransportDetails {
-			registeredTransportNames = append(registeredTransportNames, rtd.Transport)
+
+}
+
+// See docs in components package
+func (tm *transportManager) SendReliable(ctx context.Context, dbTX *gorm.DB, msgs ...*components.ReliableMessage) (preCommit func(), err error) {
+
+	peers := make(map[string]*peer)
+	for _, msg := range msgs {
+		var p *peer
+
+		msg.ID = uuid.New()
+		msg.Created = tktypes.TimestampNow()
+		_, err = msg.MessageType.Validate()
+
+		if err == nil {
+			p, err = tm.getPeer(ctx, msg.Node, true)
 		}
-		return i18n.NewError(ctx, msgs.MsgTransportNoTransportsConfiguredForNode, msg.Node, registeredTransportNames)
+
+		if err != nil {
+			return nil, err
+		}
+
+		peers[p.Name] = p
 	}
 
-	// Call the selected transport to send
-	// Note: We do not push the transport details down to the plugin on every send, as they are very large
-	//       (KBs of certificates and other data).
-	//       The transport plugin uses GetTransportDetails to request them back from us, and then caches
-	//       these internally through use of a long lived connection / connection-pool.
-	var correlID *string
-	if msg.CorrelationID != nil {
-		correlID = confutil.P(msg.CorrelationID.String())
+	if err == nil {
+		err = dbTX.
+			WithContext(ctx).
+			Create(msgs).
+			Error
 	}
-	var zeroUUID uuid.UUID
-	if msg.MessageID == zeroUUID {
-		msg.MessageID = uuid.New()
-	}
-	err = transport.send(ctx, &prototk.Message{
-		MessageType:   msg.MessageType,
-		MessageId:     msg.MessageID.String(),
-		CorrelationId: correlID,
-		Component:     msg.Component,
-		Node:          msg.Node,
-		ReplyTo:       msg.ReplyTo,
-		Payload:       msg.Payload,
-	})
+
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return func() {
+		for _, p := range peers {
+			p.notifyPersistedMsgAvailable()
+		}
+	}, nil
+
+}
+
+func (tm *transportManager) writeAcks(ctx context.Context, dbTX *gorm.DB, acks ...*components.ReliableMessageAck) error {
+	for _, ack := range acks {
+		log.L(ctx).Infof("ack received for message %s", ack.MessageID)
+		ack.Time = tktypes.TimestampNow()
+	}
+	return dbTX.
+		WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(acks).
+		Error
+}
+
+func (tm *transportManager) getReliableMessageByID(ctx context.Context, dbTX *gorm.DB, id uuid.UUID) (*components.ReliableMessage, error) {
+	var rms []*components.ReliableMessage
+	err := dbTX.
+		WithContext(ctx).
+		Order("sequence ASC").
+		Joins("Ack").
+		Where(`"reliable_msgs"."id" = ?`, id).
+		Limit(1).
+		Find(&rms).
+		Error
+	if err != nil || len(rms) < 1 {
+		return nil, err
+	}
+	return rms[0], nil
 }

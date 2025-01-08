@@ -122,11 +122,19 @@ func TestTransportRequestsOK(t *testing.T) {
 			return &prototk.ConfigureTransportResponse{}, nil
 		},
 		SendMessage: func(ctx context.Context, smr *prototk.SendMessageRequest) (*prototk.SendMessageResponse, error) {
-			assert.Equal(t, "node1", smr.Message.Node)
+			assert.Equal(t, "type1", smr.Message.MessageType)
 			return &prototk.SendMessageResponse{}, nil
 		},
 		GetLocalDetails: func(ctx context.Context, gldr *prototk.GetLocalDetailsRequest) (*prototk.GetLocalDetailsResponse, error) {
 			return &prototk.GetLocalDetailsResponse{TransportDetails: "endpoint stuff"}, nil
+		},
+		ActivatePeer: func(ctx context.Context, anr *prototk.ActivatePeerRequest) (*prototk.ActivatePeerResponse, error) {
+			assert.Equal(t, "node1", anr.NodeName)
+			return &prototk.ActivatePeerResponse{PeerInfoJson: `{"endpoint": "stuff"}`}, nil
+		},
+		DeactivatePeer: func(ctx context.Context, danr *prototk.DeactivatePeerRequest) (*prototk.DeactivatePeerResponse, error) {
+			assert.Equal(t, "node1", danr.NodeName)
+			return &prototk.DeactivatePeerResponse{}, nil
 		},
 	}
 
@@ -166,7 +174,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 
 	smr, err := transportAPI.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{Node: "node1"},
+		Message: &prototk.PaladinMsg{MessageType: "type1"},
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, smr)
@@ -175,6 +183,15 @@ func TestTransportRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, smr)
 	assert.Equal(t, "endpoint stuff", gldr.TransportDetails)
+
+	anr, err := transportAPI.ActivatePeer(ctx, &prototk.ActivatePeerRequest{NodeName: "node1"})
+	require.NoError(t, err)
+	assert.NotNil(t, anr)
+	assert.Equal(t, `{"endpoint": "stuff"}`, anr.PeerInfoJson)
+
+	danr, err := transportAPI.DeactivatePeer(ctx, &prototk.DeactivatePeerRequest{NodeName: "node1"})
+	require.NoError(t, err)
+	assert.NotNil(t, danr)
 
 	// This is the point the transport manager would call us to say the transport is initialized
 	// (once it's happy it's updated its internal state)
@@ -188,7 +205,7 @@ func TestTransportRequestsOK(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "node1_details", rts.TransportDetails)
 	rms, err := callbacks.ReceiveMessage(ctx, &prototk.ReceiveMessageRequest{
-		Message: &prototk.Message{
+		Message: &prototk.PaladinMsg{
 			Payload: []byte("body1"),
 		},
 	})

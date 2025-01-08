@@ -310,9 +310,9 @@ func (dc *domainContract) upsertPotentialStates(dCtx components.DomainContext, r
 			}
 		}
 		stateUpsert := &components.StateUpsert{
-			ID:       id,
-			SchemaID: schema.ID(),
-			Data:     tktypes.RawJSON(s.StateDataJson),
+			ID:     id,
+			Schema: schema.ID(),
+			Data:   tktypes.RawJSON(s.StateDataJson),
 		}
 		if isOutput {
 			// These are marked as locked and creating in the transaction, and become available for other transaction to read
@@ -366,14 +366,14 @@ func (dc *domainContract) LockStates(dCtx components.DomainContext, readTX *gorm
 	inputIDs := make([]string, len(postAssembly.InputStates))
 	for i, s := range postAssembly.InputStates {
 		stateLocks = append(stateLocks, &pldapi.StateLock{
-			State:       s.ID,
+			StateID:     s.ID,
 			DomainName:  domainName,
 			Transaction: tx.ID,
 			Type:        pldapi.StateLockTypeSpend.Enum(),
 		})
 		states = append(states, &components.StateUpsert{
 			ID:        s.ID,
-			SchemaID:  s.Schema,
+			Schema:    s.Schema,
 			Data:      s.Data,
 			CreatedBy: nil, // we are not responsible for creation of the state
 		})
@@ -382,14 +382,14 @@ func (dc *domainContract) LockStates(dCtx components.DomainContext, readTX *gorm
 	readIDs := make([]string, len(postAssembly.ReadStates))
 	for i, s := range postAssembly.ReadStates {
 		stateLocks = append(stateLocks, &pldapi.StateLock{
-			State:       s.ID,
+			StateID:     s.ID,
 			DomainName:  domainName,
 			Transaction: tx.ID,
 			Type:        pldapi.StateLockTypeRead.Enum(),
 		})
 		states = append(states, &components.StateUpsert{
 			ID:        s.ID,
-			SchemaID:  s.Schema,
+			Schema:    s.Schema,
 			Data:      s.Data,
 			CreatedBy: nil, // we are not responsible for creation of the state
 		})
@@ -401,7 +401,7 @@ func (dc *domainContract) LockStates(dCtx components.DomainContext, readTX *gorm
 	for i, s := range postAssembly.OutputStates {
 		states = append(states, &components.StateUpsert{
 			ID:        s.ID,
-			SchemaID:  s.Schema,
+			Schema:    s.Schema,
 			Data:      s.Data,
 			CreatedBy: &tx.ID, // output states have create-locks to the transaction
 		})
@@ -412,9 +412,9 @@ func (dc *domainContract) LockStates(dCtx components.DomainContext, readTX *gorm
 	infoIDs := make([]string, len(postAssembly.InfoStates))
 	for i, s := range postAssembly.InfoStates {
 		states = append(states, &components.StateUpsert{
-			ID:       s.ID,
-			SchemaID: s.Schema,
-			Data:     s.Data,
+			ID:     s.ID,
+			Schema: s.Schema,
+			Data:   s.Data,
 		})
 		infoIDs[i] = s.ID.String()
 	}

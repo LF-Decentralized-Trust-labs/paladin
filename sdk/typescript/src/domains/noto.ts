@@ -160,8 +160,8 @@ export class NotoInstance {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
-  async prepareTransfer(from: PaladinVerifier, data: NotoTransferParams) {
-    const txID = await this.paladin.prepareTransaction({
+  prepareTransfer(from: PaladinVerifier, data: NotoTransferParams) {
+    return this.paladin.prepareTransaction({
       type: TransactionType.PRIVATE,
       abi: notoPrivateJSON.abi,
       function: "transfer",
@@ -172,10 +172,6 @@ export class NotoInstance {
         to: data.to.lookup,
       },
     });
-    return this.paladin.pollForPreparedTransaction(
-      txID,
-      this.options.pollTimeout
-    );
   }
 
   async approveTransfer(

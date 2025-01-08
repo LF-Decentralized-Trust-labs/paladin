@@ -129,3 +129,33 @@ func (br *TransportBridge) GetLocalDetails(ctx context.Context, req *prototk.Get
 	)
 	return
 }
+
+func (br *TransportBridge) ActivatePeer(ctx context.Context, req *prototk.ActivatePeerRequest) (res *prototk.ActivatePeerResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_ActivatePeer{ActivatePeer: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_ActivatePeerRes); ok {
+				res = r.ActivatePeerRes
+			}
+			return res != nil
+		},
+	)
+	return
+}
+
+func (br *TransportBridge) DeactivatePeer(ctx context.Context, req *prototk.DeactivatePeerRequest) (res *prototk.DeactivatePeerResponse, err error) {
+	err = br.toPlugin.RequestReply(ctx,
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) {
+			dm.Message().RequestToTransport = &prototk.TransportMessage_DeactivatePeer{DeactivatePeer: req}
+		},
+		func(dm plugintk.PluginMessage[prototk.TransportMessage]) bool {
+			if r, ok := dm.Message().ResponseFromTransport.(*prototk.TransportMessage_DeactivatePeerRes); ok {
+				res = r.DeactivatePeerRes
+			}
+			return res != nil
+		},
+	)
+	return
+}

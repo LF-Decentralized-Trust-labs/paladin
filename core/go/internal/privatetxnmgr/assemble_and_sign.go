@@ -40,7 +40,7 @@ func (s *Sequencer) assembleForRemoteCoordinator(ctx context.Context, transactio
 	// if our block height is ahead of the coordinator, there is a small chance that we we assemble a transaction that the coordinator will not be able to
 	// endorse yet but it is better to wait around on the endorsement flow than to wait around on the assemble flow which is single threaded per domain
 
-	err := s.delegateDomainContext.ImportStateLocks(stateLocksJSON)
+	err := s.delegateDomainContext.ImportSnapshot(stateLocksJSON)
 	if err != nil {
 		log.L(ctx).Errorf("assembleForRemoteCoordinator: Error importing state locks: %s", err)
 		return nil, err

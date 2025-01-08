@@ -19,19 +19,73 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/kaleido-io/paladin/config/pkg/pldconf"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
-type TransportMessage struct {
-	MessageID     uuid.UUID
+type FireAndForgetMessageSend struct {
+	Node          string
+	Component     prototk.PaladinMsg_Component
+	MessageID     *uuid.UUID // optionally supplied by caller for request/reply correlation
 	CorrelationID *uuid.UUID
-	Component     string // The name of the component to route the message to once it arrives at the destination node
-	Node          string // The node id to send the message to
-	ReplyTo       string // The node id to send replies to
 	MessageType   string
 	Payload       []byte
+}
+
+type ReceivedMessage struct {
+	FromNode      string
+	MessageID     uuid.UUID
+	CorrelationID *uuid.UUID
+	MessageType   string
+	Payload       []byte
+}
+
+type ReliableMessageType string
+
+const (
+	RMTState               ReliableMessageType = "state"
+	RMTReceipt             ReliableMessageType = "receipt"
+	RMTPreparedTransaction ReliableMessageType = "prepared_txn"
+)
+
+func (t ReliableMessageType) Enum() tktypes.Enum[ReliableMessageType] {
+	return tktypes.Enum[ReliableMessageType](t)
+}
+
+func (t ReliableMessageType) Options() []string {
+	return []string{
+		string(RMTState),
+		string(RMTReceipt),
+		string(RMTPreparedTransaction),
+	}
+}
+
+type ReliableMessage struct {
+	Sequence    uint64                            `json:"sequence"        gorm:"column:sequence;primaryKey"`
+	ID          uuid.UUID                         `json:"id"              gorm:"column:id"`
+	Created     tktypes.Timestamp                 `json:"created"         gorm:"column:created;autoCreateTime:false"` // generated in our code
+	Node        string                            `json:"node"            gorm:"column:node"`                         // The node id to send the message to
+	MessageType tktypes.Enum[ReliableMessageType] `json:"messageType"     gorm:"column:msg_type"`
+	Metadata    tktypes.RawJSON                   `json:"metadata"        gorm:"column:metadata"`
+	Ack         *ReliableMessageAck               `json:"ack,omitempty"   gorm:"foreignKey:MessageID;references:ID;"`
+}
+
+func (rm ReliableMessage) TableName() string {
+	return "reliable_msgs"
+}
+
+type ReliableMessageAck struct {
+	MessageID uuid.UUID         `json:"-"                                gorm:"column:id;primaryKey"`
+	Time      tktypes.Timestamp `json:"time,omitempty"                   gorm:"column:time;autoCreateTime:false"` // generated in our code
+	Error     string            `json:"error,omitempty"                  gorm:"column:error"`
+}
+
+func (rma ReliableMessageAck) TableName() string {
+	return "reliable_msg_acks"
 }
 
 type TransportManagerToTransport interface {
@@ -41,8 +95,6 @@ type TransportManagerToTransport interface {
 
 // TransportClient is the interface for a component that can receive messages from the transport manager
 type TransportClient interface {
-	// Destination returns a string that should be matched with the Destination field of incomming messages to be routed to this client
-	Destination() string
 	// This function is used by the transport manager to deliver messages to the engine.
 	//
 	// The implementation of this function:
@@ -70,7 +122,7 @@ type TransportClient interface {
 	// It delivers messages to this function:
 	// - in whatever order they are received from the transport plugin(s), which is dependent on the _sender_ usually
 	// - with whatever concurrency is performed by the transport plugin(s), which is commonly one per remote node, but that's not assured
-	ReceiveTransportMessage(context.Context, *TransportMessage)
+	HandlePaladinMsg(ctx context.Context, msg *ReceivedMessage)
 }
 
 type TransportManager interface {
@@ -88,10 +140,18 @@ type TransportManager interface {
 	// on delivery, and the target failing to process the message should be considered a possible
 	// situation to recover from (although not critical path).
 	//
-	// e.g. at-most-once delivery semantics
-	Send(ctx context.Context, message *TransportMessage) error
+	// at-most-once delivery semantics
+	Send(ctx context.Context, send *FireAndForgetMessageSend) error
 
-	// RegisterClient registers a client to receive messages from the transport manager
-	// messages are routed to the client based on the Destination field of the message matching the value returned from Destination() function of the TransportClient
-	RegisterClient(ctx context.Context, client TransportClient) error
+	// Sends a message with at-least-once delivery semantics
+	//
+	// Each reliable message type has special building code in the transport manager, which assembles the full
+	// message by combining the metadata in the ReliableMessage with data looked up from other components.
+	// This avoids the performance and storage cost of writing the big data (states, receipts) multiple times.
+	//
+	// The message is persisted to the DB in the supplied transaction, then sent on the wire with indefinite retry
+	// including over node restart, until an ack is returned from the remote node.
+	//
+	// The pre-commit handler must be called after the DB transaction commits to trigger the delivery.
+	SendReliable(ctx context.Context, dbTX *gorm.DB, msg ...*ReliableMessage) (preCommit func(), err error)
 }

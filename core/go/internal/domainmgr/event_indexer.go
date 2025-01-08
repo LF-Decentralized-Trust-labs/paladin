@@ -357,7 +357,7 @@ func (d *domain) handleEventBatchForContract(ctx context.Context, dbTX *gorm.DB,
 	}
 
 	// Then any finalizations of those states
-	if len(stateSpends) > 0 || len(stateReads) > 0 || len(stateConfirms) > 0 {
+	if len(stateSpends) > 0 || len(stateReads) > 0 || len(stateConfirms) > 0 || len(stateInfoRecords) > 0 {
 		if err := d.dm.stateStore.WriteStateFinalizations(ctx, dbTX, stateSpends, stateReads, stateConfirms, stateInfoRecords); err != nil {
 			return nil, err
 		}

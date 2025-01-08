@@ -51,3 +51,11 @@ func TestValidate64SafeCharsStartEndAlphaNum(t *testing.T) {
 	err = ValidateSafeCharsStartEndAlphaNum(context.Background(), "not_Àll_ascii", DefaultNameMaxLen, "name")
 	assert.Regexp(t, "PD020005.*name", err)
 }
+
+func TestStrOrEmpty(t *testing.T) {
+
+	assert.Equal(t, "", StrOrEmpty(nil))
+	tStr := "test"
+	assert.Equal(t, "test", StrOrEmpty(&tStr))
+
+}

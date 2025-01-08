@@ -370,7 +370,8 @@ func (tf *transactionFlow) writeAndLockStates(ctx context.Context) {
 	// we are accessing the transactionFlow's PrivateTransaction object which is only safe to do on the sequencer thread
 	// but we need to make sure that these writes/locks are complete before the assemble requester thread can proceed to assemble
 	// the next transaction
-	if tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil {
+	if (tf.transaction.PostAssembly.OutputStatesPotential != nil && tf.transaction.PostAssembly.OutputStates == nil) ||
+		(tf.transaction.PostAssembly.InfoStatesPotential != nil && tf.transaction.PostAssembly.InfoStates == nil) {
 		// We need to write the potential states to the domain before we can sign or endorse the transaction
 		// but there is no point in doing that until we are sure that the transaction is going to be coordinated locally
 		// so this is the earliest, and latest, point in the flow that we can do this

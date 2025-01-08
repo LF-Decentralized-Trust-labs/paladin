@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/stretchr/testify/assert"
@@ -135,32 +134,9 @@ func TestReceiveFail(t *testing.T) {
 	var err error
 	for err == nil {
 		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-			Message: &prototk.Message{
-				ReplyTo:   "node1",
-				Component: "to.you",
-				Node:      "node2",
-			},
-		})
-	}
-	assert.Error(t, err)
-
-}
-
-func TestBadReplyTo(t *testing.T) {
-
-	ctx := context.Background()
-
-	plugin1, _, done := newSuccessfulVerifiedConnection(t)
-	defer done()
-
-	// Send and we should get an error as the server fails
-	var err error
-	for err == nil {
-		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-			Message: &prototk.Message{
-				ReplyTo:   "not.mine",
-				Component: "to.you",
-				Node:      "node2",
+			Node: "node2",
+			Message: &prototk.PaladinMsg{
+				Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 			},
 		})
 	}
@@ -174,6 +150,7 @@ func TestConnectFail(t *testing.T) {
 
 	plugin1, plugin2, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
 		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			require.Equal(t, "node1", rmr.FromNode)
 			return &prototk.ReceiveMessageResponse{}, nil
 		}
 	})
@@ -181,42 +158,21 @@ func TestConnectFail(t *testing.T) {
 
 	plugin2.grpcServer.Stop()
 
-	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node2",
-		},
-	})
-	assert.Regexp(t, "rpc error", err)
+	// gRPC does not guarantee we get the error immediately
+	var err error
+	for err == nil {
+		_, err = plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
+			Node: "node2",
+			Message: &prototk.PaladinMsg{
+				Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
+			},
+		})
+	}
+	assert.Error(t, err)
 
 }
 
-func TestConnectBadTransport(t *testing.T) {
-
-	ctx := context.Background()
-
-	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(callbacks1, _ *testCallbacks) {
-		callbacks1.getTransportDetails = func(ctx context.Context, gtdr *prototk.GetTransportDetailsRequest) (*prototk.GetTransportDetailsResponse, error) {
-			return &prototk.GetTransportDetailsResponse{
-				TransportDetails: `{"endpoint": "WRONG:::::::"}`,
-			}, nil
-		}
-	})
-	defer done()
-
-	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "to.you",
-			Node:      "node2",
-		},
-	})
-	assert.Regexp(t, "WRONG", err)
-
-}
-
-func TestSendNoNode(t *testing.T) {
+func TestSendNotActivated(t *testing.T) {
 
 	ctx := context.Background()
 
@@ -228,12 +184,46 @@ func TestSendNoNode(t *testing.T) {
 	defer done()
 
 	_, err := plugin1.SendMessage(ctx, &prototk.SendMessageRequest{
-		Message: &prototk.Message{
-			ReplyTo:   "node1",
-			Component: "someComponent",
+		Node: "node3",
+		Message: &prototk.PaladinMsg{
+			Component: prototk.PaladinMsg_TRANSACTION_ENGINE,
 		},
 	})
-	assert.Regexp(t, "PD030013", err)
+	assert.Regexp(t, "PD030016", err)
+
+}
+
+func TestActivateBadTransportDetails(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t, func(_, callbacks2 *testCallbacks) {
+		callbacks2.receiveMessage = func(ctx context.Context, rmr *prototk.ReceiveMessageRequest) (*prototk.ReceiveMessageResponse, error) {
+			return &prototk.ReceiveMessageResponse{}, nil
+		}
+	})
+	defer done()
+
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
+		NodeName:         "node2",
+		TransportDetails: `{"endpoint": false}`,
+	})
+	assert.Regexp(t, "PD030014", err)
+
+}
+
+func TestConnectBadTransport(t *testing.T) {
+
+	ctx := context.Background()
+
+	plugin1, _, done := newSuccessfulVerifiedConnection(t)
+	defer done()
+
+	_, err := plugin1.ActivatePeer(ctx, &prototk.ActivatePeerRequest{
+		NodeName:         "node2",
+		TransportDetails: `{"endpoint": "WRONG:::::::"}`,
+	})
+	assert.Regexp(t, "WRONG", err)
 
 }
 
@@ -263,39 +253,8 @@ func TestConnectSendStreamBadSecurityCtx(t *testing.T) {
 
 	for err == nil {
 		err = s.Send(&proto.Message{
-			ReplyTo:   "not.mine",
-			Component: "to.you",
-			Node:      "node2",
+			Component: int32(prototk.PaladinMsg_TRANSACTION_ENGINE),
 		})
 	}
 	assert.Error(t, err)
-}
-
-func TestWaitNewConn(t *testing.T) {
-
-	plugin, _, _, done := newTestGRPCTransport(t, "", "", &Config{})
-	defer done()
-
-	isNew, oc, err := plugin.waitExistingOrNewConn("node1")
-	assert.True(t, isNew)
-	assert.Nil(t, err)
-
-	bgError := make(chan error)
-	go func() {
-		_, _, err := plugin.waitExistingOrNewConn("node1")
-		bgError <- err
-	}()
-
-	for oc.waiting == 0 {
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	plugin.connLock.L.Lock()
-	oc.connecting = false
-	oc.connError = fmt.Errorf("pop")
-	plugin.connLock.Broadcast()
-	plugin.connLock.L.Unlock()
-
-	assert.Regexp(t, "pop", <-bgError)
-
 }

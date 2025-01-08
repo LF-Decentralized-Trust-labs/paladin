@@ -30,7 +30,7 @@ export const uploadABI = async (
 
   return <Promise<ABIUploadResponse>>(
     returnResponse(
-      () =>  fetch(RpcEndpoint, generatePostReq(JSON.stringify(payload))), "", [500]
+      () =>  fetch(RpcEndpoint, generatePostReq(JSON.stringify(payload))), "", []
     )
   );
 

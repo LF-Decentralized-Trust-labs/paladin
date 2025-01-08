@@ -519,7 +519,7 @@ func storeTestState(t *testing.T, td *testDomainContext, txID uuid.UUID, amount 
 
 	// Call the real statestore
 	_, err = td.c.dCtx.UpsertStates(td.c.dbTX, &components.StateUpsert{
-		SchemaID:  tktypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
+		Schema:    tktypes.MustParseBytes32(td.tp.stateSchemas[0].Id),
 		Data:      stateJSON,
 		CreatedBy: &txID,
 	})

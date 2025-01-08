@@ -99,7 +99,7 @@ func (tf *transactionFlow) applyTransactionAssembledEvent(ctx context.Context, e
 			revertReason = *event.PostAssembly.RevertReason
 		}
 		tf.revertTransaction(ctx, i18n.ExpandWithCode(ctx, i18n.MessageKey(msgs.MsgPrivateTxManagerAssembleRevert), revertReason))
-		tf.assembleCoordinator.Complete(event.AssembleRequestID, nil)
+		tf.assembleCoordinator.Complete(event.AssembleRequestID)
 		return
 	}
 	if tf.transaction.PostAssembly.AssemblyResult == prototk.AssembleTransactionResponse_PARK {
@@ -107,22 +107,14 @@ func (tf *transactionFlow) applyTransactionAssembledEvent(ctx context.Context, e
 		log.L(ctx).Infof("AssemblyResult is AssembleTransactionResponse_PARK")
 		tf.status = "parked"
 		tf.assemblePending = false
-		tf.assembleCoordinator.Complete(event.AssembleRequestID, nil)
+		tf.assembleCoordinator.Complete(event.AssembleRequestID)
 		return
 	}
 	tf.status = "assembled"
 	tf.writeAndLockStates(ctx)
-	//allow assembly thread to proceed
-	sds, err := tf.GetStateDistributions(ctx)
-	if err != nil {
-		log.L(ctx).Errorf("Error getting state distributions: %s", err)
-		// we need to proceed with unblocking the assembleCoordinator.  It wont have a chance to distribute the states to the remote assembler nodes
-		// so they may fail to assemble or may assemble a transaction that does not get endorsed but that is always a possibility anyway and the
-		// engine's retry strategy and the eventually consistent distribution of states will mean we will eventually process
-		// all transactions if they are valid
 
-	}
-	tf.assembleCoordinator.Complete(event.AssembleRequestID, sds.Remote)
+	//allow assembly thread to proceed
+	tf.assembleCoordinator.Complete(event.AssembleRequestID)
 
 }
 
@@ -132,7 +124,7 @@ func (tf *transactionFlow) applyTransactionAssembleFailedEvent(ctx context.Conte
 	tf.latestError = event.Error
 	// set assemblePending to false so that the transaction can be re-assembled
 	tf.assemblePending = false
-	tf.assembleCoordinator.Complete(event.AssembleRequestID, nil)
+	tf.assembleCoordinator.Complete(event.AssembleRequestID)
 }
 
 func (tf *transactionFlow) applyTransactionSignedEvent(ctx context.Context, event *ptmgrtypes.TransactionSignedEvent) {

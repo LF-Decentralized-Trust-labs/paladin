@@ -65,7 +65,7 @@ func genWidget(t *testing.T, schemaID tktypes.Bytes32, txID *uuid.UUID, withoutS
 	withSalt, err := json.Marshal(ij)
 	require.NoError(t, err)
 	return &components.StateUpsert{
-		SchemaID:  schemaID,
+		Schema:    schemaID,
 		Data:      withSalt,
 		CreatedBy: txID,
 	}
@@ -207,7 +207,7 @@ func TestStateLockingQuery(t *testing.T) {
 	err = dc.AddStateLocks(&pldapi.StateLock{
 		Type:        pldapi.StateLockTypeSpend.Enum(),
 		Transaction: txID2,
-		State:       widgets[5].ID,
+		StateID:     widgets[5].ID,
 	})
 	require.NoError(t, err)
 
@@ -255,7 +255,7 @@ func TestStateLockingQuery(t *testing.T) {
 	txID13 := uuid.New()
 	_, err = dc.UpsertStates(ss.p.DB(), &components.StateUpsert{
 		ID:        widgets[3].ID,
-		SchemaID:  widgets[3].Schema,
+		Schema:    widgets[3].Schema,
 		Data:      widgets[3].Data,
 		CreatedBy: &txID13,
 	})

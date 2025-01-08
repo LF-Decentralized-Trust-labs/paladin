@@ -29,6 +29,7 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/retry"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -96,12 +97,12 @@ func (t *transport) checkInit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transport) send(ctx context.Context, msg *prototk.Message) error {
-	if err := t.checkInit(ctx); err != nil {
-		return err
-	}
+func (t *transport) send(ctx context.Context, nodeName string, msg *prototk.PaladinMsg) error {
 
-	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{Message: msg})
+	_, err := t.api.SendMessage(ctx, &prototk.SendMessageRequest{
+		Node:    nodeName,
+		Message: msg,
+	})
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (t *transport) send(ctx context.Context, msg *prototk.Message) error {
 	if msg.CorrelationId != nil {
 		correlIDStr = *msg.CorrelationId
 	}
-	log.L(ctx).Debugf("transport %s message sent id=%s (cid=%s) node=%s component=%s type=%s", t.name, msg.MessageId, correlIDStr, msg.Node, msg.Component, msg.MessageType)
+	log.L(ctx).Debugf("transport %s message sent id=%s (cid=%s) node=%s component=%s type=%s", t.name, msg.MessageId, correlIDStr, nodeName, msg.Component, msg.MessageType)
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message sent: %s", t.name, protoToJSON(msg))
 	}
@@ -136,39 +137,38 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
 
-	if msg.Node != t.tm.localNodeName {
-		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidNodeReceived, msg.Node, t.tm.localNodeName)
-	}
-
 	msgID, err := uuid.Parse(msg.MessageId)
 	if err != nil {
 		log.L(ctx).Errorf("Invalid messageId from transport: %s", protoToJSON(msg))
 		return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 	}
-	var pCorrelID *uuid.UUID
-	var correlIDStr string
+
+	var correlationID *uuid.UUID
 	if msg.CorrelationId != nil {
-		correlIDStr = *msg.CorrelationId
-		correlID, err := uuid.Parse(correlIDStr)
+		parsedUUID, err := uuid.Parse(*msg.CorrelationId)
 		if err != nil {
 			log.L(ctx).Errorf("Invalid correlationId from transport: %s", protoToJSON(msg))
 			return nil, i18n.NewError(ctx, msgs.MsgTransportInvalidMessage)
 		}
-		pCorrelID = &correlID
+		correlationID = &parsedUUID
 	}
 
-	log.L(ctx).Debugf("transport %s message received id=%s (cid=%s)", t.name, msgID, correlIDStr)
+	p, err := t.tm.getPeer(ctx, req.FromNode, false /* we do not require a connection for sending here */)
+	if err != nil {
+		return nil, err
+	}
+	p.updateReceivedStats(msg)
+
+	log.L(ctx).Debugf("transport %s message received from %s id=%s (cid=%s)", t.name, p.Name, msgID, tktypes.StrOrEmpty(msg.CorrelationId))
 	if log.IsTraceEnabled() {
 		log.L(ctx).Tracef("transport %s message received: %s", t.name, protoToJSON(msg))
 	}
 
-	if err = t.deliverMessage(ctx, msg.Component, &components.TransportMessage{
+	if err := t.deliverMessage(ctx, p, msg.Component, &components.ReceivedMessage{
+		FromNode:      req.FromNode,
 		MessageID:     msgID,
+		CorrelationID: correlationID,
 		MessageType:   msg.MessageType,
-		Component:     msg.Component,
-		CorrelationID: pCorrelID,
-		Node:          msg.Node,
-		ReplyTo:       msg.ReplyTo,
 		Payload:       msg.Payload,
 	}); err != nil {
 		return nil, err
@@ -177,18 +177,23 @@ func (t *transport) ReceiveMessage(ctx context.Context, req *prototk.ReceiveMess
 	return &prototk.ReceiveMessageResponse{}, nil
 }
 
-func (t *transport) deliverMessage(ctx context.Context, destIdentity string, msg *components.TransportMessage) error {
-	t.tm.destinationsMux.RLock()
-	defer t.tm.destinationsMux.RUnlock()
+func (t *transport) deliverMessage(ctx context.Context, p *peer, component prototk.PaladinMsg_Component, msg *components.ReceivedMessage) error {
 
-	// TODO: Reconcile why we're using the identity as the component routing location - Broadhurst/Hosie discussion required
-	receiver, found := t.tm.destinations[destIdentity]
-	if !found {
-		log.L(ctx).Errorf("Component not found: %s", msg.Component)
-		return i18n.NewError(ctx, msgs.MsgTransportDestinationNotFound, msg.Component)
+	switch component {
+	case prototk.PaladinMsg_RELIABLE_MESSAGE_HANDLER:
+		_ = t.tm.reliableMsgWriter.Queue(ctx, &reliableMsgOp{
+			p:   p,
+			msg: msg,
+		})
+	case prototk.PaladinMsg_TRANSACTION_ENGINE:
+		t.tm.privateTxManager.HandlePaladinMsg(ctx, msg)
+	case prototk.PaladinMsg_IDENTITY_RESOLVER:
+		t.tm.identityResolver.HandlePaladinMsg(ctx, msg)
+	default:
+		log.L(ctx).Errorf("Component not found for message '%s': %s", msg.MessageID, component)
+		return i18n.NewError(ctx, msgs.MsgTransportComponentNotFound, component.String())
 	}
 
-	receiver.ReceiveTransportMessage(ctx, msg)
 	return nil
 }
 
