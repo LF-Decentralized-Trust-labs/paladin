@@ -41,7 +41,6 @@ func (pm *pluginManager) ConnectTransport(stream prototk.PluginController_Connec
 			}
 			return br, nil
 		})
-
 	return handler.serve()
 }
 

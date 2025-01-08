@@ -41,7 +41,6 @@ func (pm *pluginManager) ConnectDomain(stream prototk.PluginController_ConnectDo
 			}
 			return br, nil
 		})
-
 	return handler.serve()
 }
 

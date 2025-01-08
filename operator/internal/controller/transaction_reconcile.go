@@ -117,7 +117,7 @@ func (r *transactionReconcile) submitTransactionAndRequeue(ctx context.Context, 
 	tx.IdempotencyKey = r.pStatus.IdempotencyKey
 
 	var txID uuid.UUID
-	err = paladinRPC.CallRPC(context.Background(), &txID, "ptx_sendTransaction", tx)
+	err = paladinRPC.CallRPC(ctx, &txID, "ptx_sendTransaction", tx)
 	if err != nil {
 		if strings.Contains(err.Error(), "PD012220") {
 			log.FromContext(ctx).Info(fmt.Sprintf("recovering TX by idempotencyKey: %s", err))
@@ -134,7 +134,7 @@ func (r *transactionReconcile) submitTransactionAndRequeue(ctx context.Context, 
 
 func (r *transactionReconcile) queryTxByIdempotencyKeyAndRequeue(ctx context.Context, paladinRPC rpcclient.Client) error {
 	var txns []*pldapi.Transaction
-	err := paladinRPC.CallRPC(context.Background(), &txns, "ptx_queryTransactions",
+	err := paladinRPC.CallRPC(ctx, &txns, "ptx_queryTransactions",
 		query.NewQueryBuilder().Equal("idempotencyKey", r.pStatus.IdempotencyKey).Limit(1).Query())
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func (r *transactionReconcile) queryTxByIdempotencyKeyAndRequeue(ctx context.Con
 }
 
 func (r *transactionReconcile) trackTransactionAndRequeue(ctx context.Context, paladinRPC rpcclient.Client) error {
-	err := paladinRPC.CallRPC(context.Background(), &r.receipt, "ptx_getTransactionReceipt", r.pStatus.TransactionID)
+	err := paladinRPC.CallRPC(ctx, &r.receipt, "ptx_getTransactionReceipt", r.pStatus.TransactionID)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func getPaladinRPC(ctx context.Context, c client.Client, nodeName, namespace str
 	if err != nil {
 		return nil, err
 	}
-	return pldclient.New().HTTP(context.Background(), &pldconf.HTTPClientConfig{
+	return pldclient.New().HTTP(ctx, &pldconf.HTTPClientConfig{
 		URL:               url,
 		ConnectionTimeout: confutil.P(timeout),
 		RequestTimeout:    confutil.P(timeout),
