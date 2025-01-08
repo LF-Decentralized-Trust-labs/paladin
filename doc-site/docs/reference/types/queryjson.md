@@ -10,65 +10,49 @@ title: QueryJSON
     "eq": [
         {
             "field": "field1",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         },
         {
             "not": true,
             "caseInsensitive": true,
             "field": "field12",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "neq": [
         {
             "field": "field2",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "like": [
         {
             "field": "field3",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "lt": [
         {
             "field": "field4",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "lte": [
         {
             "field": "field5",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "gt": [
         {
             "field": "field6",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "gte": [
         {
             "field": "field7",
-            "value": {
-                "value": 12345
-            }
+            "value": 12345
         }
     ],
     "in": [

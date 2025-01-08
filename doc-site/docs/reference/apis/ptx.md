@@ -162,6 +162,12 @@ title: ptx_*
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
 
+|Field           |Type                                             |
+|----------------|-------------------------------------------------|
+|`id`            |[`UUID`](../types/simpletypes.md#uuid)           |
+|`created`       |[`Timestamp`](../types/simpletypes.md#timestamp) |
+
+
 ### Returns
 
 0. `preparedTransactions`: [`PreparedTransaction[]`](../types/preparedtransaction.md#preparedtransaction)
@@ -171,6 +177,11 @@ title: ptx_*
 ### Parameters
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
+
+|Field           |Type                                             |
+|----------------|-------------------------------------------------|
+|`id`            |[`UUID`](../types/simpletypes.md#uuid)           |
+|`created`       |[`Timestamp`](../types/simpletypes.md#timestamp) |
 
 ### Returns
 
@@ -182,6 +193,14 @@ title: ptx_*
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
 
+|Field           |Type                                               |
+|----------------|---------------------------------------------------|
+|`id`              |[`UUID`](../types/simpletypes.md#uuid)           |
+|`indexed`         |[`Timestamp`](../types/simpletypes.md#timestamp) |
+|`success`         |`Boolean`                                        |
+|`transactionHash` |[`HexBytes`](../types/simpletypes.md#hexbytes)   |
+|`blockNumber`     |[`HexUInt64`](../types/simpletypes.md#hexuint64) |
+
 ### Returns
 
 0. `receipts`: [`TransactionReceipt[]`](../types/transactionreceipt.md#transactionreceipt)
@@ -192,6 +211,18 @@ title: ptx_*
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
 
+|Field            |Type                                                |
+|-----------------|----------------------------------------------------|
+|`id`             |[`UUID`](../types/simpletypes.md#uuid)              |
+|`idempotencyKey` |`String`                                            |
+|`submitMode`     |`String`                                            |
+|`created`        |[`Timestamp`](../types/simpletypes.md#timestamp)    |
+|`abiReference`   |[`Timestamp`](../types/simpletypes.md#timestamp)    |
+|`functionName`   |`String`                                            |
+|`domain`         |`String`                                            |
+|`from`           |`String`                                            |
+|`to`             |[`HexBytes`](../types/simpletypes.md#hexbytes)      |
+
 ### Returns
 
 0. `transactions`: [`Transaction[]`](../types/transaction.md#transaction)
@@ -201,6 +232,18 @@ title: ptx_*
 ### Parameters
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
+
+|Field            |Type                                                |
+|-----------------|----------------------------------------------------|
+|`id`             |[`UUID`](../types/simpletypes.md#uuid)              |
+|`idempotencyKey` |`String`                                            |
+|`submitMode`     |`String`                                            |
+|`created`        |[`Timestamp`](../types/simpletypes.md#timestamp)    |
+|`abiReference`   |[`Timestamp`](../types/simpletypes.md#timestamp)    |
+|`functionName`   |`String`                                            |
+|`domain`         |`String`                                            |
+|`from`           |`String`                                            |
+|`to`             |[`HexBytes`](../types/simpletypes.md#hexbytes)      |
 
 ### Returns
 

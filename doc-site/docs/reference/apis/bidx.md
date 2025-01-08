@@ -76,6 +76,11 @@ title: bidx_*
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
 
+|Field           |Type                                             |
+|----------------|-------------------------------------------------|
+|`hash`          |[`HexBytes`](../types/simpletypes.md#hexbytes)   |
+|`number`        |[`HexUint64`](../types/simpletypes.md#hexuint64) |
+
 ### Returns
 
 0. `blocks`: [`IndexedBlock[]`](../types/indexedblock.md#indexedblock)
@@ -86,6 +91,15 @@ title: bidx_*
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
 
+|Field              |Type                                             |
+|-------------------|-------------------------------------------------|
+|`hash`             |[`HexBytes`](../types/simpletypes.md#hexbytes)   |
+|`number`           |[`HexUint64`](../types/simpletypes.md#hexuint64) |
+|`transactionIndex` |[`HexUint64`](../types/simpletypes/md#hexuint64) |
+|`logIndex`         |[`HexUint64`](../types/simpletypes/md#hexuint64) |
+|`signature`        |[`HexBytes`](../types/simpletypes/md#hexbytes)   |
+
+
 ### Returns
 
 0. `events`: [`IndexedEvent[]`](../types/indexedevent.md#indexedevent)
@@ -95,6 +109,17 @@ title: bidx_*
 ### Parameters
 
 0. `query`: [`QueryJSON`](../types/queryjson.md#queryjson)
+
+|Field              |Type                                             |
+|-------------------|-------------------------------------------------|
+|`hash`             |[`HexBytes`](../types/simpletypes.md#hexbytes)   |
+|`number`           |[`HexUint64`](../types/simpletypes.md#hexuint64) |
+|`transactionIndex` |[`HexUint64`](../types/simpletypes/md#hexuint64) |
+|`from`             |[`HexBytes`](../types/simpletypes/md#hexbytes)   |
+|`to`               |[`HexBytes`](../types/simpletypes/md#hexbytes)   |
+|`nonce`            |[`HexUint64`](../types/simpletypes/md#hexuint64) |
+|`contractAddress`  |[`HexBytes`](../types/simpletypes/md#hexbytes)   |
+|`result`           |`string`                                         |
 
 ### Returns
 
