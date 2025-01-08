@@ -419,6 +419,10 @@ task clean {
 
 // The 'e2e' task runs the whole flow
 task e2e(type: Exec, dependsOn: [deploy]) {
+    inputs.files(configurations.toolkitGo)
+    inputs.files(configurations.notoGo)
+    inputs.files(configurations.zetoGo)
+
     executable 'make'
     args 'test-e2e'
     args "NAMESPACE=${namespace}"
