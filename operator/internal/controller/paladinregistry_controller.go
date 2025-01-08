@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1alpha1 "github.com/kaleido-io/paladin/operator/api/v1alpha1"
@@ -94,7 +95,11 @@ func (r *PaladinRegistryReconciler) reconcileSmartContractDeployment(ctx context
 	}
 
 	regs := &corev1alpha1.PaladinRegistryList{}
-	r.Client.List(ctx, regs, client.InNamespace(scd.Namespace))
+	if err := r.Client.List(ctx, regs, client.InNamespace(scd.Namespace)); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to list Paladin registries")
+		return nil
+	}
+
 	reqs := make([]ctrl.Request, 0, len(regs.Items))
 
 	for _, reg := range regs.Items {
@@ -145,12 +150,10 @@ func (r *PaladinRegistryReconciler) trackContractDeploymentAndRequeue(ctx contex
 func (r *PaladinRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1alpha1.PaladinRegistry{}).
-		// Reconcile when any contract deployment changes status
-		// Watches(&corev1alpha1.SmartContractDeployment{}, handler.EnqueueRequestsFromMapFunc(r.reconcileSmartContractDeployment), reconcileEveryChange()).
-		Watches(&corev1alpha1.SmartContractDeployment{}, reconcileAll(PaladinRegistryCRMap, r.Client), reconcileEveryChange()).
+		// Reconcile when related contract deployment changes status
+		Watches(&corev1alpha1.SmartContractDeployment{}, handler.EnqueueRequestsFromMapFunc(r.reconcileSmartContractDeployment), reconcileEveryChange()).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 3,
+			MaxConcurrentReconciles: 2,
 		}).
-		// Watches(&corev1alpha1.SmartContractDeployment{}, handler.EnqueueRequestsFromMapFunc(r.reconcileSmartContractDeployment), reconcileEveryChange()).
 		Complete(r)
 }

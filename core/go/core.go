@@ -19,7 +19,6 @@ import (
 )
 import (
 	"fmt"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime/debug"
@@ -55,8 +54,4 @@ func Stop() {
 	bootstrap.Stop()
 }
 
-func main() {
-	go func() {
-		http.ListenAndServe("localhost:6060", nil) // pprof server
-	}()
-}
+func main() {}
