@@ -401,10 +401,11 @@ public class PenteDomain extends DomainInstance {
             var transitionTX = ToDomain.PreparedTransaction.newBuilder().
                     setFunctionAbiJson(transitionABI).
                     setParamsJson(new ObjectMapper().writeValueAsString(params));
-            var result = ToDomain.PrepareTransactionResponse.newBuilder().
-                    setTransaction(transitionTX);
+            var result = ToDomain.PrepareTransactionResponse.newBuilder();
 
             if (request.getTransaction().getIntent() == ToDomain.TransactionSpecification.Intent.PREPARE_TRANSACTION) {
+                transitionTX.setRequiredSigner(request.getTransaction().getFrom());
+
                 // TODO: can the transitionHash be reused from a prior step instead of being computed again?
                 var tx = new PenteTransaction(this, request.getTransaction());
                 var transitionHash = tx.eip712TypedDataEndorsementPayload(
@@ -440,6 +441,8 @@ public class PenteDomain extends DomainInstance {
 
                 result.setMetadata(new ObjectMapper().writeValueAsString(metadata));
             }
+
+            result.setTransaction(transitionTX);
             return CompletableFuture.completedFuture(result.build());
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
