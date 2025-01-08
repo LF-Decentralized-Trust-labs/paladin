@@ -91,6 +91,12 @@ async function main(): Promise<boolean> {
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
+  receipt = await paladin2.getTransactionReceipt(receipt.id, true);
+
+  const unlockInputs = receipt?.states?.read?.map((s) => s.id);
+  const unlockOutputs = receipt?.states?.info
+    ?.filter((s) => s.data["amount"] !== undefined)
+    .map((s) => s.id);
 
   // Approve unlock operation
   logger.log("Approving unlock for investor2...");
@@ -105,6 +111,9 @@ async function main(): Promise<boolean> {
   logger.log("Unlocking cash...");
   receipt = await notoCash.using(paladin3).unlockWithApproval(investor2, {
     lockId,
+    lockedInputs: unlockInputs ?? [],
+    lockedOutputs: [],
+    outputs: unlockOutputs ?? [],
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;
