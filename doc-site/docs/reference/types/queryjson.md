@@ -10,25 +10,25 @@ title: QueryJSON
     "eq": [
         {
             "field": "field1",
-            "value": 12345
+            "value": "abcde"
         },
         {
             "not": true,
             "caseInsensitive": true,
             "field": "field12",
-            "value": 12345
+            "value": "abcde"
         }
     ],
     "neq": [
         {
             "field": "field2",
-            "value": 12345
+            "value": "abcde"
         }
     ],
     "like": [
         {
             "field": "field3",
-            "value": 12345
+            "value": "abcde"
         }
     ],
     "lt": [
@@ -59,9 +59,8 @@ title: QueryJSON
         {
             "field": "field8",
             "values": [
-                {
-                    "value": 12345
-                }
+                "abcde",
+                "fghij"
             ]
         }
     ],
@@ -69,19 +68,18 @@ title: QueryJSON
         {
             "field": "field9",
             "values": [
-                {
-                    "value": 12345
-                }
+                "abcde",
+                "fghij"
             ]
         }
     ],
     "null": [
         {
             "not": true,
-            "field": "field10"
+            "field": "field1"
         },
         {
-            "field": "field11"
+            "field": "field2"
         }
     ],
     "limit": 10,
