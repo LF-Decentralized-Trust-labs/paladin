@@ -578,3 +578,24 @@ func TestEngineSuspendResumeRealDB(t *testing.T) {
 	assert.Equal(t, txNonce, newNonce)
 
 }
+
+func TestGasEstimateFactor(t *testing.T) {
+	ctx := context.Background()
+	_, ble, m, done := newTestPublicTxManager(t, false, func(mocks *mocksAndTestControl, conf *pldconf.PublicTxManagerConfig) {
+		conf.GasLimit.GasEstimateFactor = confutil.P(2.0)
+	})
+	defer done()
+
+	m.ethClient.On("EstimateGasNoResolve", mock.Anything, mock.Anything, mock.Anything).
+		Return(ethclient.EstimateGasResult{GasLimit: tktypes.MustParseHexUint64("0x62f8")}, nil)
+
+	tx := &components.PublicTxSubmission{
+		PublicTxInput: pldapi.PublicTxInput{
+			From: tktypes.MustEthAddress("0x14655a513c68280d16f72304ebfd1ae1a2262d2d"),
+			Data: []byte("[2]"),
+		},
+	}
+
+	require.NoError(t, ble.ValidateTransaction(ctx, ble.p.DB(), tx))
+	assert.Equal(t, tktypes.MustParseHexUint64("0xc5f0"), *tx.Gas)
+}
