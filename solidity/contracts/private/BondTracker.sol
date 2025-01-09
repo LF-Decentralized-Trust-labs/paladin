@@ -183,7 +183,7 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
-    function onApproveUnlock(
+    function onDelegateLock(
         address sender,
         bytes32 lockId,
         address from,

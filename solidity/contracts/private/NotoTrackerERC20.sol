@@ -96,7 +96,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
-    function onApproveUnlock(
+    function onDelegateLock(
         address sender,
         bytes32 lockId,
         address from,

@@ -50,7 +50,7 @@ interface INotoPrivate {
         bytes calldata data
     ) external;
 
-    function approveUnlock(
+    function delegateLock(
         bytes32 lockId,
         address delegate,
         bytes calldata data

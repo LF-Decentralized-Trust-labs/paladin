@@ -99,8 +99,8 @@ async function main(): Promise<boolean> {
     .map((s) => s.id);
 
   // Approve unlock operation
-  logger.log("Approving unlock for investor2...");
-  receipt = await notoCash.using(paladin2).approveUnlock(investor1, {
+  logger.log("Delegating lock to investor2...");
+  receipt = await notoCash.using(paladin2).delegateLock(investor1, {
     lockId,
     delegate: await investor2.address(),
     data: "0x",

@@ -54,7 +54,7 @@ var (
 	NotoLock           = "NotoLock"
 	NotoUnlock         = "NotoUnlock"
 	NotoUnlockPrepared = "NotoUnlockPrepared"
-	NotoUnlockApproved = "NotoUnlockApproved"
+	NotoLockDelegated  = "NotoLockDelegated"
 	NotoDelegateUnlock = "NotoDelegateUnlock"
 )
 
@@ -64,7 +64,7 @@ var allEvents = []string{
 	NotoLock,
 	NotoUnlock,
 	NotoUnlockPrepared,
-	NotoUnlockApproved,
+	NotoLockDelegated,
 	NotoDelegateUnlock,
 }
 
@@ -116,7 +116,7 @@ type NotoBurnParams struct {
 
 type NotoApproveTransferParams struct {
 	Delegate  *tktypes.EthAddress `json:"delegate"`
-	TXHash    tktypes.HexBytes    `json:"txhash"`
+	TXHash    tktypes.Bytes32     `json:"txhash"`
 	Signature tktypes.HexBytes    `json:"signature"`
 	Data      tktypes.HexBytes    `json:"data"`
 }
@@ -142,12 +142,12 @@ type NotoUnlockParams struct {
 type NotoPrepareUnlockParams struct {
 	LockID       tktypes.Bytes32  `json:"lockId"`
 	LockedInputs []string         `json:"lockedInputs"`
-	TXHash       tktypes.HexBytes `json:"txhash"`
+	UnlockHash   tktypes.Bytes32  `json:"unlockHash"`
 	Signature    tktypes.HexBytes `json:"signature"`
 	Data         tktypes.HexBytes `json:"data"`
 }
 
-type NotoApproveUnlockParams struct {
+type NotoDelegateLockParams struct {
 	LockID    tktypes.Bytes32     `json:"lockId"`
 	Delegate  *tktypes.EthAddress `json:"delegate"`
 	Signature tktypes.HexBytes    `json:"signature"`
@@ -197,12 +197,12 @@ type NotoUnlock_Event struct {
 type NotoUnlockPrepared_Event struct {
 	LockID       tktypes.Bytes32   `json:"lockId"`
 	LockedInputs []tktypes.Bytes32 `json:"lockedInputs"`
-	TXHash       tktypes.Bytes32   `json:"txhash"`
+	UnlockHash   tktypes.Bytes32   `json:"unlockHash"`
 	Signature    tktypes.HexBytes  `json:"signature"`
 	Data         tktypes.HexBytes  `json:"data"`
 }
 
-type NotoUnlockApproved_Event struct {
+type NotoLockDelegated_Event struct {
 	LockID    tktypes.Bytes32    `json:"lockId"`
 	Delegate  tktypes.EthAddress `json:"delegate"`
 	Signature tktypes.HexBytes   `json:"signature"`
@@ -883,17 +883,17 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				log.L(ctx).Warnf("Ignoring malformed NotoUnlockPrepared event in batch %s: %s", req.BatchId, err)
 			}
 
-		case n.eventSignatures[NotoUnlockApproved]:
+		case n.eventSignatures[NotoLockDelegated]:
 			log.L(ctx).Infof("Processing '%s' event in batch %s", ev.SoliditySignature, req.BatchId)
-			var unlockApproved NotoUnlockApproved_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &unlockApproved); err == nil {
-				txData, err := n.decodeTransactionData(ctx, unlockApproved.Data)
+			var lockDelegated NotoLockDelegated_Event
+			if err := json.Unmarshal([]byte(ev.DataJson), &lockDelegated); err == nil {
+				txData, err := n.decodeTransactionData(ctx, lockDelegated.Data)
 				if err != nil {
 					return nil, err
 				}
 				n.recordTransactionInfo(ev, txData, &res)
 			} else {
-				log.L(ctx).Warnf("Ignoring malformed NotoUnlockApproved event in batch %s: %s", req.BatchId, err)
+				log.L(ctx).Warnf("Ignoring malformed NotoLockDelegated event in batch %s: %s", req.BatchId, err)
 			}
 
 		case n.eventSignatures[NotoDelegateUnlock]:

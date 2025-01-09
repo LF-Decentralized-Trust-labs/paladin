@@ -34,14 +34,17 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     error NotoNotNotary(address sender);
     error NotoInvalidDelegate(bytes32 txhash, address delegate, address sender);
 
-    error NotoLockAlreadyDelegated(bytes32 lockId);
     error NotoLockNotFound(bytes32 lockId);
     error NotoInvalidLockDelegate(
         bytes32 lockId,
         address delegate,
         address sender
     );
-    error NotoUnlockNotPrepared(bytes32 lockId);
+    error NotoInvalidUnlockHash(
+        bytes32 lockId,
+        bytes32 expected,
+        bytes32 actual
+    );
 
     struct LockDetail {
         uint256 stateCount;
@@ -383,7 +386,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
      *
      * @param lockId the unique identifier for the lock
      * @param lockedInputs array of zero or more locked outputs of a previous function call
-     * @param txhash the pre-calculated hash of the transaction that is delegated
+     * @param unlockHash pre-calculated EIP-712 hash of the prepared unlock transaction
      * @param signature EIP-712 signature on the original request that spawned this transaction
      * @param data any additional transaction data (opaque to the blockchain)
      *
@@ -392,7 +395,7 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
     function prepareUnlock(
         bytes32 lockId,
         bytes32[] calldata lockedInputs,
-        bytes32 txhash,
+        bytes32 unlockHash,
         bytes calldata signature,
         bytes calldata data
     ) external virtual override onlyNotary {
@@ -400,42 +403,52 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         if (lock_.stateCount == 0) {
             revert NotoLockNotFound(lockId);
         }
-        if (lock_.delegate != address(0)) {
-            revert NotoLockAlreadyDelegated(lockId);
+        if (lock_.delegate != address(0) && lock_.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
         }
 
         _checkLockedInputs(lockId, lockedInputs);
 
-        lock_.unlock = txhash;
-        emit NotoUnlockPrepared(lockId, lockedInputs, txhash, signature, data);
+        lock_.unlock = unlockHash;
+
+        emit NotoUnlockPrepared(
+            lockId,
+            lockedInputs,
+            unlockHash,
+            signature,
+            data
+        );
     }
 
     /**
-     * @dev Approve another address to execute the prepared unlock operation.
+     * @dev Change the current delegate for a lock.
      *
      * @param lockId the unique identifier for the lock
      * @param delegate the address that is authorized to perform the unlock
      * @param signature EIP-712 signature on the original request that spawned this transaction
      * @param data any additional transaction data (opaque to the blockchain)
      *
-     * Emits a {NotoUnlockApproved} event.
+     * Emits a {NotoLockDelegated} event.
      */
-    function approveUnlock(
+    function delegateLock(
         bytes32 lockId,
         address delegate,
         bytes calldata signature,
         bytes calldata data
-    ) external virtual onlyNotary {
+    ) external virtual {
         LockDetail storage lock_ = _locks[lockId];
         if (lock_.stateCount == 0) {
             revert NotoLockNotFound(lockId);
         }
-        if (lock_.unlock == 0) {
-            revert NotoUnlockNotPrepared(lockId);
+        if (lock_.delegate == address(0)) {
+            requireNotary(msg.sender);
+        } else if (lock_.delegate != msg.sender) {
+            revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
         }
 
         lock_.delegate = delegate;
-        emit NotoUnlockApproved(lockId, delegate, signature, data);
+
+        emit NotoLockDelegated(lockId, delegate, signature, data);
     }
 
     /**
@@ -460,21 +473,18 @@ contract Noto is EIP712Upgradeable, UUPSUpgradeable, INoto {
         if (lock_.delegate != msg.sender) {
             revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
         }
-        if (lock_.unlock == 0) {
-            revert NotoUnlockNotPrepared(lockId);
-        }
-        bytes32 txhash = _buildUnlockHash(
+        bytes32 unlockHash = _buildUnlockHash(
             lockedInputs,
             lockedOutputs,
             outputs,
             data
         );
-        if (lock_.unlock != txhash) {
-            revert NotoInvalidLockDelegate(lockId, lock_.delegate, msg.sender);
+        if (lock_.unlock != unlockHash) {
+            revert NotoInvalidUnlockHash(lockId, lock_.unlock, unlockHash);
         }
-        lock_.delegate = address(0);
 
-        delete lock_.unlock;
+        lock_.delegate = address(0);
+        lock_.unlock = 0;
 
         _unlock(lockId, lockedInputs, lockedOutputs, outputs);
         emit NotoDelegateUnlock(

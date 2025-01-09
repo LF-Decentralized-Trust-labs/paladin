@@ -153,7 +153,7 @@ func (h *approveHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedT
 	}
 	params := &NotoApproveTransferParams{
 		Delegate:  inParams.Delegate,
-		TXHash:    tktypes.HexBytes(transferHash),
+		TXHash:    tktypes.Bytes32(transferHash),
 		Signature: sender.Payload,
 		Data:      data,
 	}

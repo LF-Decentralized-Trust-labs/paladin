@@ -466,7 +466,7 @@ func TestNotoForZeto(t *testing.T) {
 	// If any party found a discrepancy at this point, they could cancel the swap (last chance to back out)
 
 	log.L(ctx).Infof("Approve both transfers")
-	noto.ApproveUnlock(ctx, &nototypes.ApproveUnlockParams{
+	noto.DelegateLock(ctx, &nototypes.DelegateLockParams{
 		LockID:   lockID,
 		Delegate: transferAtom.Address,
 	}).SignAndSend(alice).Wait()

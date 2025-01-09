@@ -600,13 +600,13 @@ func TestNotoLock(t *testing.T) {
 	}
 	unlockParams := buildUnlockWithApproval(noto, lockID, &invokeResult)
 
-	log.L(ctx).Infof("Approve unlock to be executed by recipient2")
+	log.L(ctx).Infof("Delegate lock to recipient2")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
 		TransactionBase: pldapi.TransactionBase{
 			From:     recipient1Name,
 			To:       &notoAddress,
-			Function: "approveUnlock",
-			Data: toJSON(t, &types.ApproveUnlockParams{
+			Function: "delegateLock",
+			Data: toJSON(t, &types.DelegateLockParams{
 				LockID:   lockID,
 				Delegate: tktypes.MustEthAddress(recipient2Key.Verifier.Verifier),
 			}),

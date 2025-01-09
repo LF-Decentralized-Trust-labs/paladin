@@ -41,12 +41,12 @@ interface INoto {
     event NotoUnlockPrepared(
         bytes32 lockId,
         bytes32[] lockedInputs,
-        bytes32 txhash,
+        bytes32 unlockHash,
         bytes signature,
         bytes data
     );
 
-    event NotoUnlockApproved(
+    event NotoLockDelegated(
         bytes32 lockId,
         address delegate,
         bytes signature,
@@ -117,12 +117,12 @@ interface INoto {
     function prepareUnlock(
         bytes32 lockId,
         bytes32[] calldata lockedInputs,
-        bytes32 txhash,
+        bytes32 unlockHash,
         bytes calldata signature,
         bytes calldata data
     ) external;
 
-    function approveUnlock(
+    function delegateLock(
         bytes32 lockId,
         address delegate,
         bytes calldata signature,

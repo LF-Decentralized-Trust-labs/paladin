@@ -92,7 +92,7 @@ type UnlockParams struct {
 	Data    tktypes.HexBytes      `json:"data"`
 }
 
-type ApproveUnlockParams struct {
+type DelegateLockParams struct {
 	LockID   tktypes.Bytes32     `json:"lockId"`
 	Delegate *tktypes.EthAddress `json:"delegate"`
 	Data     tktypes.HexBytes    `json:"data"`

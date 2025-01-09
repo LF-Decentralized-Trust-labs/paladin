@@ -79,7 +79,7 @@ interface INotoHooks is IPenteExternalCall {
         PreparedTransaction calldata prepared
     ) external;
 
-    function onApproveUnlock(
+    function onDelegateLock(
         address sender,
         bytes32 lockId,
         address from,

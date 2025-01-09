@@ -45,13 +45,15 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 	case "lock":
 		return &lockHandler{noto: n}
 	case "unlock":
-		return &unlockHandler{noto: n}
+		return &unlockHandler{
+			unlockCommon: unlockCommon{noto: n},
+		}
 	case "prepareUnlock":
 		return &prepareUnlockHandler{
-			unlockHandler: unlockHandler{noto: n},
+			unlockCommon: unlockCommon{noto: n},
 		}
-	case "approveUnlock":
-		return &approveUnlockHandler{noto: n}
+	case "delegateLock":
+		return &delegateLockHandler{noto: n}
 	default:
 		return nil
 	}

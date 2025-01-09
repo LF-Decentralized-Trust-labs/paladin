@@ -104,8 +104,8 @@ var NotoUnlockMaskedTypeSet = eip712.TypeSet{
 	eip712.EIP712Domain: EIP712DomainType,
 }
 
-var NotoApproveUnlockTypeSet = eip712.TypeSet{
-	"ApproveUnlock": {
+var NotoDelegateLockTypeSet = eip712.TypeSet{
+	"DelegateLock": {
 		{Name: "lockId", Type: "bytes32"},
 		{Name: "delegate", Type: "address"},
 		{Name: "data", Type: "bytes"},
@@ -236,6 +236,7 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 	total := big.NewInt(0)
 	stateRefs := []*prototk.StateRef{}
 	coins := []*types.NotoLockedCoin{}
+
 	for {
 		queryBuilder := query.NewQueryBuilder().
 			Limit(10).
@@ -469,10 +470,10 @@ func (n *Noto) encodeUnlockMasked(ctx context.Context, contract *ethtypes.Addres
 	})
 }
 
-func (n *Noto) encodeApproveUnlock(ctx context.Context, contract *ethtypes.Address0xHex, lockID tktypes.Bytes32, delegate *tktypes.EthAddress, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
+func (n *Noto) encodeDelegateLock(ctx context.Context, contract *ethtypes.Address0xHex, lockID tktypes.Bytes32, delegate *tktypes.EthAddress, data tktypes.HexBytes) (ethtypes.HexBytes0xPrefix, error) {
 	return eip712.EncodeTypedDataV4(ctx, &eip712.TypedData{
-		Types:       NotoApproveUnlockTypeSet,
-		PrimaryType: "ApproveUnlock",
+		Types:       NotoDelegateLockTypeSet,
+		PrimaryType: "DelegateLock",
 		Domain:      n.eip712Domain(contract),
 		Message: map[string]any{
 			"lockId":   lockID,

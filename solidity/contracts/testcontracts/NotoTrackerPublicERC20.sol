@@ -92,7 +92,7 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         // do nothing
     }
 
-    function onApproveUnlock(
+    function onDelegateLock(
         address sender,
         bytes32 lockId,
         address from,

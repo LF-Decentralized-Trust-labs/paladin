@@ -22,31 +22,83 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/kaleido-io/paladin/domains/noto/internal/msgs"
 	"github.com/kaleido-io/paladin/domains/noto/pkg/types"
+	"github.com/kaleido-io/paladin/toolkit/pkg/algorithms"
 	"github.com/kaleido-io/paladin/toolkit/pkg/domain"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
+	"github.com/kaleido-io/paladin/toolkit/pkg/signpayloads"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
+	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
 )
 
-// This handler inherits the majority of its behavior from unlockHandler
 type prepareUnlockHandler struct {
-	unlockHandler
+	unlockCommon
+}
+
+func (h *prepareUnlockHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
+	var unlockParams types.UnlockParams
+	err := json.Unmarshal([]byte(params), &unlockParams)
+	if err == nil {
+		err = h.validateParams(ctx, &unlockParams)
+	}
+	return &unlockParams, err
+}
+
+func (h *prepareUnlockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req *prototk.InitTransactionRequest) (*prototk.InitTransactionResponse, error) {
+	params := tx.Params.(*types.UnlockParams)
+	return h.init(ctx, tx, params)
 }
 
 func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction, req *prototk.AssembleTransactionRequest) (*prototk.AssembleTransactionResponse, error) {
-	res, lockedInputStates, lockedOutputStates, unlockedOutputStates, infoStates, err := h.assembleUnlock(ctx, tx, req)
-	if err == nil && res.AssembledTransaction != nil {
-		res.AssembledTransaction.ReadStates = lockedInputStates
-		res.AssembledTransaction.InfoStates = infoStates
-		res.AssembledTransaction.InfoStates = append(res.AssembledTransaction.InfoStates, unlockedOutputStates...)
-		res.AssembledTransaction.InfoStates = append(res.AssembledTransaction.InfoStates, lockedOutputStates...)
+	params := tx.Params.(*types.UnlockParams)
+	notary := tx.DomainConfig.NotaryLookup
+
+	res, states, err := h.assembleStates(ctx, tx, params, req)
+	if err != nil || res.AssemblyResult != prototk.AssembleTransactionResponse_OK {
+		return res, err
 	}
-	return res, err
+
+	assembledTransaction := &prototk.AssembledTransaction{}
+	assembledTransaction.ReadStates = states.lockedInputs
+	assembledTransaction.InfoStates = states.info
+	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.outputs...)
+	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.lockedOutputs...)
+
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputCoins, states.lockedOutputCoins, states.outputCoins)
+	if err != nil {
+		return nil, err
+	}
+
+	return &prototk.AssembleTransactionResponse{
+		AssemblyResult:       prototk.AssembleTransactionResponse_OK,
+		AssembledTransaction: assembledTransaction,
+		AttestationPlan: []*prototk.AttestationRequest{
+			// Sender confirms the initial request with a signature
+			{
+				Name:            "sender",
+				AttestationType: prototk.AttestationType_SIGN,
+				Algorithm:       algorithms.ECDSA_SECP256K1,
+				VerifierType:    verifiers.ETH_ADDRESS,
+				Payload:         encodedUnlock,
+				PayloadType:     signpayloads.OPAQUE_TO_RSV,
+				Parties:         []string{req.Transaction.From},
+			},
+			// Notary will endorse the assembled transaction (by submitting to the ledger)
+			{
+				Name:            "notary",
+				AttestationType: prototk.AttestationType_ENDORSE,
+				Algorithm:       algorithms.ECDSA_SECP256K1,
+				VerifierType:    verifiers.ETH_ADDRESS,
+				Parties:         []string{notary},
+			},
+		},
+	}, nil
 }
 
 func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
+	params := tx.Params.(*types.UnlockParams)
 	lockedInputs, lockedOutputs, outputs := h.extractStates(req.Reads, req.Info)
 	outputs = append(outputs, lockedOutputs...)
-	return h.endorseUnlock(ctx, tx, req.Transaction.From, req.ResolvedVerifiers, req.Signatures, lockedInputs, outputs)
+	return h.endorse(ctx, tx, params, req, lockedInputs, outputs)
 }
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
@@ -60,8 +112,8 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 
 	// Include the signature from the sender
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
-	unlockSignature := domain.FindAttestation("sender", req.AttestationResult)
-	if unlockSignature == nil {
+	sender := domain.FindAttestation("sender", req.AttestationResult)
+	if sender == nil {
 		return nil, i18n.NewError(ctx, msgs.MsgAttestationNotFound, "sender")
 	}
 
@@ -72,8 +124,8 @@ func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.P
 	params := &NotoPrepareUnlockParams{
 		LockID:       inParams.LockID,
 		LockedInputs: endorsableStateIDs(lockedInputs),
-		TXHash:       tktypes.HexBytes(unlockHash),
-		Signature:    unlockSignature.Payload,
+		UnlockHash:   tktypes.Bytes32(unlockHash),
+		Signature:    sender.Payload,
 		Data:         data,
 	}
 	paramsJSON, err := json.Marshal(params)
