@@ -26,9 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed abis/ZetoFactory.json
-var ZetoFactoryJSON []byte
-
 type ZetoHelper struct {
 	t       *testing.T
 	rpc     rpcbackend.Backend
