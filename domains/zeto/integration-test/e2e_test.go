@@ -222,9 +222,9 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string, u
 	require.Len(t, coins, expectedCoins)
 
 	if useBatch {
-		assert.Equal(t, int64(10), coins[0].Data.Amount.Int().Int64()) // state for recipient1
+		assert.Equal(t, int64(15), coins[0].Data.Amount.Int().Int64()) // state for recipient1
 		assert.Equal(t, int64(40), coins[1].Data.Amount.Int().Int64()) // state for recipient2
-		assert.Equal(t, int64(10), coins[2].Data.Amount.Int().Int64()) // change for controller
+		assert.Equal(t, int64(5), coins[2].Data.Amount.Int().Int64())  // change for controller
 		assert.Equal(t, controllerAddr.String(), coins[2].Data.Owner.String())
 	} else {
 		assert.Equal(t, int64(25), coins[0].Data.Amount.Int().Int64()) // state for recipient1

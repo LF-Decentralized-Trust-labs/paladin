@@ -2,7 +2,6 @@ package zeto
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -172,9 +171,8 @@ func (z *Zeto) addOutputToMerkleTree(ctx context.Context, tree core.SparseMerkle
 func parseStatesFromEvent(txID tktypes.HexBytes, states []tktypes.HexUint256) []*prototk.StateUpdate {
 	refs := make([]*prototk.StateUpdate, len(states))
 	for i, state := range states {
-		paddedBytes := intTo32ByteSlice(state.Int())
 		refs[i] = &prototk.StateUpdate{
-			Id:            hex.EncodeToString(paddedBytes),
+			Id:            hexUint256To32ByteHexString(&state),
 			TransactionId: txID.String(),
 		}
 	}

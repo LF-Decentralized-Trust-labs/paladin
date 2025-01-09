@@ -18,6 +18,7 @@ package zeto
 import (
 	"context"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
@@ -459,6 +460,11 @@ func intTo32ByteSlice(bigInt *big.Int) (res []byte) {
 	return bigInt.FillBytes(make([]byte, 32))
 }
 
+func hexUint256To32ByteHexString(v *tktypes.HexUint256) string {
+	paddedBytes := intTo32ByteSlice(v.Int())
+	return hex.EncodeToString(paddedBytes)
+}
+
 func (z *Zeto) Sign(ctx context.Context, req *prototk.SignRequest) (*prototk.SignResponse, error) {
 	switch req.PayloadType {
 	case zetosignerapi.PAYLOAD_DOMAIN_ZETO_NULLIFIER:
@@ -505,12 +511,14 @@ func (z *Zeto) ValidateStateHashes(ctx context.Context, req *prototk.ValidateSta
 			log.L(ctx).Errorf("Error hashing state data: %s", err)
 			return nil, i18n.NewError(ctx, msgs.MsgErrorHashOutputState, err)
 		}
+		hashString := hexUint256To32ByteHexString(hash)
 		if state.Id == "" {
 			// if the requested state ID is empty, we simply set it
-			res.StateIds = append(res.StateIds, hash.String())
+			res.StateIds = append(res.StateIds, hashString)
 		} else {
 			// if the requested state ID is set, we compare it with the calculated hash
-			if hash.String() != state.Id {
+			stateId := tktypes.MustParseHexUint256(state.Id)
+			if hash.Int().Cmp(stateId.Int()) != 0 {
 				log.L(ctx).Errorf("State hash mismatch (hashed vs. received): %s != %s", hash.String(), state.Id)
 				return nil, i18n.NewError(ctx, msgs.MsgErrorStateHashMismatch, hash.String(), state.Id)
 			}
