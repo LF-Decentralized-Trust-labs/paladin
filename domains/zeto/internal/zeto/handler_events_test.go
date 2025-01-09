@@ -198,3 +198,11 @@ func TestHandleWithdrawEvent(t *testing.T) {
 	err = z.handleWithdrawEvent(ctx, merkleTree, storage, ev, "Zeto_AnonNullifier", res)
 	assert.ErrorContains(t, err, "PD210061: Failed to update merkle tree for the UTXOWithdraw event. PD210056: Failed to create new node index from hash. 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 }
+
+func TestParseStatesFromEvent(t *testing.T) {
+	txID := tktypes.MustParseHexBytes("0x1234")
+	states := parseStatesFromEvent(txID, []tktypes.HexUint256{*tktypes.MustParseHexUint256("0x1234"), *tktypes.MustParseHexUint256("0x0")})
+	assert.Len(t, states, 2)
+	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000001234", states[0].Id)
+	assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", states[1].Id)
+}
