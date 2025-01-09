@@ -186,8 +186,8 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string, u
 	assert.Regexp(t, "PD012216: Transaction reverted OwnableUnauthorizedAccount.*", err)
 
 	if useBatch {
-		// for testing the batch circuits, we transfer 50 which would require 3 UTXOs (>2)
-		amount1 := 10
+		// for testing the batch circuits, we transfer 55 which would require 3 UTXOs (>2)
+		amount1 := 15
 		amount2 := 40
 		log.L(ctx).Info("*************************************")
 		log.L(ctx).Infof("Transfer %d from controller to recipient1 (%d) and recipient2 (%d)", amount1+amount2, amount1, amount2)
@@ -209,6 +209,9 @@ func (s *zetoDomainTestSuite) testZetoFungible(t *testing.T, tokenName string, u
 	// one for the recipient (value=25)
 	expectedCoins := 2
 	if useBatch {
+		// one for the controller from the successful transaction as change (value=5)
+		// one for the recipient1 (value=15)
+		// one for the recipient2 (value=40)
 		expectedCoins = 3
 	}
 	if len(coins) != expectedCoins {
