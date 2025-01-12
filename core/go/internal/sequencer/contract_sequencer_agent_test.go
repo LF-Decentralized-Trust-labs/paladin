@@ -23,9 +23,8 @@ import (
 )
 
 func NewContractSequencerAgentForUnitTesting(t *testing.T) *contractSequencerAgent {
-	return &contractSequencerAgent{
-		isCoordinator: false,
-	}
+
+	return NewContractSequencerAgent(nil).(*contractSequencerAgent)
 }
 
 func TestIsObserver(t *testing.T) {

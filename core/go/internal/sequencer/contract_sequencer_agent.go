@@ -18,7 +18,9 @@ package sequencer
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kaleido-io/paladin/core/internal/components"
+	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"gorm.io/gorm"
 )
 
@@ -31,13 +33,14 @@ type TransportManager interface {
 // ContractSequencerAgent defines the interface for an in memory component that maintains
 // the state machine for a single paladin private contract in a single node
 type ContractSequencerAgent interface {
-	Start(ctx context.Context, heartbeatTicker ContractSequencerHeartbeatTicker, transportManager TransportManager, onStop func())
 	IsObserver() bool
 	IsCoordinator() bool
 	IsSender() bool
 	ActiveCoordinator() string
 	HandleCoordinatorHeartbeatNotification(ctx context.Context, message *CoordinatorHeartbeatNotification) error
 	HandleTransaction(ctx context.Context, transaction *components.PrivateTransaction) error
+	HandleMissedHeartbeat(ctx context.Context) error
+	DispatchedTransactions(ctx context.Context) []*DispatchedTransaction
 }
 
 type ContractSequencerHeartbeatTicker interface {
@@ -48,34 +51,22 @@ type delegation struct {
 	transaction *components.PrivateTransaction
 }
 
-type contractSequencerAgent struct {
-	isCoordinator              bool
-	isSender                   bool
-	activeCoordinator          string
-	missedHeartbeats           int
-	heartbeatFailureThreshold  int
-	stateChangeNotifier        chan struct{}
-	delegationsByTransactionID map[string]*delegation
-	transportManager           TransportManager
+type DispatchedTransaction struct {
+	TransactionID        uuid.UUID
+	Signer               tktypes.EthAddress
+	LatestSubmissionHash []byte
+	Nonce                uint64
 }
 
-func (c *contractSequencerAgent) Start(ctx context.Context, heartbeatTicker ContractSequencerHeartbeatTicker, transportManager TransportManager, onStop func()) {
-	c.transportManager = transportManager
-	go func() {
-		for {
-			select {
-			case <-heartbeatTicker.C():
-				if c.activeCoordinator != "" {
-					//expected a heartbeat from the coordinator
-					c.missedHeartbeats++
-					if c.missedHeartbeats >= c.heartbeatFailureThreshold {
-						c.activeCoordinator = ""
-						c.stateChangeNotifier <- struct{}{}
-					}
-				}
-			}
-		}
-	}()
+type contractSequencerAgent struct {
+	isCoordinator                       bool
+	isSender                            bool
+	activeCoordinator                   string
+	missedHeartbeats                    int
+	heartbeatFailureThreshold           int
+	delegationsByTransactionID          map[string]*delegation
+	dispatchedTransactionsByCoordinator map[string][]*DispatchedTransaction
+	transportManager                    TransportManager
 }
 
 func (c *contractSequencerAgent) IsObserver() bool {
@@ -90,26 +81,55 @@ func (c *contractSequencerAgent) IsSender() bool {
 	return c.isSender
 }
 
-func (c *contractSequencerAgent) HandleCoordinatorHeartbeatNotification(ctx context.Context, message *CoordinatorHeartbeatNotification) error {
-	if c.activeCoordinator != "" && c.activeCoordinator != message.From {
-		//re-delegate all transactions to the new coordinator
-		transactions := make([]*components.PrivateTransaction, 0, len(c.delegationsByTransactionID))
-		for _, delegation := range c.delegationsByTransactionID {
-			transactions = append(transactions, delegation.transaction)
-		}
-		//send delegation request
-		delegationRequest := DelegationRequest{
-			Transactions: transactions,
-		}
-		_ = c.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
-			Node:        message.From,
-			MessageType: "DelegationRequest",
-			//TODO figure out the payload
-			Payload: delegationRequest.bytes(),
-		})
+func (c *contractSequencerAgent) delegateAllTransactions(ctx context.Context) error {
+	//re-delegate all transactions to the new coordinator
+	transactions := make([]*components.PrivateTransaction, 0, len(c.delegationsByTransactionID))
+	for _, delegation := range c.delegationsByTransactionID {
+		transactions = append(transactions, delegation.transaction)
 	}
-	c.activeCoordinator = message.From
+	//send delegation request
+	delegationRequest := DelegationRequest{
+		Transactions: transactions,
+	}
+	_ = c.transportManager.Send(ctx, &components.FireAndForgetMessageSend{
+		Node:        c.activeCoordinator,
+		MessageType: "DelegationRequest",
+		//TODO figure out the payload
+		Payload: delegationRequest.bytes(),
+	})
+	return nil
+}
+
+func (c *contractSequencerAgent) HandleCoordinatorHeartbeatNotification(ctx context.Context, message *CoordinatorHeartbeatNotification) error {
+	if c.activeCoordinator != message.From {
+		c.activeCoordinator = message.From
+
+		//re-delegate all transactions to the new coordinator
+		c.delegateAllTransactions(ctx)
+
+	}
+
+	//Replace the list of dispatched transactions with the new list
+	c.dispatchedTransactionsByCoordinator[message.From] = message.DispatchedTransactions
 	c.missedHeartbeats = 0
+	return nil
+}
+
+func (c *contractSequencerAgent) HandleMissedHeartbeat(ctx context.Context) error {
+
+	if c.activeCoordinator != "" {
+		c.missedHeartbeats++
+		//expected a heartbeat from the coordinator
+		c.missedHeartbeats++
+		if c.missedHeartbeats >= c.heartbeatFailureThreshold {
+			c.activeCoordinator = ""
+			err := c.delegateAllTransactions(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -117,13 +137,22 @@ func (c *contractSequencerAgent) ActiveCoordinator() string {
 	return c.activeCoordinator
 }
 
+func (c *contractSequencerAgent) DispatchedTransactions(ctx context.Context) []*DispatchedTransaction {
+	dispatchedTransactions := make([]*DispatchedTransaction, 0)
+	for _, transactions := range c.dispatchedTransactionsByCoordinator {
+		dispatchedTransactions = append(dispatchedTransactions, transactions...)
+	}
+	return dispatchedTransactions
+}
+
 func (c *contractSequencerAgent) HandleTransaction(ctx context.Context, transaction *components.PrivateTransaction) error {
 	return nil
 }
 
-func NewContractSequencerAgent() ContractSequencerAgent {
+func NewContractSequencerAgent(transportManager TransportManager) ContractSequencerAgent {
 	return &contractSequencerAgent{
-		stateChangeNotifier:        make(chan struct{}),
-		delegationsByTransactionID: make(map[string]*delegation),
+		delegationsByTransactionID:          make(map[string]*delegation),
+		dispatchedTransactionsByCoordinator: make(map[string][]*DispatchedTransaction),
+		transportManager:                    transportManager,
 	}
 }
