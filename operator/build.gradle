@@ -401,6 +401,7 @@ task verifyAllRegistriesPublished(dependsOn: verifyAllTxnSuccess) {
 task deploy(dependsOn: [copySolidity, copyZetoSolidity, verifyAllRegistriesPublished]) {
     doLast {
         println 'Deploy setup completed. Operator is running in the paladin namespace.'
+        printClusterStatus(namespace)
     }
 }
  
