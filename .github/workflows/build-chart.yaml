@@ -85,7 +85,7 @@ jobs:
 
       - name: E2E Test
         run: |
-          ./gradlew --no-daemon e2e \
+          ./gradlew --no-daemon --parallel e2e \
             -PclusterName=${{ env.CLUSTER_NAME }} \
             -Pnamespace=${{ env.NAMESPACE }} \
             -PbuildOperator=${{ inputs.build-operator }} \
