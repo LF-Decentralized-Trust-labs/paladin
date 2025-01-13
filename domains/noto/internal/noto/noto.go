@@ -209,24 +209,6 @@ type parsedCoins struct {
 	lockedTotal  *big.Int
 }
 
-type gatheredCoins struct {
-	inCoins   []*types.NotoCoin
-	inStates  []*prototk.StateRef
-	inTotal   *big.Int
-	outCoins  []*types.NotoCoin
-	outStates []*prototk.StateRef
-	outTotal  *big.Int
-}
-
-type gatheredLockedCoins struct {
-	inCoins   []*types.NotoLockedCoin
-	inStates  []*prototk.StateRef
-	inTotal   *big.Int
-	outCoins  []*types.NotoLockedCoin
-	outStates []*prototk.StateRef
-	outTotal  *big.Int
-}
-
 func getEventSignature(ctx context.Context, abi abi.ABI, eventName string) (string, error) {
 	event := abi.Events()[eventName]
 	if event == nil {
@@ -646,33 +628,6 @@ func (n *Noto) parseCoinList(ctx context.Context, label string, states []*protot
 		}
 	}
 	return result, nil
-}
-
-// Unmarshal and count the coins from the input and output state lists
-func (n *Noto) gatherCoins(ctx context.Context, inputs, outputs []*prototk.EndorsableState) (*gatheredCoins, *gatheredLockedCoins, error) {
-	inCoins, err := n.parseCoinList(ctx, "input", inputs)
-	if err != nil {
-		return nil, nil, err
-	}
-	outCoins, err := n.parseCoinList(ctx, "output", outputs)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &gatheredCoins{
-			inCoins:   inCoins.coins,
-			inStates:  inCoins.states,
-			inTotal:   inCoins.total,
-			outCoins:  outCoins.coins,
-			outStates: outCoins.states,
-			outTotal:  outCoins.total,
-		}, &gatheredLockedCoins{
-			inCoins:   inCoins.lockedCoins,
-			inStates:  inCoins.lockedStates,
-			inTotal:   inCoins.lockedTotal,
-			outCoins:  outCoins.lockedCoins,
-			outStates: outCoins.lockedStates,
-			outTotal:  outCoins.lockedTotal,
-		}, nil
 }
 
 func (n *Noto) encodeTransactionData(ctx context.Context, transaction *prototk.TransactionSpecification, infoStates []*prototk.EndorsableState) (tktypes.HexBytes, error) {

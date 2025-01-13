@@ -96,9 +96,20 @@ func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 
 func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
-	lockedInputs, lockedOutputs, outputs := h.extractStates(req.Reads, req.Info)
-	outputs = append(outputs, lockedOutputs...)
-	return h.endorse(ctx, tx, params, req, lockedInputs, outputs)
+	lockedInputs, lockedOutputs, unlockedOutputs := h.extractStates(req.Reads, req.Info)
+	allOutputs := unlockedOutputs
+	allOutputs = append(allOutputs, lockedOutputs...)
+
+	inputs, err := h.noto.parseCoinList(ctx, "input", lockedInputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", allOutputs)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.endorse(ctx, tx, params, req, inputs, outputs)
 }
 
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {

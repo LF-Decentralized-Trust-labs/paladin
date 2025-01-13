@@ -133,16 +133,16 @@ func (h *delegateLockHandler) decodeStates(states []*pldapi.StateEncoded) []*pro
 
 func (h *delegateLockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.DelegateLockParams)
-	_, lockedCoins, err := h.noto.gatherCoins(ctx, req.Reads, nil)
+	inputs, err := h.noto.parseCoinList(ctx, "read", req.Reads)
 	if err != nil {
 		return nil, err
 	}
 
 	// Sender must specify at least one locked state, to show that they own the lock
-	if len(lockedCoins.inCoins) == 0 {
+	if len(inputs.lockedCoins) == 0 {
 		return nil, i18n.NewError(ctx, msgs.MsgNoStatesSpecified)
 	}
-	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, inputs.lockedCoins, inputs.lockedStates); err != nil {
 		return nil, err
 	}
 

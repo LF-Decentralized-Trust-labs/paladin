@@ -147,18 +147,22 @@ func (h *mintHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, err
 	}
 
-	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	inputs, err := h.noto.parseCoinList(ctx, "input", req.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the amounts
-	if err := h.noto.validateMintAmounts(ctx, params, coins); err != nil {
+	if err := h.noto.validateMintAmounts(ctx, params, inputs, outputs); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, coins.outCoins)
+	encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, nil, outputs.coins)
 	if err != nil {
 		return nil, err
 	}

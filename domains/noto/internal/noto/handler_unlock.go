@@ -200,30 +200,25 @@ func (h *unlockCommon) endorse(
 	tx *types.ParsedTransaction,
 	params *types.UnlockParams,
 	req *prototk.EndorseTransactionRequest,
-	inputs, outputs []*prototk.EndorsableState,
+	inputs, outputs *parsedCoins,
 ) (*prototk.EndorseTransactionResponse, error) {
 	if err := h.checkAllowed(ctx, tx, params.From); err != nil {
 		return nil, err
 	}
 
-	coins, lockedCoins, err := h.noto.gatherCoins(ctx, inputs, outputs)
-	if err != nil {
-		return nil, err
-	}
-
 	// Validate the amounts, and lock creator's ownership of all locked inputs/outputs
-	if err := h.noto.validateUnlockAmounts(ctx, coins, lockedCoins); err != nil {
+	if err := h.noto.validateUnlockAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, lockedCoins.inCoins, lockedCoins.inStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, inputs.lockedCoins, inputs.lockedStates); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, params.From, req.ResolvedVerifiers, outputs.lockedCoins, outputs.lockedStates); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signatures from the sender, then submits the transaction
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, lockedCoins.inCoins, lockedCoins.outCoins, coins.outCoins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, inputs.lockedCoins, outputs.lockedCoins, outputs.coins)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +305,15 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 
 func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
-	return h.endorse(ctx, tx, params, req, req.Inputs, req.Outputs)
+	inputs, err := h.noto.parseCoinList(ctx, "input", req.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", req.Outputs)
+	if err != nil {
+		return nil, err
+	}
+	return h.endorse(ctx, tx, params, req, inputs, outputs)
 }
 
 func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {

@@ -109,16 +109,20 @@ func (h *approveHandler) decodeStates(states []*pldapi.StateEncoded) []*prototk.
 
 func (h *approveHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.ApproveParams)
-	coins, _, err := h.noto.gatherCoins(ctx, h.decodeStates(params.Inputs), h.decodeStates(params.Outputs))
+	inputs, err := h.noto.parseCoinList(ctx, "input", h.decodeStates(params.Inputs))
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", h.decodeStates(params.Outputs))
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the amounts, and sender's ownership of the inputs
-	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
+	if err := h.noto.validateTransferAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
 

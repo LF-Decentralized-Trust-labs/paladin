@@ -170,24 +170,28 @@ func (h *lockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, 
 		return nil, err
 	}
 
-	coins, lockedCoins, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	inputs, err := h.noto.parseCoinList(ctx, "input", req.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the amounts, and sender's ownership of the inputs and locked outputs
-	if err := h.noto.validateLockAmounts(ctx, coins, lockedCoins); err != nil {
+	if err := h.noto.validateLockAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, lockedCoins.outCoins, lockedCoins.outStates); err != nil {
+	if err := h.noto.validateLockOwners(ctx, tx.Transaction.From, req.ResolvedVerifiers, outputs.lockedCoins, outputs.lockedStates); err != nil {
 		return nil, err
 	}
 
 	// Notary checks the signature from the sender, then submits the transaction
-	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins, lockedCoins.outCoins)
+	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputs.coins, outputs.coins, outputs.lockedCoins)
 	if err != nil {
 		return nil, err
 	}

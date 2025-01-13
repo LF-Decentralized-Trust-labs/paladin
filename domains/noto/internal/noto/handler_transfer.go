@@ -160,16 +160,20 @@ func (h *transferHandler) Assemble(ctx context.Context, tx *types.ParsedTransact
 }
 
 func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
-	coins, _, err := h.noto.gatherCoins(ctx, req.Inputs, req.Outputs)
+	inputs, err := h.noto.parseCoinList(ctx, "input", req.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs, err := h.noto.parseCoinList(ctx, "output", req.Outputs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the amounts, and sender's ownership of the inputs
-	if err := h.noto.validateTransferAmounts(ctx, coins); err != nil {
+	if err := h.noto.validateTransferAmounts(ctx, inputs, outputs); err != nil {
 		return nil, err
 	}
-	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, coins.inCoins, coins.inStates); err != nil {
+	if err := h.noto.validateOwners(ctx, tx.Transaction.From, req, inputs.coins, inputs.states); err != nil {
 		return nil, err
 	}
 
@@ -177,7 +181,7 @@ func (h *transferHandler) Endorse(ctx context.Context, tx *types.ParsedTransacti
 	case types.NotoVariantDefault:
 		if req.EndorsementRequest.Name == "notary" {
 			// Notary checks the signature from the sender, then submits the transaction
-			encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, coins.inCoins, coins.outCoins)
+			encodedTransfer, err := h.noto.encodeTransferUnmasked(ctx, tx.ContractAddress, inputs.coins, outputs.coins)
 			if err != nil {
 				return nil, err
 			}

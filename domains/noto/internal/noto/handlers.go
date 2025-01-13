@@ -60,33 +60,33 @@ func (n *Noto) GetHandler(method string) types.DomainHandler {
 }
 
 // Check that a mint has no inputs, and an output matching the requested amount
-func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams, coins *gatheredCoins) error {
-	if len(coins.inCoins) > 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "mint", coins.inCoins)
+func (n *Noto) validateMintAmounts(ctx context.Context, params *types.MintParams, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) > 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "mint", inputs.coins)
 	}
-	if coins.outTotal.Cmp(params.Amount.Int()) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.Int().Text(10), coins.outTotal.Text(10))
+	if outputs.total.Cmp(params.Amount.Int()) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "mint", params.Amount.Int().Text(10), outputs.total.Text(10))
 	}
 	return nil
 }
 
 // Check that a transfer has at least one input and output, and they net out to zero
-func (n *Noto) validateTransferAmounts(ctx context.Context, coins *gatheredCoins) error {
-	if len(coins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "transfer", coins.inCoins)
+func (n *Noto) validateTransferAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "transfer", inputs.coins)
 	}
-	if coins.inTotal.Cmp(coins.outTotal) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "transfer", coins.inTotal, coins.outTotal)
+	if inputs.total.Cmp(outputs.total) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "transfer", inputs.total, outputs.total)
 	}
 	return nil
 }
 
 // Check that a burn has at least one input, and a net output matching the requested amount
-func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams, coins *gatheredCoins) error {
-	if len(coins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "burn", coins.inCoins)
+func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "burn", inputs.coins)
 	}
-	amount := big.NewInt(0).Sub(coins.inTotal, coins.outTotal)
+	amount := big.NewInt(0).Sub(inputs.total, outputs.total)
 	if amount.Cmp(params.Amount.Int()) != 0 {
 		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "burn", params.Amount.Int().Text(10), amount.Text(10))
 	}
@@ -94,25 +94,25 @@ func (n *Noto) validateBurnAmounts(ctx context.Context, params *types.BurnParams
 }
 
 // Check that a lock produces locked coins matching the difference between the inputs and outputs
-func (n *Noto) validateLockAmounts(ctx context.Context, coins *gatheredCoins, lockedCoins *gatheredLockedCoins) error {
-	if len(coins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "lock", coins.inCoins)
+func (n *Noto) validateLockAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.coins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "lock", inputs.coins)
 	}
-	amount := big.NewInt(0).Sub(coins.inTotal, coins.outTotal)
-	if amount.Cmp(lockedCoins.outTotal) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", lockedCoins.outTotal.Text(10), amount.Text(10))
+	amount := big.NewInt(0).Sub(inputs.total, outputs.total)
+	if amount.Cmp(outputs.lockedTotal) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "lock", outputs.lockedTotal.Text(10), amount.Text(10))
 	}
 	return nil
 }
 
 // Check that an unlock produces unlocked coins matching the difference between the locked inputs and outputs
-func (n *Noto) validateUnlockAmounts(ctx context.Context, coins *gatheredCoins, lockedCoins *gatheredLockedCoins) error {
-	if len(lockedCoins.inCoins) == 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "unlock", lockedCoins.inCoins)
+func (n *Noto) validateUnlockAmounts(ctx context.Context, inputs, outputs *parsedCoins) error {
+	if len(inputs.lockedCoins) == 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidInputs, "unlock", inputs.lockedCoins)
 	}
-	amount := big.NewInt(0).Sub(lockedCoins.inTotal, lockedCoins.outTotal)
-	if amount.Cmp(coins.outTotal) != 0 {
-		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "unlock", coins.outTotal.Text(10), amount.Text(10))
+	amount := big.NewInt(0).Sub(inputs.lockedTotal, outputs.lockedTotal)
+	if amount.Cmp(outputs.total) != 0 {
+		return i18n.NewError(ctx, msgs.MsgInvalidAmount, "unlock", outputs.total.Text(10), amount.Text(10))
 	}
 	return nil
 }
