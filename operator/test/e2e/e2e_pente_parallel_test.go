@@ -196,31 +196,31 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 			{"seren", "node3"},
 		}
 
-		// It("mints some ERC-20 inside the the privacy group", func() {
+		It("mints some ERC-20 inside the the privacy group", func() {
 
-		// 	for _, user := range users {
+			for _, user := range users {
 
-		// 		invoke := rpc["node1"].ForABI(ctx, erc20PrivateABI).
-		// 			Private().
-		// 			Domain("pente").
-		// 			To(penteContract).
-		// 			Function("mint").
-		// 			Inputs(&penteInvokeParams{
-		// 				Group: penteGroupStars,
-		// 				To:    *erc20StarsAddr,
-		// 				Inputs: map[string]any{
-		// 					"to":     getEthAddress(user[0], user[1]),
-		// 					"amount": with18Decimals(1000),
-		// 				},
-		// 			}).
-		// 			From("tara@node1"). // operator
-		// 			Send().
-		// 			Wait(5 * time.Second)
-		// 		testLog("SimpleERC20 mint transaction %s", invoke.ID())
-		// 		Expect(invoke.Error()).To(BeNil())
-		// 	}
+				invoke := rpc["node1"].ForABI(ctx, erc20PrivateABI).
+					Private().
+					Domain("pente").
+					To(penteContract).
+					Function("mint").
+					Inputs(&penteInvokeParams{
+						Group: penteGroupStars,
+						To:    *erc20StarsAddr,
+						Inputs: map[string]any{
+							"to":     getEthAddress(user[0], user[1]),
+							"amount": with18Decimals(1000),
+						},
+					}).
+					From("tara@node1"). // operator
+					Send().
+					Wait(5 * time.Second)
+				testLog("SimpleERC20 mint transaction %s", invoke.ID())
+				Expect(invoke.Error()).To(BeNil())
+			}
 
-		// })
+		})
 
 		startingBalance := int64(1000)
 		It("check ERC-20 balance of each", func() {
