@@ -109,11 +109,12 @@ async function main(): Promise<boolean> {
 
   // Unlock the tokens
   logger.log("Unlocking cash...");
-  receipt = await notoCash.using(paladin3).unlockWithApproval(investor2, {
+  receipt = await notoCash.using(paladin3).unlockAsDelegate(investor2, {
     lockId,
     lockedInputs: unlockInputs ?? [],
     lockedOutputs: [],
     outputs: unlockOutputs ?? [],
+    signature: "0x",
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;

@@ -120,11 +120,12 @@ export interface NotoDelegateLockParams {
   data: string;
 }
 
-export interface NotoUnlockWithApprovalParams {
+export interface NotoUnlockPublicParams {
   lockId: string;
   lockedInputs: string[];
   lockedOutputs: string[];
   outputs: string[];
+  signature: string;
   data: string;
 }
 
@@ -295,6 +296,18 @@ export class NotoInstance {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
+  async unlockAsDelegate(from: PaladinVerifier, data: NotoUnlockPublicParams) {
+    const txID = await this.paladin.sendTransaction({
+      type: TransactionType.PUBLIC,
+      abi: notoJSON.abi,
+      function: "unlock",
+      to: this.address,
+      from: from.lookup,
+      data,
+    });
+    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
+  }
+
   async prepareUnlock(from: PaladinVerifier, data: NotoPrepareUnlockParams) {
     const txID = await this.paladin.sendTransaction({
       type: TransactionType.PRIVATE,
@@ -316,21 +329,6 @@ export class NotoInstance {
       type: TransactionType.PRIVATE,
       abi: notoPrivateJSON.abi,
       function: "delegateLock",
-      to: this.address,
-      from: from.lookup,
-      data,
-    });
-    return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
-  }
-
-  async unlockWithApproval(
-    from: PaladinVerifier,
-    data: NotoUnlockWithApprovalParams
-  ) {
-    const txID = await this.paladin.sendTransaction({
-      type: TransactionType.PUBLIC,
-      abi: notoJSON.abi,
-      function: "unlockWithApproval",
       to: this.address,
       from: from.lookup,
       data,

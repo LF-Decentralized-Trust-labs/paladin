@@ -31,6 +31,7 @@ interface INoto {
 
     event NotoUnlock(
         bytes32 lockId,
+        address sender,
         bytes32[] lockedInputs,
         bytes32[] lockedOutputs,
         bytes32[] outputs,
@@ -52,17 +53,6 @@ interface INoto {
         bytes signature,
         bytes data
     );
-
-    event NotoDelegateUnlock(
-        bytes32 lockId,
-        address delegate,
-        bytes32[] lockedInputs,
-        bytes32[] lockedOutputs,
-        bytes32[] outputs,
-        bytes data
-    );
-
-    event NotoUnlockApprovalCancelled(bytes32 lockId, bytes data);
 
     function initialize(
         address notaryAddress,
@@ -128,14 +118,4 @@ interface INoto {
         bytes calldata signature,
         bytes calldata data
     ) external;
-
-    function unlockWithApproval(
-        bytes32 lockId,
-        bytes32[] calldata lockedInputs,
-        bytes32[] calldata lockedOutputs,
-        bytes32[] calldata outputs,
-        bytes calldata data
-    ) external;
-
-    function cancelUnlockApproval(bytes32 lockId, bytes calldata data) external;
 }

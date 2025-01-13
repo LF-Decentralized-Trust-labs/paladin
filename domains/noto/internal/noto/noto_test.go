@@ -435,6 +435,9 @@ func TestHandleEventBatch_NotoUnlock(t *testing.T) {
 				DataJson:          string(notoEventJson),
 			},
 		},
+		ContractInfo: &prototk.ContractInfo{
+			ContractConfigJson: `{}`,
+		},
 	}
 
 	res, err := n.HandleEventBatch(ctx, req)

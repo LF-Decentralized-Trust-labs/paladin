@@ -140,27 +140,28 @@ func findLockedCoins(t *testing.T, ctx context.Context, rpc rpcbackend.Backend, 
 }
 
 // TODO: make this easier to extract
-func buildUnlockWithApproval(notoDomain *Noto, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) *NotoUnlockWithApprovalParams {
-	lockedInputs := make([]tktypes.HexBytes, 0)
-	lockedOutputs := make([]tktypes.HexBytes, 0)
-	unlockedOutputs := make([]tktypes.HexBytes, 0)
+func buildUnlock(notoDomain *Noto, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) *NotoUnlockParams {
+	lockedInputs := make([]string, 0)
+	lockedOutputs := make([]string, 0)
+	unlockedOutputs := make([]string, 0)
 	for _, input := range prepareUnlockResult.ReadStates {
-		lockedInputs = append(lockedInputs, input.ID)
+		lockedInputs = append(lockedInputs, input.ID.String())
 	}
 	for _, output := range prepareUnlockResult.InfoStates {
 		switch output.Schema.String() {
 		case notoDomain.CoinSchemaID():
-			unlockedOutputs = append(unlockedOutputs, output.ID)
+			unlockedOutputs = append(unlockedOutputs, output.ID.String())
 		case notoDomain.LockedCoinSchemaID():
-			lockedOutputs = append(lockedOutputs, output.ID)
+			lockedOutputs = append(lockedOutputs, output.ID.String())
 		}
 	}
 
-	return &NotoUnlockWithApprovalParams{
+	return &NotoUnlockParams{
 		LockID:        lockID,
 		LockedInputs:  lockedInputs,
 		LockedOutputs: lockedOutputs,
 		Outputs:       unlockedOutputs,
+		Signature:     tktypes.HexBytes{},
 		Data:          tktypes.HexBytes{},
 	}
 }
@@ -598,7 +599,7 @@ func TestNotoLock(t *testing.T) {
 	if rpcerr != nil {
 		require.NoError(t, rpcerr.Error())
 	}
-	unlockParams := buildUnlockWithApproval(noto, lockID, &invokeResult)
+	unlockParams := buildUnlock(noto, lockID, &invokeResult)
 
 	log.L(ctx).Infof("Delegate lock to recipient2")
 	rpcerr = rpc.CallRPC(ctx, &invokeResult, "testbed_invoke", &pldapi.TransactionInput{
@@ -622,7 +623,7 @@ func TestNotoLock(t *testing.T) {
 		Public().
 		From(recipient2Name).
 		To(&notoAddress).
-		Function("unlockWithApproval").
+		Function("unlock").
 		Inputs(unlockParams).
 		Send().
 		Wait(3 * time.Second)

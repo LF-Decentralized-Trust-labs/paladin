@@ -75,7 +75,7 @@ func decodeTransactionResult(t *testing.T, resultInput map[string]any) *testbed.
 }
 
 // TODO: make this easier to extract
-func buildUnlockWithApproval(ctx context.Context, notoDomain noto.Noto, abi abi.ABI, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) ([]*pldapi.StateEncoded, []*pldapi.StateEncoded, []byte, error) {
+func buildUnlock(ctx context.Context, notoDomain noto.Noto, abi abi.ABI, lockID tktypes.Bytes32, prepareUnlockResult *testbed.TransactionResult) ([]*pldapi.StateEncoded, []*pldapi.StateEncoded, []byte, error) {
 	notoInputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.ReadStates))
 	notoOutputStates := make([]*pldapi.StateEncoded, 0, len(prepareUnlockResult.InfoStates))
 	lockedInputs := make([]tktypes.HexBytes, 0)
@@ -96,17 +96,18 @@ func buildUnlockWithApproval(ctx context.Context, notoDomain noto.Noto, abi abi.
 		}
 	}
 
-	unlockWithApprovalParams, err := json.Marshal(map[string]any{
+	unlockParams, err := json.Marshal(map[string]any{
 		"lockId":        lockID,
 		"lockedInputs":  lockedInputs,
 		"lockedOutputs": lockedOutputs,
 		"outputs":       unlockedOutputs,
+		"signature":     "0x",
 		"data":          "0x",
 	})
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	encodedCall, err := abi.Functions()["unlockWithApproval"].EncodeCallDataJSONCtx(ctx, unlockWithApprovalParams)
+	encodedCall, err := abi.Functions()["unlock"].EncodeCallDataJSONCtx(ctx, unlockParams)
 	return notoInputStates, notoOutputStates, encodedCall, err
 }
 
@@ -407,7 +408,7 @@ func TestNotoForZeto(t *testing.T) {
 	require.NotNil(t, notoPrepareUnlock)
 	prepareUnlockResult := decodeTransactionResult(t, notoPrepareUnlock)
 
-	notoInputStates, notoOutputStates, transferNoto, err := buildUnlockWithApproval(ctx, notoDomain, noto.ABI, lockID, prepareUnlockResult)
+	notoInputStates, notoOutputStates, transferNoto, err := buildUnlock(ctx, notoDomain, noto.ABI, lockID, prepareUnlockResult)
 	require.NoError(t, err)
 
 	log.L(ctx).Infof("Prepare the Zeto transfer")

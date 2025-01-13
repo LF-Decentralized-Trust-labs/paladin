@@ -55,7 +55,6 @@ var (
 	NotoUnlock         = "NotoUnlock"
 	NotoUnlockPrepared = "NotoUnlockPrepared"
 	NotoLockDelegated  = "NotoLockDelegated"
-	NotoDelegateUnlock = "NotoDelegateUnlock"
 )
 
 var allEvents = []string{
@@ -65,7 +64,6 @@ var allEvents = []string{
 	NotoUnlock,
 	NotoUnlockPrepared,
 	NotoLockDelegated,
-	NotoDelegateUnlock,
 }
 
 func NewNoto(callbacks plugintk.DomainCallbacks) plugintk.DomainAPI {
@@ -154,14 +152,6 @@ type NotoDelegateLockParams struct {
 	Data      tktypes.HexBytes    `json:"data"`
 }
 
-type NotoUnlockWithApprovalParams struct {
-	LockID        tktypes.Bytes32    `json:"lockId"`
-	LockedInputs  []tktypes.HexBytes `json:"lockedInputs"`
-	LockedOutputs []tktypes.HexBytes `json:"lockedOutputs"`
-	Outputs       []tktypes.HexBytes `json:"outputs"`
-	Data          tktypes.HexBytes   `json:"data"`
-}
-
 type NotoTransfer_Event struct {
 	Inputs    []tktypes.Bytes32 `json:"inputs"`
 	Outputs   []tktypes.Bytes32 `json:"outputs"`
@@ -186,12 +176,13 @@ type NotoLock_Event struct {
 }
 
 type NotoUnlock_Event struct {
-	LockID        tktypes.Bytes32   `json:"lockId"`
-	LockedInputs  []tktypes.Bytes32 `json:"lockedInputs"`
-	LockedOutputs []tktypes.Bytes32 `json:"lockedOutputs"`
-	Outputs       []tktypes.Bytes32 `json:"outputs"`
-	Signature     tktypes.HexBytes  `json:"signature"`
-	Data          tktypes.HexBytes  `json:"data"`
+	LockID        tktypes.Bytes32     `json:"lockId"`
+	Sender        *tktypes.EthAddress `json:"sender"`
+	LockedInputs  []tktypes.Bytes32   `json:"lockedInputs"`
+	LockedOutputs []tktypes.Bytes32   `json:"lockedOutputs"`
+	Outputs       []tktypes.Bytes32   `json:"outputs"`
+	Signature     tktypes.HexBytes    `json:"signature"`
+	Data          tktypes.HexBytes    `json:"data"`
 }
 
 type NotoUnlockPrepared_Event struct {
@@ -203,19 +194,10 @@ type NotoUnlockPrepared_Event struct {
 }
 
 type NotoLockDelegated_Event struct {
-	LockID    tktypes.Bytes32    `json:"lockId"`
-	Delegate  tktypes.EthAddress `json:"delegate"`
-	Signature tktypes.HexBytes   `json:"signature"`
-	Data      tktypes.HexBytes   `json:"data"`
-}
-
-type NotoDelegateUnlock_Event struct {
-	LockID        tktypes.Bytes32    `json:"lockId"`
-	Delegate      tktypes.EthAddress `json:"delegate"`
-	LockedInputs  []tktypes.Bytes32  `json:"lockedInputs"`
-	LockedOutputs []tktypes.Bytes32  `json:"lockedOutputs"`
-	Outputs       []tktypes.Bytes32  `json:"outputs"`
-	Data          tktypes.HexBytes   `json:"data"`
+	LockID    tktypes.Bytes32     `json:"lockId"`
+	Delegate  *tktypes.EthAddress `json:"delegate"`
+	Signature tktypes.HexBytes    `json:"signature"`
+	Data      tktypes.HexBytes    `json:"data"`
 }
 
 type parsedCoins struct {
@@ -865,6 +847,20 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedInputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedOutputs)...)
 				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.Outputs)...)
+
+				var domainConfig *types.NotoParsedConfig
+				err = json.Unmarshal([]byte(req.ContractInfo.ContractConfigJson), &domainConfig)
+				if err != nil {
+					return nil, err
+				}
+				if domainConfig.IsNotary && domainConfig.NotaryMode == types.NotaryModeHooks.Enum() && !domainConfig.Options.Hooks.PublicAddress.Equals(unlock.Sender) {
+					err = n.handleNotaryPrivateUnlock(ctx, req.StateQueryContext, domainConfig, &unlock)
+					if err != nil {
+						// Should all errors cause retry?
+						log.L(ctx).Errorf("Failed to handle NotoUnlock event in batch %s: %s", req.BatchId, err)
+						return nil, err
+					}
+				}
 			} else {
 				log.L(ctx).Warnf("Ignoring malformed NotoUnlock event in batch %s: %s", req.BatchId, err)
 			}
@@ -895,34 +891,6 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 			} else {
 				log.L(ctx).Warnf("Ignoring malformed NotoLockDelegated event in batch %s: %s", req.BatchId, err)
 			}
-
-		case n.eventSignatures[NotoDelegateUnlock]:
-			log.L(ctx).Infof("Processing '%s' event in batch %s", ev.SoliditySignature, req.BatchId)
-			var unlock NotoDelegateUnlock_Event
-			if err := json.Unmarshal([]byte(ev.DataJson), &unlock); err == nil {
-				txData, err := n.decodeTransactionData(ctx, unlock.Data)
-				if err != nil {
-					return nil, err
-				}
-				n.recordTransactionInfo(ev, txData, &res)
-				res.SpentStates = append(res.SpentStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedInputs)...)
-				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.LockedOutputs)...)
-				res.ConfirmedStates = append(res.ConfirmedStates, n.parseStatesFromEvent(txData.TransactionID, unlock.Outputs)...)
-
-				var domainConfig *types.NotoParsedConfig
-				err = json.Unmarshal([]byte(req.ContractInfo.ContractConfigJson), &domainConfig)
-				if err != nil {
-					return nil, err
-				}
-				if domainConfig.IsNotary && domainConfig.NotaryMode == types.NotaryModeHooks.Enum() {
-					err = n.handleNotaryPrivateUnlock(ctx, req.StateQueryContext, domainConfig, &unlock)
-					if err != nil {
-						return nil, err
-					}
-				}
-			} else {
-				log.L(ctx).Warnf("Ignoring malformed NotoDelegateUnlock event in batch %s: %s", req.BatchId, err)
-			}
 		}
 	}
 	return &res, nil
@@ -930,7 +898,7 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 
 // When notary logic is implemented via Pente, unlock events from the base ledger must be propagated back to the Pente hooks
 // TODO: this method should not be invoked directly on the event loop, but rather via a queue
-func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext string, domainConfig *types.NotoParsedConfig, unlock *NotoDelegateUnlock_Event) error {
+func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext string, domainConfig *types.NotoParsedConfig, unlock *NotoUnlock_Event) error {
 	lockedInputs := make([]string, len(unlock.LockedInputs))
 	for i, input := range unlock.LockedInputs {
 		lockedInputs[i] = input.String()
@@ -981,7 +949,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		domainConfig,
 		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["handleDelegateUnlock"],
 		&DelegateUnlockHookParams{
-			Sender:  &unlock.Delegate,
+			Sender:  unlock.Sender,
 			LockID:  unlock.LockID,
 			From:    from,
 			To:      recipients,
