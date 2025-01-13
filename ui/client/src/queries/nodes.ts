@@ -14,9 +14,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const AppRoutes = {
-  Indexer: '/ui/indexer',
-  Submissions: '/ui/submissions',
-  Peers: '/ui/peers',
-  Registry: '/ui/registry'
-}
+import { ITransportPeer } from "../interfaces";
+import { generatePostReq, returnResponse } from "./common";
+import { RpcEndpoint, RpcMethods } from "./rpcMethods";
+import i18next from "i18next";
+
+export const fetchTransportNodes = async (): Promise<ITransportPeer[]> => {
+  const requestPayload = {
+    jsonrpc: "2.0",
+    id: Date.now(),
+    method: RpcMethods.transport_peers,
+  };
+
+  return <Promise<ITransportPeer[]>>(
+    returnResponse(
+      () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
+      i18next.t("errorFetchingRegistries")
+    )
+  );
+};

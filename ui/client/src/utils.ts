@@ -20,5 +20,5 @@ export const formatJSONWhenApplicable = (value: any) => {
       return JSON.stringify(value, null, 2);
     } catch (err) { }
   }
-  return value;
+  return String(value);
 };

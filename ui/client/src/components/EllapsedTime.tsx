@@ -26,9 +26,15 @@ daysjs.extend(relativeTime);
 
 type Props = {
   timestamp: string
+  icon?: JSX.Element
+  prefix?: string
 };
 
-export const EllapsedTime: React.FC<Props> = ({ timestamp }) => {
+export const EllapsedTime: React.FC<Props> = ({
+  timestamp,
+  icon = <AccessTimeIcon />,
+  prefix
+}) => {
 
   const [displayValue, setDisplayValue] = useState<string>(daysjs(timestamp).fromNow());
   const [timestampDialogOpen, setTimestampDialogOpen] = useState(false);
@@ -45,9 +51,9 @@ export const EllapsedTime: React.FC<Props> = ({ timestamp }) => {
       <Button
         sx={{ textTransform: 'none', fontWeight: '400' }}
         size="small"
-        startIcon={<AccessTimeIcon />}
+        startIcon={icon}
         onClick={() => setTimestampDialogOpen(true)}>
-        {displayValue}
+        {prefix} {displayValue}
       </Button>
       <TimestampDialog
         timestamp={timestamp}

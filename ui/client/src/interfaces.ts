@@ -126,3 +126,22 @@ export interface IABIDecodedEntry {
 }
 
 export type ABIUploadResponse = string
+
+export interface ITransportPeer {
+  name: string
+  stats: {
+    sentMsgs: number
+    receivedMsgs: number
+    sentBytes: number
+    receivedBytes: number
+    lastSend: string
+    lastReceive: string
+    reliableHighestSent: number
+    reliableAckBase: number
+  }
+  activated: string
+  outboundTransport: string
+  outbound: {
+    endpoint: string
+  }
+}
