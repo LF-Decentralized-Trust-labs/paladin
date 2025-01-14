@@ -39,7 +39,7 @@ export const Header: React.FC = () => {
       return 0;
     } else if (path.startsWith(AppRoutes.Submissions)) {
       return 1;
-    } else if(path.startsWith(AppRoutes.Peers)) {
+    } else if (path.startsWith(AppRoutes.Peers)) {
       return 2;  
     } else if (path.startsWith(AppRoutes.Registry)) {
       return 3;
