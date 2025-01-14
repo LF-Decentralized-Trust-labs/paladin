@@ -19,7 +19,38 @@ import { generatePostReq, returnResponse } from "./common";
 import { RpcEndpoint, RpcMethods } from "./rpcMethods";
 import i18next from "i18next";
 
-export const fetchTransportNodes = async (): Promise<ITransportPeer[]> => {
+export const fetchTransportNodeName = async (): Promise<string> => {
+  const requestPayload = {
+    jsonrpc: "2.0",
+    id: Date.now(),
+    method: RpcMethods.transport_nodeName,
+  };
+
+  return <Promise<string>>(
+    returnResponse(
+      () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
+      i18next.t("errorFetchingTransportNodeName")
+    )
+  );
+};
+
+export const fetchTransportLocalDetails = async (transport: string): Promise<string> => {
+  const requestPayload = {
+    jsonrpc: "2.0",
+    id: Date.now(),
+    method: RpcMethods.transport_localTransportDetails,
+    params: [transport]
+  };
+
+  return <Promise<string>>(
+    returnResponse(
+      () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
+      i18next.t("errorFetchingTransportLocalDetails")
+    )
+  );
+};
+
+export const fetchTransportPeers = async (): Promise<ITransportPeer[]> => {
   const requestPayload = {
     jsonrpc: "2.0",
     id: Date.now(),
@@ -29,7 +60,7 @@ export const fetchTransportNodes = async (): Promise<ITransportPeer[]> => {
   return <Promise<ITransportPeer[]>>(
     returnResponse(
       () => fetch(RpcEndpoint, generatePostReq(JSON.stringify(requestPayload))),
-      i18next.t("errorFetchingRegistries")
+      i18next.t("errorFetchingTransportPeers")
     )
   );
 };
