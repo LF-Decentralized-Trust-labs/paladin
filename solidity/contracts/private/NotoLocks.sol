@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+import {INotoHooks} from "./interfaces/INotoHooks.sol";
+
 /**
  * Helpers for tracking locked amounts from Noto hooks contracts.
  */
@@ -17,12 +19,7 @@ contract NotoLocks {
     struct LockDetail {
         address from;
         uint256 amount;
-        PreparedUnlock[] unlocks;
-    }
-
-    struct PreparedUnlock {
-        address[] to;
-        uint256[] amounts;
+        INotoHooks.UnlockRecipient[] recipients;
     }
 
     function _lock(bytes32 lockId, address from, uint256 amount) internal {
@@ -34,12 +31,12 @@ contract NotoLocks {
 
     function _unlock(
         bytes32 lockId,
-        uint256[] calldata amounts
+        INotoHooks.UnlockRecipient[] calldata recipients
     ) internal returns (LockDetail memory) {
         LockDetail storage lock = _locks[lockId];
-        for (uint256 i = 0; i < amounts.length; i++) {
-            lock.amount -= amounts[i];
-            _lockedBalance[lock.from] -= amounts[i];
+        for (uint256 i = 0; i < recipients.length; i++) {
+            lock.amount -= recipients[i].amount;
+            _lockedBalance[lock.from] -= recipients[i].amount;
         }
 
         LockDetail memory lockCopy = _locks[lockId];
@@ -51,30 +48,27 @@ contract NotoLocks {
 
     function _prepareUnlock(
         bytes32 lockId,
-        address[] calldata to,
-        uint256[] calldata amounts
+        INotoHooks.UnlockRecipient[] calldata recipients
     ) internal {
-        for (uint256 i = 0; i < to.length; i++) {
-            _pendingBalance[to[i]] += amounts[i];
-        }
-
         LockDetail storage lock = _locks[lockId];
-        lock.unlocks.push(PreparedUnlock(to, amounts));
+        delete lock.recipients;
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _pendingBalance[recipients[i].to] += recipients[i].amount;
+            lock.recipients.push(recipients[i]);
+        }
     }
 
     function _handleDelegateUnlock(
         bytes32 lockId,
-        uint256[] calldata amounts
+        INotoHooks.UnlockRecipient[] calldata recipients
     ) internal returns (LockDetail memory) {
         LockDetail storage lock = _locks[lockId];
-        for (uint256 i = 0; i < lock.unlocks.length; i++) {
-            PreparedUnlock storage unlock = lock.unlocks[i];
-            for (uint256 j = 0; j < unlock.to.length; j++) {
-                _pendingBalance[unlock.to[j]] -= unlock.amounts[j];
-            }
+        for (uint256 i = 0; i < lock.recipients.length; i++) {
+            _pendingBalance[lock.recipients[i].to] -= lock.recipients[i].amount;
         }
-        delete _locks[lockId].unlocks;
+        delete lock.recipients;
 
-        return _unlock(lockId, amounts);
+        return _unlock(lockId, recipients);
     }
 }

@@ -64,13 +64,12 @@ type LockHookParams struct {
 }
 
 type UnlockHookParams struct {
-	Sender   *tktypes.EthAddress   `json:"sender"`
-	LockID   tktypes.Bytes32       `json:"lockId"`
-	From     *tktypes.EthAddress   `json:"from"`
-	To       []*tktypes.EthAddress `json:"to"`
-	Amounts  []*tktypes.HexUint256 `json:"amounts"`
-	Data     tktypes.HexBytes      `json:"data"`
-	Prepared PreparedTransaction   `json:"prepared"`
+	Sender     *tktypes.EthAddress        `json:"sender"`
+	LockID     tktypes.Bytes32            `json:"lockId"`
+	From       *tktypes.EthAddress        `json:"from"`
+	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
+	Data       tktypes.HexBytes           `json:"data"`
+	Prepared   PreparedTransaction        `json:"prepared"`
 }
 
 type ApproveUnlockHookParams struct {
@@ -83,17 +82,21 @@ type ApproveUnlockHookParams struct {
 }
 
 type DelegateUnlockHookParams struct {
-	Sender  *tktypes.EthAddress   `json:"sender"`
-	LockID  tktypes.Bytes32       `json:"lockId"`
-	From    *tktypes.EthAddress   `json:"from"`
-	To      []*tktypes.EthAddress `json:"to"`
-	Amounts []*tktypes.HexUint256 `json:"amounts"`
-	Data    tktypes.HexBytes      `json:"data"`
+	Sender     *tktypes.EthAddress        `json:"sender"`
+	LockID     tktypes.Bytes32            `json:"lockId"`
+	From       *tktypes.EthAddress        `json:"from"`
+	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
+	Data       tktypes.HexBytes           `json:"data"`
 }
 
 type PreparedTransaction struct {
 	ContractAddress *tktypes.EthAddress `json:"contractAddress"`
 	EncodedCall     tktypes.HexBytes    `json:"encodedCall"`
+}
+
+type ResolvedUnlockRecipient struct {
+	To     *tktypes.EthAddress `json:"to"`
+	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 func penteInvokeABI(name string, inputs abi.ParameterArray) *abi.Entry {

@@ -17,6 +17,11 @@ interface INotoHooks is IPenteExternalCall {
         bytes encodedCall;
     }
 
+    struct UnlockRecipient {
+        address to;
+        uint256 amount;
+    }
+
     function onMint(
         address sender,
         address to,
@@ -63,8 +68,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
@@ -73,8 +77,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external;
@@ -97,8 +100,7 @@ interface INotoHooks is IPenteExternalCall {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external;
 }

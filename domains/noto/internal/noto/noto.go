@@ -576,6 +576,26 @@ func (n *Noto) validateTransaction(ctx context.Context, tx *prototk.TransactionS
 	}, handler, nil
 }
 
+func (n *Noto) ethAddressVerifiers(lookups ...string) []*prototk.ResolveVerifierRequest {
+	verifierMap := make(map[string]bool, len(lookups))
+	verifierList := make([]string, 0, len(lookups))
+	for _, lookup := range lookups {
+		if _, ok := verifierMap[lookup]; !ok {
+			verifierMap[lookup] = true
+			verifierList = append(verifierList, lookup)
+		}
+	}
+	request := make([]*prototk.ResolveVerifierRequest, len(verifierList))
+	for i, lookup := range verifierList {
+		request[i] = &prototk.ResolveVerifierRequest{
+			Lookup:       lookup,
+			Algorithm:    algorithms.ECDSA_SECP256K1,
+			VerifierType: verifiers.ETH_ADDRESS,
+		}
+	}
+	return request
+}
+
 func (n *Noto) recoverSignature(ctx context.Context, payload ethtypes.HexBytes0xPrefix, signature []byte) (*ethtypes.Address0xHex, error) {
 	sig, err := secp256k1.DecodeCompactRSV(ctx, signature)
 	if err != nil {
@@ -889,27 +909,27 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		// TODO: ensure all are from the same owner?
 	}
 
-	recipients := make([]*tktypes.EthAddress, len(outputStates))
-	amounts := make([]*tktypes.HexUint256, len(outputStates))
+	recipients := make([]*ResolvedUnlockRecipient, len(outputStates))
 	for i, state := range outputStates {
 		coin, err := n.unmarshalLockedCoin(state.DataJson)
 		if err != nil {
 			return err
 		}
-		recipients[i] = coin.Owner
-		amounts[i] = coin.Amount
+		recipients[i] = &ResolvedUnlockRecipient{
+			To:     coin.Owner,
+			Amount: coin.Amount,
+		}
 	}
 
 	transactionType, functionABI, paramsJSON, err := n.wrapHookTransaction(
 		domainConfig,
 		solutils.MustLoadBuild(notoHooksJSON).ABI.Functions()["handleDelegateUnlock"],
 		&DelegateUnlockHookParams{
-			Sender:  unlock.Sender,
-			LockID:  unlock.LockID,
-			From:    from,
-			To:      recipients,
-			Amounts: amounts,
-			Data:    unlock.Data,
+			Sender:     unlock.Sender,
+			LockID:     unlock.LockID,
+			From:       from,
+			Recipients: recipients,
+			Data:       unlock.Data,
 		},
 	)
 	if err != nil {

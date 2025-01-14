@@ -53,14 +53,8 @@ func (h *unlockCommon) validateParams(ctx context.Context, unlockParams *types.U
 	if len(unlockParams.From) == 0 {
 		return i18n.NewError(ctx, msgs.MsgParameterRequired, "from")
 	}
-	if len(unlockParams.To) == 0 {
-		return i18n.NewError(ctx, msgs.MsgParameterRequired, "to")
-	}
-	if len(unlockParams.Amounts) == 0 {
-		return i18n.NewError(ctx, msgs.MsgParameterRequired, "amounts")
-	}
-	if len(unlockParams.To) != len(unlockParams.Amounts) {
-		return i18n.NewError(ctx, msgs.MsgArraysMustBeSameLength, "to", "amounts")
+	if len(unlockParams.Recipients) == 0 {
+		return i18n.NewError(ctx, msgs.MsgParameterRequired, "recipients")
 	}
 	return nil
 }
@@ -90,32 +84,13 @@ func (h *unlockCommon) init(ctx context.Context, tx *types.ParsedTransaction, pa
 		return nil, err
 	}
 
-	verifierMap := make(map[string]bool, len(params.To)+3)
-	verifierList := make([]string, 0, len(params.To)+3)
-	for _, lookup := range []string{notary, tx.Transaction.From, params.From} {
-		if _, ok := verifierMap[lookup]; !ok {
-			verifierMap[lookup] = true
-			verifierList = append(verifierList, lookup)
-		}
-	}
-	for _, lookup := range params.To {
-		if _, ok := verifierMap[lookup]; !ok {
-			verifierMap[lookup] = true
-			verifierList = append(verifierList, lookup)
-		}
-	}
-
-	request := make([]*prototk.ResolveVerifierRequest, len(verifierList))
-	for i, lookup := range verifierList {
-		request[i] = &prototk.ResolveVerifierRequest{
-			Lookup:       lookup,
-			Algorithm:    algorithms.ECDSA_SECP256K1,
-			VerifierType: verifiers.ETH_ADDRESS,
-		}
+	lookups := []string{notary, tx.Transaction.From, params.From}
+	for _, entry := range params.Recipients {
+		lookups = append(lookups, entry.To)
 	}
 
 	return &prototk.InitTransactionResponse{
-		RequiredVerifiers: request,
+		RequiredVerifiers: h.noto.ethAddressVerifiers(lookups...),
 	}, nil
 }
 
@@ -132,8 +107,8 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 	}
 
 	requiredTotal := big.NewInt(0)
-	for _, amount := range params.Amounts {
-		requiredTotal = requiredTotal.Add(requiredTotal, amount.Int())
+	for _, entry := range params.Recipients {
+		requiredTotal = requiredTotal.Add(requiredTotal, entry.Amount.Int())
 	}
 
 	lockedInputStates, revert, err := h.noto.prepareLockedInputs(ctx, req.StateQueryContext, params.LockID, fromAddress, requiredTotal)
@@ -173,12 +148,12 @@ func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.Pars
 	notary := tx.DomainConfig.NotaryLookup
 
 	unlockedOutputs := &preparedOutputs{}
-	for i, to := range params.To {
-		toAddress, err := h.noto.findEthAddressVerifier(ctx, "to", to, req.ResolvedVerifiers)
+	for _, entry := range params.Recipients {
+		toAddress, err := h.noto.findEthAddressVerifier(ctx, "to", entry.To, req.ResolvedVerifiers)
 		if err != nil {
 			return nil, nil, err
 		}
-		outputs, err := h.noto.prepareOutputs(toAddress, params.Amounts[i], []string{notary, params.From, to})
+		outputs, err := h.noto.prepareOutputs(toAddress, entry.Amount, []string{notary, params.From, entry.To})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -363,12 +338,13 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, err
 	}
-	toAddresses := make([]*tktypes.EthAddress, len(inParams.To))
-	for i, to := range inParams.To {
-		toAddresses[i], err = h.noto.findEthAddressVerifier(ctx, "to", to, req.ResolvedVerifiers)
+	unlock := make([]*ResolvedUnlockRecipient, len(inParams.Recipients))
+	for i, entry := range inParams.Recipients {
+		to, err := h.noto.findEthAddressVerifier(ctx, "to", entry.To, req.ResolvedVerifiers)
 		if err != nil {
 			return nil, err
 		}
+		unlock[i] = &ResolvedUnlockRecipient{To: to, Amount: entry.Amount}
 	}
 
 	encodedCall, err := baseTransaction.encode(ctx)
@@ -376,12 +352,11 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 		return nil, err
 	}
 	params := &UnlockHookParams{
-		Sender:  senderAddress,
-		LockID:  inParams.LockID,
-		From:    fromAddress,
-		To:      toAddresses,
-		Amounts: inParams.Amounts,
-		Data:    inParams.Data,
+		Sender:     senderAddress,
+		LockID:     inParams.LockID,
+		From:       fromAddress,
+		Recipients: unlock,
+		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,

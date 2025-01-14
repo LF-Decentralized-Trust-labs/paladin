@@ -37,16 +37,14 @@ interface INotoPrivate {
     function unlock(
         bytes32 lockId,
         string calldata from,
-        string[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external;
 
     function prepareUnlock(
         bytes32 lockId,
         string calldata from,
-        string[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external;
 
@@ -62,5 +60,10 @@ interface INotoPrivate {
         bytes32 schema;
         address contractAddress;
         bytes data;
+    }
+
+    struct UnlockRecipient {
+        string to;
+        uint256 amount;
     }
 }

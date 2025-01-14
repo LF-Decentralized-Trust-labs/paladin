@@ -587,11 +587,13 @@ func TestNotoLock(t *testing.T) {
 			To:       &notoAddress,
 			Function: "prepareUnlock",
 			Data: toJSON(t, &types.UnlockParams{
-				LockID:  lockID,
-				From:    recipient1Name,
-				To:      []string{recipient2Name},
-				Amounts: []*tktypes.HexUint256{tktypes.Int64ToInt256(50)},
-				Data:    tktypes.HexBytes{},
+				LockID: lockID,
+				From:   recipient1Name,
+				Recipients: []*types.UnlockRecipient{{
+					To:     recipient2Name,
+					Amount: tktypes.Int64ToInt256(50),
+				}},
+				Data: tktypes.HexBytes{},
 			}),
 		},
 		ABI: types.NotoABI,

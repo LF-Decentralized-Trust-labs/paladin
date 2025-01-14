@@ -400,10 +400,12 @@ func TestNotoForZeto(t *testing.T) {
 	}).SignAndSend(alice).Wait()
 	time.Sleep(1 * time.Second) // TODO: remove
 	notoPrepareUnlock := noto.PrepareUnlock(ctx, &nototypes.UnlockParams{
-		LockID:  lockID,
-		From:    alice,
-		To:      []string{bob},
-		Amounts: []*tktypes.HexUint256{tktypes.Int64ToInt256(1)},
+		LockID: lockID,
+		From:   alice,
+		Recipients: []*nototypes.UnlockRecipient{{
+			To:     bob,
+			Amount: tktypes.Int64ToInt256(1),
+		}},
 	}).SignAndSend(alice).Wait()
 	require.NotNil(t, notoPrepareUnlock)
 	prepareUnlockResult := decodeTransactionResult(t, notoPrepareUnlock)

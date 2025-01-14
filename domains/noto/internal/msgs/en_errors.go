@@ -66,7 +66,6 @@ var (
 	MsgBurnNotAllowed              = ffe("PD200025", "Burn is not enabled")
 	MsgNoStatesSpecified           = ffe("PD200026", "No states were specified")
 	MsgUnlockNotAllowed            = ffe("PD200027", "Cannot unlock states owned by '%s'")
-	MsgArraysMustBeSameLength      = ffe("PD200028", "Arrays '%s' and '%s' must be the same length")
 	MsgMissingStateData            = ffe("PD200029", "Missing state data for one or more states: %s")
 	MsgLockNotAllowed              = ffe("PD200030", "Lock is not enabled")
 	MsgUnlockOnlyCreator           = ffe("PD200031", "Only the lock creator can perform unlock: expected=%s actual=%s")

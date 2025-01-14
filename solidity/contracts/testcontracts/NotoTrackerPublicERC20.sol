@@ -72,8 +72,7 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
@@ -84,8 +83,7 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override {
@@ -106,8 +104,7 @@ contract NotoTrackerPublicERC20 is INotoHooks, ERC20 {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external override {
         // do nothing

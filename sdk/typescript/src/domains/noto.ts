@@ -107,12 +107,14 @@ export interface NotoLockParams {
 export interface NotoUnlockParams {
   lockId: string;
   from: PaladinVerifier;
-  to: PaladinVerifier[];
-  amounts: (string | number)[];
+  recipients: UnlockRecipient[];
   data: string;
 }
 
-export interface NotoPrepareUnlockParams extends NotoUnlockParams {}
+export interface UnlockRecipient {
+  to: PaladinVerifier;
+  amount: string | number;
+}
 
 export interface NotoDelegateLockParams {
   lockId: string;
@@ -290,7 +292,10 @@ export class NotoInstance {
       data: {
         ...data,
         from: data.from.lookup,
-        to: data.to.map((to) => to.lookup),
+        recipients: data.recipients.map((recipient) => ({
+          to: recipient.to.lookup,
+          amount: recipient.amount,
+        })),
       },
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
@@ -308,7 +313,7 @@ export class NotoInstance {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
-  async prepareUnlock(from: PaladinVerifier, data: NotoPrepareUnlockParams) {
+  async prepareUnlock(from: PaladinVerifier, data: NotoUnlockParams) {
     const txID = await this.paladin.sendTransaction({
       type: TransactionType.PRIVATE,
       abi: notoPrivateJSON.abi,
@@ -318,7 +323,10 @@ export class NotoInstance {
       data: {
         ...data,
         from: data.from.lookup,
-        to: data.to.map((to) => to.lookup),
+        recipients: data.recipients.map((recipient) => ({
+          to: recipient.to.lookup,
+          amount: recipient.amount,
+        })),
       },
     });
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);

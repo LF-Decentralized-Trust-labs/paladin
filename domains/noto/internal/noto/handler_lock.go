@@ -66,18 +66,7 @@ func (h *lockHandler) Init(ctx context.Context, tx *types.ParsedTransaction, req
 	}
 
 	return &prototk.InitTransactionResponse{
-		RequiredVerifiers: []*prototk.ResolveVerifierRequest{
-			{
-				Lookup:       notary,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
-			},
-			{
-				Lookup:       tx.Transaction.From,
-				Algorithm:    algorithms.ECDSA_SECP256K1,
-				VerifierType: verifiers.ETH_ADDRESS,
-			},
-		},
+		RequiredVerifiers: h.noto.ethAddressVerifiers(notary, tx.Transaction.From),
 	}, nil
 }
 
@@ -105,33 +94,36 @@ func (h *lockHandler) Assemble(ctx context.Context, tx *types.ParsedTransaction,
 		}
 		return nil, err
 	}
+
 	lockedOutputStates, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, params.Amount, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
-	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
-	if err != nil {
-		return nil, err
-	}
 
-	var outputStates []*prototk.NewState
-	outputStates = append(outputStates, lockedOutputStates.states...)
-
-	unlockedOutputCoins := []*types.NotoCoin{}
+	unlockedOutputStates := &preparedOutputs{}
 	if inputStates.total.Cmp(params.Amount.Int()) == 1 {
 		remainder := big.NewInt(0).Sub(inputStates.total, params.Amount.Int())
 		returnedStates, err := h.noto.prepareOutputs(fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, tx.Transaction.From})
 		if err != nil {
 			return nil, err
 		}
-		unlockedOutputCoins = append(unlockedOutputCoins, returnedStates.coins...)
-		outputStates = append(outputStates, returnedStates.states...)
+		unlockedOutputStates.coins = append(unlockedOutputStates.coins, returnedStates.coins...)
+		unlockedOutputStates.states = append(unlockedOutputStates.states, returnedStates.states...)
 	}
 
-	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputStates.coins, unlockedOutputCoins, lockedOutputStates.coins)
+	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, tx.Transaction.From})
 	if err != nil {
 		return nil, err
 	}
+
+	encodedLock, err := h.noto.encodeLock(ctx, tx.ContractAddress, inputStates.coins, unlockedOutputStates.coins, lockedOutputStates.coins)
+	if err != nil {
+		return nil, err
+	}
+
+	var outputStates []*prototk.NewState
+	outputStates = append(outputStates, lockedOutputStates.states...)
+	outputStates = append(outputStates, unlockedOutputStates.states...)
 
 	attestation := []*prototk.AttestationRequest{
 		// Sender confirms the initial request with a signature

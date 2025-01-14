@@ -86,8 +86,7 @@ async function main(): Promise<boolean> {
   receipt = await notoCash.using(paladin2).prepareUnlock(investor1, {
     lockId,
     from: investor1,
-    to: [investor2],
-    amounts: [100],
+    recipients: [{ to: investor2, amount: 100 }],
     data: "0x",
   });
   if (!checkReceipt(receipt)) return false;

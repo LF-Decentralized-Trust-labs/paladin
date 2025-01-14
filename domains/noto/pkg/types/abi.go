@@ -85,17 +85,21 @@ type LockParams struct {
 }
 
 type UnlockParams struct {
-	LockID  tktypes.Bytes32       `json:"lockId"`
-	From    string                `json:"from"`
-	To      []string              `json:"to"`
-	Amounts []*tktypes.HexUint256 `json:"amounts"`
-	Data    tktypes.HexBytes      `json:"data"`
+	LockID     tktypes.Bytes32    `json:"lockId"`
+	From       string             `json:"from"`
+	Recipients []*UnlockRecipient `json:"recipients"`
+	Data       tktypes.HexBytes   `json:"data"`
 }
 
 type DelegateLockParams struct {
 	LockID   tktypes.Bytes32     `json:"lockId"`
 	Delegate *tktypes.EthAddress `json:"delegate"`
 	Data     tktypes.HexBytes    `json:"data"`
+}
+
+type UnlockRecipient struct {
+	To     string              `json:"to"`
+	Amount *tktypes.HexUint256 `json:"amount"`
 }
 
 type ApproveExtraParams struct {

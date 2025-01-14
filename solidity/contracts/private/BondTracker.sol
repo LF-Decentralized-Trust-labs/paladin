@@ -158,14 +158,13 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override onlyOwner {
-        _unlock(lockId, amounts);
-        for (uint256 i = 0; i < to.length; i++) {
-            _transfer(from, to[i], amounts[i]);
+        LockDetail memory lock_ = _unlock(lockId, recipients);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _transfer(lock_.from, recipients[i].to, recipients[i].amount);
         }
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -174,12 +173,11 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) external override onlyOwner {
-        _prepareUnlock(lockId, to, amounts);
+        _prepareUnlock(lockId, recipients);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
@@ -197,13 +195,12 @@ contract BondTracker is INotoHooks, NotoLocks, ERC20, Ownable {
         address sender,
         bytes32 lockId,
         address from,
-        address[] calldata to,
-        uint256[] calldata amounts,
+        UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external override onlyOwner {
-        LockDetail memory lock_ = _handleDelegateUnlock(lockId, amounts);
-        for (uint256 i = 0; i < to.length; i++) {
-            _transfer(lock_.from, to[i], amounts[i]);
+        LockDetail memory lock_ = _handleDelegateUnlock(lockId, recipients);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _transfer(lock_.from, recipients[i].to, recipients[i].amount);
         }
     }
 }

@@ -156,12 +156,13 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 	if err != nil {
 		return nil, err
 	}
-	toAddresses := make([]*tktypes.EthAddress, len(inParams.To))
-	for i, to := range inParams.To {
-		toAddresses[i], err = h.noto.findEthAddressVerifier(ctx, "to", to, req.ResolvedVerifiers)
+	recipients := make([]*ResolvedUnlockRecipient, len(inParams.Recipients))
+	for i, entry := range inParams.Recipients {
+		to, err := h.noto.findEthAddressVerifier(ctx, "to", entry.To, req.ResolvedVerifiers)
 		if err != nil {
 			return nil, err
 		}
+		recipients[i] = &ResolvedUnlockRecipient{To: to, Amount: entry.Amount}
 	}
 
 	encodedCall, err := baseTransaction.encode(ctx)
@@ -169,12 +170,11 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 		return nil, err
 	}
 	params := &UnlockHookParams{
-		Sender:  fromAddress,
-		LockID:  inParams.LockID,
-		From:    fromAddress,
-		To:      toAddresses,
-		Amounts: inParams.Amounts,
-		Data:    inParams.Data,
+		Sender:     fromAddress,
+		LockID:     inParams.LockID,
+		From:       fromAddress,
+		Recipients: recipients,
+		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
 			ContractAddress: (*tktypes.EthAddress)(tx.ContractAddress),
 			EncodedCall:     encodedCall,
