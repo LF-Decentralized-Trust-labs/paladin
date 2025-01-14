@@ -40,13 +40,10 @@ type unlockHandler struct {
 }
 
 type unlockStates struct {
-	lockedInputs      []*prototk.StateRef
-	lockedOutputs     []*prototk.NewState
-	outputs           []*prototk.NewState
-	lockedInputCoins  []*types.NotoLockedCoin
-	lockedOutputCoins []*types.NotoLockedCoin
-	outputCoins       []*types.NotoCoin
-	info              []*prototk.NewState
+	lockedInputs  *preparedLockedInputs
+	lockedOutputs *preparedLockedOutputs
+	outputs       *preparedOutputs
+	info          []*prototk.NewState
 }
 
 func (h *unlockCommon) validateParams(ctx context.Context, unlockParams *types.UnlockParams) error {
@@ -150,49 +147,55 @@ func (h *unlockCommon) assembleStates(ctx context.Context, tx *types.ParsedTrans
 		}
 		return nil, nil, err
 	}
+
+	remainder := big.NewInt(0).Sub(lockedInputStates.total, requiredTotal)
+	unlockedOutputs, lockedOutputs, err := h.assembleUnlockOutputs(ctx, tx, params, req, fromAddress, remainder)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	infoStates, err := h.noto.prepareInfo(params.Data, []string{notary, params.From})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	unlockedOutputCoins := []*types.NotoCoin{}
-	unlockedOutputStates := []*prototk.NewState{}
+	return &prototk.AssembleTransactionResponse{
+			AssemblyResult: prototk.AssembleTransactionResponse_OK,
+		}, &unlockStates{
+			lockedInputs:  lockedInputStates,
+			lockedOutputs: lockedOutputs,
+			outputs:       unlockedOutputs,
+			info:          infoStates,
+		}, nil
+}
+
+func (h *unlockCommon) assembleUnlockOutputs(ctx context.Context, tx *types.ParsedTransaction, params *types.UnlockParams, req *prototk.AssembleTransactionRequest, from *tktypes.EthAddress, remainder *big.Int) (*preparedOutputs, *preparedLockedOutputs, error) {
+	notary := tx.DomainConfig.NotaryLookup
+
+	unlockedOutputs := &preparedOutputs{}
 	for i, to := range params.To {
 		toAddress, err := h.noto.findEthAddressVerifier(ctx, "to", to, req.ResolvedVerifiers)
 		if err != nil {
 			return nil, nil, err
 		}
-		states, err := h.noto.prepareOutputs(toAddress, params.Amounts[i], []string{notary, params.From, to})
+		outputs, err := h.noto.prepareOutputs(toAddress, params.Amounts[i], []string{notary, params.From, to})
 		if err != nil {
 			return nil, nil, err
 		}
-		unlockedOutputCoins = append(unlockedOutputCoins, states.coins...)
-		unlockedOutputStates = append(unlockedOutputStates, states.states...)
+		unlockedOutputs.coins = append(unlockedOutputs.coins, outputs.coins...)
+		unlockedOutputs.states = append(unlockedOutputs.states, outputs.states...)
 	}
 
-	lockedOutputCoins := []*types.NotoLockedCoin{}
-	lockedOutputStates := []*prototk.NewState{}
-	if lockedInputStates.total.Cmp(requiredTotal) == 1 {
-		remainder := big.NewInt(0).Sub(lockedInputStates.total, requiredTotal)
-		states, err := h.noto.prepareLockedOutputs(params.LockID, fromAddress, (*tktypes.HexUint256)(remainder), []string{notary, params.From})
+	lockedOutputs := &preparedLockedOutputs{}
+	if remainder.Cmp(big.NewInt(0)) == 1 {
+		var err error
+		lockedOutputs, err = h.noto.prepareLockedOutputs(params.LockID, from, (*tktypes.HexUint256)(remainder), []string{notary, params.From})
 		if err != nil {
 			return nil, nil, err
 		}
-		lockedOutputCoins = append(lockedOutputCoins, states.coins...)
-		lockedOutputStates = append(lockedOutputStates, states.states...)
 	}
 
-	return &prototk.AssembleTransactionResponse{
-			AssemblyResult: prototk.AssembleTransactionResponse_OK,
-		}, &unlockStates{
-			lockedInputs:      lockedInputStates.states,
-			lockedOutputs:     lockedOutputStates,
-			outputs:           unlockedOutputStates,
-			lockedInputCoins:  lockedInputStates.coins,
-			lockedOutputCoins: lockedOutputCoins,
-			outputCoins:       unlockedOutputCoins,
-			info:              infoStates,
-		}, nil
+	return unlockedOutputs, lockedOutputs, nil
 }
 
 func (h *unlockCommon) endorse(
@@ -267,12 +270,12 @@ func (h *unlockHandler) Assemble(ctx context.Context, tx *types.ParsedTransactio
 	}
 
 	assembledTransaction := &prototk.AssembledTransaction{}
-	assembledTransaction.InputStates = states.lockedInputs
-	assembledTransaction.OutputStates = states.outputs
-	assembledTransaction.OutputStates = append(assembledTransaction.OutputStates, states.lockedOutputs...)
+	assembledTransaction.InputStates = states.lockedInputs.states
+	assembledTransaction.OutputStates = states.outputs.states
+	assembledTransaction.OutputStates = append(assembledTransaction.OutputStates, states.lockedOutputs.states...)
 	assembledTransaction.InfoStates = states.info
 
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputCoins, states.lockedOutputCoins, states.outputCoins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, states.lockedOutputs.coins, states.outputs.coins)
 	if err != nil {
 		return nil, err
 	}

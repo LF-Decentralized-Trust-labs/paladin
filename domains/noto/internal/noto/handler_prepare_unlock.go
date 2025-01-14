@@ -58,12 +58,12 @@ func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 	}
 
 	assembledTransaction := &prototk.AssembledTransaction{}
-	assembledTransaction.ReadStates = states.lockedInputs
+	assembledTransaction.ReadStates = states.lockedInputs.states
 	assembledTransaction.InfoStates = states.info
-	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.outputs...)
-	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.lockedOutputs...)
+	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.outputs.states...)
+	assembledTransaction.InfoStates = append(assembledTransaction.InfoStates, states.lockedOutputs.states...)
 
-	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputCoins, states.lockedOutputCoins, states.outputCoins)
+	encodedUnlock, err := h.noto.encodeUnlock(ctx, tx.ContractAddress, states.lockedInputs.coins, states.lockedOutputs.coins, states.outputs.coins)
 	if err != nil {
 		return nil, err
 	}
