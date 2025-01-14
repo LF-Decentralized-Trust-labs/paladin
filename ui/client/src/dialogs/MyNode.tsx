@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -54,8 +54,6 @@ export const MyNodeDialog: React.FC<Props> = ({
     queryKey: ["transportLocalDetails"],
     queryFn: () => fetchTransportLocalDetails('grpc')
   });
-
-  console.log('>>>>>>>' + transportLocalDetails)
 
   return (
     <Dialog
