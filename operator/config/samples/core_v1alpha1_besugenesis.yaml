@@ -9,7 +9,7 @@ spec:
   chainID: 1337
   gasLimit: 700000000
   consensus: qbft
-  blockPeriod: 100ms
+  blockPeriod: 1s
   emptyBlockPeriod: 10s
   initialValidators:
   - node1
