@@ -52,14 +52,6 @@ jobs:
           name: docker-compose-logs
           path: '**/docker-compose.log'
 
-      - name: Upload logs
-        uses: actions/upload-artifact@v4
-        if: always()      
-        with:
-          name: testbed-logs
-          path: |
-            **/testbed.*.log
-
   core-image-build:
     # run only on PRs
     if: github.event_name == 'pull_request'
