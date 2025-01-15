@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -126,3 +126,22 @@ export interface IABIDecodedEntry {
 }
 
 export type ABIUploadResponse = string
+
+export interface ITransportPeer {
+  name: string
+  stats: {
+    sentMsgs: number
+    receivedMsgs: number
+    sentBytes: number
+    receivedBytes: number
+    lastSend: string
+    lastReceive: string
+    reliableHighestSent: number
+    reliableAckBase: number
+  }
+  activated: string
+  outboundTransport: string
+  outbound: {
+    endpoint: string
+  }
+}

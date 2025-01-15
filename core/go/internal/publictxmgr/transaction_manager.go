@@ -111,6 +111,9 @@ type pubTxManager struct {
 	// orchestrator config
 	gasPriceIncreaseMax     *big.Int
 	gasPriceIncreasePercent int
+
+	// gas limit config
+	gasEstimateFactor float64
 }
 
 type txActivityRecords struct {
@@ -123,6 +126,7 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 
 	gasPriceClient := NewGasPriceClient(ctx, conf)
 	gasPriceIncreaseMax := confutil.BigIntOrNil(conf.GasPrice.IncreaseMax)
+	gasEstimateFactor := confutil.Float64Min(conf.GasLimit.GasEstimateFactor, 1.0, *pldconf.PublicTxManagerDefaults.GasLimit.GasEstimateFactor)
 
 	log.L(ctx).Debugf("Enterprise transaction handler created")
 
@@ -146,6 +150,7 @@ func NewPublicTransactionManager(ctx context.Context, conf *pldconf.PublicTxMana
 		gasPriceIncreasePercent:     confutil.Int(conf.GasPrice.IncreasePercentage, *pldconf.PublicTxManagerDefaults.GasPrice.IncreasePercentage),
 		activityRecordCache:         cache.NewCache[uint64, *txActivityRecords](&conf.Manager.ActivityRecords.CacheConfig, &pldconf.PublicTxManagerDefaults.Manager.ActivityRecords.CacheConfig),
 		maxActivityRecordsPerTx:     confutil.Int(conf.Manager.ActivityRecords.RecordsPerTransaction, *pldconf.PublicTxManagerDefaults.Manager.ActivityRecords.RecordsPerTransaction),
+		gasEstimateFactor:           gasEstimateFactor,
 	}
 }
 
@@ -275,8 +280,9 @@ func (ble *pubTxManager) ValidateTransaction(ctx context.Context, dbTX *gorm.DB,
 			}
 			return err
 		}
-		txi.Gas = &gasEstimateResult.GasLimit
-		log.L(ctx).Tracef("HandleNewTx <%s> using the estimated gas limit %s for transaction: %+v", txType, txi.Gas, txi)
+		factoredGasLimit := tktypes.HexUint64((float64)(gasEstimateResult.GasLimit) * ble.gasEstimateFactor)
+		txi.Gas = &factoredGasLimit
+		log.L(ctx).Tracef("HandleNewTx <%s> using the estimated gas limit %s multiplied by the gas estimate factor %.f (=%s) for transaction: %+v", txType, gasEstimateResult.GasLimit, ble.gasEstimateFactor, factoredGasLimit, txi)
 	} else {
 		log.L(ctx).Tracef("HandleNewTx <%s> using the provided gas limit %s for transaction: %+v", txType, txi.Gas, txi)
 	}
