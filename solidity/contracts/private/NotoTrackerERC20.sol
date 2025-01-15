@@ -17,7 +17,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         _mint(to, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -29,10 +29,12 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         _transfer(from, to, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
+
+    uint256 approvals;
 
     function onApproveTransfer(
         address sender,
@@ -40,7 +42,8 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address delegate,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
+        approvals++; // must store something on each call (see https://github.com/kaleido-io/paladin/issues/252)
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
@@ -50,7 +53,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         _burn(from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -62,7 +65,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         uint256 amount,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         _lock(lockId, from, amount);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -74,10 +77,11 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
-        LockDetail memory lock_ = _unlock(lockId, recipients);
+    ) public virtual override {
+        address owner = _locks[lockId].from;
+        _unlock(lockId, recipients);
         for (uint256 i = 0; i < recipients.length; i++) {
-            _transfer(lock_.from, recipients[i].to, recipients[i].amount);
+            _transfer(owner, recipients[i].to, recipients[i].amount);
         }
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -89,7 +93,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         _prepareUnlock(lockId, recipients);
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -100,7 +104,7 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address from,
         address delegate,
         PreparedTransaction calldata prepared
-    ) external override {
+    ) public virtual override {
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
 
@@ -110,10 +114,11 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
         address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data
-    ) external override {
-        LockDetail memory lock_ = _handleDelegateUnlock(lockId, recipients);
+    ) public virtual override {
+        address owner = _locks[lockId].from;
+        _handleDelegateUnlock(lockId, recipients);
         for (uint256 i = 0; i < recipients.length; i++) {
-            _transfer(lock_.from, recipients[i].to, recipients[i].amount);
+            _transfer(owner, recipients[i].to, recipients[i].amount);
         }
     }
 }

@@ -32,18 +32,17 @@ contract NotoLocks {
     function _unlock(
         bytes32 lockId,
         INotoHooks.UnlockRecipient[] calldata recipients
-    ) internal returns (LockDetail memory) {
+    ) internal {
         LockDetail storage lock = _locks[lockId];
         for (uint256 i = 0; i < recipients.length; i++) {
             lock.amount -= recipients[i].amount;
             _lockedBalance[lock.from] -= recipients[i].amount;
         }
 
-        LockDetail memory lockCopy = _locks[lockId];
-        if (lockCopy.amount == 0) {
+        delete lock.recipients;
+        if (lock.amount == 0) {
             delete _locks[lockId];
         }
-        return lockCopy;
     }
 
     function _prepareUnlock(
@@ -62,13 +61,11 @@ contract NotoLocks {
     function _handleDelegateUnlock(
         bytes32 lockId,
         INotoHooks.UnlockRecipient[] calldata recipients
-    ) internal returns (LockDetail memory) {
+    ) internal {
         LockDetail storage lock = _locks[lockId];
         for (uint256 i = 0; i < lock.recipients.length; i++) {
             _pendingBalance[lock.recipients[i].to] -= lock.recipients[i].amount;
         }
-        delete lock.recipients;
-
-        return _unlock(lockId, recipients);
+        _unlock(lockId, recipients);
     }
 }
