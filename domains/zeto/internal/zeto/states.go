@@ -75,7 +75,7 @@ func (z *Zeto) makeNewState(ctx context.Context, useNullifiers bool, coin *types
 	if err != nil {
 		return nil, err
 	}
-	hashStr := hash.String()
+	hashStr := hexUint256To32ByteHexString(hash)
 	newState := &pb.NewState{
 		Id:               &hashStr,
 		SchemaId:         z.coinSchema.Id,

@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -17,5 +17,6 @@
 export const AppRoutes = {
   Indexer: '/ui/indexer',
   Submissions: '/ui/submissions',
+  Peers: '/ui/peers',
   Registry: '/ui/registry'
 }

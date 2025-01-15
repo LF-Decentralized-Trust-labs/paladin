@@ -24,12 +24,14 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/kaleido-io/paladin/core/pkg/testbed"
-	"github.com/kaleido-io/paladin/domains/integration-test/helpers"
 	"github.com/kaleido-io/paladin/toolkit/pkg/log"
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
+
+//go:embed abis/ZetoFactory.json
+var zetoFactoryJSON []byte
 
 type ZetoDomainContracts struct {
 	FactoryAddress       *tktypes.EthAddress
@@ -51,7 +53,7 @@ type cloneableContract struct {
 }
 
 func newZetoDomainContracts() *ZetoDomainContracts {
-	factory := solutils.MustLoadBuild(helpers.ZetoFactoryJSON)
+	factory := solutils.MustLoadBuild(zetoFactoryJSON)
 
 	return &ZetoDomainContracts{
 		factoryAbi: factory.ABI,
@@ -235,5 +237,6 @@ func registerImpl(ctx context.Context, name string, domainContracts *ZetoDomainC
 		},
 		ABI: abi.ABI{abiFunc},
 	})
+	log.L(ctx).Infof("Registered implementation %s", name)
 	return err
 }

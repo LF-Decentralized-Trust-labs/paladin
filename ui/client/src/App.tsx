@@ -1,4 +1,4 @@
-// Copyright © 2024 Kaleido, Inc.
+// Copyright © 2025 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -32,6 +32,7 @@ import { Submissions } from "./views/Submissions";
 import { useEffect, useMemo, useState } from "react";
 import { constants } from "./components/config";
 import { AppRoutes } from "./routes";
+import { Nodes } from "./views/Peers";
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({}),
@@ -96,7 +97,8 @@ function App() {
               <Header />
               <Routes>
                 <Route path={AppRoutes.Indexer} element={<Indexer />} />
-                <Route path={AppRoutes.Submissions} element={<Submissions />} />\
+                <Route path={AppRoutes.Submissions} element={<Submissions />} />
+                <Route path={AppRoutes.Peers} element={<Nodes />} />
                 <Route path={AppRoutes.Registry} element={<Registries />} />
                 <Route path="*" element={<Navigate to={AppRoutes.Indexer} replace />} />
               </Routes>
