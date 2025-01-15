@@ -334,10 +334,6 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 	if err != nil {
 		return nil, err
 	}
-	fromAddress, err := h.noto.findEthAddressVerifier(ctx, "from", inParams.From, req.ResolvedVerifiers)
-	if err != nil {
-		return nil, err
-	}
 	unlock := make([]*ResolvedUnlockRecipient, len(inParams.Recipients))
 	for i, entry := range inParams.Recipients {
 		to, err := h.noto.findEthAddressVerifier(ctx, "to", entry.To, req.ResolvedVerifiers)
@@ -354,7 +350,6 @@ func (h *unlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTransact
 	params := &UnlockHookParams{
 		Sender:     senderAddress,
 		LockID:     inParams.LockID,
-		From:       fromAddress,
 		Recipients: unlock,
 		Data:       inParams.Data,
 		Prepared: PreparedTransaction{

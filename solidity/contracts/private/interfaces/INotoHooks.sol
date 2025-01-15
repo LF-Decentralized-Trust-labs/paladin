@@ -67,7 +67,6 @@ interface INotoHooks is IPenteExternalCall {
     function onUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
@@ -76,7 +75,6 @@ interface INotoHooks is IPenteExternalCall {
     function onPrepareUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
@@ -85,7 +83,6 @@ interface INotoHooks is IPenteExternalCall {
     function onDelegateLock(
         address sender,
         bytes32 lockId,
-        address from,
         address delegate,
         PreparedTransaction calldata prepared
     ) external;
@@ -99,7 +96,6 @@ interface INotoHooks is IPenteExternalCall {
     function handleDelegateUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) external;

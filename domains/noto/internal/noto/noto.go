@@ -899,16 +899,6 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		return i18n.NewError(ctx, msgs.MsgMissingStateData, unlock.Outputs)
 	}
 
-	var from *tktypes.EthAddress
-	for _, state := range inputStates {
-		coin, err := n.unmarshalCoin(state.DataJson)
-		if err != nil {
-			return err
-		}
-		from = coin.Owner
-		// TODO: ensure all are from the same owner?
-	}
-
 	recipients := make([]*ResolvedUnlockRecipient, len(outputStates))
 	for i, state := range outputStates {
 		coin, err := n.unmarshalLockedCoin(state.DataJson)
@@ -927,7 +917,6 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		&DelegateUnlockHookParams{
 			Sender:     unlock.Sender,
 			LockID:     unlock.LockID,
-			From:       from,
 			Recipients: recipients,
 			Data:       unlock.Data,
 		},

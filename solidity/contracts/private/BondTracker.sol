@@ -142,26 +142,22 @@ contract BondTracker is NotoTrackerERC20, Ownable {
     function onUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) public virtual override onlyOwner {
-        address owner = _locks[lockId].from;
-        _checkTransfers(sender, owner, recipients);
-        super.onUnlock(sender, lockId, owner, recipients, data, prepared);
+        _checkTransfers(sender, _locks[lockId].from, recipients);
+        super.onUnlock(sender, lockId, recipients, data, prepared);
     }
 
     function onPrepareUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) public virtual override onlyOwner {
-        address owner = _locks[lockId].from;
-        _checkTransfers(sender, owner, recipients);
-        super.onPrepareUnlock(sender, lockId, owner, recipients, data, prepared);
+        _checkTransfers(sender, _locks[lockId].from, recipients);
+        super.onPrepareUnlock(sender, lockId, recipients, data, prepared);
     }
 }

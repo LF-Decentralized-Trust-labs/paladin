@@ -66,7 +66,6 @@ type LockHookParams struct {
 type UnlockHookParams struct {
 	Sender     *tktypes.EthAddress        `json:"sender"`
 	LockID     tktypes.Bytes32            `json:"lockId"`
-	From       *tktypes.EthAddress        `json:"from"`
 	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
 	Data       tktypes.HexBytes           `json:"data"`
 	Prepared   PreparedTransaction        `json:"prepared"`
@@ -75,7 +74,6 @@ type UnlockHookParams struct {
 type ApproveUnlockHookParams struct {
 	Sender   *tktypes.EthAddress `json:"sender"`
 	LockID   tktypes.Bytes32     `json:"lockId"`
-	From     *tktypes.EthAddress `json:"from"`
 	Delegate *tktypes.EthAddress `json:"delegate"`
 	Data     tktypes.HexBytes    `json:"data"`
 	Prepared PreparedTransaction `json:"prepared"`
@@ -84,7 +82,6 @@ type ApproveUnlockHookParams struct {
 type DelegateUnlockHookParams struct {
 	Sender     *tktypes.EthAddress        `json:"sender"`
 	LockID     tktypes.Bytes32            `json:"lockId"`
-	From       *tktypes.EthAddress        `json:"from"`
 	Recipients []*ResolvedUnlockRecipient `json:"recipients"`
 	Data       tktypes.HexBytes           `json:"data"`
 }

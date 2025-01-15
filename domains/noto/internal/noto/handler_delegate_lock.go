@@ -202,7 +202,6 @@ func (h *delegateLockHandler) hookInvoke(ctx context.Context, tx *types.ParsedTr
 	params := &ApproveUnlockHookParams{
 		Sender:   fromAddress,
 		LockID:   inParams.LockID,
-		From:     fromAddress,
 		Delegate: inParams.Delegate,
 		Data:     inParams.Data,
 		Prepared: PreparedTransaction{

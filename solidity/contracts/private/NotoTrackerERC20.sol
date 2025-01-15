@@ -73,15 +73,14 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
     function onUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
     ) public virtual override {
-        address owner = _locks[lockId].from;
+        address from = _locks[lockId].from;
         _unlock(lockId, recipients);
         for (uint256 i = 0; i < recipients.length; i++) {
-            _transfer(owner, recipients[i].to, recipients[i].amount);
+            _transfer(from, recipients[i].to, recipients[i].amount);
         }
         emit PenteExternalCall(prepared.contractAddress, prepared.encodedCall);
     }
@@ -89,7 +88,6 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
     function onPrepareUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data,
         PreparedTransaction calldata prepared
@@ -101,7 +99,6 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
     function onDelegateLock(
         address sender,
         bytes32 lockId,
-        address from,
         address delegate,
         PreparedTransaction calldata prepared
     ) public virtual override {
@@ -111,14 +108,13 @@ contract NotoTrackerERC20 is INotoHooks, NotoLocks, ERC20 {
     function handleDelegateUnlock(
         address sender,
         bytes32 lockId,
-        address from,
         UnlockRecipient[] calldata recipients,
         bytes calldata data
     ) public virtual override {
-        address owner = _locks[lockId].from;
+        address from = _locks[lockId].from;
         _handleDelegateUnlock(lockId, recipients);
         for (uint256 i = 0; i < recipients.length; i++) {
-            _transfer(owner, recipients[i].to, recipients[i].amount);
+            _transfer(from, recipients[i].to, recipients[i].amount);
         }
     }
 }

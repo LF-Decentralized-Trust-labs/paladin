@@ -172,7 +172,6 @@ func (h *prepareUnlockHandler) hookInvoke(ctx context.Context, tx *types.ParsedT
 	params := &UnlockHookParams{
 		Sender:     fromAddress,
 		LockID:     inParams.LockID,
-		From:       fromAddress,
 		Recipients: recipients,
 		Data:       inParams.Data,
 		Prepared: PreparedTransaction{
