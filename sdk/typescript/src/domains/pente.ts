@@ -174,23 +174,34 @@ export class PentePrivacyGroup {
     );
   }
 
+  // deploy a contract
   async deploy<ConstructorParams>(
     abi: ReadonlyArray<ethers.JsonFragment>,
     bytecode: string,
     from: PaladinVerifier,
-    inputs: ConstructorParams
+    inputs?: ConstructorParams
   ) {
+
+      // Find the constructor in the ABI
     const constructor = abi.find((entry) => entry.type === "constructor");
-    if (constructor === undefined) {
-      throw new Error("Constructor not found");
-    }
+
+    // Handle the absence of a constructor
+    const constructorInputs = constructor?.inputs ?? [];
+
+    // Prepare the data object
+    const data: Record<string, any> = {
+      group: this.group,
+      bytecode,
+      inputs: inputs ?? [], // Ensure `inputs` is always included, defaulting to an empty array
+    };
+
     const txID = await this.paladin.sendTransaction({
       type: TransactionType.PRIVATE,
-      abi: [privateDeployABI(constructor.inputs ?? [])],
+      abi: [privateDeployABI(constructorInputs ?? [])],
       function: "deploy",
       to: this.address,
       from: from.lookup,
-      data: { group: this.group, bytecode, inputs },
+      data: data
     });
     const receipt = await this.paladin.pollForReceipt(
       txID,
@@ -200,6 +211,7 @@ export class PentePrivacyGroup {
     return receipt?.domainReceipt?.receipt.contractAddress;
   }
 
+  // invoke functions in the contract
   async invoke<Params>(
     from: PaladinVerifier,
     to: string,
@@ -217,6 +229,7 @@ export class PentePrivacyGroup {
     return this.paladin.pollForReceipt(txID, this.options.pollTimeout);
   }
 
+  // call functions in the contract (read-only)
   async call<Params>(
     from: PaladinVerifier,
     to: string,
