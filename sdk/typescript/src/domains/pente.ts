@@ -197,7 +197,10 @@ export class PentePrivacyGroup {
       this.options.pollTimeout,
       true
     );
-    return receipt?.domainReceipt?.receipt.contractAddress;
+    return receipt?.domainReceipt !== undefined &&
+      "receipt" in receipt.domainReceipt
+      ? receipt.domainReceipt.receipt.contractAddress
+      : undefined;
   }
 
   async invoke<Params>(

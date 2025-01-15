@@ -961,7 +961,61 @@ func (n *Noto) ExecCall(ctx context.Context, req *prototk.ExecCallRequest) (*pro
 	return nil, i18n.NewError(ctx, msgs.MsgNotImplemented)
 }
 
-func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (*prototk.BuildReceiptResponse, error) {
-	// TODO: Event logs for transfers would be great for Noto
-	return nil, i18n.NewError(ctx, msgs.MsgNoDomainReceipt)
+func (n *Noto) statesForReceipt(ctx context.Context, states []*prototk.EndorsableState) ([]*types.ReceiptState, error) {
+	coins := make([]*types.ReceiptState, len(states))
+	for i, state := range states {
+		id, err := tktypes.ParseHexBytes(ctx, state.Id)
+		if err != nil {
+			return nil, err
+		}
+		schema, err := tktypes.ParseBytes32Ctx(ctx, state.SchemaId)
+		if err != nil {
+			return nil, err
+		}
+		coins[i] = &types.ReceiptState{
+			ID:     id,
+			Schema: schema,
+			Data:   tktypes.RawJSON(state.StateDataJson),
+		}
+	}
+	return coins, nil
+}
+
+func (n *Noto) BuildReceipt(ctx context.Context, req *prototk.BuildReceiptRequest) (res *prototk.BuildReceiptResponse, err error) {
+	receipt := &types.NotoDomainReceipt{}
+
+	receipt.Inputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InputStates, []string{n.coinSchema.Id}))
+	if err == nil {
+		receipt.LockedInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InputStates, []string{n.lockedCoinSchema.Id}))
+	}
+	if err == nil {
+		receipt.Outputs, err = n.statesForReceipt(ctx, n.filterSchema(req.OutputStates, []string{n.coinSchema.Id}))
+	}
+	if err == nil {
+		receipt.LockedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.OutputStates, []string{n.lockedCoinSchema.Id}))
+	}
+	if err == nil {
+		receipt.ReadInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.ReadStates, []string{n.coinSchema.Id}))
+	}
+	if err == nil {
+		receipt.ReadLockedInputs, err = n.statesForReceipt(ctx, n.filterSchema(req.ReadStates, []string{n.lockedCoinSchema.Id}))
+	}
+	if err == nil {
+		receipt.PreparedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InfoStates, []string{n.coinSchema.Id}))
+	}
+	if err == nil {
+		receipt.PreparedLockedOutputs, err = n.statesForReceipt(ctx, n.filterSchema(req.InfoStates, []string{n.lockedCoinSchema.Id}))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	receiptJSON, err := json.Marshal(receipt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &prototk.BuildReceiptResponse{
+		ReceiptJson: string(receiptJSON),
+	}, nil
 }

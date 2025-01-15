@@ -20,6 +20,23 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 )
 
+type ReceiptState struct {
+	ID     tktypes.HexBytes `json:"id"`
+	Schema tktypes.Bytes32  `json:"schema"`
+	Data   tktypes.RawJSON  `json:"data"`
+}
+
+type NotoDomainReceipt struct {
+	Inputs                []*ReceiptState `json:"inputs"`
+	LockedInputs          []*ReceiptState `json:"lockedInputs"`
+	Outputs               []*ReceiptState `json:"outputs"`
+	LockedOutputs         []*ReceiptState `json:"lockedOutputs"`
+	ReadInputs            []*ReceiptState `json:"readInputs"`
+	ReadLockedInputs      []*ReceiptState `json:"readLockedInputs"`
+	PreparedOutputs       []*ReceiptState `json:"preparedOutputs"`
+	PreparedLockedOutputs []*ReceiptState `json:"preparedLockedOutputs"`
+}
+
 type NotoCoinState struct {
 	ID              tktypes.Bytes32    `json:"id"`
 	Created         tktypes.Timestamp  `json:"created"`

@@ -96,9 +96,8 @@ func (h *prepareUnlockHandler) Assemble(ctx context.Context, tx *types.ParsedTra
 
 func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction, req *prototk.EndorseTransactionRequest) (*prototk.EndorseTransactionResponse, error) {
 	params := tx.Params.(*types.UnlockParams)
-	lockedInputs, lockedOutputs, unlockedOutputs := h.extractStates(req.Reads, req.Info)
-	allOutputs := unlockedOutputs
-	allOutputs = append(allOutputs, lockedOutputs...)
+	lockedInputs := req.Reads
+	allOutputs := h.noto.filterSchema(req.Info, []string{h.noto.coinSchema.Id, h.noto.lockedCoinSchema.Id})
 
 	inputs, err := h.noto.parseCoinList(ctx, "input", lockedInputs)
 	if err != nil {
@@ -115,7 +114,8 @@ func (h *prepareUnlockHandler) Endorse(ctx context.Context, tx *types.ParsedTran
 func (h *prepareUnlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
 
-	lockedInputs, lockedOutputs, outputs := h.extractStates(req.ReadStates, req.InfoStates)
+	lockedInputs := req.ReadStates
+	outputs, lockedOutputs := h.noto.splitStates(req.InfoStates)
 	unlockHash, err := h.noto.encodeUnlockMasked(ctx, tx.ContractAddress, lockedInputs, lockedOutputs, outputs, inParams.Data)
 	if err != nil {
 		return nil, err

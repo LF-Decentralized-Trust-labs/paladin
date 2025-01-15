@@ -1,4 +1,5 @@
 import PaladinClient, {
+  INotoDomainReceipt,
   newGroupSalt,
   NotoFactory,
   PenteFactory,
@@ -91,11 +92,9 @@ async function main(): Promise<boolean> {
   });
   if (!checkReceipt(receipt)) return false;
   receipt = await paladin2.getTransactionReceipt(receipt.id, true);
-
-  const unlockInputs = receipt?.states?.read?.map((s) => s.id);
-  const unlockOutputs = receipt?.states?.info
-    ?.filter((s) => s.data["amount"] !== undefined)
-    .map((s) => s.id);
+  const domainReceipt = receipt?.domainReceipt as
+    | INotoDomainReceipt
+    | undefined;
 
   // Approve unlock operation
   logger.log("Delegating lock to investor2...");
@@ -110,9 +109,9 @@ async function main(): Promise<boolean> {
   logger.log("Unlocking cash...");
   receipt = await notoCash.using(paladin3).unlockAsDelegate(investor2, {
     lockId,
-    lockedInputs: unlockInputs ?? [],
-    lockedOutputs: [],
-    outputs: unlockOutputs ?? [],
+    lockedInputs: domainReceipt?.readLockedInputs?.map((s) => s.id) ?? [],
+    lockedOutputs: domainReceipt?.preparedLockedOutputs?.map((s) => s.id) ?? [],
+    outputs: domainReceipt?.preparedOutputs?.map((s) => s.id) ?? [],
     signature: "0x",
     data: "0x",
   });

@@ -62,7 +62,7 @@ export interface ITransactionReceipt {
   domain?: string;
   contractAddress?: string;
   states?: ITransactionStates;
-  domainReceipt?: IPenteDomainReceipt;
+  domainReceipt?: IPenteDomainReceipt | INotoDomainReceipt;
   failureMessage?: string;
 }
 
@@ -79,6 +79,37 @@ export interface IPenteLog {
   address: string;
   topics: string[];
   data: string;
+}
+
+export interface INotoDomainReceipt {
+  inputs: IReceiptState<INotoCoin>[];
+  outputs: IReceiptState<INotoCoin>[];
+  readInputs: IReceiptState<INotoCoin>[];
+  preparedOutputs: IReceiptState<INotoCoin>[];
+
+  lockedInputs: IReceiptState<INotoLockedCoin>[];
+  lockedOutputs: IReceiptState<INotoLockedCoin>[];
+  readLockedInputs: IReceiptState<INotoLockedCoin>[];
+  preparedLockedOutputs: IReceiptState<INotoLockedCoin>[];
+}
+
+export interface IReceiptState<T> {
+  id: string;
+  schema: string;
+  data: T;
+}
+
+export interface INotoCoin {
+  salt: string;
+  owner: string;
+  amount: string;
+}
+
+export interface INotoLockedCoin {
+  lockId: string;
+  salt: string;
+  owner: string;
+  amount: string;
 }
 
 export interface ITransactionStates {

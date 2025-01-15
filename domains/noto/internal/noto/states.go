@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"slices"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-signer/pkg/eip712"
@@ -319,6 +320,19 @@ func (n *Noto) prepareInfo(data tktypes.HexBytes, distributionList []string) ([]
 	}
 	newState, err := n.makeNewInfoState(newData, distributionList)
 	return []*prototk.NewState{newState}, err
+}
+
+func (n *Noto) filterSchema(states []*prototk.EndorsableState, schemas []string) (filtered []*prototk.EndorsableState) {
+	for _, state := range states {
+		if slices.Contains(schemas, state.SchemaId) {
+			filtered = append(filtered, state)
+		}
+	}
+	return filtered
+}
+
+func (n *Noto) splitStates(states []*prototk.EndorsableState) (unlocked []*prototk.EndorsableState, locked []*prototk.EndorsableState) {
+	return n.filterSchema(states, []string{n.coinSchema.Id}), n.filterSchema(states, []string{n.lockedCoinSchema.Id})
 }
 
 func (n *Noto) getStates(ctx context.Context, stateQueryContext, schemaId string, ids []string) ([]*prototk.StoredState, error) {

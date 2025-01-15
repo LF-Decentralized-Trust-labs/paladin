@@ -208,19 +208,6 @@ func (h *unlockCommon) endorse(
 	}, nil
 }
 
-func (h *unlockCommon) extractStates(inputs, outputs []*prototk.EndorsableState) (lockedInputs []*prototk.EndorsableState, lockedOutputs []*prototk.EndorsableState, unlockedOutputs []*prototk.EndorsableState) {
-	lockedInputs = inputs
-	for _, output := range outputs {
-		switch output.SchemaId {
-		case h.noto.coinSchema.Id:
-			unlockedOutputs = append(unlockedOutputs, output)
-		case h.noto.lockedCoinSchema.Id:
-			lockedOutputs = append(lockedOutputs, output)
-		}
-	}
-	return lockedInputs, lockedOutputs, unlockedOutputs
-}
-
 func (h *unlockHandler) ValidateParams(ctx context.Context, config *types.NotoParsedConfig, params string) (interface{}, error) {
 	var unlockParams types.UnlockParams
 	err := json.Unmarshal([]byte(params), &unlockParams)
@@ -296,7 +283,8 @@ func (h *unlockHandler) Endorse(ctx context.Context, tx *types.ParsedTransaction
 
 func (h *unlockHandler) baseLedgerInvoke(ctx context.Context, tx *types.ParsedTransaction, req *prototk.PrepareTransactionRequest) (*TransactionWrapper, error) {
 	inParams := tx.Params.(*types.UnlockParams)
-	lockedInputs, lockedOutputs, outputs := h.extractStates(req.InputStates, req.OutputStates)
+	lockedInputs := req.InputStates
+	outputs, lockedOutputs := h.noto.splitStates(req.OutputStates)
 
 	// Include the signature from the sender
 	// This is not verified on the base ledger, but can be verified by anyone with the unmasked state data
