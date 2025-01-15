@@ -102,7 +102,7 @@ var PublicTxManagerDefaults = &PublicTxManagerConfig{
 		},
 	},
 	GasLimit: GasLimitConfig{
-		GasEstimateFactor: confutil.P(1.0),
+		GasEstimateFactor: confutil.P(1.5),
 	},
 }
 
