@@ -200,7 +200,7 @@ func (n *Noto) prepareInputs(ctx context.Context, stateQueryContext string, owne
 		}
 
 		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
-		states, err := n.findAvailableStates(ctx, stateQueryContext, queryBuilder.Query().String())
+		states, err := n.findAvailableStates(ctx, stateQueryContext, n.coinSchema.Id, queryBuilder.Query().String())
 		if err != nil {
 			return nil, false, err
 		}
@@ -248,7 +248,7 @@ func (n *Noto) prepareLockedInputs(ctx context.Context, stateQueryContext string
 		}
 
 		log.L(ctx).Debugf("State query: %s", queryBuilder.Query())
-		states, err := n.findAvailableLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
+		states, err := n.findAvailableStates(ctx, stateQueryContext, n.lockedCoinSchema.Id, queryBuilder.Query().String())
 
 		if err != nil {
 			return nil, false, err
@@ -320,10 +320,23 @@ func (n *Noto) prepareInfo(data tktypes.HexBytes, distributionList []string) ([]
 	return []*prototk.NewState{newState}, err
 }
 
-func (n *Noto) findAvailableStates(ctx context.Context, stateQueryContext, query string) ([]*prototk.StoredState, error) {
+func (n *Noto) getStates(ctx context.Context, stateQueryContext, schemaId string, ids []string) ([]*prototk.StoredState, error) {
+	req := &prototk.GetStatesRequest{
+		StateQueryContext: stateQueryContext,
+		SchemaId:          schemaId,
+		StateIds:          ids,
+	}
+	res, err := n.Callbacks.GetStates(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return res.States, nil
+}
+
+func (n *Noto) findAvailableStates(ctx context.Context, stateQueryContext, schemaId, query string) ([]*prototk.StoredState, error) {
 	req := &prototk.FindAvailableStatesRequest{
 		StateQueryContext: stateQueryContext,
-		SchemaId:          n.coinSchema.Id,
+		SchemaId:          schemaId,
 		QueryJson:         query,
 	}
 	res, err := n.Callbacks.FindAvailableStates(ctx, req)
@@ -340,19 +353,6 @@ func (n *Noto) eip712Domain(contract *ethtypes.Address0xHex) map[string]any {
 		"chainId":           n.chainID,
 		"verifyingContract": contract,
 	}
-}
-
-func (n *Noto) findAvailableLockedStates(ctx context.Context, stateQueryContext, query string) ([]*prototk.StoredState, error) {
-	req := &prototk.FindAvailableStatesRequest{
-		StateQueryContext: stateQueryContext,
-		SchemaId:          n.lockedCoinSchema.Id,
-		QueryJson:         query,
-	}
-	res, err := n.Callbacks.FindAvailableStates(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return res.States, nil
 }
 
 func (n *Noto) encodeNotoCoins(coins []*types.NotoCoin) []any {

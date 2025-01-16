@@ -34,7 +34,6 @@ import (
 	"github.com/kaleido-io/paladin/toolkit/pkg/pldapi"
 	"github.com/kaleido-io/paladin/toolkit/pkg/plugintk"
 	"github.com/kaleido-io/paladin/toolkit/pkg/prototk"
-	"github.com/kaleido-io/paladin/toolkit/pkg/query"
 	"github.com/kaleido-io/paladin/toolkit/pkg/solutils"
 	"github.com/kaleido-io/paladin/toolkit/pkg/tktypes"
 	"github.com/kaleido-io/paladin/toolkit/pkg/verifiers"
@@ -929,19 +928,16 @@ func (n *Noto) HandleEventBatch(ctx context.Context, req *prototk.HandleEventBat
 // When notary logic is implemented via Pente, unlock events from the base ledger must be propagated back to the Pente hooks
 // TODO: this method should not be invoked directly on the event loop, but rather via a queue
 func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext string, domainConfig *types.NotoParsedConfig, unlock *NotoDelegateUnlock_Event) error {
-	lockedInputs := make([]any, len(unlock.LockedInputs))
+	lockedInputs := make([]string, len(unlock.LockedInputs))
 	for i, input := range unlock.LockedInputs {
 		lockedInputs[i] = input.String()
 	}
-	unlockedOutputs := make([]any, len(unlock.Outputs))
+	unlockedOutputs := make([]string, len(unlock.Outputs))
 	for i, output := range unlock.Outputs {
 		unlockedOutputs[i] = output.String()
 	}
 
-	// TODO: this should query all states by ID, not just available ones
-	// (if moved to an async handler, the states will likely be spent by the time this runs)
-	queryBuilder := query.NewQueryBuilder().In(".id", lockedInputs)
-	inputStates, err := n.findAvailableLockedStates(ctx, stateQueryContext, queryBuilder.Query().String())
+	inputStates, err := n.getStates(ctx, stateQueryContext, n.lockedCoinSchema.Id, lockedInputs)
 	if err != nil {
 		return err
 	}
@@ -949,9 +945,7 @@ func (n *Noto) handleNotaryPrivateUnlock(ctx context.Context, stateQueryContext 
 		return i18n.NewError(ctx, msgs.MsgMissingStateData, unlock.LockedInputs)
 	}
 
-	// TODO: this should query all states by ID, not just available ones
-	queryBuilder = query.NewQueryBuilder().In(".id", unlockedOutputs)
-	outputStates, err := n.findAvailableStates(ctx, stateQueryContext, queryBuilder.Query().String())
+	outputStates, err := n.getStates(ctx, stateQueryContext, n.coinSchema.Id, unlockedOutputs)
 	if err != nil {
 		return err
 	}
