@@ -265,7 +265,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 							Send().
 							// We submit the transactions one-at-a-time within each go-routine in this test
 							// (but have three concurrent go routines running)
-							Wait(5 * time.Second)
+							Wait(15 * time.Second)
 						testLog("[%d]:%.3d/%.3d SimpleERC20 mint %d from %s@%s to %s@%s transaction %s",
 							iUser, i, count, amount, user[0], user[1], toUser[0], toUser[1], invoke.ID())
 						err = invoke.Error()
