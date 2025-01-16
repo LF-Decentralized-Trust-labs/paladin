@@ -268,7 +268,7 @@ var _ = Describe("pente - parallelism on a single contract", Ordered, func() {
 							Wait(5 * time.Second)
 						testLog("[%d]:%.3d/%.3d SimpleERC20 mint %d from %s@%s to %s@%s transaction %s",
 							iUser, i, count, amount, user[0], user[1], toUser[0], toUser[1], invoke.ID())
-						err = fmt.Errorf("%w", invoke.Error())
+						err = invoke.Error()
 					}
 				}(_iUser, _user)
 			}
