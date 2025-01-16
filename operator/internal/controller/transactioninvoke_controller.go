@@ -63,8 +63,6 @@ var TransactionInvokeCRMap = CRMap[corev1alpha1.TransactionInvoke, *corev1alpha1
 func (r *TransactionInvokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// TODO: Add an admission webhook to make the contract deps, bytecode and ABIs immutable
-
 	// Fetch the TransactionInvoke instance
 	var txi corev1alpha1.TransactionInvoke
 	if err := r.Get(ctx, req.NamespacedName, &txi); err != nil {
