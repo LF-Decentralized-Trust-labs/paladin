@@ -93,6 +93,11 @@ export interface INotoDomainReceipt {
     readLockedInputs?: IReceiptState<INotoLockedCoin>[];
     preparedLockedOutputs?: IReceiptState<INotoLockedCoin>[];
   };
+  transfers?: {
+    from?: string;
+    to?: string;
+    amount: string;
+  }[];
   lockInfo?: {
     lockId: string;
     delegate?: string;

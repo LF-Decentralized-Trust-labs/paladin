@@ -500,3 +500,163 @@ func TestHandleEventBatch_NotoUnlockBadTransactionData(t *testing.T) {
 	_, err = n.HandleEventBatch(ctx, req)
 	require.ErrorContains(t, err, "FF22047")
 }
+
+func TestReceiptTransfers(t *testing.T) {
+	n := &Noto{
+		coinSchema:       &prototk.StateSchema{Id: "coin"},
+		lockedCoinSchema: &prototk.StateSchema{Id: "lockedCoin"},
+	}
+	ctx := context.Background()
+
+	transfers, err := n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates:  []*prototk.EndorsableState{},
+		OutputStates: []*prototk.EndorsableState{},
+	})
+	require.NoError(t, err)
+	require.Len(t, transfers, 0)
+
+	owner1 := tktypes.MustEthAddress("0xbb2b99dde4ca2d4c99f149d13cd55a9edada69eb")
+	owner2 := tktypes.MustEthAddress("0x3008ee73a70cd1cc57647c7d253a48defe86dd9b")
+	owner3 := tktypes.MustEthAddress("0xea82df8cb94b9fa1a0a711d75a7f7dfdec2ef53c")
+
+	// Simple mint
+	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates: []*prototk.EndorsableState{},
+		OutputStates: []*prototk.EndorsableState{{
+			Id:       "1",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner1),
+		}},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
+		From:   nil,
+		To:     owner1,
+		Amount: tktypes.Int64ToInt256(1),
+	}}, transfers)
+
+	// Simple burn
+	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates: []*prototk.EndorsableState{{
+			Id:       "1",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner1),
+		}},
+		OutputStates: []*prototk.EndorsableState{},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
+		From:   owner1,
+		To:     nil,
+		Amount: tktypes.Int64ToInt256(1),
+	}}, transfers)
+
+	// Burn with returned remainder
+	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates: []*prototk.EndorsableState{{
+			Id:       "1",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 10,
+				"owner": "%s"
+			}`, owner1),
+		}},
+		OutputStates: []*prototk.EndorsableState{{
+			Id:       "2",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 8,
+				"owner": "%s"
+			}`, owner1),
+		}},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
+		From:   owner1,
+		To:     nil,
+		Amount: tktypes.Int64ToInt256(2),
+	}}, transfers)
+
+	// Simple transfer
+	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates: []*prototk.EndorsableState{{
+			Id:       "1",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner1),
+		}},
+		OutputStates: []*prototk.EndorsableState{{
+			Id:       "2",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner2),
+		}},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
+		From:   owner1,
+		To:     owner2,
+		Amount: tktypes.Int64ToInt256(1),
+	}}, transfers)
+
+	// Unlock to multiple recipients, with locked remainder
+	transfers, err = n.receiptTransfers(ctx, &prototk.BuildReceiptRequest{
+		InputStates: []*prototk.EndorsableState{{
+			Id:       "1",
+			SchemaId: "lockedCoin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 10,
+				"owner": "%s"
+			}`, owner1),
+		}},
+		OutputStates: []*prototk.EndorsableState{{
+			Id:       "2",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner2),
+		}, {
+			Id:       "3",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner3),
+		}, {
+			Id:       "4",
+			SchemaId: "coin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 1,
+				"owner": "%s"
+			}`, owner3),
+		}, {
+			Id:       "5",
+			SchemaId: "lockedCoin",
+			StateDataJson: fmt.Sprintf(`{
+				"amount": 7,
+				"owner": "%s"
+			}`, owner1),
+		}},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []*types.ReceiptTransfer{{
+		From:   owner1,
+		To:     owner2,
+		Amount: tktypes.Int64ToInt256(1),
+	}, {
+		From:   owner1,
+		To:     owner3,
+		Amount: tktypes.Int64ToInt256(2),
+	}}, transfers)
+}
